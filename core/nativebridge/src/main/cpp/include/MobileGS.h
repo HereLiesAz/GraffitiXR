@@ -566,6 +566,10 @@ private:
     void tryUpdateFingerprint(const cv::Mat& grayClean,
                               const std::vector<cv::KeyPoint>* preKps = nullptr,
                               const cv::Mat* preDescs = nullptr);
+    // Area progress (see PaintGrid). Runs after tryUpdateFingerprint on a frame whose reloc succeeded.
+    void updatePaintGrid(const cv::Mat& colorFrame);
+    // Builds the grid from the registered design composite; caller holds mMutex.
+    void buildPaintGridLocked(const cv::Mat& composite, const std::vector<cv::Point2f>& featurePts);
     // Plane-guided rectification: homography (current-image <-> fingerprint-image) from the wall plane
     // and the VIO baseline between the current and fingerprint-capture views, plus the viewing
     // obliquity in degrees. False if no fingerprint view is stored or the geometry is degenerate.
@@ -640,6 +644,44 @@ private:
     // length check and corrupt the accumulator with another target's hits.
     long mArtworkGeneration = 0;
     std::atomic<float> mPaintingProgress{0.0f};
+    // Feature-count progress (fraction of design features ever confirmed), kept as its own channel
+    // now that mPaintingProgress is the area measure whenever a PaintGrid exists. -1 = not measured.
+    std::atomic<float> mFeatureProgress{-1.0f};
+
+    /**
+     * Area progress: the design split into a grid; each cell is painted when either
+     *  - enough of its SuperPoint features are confirmed on the wall, or
+     *  - its COLOUR RELATIONSHIPS say so. Design cells are clustered by colour; a cell is paint-
+     *    candidate when it no longer looks like its bare-wall peers (cells that looked alike in the
+     *    capture photo, or at first AR sighting when the photo doesn't cover it), and it looks like
+     *    the paint already confirmed for its design cluster — or, before any is, like another
+     *    changed cell of the same cluster. Hue never has to agree with the design: purple in the
+     *    picture painted yellow is fine, as long as the design's same-colour areas share a paint.
+     * Lighting shifts move a whole wall together, which a relational test ignores.
+     */
+    struct PaintGrid {
+        int cols = 0, rows = 0, k = 0;
+        std::vector<float> weight;                 // opaque fraction of the cell (0 = not design)
+        std::vector<int> cluster;                  // design colour cluster, -1 when weight == 0
+        std::vector<std::vector<int>> features;    // artwork descriptor rows inside the cell
+        std::vector<cv::Vec3f> base;               // bare-wall colour (lighting-normalised Lab)
+        std::vector<uint8_t> hasBase;              // 1 = capture photo, 2 = first AR sighting
+        std::vector<int> baseGroup;                // cluster of bare-wall colours, -1 = none yet
+        std::vector<uint8_t> painted, pending;
+        std::vector<cv::Vec3f> paintSum;           // per design cluster: learned paint colour
+        std::vector<int> paintN;
+        bool baseGroupsBuilt = false;
+    };
+    PaintGrid mGrid;
+    cv::Mat mCaptureRgb;                           // capture photo (fingerprint frame = its camera)
+    float mCaptureIntr[4] = {0,0,0,0};
+    std::vector<uint8_t> mPendingGridRestore;      // applied when a grid of matching shape is built
+public:
+    void setCaptureImage(const cv::Mat& rgb, const float* intr4);
+    std::vector<uint8_t> exportPaintGrid() const;
+    void restorePaintGrid(const std::vector<uint8_t>& blob);
+    float getFeatureProgress() const { return mFeatureProgress.load(std::memory_order_relaxed); }
+private:
     // -1 = never measured, which is NOT the same as 0.0 = measured and found nothing. Zero is a
     // legitimate reading here, so it cannot double as the "no data yet" sentinel.
     std::atomic<float> mCorroborationConfidence{kCorroborationUnmeasured};

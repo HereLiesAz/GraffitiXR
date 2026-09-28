@@ -446,6 +446,21 @@ class SlamManager @Inject constructor(
 
     fun getPaintMarkCount(): Int = nativeGetPaintMarkCount()
 
+    /**
+     * Area progress. The capture photo (display-oriented, with the intrinsics it was taken with)
+     * supplies each design cell's bare-wall colour; see MobileGS::PaintGrid.
+     */
+    fun setCaptureImage(bitmap: Bitmap, intrinsics: FloatArray) = nativeSetCaptureImage(bitmap, intrinsics)
+
+    /** Opaque per-project progress state (painted cells + learned paint colours), or null. */
+    fun exportPaintGrid(): ByteArray? = nativeExportPaintGrid()
+
+    /** Restore [exportPaintGrid] output; applied once the same design's grid exists. */
+    fun restorePaintGrid(state: ByteArray) = nativeRestorePaintGrid(state)
+
+    /** Fraction of design features confirmed on the wall (the detail channel), or -1. */
+    fun getFeatureProgress(): Float = nativeGetFeatureProgress()
+
     /** Drop the in-native wall feature map. */
     fun clearWallFeatureMap() = nativeClearWallFeatureMap()
     /** Live wall-feature-map point count — diagnostic. */
@@ -837,6 +852,10 @@ class SlamManager @Inject constructor(
     )
     private external fun nativeClearPaintMarks()
     private external fun nativeGetPaintMarkCount(): Int
+    private external fun nativeSetCaptureImage(bitmap: Bitmap, intrinsics: FloatArray)
+    private external fun nativeExportPaintGrid(): ByteArray?
+    private external fun nativeRestorePaintGrid(state: ByteArray)
+    private external fun nativeGetFeatureProgress(): Float
     private external fun nativeRestoreWallFeatureMap(
         descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,
         points3d: FloatArray, confidence: FloatArray, obsCount: IntArray,

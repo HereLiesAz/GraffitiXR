@@ -185,6 +185,9 @@ data class GraffitiProject(
     // original marks, so a return visit locks onto the paint once the marks are painted over.
     // Valid only with the fingerprint it was built against; a new target capture clears it.
     val paintMarks: WallFeatureMap? = null,
+    // Area-progress state (painted grid cells + learned paint colours), Base64 of the native blob.
+    // Tied to the fingerprint like paintMarks: a new target capture clears it.
+    val paintGrid: String? = null,
 
     // Per-host AzNavRail expansion state (host id -> expanded), so the rail restores exactly as the
     // user left it on reopen. Defaulted for back-compat with projects saved before this field

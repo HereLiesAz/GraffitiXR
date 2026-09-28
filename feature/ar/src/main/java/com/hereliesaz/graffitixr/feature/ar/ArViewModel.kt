@@ -1066,6 +1066,7 @@ class ArViewModel @Inject constructor(
     // deleted — so the delta was permanently 0 and the autosave never fired once.
     private val lastSavedMapPointCount = AtomicInteger(0)
     private val lastSavedPaintCount = AtomicInteger(0)
+    @Volatile private var lastSavedProgress = 0f
     private var autoSaveJob: kotlinx.coroutines.Job? = null
     private var loadedProjectId: String? = null
 
@@ -2088,13 +2089,19 @@ class ArViewModel @Inject constructor(
         // The teleological reference set: painted design features. Persisted so a return visit
         // relocalizes on the paint, not only on marks that may since have been painted over.
         val paint = slamManager.getPaintMarks()
-        if (map == null && paint == null) return
+        val grid = slamManager.exportPaintGrid()?.let { java.util.Base64.getEncoder().encodeToString(it) }
+        if (map == null && paint == null && grid == null) return
         projectRepository.updateProject {
             if (it.id == projectId) {
-                it.copy(wallFeatureMap = map ?: it.wallFeatureMap, paintMarks = paint ?: it.paintMarks)
+                it.copy(
+                    wallFeatureMap = map ?: it.wallFeatureMap,
+                    paintMarks = paint ?: it.paintMarks,
+                    paintGrid = grid ?: it.paintGrid,
+                )
             } else it
         }
         paint?.let { lastSavedPaintCount.set(it.pointCount) }
+        lastSavedProgress = slamManager.getPaintingProgress()
     }
 
     private fun saveWallFeatureMap() {
@@ -2617,6 +2624,23 @@ class ArViewModel @Inject constructor(
                 slamManager.clearPaintMarks()
                 lastSavedPaintCount.set(0)
             }
+            // Area progress: its saved state, and the capture photo that supplies bare-wall colours.
+            // Same condition as the paint marks — both are only meaningful in this fingerprint frame.
+            if (fp != null && !legacyFrame) {
+                project.paintGrid?.let { encoded ->
+                    runCatching { java.util.Base64.getDecoder().decode(encoded) }.getOrNull()
+                        ?.let { slamManager.restorePaintGrid(it) }
+                }
+                val photo = project.targetImageUris.lastOrNull()
+                val intr = project.fingerprintIntrinsics
+                if (photo != null && intr.size == 4) {
+                    val bmp = runCatching {
+                        com.hereliesaz.graffitixr.common.util.ImageUtils.loadBitmapAsync(appContext, photo)
+                    }.getOrNull()
+                    if (bmp != null) slamManager.setCaptureImage(bmp, intr.toFloatArray())
+                }
+            }
+            lastSavedProgress = 0f
         }
     }
 
@@ -2644,8 +2668,10 @@ class ArViewModel @Inject constructor(
                 // between lost everything scanned since.
                 val current = renderer?.mappedPointCount ?: 0
                 val paint = slamManager.getPaintMarkCount()
+                val progress = slamManager.getPaintingProgress()
                 if ((current > 0 && current - lastSavedMapPointCount.get() >= AUTOSAVE_POINT_DELTA) ||
-                    paint - lastSavedPaintCount.get() >= AUTOSAVE_PAINT_DELTA
+                    paint - lastSavedPaintCount.get() >= AUTOSAVE_PAINT_DELTA ||
+                    progress - lastSavedProgress >= AUTOSAVE_PROGRESS_DELTA
                 ) {
                     saveMapNow()
                 }
@@ -3334,6 +3360,9 @@ class ArViewModel @Inject constructor(
 
         /** New painted-design reference marks since the last save that trigger an autosave. */
         const val AUTOSAVE_PAINT_DELTA = 20
+
+        /** Area-progress gain since the last save that triggers an autosave. */
+        const val AUTOSAVE_PROGRESS_DELTA = 0.02f
 
         /**
          * Fixed RANSAC seed for eval runs (`IMPLEMENTATION.md` 6a.4, `EVALUATION.md` §3.1).

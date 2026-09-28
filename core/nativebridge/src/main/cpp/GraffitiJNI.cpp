@@ -1186,6 +1186,56 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArtworkFingerpr
     }
 }
 
+// Area progress: the capture photo supplies bare-wall colours (MobileGS::PaintGrid).
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetCaptureImage(
+        JNIEnv* env, jobject thiz, jobject bitmap, jfloatArray intrArray) {
+    if (!bitmap || !intrArray || env->GetArrayLength(intrArray) < 4) return;
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return;
+    cv::Mat img;
+    bitmapToMat(env, bitmap, img);
+    if (img.empty()) return;
+    float intr[4];
+    env->GetFloatArrayRegion(intrArray, 0, 4, intr);
+    try {
+        gSlamEngine->setCaptureImage(img, intr);
+    } catch (const std::exception& e) {
+        LOGE("nativeSetCaptureImage: exception: %s", e.what());
+    } catch (...) {
+        LOGE("nativeSetCaptureImage: unknown exception");
+    }
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportPaintGrid(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return nullptr;
+    std::vector<uint8_t> blob = gSlamEngine->exportPaintGrid();
+    if (blob.empty()) return nullptr;
+    jbyteArray out = env->NewByteArray((jsize)blob.size());
+    if (!out) return nullptr;
+    env->SetByteArrayRegion(out, 0, (jsize)blob.size(), reinterpret_cast<const jbyte*>(blob.data()));
+    return out;
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestorePaintGrid(JNIEnv* env, jobject thiz, jbyteArray data) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine || !data) return;
+    const jsize len = env->GetArrayLength(data);
+    if (len < 12 || len > (1 << 20)) return;
+    std::vector<uint8_t> blob((size_t)len);
+    env->GetByteArrayRegion(data, 0, len, reinterpret_cast<jbyte*>(blob.data()));
+    gSlamEngine->restorePaintGrid(blob);
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFeatureProgress(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    return gSlamEngine ? gSlamEngine->getFeatureProgress() : -1.0f;
+}
+
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
         JNIEnv* env, jobject thiz, jobject bitmap) {
