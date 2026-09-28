@@ -133,6 +133,9 @@
 
     <string name="nav_export">エクスポート</string>
 
+
+    <string name="nav_share_wall">壁を共有</string>
+
     <string name="nav_export_info">すべての表示レイヤーを統合した画像をフォトギャラリーにエクスポートします。</string>
 
 

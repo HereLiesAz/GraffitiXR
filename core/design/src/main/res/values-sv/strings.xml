@@ -133,6 +133,9 @@
 
     <string name="nav_export">Exportera</string>
 
+
+    <string name="nav_share_wall">Dela vägg</string>
+
     <string name="nav_export_info">Exportera en platt sammanslagen bild av alla synliga lager till ditt fotogalleri.</string>
 
 

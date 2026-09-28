@@ -132,6 +132,7 @@
 
     <!-- Action label to export the final image. -->
     <string name="nav_export">Export</string>
+    <string name="nav_share_wall">Wand teilen</string>
     <!-- Description of the Export action, explaining it merges layers into one image. -->
     <string name="nav_export_info">Exportieren Sie ein flaches, zusammengeführtes Bild aller sichtbaren Ebenen in Ihre Fotogalerie.</string>
 

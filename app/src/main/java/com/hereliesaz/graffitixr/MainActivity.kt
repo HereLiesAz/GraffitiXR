@@ -428,6 +428,18 @@ class MainActivity : ComponentActivity() {
 
 
                 val editorUiState by editorViewModel.uiState.collectAsState()
+                // Share Wall: EditorViewModel.shareProject() writes the .gxr and publishes a content URI;
+                // hand it to the system share sheet once, then clear it.
+                LaunchedEffect(editorUiState.shareProjectUri) {
+                    val uri = editorUiState.shareProjectUri ?: return@LaunchedEffect
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = "application/octet-stream"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    startActivity(Intent.createChooser(send, null))
+                    editorViewModel.onShareProjectUriConsumed()
+                }
                 val railExpansion by editorViewModel.railExpansion.collectAsState()
                 val mainUiState by mainViewModel.uiState.collectAsState()
                 val arUiState by arViewModel.uiState.collectAsState()
@@ -556,20 +568,17 @@ class MainActivity : ComponentActivity() {
                     // timeout would otherwise sleep the screen and pause ARCore mid-mural, repeatedly.
                     // No brightness override here (unlike touch-locked TRACE below): AR just needs to
                     // stay awake, not stay bright.
-                    val keepAwake = mainUiState.isTouchLocked || editorUiState.editorMode == EditorMode.AR
-                    if (mainUiState.isTouchLocked) {
-                        // Keep the screen on in every mode while locked, but force MAX brightness only
-                        // where it's functionally needed — the TRACE lightbox. Other modes keep system
-                        // brightness (AR touch-lock at max brightness was pure waste). Even in TRACE,
-                        // cap brightness once battery is low.
-                        params.screenBrightness = when {
-                            editorUiState.editorMode != EditorMode.TRACE ->
-                                WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-                            arUiState.batteryTier >= 2 -> 0.85f
-                            else -> 1.0f
-                        }
-                    } else {
-                        params.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                    // TRACE is a lightbox (README): screen on and brightness up for the whole mode, not
+                    // only while touch-locked — tracing unlocked used to time out at system brightness.
+                    val isTrace = editorUiState.editorMode == EditorMode.TRACE
+                    val keepAwake = mainUiState.isTouchLocked || isTrace || editorUiState.editorMode == EditorMode.AR
+                    // Force MAX brightness only where it's functionally needed — the TRACE lightbox.
+                    // Other modes keep system brightness (AR touch-lock at max brightness was pure
+                    // waste). Even in TRACE, cap brightness once battery is low.
+                    params.screenBrightness = when {
+                        !isTrace -> WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                        arUiState.batteryTier >= 2 -> 0.85f
+                        else -> 1.0f
                     }
                     window.attributes = params
                     if (keepAwake) {
@@ -2134,6 +2143,7 @@ class MainActivity : ComponentActivity() {
                 // asynchronous captures). This handler just tells the caller "user pressed Export".
                 onExportRequested()
             })
+            azRailSubItem(id = "proj.share", hostId = "host.project", text = navStrings.shareWall, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { editorViewModel.shareProject() })
             azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true } })
             azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { showSettings = true })
 
