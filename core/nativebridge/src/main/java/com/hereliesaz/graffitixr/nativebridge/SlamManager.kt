@@ -414,6 +414,38 @@ class SlamManager @Inject constructor(
             map.points3d, map.confidence, map.obsCount, map.anchor, map.intrinsics,
         )
     }
+    /**
+     * Teleological reference set: design features the wall has confirmed as painted, in the
+     * fingerprint frame. Matched by relocalization alongside the original marks, so tracking holds
+     * as they get painted over. Returned as a [WallFeatureMap] (points + descriptors only) for
+     * project persistence, or null when empty. Blob: [rows, cols, type][rows*3 floats][descriptors].
+     */
+    fun getPaintMarks(): WallFeatureMap? {
+        val blob = nativeExportPaintMarks() ?: return null
+        if (blob.size < 12) return null
+        val bb = ByteBuffer.wrap(blob).order(ByteOrder.nativeOrder())
+        val rows = bb.int; val cols = bb.int; val type = bb.int
+        if (rows <= 0 || cols <= 0 || blob.size < 12 + rows * 12) return null
+        return try {
+            val points = FloatArray(rows * 3) { bb.float }
+            val desc = ByteArray(blob.size - bb.position()).also { bb.get(it) }
+            WallFeatureMap(points3d = points, descriptorsData = desc, descriptorsRows = rows,
+                descriptorsCols = cols, descriptorsType = type)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** Restore a persisted [getPaintMarks] set. Must follow the fingerprint restore it belongs to. */
+    fun restorePaintMarks(map: WallFeatureMap) = nativeRestorePaintMarks(
+        map.descriptorsData, map.descriptorsRows, map.descriptorsCols, map.descriptorsType, map.points3d,
+    )
+
+    /** Drop the paint set — required whenever the fingerprint FRAME changes (a new capture). */
+    fun clearPaintMarks() = nativeClearPaintMarks()
+
+    fun getPaintMarkCount(): Int = nativeGetPaintMarkCount()
+
     /** Drop the in-native wall feature map. */
     fun clearWallFeatureMap() = nativeClearWallFeatureMap()
     /** Live wall-feature-map point count — diagnostic. */
@@ -799,6 +831,12 @@ class SlamManager @Inject constructor(
         points3d: FloatArray, anchorMatrix: FloatArray, intrinsics: FloatArray,
         viewMatrix: FloatArray, regions: ByteArray
     )
+    private external fun nativeExportPaintMarks(): ByteArray?
+    private external fun nativeRestorePaintMarks(
+        descriptorsData: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray
+    )
+    private external fun nativeClearPaintMarks()
+    private external fun nativeGetPaintMarkCount(): Int
     private external fun nativeRestoreWallFeatureMap(
         descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,
         points3d: FloatArray, confidence: FloatArray, obsCount: IntArray,

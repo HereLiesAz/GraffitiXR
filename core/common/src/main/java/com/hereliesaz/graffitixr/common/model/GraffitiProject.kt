@@ -180,6 +180,11 @@ data class GraffitiProject(
     // lean spatial backbone for wide-area relocalization (see docs/RELOC_MAP_DESIGN.md). Null on
     // projects without one; built passively during normal use. Defaulted for back-compat.
     val wallFeatureMap: WallFeatureMap? = null,
+    // Teleological reference set: design features the wall has confirmed as painted, in the
+    // fingerprint frame (points + descriptors only). Relocalization matches these alongside the
+    // original marks, so a return visit locks onto the paint once the marks are painted over.
+    // Valid only with the fingerprint it was built against; a new target capture clears it.
+    val paintMarks: WallFeatureMap? = null,
 
     // Per-host AzNavRail expansion state (host id -> expanded), so the rail restores exactly as the
     // user left it on reopen. Defaulted for back-compat with projects saved before this field

@@ -272,6 +272,8 @@ class MainViewModel @Inject constructor(
             projectRepository.updateProject { current ->
                 current.copy(
                     fingerprint = fp.copy(patchData = patch),
+                    // New capture = new fingerprint frame; paint placed in the old one is invalid.
+                    paintMarks = null,
                     // This path records no co-registration. Clear any left by an earlier single
                     // capture: reload would otherwise pair these new points with the old capture's
                     // anchor, intrinsics and view, and relocalize against geometry that doesn't match.
@@ -441,6 +443,8 @@ class MainViewModel @Inject constructor(
             projectRepository.updateProject { current ->
                 current.copy(
                     fingerprint = fp.copy(patchData = patch),
+                    // New capture = new fingerprint frame; paint placed in the old one is invalid.
+                    paintMarks = null,
                     // Persist the capture's intrinsics + anchor + view — the exact values just fed to
                     // restoreWallFingerprintMetric — so reload relocalizes with the true intrinsics
                     // and keeps the plane-guided rectification that the capture session had.

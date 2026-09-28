@@ -1065,6 +1065,7 @@ class ArViewModel @Inject constructor(
     // slamManager.getSplatCount(), which has been a hardcoded 0 since the voxel/splat map was
     // deleted — so the delta was permanently 0 and the autosave never fired once.
     private val lastSavedMapPointCount = AtomicInteger(0)
+    private val lastSavedPaintCount = AtomicInteger(0)
     private var autoSaveJob: kotlinx.coroutines.Job? = null
     private var loadedProjectId: String? = null
 
@@ -2083,11 +2084,17 @@ class ArViewModel @Inject constructor(
     suspend fun saveProjectWallMap() {
         val projectId = loadedProjectId ?: return
         if (projectRepository.currentProject.value?.id != projectId) return
-        val map = slamManager.getWallFeatureMap() ?: return
-        if (map.pointCount <= 0) return
+        val map = slamManager.getWallFeatureMap()?.takeIf { it.pointCount > 0 }
+        // The teleological reference set: painted design features. Persisted so a return visit
+        // relocalizes on the paint, not only on marks that may since have been painted over.
+        val paint = slamManager.getPaintMarks()
+        if (map == null && paint == null) return
         projectRepository.updateProject {
-            if (it.id == projectId) it.copy(wallFeatureMap = map) else it
+            if (it.id == projectId) {
+                it.copy(wallFeatureMap = map ?: it.wallFeatureMap, paintMarks = paint ?: it.paintMarks)
+            } else it
         }
+        paint?.let { lastSavedPaintCount.set(it.pointCount) }
     }
 
     private fun saveWallFeatureMap() {
@@ -2599,6 +2606,17 @@ class ArViewModel @Inject constructor(
                 // No map on this project: clear any map left in native from a previously loaded project.
                 slamManager.clearWallFeatureMap()
             }
+            // Painted-design reference marks live in the fingerprint frame, so they are restored
+            // only beside the fingerprint they were placed in — and cleared otherwise, so another
+            // project's paint never leaks into this one's relocalization.
+            val paint = project.paintMarks
+            if (fp != null && !legacyFrame && paint != null && paint.pointCount > 0) {
+                slamManager.restorePaintMarks(paint)
+                lastSavedPaintCount.set(paint.pointCount)
+            } else {
+                slamManager.clearPaintMarks()
+                lastSavedPaintCount.set(0)
+            }
         }
     }
 
@@ -2625,7 +2643,10 @@ class ArViewModel @Inject constructor(
                 // only by the explicit saves on AR exit and app background. A crash or a kill in
                 // between lost everything scanned since.
                 val current = renderer?.mappedPointCount ?: 0
-                if (current > 0 && current - lastSavedMapPointCount.get() >= AUTOSAVE_POINT_DELTA) {
+                val paint = slamManager.getPaintMarkCount()
+                if ((current > 0 && current - lastSavedMapPointCount.get() >= AUTOSAVE_POINT_DELTA) ||
+                    paint - lastSavedPaintCount.get() >= AUTOSAVE_PAINT_DELTA
+                ) {
                     saveMapNow()
                 }
             }
@@ -3310,6 +3331,9 @@ class ArViewModel @Inject constructor(
          * roughly a few seconds of active scanning, so at most that much work is at risk.
          */
         const val AUTOSAVE_POINT_DELTA = 500
+
+        /** New painted-design reference marks since the last save that trigger an autosave. */
+        const val AUTOSAVE_PAINT_DELTA = 20
 
         /**
          * Fixed RANSAC seed for eval runs (`IMPLEMENTATION.md` 6a.4, `EVALUATION.md` §3.1).

@@ -539,6 +539,33 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
         mLastRelocReject.store(baseDescs.empty() ? kRelocNoFeatures : kRelocFewMatches,
                                std::memory_order_relaxed);
     }
+    // Teleological reference set: painted design features (see kMaxPaintMarks). Matched on the plain
+    // pass only, with the same ratio test; unlike the backbone they are never partition-filtered,
+    // because they ARE the artwork — they only exist once the wall has confirmed them.
+    {
+        cv::Mat paintDescs; std::vector<cv::Point3f> paintPts;
+        {
+            std::lock_guard<std::mutex> lock(mMutex);
+            paintDescs = mPaintDescriptors.clone();
+            paintPts = mPaintPoints3D;
+        }
+        if (!paintDescs.empty() && !baseDescs.empty() && paintDescs.type() == baseDescs.type() &&
+            paintDescs.cols == baseDescs.cols && (size_t)paintDescs.rows == paintPts.size()) {
+            cv::Ptr<cv::DescriptorMatcher>& matcher = (baseDescs.type() == CV_32F) ? mL2Matcher : mMatcher;
+            std::vector<std::vector<cv::DMatch>> pm;
+            matcher->knnMatch(baseDescs, paintDescs, pm, 2);
+            std::vector<uint8_t> seen(paintPts.size(), 0);
+            for (auto& m : pm) {
+                if (m.size() < 2 || !(m[0].distance < kRelocLoweRatio * m[1].distance)) continue;
+                if (seen[m[0].trainIdx]) continue;
+                seen[m[0].trainIdx] = 1;
+                imgPts.push_back(baseKps[m[0].queryIdx].pt);
+                objPts.push_back(paintPts[m[0].trainIdx]);
+                corrFromBackbone.push_back(0);
+            }
+        }
+    }
+
     if (imgPts.size() >= 8) {
         cv::Mat rvec, tvec;
         std::vector<int> inliers;
@@ -1120,10 +1147,32 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         if (mArtworkGeneration == artGeneration &&
             mArtworkCorroborated.size() == (size_t)artDescs.rows) {
             everCorroborated = 0;
+            if (mArtworkPromoted.size() != (size_t)artDescs.rows) mArtworkPromoted.assign(artDescs.rows, 0);
+            const bool canPromote = mPaintDescriptors.empty() ||
+                (mPaintDescriptors.type() == artDescs.type() && mPaintDescriptors.cols == artDescs.cols);
+            const glm::mat4 fpFromDesignM = glm::make_mat4(fpFromDesign);
             for (int a = 0; a < artDescs.rows; ++a) {
                 uint8_t& c = mArtworkCorroborated[(size_t)a];
                 if (hit[a] && c < kCorrobConfirmations) ++c;
                 if (c >= kCorrobConfirmations) ++everCorroborated;
+                // Teleological promotion: a confirmed design feature is paint on the wall, at the
+                // place the design put it. It joins the reloc reference set (see kMaxPaintMarks).
+                if (c >= kCorrobConfirmations && !mArtworkPromoted[(size_t)a] && canPromote &&
+                    mPaintPoints3D.size() < kMaxPaintMarks) {
+                    const cv::Point2f& ap = artPts2d[(size_t)a];
+                    const float lx = designHalfW * (2.0f * ap.x / (float)artImgW - 1.0f);
+                    const float ly = designHalfH * (1.0f - 2.0f * ap.y / (float)artImgH);
+                    const glm::vec4 X = fpFromDesignM * glm::vec4(lx, ly, 0.0f, 1.0f);
+                    bool dup = false;   // re-registered artwork re-confirms the same paint
+                    for (const auto& q : mPaintPoints3D)
+                        if (std::abs(q.x - X.x) < 0.005f && std::abs(q.y - X.y) < 0.005f &&
+                            std::abs(q.z - X.z) < 0.005f) { dup = true; break; }
+                    if (!dup && std::isfinite(X.x) && std::isfinite(X.y) && std::isfinite(X.z)) {
+                        mPaintPoints3D.emplace_back(X.x, X.y, X.z);
+                        mPaintDescriptors.push_back(artDescs.row(a));
+                    }
+                    mArtworkPromoted[(size_t)a] = 1;
+                }
             }
         }
     }
@@ -1458,6 +1507,9 @@ void MobileGS::clearWallFingerprint() {
     mArtworkKeypoints3D.clear();
     mArtworkKeypoints2D.clear();
     mArtworkCorroborated.clear();
+    mArtworkPromoted.clear();
+    mPaintDescriptors.release();
+    mPaintPoints3D.clear();
     ++mArtworkGeneration;
     mArtworkImageW = 0;
     mArtworkImageH = 0;
@@ -1610,6 +1662,9 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
     {
         std::lock_guard<std::mutex> lock(mMutex);
         mWallKeypoints3D = std::move(points3d);
+        // A peer's fingerprint is a different frame; local paint marks do not transfer.
+        mPaintDescriptors.release();
+        mPaintPoints3D.clear();
         mWallDescriptors = descs.clone();
         // A peer's fingerprint carries no partition, and the local one indexes a different point
         // set. Empty = all backbone, i.e. pre-Phase-2 behaviour, which is the right default for a
@@ -1813,6 +1868,7 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
         mArtworkImageH = gray.rows;
         // A new design means nothing corroborated so far corroborates THIS one.
         mArtworkCorroborated.assign((size_t)mArtworkDescriptors.rows, 0);
+        mArtworkPromoted.assign((size_t)mArtworkDescriptors.rows, 0);
         ++mArtworkGeneration;
         mCorrobPredicted.store(-1, std::memory_order_relaxed);
         mCorrobMatched.store(-1, std::memory_order_relaxed);
@@ -2029,6 +2085,9 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
     {
         std::lock_guard<std::mutex> lock(mMutex);
         mWallDescriptors  = fd.descriptors.clone();
+        // New capture = new fingerprint frame; paint placed in the old one is meaningless here.
+        mPaintDescriptors.release();
+        mPaintPoints3D.clear();
         mWallKeypoints3D  = std::move(pts3d);
         // The depth path supplies no partition. Clearing rather than leaving the previous
         // fingerprint's is not optional: those bytes index a point set that no longer exists.
@@ -2073,6 +2132,45 @@ void MobileGS::setStageEnabled(int stage, bool enabled) {
     // no-op quiet, log it so a caller relying on this to change cost finds out immediately.
     LOGE("setStageEnabled(stage=%d, enabled=%d) is a no-op: no stage's work is gated by this flag.",
          stage, enabled ? 1 : 0);
+}
+
+std::vector<uint8_t> MobileGS::exportPaintMarks() const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    std::vector<uint8_t> out;
+    const int rows = mPaintDescriptors.rows;
+    if (rows <= 0 || (size_t)rows != mPaintPoints3D.size() || !mPaintDescriptors.isContinuous()) return out;
+    const int32_t hdr[3] = {rows, mPaintDescriptors.cols, mPaintDescriptors.type()};
+    const size_t descBytes = mPaintDescriptors.total() * mPaintDescriptors.elemSize();
+    out.resize(sizeof(hdr) + (size_t)rows * 3 * sizeof(float) + descBytes);
+    uint8_t* p = out.data();
+    memcpy(p, hdr, sizeof(hdr)); p += sizeof(hdr);
+    for (const auto& X : mPaintPoints3D) {
+        const float xyz[3] = {X.x, X.y, X.z};
+        memcpy(p, xyz, sizeof(xyz)); p += sizeof(xyz);
+    }
+    memcpy(p, mPaintDescriptors.data, descBytes);
+    return out;
+}
+
+void MobileGS::restorePaintMarks(const cv::Mat& descs, const std::vector<cv::Point3f>& pts) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (descs.rows != (int)pts.size()) { mPaintDescriptors.release(); mPaintPoints3D.clear(); return; }
+    mPaintDescriptors = descs.clone();
+    mPaintPoints3D = pts;
+    // Current artwork rows must be re-confirmed before being promoted again (dedup by generation).
+    mArtworkPromoted.clear();
+}
+
+void MobileGS::clearPaintMarks() {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mPaintDescriptors.release();
+    mPaintPoints3D.clear();
+    mArtworkPromoted.clear();
+}
+
+int MobileGS::getPaintMarkCount() const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    return (int)mPaintPoints3D.size();
 }
 
 void MobileGS::getRelocResult(float* out, bool withSolveView) const {
