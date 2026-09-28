@@ -315,7 +315,7 @@
 
     <string name="scanning_dots">正在扫描…</string>
 
-    <string name="matched_percent">%1$d%% 已匹配</string>
+    <string name="matched_percent">%1$d%% 已绘制</string>
 
     <string name="anchor_locked">锚点已锁定</string>
 

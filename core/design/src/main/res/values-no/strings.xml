@@ -308,7 +308,7 @@
     <!-- Label shown when scanning for relocation. -->
     <string name="scanning_dots">Skanner …</string>
     <!-- Progress label for relocation tracking. -->
-    <string name="matched_percent">%1$d%% samsvarte</string>
+    <string name="matched_percent">%1$d%% malt</string>
     <!-- Message shown when the AR anchor is successfully locked. -->
     <string name="anchor_locked">Anker låst</string>
 

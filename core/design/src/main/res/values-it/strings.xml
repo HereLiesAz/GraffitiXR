@@ -308,7 +308,7 @@
     <!-- Label shown when scanning for relocation. -->
     <string name="scanning_dots">Scansione…</string>
     <!-- Progress label for relocation tracking. -->
-    <string name="matched_percent">%1$d%% corrispondente</string>
+    <string name="matched_percent">%1$d%% dipinto</string>
     <!-- Message shown when the AR anchor is successfully locked. -->
     <string name="anchor_locked">Ancora bloccata</string>
 

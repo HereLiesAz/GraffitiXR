@@ -315,7 +315,7 @@
 
     <string name="scanning_dots">スキャン中…</string>
 
-    <string name="matched_percent">%1$d%% マッチ</string>
+    <string name="matched_percent">%1$d%% 塗装済み</string>
 
     <string name="anchor_locked">アンカーがロックされました</string>
 

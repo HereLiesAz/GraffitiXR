@@ -308,7 +308,7 @@
 
     <string name="scanning_dots">Сканирование\u2026</string>
 
-    <string name="matched_percent">%1$d%% соответствует</string>
+    <string name="matched_percent">%1$d%% закрашено</string>
 
     <string name="anchor_locked">Якорь заблокирован</string>
 

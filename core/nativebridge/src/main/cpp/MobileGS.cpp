@@ -478,9 +478,8 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
         if (mDistortionHead.run(crop, wallPatch, dist)) {
             const float matchability = dist[11], coverage = dist[12];
             if (matchability > 0.5f) {
-                // A trusted look at the wall: it measures BOTH channels, and they are different
-                // quantities. Coverage says how much of the design is realized (progress);
-                // matchability says how much to trust this frame (confidence).
+                // A trusted look at the wall. Matchability says how much to trust this frame
+                // (confidence) and is published. Coverage is not progress (see below).
                 //
                 // Clamped and finiteness-checked: these are raw ONNX outputs with no contract
                 // enforcing [0,1] or excluding NaN/Inf (unlike the neighboring count-ratio
@@ -490,7 +489,12 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
                 // readouts unclamped.
                 float clampedCoverage = std::isfinite(coverage) ? std::clamp(coverage, 0.0f, 1.0f) : 0.0f;
                 float clampedMatchability = std::isfinite(matchability) ? std::clamp(matchability, 0.0f, 1.0f) : 0.0f;
-                mPaintingProgress.store(clampedCoverage, std::memory_order_relaxed);
+                // Coverage is NOT published as progress. By the head's own training label
+                // (docs/DISTORTION_HEAD.md) it is the visible fraction of the capture patch — the
+                // original marks — which FALLS as they are painted over: an unpainted wall read
+                // ~100% and progress ran backwards. Progress comes from the corroboration ratio in
+                // tryUpdateFingerprint regardless of whether the head is loaded.
+                (void)clampedCoverage;
                 mCorroborationConfidence.store(clampedMatchability, std::memory_order_relaxed);
             } else {
                 // The head looked and did not recognize the wall. That is a statement about THIS
@@ -1142,7 +1146,9 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     // stable across frames while a lock is not, so keying on the lock would flip progress between
     // two different measurements every time the artist looked away and back — two definitions
     // alternating in one readout is worse than either alone.
-    if (!mDistortionHead.isLoaded()) {
+    // Progress is published whether or not the distortion head is loaded (see runRelocPass for why the
+    // head's coverage is not progress). Only the confidence channel below defers to the head.
+    {
         if (havePlacement) {
             // Phase 4 is active for this project. A tick with no lock publishes nothing and leaves
             // the last value standing, because the alternative is replacing a cumulative reading
@@ -1157,7 +1163,8 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
             mPaintingProgress.store((float)matched / (float)artDescs.rows,
                                     std::memory_order_relaxed);
         }
-
+    }
+    if (!mDistortionHead.isLoaded()) {
         if (gated) {
             // 4.8: zero predicted-visible is "the artist is not looking at the design", NOT "the
             // wall does not corroborate it". Publishing 0.0 would be a measurement never taken.

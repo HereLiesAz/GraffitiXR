@@ -308,7 +308,7 @@
 
     <string name="scanning_dots">掃描\u2026</string>
 
-    <string name="matched_percent">%1$d%% 匹配</string>
+    <string name="matched_percent">%1$d%% 已繪製</string>
 
     <string name="anchor_locked">錨已鎖定</string>
 
