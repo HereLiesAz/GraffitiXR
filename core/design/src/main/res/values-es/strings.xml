@@ -82,6 +82,7 @@
 
     <!-- Label for the color inversion tool. -->
     <string name="nav_invert">Invertir</string>
+    <string name="nav_blend">Fusión</string>
     <!-- Description of the Invert tool, explaining its use for stencil and overlay analysis. -->
     <string name="nav_invert_info">Crea un negativo de la capa actual. Los negros se vuelven blancos y los colores cambian a sus opuestos — útil para el análisis de plantillas y superposiciones.</string>
 

@@ -82,6 +82,7 @@
 
     <!-- Label for the color inversion tool. -->
     <string name="nav_invert">Inverti</string>
+    <string name="nav_blend">Fusione</string>
     <!-- Description of the Invert tool, explaining its use for stencil and overlay analysis. -->
     <string name="nav_invert_info">Crea un negativo del livello corrente. I neri diventano bianchi e i colori vengono capovolti nei loro opposti — utile per l\'analisi di stencil e sovrapposizioni.</string>
 

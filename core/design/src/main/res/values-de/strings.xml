@@ -82,6 +82,7 @@
 
     <!-- Label for the color inversion tool. -->
     <string name="nav_invert">Umkehren</string>
+    <string name="nav_blend">Mischmodus</string>
     <!-- Description of the Invert tool, explaining its use for stencil and overlay analysis. -->
     <string name="nav_invert_info">Erstellen Sie ein Negativ der aktuellen Ebene. Schwarztöne werden weiß und Farben werden in ihre Gegensätze umgewandelt – nützlich für die Schablonen- und Overlay-Analyse.</string>
 

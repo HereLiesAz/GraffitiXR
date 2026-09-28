@@ -395,6 +395,18 @@ class EditorViewModelTest {
     }
 
     @Test
+    fun `cycling blend mode steps through the list and undo restores it`() = runTest {
+        addDesign()
+        assertEquals(androidx.compose.ui.graphics.BlendMode.SrcOver, viewModel.uiState.value.design!!.blendMode)
+        viewModel.onCycleBlendMode()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(androidx.compose.ui.graphics.BlendMode.Multiply, viewModel.uiState.value.design!!.blendMode)
+        viewModel.onUndoClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(androidx.compose.ui.graphics.BlendMode.SrcOver, viewModel.uiState.value.design!!.blendMode)
+    }
+
+    @Test
     fun `undo and redo on empty stacks do not crash`() {
         // Fresh ViewModel has empty undo and redo stacks; neither call should throw.
         viewModel.onUndoClicked()

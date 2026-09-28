@@ -83,6 +83,9 @@
 
     <string name="nav_invert">Инвертировать</string>
 
+
+    <string name="nav_blend">Наложение</string>
+
     <string name="nav_invert_info">Создайте негатив текущего слоя. </string>
 
 

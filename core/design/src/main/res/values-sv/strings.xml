@@ -83,6 +83,9 @@
 
     <string name="nav_invert">Invertera</string>
 
+
+    <string name="nav_blend">Blandning</string>
+
     <string name="nav_invert_info">Skapa ett negativ av det aktuella lagret. Svarta blir vita och färger vänds till sina motsatser - användbart för stencil- och överlagringsanalys.</string>
 
 

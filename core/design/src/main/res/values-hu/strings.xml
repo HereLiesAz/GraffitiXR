@@ -83,6 +83,9 @@
 
     <string name="nav_invert">Invertálás</string>
 
+
+    <string name="nav_blend">Keverés</string>
+
     <string name="nav_invert_info">Hozd létre az aktuális réteg negatívját. A feketék fehérek lesznek, a színek pedig az ellentettjükre fordulnak - hasznos a sablon és a rétegzés elemzéséhez.</string>
 
 

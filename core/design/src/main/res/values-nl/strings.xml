@@ -83,6 +83,9 @@
 
     <string name="nav_invert">Omkeren</string>
 
+
+    <string name="nav_blend">Overvloeien</string>
+
     <string name="nav_invert_info">Maak een negatief van de huidige laag. Zwart wordt wit en kleuren worden omgedraaid naar hun tegenpolen – handig voor stencil- en overlay-analyse.</string>
 
 

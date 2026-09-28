@@ -83,6 +83,9 @@
 
     <string name="nav_invert">反転</string>
 
+
+    <string name="nav_blend">ブレンド</string>
+
     <string name="nav_invert_info">現在のレイヤーのネガを作成します。黒は白になり、色は反対色に反転します — ステンシルやオーバーレイの分析に便利です。</string>
 
 

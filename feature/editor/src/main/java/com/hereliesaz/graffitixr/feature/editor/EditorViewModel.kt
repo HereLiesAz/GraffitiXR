@@ -1028,6 +1028,19 @@ class EditorViewModel @Inject constructor(
 
     override fun onCycleRotationAxis() = dispatch(EditorIntent.CycleRotationAxis)
 
+    /**
+     * Cycles the design's blend mode (README: Mockup visualizes blend modes on the wall photo).
+     * A design property, like invert: it follows the design into every mode's canvas and export.
+     */
+    fun onCycleBlendMode() {
+        val design = _uiState.value.design ?: return
+        pushHistory()
+        val next = BLEND_CYCLE[(BLEND_CYCLE.indexOf(design.blendMode) + 1) % BLEND_CYCLE.size]
+        dispatch(EditorIntent.SetDesignProps(design.toLayerProps().copy(blendMode = next)))
+        saveProject()
+        emitActiveLayerProps()
+    }
+
     // ── Legibility ────────────────────────────────────────────────────────────
 
     override fun onAdjustmentStart() {
@@ -1221,3 +1234,13 @@ class EditorViewModel @Inject constructor(
     }
 
 }
+
+/** Blend modes offered by [EditorViewModel.onCycleBlendMode], Normal first. */
+private val BLEND_CYCLE = listOf(
+    androidx.compose.ui.graphics.BlendMode.SrcOver,
+    androidx.compose.ui.graphics.BlendMode.Multiply,
+    androidx.compose.ui.graphics.BlendMode.Screen,
+    androidx.compose.ui.graphics.BlendMode.Overlay,
+    androidx.compose.ui.graphics.BlendMode.Darken,
+    androidx.compose.ui.graphics.BlendMode.Lighten,
+)

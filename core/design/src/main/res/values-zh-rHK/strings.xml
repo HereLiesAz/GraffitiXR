@@ -83,6 +83,9 @@
 
     <string name="nav_invert">倒置</string>
 
+
+    <string name="nav_blend">混合</string>
+
     <string name="nav_invert_info">建立目前圖層的負片。黑色變成白色，顏色翻轉為相反的顏色 - 對於模板和疊加分析非常有用。</string>
 
 

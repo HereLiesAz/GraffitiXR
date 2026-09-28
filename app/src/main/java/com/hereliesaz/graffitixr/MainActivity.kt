@@ -1983,6 +1983,12 @@ class MainActivity : ComponentActivity() {
                 onClick = { editorViewModel.onToggleInvert() },
             )
             azRailSubItem(
+                id = "design.blend", hostId = "host.design", text = navStrings.blend,
+                color = navItemColor, classifiers = setOf("effect"),
+                shape = AzButtonShape.NONE, disabled = showLibrary,
+                onClick = { editorViewModel.onCycleBlendMode() },
+            )
+            azRailSubItem(
                 id = "design.outline", hostId = "host.design", text = navStrings.outline,
                 color = navItemColor, classifiers = setOf("toggle", "effect"),
                 shape = AzButtonShape.NONE, disabled = showLibrary,

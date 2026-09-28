@@ -82,6 +82,7 @@
 
     <!-- Label for the color inversion tool. -->
     <string name="nav_invert">Inverter</string>
+    <string name="nav_blend">Mistura</string>
     <!-- Description of the Invert tool, explaining its use for stencil and overlay analysis. -->
     <string name="nav_invert_info">Crie um negativo da camada atual. Os pretos tornam-se brancos e as cores são invertidas para seus opostos — útil para análise de estêncil e sobreposição.</string>
 

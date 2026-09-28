@@ -82,6 +82,7 @@
 
     <!-- Label for the color inversion tool. -->
     <string name="nav_invert">Inverter</string>
+    <string name="nav_blend">Blanding</string>
     <!-- Description of the Invert tool, explaining its use for stencil and overlay analysis. -->
     <string name="nav_invert_info">Lag en negativ av det gjeldende laget. Svarte blir hvite, og farger blir snudd til motsetningene sine – nyttig for sjablong- og overleggsanalyse.</string>
 
