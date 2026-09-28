@@ -330,12 +330,24 @@ class EditorViewModel @Inject constructor(
     private fun currentModeAdjustmentSnapshot(): ModeAdjustment? =
         currentSnapshotMode()?.let { _uiState.value.modeAdjustments[it] ?: ModeAdjustment() }
 
-    private fun currentCommand() =
-        EditCommand(currentDesignSnapshot(), currentSnapshotMode(), currentModeAdjustmentSnapshot())
+    override fun onUndoClicked() = applyHistory(history.popUndo { counterCommand(it) })
 
-    override fun onUndoClicked() = applyHistory(history.popUndo { currentCommand() })
+    override fun onRedoClicked() = applyHistory(history.popRedo { counterCommand(it) })
 
-    override fun onRedoClicked() = applyHistory(history.popRedo { currentCommand() })
+    /**
+     * The entry that reverses [command]: the current state of the SAME mode [command] touches, not
+     * of whichever mode is active now. Snapshotting the active mode meant an undo in one mode
+     * followed by a mode switch recorded the wrong mode's adjustment, so redo re-applied that
+     * mode's own value and never brought the undone one back.
+     */
+    private fun counterCommand(command: EditCommand): EditCommand {
+        val mode = command.oldMode
+        return EditCommand(
+            currentDesignSnapshot(),
+            mode,
+            mode?.let { _uiState.value.modeAdjustments[it] ?: ModeAdjustment() },
+        )
+    }
 
     private fun applyHistory(command: EditCommand?) {
         command ?: return
@@ -427,11 +439,11 @@ class EditorViewModel @Inject constructor(
                 val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(bitmap))
                 val localUri = "file://$path".toUri()
 
-                val metrics = context.resources.displayMetrics
-                val screenW = metrics.widthPixels.toFloat()
-                val screenH = metrics.heightPixels.toFloat()
-                // Fit the imported image to the screen so it lands somewhere usable.
-                val initialScale = minOf(screenW * 0.9f / bitmap.width, screenH * 0.9f / bitmap.height, 1.0f)
+                // Scale 1: the canvas already draws the design ContentScale.Fit inside the screen
+                // (MainScreen), and layer.scale multiplies on top of that. A pixel-based fit here
+                // shrank the design a second time, so its displayed size depended on its resolution
+                // (a 2048px photo landed at ~47% width, an 800px one at 100%).
+                val initialScale = 1f
 
                 // Replaces whatever was there: there is exactly one design, and importing is how
                 // the artist chooses it.
@@ -923,7 +935,9 @@ class EditorViewModel @Inject constructor(
         val extent = anchorHalfExtentMeters
         if (extent != null) {
             fitDesignToAnchor(extent.first, extent.second)
-        } else {
+        } else if (!dispatchModeAdjustIfInMode { it.copy(brightness = 0.1f, contrast = 1.2f, saturation = 1.1f) }) {
+            // Outside DESIGN the tone lift is a per-mode overlay like every other tone control; only
+            // in DESIGN does it edit the design itself.
             updateDesign { it.copy(brightness = 0.1f, contrast = 1.2f, saturation = 1.1f) }
         }
         saveProject()
