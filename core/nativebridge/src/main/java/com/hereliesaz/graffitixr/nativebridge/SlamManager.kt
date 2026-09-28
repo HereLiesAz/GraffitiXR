@@ -564,6 +564,9 @@ class SlamManager @Inject constructor(
      */
     fun setMappingPaused(paused: Boolean) = nativeSetMappingPaused(paused)
 
+    /** Display-oriented intrinsics of the frames fed via [feedYuvFrame]; the reloc PnP uses these. */
+    fun setLiveIntrinsics(fx: Float, fy: Float, cx: Float, cy: Float) = nativeSetLiveIntrinsics(fx, fy, cx, cy)
+
     fun updateCamera(
         viewMatrix: FloatArray,
         projectionMatrix: FloatArray,
@@ -822,6 +825,7 @@ class SlamManager @Inject constructor(
     private external fun nativeSetWallPatch(bitmap: Bitmap)
     private external fun nativeSetWallPatchBytes(data: ByteArray, size: Int)
     private external fun nativeSetMappingPaused(paused: Boolean)
+    private external fun nativeSetLiveIntrinsics(fx: Float, fy: Float, cx: Float, cy: Float)
     private external fun nativeFeedYuvFrame(
         yBuffer: ByteBuffer,
         uBuffer: ByteBuffer,

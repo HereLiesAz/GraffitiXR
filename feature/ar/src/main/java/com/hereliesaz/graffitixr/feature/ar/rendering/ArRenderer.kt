@@ -2267,6 +2267,21 @@ class ArRenderer(
                     else -> -1
                 }
 
+                // The reloc PnP's camera matrix must describe the frame it matches: this one, rotated
+                // exactly as the feed below rotates it (same convention as the capture path's
+                // rotationNeeded). Reusing the capture's intrinsics after the device turns swaps fx/fy
+                // and moves the principal point.
+                run {
+                    val dims = intrinsics.imageDimensions
+                    val live = com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation.rotateIntrinsics(
+                        intrinsics.focalLength[0], intrinsics.focalLength[1],
+                        intrinsics.principalPoint[0], intrinsics.principalPoint[1],
+                        dims[0].toFloat(), dims[1].toFloat(),
+                        (sensorOrientation - displayRotation * 90 + 360) % 360,
+                    )
+                    slamManager.setLiveIntrinsics(live[0], live[1], live[2], live[3])
+                }
+
                 try {
                     frame.acquireCameraImage().use { image ->
                         val planes = image.planes

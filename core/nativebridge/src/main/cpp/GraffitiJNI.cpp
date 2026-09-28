@@ -410,6 +410,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMappingPaused(J
 }
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetLiveIntrinsics(JNIEnv* env, jobject thiz, jfloat fx, jfloat fy, jfloat cx, jfloat cy) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    const float intr[4] = {fx, fy, cx, cy};
+    if (gSlamEngine) gSlamEngine->setLiveIntrinsics(intr);
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(
         JNIEnv* env, jobject thiz,
         jfloatArray viewMatrix, jfloatArray projMatrix,

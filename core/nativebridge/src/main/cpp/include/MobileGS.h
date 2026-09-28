@@ -497,6 +497,11 @@ public:
     // work will see a warning in logcat instead of a silently-ignored request.
     void setMappingPaused(bool paused);
 
+    // Intrinsics [fx,fy,cx,cy] of the live CPU frame in the display orientation it is fed in. The
+    // reloc PnP must use the live frame's camera matrix: reusing the capture-time intrinsics after
+    // the device rotates swaps fx/fy and offsets the principal point, biasing every solve.
+    void setLiveIntrinsics(const float* intr4);
+
     /**
      * How much of the registered design the wall now answers for: a PROGRESS measurement, on the
      * timescale of hours, roughly monotonic. For the user's progress readout.
@@ -661,6 +666,7 @@ private:
     float mFingerprintAnchorMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     // fx,fy,cx,cy the wall fingerprint's 3D points were built with; {0,..} => unset (use a default).
     float mFingerprintIntrinsics[4] = {0,0,0,0};
+    float mLiveIntrinsics[4] = {0,0,0,0}; // see setLiveIntrinsics; guarded by mMutex
     // IMPLEMENTATION.md 4.5 — the design's rigid pose in the FINGERPRINT frame plus its
     // scale-included half-extents. Guarded by mMutex like everything else here, and false until
     // Kotlin has pushed a placement: absent means the corroboration match falls back to the global

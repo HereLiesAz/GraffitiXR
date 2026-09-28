@@ -100,6 +100,11 @@ void MobileGS::initialize(int /*width*/, int /*height*/) {
     }
 }
 
+void MobileGS::setLiveIntrinsics(const float* intr4) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    memcpy(mLiveIntrinsics, intr4, 4 * sizeof(float));
+}
+
 void MobileGS::updateCamera(float* viewMat, float* projMat) {
     std::lock_guard<std::mutex> lock(mMutex);
     memcpy(mViewMatrix, viewMat, 16 * sizeof(float));
@@ -172,6 +177,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
     std::vector<uint8_t> wallRegions;
     cv::Mat wallPatch;
     float fpIntrinsics[4];
+    float liveIntrinsics[4] = {0,0,0,0};
     bool hasFpView = false;
     // Phase 2b snapshot: the persistent feature map + the last reloc pose, used (when the flag is on)
     // as the frustum-gate prior. The map is co-registered to the fingerprint anchor, so its points
@@ -188,6 +194,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
         wallPatch = mWallPatch.clone();
         memcpy(fpIntrinsics, mFingerprintIntrinsics, 4 * sizeof(float));
         hasFpView = mHasFingerprintView;
+        memcpy(liveIntrinsics, mLiveIntrinsics, 4 * sizeof(float));
         mapDescs = mMapDescriptors.clone();
         mapKps3d = mMapPoints3D;
         memcpy(mapPriorPose, mPnpCamFromFpWorld, 16 * sizeof(float));
@@ -526,8 +533,13 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
         // Camera matrix: reuse the intrinsics the fingerprint's 3D points were built with (keeps
         // the 2D<->3D correspondence consistent) when available, else a coarse default. The old
         // hardcoded init supplied only 6 of the 9 entries, leaving the bottom row uninitialised.
+        // The live frame's intrinsics win: the 3D points are metric and camera-independent, so the
+        // camera matrix must describe THIS frame, whose orientation may differ from the capture's.
         double fx = 1000.0, fy = 1000.0, cx = 960.0, cy = 540.0;
-        if (fpIntrinsics[0] > 0.0f && fpIntrinsics[1] > 0.0f) {
+        if (liveIntrinsics[0] > 0.0f && liveIntrinsics[1] > 0.0f) {
+            fx = liveIntrinsics[0]; fy = liveIntrinsics[1];
+            cx = liveIntrinsics[2]; cy = liveIntrinsics[3];
+        } else if (fpIntrinsics[0] > 0.0f && fpIntrinsics[1] > 0.0f) {
             fx = fpIntrinsics[0]; fy = fpIntrinsics[1];
             cx = fpIntrinsics[2]; cy = fpIntrinsics[3];
         }
