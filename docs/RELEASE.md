@@ -212,10 +212,15 @@ There is no `release-apk.yml` in this repository — the actual signing secrets,
 
 ### Build config (already used)
 
-`GOOGLE_SERVICES_API_KEY`, `PROJECT_ID`, `CLIENT_ID`, `ARCORE_API_KEY`,
-and `CRASH_REPORT_TOKEN` — a fine-grained token with **Issues: write on this repo only**, compiled
-into the APK for opt-in crash reports (so it is extractable; never use a broader token). See
+`GOOGLE_SERVICES_API_KEY`, `PROJECT_ID`, `CLIENT_ID`, `ARCORE_API_KEY`. See
 `android-ci.yml` / `merged-build.yml`.
+
+Crash reporting is **not** credentialed at build time. The old `CRASH_REPORT_TOKEN` build secret was
+removed: it was compiled into `BuildConfig` and shipped inside every published APK, where decompiling
+it took minutes. The credential is now a GitHub token the maintainer/tester enters in **Settings →
+Crash-report token**; it is stored only on that device (DataStore) and never in the binary. Only an
+account with **Issues: write** on `HereLiesAz/GraffitiXR` can file, so a blank token (the default)
+simply disables uploads.
 
 ---
 

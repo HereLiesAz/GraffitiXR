@@ -106,19 +106,10 @@ android {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
 
-        // Crash auto-reporting (opt-in): CrashUploadWorker files a GitHub issue with the crash log
-        // using this token, read at BUILD time from CRASH_REPORT_TOKEN (env or gradle property).
-        // Empty -> CrashUploadWorker no-ops, so local builds need nothing.
-        //
-        // SECURITY: whatever this holds ships in the APK's BuildConfig and CAN be extracted by
-        // decompiling. It is deliberately NOT GH_TOKEN (CI's write-access token): it must be a
-        // dedicated FINE-GRAINED token scoped to "Issues: write" on HereLiesAz/GraffitiXR only, so a
-        // leaked copy can at worst open issues on this repo.
-        // GitHub tokens are [A-Za-z0-9_] only (ghp_* / github_pat_*), so no string escaping is needed.
-        val crashReportToken = System.getenv("CRASH_REPORT_TOKEN")
-            ?: (project.findProperty("CRASH_REPORT_TOKEN") as String?)
-            ?: ""
-        buildConfigField("String", "CRASH_REPORT_TOKEN", "\"$crashReportToken\"")
+        // Crash auto-reporting (opt-in) is credentialed by a token the artist enters in Settings and
+        // that lives only in the app's DataStore (see SettingsRepository.crashReportToken) — NEVER
+        // compiled into the APK. The old BuildConfig.CRASH_REPORT_TOKEN baked a live GitHub credential
+        // into every published binary, where decompiling it took minutes; that whole path is gone.
     }
 
     // Release signing is a property of the project, not of each CI invocation. The keystore and

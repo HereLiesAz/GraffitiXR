@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.data.repository
 
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -63,5 +64,25 @@ class SettingsRepositoryImplTest {
         val repo = newRepository()
         repo.setCrashReportingConsent(true)
         assertTrue(repo.crashReportingConsent.first())
+    }
+
+    @Test
+    fun `crashReportToken defaults to blank when nothing has been written`() = runTest {
+        val repo = newRepository()
+        assertEquals("", repo.crashReportToken.first())
+    }
+
+    @Test
+    fun `setCrashReportToken persists the token and reads it back`() = runTest {
+        val repo = newRepository()
+        repo.setCrashReportToken("ghp_example")
+        assertEquals("ghp_example", repo.crashReportToken.first())
+    }
+
+    @Test
+    fun `setCrashReportToken trims surrounding whitespace`() = runTest {
+        val repo = newRepository()
+        repo.setCrashReportToken("  ghp_example\n")
+        assertEquals("ghp_example", repo.crashReportToken.first())
     }
 }

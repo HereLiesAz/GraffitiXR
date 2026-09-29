@@ -124,9 +124,8 @@ jobs:
         id: gradle-build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Issues-only fine-grained token baked into the APK for opt-in crash reports. Never
-          # GH_TOKEN: anything here is extractable from the shipped app.
-          CRASH_REPORT_TOKEN: ${{ secrets.CRASH_REPORT_TOKEN }}
+          # No crash-report token is injected: the crash-report credential is entered by the artist in
+          # Settings and lives only on-device, never in the APK (see SettingsRepository.crashReportToken).
           KEYSTORE_FILE: ${{ github.workspace }}/app/keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}

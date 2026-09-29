@@ -77,6 +77,8 @@ fun SettingsScreen(
     onHandednessChanged: (Boolean) -> Unit,
     crashReportingConsent: Boolean,
     onCrashReportingConsentChanged: (Boolean) -> Unit,
+    crashReportToken: String,
+    onCrashReportTokenChanged: (String) -> Unit,
     showDiagOverlay: Boolean,
     onDiagOverlayChanged: () -> Unit,
     showFeaturePoints: Boolean,
@@ -156,6 +158,49 @@ fun SettingsScreen(
     }
 
     var showLanguageDialog by remember { mutableStateOf(false) }
+    var showTokenDialog by remember { mutableStateOf(false) }
+
+    if (showTokenDialog) {
+        // Draft edited locally; only committed on Save so a half-typed token never partially
+        // overwrites the stored one. Prefilled with the current value so editing (not just replacing)
+        // works. The field masks the token like a password — it grants issue-write to the repo.
+        var draft by remember { mutableStateOf(crashReportToken) }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showTokenDialog = false },
+            title = { Text("Crash-report token") },
+            text = {
+                Column {
+                    Text(
+                        text = "A GitHub token with Issues: write on HereLiesAz/GraffitiXR. Stored " +
+                            "only on this device, never in the app. Leave blank to disable uploads.",
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    androidx.compose.material3.OutlinedTextField(
+                        value = draft,
+                        onValueChange = { draft = it },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Password
+                        ),
+                        label = { Text("Token") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                AzButton(text = strings.common.done, onClick = {
+                    onCrashReportTokenChanged(draft)
+                    showTokenDialog = false
+                })
+            },
+            dismissButton = {
+                AzButton(text = strings.common.close, onClick = { showTokenDialog = false })
+            }
+        )
+    }
 
     if (showLanguageDialog) {
         androidx.compose.material3.AlertDialog(
@@ -263,6 +308,13 @@ fun SettingsScreen(
                                 label = "Crash reports",
                                 value = if (crashReportingConsent) strings.settings.on else strings.settings.off,
                                 modifier = Modifier.clickable { onCrashReportingConsentChanged(!crashReportingConsent) }
+                            )
+                            // The credential for the upload above. Entered here, held only on-device,
+                            // never compiled into the APK. Shown as Set/Not set — never the value.
+                            SettingsItem(
+                                label = "Crash-report token",
+                                value = if (crashReportToken.isNotBlank()) "Set" else "Not set",
+                                modifier = Modifier.clickable { showTokenDialog = true }
                             )
                             SettingsItem(
                                 label = strings.settings.diagOverlay,

@@ -68,34 +68,41 @@ class GraffitiApplication : Application() {
         // + deletes them for that dialog (same startup transaction) — otherwise the async upload
         // races that delete and finds nothing. Then upload off the main thread and delete each file
         // on success. Covers both the JVM crash dump and the native (SIGSEGV/SIGABRT) backtrace. The
-        // benign isolated ":probe" native crash is intentionally NOT reported. Empty CRASH_REPORT_TOKEN
-        // (local/dev builds) -> uploadCaptured no-ops. CoroutineExceptionHandler is
-        // belt-and-suspenders: the crash-reporting path must never itself crash the app on launch.
+        // benign isolated ":probe" native crash is intentionally NOT reported. The token is the
+        // artist's own, entered in Settings and read from the repository below (NEVER compiled into
+        // the APK — a build-time token shipped a live credential inside every published binary); a
+        // blank token makes uploadCaptured no-op. CoroutineExceptionHandler is belt-and-suspenders:
+        // the crash-reporting path must never itself crash the app on launch.
         val crashUploadErrorHandler = CoroutineExceptionHandler { _, e ->
             Log.e("GraffitiApplication", "Crash upload failed at startup; ignored", e)
         }
-        val crashToken = BuildConfig.CRASH_REPORT_TOKEN
-        if (crashToken.isNotBlank()) {
-            val capturedCrashes = listOf(
-                "last_crash.txt" to "Auto-Report: App Crash",
-                "last_native_crash.txt" to "Auto-Report: Native Crash"
-            ).mapNotNull { (name, title) ->
-                runCatching {
-                    val f = java.io.File(cacheDir, name)
-                    if (f.exists()) Triple(f, title, f.readText()) else null
-                }.getOrNull()
-            }
-            if (capturedCrashes.isNotEmpty()) {
-                MainScope().launch(crashUploadErrorHandler) {
-                    if (!settingsRepository.crashReportingConsent.first()) {
-                        Log.i("GraffitiApplication", "Crash reporting not opted in; not uploading.")
-                        return@launch
-                    }
-                    val worker = CrashUploadWorker()
-                    capturedCrashes.forEach { (file, title, report) ->
-                        if (worker.uploadCaptured(crashToken, title, report)) {
-                            runCatching { file.delete() }
-                        }
+        // Capture the crash file CONTENTS now, synchronously, before MainActivity reads + deletes them
+        // for its dialog. The consent check and the token both come from the repository (async), so
+        // capture unconditionally and gate the actual upload inside the coroutine.
+        val capturedCrashes = listOf(
+            "last_crash.txt" to "Auto-Report: App Crash",
+            "last_native_crash.txt" to "Auto-Report: Native Crash"
+        ).mapNotNull { (name, title) ->
+            runCatching {
+                val f = java.io.File(cacheDir, name)
+                if (f.exists()) Triple(f, title, f.readText()) else null
+            }.getOrNull()
+        }
+        if (capturedCrashes.isNotEmpty()) {
+            MainScope().launch(crashUploadErrorHandler) {
+                if (!settingsRepository.crashReportingConsent.first()) {
+                    Log.i("GraffitiApplication", "Crash reporting not opted in; not uploading.")
+                    return@launch
+                }
+                val crashToken = settingsRepository.crashReportToken.first()
+                if (crashToken.isBlank()) {
+                    Log.i("GraffitiApplication", "No crash-report token set; not uploading.")
+                    return@launch
+                }
+                val worker = CrashUploadWorker()
+                capturedCrashes.forEach { (file, title, report) ->
+                    if (worker.uploadCaptured(crashToken, title, report)) {
+                        runCatching { file.delete() }
                     }
                 }
             }
