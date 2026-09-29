@@ -108,6 +108,14 @@ class GraffitiApplication : Application() {
             }
         }
 
+        // 1.3. Non-ARCore (artoolkitX) smoke test. Opt-in via -PposeProbe=true (default off, so this is
+        // dead-inert in normal builds). Runs the non-ARCore pose source on its own thread and logs
+        // poses (tag POSEPROBE); never touches the ARCore render path. First on-device validation of
+        // the artoolkitX integration.
+        if (BuildConfig.POSE_FORCE_PROBE) {
+            com.hereliesaz.graffitixr.feature.ar.pose.PoseSourceRegistry.probe()
+        }
+
         // 2. Update Security Provider (Fix for SSLHandshakeException)
         // Using explicit listener implementation instead of lambda for clarity/compatibility if needed
         ProviderInstaller.installIfNeededAsync(this, object : ProviderInstaller.ProviderInstallListener {
