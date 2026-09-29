@@ -38,5 +38,4 @@ A representative subset of the real, currently-exported surface (see `SlamManage
 | `feedYuvFrame(...)` | Per-frame camera feed into the reloc thread. |
 | `clearWallFingerprint()` | Drops the current fingerprint (new project / re-target). |
 
----
-*Rewritten 2026-09-04 to describe the engine actually in the tree — the previous "Persistent Voxel Memory" description (spatial hash, splat struct, `MAX_SPLATS`, `feedArCoreDepth`, `saveModel`, `draw()`) had no corresponding code anywhere in `core/nativebridge`.*
+
