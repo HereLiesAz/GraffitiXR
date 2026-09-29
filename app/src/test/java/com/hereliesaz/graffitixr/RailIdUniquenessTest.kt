@@ -28,11 +28,11 @@ class RailIdUniquenessTest {
 
     @Test
     fun `every mode registers the always-on entries exactly once`() {
-        // The navigation spine: Open, the modes host with its four mode entries, the project host
+        // The navigation spine: Open, the four top-level mode entries, the project host
         // and Help. A mode-gated tool leaking into the always-on set would show up here as a
         // registration in a mode that should not have it.
         val alwaysOn = setOf(
-            "item.open", "host.modes", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace",
+            "item.open", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace",
             "host.project", "proj.new", "proj.save", "proj.export", "proj.load", "proj.settings",
             "item.help",
         )

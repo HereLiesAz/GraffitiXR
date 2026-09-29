@@ -43,9 +43,10 @@ internal fun enumerateRailItemIdRegistrations(mode: EditorMode): List<String> {
     // Open (a sub-item of the top-level Design folder).
     ids += "item.open"
 
-    // Modes menu. Every mode's sub-host is always registered (they are the navigation entries);
-    // each mode's TOOLS are registered only while that mode is active.
-    ids += listOf("host.modes", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace")
+    // Modes. Each mode is its own top-level folder (no "host.modes" container) and is always
+    // registered (they are the navigation entries); each mode's TOOLS are registered only while
+    // that mode is active.
+    ids += listOf("mode.ar", "mode.overlay", "mode.mockup", "mode.trace")
     if (mode == EditorMode.AR) {
         ids += listOf("target.create", "mode.ar.light", "mode.ar.lock", "mode.ar.magic")
         ids += listOf("coop", "coop.host", "coop.join", "coop.leave")
@@ -98,7 +99,7 @@ internal val RAIL_ITEM_HOST_ID: Map<String, String> = mapOf(
     "design.outline" to "host.design",
     "design.isolate" to "host.design",
     "design.lock" to "host.design",
-    "mode.ar" to "host.modes",
+    // mode.ar / mode.overlay / mode.mockup / mode.trace are top-level host items (no hostId).
     "target.create" to "mode.ar",
     "mode.ar.light" to "mode.ar",
     "mode.ar.lock" to "mode.ar",
@@ -107,16 +108,13 @@ internal val RAIL_ITEM_HOST_ID: Map<String, String> = mapOf(
     "coop.host" to "coop",
     "coop.join" to "coop",
     "coop.leave" to "coop",
-    "mode.overlay" to "host.modes",
     "mode.overlay.light" to "mode.overlay",
     "mode.overlay.lock" to "mode.overlay",
-    "mode.mockup" to "host.modes",
     "mockup.wall" to "mode.mockup",
     "wall.photo" to "mockup.wall",
     "wall.file" to "mockup.wall",
     "wall.clear" to "mockup.wall",
     "mode.mockup.lock" to "mode.mockup",
-    "mode.trace" to "host.modes",
     "mode.trace.freeze" to "mode.trace",
     "mode.trace.lock" to "mode.trace",
     "proj.new" to "host.project",
