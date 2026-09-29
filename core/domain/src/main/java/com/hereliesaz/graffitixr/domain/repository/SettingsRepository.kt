@@ -88,6 +88,20 @@ interface SettingsRepository {
     suspend fun setCrashReportingConsent(on: Boolean)
 
     /**
+     * The GitHub token used to file a crash report as an issue on this project's tracker.
+     *
+     * Entered by the artist in Settings, never compiled into the APK — the old build-time
+     * `BuildConfig.CRASH_REPORT_TOKEN` shipped a live credential inside every published binary, where
+     * decompiling it took minutes. Blank by default; a blank token makes [CrashUploadWorker] no-op, so
+     * an install that never enters one uploads nothing regardless of [crashReportingConsent]. Only an
+     * account with issue-write access to HereLiesAz/GraffitiXR can actually file, so in practice this
+     * is a maintainer/tester field, not an end-user one.
+     */
+    val crashReportToken: Flow<String>
+
+    suspend fun setCrashReportToken(token: String)
+
+    /**
      * The persistent wall FEATURE MAP (`IMPLEMENTATION.md` phases 2b/3): grow it from
      * relocalization-locked frames, and match against it as a second relocalization source.
      *

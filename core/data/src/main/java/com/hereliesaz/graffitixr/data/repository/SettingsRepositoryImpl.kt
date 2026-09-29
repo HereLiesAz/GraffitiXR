@@ -42,6 +42,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val DRIFT_CORRECTION_ENABLED = booleanPreferencesKey("drift_correction_enabled")
     private val SELF_GROW_ENABLED = booleanPreferencesKey("self_grow_enabled")
     private val CRASH_REPORTING_CONSENT = booleanPreferencesKey("crash_reporting_consent")
+    private val CRASH_REPORT_TOKEN = stringPreferencesKey("crash_report_token")
     private val FEATURE_MAP_ENABLED = booleanPreferencesKey("feature_map_enabled")
     private val AUTO_FOCUS_ENABLED = booleanPreferencesKey("auto_focus_enabled")
     private val FORCED_STEREO_UNSTABLE = booleanPreferencesKey("forced_stereo_unstable")
@@ -165,6 +166,19 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setCrashReportingConsent(on: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[CRASH_REPORTING_CONSENT] = on
+        }
+    }
+
+    // Blank by default: no token ever ships in the binary, so an install that never enters one has
+    // nothing to leak and uploads nothing. Stored verbatim; trimmed on write so a pasted token with
+    // stray whitespace still authenticates.
+    override val crashReportToken: Flow<String> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[CRASH_REPORT_TOKEN] ?: "" }
+
+    override suspend fun setCrashReportToken(token: String) {
+        context.dataStore.edit { preferences ->
+            preferences[CRASH_REPORT_TOKEN] = token.trim()
         }
     }
 

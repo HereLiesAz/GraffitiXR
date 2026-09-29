@@ -22,12 +22,19 @@ class SettingsViewModel @Inject constructor(
     val crashReportingConsent: StateFlow<Boolean> = settingsRepository.crashReportingConsent
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    val crashReportToken: StateFlow<String> = settingsRepository.crashReportToken
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
     fun setLanguage(language: AppLanguage) {
         viewModelScope.launch { settingsRepository.setLanguage(language) }
     }
 
     fun setCrashReportingConsent(on: Boolean) {
         viewModelScope.launch { settingsRepository.setCrashReportingConsent(on) }
+    }
+
+    fun setCrashReportToken(token: String) {
+        viewModelScope.launch { settingsRepository.setCrashReportToken(token) }
     }
 
     fun setBackgroundColor(argb: Int) {
