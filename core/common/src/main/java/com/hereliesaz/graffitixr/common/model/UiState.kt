@@ -178,6 +178,9 @@ data class ArUiState(
     // on the wall.  0 until addLayerFeaturesToSLAM has been called (layers locked as guide).
     // Updated after every PnP relocalisation pass inside the native engine (~1–2 Hz).
     val paintingProgress: Float = 0f,
+    // Detail channel: fraction of the design's distinctive features confirmed on the wall. -1 = not
+    // measured. paintingProgress is the area measure; this is shown beside it in diagnostics.
+    val featureProgress: Float = -1f,
 
     // Guided scan phase: AMBIENT (rotate 360°) → WALL (scan the target) → COMPLETE.
     val scanPhase: ScanPhase = ScanPhase.AMBIENT,

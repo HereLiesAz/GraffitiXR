@@ -7,7 +7,12 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven { url = uri("https://jitpack.io") }
+        // JitPack builds are mutable and unsigned, so it may serve ONLY our own AzNavRail artifacts;
+        // every other dependency must come from Google or Maven Central.
+        maven {
+            url = uri("https://jitpack.io")
+            content { includeGroupByRegex("com\\.github\\.HereLiesAz(\\..*)?") }
+        }
     }
 }
 rootProject.name = "GraffitiXR"

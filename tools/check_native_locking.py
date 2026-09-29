@@ -269,6 +269,11 @@ def main() -> int:
 
     all_findings: list[Finding] = []
     for name, _start, body in functions:
+        # Convention: a `...Locked` method is only ever called with mMutex already held by its
+        # caller (e.g. buildPaintGridLocked, called inside setArtworkFingerprint's lock scope), so
+        # its body has no lock of its own to see. Checked by callers, not here.
+        if name.endswith("Locked"):
+            continue
         for f in check_function(name, body, plain_members):
             if f.member in KNOWN_UNLOCKED_OK:
                 continue

@@ -29,6 +29,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Derive CI versionCode
+        # Above every versionCode published from version.properties (14730 at the switch), and
+        # monotonic per workflow. Read by app/build.gradle.kts; version.properties is not rewritten.
+        run: echo "CI_VERSION_CODE=$((20000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+
       - name: Set up JDK 21
         uses: actions/setup-java@v6
         with:
@@ -79,6 +84,11 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Derive CI versionCode
+        # Above every versionCode published from version.properties (14730 at the switch), and
+        # monotonic per workflow. Read by app/build.gradle.kts; version.properties is not rewritten.
+        run: echo "CI_VERSION_CODE=$((20000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
 
       - name: Decode signing keystore
         env:

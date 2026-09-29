@@ -2839,6 +2839,7 @@ class ArViewModel @Inject constructor(
                 splatCount = splatCount,
                 isDepthApiSupported = isDepthApiSupported,
                 paintingProgress = progress,
+                featureProgress = slamManager.getFeatureProgress(),
                 relocDiagnostics = relocDiag,
                 corroborationDiagnostics = corrobDiag,
                 fusionDiagnostics = fusionDiag,
