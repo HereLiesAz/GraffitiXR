@@ -694,6 +694,9 @@ class ArRenderer(
     // against the wall. Owned by onDrawFrame; not safe to read from another thread.
     private val viewMatrixScratch = FloatArray(16)
     private val projMatrixScratch = FloatArray(16)
+    // The pose seam: the camera pose that drives the native SLAM map flows through this, not off the
+    // ARCore frame directly, so a non-ARCore VIO can later feed the same consumer. See PoseSource.
+    private val poseSource = com.hereliesaz.graffitixr.feature.ar.pose.ArCorePoseSource()
     private val mappingViewMatrixScratch = FloatArray(16)
     private val backboneScratch = FloatArray(16)
     // Scratch for composing the overlay matrix (anchor frame * in-plane transform).
@@ -1579,8 +1582,11 @@ class ArRenderer(
 
             val viewMatrix = viewMatrixScratch
             val projMatrix = projMatrixScratch
-            camera.getViewMatrix(viewMatrix, 0)
-            camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
+            // Pose seam: fill view/proj through the PoseSource rather than off the camera directly.
+            // ArCorePoseSource makes the identical getViewMatrix/getProjectionMatrix calls, so values
+            // are unchanged; the indirection is what lets a future non-ARCore VIO feed the same map.
+            poseSource.bind(frame)
+            val poseMeta = poseSource.sample(viewMatrix, projMatrix, 0.1f, 100.0f)
 
             // mappingViewMatrix is NOT what ARCore's own getViewMatrix() returns above — it's built
             // from camera.pose.inverse() so its translation is expressed in the "mapping" convention
@@ -1593,7 +1599,9 @@ class ArRenderer(
             val intrinsics = camera.imageIntrinsics
 
             lastStep = "slamCamera"
-            val isTracking = camera.trackingState == TrackingState.TRACKING
+            // Via the seam; identical to camera.trackingState == TRACKING (fallback covers the
+            // impossible no-frame-bound case so behavior is unchanged).
+            val isTracking = poseMeta?.isTracking ?: (camera.trackingState == TrackingState.TRACKING)
 
             // First-run onboarding: report the first tracking plane exactly once. getAllTrackables is
             // not free, so only poll (throttled) until we've reported, then this is a single boolean
@@ -1613,7 +1621,7 @@ class ArRenderer(
             // The not-tracking case is never gated (shouldRunHeavyThisFrame forces active), so a
             // relocalization always re-feeds SLAM immediately.
             if (shouldRunHeavyThisFrame(viewMatrix, isTracking)) {
-                slamManager.updateCamera(viewMatrix, projMatrix, frame.timestamp)
+                slamManager.updateCamera(viewMatrix, projMatrix, poseMeta?.timestampNs ?: frame.timestamp)
             }
 
             lastStep = "light"
