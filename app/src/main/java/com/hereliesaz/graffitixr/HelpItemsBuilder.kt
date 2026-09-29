@@ -22,8 +22,7 @@ internal fun buildHelpItems(strings: AppStrings): Map<String, Any> = mapOf(
     // Open (a sub-item of the top-level Design folder)
     "item.open" to strings.help.addImg,
 
-    // Modes menu
-    "host.modes" to strings.help.modeHost,
+    // Modes (each a top-level folder; no "host.modes" container)
     "mode.ar" to strings.help.ar,
     "mode.overlay" to strings.help.overlay,
     "mode.mockup" to strings.help.mockup,

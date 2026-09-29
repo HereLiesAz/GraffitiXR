@@ -1895,8 +1895,7 @@ class MainActivity : ComponentActivity() {
         val isDesignMode = editorUiState.editorMode == EditorMode.DESIGN
         // railExpansion (param) is the per-host expansion restored from the project so the rail reopens
         // as the user left it. Seeded into initiallyExpanded below; captured by onExpandedChange (manual
-        // toggles only). host.modes' expandWhen reads railExpansion["host.project"] so opening Project
-        // collapses Modes and closing it re-expands them.
+        // toggles only). Each mode folder's expandWhen opens it while that mode is active.
         //
         // Items are always registered with AzNavRail, but disabled on the library screen so they're
         // non-interactive there. The former if (!showLibrary) gate that removed items from the rail
@@ -1911,7 +1910,7 @@ class MainActivity : ComponentActivity() {
         // one folder instead of two unrelated top-level entries.
         //
         // expandWhen forces this open whenever the user is actually IN Design mode (matching
-        // host.modes' expandWhen pattern below) — landing here via "New Project" / "Load" /
+        // each mode folder's expandWhen pattern below) — landing here via "New Project" / "Load" /
         // the AR-stall fallback all navigate directly, never through a rail tap, so without this
         // the host stayed collapsed and both Open and the guidance callout that points at it
         // ("Tap 'Open' to add your first layer") were unreachable/invisible on a first run.
@@ -1919,7 +1918,7 @@ class MainActivity : ComponentActivity() {
                 id = "mode.design",
                 text = navStrings.design,
                 route = EditorMode.DESIGN.name,
-                color = navItemColor,
+                color = HotPink,
                 disabled = showLibrary,
                 initiallyExpanded = railExpansion["mode.design"] ?: false,
                 expandWhen = { isDesignMode },
@@ -2005,27 +2004,24 @@ class MainActivity : ComponentActivity() {
 
             azDivider()
 
-            // 2. PROJECT FOLDER — directly under Design. Opening it collapses Modes (see host.modes'
-            // expandWhen below); its expansion is persisted per-project via onExpandedChange so the two
-            // folders coordinate reactively.
-            // 3. MODES FOLDER — always expanded, unless the user manually collapses it or opens the
-            // Project folder. expandWhen returns false while Project is open (auto-collapsing Modes) and
-            // re-expands Modes on the false->true edge when Project closes; a manual collapse is respected
-            // ("user wins") until that next edge.
-            azRailHostItem(
-                id = "host.modes",
-                text = navStrings.modes,
-                color = navItemColor,
-                disabled = showLibrary,
-                initiallyExpanded = railExpansion["host.modes"] ?: true,
-                expandWhen = { railExpansion["host.project"] != true },
-                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.modes", it) },
-            )
-
+            // MODES — each mode is its own top-level, pink-outlined folder (the former "Modes"
+            // container folder has been removed; the modes were lifted out of it). Tapping a mode
+            // navigates into it via `route`; the mode's TOOLS are registered only while it is active,
+            // and expandWhen opens the folder on entry so those tools are reachable. Each mode's
+            // expansion is persisted per-host via onExpandedChange, matching the Design folder above.
             val showArModeEntry = !arUiState.isArCoreAvailabilityResolved || arUiState.isArCoreAvailable
             if (showArModeEntry) {
-                // AR is a sub-host: it navigates to AR mode and contains its tools.
-                azRailSubHostItem(id = "mode.ar", hostId = "host.modes", text = navStrings.arMode, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary)
+                // AR navigates to AR mode and contains its tools.
+                azRailHostItem(
+                    id = "mode.ar",
+                    text = navStrings.arMode,
+                    route = EditorMode.AR.name,
+                    color = HotPink,
+                    disabled = showLibrary,
+                    initiallyExpanded = railExpansion["mode.ar"] ?: false,
+                    expandWhen = { editorUiState.editorMode == EditorMode.AR },
+                    onExpandedChange = { editorViewModel.onRailHostExpansionChanged("mode.ar", it) },
+                )
                 // Target capture — only meaningful while in AR mode.
                 if (editorUiState.editorMode == EditorMode.AR) {
                     // Target button is a toggle: selected (cyan) means screen taps create the target;
@@ -2091,7 +2087,16 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            azRailSubHostItem(id = "mode.overlay", hostId = "host.modes", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary)
+            azRailHostItem(
+                id = "mode.overlay",
+                text = navStrings.overlay,
+                route = EditorMode.OVERLAY.name,
+                color = HotPink,
+                disabled = showLibrary,
+                initiallyExpanded = railExpansion["mode.overlay"] ?: false,
+                expandWhen = { editorUiState.editorMode == EditorMode.OVERLAY },
+                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("mode.overlay", it) },
+            )
             // Flashlight — illuminate the wall in low light while overlaying.
             if (editorUiState.editorMode == EditorMode.OVERLAY) {
                 azRailSubItem(id = "mode.overlay.light", hostId = "mode.overlay", text = navStrings.light, color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { arViewModel.toggleFlashlight() })
@@ -2104,7 +2109,16 @@ class MainActivity : ComponentActivity() {
             // was carrying a Wall ▸ Photo/File/Clear folder and a Mockup Lock that could not act on
             // anything they were looking at. Tapping Mockup routes into the mode, so the tools are one
             // tap away rather than gone.
-            azRailSubHostItem(id = "mode.mockup", hostId = "host.modes", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary)
+            azRailHostItem(
+                id = "mode.mockup",
+                text = navStrings.mockup,
+                route = EditorMode.MOCKUP.name,
+                color = HotPink,
+                disabled = showLibrary,
+                initiallyExpanded = railExpansion["mode.mockup"] ?: false,
+                expandWhen = { editorUiState.editorMode == EditorMode.MOCKUP },
+                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("mode.mockup", it) },
+            )
             if (editorUiState.editorMode == EditorMode.MOCKUP) {
                 azRailSubHostItem(id = "mockup.wall", hostId = "mode.mockup", text = navStrings.wall, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary)
                 azRailSubItem(id = "wall.photo", hostId = "mockup.wall", text = navStrings.photo, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { onWallPhoto() })
@@ -2117,7 +2131,16 @@ class MainActivity : ComponentActivity() {
             }
 
             // Trace ▸ { Freeze, Lock } — same mode gating as the others.
-            azRailSubHostItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary)
+            azRailHostItem(
+                id = "mode.trace",
+                text = navStrings.trace,
+                route = EditorMode.TRACE.name,
+                color = HotPink,
+                disabled = showLibrary,
+                initiallyExpanded = railExpansion["mode.trace"] ?: false,
+                expandWhen = { editorUiState.editorMode == EditorMode.TRACE },
+                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("mode.trace", it) },
+            )
             if (editorUiState.editorMode == EditorMode.TRACE) {
                 azRailSubItem(id = "mode.trace.freeze", hostId = "mode.trace", text = "Freeze", color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { mainViewModel.setTouchLocked(!isTouchLocked) })
                 azRailSubItem(id = "mode.trace.lock", hostId = "mode.trace", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { editorViewModel.onToggleModeTransformLocked(EditorMode.TRACE) })
