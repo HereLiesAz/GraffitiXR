@@ -4,15 +4,13 @@ cmake_minimum_required(VERSION 3.22.1)
 project("graffitixr_native")
 
 # OpenCV is imported from Maven Central (org.opencv:opencv). Since 4.9.0 that artifact ships a
-# Prefab part, so with `buildFeatures { prefab = true }` in build.gradle.kts, AGP generates a CMake
-# config package for it — nothing to vendor, fetch, or point OpenCV_DIR at. The package name is
-# `OpenCV` and it exposes the imported target `OpenCV::opencv_java5` (headers + libopencv_java5.so).
+# Prefab part, so with buildFeatures { prefab = true } in build.gradle.kts, AGP generates a CMake
+# config package for it.
 find_package(OpenCV REQUIRED CONFIG)
 
 # Set GLM include directory (header-only, committed under libs/glm)
 set(GLM_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../libs/glm)
 
-# Define the native library (Removed VulkanBackend.cpp)
 add_library(graffitixr SHARED
     GraffitiJNI.cpp
     MobileGS.cpp
@@ -25,59 +23,128 @@ add_library(graffitixr SHARED
 )
 
 # ---------------------------------------------------------------------------
-# Forked artoolkitX KPM (non-ARCore tracking base). Vendored as a git submodule at
-# third_party/artoolkitx. Built ONLY when the submodule is checked out; otherwise KpmBridge.cpp
-# compiles without HAVE_ARX_KPM and its JNI calls are safe no-ops, so the app and CI build unchanged.
+# SphereSLAM / artoolkitX KPM.
 #
-# FIRST-CUT / BRING-UP: this static-lib target globs KPM + its FreakMatcher matcher plus the AR-param,
-# ARUtil and OCVT support KPM needs, and links OpenCV. It is expected to need iteration on the first
-# on-device NDK build (missing sources, defines, or OpenCV API deltas) — that is the point of the
-# -PposeProbe smoke test. Repo-root/third_party/artoolkitx/Source/ARX is five levels up from here.
+# This is a SIDE-BY-SIDE native tracker. ARCore remains independent in feature/ar.
+# KPM is compiled only when the pinned artoolkitX submodule is checked out. Without it, KpmBridge
+# builds safe unavailable stubs and the rest of GraffitiXR is unchanged.
 set(ARX_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../third_party/artoolkitx/Source/ARX)
+set(ARX_SOURCE_ROOT ${ARX_ROOT}/..)
+
 if(EXISTS ${ARX_ROOT}/KPM/include/ARX/KPM/kpm.h)
-    message(STATUS "graffitixr: building forked artoolkitX KPM from ${ARX_ROOT}")
+    message(STATUS "graffitixr: building SphereSLAM KPM from ${ARX_ROOT}")
+
     find_library(log-lib log)
+    find_library(m-lib m)
 
-    file(GLOB_RECURSE ARX_KPM_SRC
-        ${ARX_ROOT}/KPM/*.cpp
-        ${ARX_ROOT}/OCVT/*.cpp
+    # artoolkitX normally generates this header from its top-level CMake. We build only the KPM/AR
+    # subset, so generate the same header locally with the pinned source version and the features this
+    # subset actually uses.
+    set(ARX_VERSION_MAJOR 1)
+    set(ARX_VERSION_MINOR 1)
+    set(ARX_VERSION_TINY 23)
+    set(ARX_VERSION_DEV 0)
+    set(HAVE_NFT 1)
+    set(HAVE_2D 0)
+    set(HAVE_GL 0)
+    set(HAVE_GLES2 0)
+    set(HAVE_GL3 0)
+    set(HAVE_OPENCV 0)
+    set(HAVE_GTSAM 0)
+    set(USE_CPARAM_SEARCH 0)
+    set(USE_GL_STATE_CACHE 0)
+    set(USE_GTSAM 0)
+    set(HAVE_INTEL_SIMD 0)
+
+    set(ARX_GENERATED_INCLUDE ${CMAKE_CURRENT_BINARY_DIR}/arx_generated)
+    file(MAKE_DIRECTORY ${ARX_GENERATED_INCLUDE}/ARX/AR)
+    configure_file(
+        ${ARX_ROOT}/AR/include/ARX/AR/config.h.in
+        ${ARX_GENERATED_INCLUDE}/ARX/AR/config.h
+        @ONLY
     )
-    file(GLOB ARX_SUPPORT_SRC
+
+    # The pinned artoolkitX submodule carries its Android JPEG headers and ABI-specific static lib.
+    # KPM's matcher includes jpeglib even though our runtime path consumes raw luma frames.
+    set(ARX_JPEG_INCLUDE ${ARX_SOURCE_ROOT}/depends/android/include)
+    set(ARX_JPEG_LIB ${ARX_SOURCE_ROOT}/depends/android/lib/${ANDROID_ABI}/libjpeg.a)
+    if(NOT EXISTS ${ARX_JPEG_LIB})
+        message(FATAL_ERROR "graffitixr: artoolkitX JPEG library missing for ABI ${ANDROID_ABI}: ${ARX_JPEG_LIB}")
+    endif()
+
+    # Match artoolkitX's own KPM CMake source list exactly. Do not recursively glob FreakMatcher:
+    # that tree contains optional database-IO translation units that upstream itself does not build.
+    set(ARX_KPM_SRC
+        ${ARX_ROOT}/KPM/kpmHandle.cpp
+        ${ARX_ROOT}/KPM/kpmRefDataSet.cpp
+        ${ARX_ROOT}/KPM/kpmMatching.cpp
+        ${ARX_ROOT}/KPM/kpmResult.cpp
+        ${ARX_ROOT}/KPM/kpmUtil.cpp
+        ${ARX_ROOT}/KPM/kpmFopen.c
+        ${ARX_ROOT}/KPM/FreakMatcher/detectors/DoG_scale_invariant_detector.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/detectors/gaussian_scale_space_pyramid.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/detectors/gradients.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/detectors/harris.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/detectors/orientation_assignment.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/detectors/pyramid.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/facade/visual_database_facade.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/matchers/hough_similarity_voting.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/matchers/freak.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/framework/date_time.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/framework/image.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/framework/logger.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/framework/timers.cpp
+    )
+    file(GLOB_RECURSE ARX_AR_C_SRC CONFIGURE_DEPENDS
         ${ARX_ROOT}/AR/*.c
-        ${ARX_ROOT}/ARUtil/*.c
+    )
+    set(ARX_SUPPORT_SRC
+        ${ARX_ROOT}/ARUtil/log.c
     )
 
-    add_library(arx_kpm STATIC ${ARX_KPM_SRC} ${ARX_SUPPORT_SRC})
-    target_compile_definitions(arx_kpm PUBLIC ARX_TARGET_PLATFORM_ANDROID HAVE_OPENCV)
+    add_library(arx_kpm STATIC
+        ${ARX_KPM_SRC}
+        ${ARX_AR_C_SRC}
+        ${ARX_SUPPORT_SRC}
+    )
+
+    target_compile_definitions(arx_kpm PRIVATE
+        ARX_TARGET_PLATFORM_ANDROID=1
+    )
     target_include_directories(arx_kpm PUBLIC
-        ${ARX_ROOT}/include
+        ${ARX_GENERATED_INCLUDE}
         ${ARX_ROOT}/KPM/include
         ${ARX_ROOT}/KPM
         ${ARX_ROOT}/KPM/FreakMatcher
         ${ARX_ROOT}/AR/include
         ${ARX_ROOT}/ARUtil/include
-        ${ARX_ROOT}/OCVT/include
+        ${ARX_JPEG_INCLUDE}
     )
-    target_link_libraries(arx_kpm OpenCV::opencv_java5 ${log-lib})
+    target_link_libraries(arx_kpm PRIVATE
+        ${ARX_JPEG_LIB}
+        ${log-lib}
+        ${m-lib}
+    )
 
     target_link_libraries(graffitixr arx_kpm)
     target_compile_definitions(graffitixr PRIVATE HAVE_ARX_KPM)
-    target_include_directories(graffitixr PRIVATE ${ARX_ROOT}/include ${ARX_ROOT}/KPM/include)
+    target_include_directories(graffitixr PRIVATE
+        ${ARX_GENERATED_INCLUDE}
+        ${ARX_ROOT}/KPM/include
+        ${ARX_ROOT}/AR/include
+        ${ARX_ROOT}/ARUtil/include
+    )
 else()
-    message(STATUS "graffitixr: artoolkitX submodule not present; KPM disabled (KpmBridge is a no-op)")
+    message(STATUS "graffitixr: artoolkitX submodule not present; SphereSLAM KPM disabled")
 endif()
 
-# Include directories. OpenCV's headers arrive via the imported target's INTERFACE_INCLUDE_DIRECTORIES.
 target_include_directories(graffitixr PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${GLM_DIR}
 )
 
-# Find required Android libraries
 find_library(log-lib log)
 
-# Link libraries - OpenGL ES 3.0 for splat rendering, jnigraphics for Bitmap manipulation.
-# OpenCV::opencv_java5 carries both the include dirs and the shared library to link against.
 target_link_libraries(graffitixr
     ${log-lib}
     OpenCV::opencv_java5

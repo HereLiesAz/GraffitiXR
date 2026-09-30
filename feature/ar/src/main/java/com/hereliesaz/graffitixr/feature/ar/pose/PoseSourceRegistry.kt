@@ -1,40 +1,44 @@
 package com.hereliesaz.graffitixr.feature.ar.pose
 
 import android.util.Log
-import com.hereliesaz.graffitixr.nativebridge.KpmBridge
+import com.hereliesaz.sphereslam.SphereSlam
 
 /**
- * Entry point for the non-ARCore tracking bring-up.
+ * Registry/bring-up entry point for pose producers.
  *
- * The non-ARCore base is a fork of artoolkitX's KPM (keypoint matching) + AR2, vendored as native
- * source under `third_party/artoolkitx` and built into the `graffitixr` native library (see
- * core/nativebridge CMake). On top of it we build the planar-mosaic fingerprint (each captured view a
- * metric planar KPM page, tiled across the wall plane so toward/away translation comes from the
- * homography — not a photosphere, which loses depth), grown adaptively for overpaint survival.
+ * ARCore remains the existing production pose source through [ArCorePoseSource]. SphereSLAM is added
+ * beside it, not underneath it and not in place of it. The two paths deliberately stay independent
+ * behind [PoseSource].
  *
- * Phase 1 (now) is a link smoke test: prove the forked KPM actually compiles and links in the NDK
- * build on-device before any capture/match/mosaic logic. [probe] runs it and logs the result.
+ * SphereSLAM Phase 2 exposes calibrated artoolkitX KPM page generation/matching as its own library.
+ * It is not automatically selected yet and the ARCore render path is untouched.
  */
 object PoseSourceRegistry {
     private const val TAG = "POSEPROBE"
 
     /**
-     * Non-ARCore bring-up smoke test, invoked by the -PposeProbe launch path. Currently: confirm the
-     * forked artoolkitX KPM links and a handle can be created natively. Never touches the ARCore
-     * render path. Logs to logcat (tag POSEPROBE).
+     * Opt-in native link probe invoked by -PposeProbe=true. This checks only the SphereSLAM/KPM
+     * sibling path; it never changes, replaces, or wraps the active [ArCorePoseSource].
      */
     fun probe() {
         Thread({
-            val available = runCatching { KpmBridge.isAvailable() }.getOrDefault(false)
+            val available = runCatching { SphereSlam.isAvailable() }.getOrDefault(false)
             if (!available) {
-                Log.w(TAG, "probe: KPM not built in (is the third_party/artoolkitx submodule present " +
-                    "and CMake building arx_kpm?)")
+                Log.w(
+                    TAG,
+                    "probe: SphereSLAM/KPM not built in (is third_party/artoolkitx checked out?)",
+                )
                 return@Thread
             }
-            val ok = runCatching { KpmBridge.smokeTest(640, 480) }.getOrElse { e ->
-                Log.e(TAG, "probe: KPM smoke test threw", e); false
+            val ok = runCatching { SphereSlam.smokeTest(640, 480) }.getOrElse { e ->
+                Log.e(TAG, "probe: SphereSLAM/KPM smoke test threw", e)
+                false
             }
-            Log.i(TAG, "probe: KPM link smoke test ${if (ok) "PASSED (handle created)" else "FAILED"}")
+            Log.i(
+                TAG,
+                "probe: SphereSLAM/KPM link smoke test " +
+                    if (ok) "PASSED (ARCore unchanged)" else "FAILED",
+            )
         }, "pose-probe").start()
     }
 }
