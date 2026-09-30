@@ -18,7 +18,7 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 #ifdef HAVE_ARX_KPM
-#include <ARX/AR/param.h>
+#include <ARX/AR/ar.h>
 #include <ARX/KPM/kpm.h>
 
 namespace {
