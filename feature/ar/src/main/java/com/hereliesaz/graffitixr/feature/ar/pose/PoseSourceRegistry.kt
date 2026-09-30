@@ -8,21 +8,17 @@ import com.hereliesaz.sphereslam.SphereSlam
  *
  * ARCore remains the existing production pose source through [ArCorePoseSource]. SphereSLAM is added
  * beside it, not underneath it and not in place of it. The two paths deliberately stay independent
- * behind [PoseSource] so devices can use ARCore when available while the native path can mature and be
- * selected explicitly later.
+ * behind [PoseSource].
  *
- * SphereSLAM Phase 2 currently exposes artoolkitX KPM planar homography tracking. That is enough to
- * validate wall locking while moving toward/away from the surface, but it is NOT yet advertised as a
- * calibrated metric 6-DoF pose. The ARCore render path is untouched.
+ * SphereSLAM Phase 2 exposes calibrated artoolkitX KPM page generation/matching as its own library.
+ * It is not automatically selected yet and the ARCore render path is untouched.
  */
 object PoseSourceRegistry {
     private const val TAG = "POSEPROBE"
 
     /**
-     * Opt-in native bring-up probe invoked by -PposeProbe=true.
-     *
-     * This checks only the SphereSLAM/KPM sibling path. It never changes, replaces, or wraps the
-     * active [ArCorePoseSource].
+     * Opt-in native link probe invoked by -PposeProbe=true. This checks only the SphereSLAM/KPM
+     * sibling path; it never changes, replaces, or wraps the active [ArCorePoseSource].
      */
     fun probe() {
         Thread({
