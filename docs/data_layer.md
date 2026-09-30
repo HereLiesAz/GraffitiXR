@@ -21,7 +21,7 @@ it without depending on `app/`).
   - `layers: List<OverlayLayer>` — read-only migration path for projects saved when this app still
     held a layer list; collapsed into `design` on load (`ProjectManager.migrateInMemory`) and never
     written again.
-  - `targetImageUris`, `fingerprint`, `wallFeatureMap`, `captureEnvironment`,
+  - `targetImageUris`, `sphereSlamReferenceUri`/scale metadata, `fingerprint`, `wallFeatureMap`, `captureEnvironment`,
     `fingerprintIntrinsics`/`fingerprintAnchor`/`fingerprintViewMatrix` — everything captured about
     the AR target: the marks descriptor blob, the passively-built wide-area feature map, and the
     device/camera state at capture time (see `CaptureEnvironment.kt`'s KDoc for why each group is
