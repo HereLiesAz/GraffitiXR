@@ -57,6 +57,8 @@ dependencies {
 
     // Native Engine (MobileGS)
     implementation(project(":core:nativebridge"))
+    // Side-by-side non-ARCore tracker. ARCore remains a separate first-class pose source.
+    implementation(project(":sphereslam"))
     implementation(project(":android_collaboration_module"))
 
     // Compose
