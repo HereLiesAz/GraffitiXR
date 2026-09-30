@@ -11,9 +11,10 @@ import timber.log.Timber
  * devices — see app/src/main/AndroidManifest.xml — so the app must check at
  * runtime before attempting to construct an ARCore Session.
  *
- * Use [check] from a coroutine on app start. The result drives the
- * `isArCoreAvailable` flag in [com.hereliesaz.graffitixr.common.model.ArUiState],
- * which the mode chooser and onboarding overlays observe.
+ * Use [check] from a coroutine on app start. This reports **ARCore** capability only; it must not
+ * be treated as the final answer to "can this device use GraffitiXR AR?". Once the standalone
+ * SphereSLAM backend is complete, unsupported ARCore devices must route to that backend instead of
+ * hiding AR mode. The current UI still uses this result directly, which is a temporary limitation.
  */
 object ArAvailabilityChecker {
 
@@ -46,9 +47,9 @@ object ArAvailabilityChecker {
             ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED,
             ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD -> Result.NeedsInstallOrUpdate
             ArCoreApk.Availability.UNSUPPORTED_DEVICE_NOT_CAPABLE -> Result.Unsupported
-            // Still UNKNOWN after timeout: treat as unsupported to be safe; the
-            // chooser will hide AR mode and the user can still use the four
-            // non-AR modes.
+            // Still UNKNOWN after timeout: classify ARCore itself as unsupported.
+            // Current UI hides AR mode here, but the intended architecture routes
+            // to standalone SphereSLAM once that backend is complete.
             else -> Result.Unsupported
         }
     }

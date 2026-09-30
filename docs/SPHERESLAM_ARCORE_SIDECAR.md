@@ -4,22 +4,13 @@ Status: implemented on `feat/sphereslam-parallel-arcore` as a follow-up to merge
 
 ## Non-negotiable architecture
 
-SphereSLAM does **not** replace ARCore.
+SphereSLAM has **two required roles**, selected by device capability.
 
-ARCore remains GraffitiXR's primary continuous 6-DoF tracker and continues to own:
+### Mode A — ARCore + SphereSLAM hybrid
 
-- the live AR session and camera;
-- `ArCorePoseSource`;
-- `viewMatrix` and `projectionMatrix`;
-- the renderer's primary tracking state;
-- frame-to-frame metric motion;
-- plane/depth/cloud-anchor logic already implemented in `:feature:ar`.
-
-SphereSLAM/KPM runs beside ARCore as a visual wall-recognition and relocalization sidecar. Its
-output is intended for later drift-correction / fusion logic, never as an implicit replacement for
-ARCore.
-
-Current conceptual flow:
+On an ARCore-capable device, ARCore remains the primary continuous metric 6-DoF tracker. SphereSLAM
+runs beside it for wall recognition, relocalization, and later explicit drift correction/fusion.
+SphereSLAM must not silently overwrite ARCore view/projection matrices in this mode.
 
 ```
 ARCore Session
@@ -29,10 +20,51 @@ ARCore Session
          ├─ MobileGS relocalization ─► existing ORB/SuperPoint + PnP path
          └─ SphereSLAM/KPM ──────────► planar wall observation
                                           │
-                                          └─ future explicit fusion/correction stage
+                                          └─ explicit fusion/correction stage
 ```
 
-There is no automatic source switch, fallback, or pose replacement in this branch.
+### Mode B — SphereSLAM standalone
+
+On a phone where ARCore is unsupported or unavailable, **AR mode must remain usable**. SphereSLAM is
+the required standalone tracking backend and must provide the capabilities the app needs without
+constructing an ARCore `Session`.
+
+The standalone path must eventually own or receive:
+
+- raw camera frames through a non-ARCore camera path such as CameraX;
+- calibrated camera intrinsics and display-rotation handling;
+- IMU samples needed for robust visual-inertial tracking;
+- continuous metric 6-DoF camera pose;
+- OpenGL-compatible `viewMatrix` and `projectionMatrix` through `PoseSource`;
+- wall-target capture and metric scale establishment;
+- anchor/overlay placement without `com.google.ar.core.Anchor`;
+- wall-map growth, persistence, restoration, and return-visit relocalization;
+- loss/recovery state so the renderer can stop integrating bad poses and reacquire the wall.
+
+Conceptually:
+
+```
+CameraX + IMU
+      │
+      ▼
+SphereSLAM continuous tracking ──────► SphereSlamPoseSource ─────► primary renderer pose
+      │
+      ├─ KPM wall atlas / relocalization
+      ├─ MobileGS fingerprint/relocalization where useful
+      └─ standalone wall/anchor model ────────────────────────────► overlay placement
+```
+
+ARCore is therefore **preferred when present, but never a hard requirement for the app's AR
+purpose**.
+
+### Current implementation status
+
+This branch implements the Mode A KPM sidecar foundation only. It does **not** yet implement the
+complete Mode B continuous tracker, CameraX/IMU camera pipeline, or ARCore-independent anchor model.
+Until those pieces exist, the current UI still disables AR mode when ARCore is unavailable. That is
+a temporary implementation limitation, not the intended product behavior.
+
+The app manifest already marks ARCore optional, so installability on non-ARCore devices is preserved.
 
 ## What existed before this follow-up
 
@@ -89,7 +121,7 @@ The adapter's `Observation` contains:
 - KPM `inliers`;
 - `pageToCamera3x4`.
 
-The adapter does **not** expose a replacement ARCore pose.
+The adapter does **not** expose a replacement ARCore pose in the current hybrid implementation. A future standalone `SphereSlamPoseSource` will be a separate continuous-pose component rather than treating a single KPM page match as frame-to-frame SLAM.
 
 ### 2. AR renderer side-by-side wiring
 
@@ -139,8 +171,9 @@ Current divisor: `6`.
 
 At a typical 60 fps render cadence this is approximately 10 Hz.
 
-That rate is intentional: SphereSLAM is a visual relocalization sidecar, not the primary
-frame-to-frame tracker. ARCore remains full-rate.
+That rate is intentional for the **hybrid** path implemented here: KPM is acting as a visual
+relocalization sidecar while ARCore remains full-rate. Standalone SphereSLAM cannot use this
+throttled KPM loop as its only pose source; it requires a continuous tracker fed at camera/IMU rate.
 
 ### 3. Native build hardening
 
@@ -272,7 +305,7 @@ ARCore teardown remains controlled by the renderer/session locking already prese
 
 The current follow-up intentionally stops before pose fusion.
 
-Not implemented yet:
+Not implemented yet for the hybrid path:
 
 - converting `pageToCamera3x4` into GraffitiXR's ARCore/OpenGL/world conventions;
 - metric reference-scale derivation from target capture/depth;
@@ -283,6 +316,19 @@ Not implemented yet:
 - adding additional pages during adaptive wall-map growth;
 - device validation of KPM reacquisition while walking toward/away from the wall.
 
+Not implemented yet for required standalone operation:
+
+- a continuous SphereSLAM visual-inertial 6-DoF tracker (KPM matches alone are not sufficient);
+- CameraX/raw-camera ownership when there is no ARCore `Session`;
+- IMU ingestion and camera/IMU timestamp alignment;
+- metric initialization and scale recovery without ARCore depth/pose;
+- a `SphereSlamPoseSource` that fulfills the existing `PoseSource` matrix contract;
+- an ARCore-independent anchor/wall transform model;
+- ARCore-independent hit testing / wall placement;
+- a camera-background renderer driven by the standalone camera stream;
+- runtime backend selection that keeps AR mode enabled when SphereSLAM standalone is ready;
+- end-to-end tests on an actually ARCore-unsupported device.
+
 There is also one cleanup item: the asynchronous runtime adapter currently talks to
 `KpmBridge` directly while the merged library already exposes `SphereSlamEngine`. A later cleanup
 can make the adapter delegate through that public engine so JNI ownership has exactly one Kotlin
@@ -292,16 +338,25 @@ abstraction. This does not change the side-by-side architecture.
 
 Future changes should preserve all of these:
 
-1. `ArCorePoseSource` remains a first-class primary source.
-2. `libs.arcore.client` remains present.
-3. SphereSLAM must not silently overwrite the renderer's view/projection matrices.
-4. KPM matching stays off the ARCore GL thread.
-5. KPM translation must not be called metric until reference scale is physically calibrated.
-6. Coordinate conversion must be explicit and tested before any KPM transform reaches
-   `PoseFusion`.
-7. Loss or failure of SphereSLAM must degrade to normal ARCore behavior, not break the AR session.
-8. Existing MobileGS relocalization remains available until an explicit architectural decision says
-   otherwise.
+1. ARCore remains a first-class primary tracker **when it is available**.
+2. ARCore remains an optional dependency at the product level; unsupported phones must be able to
+   enter a fully functional SphereSLAM-backed AR mode once standalone support is complete.
+3. In hybrid mode, SphereSLAM must not silently overwrite ARCore view/projection matrices. Any
+   correction enters through an explicit fusion stage.
+4. In standalone mode, SphereSLAM is explicitly allowed to be the primary `PoseSource`; that is not
+   considered an ARCore replacement bug, it is the required fallback architecture.
+5. KPM matching stays off the render thread.
+6. A KPM page match is a relocalization observation, not by itself a complete continuous SLAM pose
+   source.
+7. KPM translation must not be called metric until reference scale is physically calibrated.
+8. Coordinate conversion must be explicit and tested before any KPM transform reaches
+   `PoseFusion` or a standalone pose source.
+9. Loss or failure of SphereSLAM in hybrid mode must degrade to normal ARCore behavior, not break
+   the AR session.
+10. Loss or failure of the standalone tracker must put tracking into an explicit lost/reacquiring
+    state rather than freezing and presenting a stale pose as valid.
+11. Existing MobileGS relocalization remains available until an explicit architectural decision says
+    otherwise.
 
 ## Files changed by this follow-up
 

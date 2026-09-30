@@ -71,10 +71,17 @@ off by default — drift correction and self-growing fingerprint (`docs/TELEOLOG
 is a Maven Central dependency (`org.opencv:opencv`), not a vendored/embedded copy.
 
 ### `:sphereslam`
-Calibrated planar KPM wall-tracking library built from the pinned artoolkitX source. It is a sibling
-to ARCore, not a replacement. `:feature:ar` can seed a planar wall reference and feed throttled
-camera-luma frames to it while `ArCorePoseSource` remains the primary continuous pose source.
-SphereSLAM observations are not currently fused into the rendered pose. See
+Native tracking/relocalization module built around the pinned artoolkitX integration. It has two
+architectural roles:
+
+- **ARCore-capable devices:** run beside `ArCorePoseSource` for wall recognition/relocalization and
+  later explicit pose correction.
+- **ARCore-unavailable devices:** become the complete standalone tracking backend, providing a
+  continuous metric 6-DoF `PoseSource`, wall anchoring, and relocalization without an ARCore
+  `Session`.
+
+The code currently implements the calibrated KPM sidecar portion of the first role; the continuous
+standalone tracker is still required work. See
 [`SPHERESLAM_ARCORE_SIDECAR.md`](SPHERESLAM_ARCORE_SIDECAR.md).
 
 ## Data Flow (AR Pipeline)
@@ -105,16 +112,22 @@ frame.acquireCameraImage() [YUV] ────────────┼► slam
                                    ArRenderer draws camera background + AR overlay
 ~~~
 
-**SphereSLAM coexistence:** `ArCorePoseSource` still supplies the live renderer pose. SphereSLAM
-runs asynchronously beside it and currently publishes wall-relative observations only. The detailed
-contract, calibration assumptions, threading model, and remaining fusion work are documented in
+**Tracking backend selection:** on ARCore-capable devices, `ArCorePoseSource` supplies the live
+renderer pose while SphereSLAM runs asynchronously beside it and currently publishes wall-relative
+observations only. On ARCore-unavailable devices, the required end state is a standalone
+`SphereSlamPoseSource` backed by raw camera + IMU input; AR mode must not be removed merely because
+ARCore is missing. The current build has not completed that standalone path yet. The detailed
+contract, calibration assumptions, threading model, and remaining work are documented in
 [`SPHERESLAM_ARCORE_SIDECAR.md`](SPHERESLAM_ARCORE_SIDECAR.md).
 
 **Camera ownership:**
-- `EditorMode.AR` → ARCore `Session` owns the camera.
-- `EditorMode.OVERLAY` → CameraX owns the camera (ARCore-available devices still use the ARCore
-  session; devices without ARCore fall back to a planar homography tracker over the same OpenCV
-  pipeline — see `docs/UI_UX.md`).
+- `EditorMode.AR`, hybrid mode → ARCore `Session` owns the camera and SphereSLAM consumes frames
+  acquired from that session.
+- `EditorMode.AR`, standalone mode (required, not yet complete) → CameraX/raw camera owns the
+  camera; SphereSLAM + IMU supply the primary pose and wall transform without creating an ARCore
+  `Session`.
+- `EditorMode.OVERLAY` → CameraX owns the camera (devices without ARCore can continue using the
+  planar homography/OpenCV overlay path described in `docs/UI_UX.md`).
 
 ## Relocalization and Drift Correction
 
