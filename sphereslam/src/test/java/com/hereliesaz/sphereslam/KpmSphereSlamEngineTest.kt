@@ -24,7 +24,7 @@ class KpmSphereSlamEngineTest {
         assertNotNull(match)
         assertEquals(7, match!!.pageNo)
         assertEquals(9, match.inlierCount)
-        assertEquals(0.25f, match.reprojectionError)
+        assertEquals(0.25f, match.reprojectionError, 0f)
         assertEquals(12, match.projectiveTransform3x4.size)
 
         engine.close()
