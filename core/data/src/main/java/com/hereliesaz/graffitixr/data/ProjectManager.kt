@@ -550,6 +550,7 @@ class ProjectManager @Inject constructor(
                 originalOverlayImageUri = localUri(migrated.originalOverlayImageUri),
                 thumbnailUri = localUri(migrated.thumbnailUri),
                 targetImageUris = migrated.targetImageUris.map { localUri(it)!! },
+                sphereSlamReferenceUri = localUri(migrated.sphereSlamReferenceUri),
                 evolutionImageUris = migrated.evolutionImageUris.map { localUri(it)!! },
                 targetFingerprintPath = migrated.targetFingerprintPath?.let { localPath(it).absolutePath },
             )

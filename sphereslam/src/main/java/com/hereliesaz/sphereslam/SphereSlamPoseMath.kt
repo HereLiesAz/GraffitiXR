@@ -92,7 +92,7 @@ object SphereSlamPoseMath {
         pageCenterYmm: Float = 0f,
     ): FloatArray {
         require(cameraFromPage3x4.size == 12) { "KPM pose must contain 12 floats" }
-        require(cameraFromPage3x4.all(Float::isFinite)) { "KPM pose must be finite" }
+        require(cameraFromPage3x4.all { it.isFinite() }) { "KPM pose must be finite" }
         require(pageCenterXmm.isFinite() && pageCenterYmm.isFinite())
 
         val p = cameraFromPage3x4
