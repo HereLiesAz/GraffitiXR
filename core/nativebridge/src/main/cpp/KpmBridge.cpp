@@ -3,9 +3,10 @@
 // ARCore remains an independent first-class pose source. This file exposes only the native KPM
 // primitive used by the side-by-side :sphereslam library.
 //
-// Phase 2 adds a persistent planar-homography session: build/merge reference pages, match a live
-// luma frame, return KPM's 3x4 projective transform + error + inlier count. Homography mode is NOT a
-// calibrated metric 6-DoF world pose; calibrated pose is a later layer using camera intrinsics.
+// IMPORTANT: artoolkitX 1.1.23's BINARY_FEATURE/FREAK matching path unconditionally runs its
+// calibrated pose solve. kpmCreateHandleHomography() therefore leaves a null cparamLT that the
+// matcher later dereferences. Runtime sessions here use kpmCreateHandle() with explicit intrinsics;
+// the homography constructor is retained only for the link-only smoke test.
 
 #include <jni.h>
 #include <android/log.h>
@@ -17,6 +18,7 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 #ifdef HAVE_ARX_KPM
+#include <ARX/AR/param.h>
 #include <ARX/KPM/kpm.h>
 
 namespace {
@@ -24,6 +26,7 @@ namespace {
 struct KpmSession {
     KpmHandle *handle = nullptr;
     KpmRefDataSet *atlas = nullptr;
+    ARParamLT *cameraParams = nullptr;
     int frameWidth = 0;
     int frameHeight = 0;
     std::mutex mutex;
@@ -40,6 +43,46 @@ bool directBuffer(JNIEnv *env, jobject buffer, jlong requiredBytes, ARUint8 **ou
     if (!ptr || capacity < requiredBytes) return false;
     *out = static_cast<ARUint8 *>(ptr);
     return true;
+}
+
+ARParamLT *makeCameraParams(
+        int width,
+        int height,
+        float fx,
+        float fy,
+        float cx,
+        float cy) {
+    if (width <= 0 || height <= 0 || fx <= 0.0f || fy <= 0.0f) return nullptr;
+
+    ARParam param{};
+    if (arParamClear(&param, width, height, AR_DIST_FUNCTION_VERSION_DEFAULT) < 0) {
+        return nullptr;
+    }
+
+    // Camera matrix K in artoolkitX's 3x4 form.
+    param.mat[0][0] = static_cast<ARdouble>(fx);
+    param.mat[0][1] = 0.0;
+    param.mat[0][2] = static_cast<ARdouble>(cx);
+    param.mat[0][3] = 0.0;
+    param.mat[1][0] = 0.0;
+    param.mat[1][1] = static_cast<ARdouble>(fy);
+    param.mat[1][2] = static_cast<ARdouble>(cy);
+    param.mat[1][3] = 0.0;
+    param.mat[2][0] = 0.0;
+    param.mat[2][1] = 0.0;
+    param.mat[2][2] = 1.0;
+    param.mat[2][3] = 0.0;
+
+    // Version-5 distortion layout is OpenCV's 12 coefficients followed by fx/fy/cx/cy/scale.
+    // Coefficients remain zero from arParamClear(), so this is an identity distortion model in the
+    // correct pixel calibration. Camera2 distortion can be plumbed here later without changing KPM.
+    param.dist_factor[12] = static_cast<ARdouble>(fx);
+    param.dist_factor[13] = static_cast<ARdouble>(fy);
+    param.dist_factor[14] = static_cast<ARdouble>(cx);
+    param.dist_factor[15] = static_cast<ARdouble>(cy);
+    param.dist_factor[16] = 1.0;
+
+    return arParamLTCreate(&param, AR_PARAM_LT_DEFAULT_OFFSET);
 }
 
 } // namespace
@@ -67,7 +110,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_KpmBridge_nativeKpmSmokeTest(
         return JNI_FALSE;
     }
     kpmDeleteHandle(&h);
-    LOGI("nativeKpmSmokeTest: KPM handle created and destroyed OK (%dx%d)", width, height);
+    LOGI("nativeKpmSmokeTest: KPM symbols linked OK (%dx%d)", width, height);
     return JNI_TRUE;
 #else
     (void) width;
@@ -78,24 +121,51 @@ Java_com_hereliesaz_graffitixr_nativebridge_KpmBridge_nativeKpmSmokeTest(
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_KpmBridge_nativeCreateHomographySession(
-        JNIEnv *, jobject, jint width, jint height) {
+Java_com_hereliesaz_graffitixr_nativebridge_KpmBridge_nativeCreateCalibratedSession(
+        JNIEnv *,
+        jobject,
+        jint width,
+        jint height,
+        jfloat fx,
+        jfloat fy,
+        jfloat cx,
+        jfloat cy) {
 #ifdef HAVE_ARX_KPM
-    if (width <= 0 || height <= 0) return 0;
+    if (width <= 0 || height <= 0 || fx <= 0.0f || fy <= 0.0f) return 0;
 
     auto *session = new KpmSession();
-    session->handle = kpmCreateHandleHomography(static_cast<int>(width), static_cast<int>(height));
-    if (!session->handle) {
+    session->cameraParams = makeCameraParams(
+        static_cast<int>(width),
+        static_cast<int>(height),
+        fx,
+        fy,
+        cx,
+        cy
+    );
+    if (!session->cameraParams) {
         delete session;
-        LOGE("nativeCreateHomographySession: KPM handle creation failed");
+        LOGE("nativeCreateCalibratedSession: camera parameter creation failed");
         return 0;
     }
+
+    session->handle = kpmCreateHandle(session->cameraParams);
+    if (!session->handle) {
+        arParamLTFree(&session->cameraParams);
+        delete session;
+        LOGE("nativeCreateCalibratedSession: KPM handle creation failed");
+        return 0;
+    }
+
     session->frameWidth = static_cast<int>(width);
     session->frameHeight = static_cast<int>(height);
     return static_cast<jlong>(reinterpret_cast<intptr_t>(session));
 #else
     (void) width;
     (void) height;
+    (void) fx;
+    (void) fy;
+    (void) cx;
+    (void) cy;
     return 0;
 #endif
 }
@@ -242,6 +312,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_KpmBridge_nativeDestroySession(
 
     if (session->atlas) kpmDeleteRefDataSet(&session->atlas);
     if (session->handle) kpmDeleteHandle(&session->handle);
+    if (session->cameraParams) arParamLTFree(&session->cameraParams);
     delete session;
 #else
     (void) sessionValue;
