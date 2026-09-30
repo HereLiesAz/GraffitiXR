@@ -6,12 +6,12 @@ import java.nio.ByteBuffer
 /**
  * Low-level JNI bridge to the forked artoolkitX KPM tracker.
  *
- * This is intentionally a native primitive, not an ARCore replacement. :sphereslam owns the public
- * tracking API and feature/ar owns pose-source selection. ARCore continues to run through its own
- * ArCorePoseSource path.
+ * This is a native primitive used only by the side-by-side :sphereslam library. ARCore remains a
+ * separate first-class pose source in feature/ar.
  *
- * When third_party/artoolkitx is not checked out, the native side is compiled without HAVE_ARX_KPM
- * and every KPM entry point safely reports unavailable.
+ * The pinned artoolkitX binary/FREAK matcher requires camera calibration even though it exposes a
+ * homography-handle constructor, so runtime sessions are deliberately calibrated from fx/fy/cx/cy.
+ * When the artoolkitX submodule is absent, every KPM entry point safely reports unavailable.
  */
 object KpmBridge {
     init {
@@ -24,21 +24,29 @@ object KpmBridge {
         width > 0 && height > 0 && nativeKpmSmokeTest(width, height)
 
     /**
-     * Creates an independent homography-tracking session.
-     *
-     * The returned session does not contain camera calibration; its 3x4 result is a projective planar
-     * transform, not a metric ARCore-style world pose.
+     * Creates an independent calibrated KPM session. Distortion is currently treated as zero; the
+     * caller must supply intrinsics in the exact pixel coordinate system of the luma frames.
      */
-    fun createHomographySession(width: Int, height: Int): Long {
+    fun createCalibratedSession(
+        width: Int,
+        height: Int,
+        fx: Float,
+        fy: Float,
+        cx: Float,
+        cy: Float,
+    ): Long {
         require(width > 0 && height > 0)
-        return nativeCreateHomographySession(width, height)
+        require(fx > 0f && fy > 0f)
+        require(cx.isFinite() && cy.isFinite())
+        return nativeCreateCalibratedSession(width, height, fx, fy, cx, cy)
     }
 
     /**
      * Adds one planar reference image to the session's KPM atlas.
      *
-     * luma must be a direct, tightly packed width*height luminance buffer.
-     * Returns the number of generated reference features, or a negative error code.
+     * luma must be a direct, tightly packed width*height luminance buffer. KPM converts reference
+     * pixels to planar millimetres using referenceDpi, so translation scale is only as accurate as
+     * that value.
      */
     fun addPlanarPage(
         session: Long,
@@ -73,8 +81,8 @@ object KpmBridge {
      * Matches one tightly packed direct luma frame.
      *
      * On success returns pageNo and writes 14 floats to out:
-     * 0..11 = KPM 3x4 projective transform, 12 = reprojection error, 13 = inlier count.
-     * Returns -1 when there is no valid match.
+     * 0..11 = artoolkitX camera-from-reference-plane 3x4 transform (row-major),
+     * 12 = reprojection error, 13 = inlier count.
      */
     fun matchPlanar(session: Long, luma: ByteBuffer, out: FloatArray): Int {
         require(session != 0L)
@@ -89,7 +97,14 @@ object KpmBridge {
 
     private external fun nativeKpmAvailable(): Boolean
     private external fun nativeKpmSmokeTest(width: Int, height: Int): Boolean
-    private external fun nativeCreateHomographySession(width: Int, height: Int): Long
+    private external fun nativeCreateCalibratedSession(
+        width: Int,
+        height: Int,
+        fx: Float,
+        fy: Float,
+        cx: Float,
+        cy: Float,
+    ): Long
     private external fun nativeAddPlanarPage(
         session: Long,
         luma: ByteBuffer,
