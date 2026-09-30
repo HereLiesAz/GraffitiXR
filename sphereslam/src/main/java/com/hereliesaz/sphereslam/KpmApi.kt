@@ -4,7 +4,7 @@ import com.hereliesaz.graffitixr.nativebridge.KpmBridge
 import java.nio.ByteBuffer
 
 internal interface KpmApi {
-    fun create(width: Int, height: Int): Long
+    fun create(width: Int, height: Int, calibration: SphereSlamCalibration): Long
     fun addPage(
         session: Long,
         luma: ByteBuffer,
@@ -20,8 +20,15 @@ internal interface KpmApi {
 }
 
 internal object NativeKpmApi : KpmApi {
-    override fun create(width: Int, height: Int): Long =
-        KpmBridge.createHomographySession(width, height)
+    override fun create(width: Int, height: Int, calibration: SphereSlamCalibration): Long =
+        KpmBridge.createCalibratedSession(
+            width,
+            height,
+            calibration.fx,
+            calibration.fy,
+            calibration.cx,
+            calibration.cy,
+        )
 
     override fun addPage(
         session: Long,
