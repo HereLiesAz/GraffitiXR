@@ -1,36 +1,107 @@
 package com.hereliesaz.graffitixr.nativebridge
 
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
+import java.nio.ByteBuffer
 
 /**
- * JNI bridge to the forked artoolkitX KPM (keypoint matching) tracker, vendored as native source
- * under `third_party/artoolkitx` and built into the `graffitixr` library.
+ * Low-level JNI bridge to the forked artoolkitX KPM tracker.
  *
- * This is the non-ARCore tracking base. The plan on top of it: build a metric planar KPM page from
- * each captured view ([nativeKpmGenPageFromLuma], later), tile pages across the wall plane into one
- * mosaic ("fingerprint"), match live frames ([nativeKpmMatch], later) to recover 6-DoF pose including
- * toward/away translation from the planar homography, and grow the mosaic adaptively for overpaint
- * survival.
+ * This is intentionally a native primitive, not an ARCore replacement. :sphereslam owns the public
+ * tracking API and feature/ar owns pose-source selection. ARCore continues to run through its own
+ * ArCorePoseSource path.
  *
- * PHASE 1 (this file): a link smoke test only. [smokeTest] creates and destroys a KPM handle to prove
- * the forked KPM actually compiles and links in the NDK build on-device. When the artoolkitX submodule
- * isn't checked out (e.g. CI), the native side is compiled without KPM and every call returns
- * false/no-op — so the app and CI build unchanged.
+ * When third_party/artoolkitx is not checked out, the native side is compiled without HAVE_ARX_KPM
+ * and every KPM entry point safely reports unavailable.
  */
 object KpmBridge {
     init {
         NativeLibLoader.loadAll()
     }
 
-    /** True when the native library was built with the forked KPM present (submodule checked out). */
     fun isAvailable(): Boolean = runCatching { nativeKpmAvailable() }.getOrDefault(false)
 
+    fun smokeTest(width: Int, height: Int): Boolean =
+        width > 0 && height > 0 && nativeKpmSmokeTest(width, height)
+
     /**
-     * Create a KPM homography handle for [width]x[height] frames and immediately destroy it. Returns
-     * true if the handle was created — i.e. KPM is linked and callable. No camera, no matching.
+     * Creates an independent homography-tracking session.
+     *
+     * The returned session does not contain camera calibration; its 3x4 result is a projective planar
+     * transform, not a metric ARCore-style world pose.
      */
-    fun smokeTest(width: Int, height: Int): Boolean = nativeKpmSmokeTest(width, height)
+    fun createHomographySession(width: Int, height: Int): Long {
+        require(width > 0 && height > 0)
+        return nativeCreateHomographySession(width, height)
+    }
+
+    /**
+     * Adds one planar reference image to the session's KPM atlas.
+     *
+     * luma must be a direct, tightly packed width*height luminance buffer.
+     * Returns the number of generated reference features, or a negative error code.
+     */
+    fun addPlanarPage(
+        session: Long,
+        luma: ByteBuffer,
+        width: Int,
+        height: Int,
+        referenceDpi: Float,
+        pageNo: Int,
+        imageNo: Int,
+        maxFeatures: Int,
+    ): Int {
+        require(session != 0L)
+        require(luma.isDirect)
+        require(width > 0 && height > 0)
+        require(referenceDpi > 0f)
+        require(pageNo >= 0)
+        require(imageNo >= 0)
+        require(maxFeatures > 0)
+        return nativeAddPlanarPage(
+            session,
+            luma,
+            width,
+            height,
+            referenceDpi,
+            pageNo,
+            imageNo,
+            maxFeatures,
+        )
+    }
+
+    /**
+     * Matches one tightly packed direct luma frame.
+     *
+     * On success returns pageNo and writes 14 floats to out:
+     * 0..11 = KPM 3x4 projective transform, 12 = reprojection error, 13 = inlier count.
+     * Returns -1 when there is no valid match.
+     */
+    fun matchPlanar(session: Long, luma: ByteBuffer, out: FloatArray): Int {
+        require(session != 0L)
+        require(luma.isDirect)
+        require(out.size >= MATCH_OUTPUT_FLOATS)
+        return nativeMatchPlanar(session, luma, out)
+    }
+
+    fun destroySession(session: Long) {
+        if (session != 0L) nativeDestroySession(session)
+    }
 
     private external fun nativeKpmAvailable(): Boolean
     private external fun nativeKpmSmokeTest(width: Int, height: Int): Boolean
+    private external fun nativeCreateHomographySession(width: Int, height: Int): Long
+    private external fun nativeAddPlanarPage(
+        session: Long,
+        luma: ByteBuffer,
+        width: Int,
+        height: Int,
+        referenceDpi: Float,
+        pageNo: Int,
+        imageNo: Int,
+        maxFeatures: Int,
+    ): Int
+    private external fun nativeMatchPlanar(session: Long, luma: ByteBuffer, out: FloatArray): Int
+    private external fun nativeDestroySession(session: Long)
+
+    const val MATCH_OUTPUT_FLOATS = 14
 }
