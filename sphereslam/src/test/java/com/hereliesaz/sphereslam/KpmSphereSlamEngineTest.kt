@@ -9,11 +9,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KpmSphereSlamEngineTest {
+    private val calibration = SphereSlamCalibration(800f, 810f, 320f, 240f)
+
     @Test
-    fun addPage_andMatch_useIndependentNativeSession() {
+    fun addPage_andMatch_useIndependentCalibratedNativeSession() {
         val api = FakeKpmApi()
-        val engine = KpmSphereSlamEngine(4, 4, api)
+        val engine = KpmSphereSlamEngine(4, 4, calibration, api)
         assertTrue(engine.isReady)
+        assertEquals(calibration, api.createdWith)
 
         val reference = ByteBuffer.allocateDirect(16)
         val generated = engine.addPage(reference, 4, 4, PlanarPage(pageNo = 7))
@@ -25,7 +28,7 @@ class KpmSphereSlamEngineTest {
         assertEquals(7, match!!.pageNo)
         assertEquals(9, match.inlierCount)
         assertEquals(0.25f, match.reprojectionError, 0f)
-        assertEquals(12, match.projectiveTransform3x4.size)
+        assertEquals(12, match.cameraFromPage3x4.size)
 
         engine.close()
         assertFalse(engine.isReady)
@@ -35,7 +38,7 @@ class KpmSphereSlamEngineTest {
     @Test
     fun noMatch_returnsNull_withoutAffectingSession() {
         val api = FakeKpmApi(matchPage = -1)
-        val engine = KpmSphereSlamEngine(2, 2, api)
+        val engine = KpmSphereSlamEngine(2, 2, calibration, api)
 
         assertNull(engine.match(ByteBuffer.allocateDirect(4)))
         assertTrue(engine.isReady)
@@ -47,8 +50,16 @@ class KpmSphereSlamEngineTest {
         private val matchPage: Int = 7,
     ) : KpmApi {
         var destroyCalls = 0
+        var createdWith: SphereSlamCalibration? = null
 
-        override fun create(width: Int, height: Int): Long = 123L
+        override fun create(
+            width: Int,
+            height: Int,
+            calibration: SphereSlamCalibration,
+        ): Long {
+            createdWith = calibration
+            return 123L
+        }
 
         override fun addPage(
             session: Long,
