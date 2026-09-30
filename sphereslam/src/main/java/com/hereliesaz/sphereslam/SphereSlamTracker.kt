@@ -100,6 +100,22 @@ class SphereSlamTracker(
         }
     }
 
+    /**
+     * Start a fresh wall atlas with this calibrated camera. Used by a new target capture so pages
+     * from an older wall cannot contaminate the new reference. The reset and following page-add are
+     * ordered on the same worker.
+     */
+    fun reset(camera: CameraModel) {
+        if (closed.get()) return
+        worker.execute {
+            if (closed.get()) return@execute
+            destroyHandle()
+            cameraModel = camera
+            latest.set(null)
+            nativeHandle = if (native.available) native.create(camera) else 0L
+        }
+    }
+
     fun setReference(
         luma: ByteBuffer,
         width: Int,
