@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import com.hereliesaz.graffitixr.design.theme.rememberAppStrings
 import com.hereliesaz.graffitixr.feature.ar.rendering.HomographyOverlayRenderer
@@ -73,6 +74,8 @@ fun SphereSlamStandaloneOverlay(
     persistedReferenceWidthMeters: Float = 1f,
     persistedReferencePhysicallyMetric: Boolean = false,
     onReferenceCaptured: (Bitmap, Float, Boolean) -> Unit = { _, _, _ -> },
+    adjustment: ModeAdjustment? = null,
+    onUnitsPerPixel: (Float) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -87,6 +90,8 @@ fun SphereSlamStandaloneOverlay(
         mutableStateOf(persistedReferencePhysicallyMetric)
     }
     var referenceReady by remember { mutableStateOf(false) }
+    var referenceWidthUnits by remember { mutableStateOf(0f) }
+    var referenceHeightUnits by remember { mutableStateOf(0f) }
     var isTrackingLost by remember { mutableStateOf(true) }
     var fatalMessage by remember { mutableStateOf<String?>(null) }
 
@@ -197,6 +202,46 @@ fun SphereSlamStandaloneOverlay(
         designBitmap?.let(glRenderer::updateDesignBitmap)
     }
 
+    LaunchedEffect(
+        glRenderer,
+        adjustment?.offsetX,
+        adjustment?.offsetY,
+        adjustment?.scale,
+        adjustment?.rotation,
+        adjustment?.rotationX,
+        adjustment?.rotationY,
+    ) {
+        glRenderer.setTransform(
+            panX = adjustment?.offsetX ?: 0f,
+            panY = adjustment?.offsetY ?: 0f,
+            scale = adjustment?.scale ?: 1f,
+            // Stored model convention is CW+ in screen space; GL wall-local +Z is CCW+.
+            rotationZDeg = -(adjustment?.rotation ?: 0f),
+            rotationXDeg = adjustment?.rotationX ?: 0f,
+            rotationYDeg = adjustment?.rotationY ?: 0f,
+        )
+    }
+
+    LaunchedEffect(glRenderer, designBitmap, referenceWidthUnits, referenceHeightUnits) {
+        val pageW = referenceWidthUnits
+        val pageH = referenceHeightUnits
+        if (pageW <= 0f || pageH <= 0f) return@LaunchedEffect
+
+        val bitmap = designBitmap
+        if (bitmap == null || bitmap.width <= 0 || bitmap.height <= 0) {
+            glRenderer.setExtent(pageW * 0.5f, pageH * 0.5f)
+        } else {
+            val aspect = bitmap.width.toFloat() / bitmap.height.toFloat()
+            var designW = pageW
+            var designH = designW / aspect
+            if (designH > pageH) {
+                designH = pageH
+                designW = designH * aspect
+            }
+            glRenderer.setExtent(designW * 0.5f, designH * 0.5f)
+        }
+    }
+
     val cameraId by produceState<String?>(initialValue = null, cameraController, reference) {
         while (value == null) {
             value = runCatching {
@@ -220,11 +265,13 @@ fun SphereSlamStandaloneOverlay(
                 referenceImage = referenceImage,
                 onReferenceReady = { registered: SphereSlamStandaloneSession.Reference ->
                     val g = registered.geometry
-                    glRenderer.setExtent(g.widthMeters * 0.5f, g.heightMeters * 0.5f)
+                    referenceWidthUnits = g.widthMeters
+                    referenceHeightUnits = g.heightMeters
                     referenceReady = true
                 },
                 onFrameTracked = { frame ->
                     isTrackingLost = frame == null
+                    onUnitsPerPixel(frame?.unitsPerPixel ?: 0f)
                     if (frame == null) {
                         glRenderer.clearPose()
                     } else {

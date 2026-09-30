@@ -48,6 +48,8 @@ data class SphereSlamStandaloneFrame(
     val pageNo: Int,
     val reprojectionError: Float,
     val inlierCount: Int,
+    /** Wall/render units represented by one vertical display-frame pixel at the target centre. */
+    val unitsPerPixel: Float,
     val source: SphereSlamStandalonePoseSource,
 ) {
     init {
@@ -159,6 +161,11 @@ class SphereSlamStandaloneTrackingAnalyzer(
                     pageNo = pose.pageNo,
                     reprojectionError = pose.reprojectionError,
                     inlierCount = pose.inlierCount,
+                    unitsPerPixel = unitsPerPixel(
+                        pose.viewMatrix,
+                        projection,
+                        rotated.height,
+                    ),
                     source = SphereSlamStandalonePoseSource.KPM,
                 )
                 lastGood = tracked
@@ -246,6 +253,17 @@ class SphereSlamStandaloneTrackingAnalyzer(
             timestampNs = timestampNs,
             source = SphereSlamStandalonePoseSource.IMU_BRIDGE,
         )
+    }
+
+    private fun unitsPerPixel(
+        viewMatrix: FloatArray,
+        projection: FloatArray,
+        frameHeightPixels: Int,
+    ): Float {
+        if (frameHeightPixels <= 0 || projection[5] == 0f) return 0f
+        val depth = kotlin.math.abs(viewMatrix[14])
+        val tanHalfFovY = 1f / projection[5]
+        return depth * 2f * tanHalfFovY / frameHeightPixels.toFloat()
     }
 
     private fun directFrame(bytes: ByteArray): ByteBuffer {
