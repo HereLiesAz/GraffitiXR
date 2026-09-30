@@ -72,11 +72,28 @@ if(EXISTS ${ARX_ROOT}/KPM/include/ARX/KPM/kpm.h)
         message(FATAL_ERROR "graffitixr: artoolkitX JPEG library missing for ABI ${ANDROID_ABI}: ${ARX_JPEG_LIB}")
     endif()
 
-    # KPM owns its FREAK matcher under this tree. The AR C sources provide the matrix/ICP and camera
-    # parameter symbols KPM references; ARUtil/log.c supplies ARLOG*. OCVT is intentionally excluded.
-    file(GLOB_RECURSE ARX_KPM_SRC CONFIGURE_DEPENDS
-        ${ARX_ROOT}/KPM/*.cpp
-        ${ARX_ROOT}/KPM/*.c
+    # Match artoolkitX's own KPM CMake source list exactly. Do not recursively glob FreakMatcher:
+    # that tree contains optional database-IO translation units that upstream itself does not build.
+    set(ARX_KPM_SRC
+        ${ARX_ROOT}/KPM/kpmHandle.cpp
+        ${ARX_ROOT}/KPM/kpmRefDataSet.cpp
+        ${ARX_ROOT}/KPM/kpmMatching.cpp
+        ${ARX_ROOT}/KPM/kpmResult.cpp
+        ${ARX_ROOT}/KPM/kpmUtil.cpp
+        ${ARX_ROOT}/KPM/kpmFopen.c
+        ${ARX_ROOT}/KPM/FreakMatcher/detectors/DoG_scale_invariant_detector.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/detectors/gaussian_scale_space_pyramid.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/detectors/gradients.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/detectors/harris.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/detectors/orientation_assignment.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/detectors/pyramid.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/facade/visual_database_facade.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/matchers/hough_similarity_voting.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/matchers/freak.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/framework/date_time.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/framework/image.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/framework/logger.cpp
+        ${ARX_ROOT}/KPM/FreakMatcher/framework/timers.cpp
     )
     file(GLOB_RECURSE ARX_AR_C_SRC CONFIGURE_DEPENDS
         ${ARX_ROOT}/AR/*.c
