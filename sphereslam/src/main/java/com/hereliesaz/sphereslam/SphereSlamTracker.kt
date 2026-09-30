@@ -204,11 +204,11 @@ class SphereSlamTracker(
     private object KpmNative : Native {
         override val available: Boolean get() = KpmBridge.isAvailable()
 
-        override fun create(camera: CameraModel): Long = KpmBridge.createTracker(
+        override fun create(camera: CameraModel): Long = KpmBridge.createCalibratedSession(
             camera.width, camera.height, camera.fx, camera.fy, camera.cx, camera.cy
         )
 
-        override fun destroy(handle: Long) = KpmBridge.destroyTracker(handle)
+        override fun destroy(handle: Long) = KpmBridge.destroySession(handle)
 
         override fun setReference(
             handle: Long,
@@ -219,18 +219,33 @@ class SphereSlamTracker(
             pageNo: Int,
             imageNo: Int,
             maxFeatures: Int,
-        ): Boolean = KpmBridge.setReference(
-            handle, luma, width, height, dpi, pageNo, imageNo, maxFeatures
-        )
+        ): Boolean {
+            val direct = ByteBuffer.allocateDirect(luma.size)
+            direct.put(luma).rewind()
+            return KpmBridge.addPlanarPage(
+                handle,
+                direct,
+                width,
+                height,
+                dpi,
+                pageNo,
+                imageNo,
+                maxFeatures,
+            ) > 0
+        }
 
         override fun match(handle: Long, luma: ByteArray, timestampNs: Long): Observation? {
-            val match = KpmBridge.match(handle, luma, timestampNs) ?: return null
+            val direct = ByteBuffer.allocateDirect(luma.size)
+            direct.put(luma).rewind()
+            val out = FloatArray(KpmBridge.MATCH_OUTPUT_FLOATS)
+            val pageNo = KpmBridge.matchPlanar(handle, direct, out)
+            if (pageNo < 0) return null
             return Observation(
-                match.timestampNs,
-                match.pageNo,
-                match.error,
-                match.inliers,
-                match.pageToCamera3x4,
+                timestampNs = timestampNs,
+                pageNo = pageNo,
+                error = out[12],
+                inliers = out[13].toInt(),
+                pageToCamera3x4 = out.copyOfRange(0, 12),
             )
         }
     }
