@@ -3,10 +3,28 @@ package com.hereliesaz.sphereslam
 import java.nio.ByteBuffer
 
 /**
+ * Pixel-space camera calibration for a SphereSLAM frame.
+ *
+ * Distortion is currently assumed zero. The values must describe the same orientation and pixel
+ * dimensions as the luma frames passed to the engine.
+ */
+data class SphereSlamCalibration(
+    val fx: Float,
+    val fy: Float,
+    val cx: Float,
+    val cy: Float,
+) {
+    init {
+        require(fx > 0f && fy > 0f)
+        require(cx.isFinite() && cy.isFinite())
+    }
+}
+
+/**
  * One planar KPM reference image.
  *
- * referenceDpi controls the reference coordinate scale inside KPM. Until calibrated camera
- * intrinsics + a physical wall scale are supplied, it must not be interpreted as real-world metres.
+ * KPM uses referenceDpi to map pixels onto its planar coordinate system in millimetres. That means
+ * the returned translation scale is only physically metric when referenceDpi is physically correct.
  */
 data class PlanarPage(
     val pageNo: Int,
@@ -23,21 +41,21 @@ data class PlanarPage(
 }
 
 /**
- * Result of planar KPM tracking.
+ * Result of calibrated planar KPM tracking.
  *
- * projectiveTransform3x4 is KPM homography-mode output in row-major order. It is deliberately not
- * called a camera pose: without camera calibration it is not equivalent to ARCore's metric 6-DoF
- * world-to-view matrix.
+ * cameraFromPage3x4 is artoolkitX's row-major camera-from-reference-plane pose. Translation is in
+ * KPM's reference-plane millimetres; do not treat it as an ARCore/OpenGL view matrix until the
+ * coordinate-convention adapter is applied.
  */
 data class PlanarMatch(
     val pageNo: Int,
-    val projectiveTransform3x4: FloatArray,
+    val cameraFromPage3x4: FloatArray,
     val reprojectionError: Float,
     val inlierCount: Int,
 ) {
     init {
         require(pageNo >= 0)
-        require(projectiveTransform3x4.size == 12)
+        require(cameraFromPage3x4.size == 12)
         require(inlierCount >= 0)
     }
 }
@@ -48,6 +66,7 @@ data class PlanarMatch(
 interface SphereSlamEngine : AutoCloseable {
     val frameWidth: Int
     val frameHeight: Int
+    val calibration: SphereSlamCalibration
     val isReady: Boolean
 
     fun addPage(luma: ByteBuffer, width: Int, height: Int, page: PlanarPage): Int
