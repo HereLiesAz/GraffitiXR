@@ -697,6 +697,9 @@ class ArRenderer(
     // The pose seam: the camera pose that drives the native SLAM map flows through this, not off the
     // ARCore frame directly, so a non-ARCore VIO can later feed the same consumer. See PoseSource.
     private val poseSource = com.hereliesaz.graffitixr.feature.ar.pose.ArCorePoseSource()
+    // Parallel wall tracker. It observes camera luma beside ARCore; it never replaces poseSource.
+    // Its output is reserved for relocalization/drift fusion once metric page scale is established.
+    private val sphereSlamTracker = com.hereliesaz.sphereslam.SphereSlamTracker()
     private val mappingViewMatrixScratch = FloatArray(16)
     private val backboneScratch = FloatArray(16)
     // Scratch for composing the overlay matrix (anchor frame * in-plane transform).
@@ -2073,6 +2076,27 @@ class ArRenderer(
                 captureRequested = false
                 try {
                     frame.acquireCameraImage().use { image ->
+                        // Seed a fresh SphereSLAM planar atlas from the same target capture ARCore
+                        // continues to use. KPM receives calibrated image intrinsics, but remains a
+                        // sidecar: no matrix from it is allowed to replace ARCore's primary pose.
+                        val sphereY = image.planes[0]
+                        sphereSlamTracker.reset(
+                            com.hereliesaz.sphereslam.SphereSlamTracker.CameraModel(
+                                width = image.width,
+                                height = image.height,
+                                fx = intrinsics.focalLength[0],
+                                fy = intrinsics.focalLength[1],
+                                cx = intrinsics.principalPoint[0],
+                                cy = intrinsics.principalPoint[1],
+                            )
+                        )
+                        sphereSlamTracker.setReference(
+                            luma = sphereY.buffer,
+                            width = image.width,
+                            height = image.height,
+                            rowStride = sphereY.rowStride,
+                        )
+
                         val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
                         // Real native YUV→RGBA (OpenCV NEON on ARM). Replaces the fake "direct"
                         // path that went via YuvImage.compressToJpeg + BitmapFactory.decodeByteArray
@@ -2305,6 +2329,20 @@ class ArRenderer(
                             frame.timestamp,
                             cvRotateCode
                         )
+                        // KPM is deliberately lower-rate and asynchronous. ARCore still updates
+                        // every render frame; SphereSLAM gets a luma snapshot only often enough to
+                        // relocalize without turning the GL thread into a photocopier.
+                        if (frameCount % SPHERESLAM_FEED_DIVISOR == 0 &&
+                            sphereSlamTracker.isReferenceReady
+                        ) {
+                            sphereSlamTracker.submitFrame(
+                                luma = planes[0].buffer,
+                                width = image.width,
+                                height = image.height,
+                                rowStride = planes[0].rowStride,
+                                timestampNs = frame.timestamp,
+                            )
+                        }
                     }
                 } catch (_: com.google.ar.core.exceptions.NotYetAvailableException) {
                     // Normal on first frames
@@ -2985,6 +3023,7 @@ class ArRenderer(
         watchdog?.interrupt()
         watchdog = null
         backgroundScope.cancel("Renderer detached and destroyed.")
+        sphereSlamTracker.close()
         // Bounded acquisition only. If the GL thread is wedged mid-frame holding the lock,
         // fall through and null the @Volatile session anyway: isDestroying (checked at the
         // top of onDrawFrame) already stops any NEW frame from touching it, and the wedged
@@ -3013,6 +3052,10 @@ class ArRenderer(
     }
 
     private companion object {
+        // KPM is a relocalization sidecar, not the primary frame-to-frame tracker. 10 Hz at a
+        // typical 60-fps render cadence is enough for wall reacquisition while ARCore stays full-rate.
+        const val SPHERESLAM_FEED_DIVISOR = 6
+
         // PnP inlier floor for the doodle swap — self-grow itself trusts a relock at >= 20 inliers
         // (MobileGS), so the same bar means "relocalization has confidently latched onto the marks".
         const val DOODLE_MIN_RELOC_INLIERS = 20
