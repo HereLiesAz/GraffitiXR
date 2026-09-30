@@ -95,6 +95,15 @@ android {
         versionCode = currentVersionCode
         versionName = currentVersionName
 
+        // Non-ARCore (artoolkitX) smoke test: build with -PposeProbe=true to run the non-ARCore pose
+        // source at app launch and log poses to logcat (tag POSEPROBE), independent of the ARCore-gated
+        // AR mode. Default false — zero effect on normal builds.
+        buildConfigField(
+            "boolean",
+            "POSE_FORCE_PROBE",
+            ((project.findProperty("poseProbe") as String?)?.toBoolean() ?: false).toString(),
+        )
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
