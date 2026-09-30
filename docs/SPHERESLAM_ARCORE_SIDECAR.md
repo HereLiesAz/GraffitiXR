@@ -1,4 +1,4 @@
-# SphereSLAM + ARCore Sidecar Integration
+# SphereSLAM Hybrid + Standalone Integration
 
 Status: implemented on `feat/sphereslam-parallel-arcore` as a follow-up to merged PR #1959.
 
@@ -59,10 +59,25 @@ purpose**.
 
 ### Current implementation status
 
-This branch implements the Mode A KPM sidecar foundation only. It does **not** yet implement the
-complete Mode B continuous tracker, CameraX/IMU camera pipeline, or ARCore-independent anchor model.
-Until those pieces exist, the current UI still disables AR mode when ARCore is unavailable. That is
-a temporary implementation limitation, not the intended product behavior.
+This branch now has a first functional Mode B path as well as Mode A:
+
+- AR mode stays visible on devices where ARCore resolves unsupported;
+- CameraX owns the standalone camera;
+- the Y plane is packed with its real row/pixel stride and rotated into display orientation;
+- Camera2 intrinsics are rotated through the same display transform as the pixels;
+- a rectified wall target becomes a calibrated KPM reference page;
+- KPM's camera-from-page 3x4 is converted with artoolkitX's own right-handed OpenGL convention;
+- the KPM lower-left page frame is shifted to a centered renderer frame;
+- KPM millimetres are converted into the renderer's shared units;
+- the design is rendered directly from that wall-relative view/projection pair;
+- the existing fused game-rotation sensor bridges visual losses for at most 400 ms without
+  inventing translational motion;
+- the rectified canonical wall page is persisted as `sphereslam_reference.png` in the project and
+  restored on reopen/import, rebuilding the KPM atlas locally.
+
+The initial standalone target uses a normalized 1.0-unit page width, so registration is internally
+consistent but distance readouts are **not** physically metric yet. A future measured-width/depth
+path can set the same API to a true physical width without changing the pose math.
 
 The app manifest already marks ARCore optional, so installability on non-ARCore devices is preserved.
 
@@ -316,18 +331,29 @@ Not implemented yet for the hybrid path:
 - adding additional pages during adaptive wall-map growth;
 - device validation of KPM reacquisition while walking toward/away from the wall.
 
-Not implemented yet for required standalone operation:
+Implemented for initial standalone wall tracking:
 
-- a continuous SphereSLAM visual-inertial 6-DoF tracker (KPM matches alone are not sufficient);
 - CameraX/raw-camera ownership when there is no ARCore `Session`;
-- IMU ingestion and camera/IMU timestamp alignment;
-- metric initialization and scale recovery without ARCore depth/pose;
-- a `SphereSlamPoseSource` that fulfills the existing `PoseSource` matrix contract;
-- an ARCore-independent anchor/wall transform model;
-- ARCore-independent hit testing / wall placement;
-- a camera-background renderer driven by the standalone camera stream;
-- runtime backend selection that keeps AR mode enabled when SphereSLAM standalone is ready;
-- end-to-end tests on an actually ARCore-unsupported device.
+- calibrated, display-oriented camera input;
+- KPM wall-relative 6-DoF pose;
+- a 400 ms fused-gyro orientation bridge for short visual misses;
+- ARCore-independent centered wall transform and OpenGL overlay rendering;
+- runtime routing that keeps AR mode enabled without ARCore;
+- persisted canonical KPM wall reference with project import relocation.
+
+Still required for full standalone parity:
+
+- physical scale acquisition (measured target width, depth alternative, or another explicit source)
+  before any UI reports real-world metres;
+- integration with GraffitiXR's normal target-review/fingerprint workflow instead of the current
+  standalone capture/unwarp surface;
+- the normal AR design pan/scale/rotate/tone controls applied to the standalone renderer;
+- MobileGS paint-progress/corroboration integration on the standalone camera feed;
+- saved wide-area/self-growing wall-map pages beyond the canonical target;
+- equivalents or deliberate degradations for ARCore plane/depth/cloud-anchor-only features;
+- co-op calibration on the standalone coordinate frame;
+- device validation on actually ARCore-unsupported hardware, including rotation changes, occlusion,
+  process recreation, export/import, and return-visit reacquisition.
 
 There is also one cleanup item: the asynchronous runtime adapter currently talks to
 `KpmBridge` directly while the merged library already exposes `SphereSlamEngine`. A later cleanup

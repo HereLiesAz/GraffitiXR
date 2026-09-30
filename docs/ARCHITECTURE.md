@@ -80,8 +80,11 @@ architectural roles:
   continuous metric 6-DoF `PoseSource`, wall anchoring, and relocalization without an ARCore
   `Session`.
 
-The code currently implements the calibrated KPM sidecar portion of the first role; the continuous
-standalone tracker is still required work. See
+The code now implements both the calibrated hybrid KPM sidecar and an initial standalone
+wall-target path. On non-ARCore devices CameraX supplies display-oriented luminance + intrinsics,
+KPM supplies the wall-relative 6-DoF pose while the target is visible, and the fused game-rotation
+sensor bridges very short visual dropouts without inventing translation. Standalone parity with the
+full ARCore feature set is still in progress. See
 [`SPHERESLAM_ARCORE_SIDECAR.md`](SPHERESLAM_ARCORE_SIDECAR.md).
 
 ## Data Flow (AR Pipeline)
@@ -113,11 +116,12 @@ frame.acquireCameraImage() [YUV] ────────────┼► slam
 ~~~
 
 **Tracking backend selection:** on ARCore-capable devices, `ArCorePoseSource` supplies the live
-renderer pose while SphereSLAM runs asynchronously beside it and currently publishes wall-relative
-observations only. On ARCore-unavailable devices, the required end state is a standalone
-`SphereSlamPoseSource` backed by raw camera + IMU input; AR mode must not be removed merely because
-ARCore is missing. The current build has not completed that standalone path yet. The detailed
-contract, calibration assumptions, threading model, and remaining work are documented in
+renderer pose while SphereSLAM runs asynchronously beside it. On ARCore-unavailable devices,
+`MainScreen` keeps AR mode reachable and switches camera ownership to CameraX; the standalone
+SphereSLAM analyzer converts each successful KPM wall match directly into the OpenGL view matrix
+used by the transparent overlay renderer. A short fused-gyro bridge covers brief visual misses.
+The detailed contract, calibration assumptions, threading model, and remaining parity work are
+documented in
 [`SPHERESLAM_ARCORE_SIDECAR.md`](SPHERESLAM_ARCORE_SIDECAR.md).
 
 **Camera ownership:**
