@@ -6,8 +6,8 @@ import java.nio.ByteBuffer
 /**
  * Low-level JNI bridge to the forked artoolkitX KPM tracker.
  *
- * This is a native primitive used only by the side-by-side :sphereslam library. ARCore remains a
- * separate first-class pose source in feature/ar.
+ * This is the native primitive used by :sphereslam in both hybrid and standalone tracking modes.
+ * ARCore remains a separate first-class pose source in feature/ar when the device supports it.
  *
  * The pinned artoolkitX binary/FREAK matcher requires camera calibration even though it exposes a
  * homography-handle constructor, so runtime sessions are deliberately calibrated from fx/fy/cx/cy.
