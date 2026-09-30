@@ -5,9 +5,10 @@ import java.nio.ByteBuffer
 internal class KpmSphereSlamEngine(
     override val frameWidth: Int,
     override val frameHeight: Int,
+    override val calibration: SphereSlamCalibration,
     private val api: KpmApi,
 ) : SphereSlamEngine {
-    private var session: Long = api.create(frameWidth, frameHeight)
+    private var session: Long = api.create(frameWidth, frameHeight, calibration)
     private val scratch = FloatArray(14)
 
     override val isReady: Boolean
@@ -43,7 +44,7 @@ internal class KpmSphereSlamEngine(
 
         return PlanarMatch(
             pageNo = pageNo,
-            projectiveTransform3x4 = scratch.copyOfRange(0, 12),
+            cameraFromPage3x4 = scratch.copyOfRange(0, 12),
             reprojectionError = scratch[12],
             inlierCount = scratch[13].toInt().coerceAtLeast(0),
         )
