@@ -214,6 +214,13 @@ data class ArUiState(
     // every cold start before the check resolves.
     val isArCoreAvailabilityResolved: Boolean = false,
 
+    // Persisted canonical wall page for the ARCore-independent SphereSLAM path. Null means this
+    // project has not captured a standalone target yet. Width is only a physical measurement when
+    // the accompanying flag is true; the initial implementation stores a normalized 1.0-unit page.
+    val sphereSlamReferenceUri: Uri? = null,
+    val sphereSlamReferenceWidthMeters: Float = 1f,
+    val sphereSlamReferencePhysicallyMetric: Boolean = false,
+
     // Mirrors the runtime camera permission state so AR overlays can react without
     // threading the raw permission flag all the way into every composable.
     val hasCameraPermission: Boolean = false,

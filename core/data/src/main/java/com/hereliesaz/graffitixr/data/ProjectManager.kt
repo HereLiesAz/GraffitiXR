@@ -124,6 +124,18 @@ class ProjectManager @Inject constructor(
                     // can wipe an existing target.
                     targetFingerprint = projectData.targetFingerprint ?: existing.targetFingerprint,
                     targetFingerprintPath = projectData.targetFingerprintPath ?: existing.targetFingerprintPath,
+                    // Standalone SphereSLAM's canonical wall page is just as persistent as the
+                    // fingerprint: routine/stale saves must not silently erase it.
+                    sphereSlamReferenceUri =
+                        projectData.sphereSlamReferenceUri ?: existing.sphereSlamReferenceUri,
+                    sphereSlamReferenceWidthMeters =
+                        if (projectData.sphereSlamReferenceUri != null)
+                            projectData.sphereSlamReferenceWidthMeters
+                        else existing.sphereSlamReferenceWidthMeters,
+                    sphereSlamReferencePhysicallyMetric =
+                        if (projectData.sphereSlamReferenceUri != null)
+                            projectData.sphereSlamReferencePhysicallyMetric
+                        else existing.sphereSlamReferencePhysicallyMetric,
                     wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
                     paintMarks = projectData.paintMarks ?: existing.paintMarks,
                     paintGrid = projectData.paintGrid ?: existing.paintGrid,
@@ -218,6 +230,37 @@ class ProjectManager @Inject constructor(
             }
         }
         return uris.drop(overflow)
+    }
+
+    /**
+     * Persist the canonical rectified wall page used by standalone SphereSLAM.
+     *
+     * The filename is stable on purpose: a recapture replaces the old canonical page instead of
+     * growing an unbounded second capture history. Project export already zips the whole project
+     * directory, so this artifact automatically round-trips with .gxr files.
+     */
+    suspend fun saveSphereSlamReference(
+        context: Context,
+        projectId: String,
+        bitmap: Bitmap,
+    ): Uri = withContext(Dispatchers.IO) {
+        val root = File(context.filesDir, "projects/$projectId").also { if (!it.exists()) it.mkdirs() }
+        val target = File(root, "sphereslam_reference.png")
+        val tmp = File.createTempFile("sphereslam_reference_", ".tmp", root)
+        try {
+            FileOutputStream(tmp).use { out ->
+                check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) {
+                    "Could not encode SphereSLAM reference image"
+                }
+            }
+            if (target.exists() && !target.delete()) {
+                error("Could not replace existing SphereSLAM reference")
+            }
+            check(tmp.renameTo(target)) { "Could not install SphereSLAM reference image" }
+        } finally {
+            if (tmp.exists()) tmp.delete()
+        }
+        uriProvider.getUriForFile(target)
     }
 
     /**

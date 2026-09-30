@@ -1103,6 +1103,15 @@ class ArViewModel @Inject constructor(
         }
         viewModelScope.launch {
             projectRepository.currentProject.collect { project ->
+                _uiState.update {
+                    it.copy(
+                        sphereSlamReferenceUri = project?.sphereSlamReferenceUri,
+                        sphereSlamReferenceWidthMeters =
+                            project?.sphereSlamReferenceWidthMeters ?: 1f,
+                        sphereSlamReferencePhysicallyMetric =
+                            project?.sphereSlamReferencePhysicallyMetric ?: false,
+                    )
+                }
                 if (project != null) {
                     loadedProjectId = project.id
                     loadMapIfExists()
@@ -1871,6 +1880,43 @@ class ArViewModel @Inject constructor(
             } ?: false
         } finally {
             try { appCtx.unbindService(conn) } catch (_: Exception) {}
+        }
+    }
+
+    /**
+     * Save the rectified page that lets the standalone SphereSLAM path relocalize this project on a
+     * later visit. File IO and the repository update run off Main; tracking can begin immediately
+     * from the in-memory bitmap while this persists.
+     */
+    fun saveSphereSlamReference(
+        bitmap: Bitmap,
+        referenceWidthMeters: Float = 1f,
+        physicallyMetric: Boolean = false,
+    ) {
+        require(referenceWidthMeters.isFinite() && referenceWidthMeters > 0f)
+        val projectId = projectRepository.currentProject.value?.id ?: return
+        viewModelScope.launch(dispatchers.io) {
+            try {
+                val uri = projectManager.saveSphereSlamReference(appContext, projectId, bitmap)
+                projectRepository.updateProject { current ->
+                    if (current.id != projectId) current
+                    else current.copy(
+                        sphereSlamReferenceUri = uri,
+                        sphereSlamReferenceWidthMeters = referenceWidthMeters,
+                        sphereSlamReferencePhysicallyMetric = physicallyMetric,
+                    )
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to persist standalone SphereSLAM reference")
+                _feedback.tryEmit(
+                    com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                        "Wall tracking works for this session, but the SphereSLAM target couldn't be saved.",
+                        e,
+                    ),
+                )
+            }
         }
     }
 

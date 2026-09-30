@@ -1,7 +1,9 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.PixelFormat
+import android.net.Uri
 import android.opengl.GLSurfaceView
 import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.Camera2CameraInfo
@@ -67,6 +69,10 @@ private val SPHERESLAM_DEFAULT_UNWARP_POINTS = listOf(
 fun SphereSlamStandaloneOverlay(
     cameraController: LifecycleCameraController,
     designBitmap: Bitmap?,
+    persistedReferenceUri: Uri? = null,
+    persistedReferenceWidthMeters: Float = 1f,
+    persistedReferencePhysicallyMetric: Boolean = false,
+    onReferenceCaptured: (Bitmap, Float, Boolean) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -76,6 +82,10 @@ fun SphereSlamStandaloneOverlay(
     var rawCaptureBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var unwarpPoints by remember { mutableStateOf(SPHERESLAM_DEFAULT_UNWARP_POINTS) }
     var referenceBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var activeReferenceWidthMeters by remember { mutableStateOf(persistedReferenceWidthMeters) }
+    var activeReferencePhysicallyMetric by remember {
+        mutableStateOf(persistedReferencePhysicallyMetric)
+    }
     var referenceReady by remember { mutableStateOf(false) }
     var isTrackingLost by remember { mutableStateOf(true) }
     var fatalMessage by remember { mutableStateOf<String?>(null) }
@@ -87,6 +97,21 @@ fun SphereSlamStandaloneOverlay(
         referenceReady = false
         isTrackingLost = true
         fatalMessage = null
+    }
+
+    LaunchedEffect(persistedReferenceUri) {
+        val uri = persistedReferenceUri ?: return@LaunchedEffect
+        if (referenceBitmap != null) return@LaunchedEffect
+        val restored = withContext(Dispatchers.IO) {
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.use(BitmapFactory::decodeStream)
+            }.getOrNull()
+        }
+        if (restored != null) {
+            activeReferenceWidthMeters = persistedReferenceWidthMeters
+            activeReferencePhysicallyMetric = persistedReferencePhysicallyMetric
+            referenceBitmap = restored
+        }
     }
 
     val reference = referenceBitmap
@@ -138,8 +163,11 @@ fun SphereSlamStandaloneOverlay(
                                 fatalMessage = "Couldn't rectify that target — mark four clear corners."
                                 rawCaptureBitmap = null
                             } else {
+                                activeReferenceWidthMeters = 1f
+                                activeReferencePhysicallyMetric = false
                                 referenceBitmap = unwarped
                                 rawCaptureBitmap = null
+                                onReferenceCaptured(unwarped, 1f, false)
                             }
                         }
                     }
@@ -159,8 +187,8 @@ fun SphereSlamStandaloneOverlay(
             luma = bitmapToLuma(reference),
             width = reference.width,
             height = reference.height,
-            referenceWidthMeters = 1f,
-            physicallyMetric = false,
+            referenceWidthMeters = activeReferenceWidthMeters,
+            physicallyMetric = activeReferencePhysicallyMetric,
         )
     }
     val glRenderer = remember(context) { HomographyOverlayRenderer(context) }

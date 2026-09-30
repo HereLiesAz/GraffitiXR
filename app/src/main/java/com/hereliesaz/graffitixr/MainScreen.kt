@@ -137,6 +137,17 @@ fun MainScreen(
                         com.hereliesaz.graffitixr.feature.ar.SphereSlamStandaloneOverlay(
                             cameraController = cameraController,
                             designBitmap = uiState.design?.takeIf { it.isVisible }?.bitmap,
+                            persistedReferenceUri = arUiState.sphereSlamReferenceUri,
+                            persistedReferenceWidthMeters = arUiState.sphereSlamReferenceWidthMeters,
+                            persistedReferencePhysicallyMetric =
+                                arUiState.sphereSlamReferencePhysicallyMetric,
+                            onReferenceCaptured = { bitmap, widthMeters, physicallyMetric ->
+                                arViewModel.saveSphereSlamReference(
+                                    bitmap,
+                                    widthMeters,
+                                    physicallyMetric,
+                                )
+                            },
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {
