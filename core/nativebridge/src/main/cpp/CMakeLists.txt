@@ -109,6 +109,7 @@ if(EXISTS ${ARX_ROOT}/KPM/include/ARX/KPM/kpm.h)
 
     set(ARX_SUPPORT_SRC
         ${ARX_ROOT}/ARUtil/log.c
+        ${ARX_ROOT}/ARUtil/file_utils.c
     )
 
     add_library(arx_kpm STATIC
