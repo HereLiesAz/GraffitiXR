@@ -78,6 +78,9 @@ fun MainScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val rendererRef = remember { mutableStateOf<ArRenderer?>(null) }
+    // ARCore mode publishes metres/pixel through ArRenderer. Standalone SphereSLAM has no
+    // ArRenderer, so its CameraX/KPM path publishes the same wall-unit/pixel quantity here.
+    var standaloneArUnitsPerPixel by remember { mutableFloatStateOf(0f) }
 
     val bgColor = if (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY) Transparent else uiState.canvasBackground
     Box(modifier = Modifier.fillMaxSize().background(bgColor)) {
@@ -134,9 +137,35 @@ fun MainScreen(
                             controller = cameraController,
                             modifier = Modifier.fillMaxSize(),
                         )
+
+                        val standaloneDesign = uiState.design?.takeIf {
+                            it.isVisible && it.bitmap != null
+                        }
+                        val standaloneAdj = uiState.modeAdjustments[EditorMode.AR]
+                        var standaloneTexture by remember { mutableStateOf<AndroidBitmap?>(null) }
+
+                        // Match ARCore mode's texture treatment: tone fields are baked into the
+                        // texture, while pan/scale/rotation stay geometric in the renderer.
+                        LaunchedEffect(
+                            standaloneDesign,
+                            standaloneAdj?.brightness,
+                            standaloneAdj?.contrast,
+                            standaloneAdj?.saturation,
+                            standaloneAdj?.opacity,
+                            standaloneAdj?.isInverted,
+                        ) {
+                            standaloneTexture = if (standaloneDesign == null) {
+                                null
+                            } else {
+                                withContext(Dispatchers.Default) {
+                                    compositeDesignForAr(standaloneDesign, standaloneAdj)
+                                }
+                            }
+                        }
+
                         com.hereliesaz.graffitixr.feature.ar.SphereSlamStandaloneOverlay(
                             cameraController = cameraController,
-                            designBitmap = uiState.design?.takeIf { it.isVisible }?.bitmap,
+                            designBitmap = standaloneTexture,
                             persistedReferenceUri = arUiState.sphereSlamReferenceUri,
                             persistedReferenceWidthMeters = arUiState.sphereSlamReferenceWidthMeters,
                             persistedReferencePhysicallyMetric =
@@ -148,6 +177,8 @@ fun MainScreen(
                                     physicallyMetric,
                                 )
                             },
+                            adjustment = standaloneAdj,
+                            onUnitsPerPixel = { standaloneArUnitsPerPixel = it },
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {
@@ -662,7 +693,8 @@ fun MainScreen(
                                         // wall-up (opposite screen +Y), so x passes through and y
                                         // is negated so the artwork follows the finger.
                                         val adjustedPan = if (uiState.editorMode == EditorMode.AR) {
-                                            val mpp = rendererRef.value?.currentMetersPerPixel ?: 0f
+                                            val mpp = rendererRef.value?.currentMetersPerPixel
+                                                ?: standaloneArUnitsPerPixel
                                             androidx.compose.ui.geometry.Offset(pan.x * mpp, -pan.y * mpp)
                                         } else pan
                                         editorViewModel.onModeTransformGesture(uiState.editorMode, adjustedPan, zoom, turn)
