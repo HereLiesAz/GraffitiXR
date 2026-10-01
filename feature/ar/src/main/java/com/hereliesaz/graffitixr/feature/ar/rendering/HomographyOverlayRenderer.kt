@@ -33,6 +33,26 @@ import javax.microedition.khronos.opengles.GL10
  * math `CameraPreview` uses for its own `PreviewView.ScaleType`, computed independently here since
  * a `GLSurfaceView` has no such built-in mode.
  */
+internal sealed interface TextureUpdateCommand {
+    data class Replace(val bitmap: Bitmap) : TextureUpdateCommand
+    data object Clear : TextureUpdateCommand
+}
+
+/** Single-slot, last-command-wins mailbox between UI and GL threads. */
+internal class TextureUpdateMailbox {
+    private val pending = AtomicReference<TextureUpdateCommand?>(null)
+
+    fun replace(bitmap: Bitmap) {
+        pending.set(TextureUpdateCommand.Replace(bitmap))
+    }
+
+    fun clear() {
+        pending.set(TextureUpdateCommand.Clear)
+    }
+
+    fun take(): TextureUpdateCommand? = pending.getAndSet(null)
+}
+
 class HomographyOverlayRenderer(context: Context) : android.opengl.GLSurfaceView.Renderer {
 
     /** One pose + the projection it was computed against, published together so they can't tear. */
@@ -41,7 +61,7 @@ class HomographyOverlayRenderer(context: Context) : android.opengl.GLSurfaceView
     private val overlayRenderer = OverlayRenderer(context)
 
     private val latestFrame = AtomicReference<Frame?>(null)
-    private val pendingBitmap = AtomicReference<Bitmap?>(null)
+    private val textureUpdates = TextureUpdateMailbox()
     @Volatile private var extentHalfW = 0.5f
     @Volatile private var extentHalfH = 0.5f
     @Volatile private var extentDirty = false
@@ -73,7 +93,12 @@ class HomographyOverlayRenderer(context: Context) : android.opengl.GLSurfaceView
 
     /** Replace the design texture. Uploaded to GL on the next [onDrawFrame]. Any thread. */
     fun updateDesignBitmap(bitmap: Bitmap) {
-        pendingBitmap.set(bitmap)
+        textureUpdates.replace(bitmap)
+    }
+
+    /** Clear the design texture on the next GL frame. Any thread. */
+    fun clearDesignBitmap() {
+        textureUpdates.clear()
     }
 
     /** The design quad's half-extents — MUST match what was passed to `HomographyArTracker.setReference`. */
@@ -124,7 +149,11 @@ class HomographyOverlayRenderer(context: Context) : android.opengl.GLSurfaceView
             overlayRenderer.setExtent(extentHalfW, extentHalfH)
             extentDirty = false
         }
-        pendingBitmap.getAndSet(null)?.let { overlayRenderer.updateTexture(it) }
+        when (val textureUpdate = textureUpdates.take()) {
+            is TextureUpdateCommand.Replace -> overlayRenderer.updateTexture(textureUpdate.bitmap)
+            TextureUpdateCommand.Clear -> overlayRenderer.clearTexture()
+            null -> Unit
+        }
 
         val frame = latestFrame.get() ?: return
         val viewport = letterboxViewport(surfaceWidth, surfaceHeight, frame.frameAspect)
