@@ -280,8 +280,8 @@ class ArViewModelTest {
 
     @Test
     fun `SphereSLAM recapture commits URI and scale together then deletes old reference`() = runTest {
-        val oldUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_old.png")
-        val newUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_new.png")
+        val oldUri = mockk<Uri>(relaxed = true)
+        val newUri = mockk<Uri>(relaxed = true)
         val project = com.hereliesaz.graffitixr.common.model.GraffitiProject(
             id = "slam",
             name = "Wall",
@@ -323,8 +323,8 @@ class ArViewModelTest {
 
     @Test
     fun `cancellation after SphereSLAM metadata commit keeps candidate and deletes old reference`() = runTest {
-        val oldUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_old.png")
-        val candidateUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_candidate.png")
+        val oldUri = mockk<Uri>(relaxed = true)
+        val candidateUri = mockk<Uri>(relaxed = true)
         val project = com.hereliesaz.graffitixr.common.model.GraffitiProject(
             id = "slam",
             name = "Wall",
@@ -369,9 +369,9 @@ class ArViewModelTest {
 
     @Test
     fun `competing SphereSLAM recapture keeps newer metadata and deletes uncommitted candidate`() = runTest {
-        val oldUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_old.png")
-        val newerUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_newer.png")
-        val candidateUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_candidate.png")
+        val oldUri = mockk<Uri>(relaxed = true)
+        val newerUri = mockk<Uri>(relaxed = true)
+        val candidateUri = mockk<Uri>(relaxed = true)
         val original = com.hereliesaz.graffitixr.common.model.GraffitiProject(
             id = "slam",
             name = "Wall",
@@ -415,7 +415,7 @@ class ArViewModelTest {
 
     @Test
     fun `invalid persisted SphereSLAM URI clears only matching standalone fields`() = runTest {
-        val uri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_old.png")
+        val uri = mockk<Uri>(relaxed = true)
         val project = com.hereliesaz.graffitixr.common.model.GraffitiProject(
             id = "slam",
             name = "Wall",
@@ -453,8 +453,8 @@ class ArViewModelTest {
 
     @Test
     fun `stale invalid-reference callback cannot clear a newer SphereSLAM recapture`() = runTest {
-        val oldUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_old.png")
-        val newUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_new.png")
+        val oldUri = mockk<Uri>(relaxed = true)
+        val newUri = mockk<Uri>(relaxed = true)
         val project = com.hereliesaz.graffitixr.common.model.GraffitiProject(
             id = "slam",
             name = "Wall",
