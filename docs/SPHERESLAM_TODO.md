@@ -227,7 +227,9 @@ Remaining:
   then delete the previous file.
 - [x] Delete/garbage-collect superseded standalone reference files best-effort after metadata commit;
   aborted/project-switched recaptures delete their uncommitted candidate instead.
-- [ ] Add tests for project save/load/import with and without standalone target metadata.
+- [x] Add project/data tests for legacy projects without standalone fields, versioned reference
+  write/delete lifecycle, and import URI relocation with standalone scale metadata.
+- [ ] Add a full repository-level save/load replacement-race test for standalone target metadata.
 - [ ] Add process-death restoration test.
 
 **ACCEPTANCE:** an artist can create, review, save, reopen, replace, export, import, and reacquire a
@@ -342,7 +344,7 @@ Implemented:
 
 Remaining:
 
-- [ ] Add migration tests for projects created before the standalone fields existed.
+- [x] Add migration/default test for projects created before the standalone fields existed.
 - [ ] Add migration tests for malformed/missing URI-referenced SphereSLAM reference PNGs,
   including the legacy fixed `sphereslam_reference.png` name.
 - [ ] On missing/corrupt reference, clear only standalone target state and preserve the rest of the
