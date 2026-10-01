@@ -73,6 +73,7 @@ public:
                                const float* anchorMatrix16, const float* intrinsics4);
     void clearWallFeatureMap();
     int getMapPointCount() const { std::lock_guard<std::mutex> lock(mMutex); return (int)mMapPoints3D.size(); }
+    uint64_t getWallFeatureMapRevision() const { return mMapRevision.load(std::memory_order_relaxed); }
     // Phase 3b: pack the live feature map (points/descriptors/confidence/obs + co-registration) into a
     // self-describing little-endian blob for .gxr persistence; empty if there's no map. Race-free (one lock).
     std::vector<uint8_t> exportWallFeatureMap() const;
@@ -721,6 +722,9 @@ private:
     std::vector<int> mMapObs;
     float mMapAnchorMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     float mMapIntrinsics[4] = {0,0,0,0};
+    // Increments on every map-content mutation, including confidence/observation-only updates.
+    // Point count alone is not a valid dirty signal once the map reaches its fixed capacity.
+    std::atomic<uint64_t> mMapRevision{0};
     // Phase 2b flag: when true, relocThreadFunc also matches the frustum-gated map and merges those
     // correspondences into PnP. Default OFF so the map has zero effect on reloc until device-validated.
     std::atomic<bool> mMapRelocEnabled{false};
