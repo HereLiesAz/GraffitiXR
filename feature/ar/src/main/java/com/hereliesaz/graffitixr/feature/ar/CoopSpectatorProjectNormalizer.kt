@@ -42,6 +42,11 @@ internal fun normalizeCoopSpectatorProject(
 
             val halfWidth = standaloneBaseHalfWidthMeters(project, imageDimensions)
                 ?: project.arDesignHalfWidthM.takeIf { it.isFinite() && it > 0f }
+            if (project.design != null) {
+                require(halfWidth != null) {
+                    "metric standalone host design size could not be reconstructed"
+                }
+            }
 
             project.copy(
                 modeAdjustments = project.modeAdjustments + (arKey to hostAdjustment),
