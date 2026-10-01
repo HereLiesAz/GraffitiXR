@@ -86,4 +86,43 @@ class ArRailBackendPolicyTest {
         assertFalse(p.coopCalibrationAvailable)
         assertTrue(p.coopDisabledReason!!.contains("Checking"))
     }
+    @Test
+    fun `standalone Host readiness uses page target not ARCore anchor or cloud`() {
+        val p = arRailBackendPolicy(
+            arCoreAvailabilityResolved = true,
+            arCoreAvailable = false,
+            sphereSlamAvailabilityResolved = true,
+            sphereSlamAvailable = true,
+        )
+        assertTrue(
+            coopHostReady(
+                policy = p,
+                arCoreAnchorEstablished = false,
+                arCorePointCount = 0,
+                standaloneReferencePresent = true,
+            )
+        )
+        assertFalse(
+            coopHostReady(
+                policy = p,
+                arCoreAnchorEstablished = true,
+                arCorePointCount = 500,
+                standaloneReferencePresent = false,
+            )
+        )
+    }
+
+    @Test
+    fun `ARCore Host readiness still requires its anchor and mapped points`() {
+        val p = arRailBackendPolicy(
+            arCoreAvailabilityResolved = true,
+            arCoreAvailable = true,
+            sphereSlamAvailabilityResolved = false,
+            sphereSlamAvailable = false,
+        )
+        assertTrue(coopHostReady(p, true, 1, false))
+        assertFalse(coopHostReady(p, true, 0, true))
+        assertFalse(coopHostReady(p, false, 100, true))
+    }
+
 }
