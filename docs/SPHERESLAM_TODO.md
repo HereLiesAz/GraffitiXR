@@ -314,9 +314,14 @@ Implemented:
 
 Remaining:
 
-- [ ] Verify every rail/control available in AR mode either:
-  - [ ] works on both backends; or
-  - [ ] is explicitly disabled with a backend-specific reason.
+- [x] Verify every AR rail/control against backend capability:
+  - [x] Light, Lock, Magic, design controls, and project/library/settings actions use shared state and
+    remain available on standalone.
+  - [x] legacy ARCore Target is disabled on standalone with “Use the on-screen Wall Target capture”.
+  - [x] Co-op Host/Join are disabled on standalone with an explicit calibration-required reason
+    until a standalone↔peer frame transform exists; Leave remains reachable for an active session.
+  - [x] AR mode preview Export is disabled on standalone with an explicit reason until CameraX +
+    transparent-GL compositing is implemented, rather than silently exporting layers-only.
 - [x] Verify transform lock prevents standalone pan/scale/rotate: both AR backends consume the same
   `modeAdjustments[AR]`, and the shared reducer rejects AR transform gestures while locked.
 - [x] Verify undo/redo behavior for standalone mode adjustments with an explicit AR-mode gesture
