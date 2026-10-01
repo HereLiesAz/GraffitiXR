@@ -341,23 +341,13 @@ fun SphereSlamStandaloneOverlay(
     }
 
     LaunchedEffect(glRenderer, designBitmap, referenceWidthUnits, referenceHeightUnits) {
-        val pageW = referenceWidthUnits
-        val pageH = referenceHeightUnits
-        if (pageW <= 0f || pageH <= 0f) return@LaunchedEffect
-
-        val bitmap = designBitmap
-        if (bitmap == null || bitmap.width <= 0 || bitmap.height <= 0) {
-            glRenderer.setExtent(pageW * 0.5f, pageH * 0.5f)
-        } else {
-            val aspect = bitmap.width.toFloat() / bitmap.height.toFloat()
-            var designW = pageW
-            var designH = designW / aspect
-            if (designH > pageH) {
-                designH = pageH
-                designW = designH * aspect
-            }
-            glRenderer.setExtent(designW * 0.5f, designH * 0.5f)
-        }
+        val fit = fitStandaloneDesignHalfExtents(
+            pageWidthUnits = referenceWidthUnits,
+            pageHeightUnits = referenceHeightUnits,
+            designWidthPx = designBitmap?.width,
+            designHeightPx = designBitmap?.height,
+        ) ?: return@LaunchedEffect
+        glRenderer.setExtent(fit.halfWidth, fit.halfHeight)
     }
 
     val cameraId by produceState<String?>(initialValue = null, cameraController, reference) {
