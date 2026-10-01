@@ -576,9 +576,10 @@ Every AR feature now has an explicit backend answer.
 - [x] Persist `sphereSlamAnchorGeneration` + frame version with the project.
 - [x] Recapture or invalid-reference cleanup increments the generation and invalidates atlas/map
   state tied to the superseded page.
-- [x] Persist AR design placement with `sphereSlamPlacementAnchorGeneration`. A generation mismatch
-  preserves tone but zeros spatial placement, clears stale undo/redo/reset history, and requires the
-  next placement edit to bind to the current wall generation.
+- [x] Persist standalone AR design placement separately from ARCore in
+  `sphereSlamModeAdjustment`, bound by `sphereSlamPlacementAnchorGeneration`. A generation
+  mismatch preserves its tone but zeros only standalone spatial placement and clears only standalone
+  undo/redo/reset history. ARCore's `modeAdjustments[AR]` remains untouched.
 
 ### Cloud anchors
 
