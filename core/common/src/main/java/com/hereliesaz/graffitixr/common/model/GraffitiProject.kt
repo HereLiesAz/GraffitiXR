@@ -1,5 +1,13 @@
 package com.hereliesaz.graffitixr.common.model
 
+/**
+ * Persisted frame contract for [GraffitiProject.sphereSlamFingerprint].
+ *
+ * v1 = centered rectified KPM page: +X image-right, +Y image-up, +Z wall normal, with the exact
+ * artoolkitX half-pixel page mapping. Bump this BEFORE changing point semantics.
+ */
+const val SPHERE_SLAM_FINGERPRINT_FRAME_VERSION: Int = 1
+
 import android.net.Uri
 import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
@@ -116,6 +124,7 @@ data class GraffitiProject(
      * the wrong frame semantics.
      */
     val sphereSlamFingerprint: Fingerprint? = null,
+    val sphereSlamFingerprintFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
 
     val refinementPaths: List<RefinementPath> = emptyList(),
 

@@ -84,6 +84,8 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private val referenceImage: SphereSlamStandaloneReferenceImage,
     private val slamManager: SlamManager? = null,
     private val mobileGsFingerprint: Fingerprint? = null,
+    private val mobileGsFingerprintFrameVersion: Int =
+        com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     private val onFrameTracked: (SphereSlamStandaloneFrame?) -> Unit,
     private val onReferenceReady: (SphereSlamStandaloneSession.Reference) -> Unit = {},
     private val onDiagnostic: (String) -> Unit = {},
@@ -537,6 +539,19 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         slam.setLiveIntrinsics(intrinsics.fx, intrinsics.fy, intrinsics.cx, intrinsics.cy)
 
         val fp = mobileGsFingerprint
+        val expectedFrameVersion =
+            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION
+        if (fp != null && mobileGsFingerprintFrameVersion != expectedFrameVersion) {
+            slam.clearWallFingerprint()
+            slam.overlayMarkCenterLocal = null
+            slam.captureAnchorCam = null
+            onDiagnostic(
+                "SphereSLAM MobileGS seed refused backend=standalone-kpm " +
+                    "frame=centered-page version=" + mobileGsFingerprintFrameVersion +
+                    " expected=" + expectedFrameVersion,
+            )
+            return
+        }
         if (fp == null || fp.descriptorsRows <= 0 || fp.points3d.size != fp.descriptorsRows * 3) {
             // Native MobileGS is process-global. A standalone project with no seed must explicitly
             // clear a prior project's fingerprint rather than continuing to match the wrong wall.
@@ -563,8 +578,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             fp.markCenterLocal.takeIf { it.size == 3 }?.toFloatArray()
         slam.captureAnchorCam = null
         onDiagnostic(
-            "SphereSLAM standalone MobileGS seed rows=" + fp.descriptorsRows +
-                " type=" + fp.descriptorsType + " frame=centered-page",
+            "SphereSLAM MobileGS seed backend=standalone-kpm frame=centered-page " +
+                "version=" + mobileGsFingerprintFrameVersion +
+                " rows=" + fp.descriptorsRows + " type=" + fp.descriptorsType,
         )
     }
 

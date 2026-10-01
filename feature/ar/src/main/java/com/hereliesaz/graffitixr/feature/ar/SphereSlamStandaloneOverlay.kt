@@ -86,6 +86,8 @@ fun SphereSlamStandaloneOverlay(
     designBitmap: Bitmap?,
     slamManager: SlamManager,
     mobileGsFingerprint: Fingerprint? = null,
+    mobileGsFingerprintFrameVersion: Int =
+        com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     persistedReferenceUri: Uri? = null,
     persistedReferenceWidthMeters: Float = 1f,
     persistedReferencePhysicallyMetric: Boolean = false,
@@ -467,7 +469,13 @@ fun SphereSlamStandaloneOverlay(
         }
     }
 
-    DisposableEffect(cameraController, cameraId, referenceImage, mobileGsFingerprint) {
+    DisposableEffect(
+        cameraController,
+        cameraId,
+        referenceImage,
+        mobileGsFingerprint,
+        mobileGsFingerprintFrameVersion,
+    ) {
         val id = cameraId
         if (id == null) {
             onDispose {}
@@ -481,6 +489,7 @@ fun SphereSlamStandaloneOverlay(
                 referenceImage = referenceImage,
                 slamManager = slamManager,
                 mobileGsFingerprint = mobileGsFingerprint,
+                mobileGsFingerprintFrameVersion = mobileGsFingerprintFrameVersion,
                 onReferenceReady = { registered: SphereSlamStandaloneSession.Reference ->
                     val g = registered.geometry
                     mainHandler.post {

@@ -188,6 +188,15 @@ class ProjectManager @Inject constructor(
                         } else {
                             projectData.sphereSlamFingerprint ?: existing.sphereSlamFingerprint
                         },
+                    sphereSlamFingerprintFrameVersion =
+                        if (
+                            projectData.sphereSlamReferenceUri != null &&
+                            projectData.sphereSlamReferenceUri != existing.sphereSlamReferenceUri
+                        ) {
+                            projectData.sphereSlamFingerprintFrameVersion
+                        } else {
+                            existing.sphereSlamFingerprintFrameVersion
+                        },
                     wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
                     paintMarks = projectData.paintMarks ?: existing.paintMarks,
                     paintGrid = projectData.paintGrid ?: existing.paintGrid,

@@ -1148,6 +1148,9 @@ class ArViewModel @Inject constructor(
                         sphereSlamReferencePhysicallyMetric =
                             project?.sphereSlamReferencePhysicallyMetric ?: false,
                         sphereSlamFingerprint = project?.sphereSlamFingerprint,
+                        sphereSlamFingerprintFrameVersion =
+                            project?.sphereSlamFingerprintFrameVersion
+                                ?: com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                     )
                 }
                 if (project != null) {
@@ -1988,6 +1991,8 @@ class ArViewModel @Inject constructor(
                             sphereSlamReferenceWidthMeters = referenceWidthMeters,
                             sphereSlamReferencePhysicallyMetric = physicallyMetric,
                             sphereSlamFingerprint = standaloneFingerprint,
+                            sphereSlamFingerprintFrameVersion =
+                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                         )
                     }
                 }

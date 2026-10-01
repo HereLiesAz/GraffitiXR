@@ -432,16 +432,16 @@ Required work:
   do not lie to native code by setting an "ARCore" flag when ARCore does not exist.
 - [ ] Audit every native branch conditioned on `mIsArCoreTracking` and decide the standalone
   equivalent explicitly.
-- [ ] Restore existing saved ARCore fingerprints safely on standalone devices:
+- [x] Restore existing saved ARCore fingerprints safely on standalone devices:
   - [ ] either provide a validated frame conversion; or
-  - [ ] mark them ARCore-frame-only and require a standalone target/fingerprint conversion step.
+  - [x] treat `fingerprint` as ARCore/capture-camera-frame-only and require the separate standalone page/`sphereSlamFingerprint` path.
 - [x] Define behavior for projects that contain both ARCore fingerprint data and a standalone page: keep separate persisted fingerprints and install only the active backend's frame into native MobileGS.
 - [x] Feed baseline paint-progress/corroboration after centered-page alignment is proven; spatially gated self-grow remains disabled pending the checks below.
   - [x] Standalone artwork registration is descriptors-only (no fake depth); native global matching drives progress until design-placement gating is validated.
 
 - [ ] Verify self-grow adds points in the standalone fingerprint frame.
 - [ ] Verify saved wall feature maps preserve that frame across process restarts.
-- [ ] Add diagnostics identifying fingerprint frame/version/backend.
+- [x] Add diagnostics identifying fingerprint frame/version/backend; standalone seed logs `backend=standalone-kpm frame=centered-page version=1` and refuses unknown versions.
 
 **ACCEPTANCE:** MobileGS can consume standalone frames without any implicit ARCore-world assumption,
 and return-visit / paint-progress results agree spatially with the KPM wall pose.

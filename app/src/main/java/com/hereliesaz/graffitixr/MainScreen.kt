@@ -244,6 +244,8 @@ fun MainScreen(
                             designBitmap = standaloneTexture,
                             slamManager = slamManager,
                             mobileGsFingerprint = arUiState.sphereSlamFingerprint,
+                            mobileGsFingerprintFrameVersion =
+                                arUiState.sphereSlamFingerprintFrameVersion,
                             persistedReferenceUri = arUiState.sphereSlamReferenceUri,
                             persistedReferenceWidthMeters = arUiState.sphereSlamReferenceWidthMeters,
                             persistedReferencePhysicallyMetric =

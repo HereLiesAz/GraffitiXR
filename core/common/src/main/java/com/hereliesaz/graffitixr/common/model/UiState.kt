@@ -228,6 +228,7 @@ data class ArUiState(
     val sphereSlamReferencePhysicallyMetric: Boolean = false,
     // Separate from the ARCore/capture-camera fingerprint; see GraffitiProject.sphereSlamFingerprint.
     val sphereSlamFingerprint: Fingerprint? = null,
+    val sphereSlamFingerprintFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
 
     // Mirrors the runtime camera permission state so AR overlays can react without
     // threading the raw permission flag all the way into every composable.
