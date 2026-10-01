@@ -13,6 +13,8 @@ class ArRailBackendPolicyTest {
         val p = arRailBackendPolicy(
             arCoreAvailabilityResolved = false,
             arCoreAvailable = false,
+            sphereSlamAvailabilityResolved = false,
+            sphereSlamAvailable = false,
         )
         assertFalse(p.backendResolved)
         assertFalse(p.targetRailEnabled)
@@ -28,6 +30,8 @@ class ArRailBackendPolicyTest {
         val p = arRailBackendPolicy(
             arCoreAvailabilityResolved = true,
             arCoreAvailable = true,
+            sphereSlamAvailabilityResolved = false,
+            sphereSlamAvailable = false,
         )
         assertTrue(p.backendResolved)
         assertFalse(p.standalone)
@@ -44,6 +48,8 @@ class ArRailBackendPolicyTest {
         val p = arRailBackendPolicy(
             arCoreAvailabilityResolved = true,
             arCoreAvailable = false,
+            sphereSlamAvailabilityResolved = true,
+            sphereSlamAvailable = true,
         )
         assertTrue(p.backendResolved)
         assertTrue(p.standalone)
@@ -53,5 +59,31 @@ class ArRailBackendPolicyTest {
         assertTrue(p.targetDisabledReason!!.contains("Wall Target"))
         assertNull(p.coopDisabledReason)
         assertTrue(p.exportDisabledReason!!.contains("not implemented"))
+    }
+
+    @Test
+    fun `standalone co-op stays disabled when KPM runtime is unavailable`() {
+        val p = arRailBackendPolicy(
+            arCoreAvailabilityResolved = true,
+            arCoreAvailable = false,
+            sphereSlamAvailabilityResolved = true,
+            sphereSlamAvailable = false,
+        )
+        assertTrue(p.backendResolved)
+        assertTrue(p.standalone)
+        assertFalse(p.coopCalibrationAvailable)
+        assertTrue(p.coopDisabledReason!!.contains("unavailable"))
+    }
+
+    @Test
+    fun `standalone co-op waits for KPM capability resolution`() {
+        val p = arRailBackendPolicy(
+            arCoreAvailabilityResolved = true,
+            arCoreAvailable = false,
+            sphereSlamAvailabilityResolved = false,
+            sphereSlamAvailable = false,
+        )
+        assertFalse(p.coopCalibrationAvailable)
+        assertTrue(p.coopDisabledReason!!.contains("Checking"))
     }
 }
