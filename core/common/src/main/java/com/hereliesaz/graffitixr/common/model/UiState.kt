@@ -231,6 +231,7 @@ data class ArUiState(
     val sphereSlamFingerprintFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     val sphereSlamWallFeatureMap: WallFeatureMap? = null,
     val sphereSlamWallFeatureMapFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+    val sphereSlamAtlasPages: List<SphereSlamAtlasPage> = emptyList(),
 
     // Mirrors the runtime camera permission state so AR overlays can react without
     // threading the raw permission flag all the way into every composable.
