@@ -206,6 +206,9 @@ class ArViewModel @Inject constructor(
     // each launched their own forever-collect, so host→leave→host stacked collectors; this lets
     // each entry cancel the prior one and leaveSession stop it.
     private var coopStateJob: kotlinx.coroutines.Job? = null
+    /** Host wall-frame identity frozen when Host was started; null outside a host session. */
+    @Volatile private var hostedCoopSpatialFrame:
+        com.hereliesaz.graffitixr.common.model.CoopSpatialFrame? = null
 
     private fun observeCoopState() {
         coopStateJob?.cancel()
@@ -246,29 +249,20 @@ class ArViewModel @Inject constructor(
     @Volatile private var reportedGuestEditDrop = false
 
     fun startHosting() {
-        // serializeCurrentProject() zips the whole project directory and can run to several MB for
-        // a project with many target images — run this whole flow off Main so neither that call nor
-        // HostSession's own synchronous size-probe (see the snapshotProvider lambda below) can block
-        // the UI thread.
+        // serializeCurrentProject() zips the whole project directory and can run to several MB.
         viewModelScope.launch(dispatchers.io) {
             try {
-                // Both preconditions are checked here rather than only in the rail's enablement
-                // colour, so tapping Host always yields either a session or an explanation of what
-                // is missing — previously a tap with the button greyed out simply did nothing.
                 val st = _uiState.value
-                if (!st.isAnchorEstablished || st.splatCount <= 0) {
+                if (!st.isArCoreAvailabilityResolved) {
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                            "Scan and lock onto the wall first — a guest needs the mapped surface to line up with yours"
+                            "AR backend is still being resolved — try Host again in a moment"
                         )
                     )
                     return@launch
                 }
-                // The anchor and an open project are independent: hosting without the latter produced
-                // a session that looked healthy on the host (QR shown, WaitingForGuest) but shipped a
-                // zero-byte bulk payload, which the guest's loadAsSpectator discards on its
-                // `bytes.isEmpty()` guard — the guest joined to nothing, with no error on either end.
-                if (projectRepository.currentProject.value == null) {
+                val project = projectRepository.currentProject.value
+                if (project == null) {
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
                             "Open a project before sharing — there's nothing to send to a guest yet"
@@ -276,14 +270,39 @@ class ArViewModel @Inject constructor(
                     )
                     return@launch
                 }
-                // A one-off probe purely to give an immediate, attributable error if the project
-                // can't be packaged at all — the actual bytes sent to a guest are re-read fresh by
-                // the snapshotProvider below every time a bulk resync goes out (initial join, or a
-                // reconnect that lands in a replay gap), not this one-time snapshot, so a guest
-                // joining or rejoining well into the session gets the project as it stands then.
+
+                val baseSpatial = CoopSpatialFrameFactory.fromProject(project, st.isArCoreAvailable)
+                if (baseSpatial == null) {
+                    _feedback.tryEmit(
+                        com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                            if (st.isArCoreAvailable) {
+                                "Capture and lock a current wall target before hosting"
+                            } else {
+                                "Capture a standalone Wall Target before hosting"
+                            }
+                        )
+                    )
+                    return@launch
+                }
+
+                val initialFingerprint = slamManager.exportFingerprint() ?: ByteArray(0)
+                val hostedSpatial = baseSpatial.copy(
+                    fingerprintAvailable = initialFingerprint.isNotEmpty(),
+                )
+                if (
+                    hostedSpatial.hostBackend ==
+                        com.hereliesaz.graffitixr.common.model.CoopTrackingBackend.ARCORE &&
+                    !hostedSpatial.fingerprintAvailable
+                ) {
+                    _feedback.tryEmit(
+                        com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                            "Wall fingerprint is not ready yet — keep the target in view and try Host again"
+                        )
+                    )
+                    return@launch
+                }
+
                 if (projectManager.serializeCurrentProject().isEmpty()) {
-                    // A project is open but its folder didn't serialize (never saved to disk, or the
-                    // directory is missing). Same silent-empty-session outcome, different cause.
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
                             "Couldn't package this project to share — try saving it first"
@@ -291,38 +310,50 @@ class ArViewModel @Inject constructor(
                     )
                     return@launch
                 }
+
+                val arCoreHost = st.isArCoreAvailable
                 val qrString = collaborationManager.startHosting(
                     projectId = projectManager.currentProjectId(),
                     localDeviceName = android.os.Build.MODEL,
                 ) {
-                    // snapshotProvider's type (CollaborationManager) is a plain () -> ProjectSnapshot,
-                    // not suspend — it's invoked both synchronously from HostSession's init{} and
-                    // later from its own IO-dispatched coroutine, neither of which can be changed to
-                    // call a suspend function without a deeper restructuring of the collab module.
-                    // This whole startHosting() flow already runs on dispatchers.io (see the launch
-                    // above), so bridging with runBlocking here blocks an IO-pool thread, never Main.
+                    val current = projectRepository.currentProject.value
+                        ?: error("project closed while hosting")
+                    val wireFingerprint = slamManager.exportFingerprint() ?: ByteArray(0)
+                    val currentSpatial = CoopSpatialFrameFactory.fromProject(current, arCoreHost)
+                        ?: error("host wall frame disappeared while hosting")
                     com.hereliesaz.graffitixr.core.collaboration.ProjectSnapshot(
-                        fingerprintBytes = slamManager.exportFingerprint() ?: ByteArray(0),
-                        projectBytes = kotlinx.coroutines.runBlocking { projectManager.serializeCurrentProject() },
-                        layerCount = projectRepository.currentProject.value?.layers?.size ?: 0,
+                        fingerprintBytes = wireFingerprint,
+                        projectBytes = kotlinx.coroutines.runBlocking {
+                            projectManager.serializeCurrentProject()
+                        },
+                        layerCount = current.layers.size,
+                        spatialFrame = currentSpatial.copy(
+                            fingerprintAvailable = wireFingerprint.isNotEmpty(),
+                        ),
                     )
                 }
+                hostedCoopSpatialFrame = hostedSpatial
                 _uiState.update {
                     it.copy(
                         coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.HOST,
-                        coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.WaitingForGuest,
+                        coopSessionState =
+                            com.hereliesaz.graffitixr.common.model.CoopSessionState.WaitingForGuest,
+                        coopPeerSpatialFrame = null,
+                        coopPeerFingerprint = null,
                     )
                 }
                 _hostQrPayload.value = qrString
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
+                hostedCoopSpatialFrame = null
                 _uiState.update {
-                    it.copy(coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.Ended(com.hereliesaz.graffitixr.common.model.CoopSessionState.EndReason.NetworkLost))
+                    it.copy(
+                        coopSessionState =
+                            com.hereliesaz.graffitixr.common.model.CoopSessionState.Ended(
+                                com.hereliesaz.graffitixr.common.model.CoopSessionState.EndReason.NetworkLost
+                            )
+                    )
                 }
-                // Ended(NetworkLost) is the only state this can express, but the real cause is often
-                // not the network at all — HostSession fails fast on an oversized project precisely so
-                // the reason is attributable, and collapsing everything to "network lost" threw that
-                // away. Surface the actual message through the feedback channel the UI already toasts.
                 android.util.Log.e("ArViewModel", "Failed to start hosting", e)
                 _feedback.tryEmit(
                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
@@ -331,7 +362,6 @@ class ArViewModel @Inject constructor(
                 )
                 return@launch
             }
-            // Observe collaborationManager.state and propagate (single tracked collector).
             observeCoopState()
         }
     }
@@ -339,13 +369,14 @@ class ArViewModel @Inject constructor(
     fun joinFromQr(qr: String) {
         viewModelScope.launch {
             try {
+                val localBackend = CoopSpatialFrameFactory.localBackend(_uiState.value.isArCoreAvailable)
                 collaborationManager.joinFromQr(
                     qr = qr,
                     localDeviceName = android.os.Build.MODEL,
-                    onBulkReceived = { fingerprint, project ->
-                        slamManager.alignToPeer(fingerprint)
-                        // A failed load used to be logged and nothing else: the guest showed
-                        // Connected with no project. Say so and end the session instead.
+                    localBackend = localBackend,
+                    onBulkReceived = { fingerprint, project, spatialFrame ->
+                        // Project assets first: a standalone host's canonical KPM page/atlas arrives
+                        // inside this archive and must exist before the CameraX analyzer can restore it.
                         if (!projectManager.loadAsSpectator(project)) {
                             _feedback.tryEmit(
                                 com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
@@ -353,21 +384,62 @@ class ArViewModel @Inject constructor(
                                 )
                             )
                             leaveSession()
+                            return@joinFromQr
+                        }
+
+                        if (localBackend ==
+                            com.hereliesaz.graffitixr.common.model.CoopTrackingBackend.ARCORE) {
+                            if (fingerprint.isEmpty()) {
+                                _feedback.tryEmit(
+                                    com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                                        "The host did not provide geometry ARCore can align to.", null
+                                    )
+                                )
+                                leaveSession()
+                                return@joinFromQr
+                            }
+                            // PnP object frame -> host wall frame is now explicit. Existing ARCore
+                            // PoseFusion/return-visit anchoring consumes this exact bridge.
+                            slamManager.alignToPeer(fingerprint)
+                            slamManager.captureAnchorCam =
+                                spatialFrame.fingerprintFromWall.toFloatArray()
+                            _uiState.update {
+                                it.copy(
+                                    coopPeerSpatialFrame = spatialFrame,
+                                    coopPeerFingerprint = null,
+                                )
+                            }
+                        } else {
+                            // Standalone consumes the shared KPM page when the host is SphereSLAM.
+                            // For an ARCore host it instead feeds this peer fingerprint through
+                            // MobileGS and composes PnP through fingerprintFromWall.
+                            _uiState.update {
+                                it.copy(
+                                    coopPeerSpatialFrame = spatialFrame,
+                                    coopPeerFingerprint = fingerprint.copyOf(),
+                                )
+                            }
                         }
                     },
                     onOp = { op -> dispatchSpectatorOp(op) },
                 )
-                _uiState.update { it.copy(coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) }
+                hostedCoopSpatialFrame = null
+                _uiState.update {
+                    it.copy(coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.GUEST)
+                }
                 observeCoopState()
                 reportedGuestEditDrop = false
                 observeDroppedGuestEdits()
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 _uiState.update {
-                    it.copy(coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.Ended(com.hereliesaz.graffitixr.common.model.CoopSessionState.EndReason.NetworkLost))
+                    it.copy(
+                        coopSessionState =
+                            com.hereliesaz.graffitixr.common.model.CoopSessionState.Ended(
+                                com.hereliesaz.graffitixr.common.model.CoopSessionState.EndReason.NetworkLost
+                            )
+                    )
                 }
-                // Same attribution problem as startHosting: a malformed QR payload or an unreachable
-                // host both read as "network lost" without this.
                 android.util.Log.e("ArViewModel", "Failed to join session", e)
                 _feedback.tryEmit(
                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
@@ -386,10 +458,13 @@ class ArViewModel @Inject constructor(
             guestEditDropJob = null
             collaborationManager.leaveSession()
             reportedGuestEditDrop = false
+            hostedCoopSpatialFrame = null
             _uiState.update {
                 it.copy(
                     coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.NONE,
                     coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.Idle,
+                    coopPeerSpatialFrame = null,
+                    coopPeerFingerprint = null,
                     guestEditWasDropped = false,
                 )
             }
@@ -1180,6 +1255,28 @@ class ArViewModel @Inject constructor(
                                 ?: com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                         sphereSlamAtlasPages = project?.sphereSlamAtlasPages.orEmpty(),
                     )
+                }
+                if (
+                    project != null &&
+                    _uiState.value.coopRole ==
+                        com.hereliesaz.graffitixr.common.model.CoopRole.HOST
+                ) {
+                    val hosted = hostedCoopSpatialFrame
+                    if (hosted != null) {
+                        val current = CoopSpatialFrameFactory.fromProject(
+                            project,
+                            hosted.hostBackend ==
+                                com.hereliesaz.graffitixr.common.model.CoopTrackingBackend.ARCORE,
+                        )?.copy(fingerprintAvailable = hosted.fingerprintAvailable)
+                        if (current != hosted) {
+                            _feedback.tryEmit(
+                                com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                                    "Wall target changed — sharing ended. Start Host again for the new wall."
+                                )
+                            )
+                            leaveSession()
+                        }
+                    }
                 }
                 if (project != null) {
                     loadedProjectId = project.id
