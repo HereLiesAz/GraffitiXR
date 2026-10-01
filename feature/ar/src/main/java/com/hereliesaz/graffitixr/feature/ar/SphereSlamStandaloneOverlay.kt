@@ -225,12 +225,15 @@ fun SphereSlamStandaloneOverlay(
     }
 
     val reference = referenceBitmap
+    // An active ARCore-hosted co-op session is authoritative even if the imported host archive
+    // happens to retain an OLD standalone page from some earlier capture. Tracking that stale page
+    // would align the guest to the wrong wall. Peer geometry therefore wins solely from the live
+    // protocol-v3 session contract; local/persisted page state is irrelevant while it is active.
     val peerOnlyTracking =
-        reference == null &&
-            coopPeerSpatialFrame?.hostBackend ==
-                com.hereliesaz.graffitixr.common.model.CoopTrackingBackend.ARCORE &&
+        coopPeerSpatialFrame?.hostBackend ==
+            com.hereliesaz.graffitixr.common.model.CoopTrackingBackend.ARCORE &&
             coopPeerSpatialFrame.fingerprintAvailable &&
-            !coopPeerFingerprint.isNullOrEmpty()
+            coopPeerFingerprint?.isNotEmpty() == true
     if (reference == null && !peerOnlyTracking) {
         val pending = pendingReferenceBitmap
         if (pending != null) {
