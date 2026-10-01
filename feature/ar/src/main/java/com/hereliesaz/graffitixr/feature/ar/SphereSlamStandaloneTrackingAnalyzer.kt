@@ -113,6 +113,7 @@ class SphereSlamStandaloneTrackingAnalyzer(
     private var sessionKey: SessionKey? = null
     private var lastDiagnosticKey: DiagnosticKey? = null
     private var lastPoseRejection: StandalonePoseRejection? = null
+    private var lastAcceptedVisualView: FloatArray? = null
     private var lastGood: SphereSlamStandaloneFrame? = null
     private var frameBuffer: ByteBuffer? = null
     @Volatile private var closed = false
@@ -200,6 +201,12 @@ class SphereSlamStandaloneTrackingAnalyzer(
                     viewMatrix = pose.viewMatrix,
                     inlierCount = pose.inlierCount,
                     reprojectionError = pose.reprojectionError,
+                    previousViewMatrix = lastAcceptedVisualView,
+                    referenceWidthUnits = pose.reference.geometry.widthMeters,
+                    // Once the short visual bridge has expired, the next legitimate wall return may
+                    // be far from the previous camera pose. Keep continuity gates deliberately
+                    // looser for that explicit reacquisition case.
+                    reacquiring = lastGood == null && lastAcceptedVisualView != null,
                 )
                 if (!acceptance.accepted) {
                     val rejection = acceptance.rejection
@@ -216,6 +223,7 @@ class SphereSlamStandaloneTrackingAnalyzer(
                 }
 
                 lastPoseRejection = null
+                lastAcceptedVisualView = pose.viewMatrix.copyOf()
                 pendingImuReference?.let(bridge::commitReference)
                 val tracked = SphereSlamStandaloneFrame(
                     viewMatrix = pose.viewMatrix,
@@ -402,6 +410,7 @@ class SphereSlamStandaloneTrackingAnalyzer(
         sessionKey = null
         lastDiagnosticKey = null
         lastPoseRejection = null
+        lastAcceptedVisualView = null
         frameBuffer = null
     }
 }

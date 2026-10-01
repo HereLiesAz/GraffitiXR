@@ -251,10 +251,10 @@ Remaining:
   pinned artoolkitX binary KPM minimum correspondence count.
 - [x] Add configurable maximum reprojection/ICP error for standalone acceptance. Default is 10.0,
   matching the pinned artoolkitX `kpmUtilGetPose_binary` rejection threshold.
-- [ ] Add pose-jump rejection:
-  - [ ] maximum angular jump per frame;
-  - [ ] maximum translation jump per frame;
-  - [ ] separate relaxed thresholds during explicit reacquisition.
+- [x] Add pose-jump rejection:
+  - [x] maximum angular jump per frame (90° default catastrophic-jump ceiling);
+  - [x] maximum translation jump per frame in reference-page widths (2 page widths default);
+  - [x] separate relaxed thresholds during explicit reacquisition (175° / 8 page widths).
 - [ ] Add hysteresis so a single weak frame does not flap LOCKED↔LOST.
 - [ ] Define and expose standalone tracking states:
   - [ ] INITIALIZING;
@@ -613,7 +613,8 @@ Still required:
 
 - [ ] standalone acceptance-gate tests for observation age;
 - [x] standalone acceptance-gate tests for inliers/error/non-finite poses;
-- [ ] pose-jump gate tests;
+- [x] pose-jump gate tests, including scale-independent page-width translation and relaxed
+  reacquisition thresholds;
 - [ ] tracking-state hysteresis tests;
 - [ ] standalone page↔MobileGS frame conversion tests;
 - [ ] hybrid page↔ARCore frame conversion tests;

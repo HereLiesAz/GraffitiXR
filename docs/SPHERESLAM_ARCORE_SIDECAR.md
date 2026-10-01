@@ -322,9 +322,11 @@ silently pass normal builds that never initialize the submodule.
 
 The CameraX standalone path applies an explicit app-level KPM acceptance policy before publishing a
 pose. Defaults mirror the pinned artoolkitX binary path: at least 4 inliers and ICP/reprojection
-error no greater than 10.0. Non-finite matrices/errors are also rejected. Rejections enter the same
-short IMU-bridge/loss path as a missing visual match and are logged only when the rejection reason
-changes. Pose-jump and observation-age gates remain separate TODO items.
+error no greater than 10.0. Non-finite matrices/errors are also rejected. A second continuity gate rejects catastrophic
+frame-to-frame jumps using reference-page widths (scale-independent for measured and normalized
+targets) and rotation angle. Reacquisition has deliberately looser limits than locked tracking.
+Rejections enter the same short IMU-bridge/loss path as a missing visual match and are logged only
+when the rejection reason changes. Observation-age gating remains a separate TODO item.
 
 ## Standalone calibration diagnostics
 

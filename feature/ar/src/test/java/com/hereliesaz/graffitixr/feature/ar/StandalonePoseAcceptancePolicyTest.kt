@@ -52,6 +52,58 @@ class StandalonePoseAcceptancePolicyTest {
     }
 
     @Test
+    fun rejectsCatastrophicTranslationRelativeToReferenceWidth() {
+        val candidate = identity.copyOf().also { it[12] = -3f }
+        val result = StandalonePoseAcceptancePolicy().evaluate(
+            viewMatrix = candidate,
+            inlierCount = 12,
+            reprojectionError = 1f,
+            previousViewMatrix = identity,
+            referenceWidthUnits = 1f,
+        )
+        assertEquals(StandalonePoseRejection.TRANSLATION_JUMP, result.rejection)
+    }
+
+    @Test
+    fun rejectsCatastrophicAngularJumpButUsesRelaxedReacquisitionLimit() {
+        val angle = Math.toRadians(120.0)
+        val c = kotlin.math.cos(angle).toFloat()
+        val s = kotlin.math.sin(angle).toFloat()
+        val candidate = floatArrayOf(
+            c, s, 0f, 0f,
+            -s, c, 0f, 0f,
+            0f, 0f, 1f, 0f,
+            0f, 0f, 0f, 1f,
+        )
+        val normal = StandalonePoseAcceptancePolicy().evaluate(
+            candidate, 12, 1f, identity, 1f, reacquiring = false,
+        )
+        assertEquals(StandalonePoseRejection.ANGULAR_JUMP, normal.rejection)
+
+        val reacquiring = StandalonePoseAcceptancePolicy().evaluate(
+            candidate, 12, 1f, identity, 1f, reacquiring = true,
+        )
+        assertTrue(reacquiring.accepted)
+    }
+
+    @Test
+    fun translationGateIsScaleIndependentInPageWidths() {
+        val candidate = identity.copyOf().also { it[12] = -1.5f }
+        assertTrue(
+            StandalonePoseAcceptancePolicy().evaluate(
+                candidate, 12, 1f, identity, 1f, false,
+            ).accepted,
+        )
+
+        val physicallyScaledCandidate = identity.copyOf().also { it[12] = -3f }
+        assertTrue(
+            StandalonePoseAcceptancePolicy().evaluate(
+                physicallyScaledCandidate, 12, 1f, identity, 2f, false,
+            ).accepted,
+        )
+    }
+
+    @Test
     fun thresholdsAreConfigurableButCannotUndercutKpmMinimumGeometry() {
         val policy = StandalonePoseAcceptancePolicy(
             StandalonePoseAcceptanceConfig(minInliers = 8, maxReprojectionError = 3f),
