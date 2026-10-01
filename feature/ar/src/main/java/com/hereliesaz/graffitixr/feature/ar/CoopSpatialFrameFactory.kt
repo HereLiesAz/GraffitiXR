@@ -63,14 +63,25 @@ internal object CoopSpatialFrameFactory {
             fp.isLegacyFrame()
         ) return null
 
+        val savedDesignHalfWidth = project.arDesignHalfWidthM
+        // If artwork already exists, its metric base width is part of cross-backend placement.
+        // Guessing 1 m here would align the wall pose correctly but change the mural's physical
+        // scale on a standalone guest, which is still a calibration failure. A project with no
+        // artwork may use a neutral 1 m reference because there is no design scale to preserve yet.
+        if (
+            project.design != null &&
+            (!savedDesignHalfWidth.isFinite() || savedDesignHalfWidth <= 0f)
+        ) return null
+        val referenceWidth =
+            savedDesignHalfWidth.takeIf { it.isFinite() && it > 0f }?.times(2f) ?: 1f
+
         return CoopSpatialFrame(
             hostBackend = CoopTrackingBackend.ARCORE,
             fingerprintFrameVersion = ARCORE_FINGERPRINT_FRAME_VERSION,
             scale = CoopSpatialScale.METRIC,
             fingerprintAvailable = true,
             anchorRevision = fingerprintRevision(fp),
-            referenceWidthUnits =
-                (project.arDesignHalfWidthM.takeIf { it.isFinite() && it > 0f }?.times(2f) ?: 1f),
+            referenceWidthUnits = referenceWidth,
             fingerprintFromWall = fp.captureAnchorCam,
         )
     }
