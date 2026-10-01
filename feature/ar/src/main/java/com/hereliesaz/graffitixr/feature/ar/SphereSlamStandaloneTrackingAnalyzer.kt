@@ -87,6 +87,8 @@ class SphereSlamStandaloneTrackingAnalyzer(
         StandalonePoseAcceptancePolicy(),
     private val observationAgePolicy: StandaloneObservationAgePolicy =
         StandaloneObservationAgePolicy(),
+    private val targetQualityConfig: StandaloneTargetQualityConfig =
+        StandaloneTargetQualityConfig(),
     private val bridge: GyroOrientationBridge = GyroOrientationBridge(context),
     private val trackingStateMachine: StandaloneTrackingStateMachine =
         StandaloneTrackingStateMachine(),
@@ -433,6 +435,16 @@ class SphereSlamStandaloneTrackingAnalyzer(
                 height = referenceImage.height,
                 referenceWidthMeters = referenceImage.referenceWidthMeters,
                 physicallyMetric = referenceImage.physicallyMetric,
+            )
+            if (reference.featureCount < targetQualityConfig.minKpmFeatures) {
+                throw StandaloneReferenceTooWeakException(
+                    featureCount = reference.featureCount,
+                    minimumFeatureCount = targetQualityConfig.minKpmFeatures,
+                )
+            }
+            onDiagnostic(
+                "SphereSLAM standalone reference features=${reference.featureCount} " +
+                    "minimum=${targetQualityConfig.minKpmFeatures}",
             )
             session = created
             sessionKey = key
