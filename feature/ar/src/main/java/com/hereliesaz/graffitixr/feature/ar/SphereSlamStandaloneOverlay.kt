@@ -140,10 +140,14 @@ fun SphereSlamStandaloneOverlay(
     }
 
     fun resetCapture() {
-        referenceBitmap?.let {
-            previousReferenceBitmap = it
-            previousReferenceWidthMeters = activeReferenceWidthMeters
-            previousReferencePhysicallyMetric = activeReferencePhysicallyMetric
+        // Only a page that completed native KPM registration is a safe rollback candidate.
+        // Keeping an unvalidated bitmap here can create an infinite weak-target restore loop.
+        if (referenceReady) {
+            referenceBitmap?.let {
+                previousReferenceBitmap = it
+                previousReferenceWidthMeters = activeReferenceWidthMeters
+                previousReferencePhysicallyMetric = activeReferencePhysicallyMetric
+            }
         }
         rawCaptureBitmap = null
         pendingReferenceBitmap = null
@@ -542,10 +546,17 @@ fun SphereSlamStandaloneOverlay(
                                     previousReferencePhysicallyMetric
                                 referenceNeedsPersistence = false
                                 previousReferenceBitmap = null
+                                referenceReady = false
+                                trackingState = StandaloneTrackingState.INITIALIZING
+                                currentFailure = null
+                                fatalMessage = null
                                 referenceBitmap = old
-                                fatalMessage =
-                                    "New target had only ${error.featureCount} KPM features; " +
-                                        "restored the previous target."
+                                onDiagnostic(
+                                    "SphereSLAM replacement target rejected: " +
+                                        "features=${error.featureCount} " +
+                                        "minimum=${error.minimumFeatureCount}; " +
+                                        "restored previous validated target",
+                                )
                             } else {
                                 fatalMessage =
                                     "That target has too little trackable detail " +
