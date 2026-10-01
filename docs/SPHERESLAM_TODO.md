@@ -317,8 +317,10 @@ Remaining:
 - [ ] Verify every rail/control available in AR mode either:
   - [ ] works on both backends; or
   - [ ] is explicitly disabled with a backend-specific reason.
-- [ ] Verify transform lock prevents standalone pan/scale/rotate exactly as it does in ARCore mode.
-- [ ] Verify undo/redo behavior for standalone mode adjustments.
+- [x] Verify transform lock prevents standalone pan/scale/rotate: both AR backends consume the same
+  `modeAdjustments[AR]`, and the shared reducer rejects AR transform gestures while locked.
+- [x] Verify undo/redo behavior for standalone mode adjustments with an explicit AR-mode gesture
+  history test; standalone and ARCore consume the same restored adjustment.
 - [x] Verify design visibility/removal clears the standalone GL texture: null design now posts an
   explicit GL-thread clear command instead of leaving the previous texture resident.
 - [x] Verify rapid clear/replace ordering with a single-slot atomic texture-command mailbox; unit
