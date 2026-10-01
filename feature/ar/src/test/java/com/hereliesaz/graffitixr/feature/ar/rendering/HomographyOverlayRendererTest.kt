@@ -1,7 +1,10 @@
 package com.hereliesaz.graffitixr.feature.ar.rendering
 
+import android.graphics.Bitmap
+import io.mockk.mockk
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 /**
@@ -47,5 +50,30 @@ class HomographyOverlayRendererTest {
         assertNull(letterboxViewport(1080, 0, 1f))
         assertNull(letterboxViewport(1080, 1920, 0f))
         assertNull(letterboxViewport(1080, 1920, -1f))
+    }
+
+    @Test
+    fun `texture mailbox clear wins when it is the latest command`() {
+        val mailbox = TextureUpdateMailbox()
+        val bitmap = mockk<Bitmap>(relaxed = true)
+
+        mailbox.replace(bitmap)
+        mailbox.clear()
+
+        assertSame(TextureUpdateCommand.Clear, mailbox.take())
+        assertNull(mailbox.take())
+    }
+
+    @Test
+    fun `texture mailbox replacement wins when it is the latest command`() {
+        val mailbox = TextureUpdateMailbox()
+        val bitmap = mockk<Bitmap>(relaxed = true)
+
+        mailbox.clear()
+        mailbox.replace(bitmap)
+
+        val command = mailbox.take() as TextureUpdateCommand.Replace
+        assertSame(bitmap, command.bitmap)
+        assertNull(mailbox.take())
     }
 }
