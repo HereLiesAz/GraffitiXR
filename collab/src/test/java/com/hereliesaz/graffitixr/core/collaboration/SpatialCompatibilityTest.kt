@@ -76,4 +76,55 @@ class SpatialCompatibilityTest {
         host.close(CoopSessionState.EndReason.UserLeft)
         standaloneGuest.close(CoopSessionState.EndReason.UserLeft)
     }
+    @Test
+    fun `host frame change before bulk ends session instead of reframing guest`() = runBlocking {
+        var currentFrame = testSpatialFrame(
+            backend = CoopTrackingBackend.ARCORE,
+            scale = CoopSpatialScale.METRIC,
+            fingerprintAvailable = true,
+            revision = 1L,
+        )
+        val host = HostSession(
+            token = "tok",
+            protocolVersion = 3,
+            localDeviceName = "host",
+            projectId = "p1",
+            snapshotProvider = {
+                ProjectSnapshot(
+                    fingerprintBytes = ByteArray(64) { it.toByte() },
+                    projectBytes = ByteArray(64),
+                    layerCount = 0,
+                    spatialFrame = currentFrame,
+                )
+            },
+        )
+        // HostSession freezes revision 1 at construction. Simulate a wall recapture before the
+        // guest's fresh bulk snapshot is produced; the snapshot must not be sent under revision 1.
+        currentFrame = currentFrame.copy(anchorRevision = 2L)
+        val port = host.startListening()
+
+        var bulkReceived = false
+        val guest = GuestSession(
+            host = "127.0.0.1",
+            port = port,
+            token = "tok",
+            protocolVersion = 3,
+            localDeviceName = "guest",
+            localBackend = CoopTrackingBackend.ARCORE,
+            onBulkReceived = { _, _, _ -> bulkReceived = true },
+            onOp = {},
+            reconnectWindowMs = 1_000L,
+            reconnectIntervalMs = 100L,
+        )
+        guest.connect()
+
+        val hostEnded = withTimeout(5_000) {
+            host.state.first { it is CoopSessionState.Ended }
+        } as CoopSessionState.Ended
+        assertEquals(CoopSessionState.EndReason.SpatialFrameChanged, hostEnded.reason)
+        assertTrue("changed wall frame must never be transferred as bulk", !bulkReceived)
+
+        guest.close(CoopSessionState.EndReason.UserLeft)
+    }
+
 }
