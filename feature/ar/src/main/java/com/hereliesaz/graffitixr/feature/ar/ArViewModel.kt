@@ -1141,8 +1141,6 @@ class ArViewModel @Inject constructor(
         }
         viewModelScope.launch {
             projectRepository.currentProject.collect { project ->
-                lastStandaloneSavedMapPointCount =
-                    project?.sphereSlamWallFeatureMap?.pointCount ?: 0
                 _uiState.update {
                     it.copy(
                         sphereSlamReferenceUri = project?.sphereSlamReferenceUri,
@@ -3457,7 +3455,7 @@ class ArViewModel @Inject constructor(
 
     @Volatile private var lastStandaloneGuideKey: String? = null
     @Volatile private var lastStandaloneNativeUiUpdateMs: Long = Long.MIN_VALUE
-    @Volatile private var lastStandaloneSavedMapPointCount: Int = 0
+    @Volatile private var lastStandaloneSavedMapRevision: Long = Long.MIN_VALUE
     @Volatile private var lastStandaloneMapSaveMs: Long = Long.MIN_VALUE
     private val standaloneMapSaveInFlight = AtomicBoolean(false)
 
@@ -3520,7 +3518,8 @@ class ArViewModel @Inject constructor(
         val corrob = slamManager.getCorroborationDiagnostics()
         val wallPoints = slamManager.getWallKeypointCount()
         val mapPoints = slamManager.getMapPointCount()
-        maybePersistStandaloneWallFeatureMap(now, mapPoints)
+        val mapRevision = slamManager.getWallFeatureMapRevision()
+        maybePersistStandaloneWallFeatureMap(now, mapPoints, mapRevision)
 
         _uiState.update { state ->
             state.copy(
@@ -3535,8 +3534,12 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    private fun maybePersistStandaloneWallFeatureMap(nowMs: Long, mapPointCount: Int) {
-        if (mapPointCount <= 0 || mapPointCount == lastStandaloneSavedMapPointCount) return
+    private fun maybePersistStandaloneWallFeatureMap(
+        nowMs: Long,
+        mapPointCount: Int,
+        mapRevision: Long,
+    ) {
+        if (mapPointCount <= 0 || mapRevision == lastStandaloneSavedMapRevision) return
         if (
             lastStandaloneMapSaveMs != Long.MIN_VALUE &&
             nowMs - lastStandaloneMapSaveMs < STANDALONE_MAP_SAVE_INTERVAL_MS
@@ -3573,7 +3576,9 @@ class ArViewModel @Inject constructor(
                     }
                 }
                 if (committed) {
-                    lastStandaloneSavedMapPointCount = map.pointCount
+                    // Revision, not point count: confidence/observation updates and cap-time
+                    // replacement mutate the map even when its size is unchanged.
+                    lastStandaloneSavedMapRevision = mapRevision
                     lastStandaloneMapSaveMs = android.os.SystemClock.elapsedRealtime()
                     appendDiag(
                         "SphereSLAM MobileGS map saved frame=centered-page " +
