@@ -47,6 +47,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.hereliesaz.graffitixr.common.model.Fingerprint
 import com.hereliesaz.graffitixr.common.model.WallFeatureMap
 import com.hereliesaz.graffitixr.common.model.ModeAdjustment
+import com.hereliesaz.graffitixr.common.model.SphereSlamAtlasPage
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import com.hereliesaz.graffitixr.design.theme.rememberAppStrings
@@ -95,8 +96,10 @@ fun SphereSlamStandaloneOverlay(
     persistedReferenceUri: Uri? = null,
     persistedReferenceWidthMeters: Float = 1f,
     persistedReferencePhysicallyMetric: Boolean = false,
+    persistedAtlasPages: List<SphereSlamAtlasPage> = emptyList(),
     onReferenceCaptured: (Bitmap, Float, Boolean) -> Unit = { _, _, _ -> },
     onPersistedReferenceInvalid: (Uri) -> Unit = {},
+    onPersistedAtlasPageInvalid: (Int, Uri) -> Unit = { _, _ -> },
     adjustment: ModeAdjustment? = null,
     onUnitsPerPixel: (Float) -> Unit = {},
     onTrackingTick: (Boolean) -> Unit = {},
@@ -365,6 +368,49 @@ fun SphereSlamStandaloneOverlay(
             physicallyMetric = activeReferencePhysicallyMetric,
         )
     }
+    val atlasReferenceImages by produceState(
+        initialValue = emptyList<SphereSlamStandaloneAtlasReferenceImage>(),
+        persistedAtlasPages,
+    ) {
+        val expectedFrame =
+            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION
+        val loaded = withContext(Dispatchers.IO) {
+            val valid = mutableListOf<SphereSlamStandaloneAtlasReferenceImage>()
+            val invalid = mutableListOf<Pair<Int, Uri>>()
+            persistedAtlasPages.sortedBy { it.pageNo }.forEach { page ->
+                if (page.frameVersion != expectedFrame) {
+                    invalid += page.pageNo to page.referenceUri
+                    return@forEach
+                }
+                val bitmap = runCatching {
+                    context.contentResolver.openInputStream(page.referenceUri)
+                        ?.use(BitmapFactory::decodeStream)
+                }.getOrNull()
+                if (bitmap == null) {
+                    invalid += page.pageNo to page.referenceUri
+                } else {
+                    valid += SphereSlamStandaloneAtlasReferenceImage(
+                        pageNo = page.pageNo,
+                        luma = bitmapToLuma(bitmap),
+                        width = bitmap.width,
+                        height = bitmap.height,
+                        referenceWidthMeters = page.referenceWidthMeters,
+                        physicallyMetric = page.physicallyMetric,
+                        canonicalFromPage = page.canonicalFromPage.toFloatArray(),
+                    )
+                }
+            }
+            valid to invalid
+        }
+        loaded.second.forEach { (pageNo, uri) ->
+            onPersistedAtlasPageInvalid(pageNo, uri)
+            onDiagnostic(
+                "SphereSLAM atlas page refused page=" + pageNo +
+                    " reason=missing-corrupt-or-frame-version",
+            )
+        }
+        value = loaded.first
+    }
     val glRenderer = remember(context) { HomographyOverlayRenderer(context) }
 
     LaunchedEffect(glRenderer, designBitmap) {
@@ -524,6 +570,7 @@ fun SphereSlamStandaloneOverlay(
         mobileGsFingerprintFrameVersion,
         mobileGsWallFeatureMap,
         mobileGsWallFeatureMapFrameVersion,
+        atlasReferenceImages,
     ) {
         val id = cameraId
         if (id == null) {
@@ -536,6 +583,7 @@ fun SphereSlamStandaloneOverlay(
                 context = context,
                 cameraId = id,
                 referenceImage = referenceImage,
+                atlasReferenceImages = atlasReferenceImages,
                 slamManager = slamManager,
                 mobileGsFingerprint = mobileGsFingerprint,
                 mobileGsFingerprintFrameVersion = mobileGsFingerprintFrameVersion,
