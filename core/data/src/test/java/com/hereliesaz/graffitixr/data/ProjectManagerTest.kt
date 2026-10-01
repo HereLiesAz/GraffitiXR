@@ -113,6 +113,20 @@ class ProjectManagerTest {
     }
 
     @Test
+    fun `deleteProject removes versioned SphereSLAM reference with project directory`() = runTest {
+        val bitmap = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
+        manager.saveProject(mockContext, GraffitiProject(id = "delete_slam", name = "Wall"))
+        val uri = manager.saveSphereSlamReference(mockContext, "delete_slam", bitmap)
+        val file = File(requireNotNull(uri.path))
+        assertTrue(file.exists())
+
+        manager.deleteProject(mockContext, "delete_slam")
+
+        assertFalse(file.exists())
+        assertFalse(File(tempFilesDir, "projects/delete_slam").exists())
+    }
+
+    @Test
     fun `importProjectFromUri fails gracefully on bad URI`() = runTest {
         val mockUri = Uri.parse("content://test/project.gxr")
         val mockResolver = mockk<android.content.ContentResolver>()
