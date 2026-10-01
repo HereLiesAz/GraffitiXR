@@ -116,6 +116,22 @@ fun MainScreen(
             }
         }
 
+        // The same AR controls drive two different coordinate frames. Keep their persisted
+        // adjustments separate and swap which one EditorViewModel exposes to gestures/undo when
+        // backend ownership changes.
+        LaunchedEffect(
+            uiState.projectId,
+            uiState.editorMode,
+            arUiState.isArCoreAvailabilityResolved,
+            arUiState.isArCoreAvailable,
+        ) {
+            editorViewModel.setStandaloneArBackendActive(
+                uiState.editorMode == EditorMode.AR &&
+                    arUiState.isArCoreAvailabilityResolved &&
+                    !arUiState.isArCoreAvailable,
+            )
+        }
+
         if (hasCameraPermission && isCameraActive && uiState.editorMode != EditorMode.TRACE) {
             when (uiState.editorMode) {
                 EditorMode.AR -> {
@@ -193,29 +209,9 @@ fun MainScreen(
                         val standaloneDesign = uiState.design?.takeIf {
                             it.isVisible && it.bitmap != null
                         }
-                        val rawStandaloneAdj = uiState.modeAdjustments[EditorMode.AR]
-                        // Spatial AR placement belongs to one canonical standalone wall generation.
-                        // Tone is frame-independent, so a recapture preserves the look but refuses
-                        // the old pan/scale/rotation until the artist places it in the new frame.
-                        val standaloneAdj =
-                            if (
-                                rawStandaloneAdj != null &&
-                                arUiState.sphereSlamReferenceUri != null &&
-                                arUiState.sphereSlamPlacementAnchorGeneration !=
-                                    arUiState.sphereSlamAnchorGeneration
-                            ) {
-                                rawStandaloneAdj.copy(
-                                    offsetX = 0f,
-                                    offsetY = 0f,
-                                    scale = 1f,
-                                    rotation = 0f,
-                                    rotationX = 0f,
-                                    rotationY = 0f,
-                                    isTransformLocked = false,
-                                )
-                            } else {
-                                rawStandaloneAdj
-                            }
+                        // EditorViewModel exposes the SphereSLAM-specific adjustment while this
+                        // backend owns AR; ARCore's independent adjustment remains persisted offscreen.
+                        val standaloneAdj = uiState.modeAdjustments[EditorMode.AR]
                         var standaloneTexture by remember { mutableStateOf<AndroidBitmap?>(null) }
 
                         // Match ARCore mode's texture treatment: tone fields are baked into the
