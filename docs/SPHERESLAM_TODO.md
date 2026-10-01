@@ -319,9 +319,10 @@ Remaining:
   - [ ] is explicitly disabled with a backend-specific reason.
 - [ ] Verify transform lock prevents standalone pan/scale/rotate exactly as it does in ARCore mode.
 - [ ] Verify undo/redo behavior for standalone mode adjustments.
-- [ ] Verify design visibility toggling clears the standalone GL texture rather than leaving the last
-  texture resident/visible.
-- [ ] Verify replacing/removing the design updates the standalone GL texture immediately.
+- [x] Verify design visibility/removal clears the standalone GL texture: null design now posts an
+  explicit GL-thread clear command instead of leaving the previous texture resident.
+- [x] Verify rapid clear/replace ordering with a single-slot atomic texture-command mailbox; unit
+  tests prove the latest clear or replacement wins.
 - [ ] Verify design aspect changes recalculate base extent without resetting user adjustment.
 - [ ] Confirm touch/gesture coordinates still line up when CameraX preview is letterboxed/cropped.
 - [ ] Add GL/instrumentation tests for standalone texture clear/replace if test infrastructure permits.
