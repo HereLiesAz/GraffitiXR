@@ -327,6 +327,14 @@ repository's atomic project update, and only then deletes the previous reference
 project changes or the metadata save fails, the uncommitted candidate is deleted and the previous
 reference remains authoritative.
 
+## Missing or corrupt persisted reference
+
+If the saved reference URI cannot be decoded, the standalone UI asks for a new target and calls a
+compare-guarded repository cleanup. Only the matching SphereSLAM URI/width/metric fields are reset;
+all other project data is preserved. If a newer recapture has already replaced the URI, the stale
+failure callback becomes a no-op.
+
+
 ## Standalone target quality
 
 A newly rectified target is preflighted before native registration for minimum size, luminance
