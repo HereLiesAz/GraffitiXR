@@ -61,15 +61,20 @@ This must happen before treating the branch as merge-ready.
   (covered by the repository-wide Gradle `test` task in Android CI).
 - [x] Run the app module's JVM/unit tests (repository-wide Gradle `test` passed).
 - [x] Run the repository's native locking/static checks that cover `MobileGS` / JNI.
-- [ ] Compile the native `:core:nativebridge` target for every release ABI.
+- [x] Compile the native `:core:nativebridge` target for every release ABI. Android CI release
+  packaging verified `libgraffitixr.so` plus the KPM JNI symbols in both `arm64-v8a` and
+  `armeabi-v7a`.
 - [ ] Build at least one debug APK containing artoolkitX KPM.
 - [x] Build the normal release artifact(s): Android CI `release-build` completed
   `assembleRelease` successfully with the real artoolkitX submodule initialized.
-- [ ] Inspect the merged manifest and confirm:
-  - [ ] `android.hardware.camera.ar` remains `required="false"`;
-  - [ ] `com.google.ar.core` remains optional;
-  - [ ] no new required hardware feature excludes non-ARCore devices.
-- [ ] Confirm ProGuard/R8 does not strip the KPM JNI entry points or standalone classes.
+- [x] Inspect the merged manifest and confirm (enforced by `check_sphereslam_manifest.py` in the
+  successful release-build job):
+  - [x] `android.hardware.camera.ar` remains `required="false"`;
+  - [x] `com.google.ar.core` remains optional;
+  - [x] no new required hardware feature excludes non-ARCore devices.
+- [x] Confirm ProGuard/R8 does not strip the KPM JNI entry points or standalone classes:
+  `check_sphereslam_apk.py --variant release` passed against the shrunk release APK and found all
+  required JNI symbols plus the preserved KPM/SphereSLAM DEX descriptors.
 - [ ] Confirm no duplicate native symbol/source issue was introduced by the explicit artoolkitX AR
   source list.
 - [x] Add/enable CI for branch/PR validation; PR #1961 ran Android CI with the artoolkitX
@@ -92,7 +97,10 @@ support objects that upstream ARUtil links with it:
 - Android/NDK zlib: `libz`.
 
 The continuation branch now matches those transitive upstream dependencies rather than suppressing
-individual unresolved symbols. This item remains unchecked until CI completes the final link.
+individual unresolved symbols. Android CI subsequently completed `assembleRelease`, linked the final
+`libgraffitixr.so`, verified KPM JNI symbols in both supported ARM ABIs, verified the shrunk DEX
+classes, and passed the non-ARCore merged-manifest check. The remaining unchecked build items are the
+debug-APK packaging run and the explicit duplicate-source/static-contract execution.
 
 A later superseded CI run also caught an extra closing brace introduced while adding
 `ImageProxy.cropRect` support in `LumaFrameTransform.kt`; that Kotlin syntax regression was fixed
