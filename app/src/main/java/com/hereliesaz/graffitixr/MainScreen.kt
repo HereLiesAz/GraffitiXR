@@ -267,6 +267,9 @@ fun MainScreen(
                             onPersistedAtlasPageInvalid = { pageNo, uri ->
                                 arViewModel.clearSphereSlamAtlasPageIfMatches(pageNo, uri)
                             },
+                            onAtlasPageCaptured = { candidate ->
+                                arViewModel.saveSphereSlamAtlasPage(candidate)
+                            },
                             adjustment = standaloneAdj,
                             onUnitsPerPixel = { standaloneArUnitsPerPixel = it },
                             onTrackingTick = { arViewModel.onStandaloneTrackingTick(it) },
