@@ -1280,10 +1280,15 @@ class ArViewModel @Inject constructor(
                 }
                 if (project != null) {
                     loadedProjectId = project.id
-                    // Once ARCore is known unavailable, the standalone analyzer exclusively owns the
-                    // native wall fingerprint. Re-running these ARCore loaders on every project save
-                    // would race it and reinterpret capture-camera maps in the centered page frame.
-                    if (_uiState.value.isArCoreAvailable) {
+                    // Native MobileGS has exactly one active fingerprint frame. Standalone owns it
+                    // on non-ARCore devices; an ARCore co-op GUEST also owns it once protocol-v3 peer
+                    // geometry has been installed. Never let a later spectator-project emission run
+                    // the ordinary local loader over that peer fingerprint.
+                    val peerOwnsNativeFingerprint =
+                        _uiState.value.coopRole ==
+                            com.hereliesaz.graffitixr.common.model.CoopRole.GUEST &&
+                            _uiState.value.coopPeerSpatialFrame != null
+                    if (_uiState.value.isArCoreAvailable && !peerOwnsNativeFingerprint) {
                         loadMapIfExists()
                         loadFingerprintIfExists()
                     }
