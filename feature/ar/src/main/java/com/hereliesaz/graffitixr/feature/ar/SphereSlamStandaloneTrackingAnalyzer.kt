@@ -175,7 +175,6 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             val rawIntrinsics = CameraIntrinsicsEstimator.estimate(
                 context,
                 cameraId,
-                cameraTimestampSource.name,
                 rawWidth,
                 rawHeight,
             ) ?: run {

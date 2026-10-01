@@ -492,7 +492,7 @@ class ProjectManagerTest {
             val captured = mutableListOf<GraffitiProject>()
             val repo =
                 mockk<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>(relaxed = true)
-            coEvery { repo.createProject(any()) } coAnswers {
+            coEvery { repo.createProject(any<GraffitiProject>()) } coAnswers {
                 captured += firstArg<GraffitiProject>()
             }
             val provider =
