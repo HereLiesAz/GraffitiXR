@@ -100,6 +100,21 @@ object StandaloneFingerprintFrame {
     /** Inverse of [fingerprintFromAnchor]; kept explicit at call sites for frame readability. */
     fun anchorFromFingerprint(): FloatArray = identity4()
 
+    /**
+     * True only when a persisted map declares the standalone centred-page anchor.
+     *
+     * The standalone wall frame and fingerprint anchor are intentionally identical, so any
+     * translation/rotation here means the map belongs to some other frame contract and must not be
+     * restored as SphereSLAM state.
+     */
+    fun isCenteredPageAnchor(anchor: FloatArray, epsilon: Float = 1e-5f): Boolean {
+        if (anchor.size != 16 || !epsilon.isFinite() || epsilon < 0f) return false
+        val identity = identity4()
+        return anchor.indices.all { i ->
+            anchor[i].isFinite() && kotlin.math.abs(anchor[i] - identity[i]) <= epsilon
+        }
+    }
+
     private fun identity4(): FloatArray = floatArrayOf(
         1f, 0f, 0f, 0f,
         0f, 1f, 0f, 0f,
