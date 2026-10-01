@@ -49,6 +49,11 @@ data class CoopSpatialFrame(
     val hostBackend: CoopTrackingBackend,
     val fingerprintFrameVersion: Int,
     val scale: CoopSpatialScale,
+    /**
+     * Whether the bulk snapshot carries a PnP fingerprint in this frame. Standalone peers can share
+     * one KPM page without it; every cross-backend pairing needs it as the geometric bridge.
+     */
+    val fingerprintAvailable: Boolean,
     /** Stable for the host wall target; changes when the target/fingerprint is replaced. */
     val anchorRevision: Long,
     /** One useful wall-width scale in this frame. Metres for METRIC, page units otherwise. */
@@ -78,8 +83,11 @@ data class CoopSpatialFrame(
      * consume the same shared page. ARCore's world translation is metres, so accepting it there
      * would silently relabel arbitrary page units as metres.
      */
-    fun supportsGuest(guestBackend: CoopTrackingBackend): Boolean =
-        scale == CoopSpatialScale.METRIC ||
+    fun supportsGuest(guestBackend: CoopTrackingBackend): Boolean {
+        if (guestBackend != hostBackend && !fingerprintAvailable) return false
+        if (hostBackend == CoopTrackingBackend.ARCORE && !fingerprintAvailable) return false
+        return scale == CoopSpatialScale.METRIC ||
             (hostBackend == CoopTrackingBackend.SPHERESLAM &&
                 guestBackend == CoopTrackingBackend.SPHERESLAM)
+    }
 }
