@@ -25,6 +25,7 @@ import com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
 import com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import com.google.ar.core.Config
@@ -64,6 +65,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.design.R as DesignR
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -1941,7 +1943,12 @@ class ArViewModel @Inject constructor(
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 if (!metadataCommitted) {
-                    projectManager.deleteSphereSlamReference(appContext, projectId, newUri)
+                    // This catch runs after the parent job is already cancelled. Cleanup must
+                    // escape that cancelled context or withContext(Dispatchers.IO) inside
+                    // deleteSphereSlamReference() immediately rethrows and leaves an orphan PNG.
+                    withContext(NonCancellable) {
+                        projectManager.deleteSphereSlamReference(appContext, projectId, newUri)
+                    }
                 }
                 throw e
             } catch (e: Exception) {
