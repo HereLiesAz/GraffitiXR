@@ -140,6 +140,14 @@ documented in
 - `EditorMode.OVERLAY` → CameraX owns the camera (devices without ARCore can continue using the
   planar homography/OpenCV overlay path described in `docs/UI_UX.md`).
 
+**Standalone AR capability boundary:** the centered KPM page/atlas is the wall anchor. Core placement
+does not construct an ARCore `Anchor` or depend on `Frame.hitTest`; when a screen-space wall query
+is needed, `StandaloneWallHitTest` intersects the calibrated CameraX ray with canonical z=0 and
+accepts only registered page coverage while visually locked. ARCore Depth/stereo probes and
+planes/point-cloud debug renderers stay behind the ARCore branch. Standalone exposes KPM
+page/inlier/error/age diagnostics instead, and its persisted anchor/placement generations prevent a
+recapture from reusing transforms authored in the superseded wall frame.
+
 ## Relocalization and Drift Correction
 
 The engine uses a dedicated background thread (`relocThreadFunc`) to continuously match the current
