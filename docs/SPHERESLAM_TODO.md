@@ -144,21 +144,25 @@ Current behavior is deliberately normalized, not physically metric.
 - [x] Non-metric standalone mode does not claim a real physical measurement in the implementation
   contract.
 
-Remaining:
+Remaining / status:
 
-- [ ] Choose the first physical-scale input supported in UI:
-  - [ ] measured target width entered by the user; **recommended first implementation**;
-  - [ ] two-point wall measurement;
-  - [ ] hardware depth where available without ARCore;
-  - [ ] another independently verifiable source.
-- [ ] Add the chosen scale field(s) to project data with backward-compatible defaults.
-- [ ] Add UI for entering/capturing the scale.
-- [ ] Validate scale bounds and reject zero/negative/implausible values.
-- [ ] Pass real width to `SphereSlamStandaloneSession.addReference`.
-- [ ] Persist `sphereSlamReferencePhysicallyMetric=true` only after successful scale acquisition.
-- [ ] Update standalone distance/measurement UI so it is enabled only for physically metric targets.
-- [ ] Add unit tests proving the same pixel reference yields correct KPM DPI for several physical
-  widths.
+- [x] Choose the first physical-scale input: measured rectified-target width entered by the artist.
+  The alternatives (two-point measurement / hardware depth) can be added later without changing the
+  KPM scale contract.
+- [x] Add the chosen scale fields to project data with backward-compatible defaults
+  (`sphereSlamReferenceWidthMeters` + `sphereSlamReferencePhysicallyMetric`).
+- [x] Add capture UI that asks for the real target width after four-corner rectification.
+- [x] Validate scale bounds and reject non-finite, zero/negative, and implausible values
+  (accepted range: 0.05–100 m).
+- [x] Pass the entered real width to `SphereSlamStandaloneSession.addReference`.
+- [x] Persist `sphereSlamReferencePhysicallyMetric=true` only when a validated measured width is
+  accepted.
+- [x] Preserve an explicit "Continue Without Physical Scale" path using normalized 1.0-unit scale
+  with the metric flag false.
+- [ ] Update standalone distance/measurement UI so it is enabled only for physically metric targets
+  when such a readout is added.
+- [x] Add unit tests proving the same pixel reference round-trips through KPM DPI for several
+  physical widths, plus validation-boundary tests for the capture input.
 - [ ] Add an on-device ruler/tape-measure validation at multiple camera distances.
 
 **ACCEPTANCE:** camera translation and rendered design dimensions agree with a physical measurement

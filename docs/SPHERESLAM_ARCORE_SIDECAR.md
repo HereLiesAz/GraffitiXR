@@ -75,9 +75,11 @@ This branch now has a first functional Mode B path as well as Mode A:
 - the rectified canonical wall page is persisted as `sphereslam_reference.png` in the project and
   restored on reopen/import, rebuilding the KPM atlas locally.
 
-The initial standalone target uses a normalized 1.0-unit page width, so registration is internally
-consistent but distance readouts are **not** physically metric yet. A future measured-width/depth
-path can set the same API to a true physical width without changing the pose math.
+After rectification, standalone target capture now asks for the real width represented by the page.
+A validated measured width is converted into KPM DPI and persisted with
+`sphereSlamReferencePhysicallyMetric=true`, so KPM translation/design scale can be physically
+metric. The artist can explicitly skip measurement; that path uses normalized 1.0-unit width with
+the metric flag false and must never be displayed as a real-world distance.
 
 The app manifest already marks ARCore optional, so installability on non-ARCore devices is preserved.
 
@@ -352,8 +354,8 @@ Implemented for initial standalone wall tracking:
 
 Still required for full standalone parity:
 
-- physical scale acquisition (measured target width, depth alternative, or another explicit source)
-  before any UI reports real-world metres;
+- on-device validation of measured target scale at several distances before relying on it for
+  measurement-sensitive UI;
 - integration with GraffitiXR's normal target-review/fingerprint workflow instead of the current
   standalone capture/unwarp surface;
 - MobileGS/fingerprint integration in an explicitly defined standalone wall coordinate frame;
