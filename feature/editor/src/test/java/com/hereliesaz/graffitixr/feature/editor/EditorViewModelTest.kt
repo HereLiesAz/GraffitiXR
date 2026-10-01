@@ -409,10 +409,21 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `standalone recapture clears stale AR placement history and next gesture binds new generation`() = runTest {
+    fun `standalone recapture clears only standalone placement and preserves ARCore adjustment`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
+        val wallUri = Uri.parse("file://wall")
+        val arCoreAdjustment = ModeAdjustment(offsetX = 9f, scale = 2f, rotation = 33f)
+        currentProjectFlow.value = requireNotNull(currentProjectFlow.value).copy(
+            sphereSlamReferenceUri = wallUri,
+            sphereSlamAnchorGeneration = 0L,
+            sphereSlamPlacementAnchorGeneration = 0L,
+            sphereSlamModeAdjustment = ModeAdjustment(opacity = 0.65f),
+            modeAdjustments = mapOf(EditorMode.AR.name to arCoreAdjustment),
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
         viewModel.setEditorMode(EditorMode.AR)
-        viewModel.onOpacityChanged(0.65f)
+        viewModel.setStandaloneArBackendActive(true)
         viewModel.onGestureStart()
         viewModel.onModeTransformGesture(
             EditorMode.AR,
@@ -428,9 +439,8 @@ class EditorViewModelTest {
         assertEquals(0.65f, adjustment.opacity, 1e-4f)
         assertTrue(viewModel.uiState.value.undoCount > 0)
 
-        val wallUri = Uri.parse("file://wall")
+        // Canonical standalone page changes; ARCore's independent adjustment remains valid.
         currentProjectFlow.value = requireNotNull(currentProjectFlow.value).copy(
-            sphereSlamReferenceUri = wallUri,
             sphereSlamAnchorGeneration = 1L,
             sphereSlamPlacementAnchorGeneration = 0L,
         )
@@ -462,11 +472,18 @@ class EditorViewModelTest {
         viewModel.onGestureEnd()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        adjustment = requireNotNull(viewModel.uiState.value.modeAdjustments[EditorMode.AR])
+        val saved = requireNotNull(currentProjectFlow.value)
+        adjustment = requireNotNull(saved.sphereSlamModeAdjustment)
         assertEquals(0.1f, adjustment.offsetX, 1e-4f)
         assertEquals(0.05f, adjustment.offsetY, 1e-4f)
         assertEquals(1.2f, adjustment.scale, 1e-4f)
-        assertEquals(1L, currentProjectFlow.value?.sphereSlamPlacementAnchorGeneration)
+        assertEquals(1L, saved.sphereSlamPlacementAnchorGeneration)
+        assertEquals(arCoreAdjustment, saved.modeAdjustments[EditorMode.AR.name])
+
+        // Switching backend restores ARCore's untouched coordinate state.
+        viewModel.setStandaloneArBackendActive(false)
+        val restoredArCore = requireNotNull(viewModel.uiState.value.modeAdjustments[EditorMode.AR])
+        assertEquals(arCoreAdjustment, restoredArCore)
     }
 
     @Test
