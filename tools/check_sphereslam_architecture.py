@@ -12,6 +12,7 @@ invariants that are easy to accidentally regress during UI/renderer refactors:
    centred SphereSLAM fingerprint frame rather than passing through an ARCore-world conversion.
 5. The standalone runtime never reaches ARCore-only hit-test/depth/anchor/perception APIs and exposes
    an explicit canonical-wall hit-test seam instead.
+6. Co-op never installs peer geometry without a protocol-v3 backend/scale/wall-frame contract.
 
 If a future, legitimate architecture change trips this check, update the check together with the
 new explicit seam. Do not simply weaken/remove it.
@@ -54,6 +55,18 @@ ar_view_model = read(
 standalone_wall_hit = read(
     "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/StandaloneWallHitTest.kt"
 )
+coop_peer_analyzer = read(
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/CoopPeerFingerprintAnalyzer.kt"
+)
+coop_spatial_frame = read(
+    "core/common/src/main/java/com/hereliesaz/graffitixr/common/model/CoopSpatialFrame.kt"
+)
+coop_protocol = read(
+    "collab/src/main/java/com/hereliesaz/graffitixr/core/collaboration/wire/ProtocolVersion.kt"
+)
+coop_handshake = read(
+    "collab/src/main/java/com/hereliesaz/graffitixr/core/collaboration/wire/HandshakePayloads.kt"
+)
 
 # 1. AR reachability must not be gated by ARCore availability.
 mode_assignment = re.search(r"val\s+showArModeEntry\s*=\s*([^\n]+)", main_activity)
@@ -71,6 +84,7 @@ else:
 standalone_paths = [
     "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/SphereSlamStandaloneOverlay.kt",
     "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/SphereSlamStandaloneTrackingAnalyzer.kt",
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/CoopPeerFingerprintAnalyzer.kt",
     "sphereslam/src/main/java/com/hereliesaz/sphereslam/SphereSlamStandaloneSession.kt",
 ]
 for path in standalone_paths:
@@ -182,6 +196,22 @@ if (
     fail("ARCore-only stereo/depth probe no longer requires positively resolved ARCore capability.")
 if "(!capability.isArCoreAvailabilityResolved || !capability.isArCoreAvailable)" not in ar_view_model:
     fail("setArMode no longer fails closed while ARCore availability is unresolved/unavailable.")
+
+# 6. Co-op peer geometry must be framed explicitly before either backend consumes it.
+if "const val CURRENT: Int = 3" not in coop_protocol:
+    fail("Co-op protocol must remain v3+ while spatial-frame metadata is required.")
+for token in ("localBackend: CoopTrackingBackend", "spatialFrame: CoopSpatialFrame"):
+    if token not in coop_handshake:
+        fail(f"Co-op handshake/bulk payload lost required spatial token {token!r}.")
+for token in ("fingerprintFromWall", "supportsGuest", "NORMALIZED_PAGE"):
+    if token not in coop_spatial_frame:
+        fail(f"CoopSpatialFrame lost required frame/scale contract token {token!r}.")
+if "slam.alignToPeer(peerBytes)" not in coop_peer_analyzer:
+    fail("Standalone peer-fingerprint tracker no longer installs the validated co-op fingerprint.")
+if "CoopPeerWallPoseSolver" not in coop_peer_analyzer:
+    fail("Standalone peer-fingerprint tracker no longer composes PnP into the host wall frame.")
+if "localBackend = localBackend" not in ar_view_model or "spatialFrame.fingerprintFromWall" not in ar_view_model:
+    fail("ArViewModel no longer routes validated co-op backend/frame metadata to peer alignment.")
 for required in (
     "isDepthApiSupported = false",
     "isHardwareStereoActive = false",
@@ -198,6 +228,6 @@ if FAILURES:
 
 print(
     "SphereSLAM architecture invariant check OK: AR mode remains reachable, standalone is "
-    "ARCore-independent, hybrid KPM is observation-only, and ARCore-only perception APIs stay "
-    "behind explicit backend boundaries."
+    "ARCore-independent, hybrid KPM is observation-only, ARCore-only perception APIs stay "
+    "behind explicit backend boundaries, and co-op geometry is explicitly framed."
 )
