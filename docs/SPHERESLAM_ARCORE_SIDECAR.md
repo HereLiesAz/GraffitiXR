@@ -318,6 +318,14 @@ final shared-library link. The continuation branch mirrors upstream ARUtil's bun
 support sources and links NDK zlib. Keep this CI path enabled; otherwise native KPM regressions can
 silently pass normal builds that never initialize the submodule.
 
+## Standalone target quality
+
+A newly rectified target is preflighted before native registration for minimum size, luminance
+contrast, blur (Laplacian variance), and severe clipped exposure. Exposure is a warning; size,
+contrast, and blur are blockers. Native KPM registration is still authoritative: the generated
+reference feature count must meet an initial floor of 16. A replacement is persisted only after
+that native check passes, so a weak recapture cannot overwrite the previous valid saved target.
+
 ## Standalone observation age
 
 For Camera2 devices that declare `SENSOR_INFO_TIMESTAMP_SOURCE_REALTIME`, the analyzer compares
