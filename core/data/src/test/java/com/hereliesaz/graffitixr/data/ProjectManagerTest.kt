@@ -403,6 +403,57 @@ class ProjectManagerTest {
     }
 
     @Test
+    fun `process death before SphereSLAM metadata commit restores previous reference`() = runTest {
+        val bitmap = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
+        val oldUri = manager.saveSphereSlamReference(mockContext, "slam_crash_before", bitmap)
+        manager.saveProject(
+            mockContext,
+            GraffitiProject(
+                id = "slam_crash_before",
+                name = "Wall",
+                sphereSlamReferenceUri = oldUri,
+                sphereSlamReferenceWidthMeters = 1.25f,
+                sphereSlamReferencePhysicallyMetric = true,
+            ),
+        )
+
+        // This write represents the candidate file existing when the process dies before the
+        // repository can commit its URI + scale metadata.
+        val orphanCandidate =
+            manager.saveSphereSlamReference(mockContext, "slam_crash_before", bitmap)
+
+        val restored = manager.loadProjectMetadata(mockContext, "slam_crash_before")
+        assertEquals(oldUri, restored?.sphereSlamReferenceUri)
+        assertEquals(1.25f, restored?.sphereSlamReferenceWidthMeters ?: 0f, 0f)
+        assertTrue(File(requireNotNull(oldUri.path)).exists())
+        assertTrue(File(requireNotNull(orphanCandidate.path)).exists())
+    }
+
+    @Test
+    fun `process death after SphereSLAM metadata commit restores new reference even if old file remains`() = runTest {
+        val bitmap = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
+        val oldUri = manager.saveSphereSlamReference(mockContext, "slam_crash_after", bitmap)
+        val newUri = manager.saveSphereSlamReference(mockContext, "slam_crash_after", bitmap)
+        manager.saveProject(
+            mockContext,
+            GraffitiProject(
+                id = "slam_crash_after",
+                name = "Wall",
+                sphereSlamReferenceUri = newUri,
+                sphereSlamReferenceWidthMeters = 2.75f,
+                sphereSlamReferencePhysicallyMetric = true,
+            ),
+        )
+
+        // Simulate death before best-effort cleanup of oldUri.
+        val restored = manager.loadProjectMetadata(mockContext, "slam_crash_after")
+        assertEquals(newUri, restored?.sphereSlamReferenceUri)
+        assertEquals(2.75f, restored?.sphereSlamReferenceWidthMeters ?: 0f, 0f)
+        assertTrue(File(requireNotNull(oldUri.path)).exists())
+        assertTrue(File(requireNotNull(newUri.path)).exists())
+    }
+
+    @Test
     fun `duplicate-id import rebases SphereSLAM reference into newly assigned project id`() = runTest {
         manager.saveProject(
             mockContext,
