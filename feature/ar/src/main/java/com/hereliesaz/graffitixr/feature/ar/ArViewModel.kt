@@ -1097,6 +1097,18 @@ class ArViewModel @Inject constructor(
             val result = ArAvailabilityChecker.check(appContext)
             val supported = result == ArAvailabilityChecker.Result.Supported ||
                 result == ArAvailabilityChecker.Result.NeedsInstallOrUpdate
+            if (!supported) {
+                // The native MobileGS instance is process-global. Project loading may have installed
+                // an ARCore/capture-camera fingerprint while ARCore capability was still UNKNOWN.
+                // Clear that frame BEFORE publishing "ARCore unavailable"; the standalone analyzer
+                // starts only after this state update and will then install the centered page-frame
+                // fingerprint deterministically.
+                loadedFingerprint = null
+                slamManager.clearWallFingerprint()
+                slamManager.clearWallFeatureMap()
+                slamManager.overlayMarkCenterLocal = null
+                slamManager.captureAnchorCam = null
+            }
             _uiState.update {
                 it.copy(
                     isArCoreAvailable = supported,
@@ -1140,8 +1152,13 @@ class ArViewModel @Inject constructor(
                 }
                 if (project != null) {
                     loadedProjectId = project.id
-                    loadMapIfExists()
-                    loadFingerprintIfExists()
+                    // Once ARCore is known unavailable, the standalone analyzer exclusively owns the
+                    // native wall fingerprint. Re-running these ARCore loaders on every project save
+                    // would race it and reinterpret capture-camera maps in the centered page frame.
+                    if (_uiState.value.isArCoreAvailable) {
+                        loadMapIfExists()
+                        loadFingerprintIfExists()
+                    }
                 }
             }
         }
