@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.viewinterop.AndroidView
 import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.WallFeatureMap
 import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
@@ -87,6 +88,9 @@ fun SphereSlamStandaloneOverlay(
     slamManager: SlamManager,
     mobileGsFingerprint: Fingerprint? = null,
     mobileGsFingerprintFrameVersion: Int =
+        com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+    mobileGsWallFeatureMap: WallFeatureMap? = null,
+    mobileGsWallFeatureMapFrameVersion: Int =
         com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     persistedReferenceUri: Uri? = null,
     persistedReferenceWidthMeters: Float = 1f,
@@ -518,6 +522,8 @@ fun SphereSlamStandaloneOverlay(
         referenceImage,
         mobileGsFingerprint,
         mobileGsFingerprintFrameVersion,
+        mobileGsWallFeatureMap,
+        mobileGsWallFeatureMapFrameVersion,
     ) {
         val id = cameraId
         if (id == null) {
@@ -533,6 +539,8 @@ fun SphereSlamStandaloneOverlay(
                 slamManager = slamManager,
                 mobileGsFingerprint = mobileGsFingerprint,
                 mobileGsFingerprintFrameVersion = mobileGsFingerprintFrameVersion,
+                mobileGsWallFeatureMap = mobileGsWallFeatureMap,
+                mobileGsWallFeatureMapFrameVersion = mobileGsWallFeatureMapFrameVersion,
                 onReferenceReady = { registered: SphereSlamStandaloneSession.Reference ->
                     val g = registered.geometry
                     mainHandler.post {
