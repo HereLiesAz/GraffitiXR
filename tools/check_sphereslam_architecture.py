@@ -62,10 +62,13 @@ for path in standalone_paths:
         fail(f"{path} constructs Session(...); standalone must not construct an ARCore Session.")
 
 branch_start = main_screen.find("} else if (!arUiState.isArCoreAvailable) {")
-branch_end = main_screen.find("} else {", branch_start + 1) if branch_start >= 0 else -1
+branch_end_marker = "\n                    } else {\n                        var glView"
+branch_end = main_screen.find(branch_end_marker, branch_start + 1) if branch_start >= 0 else -1
 if branch_start < 0 or branch_end < 0:
     fail("Could not locate MainScreen's non-ARCore standalone branch.")
 else:
+    # Do not search for the first nested "} else {" inside the branch: Compose callbacks contain
+    # their own conditionals. Anchor the end at the outer ARCore branch's distinctive glView setup.
     standalone_branch = main_screen[branch_start:branch_end]
     forbidden = {
         "Session(": "constructs an ARCore Session",
