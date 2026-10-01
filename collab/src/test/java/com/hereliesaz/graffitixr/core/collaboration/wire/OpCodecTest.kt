@@ -1,6 +1,8 @@
 package com.hereliesaz.graffitixr.core.collaboration.wire
 
 import com.hereliesaz.graffitixr.common.model.CoopSessionState
+import com.hereliesaz.graffitixr.common.model.CoopTrackingBackend
+import com.hereliesaz.graffitixr.core.collaboration.testSpatialFrame
 import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.Op
 import org.junit.Assert.assertEquals
@@ -13,8 +15,9 @@ class OpCodecTest {
         val original = HelloPayload(
             guestNonce = ByteArray(16) { it.toByte() },
             proof = ByteArray(32) { (it * 3).toByte() },
-            clientVersion = 2,
+            clientVersion = 3,
             deviceName = "Pixel",
+            localBackend = CoopTrackingBackend.SPHERESLAM,
         )
         assertEquals(original, OpCodec.decode<HelloPayload>(OpCodec.encode(original)))
     }
@@ -23,7 +26,7 @@ class OpCodecTest {
     fun `HelloOk round-trips`() {
         val original = HelloOkPayload(
             sessionId = "sid",
-            protocolVersion = 2,
+            protocolVersion = 3,
             hostNonce = ByteArray(16) { (it + 1).toByte() },
             hostProof = ByteArray(32) { (it * 5).toByte() },
         )
@@ -40,7 +43,7 @@ class OpCodecTest {
 
     @Test
     fun `BulkBegin round-trips`() {
-        val original = BulkBeginPayload("p1", 5, 1024, 4096)
+        val original = BulkBeginPayload("p1", 5, 1024, 4096, testSpatialFrame())
         assertEquals(original, OpCodec.decode<BulkBeginPayload>(OpCodec.encode(original)))
     }
 
