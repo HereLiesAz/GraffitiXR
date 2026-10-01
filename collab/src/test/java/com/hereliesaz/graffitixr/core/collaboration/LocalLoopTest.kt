@@ -2,6 +2,7 @@
 package com.hereliesaz.graffitixr.core.collaboration
 
 import com.hereliesaz.graffitixr.common.model.CoopSessionState
+import com.hereliesaz.graffitixr.common.model.CoopTrackingBackend
 import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.Op
 import com.hereliesaz.graffitixr.core.collaboration.session.GuestSession
@@ -29,7 +30,12 @@ class LocalLoopTest {
             localDeviceName = "host",
             projectId = "p1",
             snapshotProvider = {
-                ProjectSnapshot(fingerprintBytes = fingerprint, projectBytes = projectBytes, layerCount = 0)
+                ProjectSnapshot(
+                    fingerprintBytes = fingerprint,
+                    projectBytes = projectBytes,
+                    layerCount = 0,
+                    spatialFrame = testSpatialFrame(),
+                )
             },
         )
         val port = host.startListening()
@@ -42,7 +48,8 @@ class LocalLoopTest {
             token = "tok",
             protocolVersion = 1,
             localDeviceName = "guest",
-            onBulkReceived = { fp, pb ->
+            localBackend = CoopTrackingBackend.ARCORE,
+            onBulkReceived = { fp, pb, _ ->
                 bulkOk = fp.contentEquals(fingerprint) && pb.contentEquals(projectBytes)
             },
             onOp = { op -> received.add(op) },
