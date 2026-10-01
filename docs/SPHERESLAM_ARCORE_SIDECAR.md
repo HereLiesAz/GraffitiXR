@@ -354,6 +354,22 @@ contrast, and blur are blockers. Native KPM registration is still authoritative:
 reference feature count must meet an initial floor of 16. A replacement is persisted only after
 that native check passes, so a weak recapture cannot overwrite the previous valid saved target.
 
+## Standalone failure diagnostics
+
+Standalone failures are classified rather than collapsed into one generic KPM error. The runtime
+distinguishes native-library unavailability, camera/camera-calibration unavailability, weak
+references, no page match, stale observations, excessive reprojection error, insufficient inliers,
+pose jumps, corrupt persisted targets, and unexpected internal failures. Transient visual-quality
+failures feed the reacquisition HUD; recoverable setup/data failures get concise artist-facing
+guidance; true native/internal failures remain modal.
+
+Failure and calibration transitions also retain numeric diagnostics. The failure/reacquisition UI
+offers **Copy Diagnostics**, producing one text payload with the standalone backend, camera ID and
+intrinsics, raw/crop/display frame geometry, timestamp source, tracking state, last KPM page/inliers/
+error/age/match duration, physical-scale status, and current failure detail. Camera-ID acquisition
+reports CAMERA_UNAVAILABLE after five seconds rather than spinning indefinitely, while continuing to
+accept a late CameraX bind if it recovers.
+
 ## Standalone observation age
 
 For Camera2 devices that declare `SENSOR_INFO_TIMESTAMP_SOURCE_REALTIME`, the analyzer compares
