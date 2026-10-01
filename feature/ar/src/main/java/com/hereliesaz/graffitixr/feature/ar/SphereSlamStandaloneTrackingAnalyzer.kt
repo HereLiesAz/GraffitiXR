@@ -41,6 +41,23 @@ data class SphereSlamStandaloneReferenceImage(
     }
 }
 
+data class SphereSlamStandaloneAtlasReferenceImage(
+    val pageNo: Int,
+    val luma: ByteArray,
+    val width: Int,
+    val height: Int,
+    val referenceWidthMeters: Float,
+    val physicallyMetric: Boolean,
+    val canonicalFromPage: FloatArray,
+) {
+    init {
+        require(pageNo > 0)
+        require(width > 0 && height > 0 && luma.size == width * height)
+        require(referenceWidthMeters.isFinite() && referenceWidthMeters > 0f)
+        require(canonicalFromPage.size == 16 && canonicalFromPage.all { it.isFinite() })
+    }
+}
+
 enum class SphereSlamStandalonePoseSource {
     KPM,
     IMU_BRIDGE,
@@ -83,6 +100,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private val context: Context,
     private val cameraId: String,
     private val referenceImage: SphereSlamStandaloneReferenceImage,
+    private val atlasReferenceImages: List<SphereSlamStandaloneAtlasReferenceImage> = emptyList(),
     private val slamManager: SlamManager? = null,
     private val mobileGsFingerprint: Fingerprint? = null,
     private val mobileGsFingerprintFrameVersion: Int =
@@ -525,6 +543,31 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 "SphereSLAM standalone reference features=" + reference.featureCount +
                     " minimum=" + targetQualityConfig.minKpmFeatures,
             )
+
+            val stablePages = atlasReferenceImages.sortedBy { it.pageNo }
+            require(stablePages.map { it.pageNo }.distinct().size == stablePages.size) {
+                "SphereSLAM atlas contains duplicate page IDs"
+            }
+            stablePages.forEach { page ->
+                val pageBuffer = ByteBuffer.allocateDirect(page.luma.size).apply {
+                    put(page.luma)
+                    flip()
+                }
+                val added = created.addReference(
+                    luma = pageBuffer,
+                    width = page.width,
+                    height = page.height,
+                    referenceWidthMeters = page.referenceWidthMeters,
+                    physicallyMetric = page.physicallyMetric,
+                    pageNo = page.pageNo,
+                    canonicalFromPage = page.canonicalFromPage,
+                )
+                onDiagnostic(
+                    "SphereSLAM atlas page=" + page.pageNo +
+                        " features=" + added.featureCount +
+                        " frame=canonical-centered-page",
+                )
+            }
             configureMobileGs(intrinsics)
             session = created
             sessionKey = key
