@@ -131,7 +131,9 @@ Remaining:
   - [ ] 4:3 sensor → portrait display;
   - [ ] 4:3 sensor → landscape display;
   - [ ] 16:9/other cropped CameraX stream;
-  - [ ] front camera if the app ever allows it; otherwise explicitly lock standalone AR to back camera.
+  - [x] front camera is not a supported standalone path; standalone AR explicitly forces
+    `CameraSelector.DEFAULT_BACK_CAMERA` while active and restores the shared controller selector
+    on exit.
 - [x] Prevent CameraX crop/zoom from invalidating the intrinsics used by KPM for the supported
   standalone path: apply ImageProxy crop explicitly and lock camera zoom at 1x while tracking.
   - [x] Apply `ImageProxy.cropRect` to the luma pixels before rotation.
