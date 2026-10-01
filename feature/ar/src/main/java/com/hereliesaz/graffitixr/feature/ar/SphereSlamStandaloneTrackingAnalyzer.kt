@@ -591,11 +591,12 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 map != null &&
                 StandaloneFingerprintFrame.isCenteredPageAnchor(map.anchor)
         if (mapFrameOk) {
-            slam.restoreWallFeatureMap(map!!)
+            val compatibleMap = requireNotNull(map)
+            slam.restoreWallFeatureMap(compatibleMap)
             onDiagnostic(
                 "SphereSLAM MobileGS map restored backend=standalone-kpm frame=centered-page " +
                     "version=" + mobileGsWallFeatureMapFrameVersion +
-                    " points=" + map.pointCount,
+                    " points=" + compatibleMap.pointCount,
             )
         } else {
             // Empty is normal for a new project. A non-empty incompatible map is deliberately
