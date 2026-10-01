@@ -463,30 +463,36 @@ and return-visit / paint-progress results agree spatially with the KPM wall pose
 
 ## 9. Standalone wall-map growth beyond one page
 
-Current implementation rebuilds one canonical KPM page.
+The standalone matcher now grows a bounded KPM atlas while page 0 remains the immutable canonical
+wall frame.
 
-- [ ] Define when an additional page should be captured:
-  - [ ] minimum baseline from existing pages;
-  - [ ] sufficient KPM/feature quality;
-  - [ ] sufficient overlap for frame registration;
-  - [ ] not while tracking confidence is low.
-- [ ] Assign stable page IDs.
-- [ ] Store page-to-canonical-wall transforms.
-- [ ] Add pages without resetting the canonical wall frame.
-- [ ] Match against the atlas and report which page produced the pose.
-- [ ] Convert every matched page pose back into the same canonical wall frame.
-- [ ] Cap page count / memory usage.
-- [ ] Define page eviction/compaction policy.
-- [ ] Persist page images or a rebuildable page dataset.
-- [ ] Restore page atlas on project reopen.
-- [ ] Include atlas assets in export/import.
-- [ ] Add corruption/version handling.
-- [ ] Test moving far enough that the original page exits view while a grown page remains visible.
-- [ ] Test returning from a grown page to the original page without a coordinate jump.
-- [ ] Test loop consistency across three or more overlapping pages.
+- [x] Define when an additional page should be captured:
+  - [x] minimum baseline from existing pages;
+  - [x] sufficient KPM/feature quality;
+  - [x] sufficient overlap for frame registration;
+  - [x] only from a fully accepted `LOCKED` visual pose, never bridged/low-confidence tracking.
+- [x] Assign stable monotonically increasing page IDs.
+- [x] Store page-to-canonical-wall transforms.
+- [x] Add pages without resetting the canonical wall frame.
+- [x] Match against the atlas and report which page produced the pose.
+- [x] Convert every matched page pose back into the same canonical wall frame before it leaves
+  `SphereSlamStandaloneSession`.
+- [x] Cap page count / memory usage at 12 total pages.
+- [x] Define page eviction/compaction policy: no runtime eviction; the hard cap preserves stable IDs
+  and avoids silently deleting the only reference for a distant wall region.
+- [x] Persist rectified page images plus scale/frame metadata.
+- [x] Restore page atlas on project reopen.
+- [x] Include atlas assets in export/import via the project directory and URI rebasing path.
+- [x] Add corruption/version handling; incompatible or unreadable grown pages are removed
+  independently without invalidating canonical page 0.
+- [x] Unit-test matching when only a grown page supplies the observation.
+- [x] Unit-test return from grown pages to page 0 without a coordinate jump.
+- [x] Unit-test loop consistency across three overlapping page frames.
+- [ ] Real-device test: walk far enough that page 0 leaves the camera view while a grown page remains
+  visible, then return to page 0 and verify no visible artwork jump.
 
-**ACCEPTANCE:** an artist can move across a wall larger than the original target while the artwork
-remains in one stable wall coordinate frame.
+**ACCEPTANCE:** the software path can grow and restore a larger-wall atlas without changing coordinate
+frames. Physical walk-off/return validation remains in the later real-device validation phase.
 
 ---
 
