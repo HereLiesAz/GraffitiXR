@@ -137,6 +137,17 @@ class ProjectManager @Inject constructor(
                         if (projectData.sphereSlamReferenceUri != null)
                             projectData.sphereSlamReferencePhysicallyMetric
                         else existing.sphereSlamReferencePhysicallyMetric,
+                    // A new canonical page defines a new standalone object frame. Preserve an old
+                    // seed only while the canonical reference URI itself is unchanged.
+                    sphereSlamFingerprint =
+                        if (
+                            projectData.sphereSlamReferenceUri != null &&
+                            projectData.sphereSlamReferenceUri != existing.sphereSlamReferenceUri
+                        ) {
+                            projectData.sphereSlamFingerprint
+                        } else {
+                            projectData.sphereSlamFingerprint ?: existing.sphereSlamFingerprint
+                        },
                     wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
                     paintMarks = projectData.paintMarks ?: existing.paintMarks,
                     paintGrid = projectData.paintGrid ?: existing.paintGrid,

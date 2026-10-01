@@ -420,9 +420,9 @@ Required work:
   centred with the same half-pixel convention as artoolkitX, renderer wall space and MobileGS
   standalone object space are identical, and the standalone wall/anchor relationship is identity.
   JVM tests pin pixel/KPM equivalence, Y-up orientation, and the identity frame bridge.
-- [ ] Decide how standalone creates the first MobileGS fingerprint:
-  - [ ] generate 3D points directly on the KPM page plane; or
-  - [ ] adapt `MetricFingerprintBuilder` to accept the standalone wall frame.
+- [x] Decide how standalone creates the first MobileGS fingerprint:
+  - [x] generate 3D points directly on the KPM page plane;
+  - [x] do not adapt the ARCore capture-camera builder; use a dedicated standalone page builder.
 - [ ] Ensure descriptor pixels and 3D points are generated from the same display-oriented image.
 - [ ] Set MobileGS live intrinsics from the standalone display-oriented CameraX calibration.
 - [ ] Feed CameraX YUV/color frames to MobileGS only after the frame contract above is satisfied.

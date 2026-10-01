@@ -24,6 +24,7 @@ import com.hereliesaz.graffitixr.common.util.imageStats
 import com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
 import com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
+import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
@@ -1934,6 +1935,19 @@ class ArViewModel @Inject constructor(
             var newUri: android.net.Uri? = null
             var transformApplied = false
             try {
+                // Build the MobileGS seed from the KPM-validated rectified page before committing
+                // metadata. A failure here does NOT invalidate KPM wall tracking; it merely leaves
+                // the optional MobileGS seed absent for this reference.
+                val standaloneFingerprint = runCatching {
+                    StandaloneFingerprintBuilder.build(
+                        slam = slamManager,
+                        bitmap = bitmap,
+                        referenceWidthMeters = referenceWidthMeters,
+                    )
+                }.onFailure { error ->
+                    Timber.w(error, "Standalone MobileGS fingerprint seed build failed")
+                }.getOrNull()
+
                 newUri = projectManager.saveSphereSlamReference(appContext, projectId, bitmap)
                 val candidateUri = newUri
                 projectRepository.updateProject { current ->
@@ -1948,6 +1962,7 @@ class ArViewModel @Inject constructor(
                             sphereSlamReferenceUri = candidateUri,
                             sphereSlamReferenceWidthMeters = referenceWidthMeters,
                             sphereSlamReferencePhysicallyMetric = physicallyMetric,
+                            sphereSlamFingerprint = standaloneFingerprint,
                         )
                     }
                 }

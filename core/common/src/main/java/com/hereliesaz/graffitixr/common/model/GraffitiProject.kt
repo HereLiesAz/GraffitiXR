@@ -107,6 +107,16 @@ data class GraffitiProject(
     val sphereSlamReferenceWidthMeters: Float = 1f,
     val sphereSlamReferencePhysicallyMetric: Boolean = false,
 
+    /**
+     * MobileGS reloc seed built from the SAME rectified page as [sphereSlamReferenceUri].
+     *
+     * Kept separate from [fingerprint]: the legacy/ARCore fingerprint stores object points in a
+     * capture-camera CV frame, while this seed stores points in the centered durable SphereSLAM wall
+     * frame. Mixing those two fields would make an ARCore loader interpret valid page points using
+     * the wrong frame semantics.
+     */
+    val sphereSlamFingerprint: Fingerprint? = null,
+
     val refinementPaths: List<RefinementPath> = emptyList(),
 
     // Legacy visual state grouped to fix binary compatibility issues with large data classes.
