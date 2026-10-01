@@ -592,6 +592,45 @@ fun SphereSlamStandaloneOverlay(
         onDiagnostic("SphereSLAM standalone diagnostic dump copied")
     }
 
+    fun consumeTrackedFrame(frame: SphereSlamStandaloneFrame?) {
+        // Renderer state is atomic/volatile and intentionally updated directly from the analysis
+        // worker. Compose state belongs to Main and is posted there separately.
+        if (frame == null) {
+            glRenderer.clearPose()
+        } else {
+            glRenderer.updatePose(frame.viewMatrix, frame.projMatrix, frame.frameAspect)
+        }
+        val screenUnitsPerPixel = frame?.let {
+            val size = surfaceSize.get()
+            standaloneScreenUnitsPerPixel(
+                frameUnitsPerPixel = it.unitsPerPixel,
+                frameHeightPixels = it.frameHeightPixels,
+                frameAspect = it.frameAspect,
+                surfaceWidthPixels = size.width,
+                surfaceHeightPixels = size.height,
+            )
+        } ?: 0f
+        mainHandler.post {
+            if (peerOnlyTracking) {
+                trackingState =
+                    if (frame != null) StandaloneTrackingState.LOCKED
+                    else StandaloneTrackingState.REACQUIRING
+            }
+            if (frame != null) {
+                matchDiagnostics = StandaloneMatchDiagnostics(
+                    pageNo = frame.pageNo,
+                    inliers = frame.inlierCount,
+                    reprojectionError = frame.reprojectionError,
+                    observationAgeMs = frame.observationAgeMs,
+                    matchDurationMs = frame.matchDurationMs,
+                    source = frame.source,
+                )
+            }
+            onUnitsPerPixel(screenUnitsPerPixel)
+            onTrackingTick(frame != null)
+        }
+    }
+
     // CameraController implements pinch-to-camera-zoom itself. That would change the effective
     // intrinsics behind KPM while GraffitiXR's own pinch gesture is supposed to scale the artwork.
     // Keep the standalone camera calibrated at 1x for this composition only, and restore the shared
@@ -628,6 +667,9 @@ fun SphereSlamStandaloneOverlay(
         mobileGsFingerprint,
         mobileGsFingerprintFrameVersion,
         atlasReferenceImages,
+        peerOnlyTracking,
+        coopPeerSpatialFrame,
+        coopPeerFingerprint,
     ) {
         val id = cameraId
         val restoredAtlas = atlasReferenceImages
@@ -637,10 +679,31 @@ fun SphereSlamStandaloneOverlay(
             val executor = Executors.newSingleThreadExecutor { runnable ->
                 Thread(runnable, "sphereslam-standalone-camera").apply { isDaemon = true }
             }
-            val analyzer = SphereSlamStandaloneTrackingAnalyzer(
+            if (peerOnlyTracking) {
+                val peerSpatial = requireNotNull(coopPeerSpatialFrame)
+                val peerFingerprint = requireNotNull(coopPeerFingerprint)
+                val analyzer = CoopPeerFingerprintAnalyzer(
+                    context = context,
+                    cameraId = id,
+                    slam = slamManager,
+                    peerFingerprint = peerFingerprint,
+                    spatialFrame = peerSpatial,
+                    onFrameTracked = ::consumeTrackedFrame,
+                    onDiagnostic = { text -> mainHandler.post { onDiagnostic(text) } },
+                )
+                cameraController.setImageAnalysisAnalyzer(executor, analyzer)
+                onDispose {
+                    cameraController.clearImageAnalysisAnalyzer()
+                    mainHandler.removeCallbacksAndMessages(null)
+                    executor.execute { analyzer.close() }
+                    executor.shutdown()
+                    glRenderer.clearPose()
+                }
+            } else {
+                val analyzer = SphereSlamStandaloneTrackingAnalyzer(
                 context = context,
                 cameraId = id,
-                referenceImage = referenceImage,
+                referenceImage = requireNotNull(referenceImage),
                 atlasReferenceImages = restoredAtlas,
                 slamManager = slamManager,
                 mobileGsFingerprint = mobileGsFingerprint,
@@ -697,39 +760,7 @@ fun SphereSlamStandaloneOverlay(
                         }
                     }
                 },
-                onFrameTracked = { frame ->
-                    // Renderer state is atomic/volatile and intentionally updated directly from the
-                    // analysis worker. Compose state belongs to Main and is posted there separately.
-                    if (frame == null) {
-                        glRenderer.clearPose()
-                    } else {
-                        glRenderer.updatePose(frame.viewMatrix, frame.projMatrix, frame.frameAspect)
-                    }
-                    val screenUnitsPerPixel = frame?.let {
-                        val size = surfaceSize.get()
-                        standaloneScreenUnitsPerPixel(
-                            frameUnitsPerPixel = it.unitsPerPixel,
-                            frameHeightPixels = it.frameHeightPixels,
-                            frameAspect = it.frameAspect,
-                            surfaceWidthPixels = size.width,
-                            surfaceHeightPixels = size.height,
-                        )
-                    } ?: 0f
-                    mainHandler.post {
-                        if (frame != null) {
-                            matchDiagnostics = StandaloneMatchDiagnostics(
-                                pageNo = frame.pageNo,
-                                inliers = frame.inlierCount,
-                                reprojectionError = frame.reprojectionError,
-                                observationAgeMs = frame.observationAgeMs,
-                                matchDurationMs = frame.matchDurationMs,
-                                source = frame.source,
-                            )
-                        }
-                        onUnitsPerPixel(screenUnitsPerPixel)
-                        onTrackingTick(frame != null)
-                    }
-                },
+                onFrameTracked = ::consumeTrackedFrame,
                 onFatalError = { error ->
                     mainHandler.post {
                         if (error is StandaloneReferenceTooWeakException) {
@@ -777,6 +808,7 @@ fun SphereSlamStandaloneOverlay(
                 executor.execute { analyzer.close() }
                 executor.shutdown()
                 glRenderer.clearPose()
+            }
             }
         }
     }
