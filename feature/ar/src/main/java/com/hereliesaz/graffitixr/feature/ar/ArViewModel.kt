@@ -1911,7 +1911,6 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.io) {
             var newUri: android.net.Uri? = null
             var transformApplied = false
-            var metadataCommitted = false
             try {
                 newUri = projectManager.saveSphereSlamReference(appContext, projectId, bitmap)
                 val candidateUri = newUri
@@ -1930,9 +1929,8 @@ class ArViewModel @Inject constructor(
                         )
                     }
                 }
-                metadataCommitted = transformApplied
 
-                if (metadataCommitted) {
+                if (transformApplied) {
                     projectManager.deleteSphereSlamReference(
                         appContext,
                         projectId,
@@ -1942,18 +1940,27 @@ class ArViewModel @Inject constructor(
                     projectManager.deleteSphereSlamReference(appContext, projectId, newUri)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
-                if (!metadataCommitted) {
-                    // This catch runs after the parent job is already cancelled. Cleanup must
-                    // escape that cancelled context or withContext(Dispatchers.IO) inside
-                    // deleteSphereSlamReference() immediately rethrows and leaves an orphan PNG.
-                    withContext(NonCancellable) {
-                        projectManager.deleteSphereSlamReference(appContext, projectId, newUri)
-                    }
+                // updateProject persists project.json before it publishes currentProject. A
+                // cancellation can therefore arrive after either half of that commit. Reconcile
+                // against both in-memory and on-disk metadata before deleting either image.
+                withContext(NonCancellable) {
+                    reconcileInterruptedSphereSlamReferenceSave(
+                        projectId = projectId,
+                        expectedPreviousUri = expectedPreviousUri,
+                        candidateUri = newUri,
+                    )
                 }
                 throw e
             } catch (e: Exception) {
-                if (!metadataCommitted) {
-                    projectManager.deleteSphereSlamReference(appContext, projectId, newUri)
+                // The same ambiguity exists for an exception thrown after the atomic project.json
+                // replacement but before updateProject returns. Never decide from a local boolean
+                // alone whether the candidate is safe to delete.
+                withContext(NonCancellable) {
+                    reconcileInterruptedSphereSlamReferenceSave(
+                        projectId = projectId,
+                        expectedPreviousUri = expectedPreviousUri,
+                        candidateUri = newUri,
+                    )
                 }
                 Timber.e(e, "Failed to persist standalone SphereSLAM reference")
                 _feedback.tryEmit(
@@ -1963,6 +1970,40 @@ class ArViewModel @Inject constructor(
                     ),
                 )
             }
+        }
+    }
+
+    /**
+     * Resolve an interrupted standalone-reference swap from authoritative state.
+     *
+     * [ProjectRepositoryImpl.updateProject] writes project.json before publishing currentProject,
+     * so interruption can leave either source one step ahead of the other. If either source already
+     * points at [candidateUri], the candidate is committed and must be kept; the superseded image can
+     * be removed. Otherwise the candidate never became authoritative and is safe to delete.
+     */
+    private suspend fun reconcileInterruptedSphereSlamReferenceSave(
+        projectId: String,
+        expectedPreviousUri: android.net.Uri?,
+        candidateUri: android.net.Uri?,
+    ) {
+        val candidate = candidateUri ?: return
+        val currentCommitted =
+            projectRepository.currentProject.value?.let { current ->
+                current.id == projectId && current.sphereSlamReferenceUri == candidate
+            } == true
+        val diskCommitted = runCatching {
+            projectManager.loadProjectMetadata(appContext, projectId)
+                ?.sphereSlamReferenceUri == candidate
+        }.getOrDefault(false)
+
+        if (currentCommitted || diskCommitted) {
+            projectManager.deleteSphereSlamReference(
+                appContext,
+                projectId,
+                expectedPreviousUri,
+            )
+        } else {
+            projectManager.deleteSphereSlamReference(appContext, projectId, candidate)
         }
     }
 
