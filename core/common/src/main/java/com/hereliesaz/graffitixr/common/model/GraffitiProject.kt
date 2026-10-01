@@ -157,6 +157,15 @@ data class GraffitiProject(
      * A mismatch means the adjustment belongs to an older standalone wall frame and must not render.
      */
     val sphereSlamPlacementAnchorGeneration: Long = 0L,
+    /**
+     * Standalone AR's whole-design adjustment. Kept separate from modeAdjustments[AR] because an
+     * ARCore anchor frame and a centered SphereSLAM page frame are not interchangeable until the
+     * explicit cross-backend calibration work exists.
+     *
+     * Null is the migration value for projects created before the split; standalone initially copies
+     * the legacy AR adjustment, then persists its own value on the first edit/save.
+     */
+    val sphereSlamModeAdjustment: ModeAdjustment? = null,
 
     /**
      * MobileGS reloc seed built from the SAME rectified page as [sphereSlamReferenceUri].
