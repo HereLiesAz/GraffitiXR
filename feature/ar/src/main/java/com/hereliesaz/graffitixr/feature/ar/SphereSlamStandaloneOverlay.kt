@@ -313,7 +313,11 @@ fun SphereSlamStandaloneOverlay(
     val glRenderer = remember(context) { HomographyOverlayRenderer(context) }
 
     LaunchedEffect(glRenderer, designBitmap) {
-        designBitmap?.let(glRenderer::updateDesignBitmap)
+        if (designBitmap == null) {
+            glRenderer.clearDesignBitmap()
+        } else {
+            glRenderer.updateDesignBitmap(designBitmap)
+        }
     }
 
     LaunchedEffect(
