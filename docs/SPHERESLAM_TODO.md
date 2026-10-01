@@ -247,8 +247,10 @@ Remaining:
 - [ ] Measure actual KPM cadence/latency on target devices.
 - [ ] Record KPM observation age in standalone diagnostics.
 - [ ] Gate stale KPM matches by timestamp, not just callback order.
-- [ ] Add configurable minimum inlier count for standalone acceptance.
-- [ ] Add configurable maximum reprojection error for standalone acceptance.
+- [x] Add configurable minimum inlier count for standalone acceptance. Default is 4, matching the
+  pinned artoolkitX binary KPM minimum correspondence count.
+- [x] Add configurable maximum reprojection/ICP error for standalone acceptance. Default is 10.0,
+  matching the pinned artoolkitX `kpmUtilGetPose_binary` rejection threshold.
 - [ ] Add pose-jump rejection:
   - [ ] maximum angular jump per frame;
   - [ ] maximum translation jump per frame;
@@ -609,7 +611,8 @@ Still required:
 
 ### JVM/pure math
 
-- [ ] standalone acceptance-gate tests for inliers/error/age;
+- [ ] standalone acceptance-gate tests for observation age;
+- [x] standalone acceptance-gate tests for inliers/error/non-finite poses;
 - [ ] pose-jump gate tests;
 - [ ] tracking-state hysteresis tests;
 - [ ] standalone page↔MobileGS frame conversion tests;

@@ -78,6 +78,8 @@ class SphereSlamStandaloneTrackingAnalyzer(
     private val onReferenceReady: (SphereSlamStandaloneSession.Reference) -> Unit = {},
     private val onDiagnostic: (String) -> Unit = {},
     private val onFatalError: (Throwable) -> Unit = {},
+    private val poseAcceptancePolicy: StandalonePoseAcceptancePolicy =
+        StandalonePoseAcceptancePolicy(),
     private val bridge: GyroOrientationBridge = GyroOrientationBridge(context),
     private val maxBridgeMs: Long = 400L,
 ) : ImageAnalysis.Analyzer, AutoCloseable {
@@ -110,6 +112,7 @@ class SphereSlamStandaloneTrackingAnalyzer(
     private var session: SphereSlamStandaloneSession? = null
     private var sessionKey: SessionKey? = null
     private var lastDiagnosticKey: DiagnosticKey? = null
+    private var lastPoseRejection: StandalonePoseRejection? = null
     private var lastGood: SphereSlamStandaloneFrame? = null
     private var frameBuffer: ByteBuffer? = null
     @Volatile private var closed = false
@@ -193,6 +196,26 @@ class SphereSlamStandaloneTrackingAnalyzer(
 
             val pose = active.match(direct, timestampNs)
             if (pose != null) {
+                val acceptance = poseAcceptancePolicy.evaluate(
+                    viewMatrix = pose.viewMatrix,
+                    inlierCount = pose.inlierCount,
+                    reprojectionError = pose.reprojectionError,
+                )
+                if (!acceptance.accepted) {
+                    val rejection = acceptance.rejection
+                    if (rejection != null && rejection != lastPoseRejection) {
+                        lastPoseRejection = rejection
+                        onDiagnostic(
+                            "SphereSLAM standalone KPM rejected=$rejection " +
+                                "page=${pose.pageNo} inliers=${pose.inlierCount} " +
+                                "error=${pose.reprojectionError}",
+                        )
+                    }
+                    onFrameTracked(bridgeLastGood(projection, rotated, timestampNs))
+                    return
+                }
+
+                lastPoseRejection = null
                 pendingImuReference?.let(bridge::commitReference)
                 val tracked = SphereSlamStandaloneFrame(
                     viewMatrix = pose.viewMatrix,
@@ -378,6 +401,7 @@ class SphereSlamStandaloneTrackingAnalyzer(
         session = null
         sessionKey = null
         lastDiagnosticKey = null
+        lastPoseRejection = null
         frameBuffer = null
     }
 }

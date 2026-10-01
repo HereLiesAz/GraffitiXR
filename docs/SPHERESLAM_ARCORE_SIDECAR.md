@@ -318,6 +318,14 @@ final shared-library link. The continuation branch mirrors upstream ARUtil's bun
 support sources and links NDK zlib. Keep this CI path enabled; otherwise native KPM regressions can
 silently pass normal builds that never initialize the submodule.
 
+## Standalone pose acceptance
+
+The CameraX standalone path applies an explicit app-level KPM acceptance policy before publishing a
+pose. Defaults mirror the pinned artoolkitX binary path: at least 4 inliers and ICP/reprojection
+error no greater than 10.0. Non-finite matrices/errors are also rejected. Rejections enter the same
+short IMU-bridge/loss path as a missing visual match and are logged only when the rejection reason
+changes. Pose-jump and observation-age gates remain separate TODO items.
+
 ## Standalone calibration diagnostics
 
 Whenever the effective CameraX calibration changes, the standalone analyzer emits one line through
