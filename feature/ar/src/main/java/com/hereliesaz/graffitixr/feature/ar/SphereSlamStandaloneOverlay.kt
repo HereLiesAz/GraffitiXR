@@ -93,6 +93,7 @@ fun SphereSlamStandaloneOverlay(
     onPersistedReferenceInvalid: (Uri) -> Unit = {},
     adjustment: ModeAdjustment? = null,
     onUnitsPerPixel: (Float) -> Unit = {},
+    onTrackingTick: (Boolean) -> Unit = {},
     onDiagnostic: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -549,6 +550,7 @@ fun SphereSlamStandaloneOverlay(
                             )
                         }
                         onUnitsPerPixel(screenUnitsPerPixel)
+                        onTrackingTick(frame != null)
                     }
                 },
                 onFatalError = { error ->

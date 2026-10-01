@@ -1982,6 +1982,7 @@ class ArViewModel @Inject constructor(
                         current
                     } else {
                         transformApplied = true
+                        lastStandaloneGuideKey = null
                         current.copy(
                             sphereSlamReferenceUri = candidateUri,
                             sphereSlamReferenceWidthMeters = referenceWidthMeters,
@@ -3289,6 +3290,81 @@ class ArViewModel @Inject constructor(
                 artworkRegInFlight.set(false)
             }
             tryAutoFit()
+        }
+    }
+
+    @Volatile private var lastStandaloneGuideKey: String? = null
+    @Volatile private var lastStandaloneNativeUiUpdateMs: Long = Long.MIN_VALUE
+
+    /**
+     * Register the artwork validator for the ARCore-independent MobileGS path.
+     *
+     * This is intentionally descriptors-only: the standalone wall fingerprint already carries
+     * metric/normalized 3D page points, while the artwork image has no depth map of its own. Native
+     * MobileGS explicitly supports this mode for painting progress and falls back to global
+     * clean-wall↔artwork matching until standalone design-placement gating is proven.
+     *
+     * Do NOT call [tryAutoFit] here. Its pose/frame assumptions are still the ARCore fingerprint
+     * contract and are tracked separately in SPHERESLAM_TODO.md.
+     */
+    fun updateStandalonePaintingGuide(bitmap: Bitmap, designKey: String? = null) {
+        if (designKey != null && designKey == lastStandaloneGuideKey) return
+        if (!artworkRegInFlight.compareAndSet(false, true)) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                slamManager.setArtworkFingerprint(
+                    bitmap,
+                    null,
+                    0,
+                    0,
+                    0,
+                    FloatArray(4),
+                    FloatArray(16),
+                )
+                lastStandaloneGuideKey = designKey
+                Timber.i("Standalone MobileGS artwork guide registered: key=$designKey")
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                Timber.e(e, "Failed to register standalone MobileGS artwork guide")
+            } finally {
+                artworkRegInFlight.set(false)
+            }
+        }
+    }
+
+    /**
+     * Mirror the native MobileGS state into the backend-neutral AR UI while standalone CameraX/KPM
+     * is active. The JNI getters are the same ones ARCore mode already samples in [setTrackingState].
+     *
+     * Called at camera cadence, but native painting progress changes at reloc cadence (~1–2 Hz), so
+     * cap UI/native polling at 10 Hz to avoid pointless JNI traffic.
+     */
+    fun onStandaloneTrackingTick(isTracking: Boolean) {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastStandaloneNativeUiUpdateMs < 100L) return
+        lastStandaloneNativeUiUpdateMs = now
+
+        val progress = if (isTracking) {
+            slamManager.getPaintingProgress()
+        } else {
+            _uiState.value.paintingProgress
+        }
+        val featureProgress = slamManager.getFeatureProgress()
+        val reloc = slamManager.getRelocDiagnostics()
+        val corrob = slamManager.getCorroborationDiagnostics()
+        val wallPoints = slamManager.getWallKeypointCount()
+
+        _uiState.update { state ->
+            state.copy(
+                isScanning = isTracking,
+                isArReady = state.isArReady || isTracking,
+                paintingProgress = progress,
+                featureProgress = featureProgress,
+                relocDiagnostics = reloc,
+                corroborationDiagnostics = corrob,
+                wallFingerprintPoints = wallPoints,
+            )
         }
     }
 

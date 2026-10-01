@@ -423,10 +423,10 @@ Required work:
 - [x] Decide how standalone creates the first MobileGS fingerprint:
   - [x] generate 3D points directly on the KPM page plane;
   - [x] do not adapt the ARCore capture-camera builder; use a dedicated standalone page builder.
-- [ ] Ensure descriptor pixels and 3D points are generated from the same display-oriented image.
-- [ ] Set MobileGS live intrinsics from the standalone display-oriented CameraX calibration.
-- [ ] Feed CameraX YUV/color frames to MobileGS only after the frame contract above is satisfied.
-- [ ] Feed standalone camera view/projection to `slamManager.updateCamera` only after its world/frame
+- [x] Ensure descriptor pixels and 3D points are generated from the same rectified page image used to seed KPM; live matching uses the same display-oriented CameraX frame contract.
+- [x] Set MobileGS live intrinsics from the standalone display-oriented CameraX calibration.
+- [x] Feed the exact cropped/rotated display luma frame to MobileGS only after the frame contract above is satisfied.
+- [x] Feed accepted standalone camera view/projection to `slamManager.updateCamera` only after its world/frame
   semantics match what MobileGS expects.
 - [ ] Rename or generalize `setArCoreTrackingState` before using it for standalone tracking health;
   do not lie to native code by setting an "ARCore" flag when ARCore does not exist.
@@ -435,8 +435,10 @@ Required work:
 - [ ] Restore existing saved ARCore fingerprints safely on standalone devices:
   - [ ] either provide a validated frame conversion; or
   - [ ] mark them ARCore-frame-only and require a standalone target/fingerprint conversion step.
-- [ ] Define behavior for projects that contain both ARCore fingerprint data and a standalone page.
-- [ ] Feed paint-progress/distortion-head/corroboration only after coordinate alignment is proven.
+- [x] Define behavior for projects that contain both ARCore fingerprint data and a standalone page: keep separate persisted fingerprints and install only the active backend's frame into native MobileGS.
+- [x] Feed baseline paint-progress/corroboration after centered-page alignment is proven; spatially gated self-grow remains disabled pending the checks below.
+  - [x] Standalone artwork registration is descriptors-only (no fake depth); native global matching drives progress until design-placement gating is validated.
+
 - [ ] Verify self-grow adds points in the standalone fingerprint frame.
 - [ ] Verify saved wall feature maps preserve that frame across process restarts.
 - [ ] Add diagnostics identifying fingerprint frame/version/backend.

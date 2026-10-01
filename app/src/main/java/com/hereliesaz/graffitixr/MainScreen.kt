@@ -215,6 +215,30 @@ fun MainScreen(
                             }
                         }
 
+
+                        // Painting progress is about WHAT is being painted, not display tone. Use
+                        // the untoned design composite just like ARCore mode does. The standalone
+                        // fingerprint value is part of the key so a newly accepted wall page
+                        // re-registers the same design against the new MobileGS wall frame.
+                        LaunchedEffect(
+                            standaloneDesign,
+                            arUiState.sphereSlamFingerprint,
+                            arUiState.sphereSlamReferenceUri,
+                        ) {
+                            if (
+                                standaloneDesign != null &&
+                                arUiState.sphereSlamFingerprint != null
+                            ) {
+                                val guide = withContext(Dispatchers.Default) {
+                                    compositeDesignForAr(standaloneDesign)
+                                }
+                                val guideKey =
+                                    (standaloneDesign.uri?.toString() ?: "memory") + "|" +
+                                        (arUiState.sphereSlamReferenceUri?.toString() ?: "no-page")
+                                arViewModel.updateStandalonePaintingGuide(guide, guideKey)
+                            }
+                        }
+
                         com.hereliesaz.graffitixr.feature.ar.SphereSlamStandaloneOverlay(
                             cameraController = cameraController,
                             designBitmap = standaloneTexture,
@@ -236,6 +260,7 @@ fun MainScreen(
                             },
                             adjustment = standaloneAdj,
                             onUnitsPerPixel = { standaloneArUnitsPerPixel = it },
+                            onTrackingTick = { arViewModel.onStandaloneTrackingTick(it) },
                             onDiagnostic = { text -> arViewModel.appendDiag(text) },
                             modifier = Modifier.fillMaxSize(),
                         )
