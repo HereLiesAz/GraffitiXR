@@ -56,13 +56,15 @@ This must happen before treating the branch as merge-ready.
 
 - [x] Rebase/merge the newer `main` commits into the standalone implementation before merge.
 - [x] Resolve the resulting native/doc conflicts without changing the dual-backend architecture.
-- [ ] Run `:sphereslam:test`.
-- [ ] Run `:feature:ar:testDebugUnitTest` or the repository's actual equivalent unit-test task.
-- [ ] Run the app module's JVM/unit tests.
-- [ ] Run the repository's native locking/static checks that cover `MobileGS` / JNI.
+- [x] Run `:sphereslam:test` (covered by the repository-wide Gradle `test` task in Android CI).
+- [x] Run `:feature:ar:testDebugUnitTest` or the repository's actual equivalent unit-test task
+  (covered by the repository-wide Gradle `test` task in Android CI).
+- [x] Run the app module's JVM/unit tests (repository-wide Gradle `test` passed).
+- [x] Run the repository's native locking/static checks that cover `MobileGS` / JNI.
 - [ ] Compile the native `:core:nativebridge` target for every release ABI.
 - [ ] Build at least one debug APK containing artoolkitX KPM.
-- [ ] Build the normal release artifact(s).
+- [x] Build the normal release artifact(s): Android CI `release-build` completed
+  `assembleRelease` successfully with the real artoolkitX submodule initialized.
 - [ ] Inspect the merged manifest and confirm:
   - [ ] `android.hardware.camera.ar` remains `required="false"`;
   - [ ] `com.google.ar.core` remains optional;
@@ -72,8 +74,8 @@ This must happen before treating the branch as merge-ready.
   source list.
 - [x] Add/enable CI for branch/PR validation; PR #1961 ran Android CI with the artoolkitX
   submodule enabled in the release-build job.
-- [ ] Re-run release CI after the ARUtil/minizip/SHA-1 support-source fix added on
-  `feat/sphereslam-todo-continuation`.
+- [x] Re-run release CI after the ARUtil/minizip/SHA-1 support-source fix; the release build
+  completed successfully, proving the previous undefined-symbol failure is resolved.
 
 **ACCEPTANCE:** branch compiles, tests run, native libraries package for supported ABIs, and the
 merged manifest still permits installation on non-ARCore hardware.
@@ -96,6 +98,11 @@ A later superseded CI run also caught an extra closing brace introduced while ad
 `ImageProxy.cropRect` support in `LumaFrameTransform.kt`; that Kotlin syntax regression was fixed
 at `42ec45ff` before continuing. Keep the full `test` task in the loop even when a change looks
 like pure camera math.
+
+The first architecture-guard run then produced a false negative because the checker treated the
+first nested Compose `} else {` as the end of the outer non-ARCore branch. The application source
+still mounted `SphereSlamStandaloneOverlay`; the guard now anchors the block end at the distinct
+outer ARCore branch (`var glView`) instead. This was a checker defect, not a runtime regression.
 
 ---
 
