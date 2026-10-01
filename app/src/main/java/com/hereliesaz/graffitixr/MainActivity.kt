@@ -1856,6 +1856,8 @@ class MainActivity : ComponentActivity() {
         val arRailPolicy = arRailBackendPolicy(
             arCoreAvailabilityResolved = arUiState.isArCoreAvailabilityResolved,
             arCoreAvailable = arUiState.isArCoreAvailable,
+            sphereSlamAvailabilityResolved = arUiState.isSphereSlamAvailabilityResolved,
+            sphereSlamAvailable = arUiState.isSphereSlamAvailable,
         )
         val requestPermissions = {
             val perms = mutableListOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
@@ -2039,6 +2041,14 @@ class MainActivity : ComponentActivity() {
                     // The policy still gates unresolved capability; incompatible peers are rejected
                     // during handshake rather than silently combining unrelated wall/page frames.
                     val coopBackendBlocked = !arRailPolicy.coopCalibrationAvailable
+                    val coopHostReady =
+                        if (arRailPolicy.standalone) {
+                            // Standalone never creates an ARCore Anchor or accumulated ARCore cloud.
+                            // Its durable page-0 target is the wall coordinate object Host shares.
+                            arUiState.sphereSlamReferenceUri != null
+                        } else {
+                            arUiState.isAnchorEstablished && arUiState.splatCount > 0
+                        }
                     val coopContainerBlocked =
                         coopBackendBlocked && arUiState.coopRole == CoopRole.NONE
                     azRailSubHostItem(
@@ -2059,8 +2069,7 @@ class MainActivity : ComponentActivity() {
                         classifiers = setOf("toggle"),
                         shape = AzButtonShape.NONE,
                         disabled = showLibrary || coopBackendBlocked ||
-                            (!(arUiState.isAnchorEstablished && arUiState.splatCount > 0) &&
-                                arUiState.coopRole != CoopRole.HOST),
+                            (!coopHostReady && arUiState.coopRole != CoopRole.HOST),
                         onClick = { if (arUiState.coopRole != CoopRole.HOST) arViewModel.startHosting() },
                     )
                     azRailSubItem(
