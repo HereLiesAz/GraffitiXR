@@ -109,6 +109,7 @@ Implemented foundation:
 - [x] KPM page origin is shifted from lower-left to the centered renderer frame.
 - [x] KPM millimetres are converted to renderer units.
 - [x] Unit tests cover luma packing/quarter-turn rotation.
+- [x] Unit tests cover CameraX crop-before-rotation and principal-point crop adjustment.
 - [x] Unit tests cover KPM→OpenGL sign/layout conversion.
 - [x] Unit tests cover page centering and page scale math.
 
@@ -120,7 +121,10 @@ Remaining:
   - [ ] 16:9/other cropped CameraX stream;
   - [ ] front camera if the app ever allows it; otherwise explicitly lock standalone AR to back camera.
 - [ ] Verify CameraX crop/zoom does not invalidate the intrinsics used by KPM.
-- [ ] If CameraX applies a crop region, incorporate that crop into `fx/fy/cx/cy`.
+  - [x] Apply `ImageProxy.cropRect` to the luma pixels before rotation.
+  - [x] Shift `cx/cy` by the crop origin before rotating intrinsics.
+  - [ ] Verify/handle effective intrinsics if CameraX digital zoom changes the sensor crop/scale.
+- [x] If CameraX applies an ImageProxy crop region, incorporate that crop into `fx/fy/cx/cy`.
 - [ ] Verify lens distortion is acceptable with the current zero-distortion KPM camera model.
 - [ ] If not, populate artoolkitX distortion parameters from Camera2 calibration metadata or undistort
   frames before KPM.

@@ -35,6 +35,35 @@ class LumaFrameTransformTest {
     }
 
     @Test
+    fun cropsStridedSource_beforeRotating() {
+        // Logical 4x3 image with pixelStride=1, rowStride=4:
+        //  1  2  3  4
+        //  5  6  7  8
+        //  9 10 11 12
+        val source = ByteBuffer.wrap(byteArrayOf(
+            1, 2, 3, 4,
+            5, 6, 7, 8,
+            9, 10, 11, 12,
+        ))
+        val out = LumaFrameTransform.packCropAndRotate(
+            source = source,
+            sourceWidth = 4,
+            sourceHeight = 3,
+            rowStride = 4,
+            pixelStride = 1,
+            cropLeft = 1,
+            cropTop = 1,
+            cropWidth = 2,
+            cropHeight = 2,
+            rotationDegrees = 90,
+        )
+        assertEquals(2, out.width)
+        assertEquals(2, out.height)
+        // Cropped 6,7 / 10,11, then clockwise 90°.
+        assertArrayEquals(byteArrayOf(10, 6, 11, 7), out.bytes)
+    }
+
+    @Test
     fun rotates180_and270() {
         val r180 = LumaFrameTransform.packAndRotate(stridedSource(), 3, 2, 8, 2, 180)
         assertArrayEquals(byteArrayOf(6, 5, 4, 3, 2, 1), r180.bytes)

@@ -110,13 +110,19 @@ class SphereSlamStandaloneTrackingAnalyzer(
             val rawWidth = image.width
             val rawHeight = image.height
             val rotationDeg = image.imageInfo.rotationDegrees
+            val crop = image.cropRect
+            if (crop.width() <= 0 || crop.height() <= 0) return
 
-            val rotated = LumaFrameTransform.packAndRotate(
+            val rotated = LumaFrameTransform.packCropAndRotate(
                 source = y.buffer,
-                width = rawWidth,
-                height = rawHeight,
+                sourceWidth = rawWidth,
+                sourceHeight = rawHeight,
                 rowStride = y.rowStride,
                 pixelStride = y.pixelStride,
+                cropLeft = crop.left,
+                cropTop = crop.top,
+                cropWidth = crop.width(),
+                cropHeight = crop.height(),
                 rotationDegrees = rotationDeg,
             )
 
@@ -126,13 +132,20 @@ class SphereSlamStandaloneTrackingAnalyzer(
                 rawWidth,
                 rawHeight,
             ) ?: return
+            val croppedIntrinsics = cropCameraIntrinsics(
+                intrinsics = rawIntrinsics,
+                cropLeft = crop.left,
+                cropTop = crop.top,
+                cropWidth = crop.width(),
+                cropHeight = crop.height(),
+            )
             val ri = CaptureRotation.rotateIntrinsics(
-                rawIntrinsics.fx,
-                rawIntrinsics.fy,
-                rawIntrinsics.cx,
-                rawIntrinsics.cy,
-                rawWidth.toFloat(),
-                rawHeight.toFloat(),
+                croppedIntrinsics.fx,
+                croppedIntrinsics.fy,
+                croppedIntrinsics.cx,
+                croppedIntrinsics.cy,
+                croppedIntrinsics.width.toFloat(),
+                croppedIntrinsics.height.toFloat(),
                 rotationDeg,
             )
             val intrinsics = CameraIntrinsics(

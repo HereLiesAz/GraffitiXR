@@ -63,8 +63,10 @@ This branch now has a first functional Mode B path as well as Mode A:
 
 - AR mode stays visible on devices where ARCore resolves unsupported;
 - CameraX owns the standalone camera;
-- the Y plane is packed with its real row/pixel stride and rotated into display orientation;
-- Camera2 intrinsics are rotated through the same display transform as the pixels;
+- the Y plane is cropped by `ImageProxy.cropRect`, packed with its real row/pixel stride, then
+  rotated into display orientation;
+- Camera2 intrinsics are shifted by the same crop origin and rotated through the same display
+  transform as the pixels;
 - a rectified wall target becomes a calibrated KPM reference page;
 - KPM's camera-from-page 3x4 is converted with artoolkitX's own right-handed OpenGL convention;
 - the KPM lower-left page frame is shifted to a centered renderer frame;
