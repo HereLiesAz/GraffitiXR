@@ -116,6 +116,20 @@ fun SphereSlamStandaloneOverlay(
         mutableStateOf(StandaloneTrackingState.INITIALIZING)
     }
     var fatalMessage by remember { mutableStateOf<String?>(null) }
+    var currentFailure by remember { mutableStateOf<StandaloneFailureEvent?>(null) }
+
+    fun applyFailure(event: StandaloneFailureEvent, emitDiagnostic: Boolean = true) {
+        currentFailure = event
+        if (emitDiagnostic) {
+            onDiagnostic(
+                "SphereSLAM standalone failure=${event.reason} severity=${event.severity}" +
+                    if (event.diagnostic.isBlank()) "" else " ${event.diagnostic}",
+            )
+        }
+        if (event.severity == StandaloneFailureSeverity.FATAL) {
+            fatalMessage = event.userMessage
+        }
+    }
 
     fun resetCapture() {
         referenceBitmap?.let {
@@ -132,6 +146,7 @@ fun SphereSlamStandaloneOverlay(
         unwarpPoints = SPHERESLAM_DEFAULT_UNWARP_POINTS
         referenceReady = false
         trackingState = StandaloneTrackingState.INITIALIZING
+        currentFailure = null
         fatalMessage = null
     }
 
@@ -147,10 +162,17 @@ fun SphereSlamStandaloneOverlay(
             activeReferenceWidthMeters = persistedReferenceWidthMeters
             activeReferencePhysicallyMetric = persistedReferencePhysicallyMetric
             referenceNeedsPersistence = false
+            if (currentFailure?.reason == StandaloneFailureReason.PERSISTED_TARGET_CORRUPT) {
+                currentFailure = null
+            }
             referenceBitmap = restored
         } else {
-            fatalMessage =
-                "Saved SphereSLAM wall target is missing or unreadable. Capture a new target."
+            applyFailure(
+                StandaloneFailureClassifier.event(
+                    StandaloneFailureReason.PERSISTED_TARGET_CORRUPT,
+                    "reference=${uri.lastPathSegment.orEmpty()}",
+                ),
+            )
             onPersistedReferenceInvalid(uri)
         }
     }
@@ -355,11 +377,30 @@ fun SphereSlamStandaloneOverlay(
     }
 
     val cameraId by produceState<String?>(initialValue = null, cameraController, reference) {
+        val startedMs = android.os.SystemClock.elapsedRealtime()
+        var unavailableReported = false
         while (value == null) {
             value = runCatching {
                 cameraController.cameraInfo?.let { Camera2CameraInfo.from(it).cameraId }
             }.getOrNull()
-            if (value == null) delay(50)
+            if (value == null) {
+                if (
+                    !unavailableReported &&
+                    android.os.SystemClock.elapsedRealtime() - startedMs >= 5_000L
+                ) {
+                    unavailableReported = true
+                    applyFailure(
+                        StandaloneFailureClassifier.event(
+                            StandaloneFailureReason.CAMERA_UNAVAILABLE,
+                            "cameraInfo remained unavailable for 5000ms",
+                        ),
+                    )
+                }
+                delay(50)
+            }
+        }
+        if (unavailableReported && currentFailure?.reason == StandaloneFailureReason.CAMERA_UNAVAILABLE) {
+            currentFailure = null
         }
     }
 
@@ -418,8 +459,19 @@ fun SphereSlamStandaloneOverlay(
                 onDiagnostic = { text ->
                     mainHandler.post { onDiagnostic(text) }
                 },
+                onFailure = { event ->
+                    mainHandler.post { applyFailure(event, emitDiagnostic = false) }
+                },
                 onTrackingStateChanged = { state ->
-                    mainHandler.post { trackingState = state }
+                    mainHandler.post {
+                        trackingState = state
+                        if (
+                            state == StandaloneTrackingState.LOCKED &&
+                            currentFailure?.severity == StandaloneFailureSeverity.TRANSIENT
+                        ) {
+                            currentFailure = null
+                        }
+                    }
                 },
                 onFrameTracked = { frame ->
                     // Renderer state is atomic/volatile and intentionally updated directly from the
@@ -464,12 +516,9 @@ fun SphereSlamStandaloneOverlay(
                                         "${error.minimumFeatureCount}). Recapture a richer wall patch."
                             }
                         } else {
-                            fatalMessage = when (error) {
-                                is UnsatisfiedLinkError ->
-                                    "SphereSLAM isn't available in this build."
-                                else ->
-                                    "SphereSLAM couldn't track this target. Recapture a textured wall patch."
-                            }
+                            val event = StandaloneFailureClassifier.fromThrowable(error)
+                            currentFailure = event
+                            fatalMessage = event.userMessage
                         }
                     }
                 },
@@ -509,7 +558,10 @@ fun SphereSlamStandaloneOverlay(
     if (!referenceReady || trackingState == StandaloneTrackingState.INITIALIZING) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Text(
-                text = if (!referenceReady) "Preparing wall tracker…" else "Finding wall target…",
+                text = currentFailure
+                    ?.takeIf { it.severity != StandaloneFailureSeverity.FATAL }
+                    ?.userMessage
+                    ?: if (!referenceReady) "Preparing wall tracker…" else "Finding wall target…",
                 color = Color.White,
                 modifier = Modifier
                     .padding(top = 32.dp)
@@ -525,11 +577,14 @@ fun SphereSlamStandaloneOverlay(
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = if (trackingState == StandaloneTrackingState.LOST) {
-                        "Wall target lost"
-                    } else {
-                        strings.ar.reacquiringTarget
-                    },
+                    text = currentFailure
+                        ?.takeIf { it.severity != StandaloneFailureSeverity.FATAL }
+                        ?.userMessage
+                        ?: if (trackingState == StandaloneTrackingState.LOST) {
+                            "Wall target lost"
+                        } else {
+                            strings.ar.reacquiringTarget
+                        },
                     color = Color.White,
                     modifier = Modifier
                         .padding(top = 32.dp)
