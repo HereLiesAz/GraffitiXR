@@ -1959,6 +1959,44 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Clear only the standalone reference fields when the URI that failed to restore is still the
+     * project's current reference. A newer recapture wins the compare and is left untouched.
+     */
+    fun clearSphereSlamReferenceIfMatches(expectedUri: android.net.Uri) {
+        val projectId = projectRepository.currentProject.value?.id ?: return
+        viewModelScope.launch(dispatchers.io) {
+            var cleared = false
+            try {
+                projectRepository.updateProject { current ->
+                    if (
+                        current.id != projectId ||
+                        current.sphereSlamReferenceUri != expectedUri
+                    ) {
+                        current
+                    } else {
+                        cleared = true
+                        current.copy(
+                            sphereSlamReferenceUri = null,
+                            sphereSlamReferenceWidthMeters = 1f,
+                            sphereSlamReferencePhysicallyMetric = false,
+                        )
+                    }
+                }
+                if (cleared) {
+                    projectManager.deleteSphereSlamReference(appContext, projectId, expectedUri)
+                    appendDiag(
+                        "SphereSLAM standalone cleared missing/corrupt persisted reference",
+                    )
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to clear invalid standalone SphereSLAM reference")
+            }
+        }
+    }
+
     fun setCameraPermission(granted: Boolean) {
         _uiState.update { it.copy(hasCameraPermission = granted) }
     }
