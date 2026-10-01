@@ -327,6 +327,13 @@ repository's atomic project update, and only then deletes the previous reference
 project changes or the metadata save fails, the uncommitted candidate is deleted and the previous
 reference remains authoritative.
 
+## Import and co-op reference transport
+
+The portable artifact is the rectified SphereSLAM reference PNG plus its width/metric metadata in
+`project.json`. Imports and co-op spectator loads copy that PNG into the destination project and
+rebase `sphereSlamReferenceUri` before use. KPM atlases and native session handles are rebuilt
+locally and are never persisted or transferred.
+
 ## Missing or corrupt persisted reference
 
 If the saved reference URI cannot be decoded, the standalone UI asks for a new target and calls a
