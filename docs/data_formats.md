@@ -74,8 +74,10 @@ missing from an old file just uses its Kotlin default). Notably:
 - `wallFeatureMap: WallFeatureMap?` carries the passively-built wide-area feature map the same
   way — flat `FloatArray`/`ByteArray`/`IntArray` fields, not a separate file (see §1).
 - `sphereSlamAnchorGeneration` + `sphereSlamAnchorFrameVersion` identify the canonical standalone
-  wall frame; `sphereSlamPlacementAnchorGeneration` says which generation the persisted AR spatial
-  placement belongs to. A mismatch invalidates pan/scale/rotation while leaving tone intact.
+  wall frame; `sphereSlamModeAdjustment` stores standalone AR's adjustment separately from
+  `modeAdjustments[AR]` (ARCore), and `sphereSlamPlacementAnchorGeneration` says which standalone
+  wall generation it belongs to. A mismatch invalidates standalone pan/scale/rotation while leaving
+  both its tone and ARCore's independent adjustment intact.
 - `sphereSlamAtlasPages` carries stable page IDs, page-image URIs, physical/normalized scale, frame
   version, and the rigid `canonicalFromPage` transform used to rebase KPM matches.
 - `captureEnvironment: CaptureEnvironment?` carries device attitude, ARCore poses, frame
