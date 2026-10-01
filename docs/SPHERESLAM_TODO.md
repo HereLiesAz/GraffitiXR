@@ -92,6 +92,11 @@ support objects that upstream ARUtil links with it:
 The continuation branch now matches those transitive upstream dependencies rather than suppressing
 individual unresolved symbols. This item remains unchecked until CI completes the final link.
 
+A later superseded CI run also caught an extra closing brace introduced while adding
+`ImageProxy.cropRect` support in `LumaFrameTransform.kt`; that Kotlin syntax regression was fixed
+at `42ec45ff` before continuing. Keep the full `test` task in the loop even when a change looks
+like pure camera math.
+
 ---
 
 ## 2. Standalone camera/calibration correctness
