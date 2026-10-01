@@ -111,6 +111,15 @@ internal fun retryOnLockTimeout(
     return outcome
 }
 
+internal fun shouldRestoreLocalArCoreFingerprint(
+    isArCoreAvailable: Boolean,
+    coopRole: com.hereliesaz.graffitixr.common.model.CoopRole,
+    peerSpatialFramePresent: Boolean,
+): Boolean =
+    isArCoreAvailable &&
+        !(coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST &&
+            peerSpatialFramePresent)
+
 @HiltViewModel
 class ArViewModel @Inject constructor(
     private val slamManager: SlamManager,
@@ -1297,11 +1306,13 @@ class ArViewModel @Inject constructor(
                     // on non-ARCore devices; an ARCore co-op GUEST also owns it once protocol-v3 peer
                     // geometry has been installed. Never let a later spectator-project emission run
                     // the ordinary local loader over that peer fingerprint.
-                    val peerOwnsNativeFingerprint =
-                        _uiState.value.coopRole ==
-                            com.hereliesaz.graffitixr.common.model.CoopRole.GUEST &&
-                            _uiState.value.coopPeerSpatialFrame != null
-                    if (_uiState.value.isArCoreAvailable && !peerOwnsNativeFingerprint) {
+                    if (
+                        shouldRestoreLocalArCoreFingerprint(
+                            isArCoreAvailable = _uiState.value.isArCoreAvailable,
+                            coopRole = _uiState.value.coopRole,
+                            peerSpatialFramePresent = _uiState.value.coopPeerSpatialFrame != null,
+                        )
+                    ) {
                         loadMapIfExists()
                         loadFingerprintIfExists()
                     }
