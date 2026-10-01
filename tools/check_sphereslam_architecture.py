@@ -10,6 +10,8 @@ invariants that are easy to accidentally regress during UI/renderer refactors:
    introduced; it must not write directly into the primary ARCore view/projection matrices.
 4. MobileGS tracking validity is backend-neutral, and standalone self-grow/map points remain in the
    centred SphereSLAM fingerprint frame rather than passing through an ARCore-world conversion.
+5. The standalone runtime never reaches ARCore-only hit-test/depth/anchor/perception APIs and exposes
+   an explicit canonical-wall hit-test seam instead.
 
 If a future, legitimate architecture change trips this check, update the check together with the
 new explicit seam. Do not simply weaken/remove it.
@@ -45,6 +47,12 @@ mobile_gs_h = read("core/nativebridge/src/main/cpp/include/MobileGS.h")
 graffiti_jni = read("core/nativebridge/src/main/cpp/GraffitiJNI.cpp")
 slam_manager = read(
     "core/nativebridge/src/main/java/com/hereliesaz/graffitixr/nativebridge/SlamManager.kt"
+)
+ar_view_model = read(
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/ArViewModel.kt"
+)
+standalone_wall_hit = read(
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/StandaloneWallHitTest.kt"
 )
 
 # 1. AR reachability must not be gated by ARCore availability.
@@ -144,6 +152,39 @@ if "mMapPoints3D.push_back(cv::Point3f(P.x, P.y, P.z));" not in mobile_gs_cpp:
         "review standalone centred-page frame preservation."
     )
 
+# 5. Standalone equivalents must fail closed instead of reaching ARCore-only APIs.
+standalone_forbidden = {
+    "frame.hitTest": "ARCore Frame.hitTest",
+    "acquireDepthImage": "ARCore Depth API",
+    "createAnchor(": "ARCore Anchor creation",
+    "PlaneRenderer": "ARCore plane renderer",
+    "PointCloudRenderer": "ARCore point-cloud renderer",
+    "ArDebugRenderer": "ARCore perception debug renderer",
+}
+for path in standalone_paths:
+    text = read(path)
+    for token, meaning in standalone_forbidden.items():
+        if token in text:
+            fail(f"{path} reaches {meaning} through token {token!r}; standalone must use an explicit equivalent.")
+
+if "object StandaloneWallHitTest" not in standalone_wall_hit:
+    fail("Standalone canonical wall hit-test seam is missing.")
+for required in ("wallLocked", "coveredRegions", "Vec3(x, y, 0f)"):
+    if required not in standalone_wall_hit:
+        fail(f"StandaloneWallHitTest lost required fail-closed/canonical-wall contract token {required!r}.")
+
+if 'GlassesSessionState.Fallback("Standalone wall calibration for glasses is not implemented yet")' not in ar_view_model:
+    fail("Standalone wearable calibration no longer fails closed before the ARCore hit-test path.")
+if "probe: skipped; ARCore-only depth probe is unavailable on standalone backend" not in ar_view_model:
+    fail("Standalone runtime no longer explicitly skips the ARCore-only stereo/depth probe.")
+for required in (
+    "isDepthApiSupported = false",
+    "isHardwareStereoActive = false",
+    "currentCenterDepth = -1f",
+):
+    if required not in ar_view_model:
+        fail(f"Standalone tracking no longer clears stale ARCore depth state: missing {required!r}.")
+
 if FAILURES:
     print("SphereSLAM architecture invariant check FAILED:", file=sys.stderr)
     for item in FAILURES:
@@ -152,5 +193,6 @@ if FAILURES:
 
 print(
     "SphereSLAM architecture invariant check OK: AR mode remains reachable, standalone is "
-    "ARCore-independent, and hybrid KPM is observation-only."
+    "ARCore-independent, hybrid KPM is observation-only, and ARCore-only perception APIs stay "
+    "behind explicit backend boundaries."
 )
