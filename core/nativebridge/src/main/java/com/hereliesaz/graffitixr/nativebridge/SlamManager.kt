@@ -472,6 +472,8 @@ class SlamManager @Inject constructor(
     fun clearWallFeatureMap() = nativeClearWallFeatureMap()
     /** Live wall-feature-map point count — diagnostic. */
     fun getMapPointCount(): Int = nativeGetMapPointCount()
+    /** Monotonic content revision; changes for point, descriptor, confidence, or observation updates. */
+    fun getWallFeatureMapRevision(): Long = nativeGetWallFeatureMapRevision()
     /** Phase 2b: enable live map-matching in reloc. Default OFF — experimental until device-validated. */
     fun setMapRelocEnabled(enabled: Boolean) = nativeSetMapRelocEnabled(enabled)
     /** Phase 3: passively grow the feature map from reloc-locked frames. Default OFF; independent of matching. */
@@ -897,6 +899,7 @@ class SlamManager @Inject constructor(
     private external fun nativeClearWallFeatureMap()
     private external fun nativeClearWallFingerprint()
     private external fun nativeGetMapPointCount(): Int
+    private external fun nativeGetWallFeatureMapRevision(): Long
     private external fun nativeSetMapRelocEnabled(enabled: Boolean)
     private external fun nativeSetMapBuildEnabled(enabled: Boolean)
     private external fun nativeExportWallFeatureMap(): ByteArray?
