@@ -874,7 +874,10 @@ class ArViewModelTest {
         val field = viewModel.javaClass.getDeclaredField("_uiState")
         field.isAccessible = true
         val flow = field.get(viewModel) as MutableStateFlow<ArUiState>
-        flow.value = flow.value.copy(isArCoreAvailable = true)
+        flow.value = flow.value.copy(
+            isArCoreAvailable = true,
+            isArCoreAvailabilityResolved = true,
+        )
     }
 
     private fun setPrivateField(obj: Any, fieldName: String, value: Any?) {
