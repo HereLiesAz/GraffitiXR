@@ -80,6 +80,7 @@ fun SphereSlamStandaloneOverlay(
     persistedReferenceWidthMeters: Float = 1f,
     persistedReferencePhysicallyMetric: Boolean = false,
     onReferenceCaptured: (Bitmap, Float, Boolean) -> Unit = { _, _, _ -> },
+    onPersistedReferenceInvalid: (Uri) -> Unit = {},
     adjustment: ModeAdjustment? = null,
     onUnitsPerPixel: (Float) -> Unit = {},
     onDiagnostic: (String) -> Unit = {},
@@ -143,6 +144,10 @@ fun SphereSlamStandaloneOverlay(
             activeReferencePhysicallyMetric = persistedReferencePhysicallyMetric
             referenceNeedsPersistence = false
             referenceBitmap = restored
+        } else {
+            fatalMessage =
+                "Saved SphereSLAM wall target is missing or unreadable. Capture a new target."
+            onPersistedReferenceInvalid(uri)
         }
     }
 
