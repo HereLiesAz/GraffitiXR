@@ -5,8 +5,9 @@ import android.graphics.Bitmap
 import com.hereliesaz.graffitixr.nativebridge.HomographyTrackerNative
 
 /**
- * ARCore-unavailable fallback: a Kotlin-shaped wrapper over [HomographyTrackerNative] /
- * `HomographyTracker.h`'s planar-target tracker.
+ * Legacy non-ARCore Overlay tracker: a Kotlin-shaped wrapper over [HomographyTrackerNative] /
+ * `HomographyTracker.h`'s planar-target tracker. Non-ARCore AR mode itself now uses
+ * SphereSLAM/KPM; this class remains for Overlay's planar live-tracking behavior.
  *
  * This is the tracking math and its JNI boundary. [HomographyFallbackOverlay] is what actually
  * wires this to CameraX, camera intrinsics, [com.hereliesaz.graffitixr.feature.ar.rendering.OverlayRenderer],

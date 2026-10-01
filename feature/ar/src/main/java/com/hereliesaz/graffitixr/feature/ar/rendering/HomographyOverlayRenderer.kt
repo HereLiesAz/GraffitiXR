@@ -10,10 +10,10 @@ import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 /**
- * `GLSurfaceView.Renderer` for the ARCore-unavailable fallback: draws
- * [OverlayRenderer]'s design quad, positioned by [com.hereliesaz.graffitixr.feature.ar.
- * BridgedHomographyTracker]'s tracked pose, on a transparent GL surface layered above
- * [com.hereliesaz.graffitixr.feature.ar.CameraPreview]'s CameraX preview — the same
+ * CameraX-backed transparent `GLSurfaceView.Renderer` shared by standalone SphereSLAM AR and the
+ * legacy homography Overlay tracker. It draws [OverlayRenderer]'s design quad from the view/projection
+ * pair supplied by the active tracker above [com.hereliesaz.graffitixr.feature.ar.CameraPreview] —
+ * the same
  * `setZOrderMediaOverlay(true)` + `PixelFormat.TRANSLUCENT` pattern `MainScreen.kt` already uses
  * to layer AR mode's GL surface, just with CameraX supplying the camera image underneath instead
  * of ARCore drawing its own camera background.

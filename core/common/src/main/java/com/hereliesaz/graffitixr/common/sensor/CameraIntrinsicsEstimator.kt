@@ -9,8 +9,8 @@ import timber.log.Timber
 /**
  * Estimates [CameraIntrinsics] from Camera2's `CameraCharacteristics` — the piece ARCore's
  * `Camera.getImageIntrinsics()` supplies for free and CameraX doesn't, needed by
- * [com.hereliesaz.graffitixr.feature.ar.rendering.ProjectionMatrix] for the ARCore-unavailable
- * fallback (`com.hereliesaz.graffitixr.feature.ar.BridgedHomographyTracker`).
+ * [com.hereliesaz.graffitixr.feature.ar.rendering.ProjectionMatrix] for CameraX-backed tracking:
+ * standalone SphereSLAM AR and the legacy non-ARCore homography Overlay tracker.
  *
  * **Precision, in descending order of what's actually available:**
  * 1. `LENS_INTRINSIC_CALIBRATION` — a real, per-device-calibrated `[fx, fy, cx, cy, skew]` (skew
@@ -19,8 +19,9 @@ import timber.log.Timber
  * 2. Otherwise, the classic pinhole approximation from the lens' nominal focal length and the
  *    sensor's physical size: `fx = focalLengthMm · pixelArrayWidthPx / sensorWidthMm` (and the `y`
  *    equivalent), principal point assumed exactly centered. This is a real approximation — no lens
- *    is perfectly centered or distortion-free — consistent with this whole fallback's character
- *    (see `HomographyTracker.h`'s class doc): good enough to size and orient an overlay, not a
+ *    is perfectly centered or distortion-free. That approximation is shared by the CameraX
+ *    tracking paths and is not photogrammetry-grade calibration; see the standalone SphereSLAM
+ *    calibration checklist before treating it as physically exact.
  *    photogrammetry-grade calibration.
  *
  * The two paths are defined against different denominators. `LENS_INTRINSIC_CALIBRATION`'s

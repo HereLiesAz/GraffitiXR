@@ -32,7 +32,8 @@ fun rememberCameraController(): LifecycleCameraController {
             // when ARCore is unavailable. Overlay also uses live analysis for its homography
             // fallback. Enabling the use case is not the cost:
             // nothing runs per-frame until a caller actually attaches an analyzer via
-            // setImageAnalysisAnalyzer, which only the ARCore-fallback path does.
+            // setImageAnalysisAnalyzer. Standalone SphereSLAM AR and the legacy non-ARCore
+            // homography Overlay path both attach one when active.
             setEnabledUseCases(LifecycleCameraController.IMAGE_CAPTURE or LifecycleCameraController.IMAGE_ANALYSIS)
             initializationFuture.addListener({
                 cameraControl?.let { control ->
@@ -110,9 +111,9 @@ fun CameraPreview(
         factory = { context ->
             PreviewView(context).apply {
                 this.controller = controller
-                // FIT_CENTER, not the default FILL_CENTER: the ARCore-fallback path
-                // (HomographyFallbackOverlay, the sole other consumer of this composable) solves
-                // its pose against the raw ImageAnalysis frame's own aspect ratio and draws with a
+                // FIT_CENTER, not the default FILL_CENTER: both CameraX tracking consumers
+                // (SphereSlamStandaloneOverlay for AR and HomographyFallbackOverlay for Overlay)
+                // solve pose against the ImageAnalysis frame's own aspect ratio and draw with a
                 // GL viewport letterboxed to match FIT_CENTER exactly (see
                 // HomographyOverlayRenderer's doc). FILL_CENTER's crop has no such matching
                 // counterpart on the GL side, which stretched/mis-scaled the tracked overlay
