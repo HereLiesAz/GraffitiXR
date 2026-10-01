@@ -5,6 +5,8 @@ import android.graphics.BitmapFactory
 import android.graphics.PixelFormat
 import android.net.Uri
 import android.opengl.GLSurfaceView
+import android.os.Handler
+import android.os.Looper
 import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
@@ -81,6 +83,7 @@ fun SphereSlamStandaloneOverlay(
     val context = LocalContext.current
     val strings = rememberAppStrings()
     val scope = rememberCoroutineScope()
+    val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
     var rawCaptureBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var unwarpPoints by remember { mutableStateOf(SPHERESLAM_DEFAULT_UNWARP_POINTS) }
@@ -265,23 +268,31 @@ fun SphereSlamStandaloneOverlay(
                 referenceImage = referenceImage,
                 onReferenceReady = { registered: SphereSlamStandaloneSession.Reference ->
                     val g = registered.geometry
-                    referenceWidthUnits = g.widthMeters
-                    referenceHeightUnits = g.heightMeters
-                    referenceReady = true
+                    mainHandler.post {
+                        referenceWidthUnits = g.widthMeters
+                        referenceHeightUnits = g.heightMeters
+                        referenceReady = true
+                    }
                 },
                 onFrameTracked = { frame ->
-                    isTrackingLost = frame == null
-                    onUnitsPerPixel(frame?.unitsPerPixel ?: 0f)
+                    // Renderer state is atomic/volatile and intentionally updated directly from the
+                    // analysis worker. Compose state belongs to Main and is posted there separately.
                     if (frame == null) {
                         glRenderer.clearPose()
                     } else {
                         glRenderer.updatePose(frame.viewMatrix, frame.projMatrix, frame.frameAspect)
                     }
+                    mainHandler.post {
+                        isTrackingLost = frame == null
+                        onUnitsPerPixel(frame?.unitsPerPixel ?: 0f)
+                    }
                 },
                 onFatalError = { error ->
-                    fatalMessage = when (error) {
-                        is UnsatisfiedLinkError -> "SphereSLAM isn't available in this build."
-                        else -> "SphereSLAM couldn't track this target. Recapture a textured wall patch."
+                    mainHandler.post {
+                        fatalMessage = when (error) {
+                            is UnsatisfiedLinkError -> "SphereSLAM isn't available in this build."
+                            else -> "SphereSLAM couldn't track this target. Recapture a textured wall patch."
+                        }
                     }
                 },
             )
@@ -290,6 +301,10 @@ fun SphereSlamStandaloneOverlay(
 
             onDispose {
                 cameraController.clearImageAnalysisAnalyzer()
+                // Drop worker-posted UI callbacks before the remembered Handler can outlive this
+                // standalone overlay composition. Native teardown is serialized behind any in-flight
+                // analyze() call on the same executor.
+                mainHandler.removeCallbacksAndMessages(null)
                 executor.execute { analyzer.close() }
                 executor.shutdown()
                 glRenderer.clearPose()
