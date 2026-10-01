@@ -630,6 +630,11 @@ equivalent.
 - [x] Reconnect/resync reuses the same spatial descriptor and fresh project ZIP; if the host target
   changes, the session ends with SpatialFrameChanged rather than rebasing the guest silently.
   Project ZIP relocation already covers standalone page-0 and atlas URIs.
+- [x] Normalize the spectator copy's active AR placement into the guest backend before repository
+  publication: standalone-host placement moves into ARCore's AR slot (with the same metric base quad
+  reconstructed from page/design aspect), while ARCore-host placement moves into standalone's slot
+  and stale standalone target metadata is discarded. Missing metric size fails closed rather than
+  silently screen-fitting a different mural size.
 
 **ACCEPTANCE:** co-op never silently combines coordinates from different backends/scales as though
 they were the same frame.
