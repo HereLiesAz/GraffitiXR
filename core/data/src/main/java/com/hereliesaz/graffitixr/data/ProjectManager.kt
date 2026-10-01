@@ -18,6 +18,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -233,11 +234,12 @@ class ProjectManager @Inject constructor(
     }
 
     /**
-     * Persist the canonical rectified wall page used by standalone SphereSLAM.
+     * Writes a new rectified wall page for standalone SphereSLAM and returns its URI.
      *
-     * The filename is stable on purpose: a recapture replaces the old canonical page instead of
-     * growing an unbounded second capture history. Project export already zips the whole project
-     * directory, so this artifact automatically round-trips with .gxr files.
+     * Each successful write gets a unique final filename. The caller commits that URI together with
+     * its scale metadata through ProjectRepository.updateProject(), then deletes the previously
+     * referenced file. Versioning is intentional: overwriting a single canonical PNG before
+     * project.json commits can leave new pixels paired with old scale metadata after process death.
      */
     suspend fun saveSphereSlamReference(
         context: Context,
@@ -245,22 +247,43 @@ class ProjectManager @Inject constructor(
         bitmap: Bitmap,
     ): Uri = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/$projectId").also { if (!it.exists()) it.mkdirs() }
-        val target = File(root, "sphereslam_reference.png")
+        val target = File(root, "sphereslam_reference_${UUID.randomUUID()}.png")
         val tmp = File.createTempFile("sphereslam_reference_", ".tmp", root)
         try {
             FileOutputStream(tmp).use { out ->
                 check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) {
                     "Could not encode SphereSLAM reference image"
                 }
-            }
-            if (target.exists() && !target.delete()) {
-                error("Could not replace existing SphereSLAM reference")
+                out.flush()
+                out.fd.sync()
             }
             check(tmp.renameTo(target)) { "Could not install SphereSLAM reference image" }
         } finally {
             if (tmp.exists()) tmp.delete()
         }
         uriProvider.getUriForFile(target)
+    }
+
+    /**
+     * Best-effort deletion for a standalone SphereSLAM reference owned by [projectId].
+     *
+     * Accept the old fixed canonical filename for cleanup/migration as well as the current
+     * versioned names, but never delete a path outside this project directory.
+     */
+    suspend fun deleteSphereSlamReference(
+        context: Context,
+        projectId: String,
+        uri: Uri?,
+    ) = withContext(Dispatchers.IO) {
+        val path = uri?.path ?: return@withContext
+        val root = File(context.filesDir, "projects/$projectId").canonicalFile
+        val file = File(path).canonicalFile
+        val validName =
+            file.name == "sphereslam_reference.png" ||
+                (file.name.startsWith("sphereslam_reference_") && file.extension == "png")
+        if (file.parentFile == root && validName) {
+            runCatching { file.delete() }
+        }
     }
 
     /**
