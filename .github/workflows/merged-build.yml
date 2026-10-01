@@ -60,6 +60,9 @@ jobs:
           # "unit tests passed" means. Keep them in agreement.
           ./gradlew test --continue --build-cache --no-daemon --stacktrace
 
+      - name: SphereSLAM architecture invariants
+        run: python3 tools/check_sphereslam_architecture.py
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7

@@ -37,11 +37,16 @@ These are invariants, not optional cleanup.
 - [x] Never silently replace ARCore view/projection matrices with a KPM observation in hybrid mode.
 - [x] Treat long standalone visual loss as LOST/REACQUIRING instead of freezing the last pose.
 - [x] Do not integrate phone accelerometer translation as fake dead reckoning.
-- [ ] Add an automated architecture test that fails if non-ARCore AR mode is hidden again.
-- [ ] Add an automated architecture test that fails if the standalone branch constructs an ARCore
+- [x] Add an automated architecture test that fails if non-ARCore AR mode is hidden again.
+- [x] Add an automated architecture test that fails if the standalone branch constructs an ARCore
   `Session`.
-- [ ] Add an automated architecture test that fails if hybrid SphereSLAM writes directly into the
+- [x] Add an automated architecture test that fails if hybrid SphereSLAM writes directly into the
   primary renderer pose without going through the explicit fusion seam.
+
+The three architecture guards above are enforced by
+`tools/check_sphereslam_architecture.py` in both Android CI and Merged Build & Release. The check
+is deliberately strict: any future hybrid observation consumption must introduce/update an explicit
+fusion seam rather than bypassing the guard.
 
 ---
 
