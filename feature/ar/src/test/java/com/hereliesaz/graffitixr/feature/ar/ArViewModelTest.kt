@@ -264,6 +264,95 @@ class ArViewModelTest {
     // ==================== Standalone SphereSLAM persistence tests ====================
 
     @Test
+    fun `SphereSLAM recapture commits URI and scale together then deletes old reference`() = runTest {
+        val oldUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_old.png")
+        val newUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_new.png")
+        val project = com.hereliesaz.graffitixr.common.model.GraffitiProject(
+            id = "slam",
+            name = "Wall",
+            sphereSlamReferenceUri = oldUri,
+            sphereSlamReferenceWidthMeters = 1f,
+            sphereSlamReferencePhysicallyMetric = false,
+        )
+        val flow = MutableStateFlow<com.hereliesaz.graffitixr.common.model.GraffitiProject?>(project)
+        every { projectRepository.currentProject } returns flow
+        coEvery { projectManager.saveSphereSlamReference(context, "slam", any()) } returns newUri
+        coEvery {
+            projectRepository.updateProject(
+                any<(com.hereliesaz.graffitixr.common.model.GraffitiProject) ->
+                    com.hereliesaz.graffitixr.common.model.GraffitiProject>(),
+            )
+        } coAnswers {
+            val transform = firstArg<
+                (com.hereliesaz.graffitixr.common.model.GraffitiProject) ->
+                    com.hereliesaz.graffitixr.common.model.GraffitiProject
+            >()
+            flow.value = transform(requireNotNull(flow.value))
+        }
+        val bitmap = mockk<Bitmap>(relaxed = true)
+
+        viewModel.saveSphereSlamReference(bitmap, 2.5f, true)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val updated = requireNotNull(flow.value)
+        assertEquals(newUri, updated.sphereSlamReferenceUri)
+        assertEquals(2.5f, updated.sphereSlamReferenceWidthMeters, 0f)
+        assertTrue(updated.sphereSlamReferencePhysicallyMetric)
+        coVerify {
+            projectManager.deleteSphereSlamReference(context, "slam", oldUri)
+        }
+        coVerify(exactly = 0) {
+            projectManager.deleteSphereSlamReference(context, "slam", newUri)
+        }
+    }
+
+    @Test
+    fun `competing SphereSLAM recapture keeps newer metadata and deletes uncommitted candidate`() = runTest {
+        val oldUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_old.png")
+        val newerUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_newer.png")
+        val candidateUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_candidate.png")
+        val original = com.hereliesaz.graffitixr.common.model.GraffitiProject(
+            id = "slam",
+            name = "Wall",
+            sphereSlamReferenceUri = oldUri,
+        )
+        val flow = MutableStateFlow<com.hereliesaz.graffitixr.common.model.GraffitiProject?>(original)
+        every { projectRepository.currentProject } returns flow
+        coEvery { projectManager.saveSphereSlamReference(context, "slam", any()) } returns candidateUri
+        coEvery {
+            projectRepository.updateProject(
+                any<(com.hereliesaz.graffitixr.common.model.GraffitiProject) ->
+                    com.hereliesaz.graffitixr.common.model.GraffitiProject>(),
+            )
+        } coAnswers {
+            val transform = firstArg<
+                (com.hereliesaz.graffitixr.common.model.GraffitiProject) ->
+                    com.hereliesaz.graffitixr.common.model.GraffitiProject
+            >()
+            flow.value = transform(requireNotNull(flow.value))
+        }
+        val bitmap = mockk<Bitmap>(relaxed = true)
+
+        viewModel.saveSphereSlamReference(bitmap, 2f, true)
+        // Simulate a newer save/project update winning before this coroutine reaches updateProject.
+        flow.value = original.copy(
+            sphereSlamReferenceUri = newerUri,
+            sphereSlamReferenceWidthMeters = 3f,
+            sphereSlamReferencePhysicallyMetric = true,
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(newerUri, flow.value?.sphereSlamReferenceUri)
+        assertEquals(3f, flow.value?.sphereSlamReferenceWidthMeters ?: 0f, 0f)
+        coVerify {
+            projectManager.deleteSphereSlamReference(context, "slam", candidateUri)
+        }
+        coVerify(exactly = 0) {
+            projectManager.deleteSphereSlamReference(context, "slam", oldUri)
+        }
+    }
+
+    @Test
     fun `invalid persisted SphereSLAM URI clears only matching standalone fields`() = runTest {
         val uri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_old.png")
         val project = com.hereliesaz.graffitixr.common.model.GraffitiProject(
