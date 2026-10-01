@@ -819,12 +819,19 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
     if (mWallKeypoints3D.size() < 8) return;                                   // need the fingerprint plane
     if (!mMapDescriptors.empty() && mMapDescriptors.type() != descs.type()) return;
     if (mMapPoints3D.size() != (size_t)mMapDescriptors.rows) return;  // corrupted map: bail rather than crash
+    bool mapMutated = false;
 
     // Keep the parallel arrays aligned with the points: a restored map may have carried points +
     // descriptors but empty confidence/obs (both optional in WallFeatureMap). Without this, the add
     // path below would desync them from mMapPoints3D and corrupt per-point confidence.
-    if (mMapConfidence.size() != mMapPoints3D.size()) mMapConfidence.resize(mMapPoints3D.size(), 1.0f);
-    if (mMapObs.size() != mMapPoints3D.size()) mMapObs.resize(mMapPoints3D.size(), 1);
+    if (mMapConfidence.size() != mMapPoints3D.size()) {
+        mMapConfidence.resize(mMapPoints3D.size(), 1.0f);
+        mapMutated = true;
+    }
+    if (mMapObs.size() != mMapPoints3D.size()) {
+        mMapObs.resize(mMapPoints3D.size(), 1);
+        mapMutated = true;
+    }
 
     // Confidence-prune when at capacity so the map keeps refreshing within the cap (drop points that
     // never earned a re-observation). Compacts all four parallel arrays + the descriptor matrix.
@@ -846,6 +853,7 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
                 mMapDescriptors.row((int)i).copyTo(nd.row((int)idx));
             }
         }
+        if (kept.size() != mMapPoints3D.size()) mapMutated = true;
         mMapPoints3D.swap(np); mMapConfidence.swap(nc); mMapObs.swap(no); mMapDescriptors = nd;
     }
 
@@ -875,8 +883,10 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
             if (m[0].distance < kRelocLoweRatio * m[1].distance) {
                 int ti = m[0].trainIdx, qi = m[0].queryIdx;
                 if (ti >= 0 && ti < (int)mMapConfidence.size() && qi >= 0 && qi < (int)matched.size()) {
-                    mMapConfidence[ti] = std::min(1.0f, mMapConfidence[ti] + 0.1f);
+                    const float oldConfidence = mMapConfidence[ti];
+                    mMapConfidence[ti] = std::min(1.0f, oldConfidence + 0.1f);
                     mMapObs[ti] += 1;
+                    mapMutated = true;
                     matched[qi] = 1;
                 }
             }
@@ -904,12 +914,14 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
         mMapConfidence.push_back(0.1f);
         mMapObs.push_back(1);
         mMapDescriptors.push_back(descs.row((int)i));
+        mapMutated = true;
         ++added;
     }
 
     // Co-register the map to the fingerprint anchor + intrinsics (same frame as the points above).
     memcpy(mMapAnchorMatrix, mFingerprintAnchorMatrix, 16 * sizeof(float));
     mMapIntrinsics[0]=(float)fx; mMapIntrinsics[1]=(float)fy; mMapIntrinsics[2]=(float)cx; mMapIntrinsics[3]=(float)cy;
+    if (mapMutated) mMapRevision.fetch_add(1, std::memory_order_relaxed);
     if (added > 0) LOGI("Map build: +%d pts (map now %zu)", added, mMapPoints3D.size());
 }
 
@@ -1599,6 +1611,7 @@ void MobileGS::restoreWallFeatureMap(const cv::Mat& d, const std::vector<cv::Poi
     memcpy(mMapAnchorMatrix, anchorMatrix16 ? anchorMatrix16 : kIdentity16, 16 * sizeof(float));
     if (intrinsics4) memcpy(mMapIntrinsics, intrinsics4, 4 * sizeof(float));
     else             memset(mMapIntrinsics, 0, 4 * sizeof(float));
+    mMapRevision.fetch_add(1, std::memory_order_relaxed);
 }
 
 void MobileGS::clearWallFeatureMap() {
@@ -1611,6 +1624,7 @@ void MobileGS::clearWallFeatureMap() {
     static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     memcpy(mMapAnchorMatrix, kIdentity16, 16 * sizeof(float));
     memset(mMapIntrinsics, 0, 4 * sizeof(float));
+    mMapRevision.fetch_add(1, std::memory_order_relaxed);
 }
 
 std::vector<uint8_t> MobileGS::exportFingerprint() {
