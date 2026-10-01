@@ -350,12 +350,15 @@ Remaining:
 - [x] On missing/corrupt reference, clear only standalone target URI/scale fields and preserve the
   rest of the project. Cleanup uses a compare guard so a stale failure callback cannot erase a newer
   recapture.
-- [ ] Verify duplicate/imported project IDs do not point at another project's reference file.
+- [x] Verify duplicate-ID imports rebase the SphereSLAM URI into the newly assigned local project
+  directory and leave the existing project untouched.
 - [ ] Verify project deletion removes the standalone reference.
 - [ ] Verify project copy/duplicate flows, if any, copy and rebase the standalone reference.
-- [ ] Verify co-op bulk project transfer includes and rebases the standalone reference.
-- [ ] Decide whether co-op peers need the raw reference PNG, a serialized KPM atlas, or both.
-- [ ] Do not persist raw native KPM handles.
+- [x] Verify co-op bulk project transfer includes and rebases the standalone reference into the
+  spectator project directory.
+- [x] Decide co-op storage contract: transfer the raw rectified reference PNG + scale metadata and
+  rebuild KPM locally; do not serialize a native atlas.
+- [x] Do not persist raw native KPM handles.
 - [ ] If a serialized KPM dataset is later persisted:
   - [ ] version its format;
   - [ ] store the source image/calibration alongside it for rebuild;
