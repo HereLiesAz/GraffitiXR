@@ -2041,14 +2041,13 @@ class MainActivity : ComponentActivity() {
                     // The policy still gates unresolved capability; incompatible peers are rejected
                     // during handshake rather than silently combining unrelated wall/page frames.
                     val coopBackendBlocked = !arRailPolicy.coopCalibrationAvailable
-                    val coopHostReady =
-                        if (arRailPolicy.standalone) {
-                            // Standalone never creates an ARCore Anchor or accumulated ARCore cloud.
-                            // Its durable page-0 target is the wall coordinate object Host shares.
-                            arUiState.sphereSlamReferenceUri != null
-                        } else {
-                            arUiState.isAnchorEstablished && arUiState.splatCount > 0
-                        }
+                    val coopHostReady = coopHostReady(
+                        policy = arRailPolicy,
+                        arCoreAnchorEstablished = arUiState.isAnchorEstablished,
+                        arCorePointCount = arUiState.splatCount,
+                        // Standalone never creates an ARCore Anchor/cloud; page 0 IS its wall frame.
+                        standaloneReferencePresent = arUiState.sphereSlamReferenceUri != null,
+                    )
                     val coopContainerBlocked =
                         coopBackendBlocked && arUiState.coopRole == CoopRole.NONE
                     azRailSubHostItem(
