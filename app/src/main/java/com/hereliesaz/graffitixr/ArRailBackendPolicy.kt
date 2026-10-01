@@ -7,6 +7,8 @@ internal data class ArRailBackendPolicy(
     val targetDisabledReason: String?,
     val coopCalibrationAvailable: Boolean,
     val coopDisabledReason: String?,
+    val modePreviewExportAvailable: Boolean,
+    val exportDisabledReason: String?,
 )
 
 /**
@@ -29,6 +31,8 @@ internal fun arRailBackendPolicy(
             targetDisabledReason = "Checking AR backend…",
             coopCalibrationAvailable = false,
             coopDisabledReason = "Checking AR backend…",
+            modePreviewExportAvailable = false,
+            exportDisabledReason = "Checking AR backend…",
         )
     }
     if (arCoreAvailable) {
@@ -39,6 +43,8 @@ internal fun arRailBackendPolicy(
             targetDisabledReason = null,
             coopCalibrationAvailable = true,
             coopDisabledReason = null,
+            modePreviewExportAvailable = true,
+            exportDisabledReason = null,
         )
     }
     return ArRailBackendPolicy(
@@ -48,5 +54,7 @@ internal fun arRailBackendPolicy(
         targetDisabledReason = "Use the on-screen Wall Target capture",
         coopCalibrationAvailable = false,
         coopDisabledReason = "ARCore calibration required for co-op",
+        modePreviewExportAvailable = false,
+        exportDisabledReason = "Standalone camera + overlay export is not implemented yet",
     )
 }
