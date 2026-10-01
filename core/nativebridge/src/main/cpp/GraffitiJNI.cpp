@@ -1046,6 +1046,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetMapPointCount(J
     return gSlamEngine ? gSlamEngine->getMapPointCount() : 0;
 }
 
+JNIEXPORT jlong JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetWallFeatureMapRevision(JNIEnv*, jobject) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    return gSlamEngine ? static_cast<jlong>(gSlamEngine->getWallFeatureMapRevision()) : 0;
+}
+
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMapRelocEnabled(JNIEnv*, jobject, jboolean enabled) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
