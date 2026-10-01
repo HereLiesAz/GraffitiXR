@@ -246,6 +246,13 @@ data class ArUiState(
 
     val coopRole: CoopRole = CoopRole.NONE,
     val coopSessionState: CoopSessionState = CoopSessionState.Idle,
+    /**
+     * Transient v3 co-op geometry for a guest. Never persisted into the local project: the project
+     * archive contains the host's durable assets, while these bytes/metadata describe the active
+     * network session and are cleared on leave.
+     */
+    val coopPeerSpatialFrame: CoopSpatialFrame? = null,
+    val coopPeerFingerprint: ByteArray? = null,
     val showCoopNotFoundDialog: Boolean = false,
 
     // ── Enhanced Diagnostics ──────────────
