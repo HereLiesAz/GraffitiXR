@@ -245,8 +245,12 @@ Implemented:
 Remaining:
 
 - [ ] Measure actual KPM cadence/latency on target devices.
-- [ ] Record KPM observation age in standalone diagnostics.
-- [ ] Gate stale KPM matches by timestamp, not just callback order.
+- [x] Record KPM observation age in standalone diagnostics when Camera2 declares a REALTIME
+  timestamp source; also record KPM match-processing duration on every device.
+- [x] Gate stale KPM matches by timestamp when Camera2 declares
+  `SENSOR_INFO_TIMESTAMP_SOURCE_REALTIME` (250 ms default ceiling). UNKNOWN timestamp sources are
+  never compared to `elapsedRealtimeNanos()`; absolute age is reported as unavailable rather than
+  guessed.
 - [x] Add configurable minimum inlier count for standalone acceptance. Default is 4, matching the
   pinned artoolkitX binary KPM minimum correspondence count.
 - [x] Add configurable maximum reprojection/ICP error for standalone acceptance. Default is 10.0,
@@ -612,7 +616,8 @@ Still required:
 
 ### JVM/pure math
 
-- [ ] standalone acceptance-gate tests for observation age;
+- [x] standalone acceptance-gate tests for REALTIME observation age/staleness and UNKNOWN-source
+  no-guess behavior;
 - [x] standalone acceptance-gate tests for inliers/error/non-finite poses;
 - [x] pose-jump gate tests, including scale-independent page-width translation and relaxed
   reacquisition thresholds;

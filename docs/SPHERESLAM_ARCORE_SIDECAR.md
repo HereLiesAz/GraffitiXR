@@ -318,6 +318,14 @@ final shared-library link. The continuation branch mirrors upstream ARUtil's bun
 support sources and links NDK zlib. Keep this CI path enabled; otherwise native KPM regressions can
 silently pass normal builds that never initialize the submodule.
 
+## Standalone observation age
+
+For Camera2 devices that declare `SENSOR_INFO_TIMESTAMP_SOURCE_REALTIME`, the analyzer compares
+the CameraX frame timestamp with `SystemClock.elapsedRealtimeNanos()` after KPM matching and rejects
+observations older than 250 ms. Devices reporting UNKNOWN timestamp source are not forced into a
+made-up clock conversion: absolute age is logged as unavailable, while KPM processing duration is
+still measured. Accepted-match metrics are rate-limited to one diagnostic line every five seconds.
+
 ## Standalone tracking-state contract
 
 The standalone runtime exposes explicit `INITIALIZING`, `LOCKED`, `IMU_BRIDGE`,
