@@ -127,6 +127,16 @@ data class GraffitiProject(
     val sphereSlamFingerprint: Fingerprint? = null,
     val sphereSlamFingerprintFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
 
+    /**
+     * Wide-area MobileGS feature map for the standalone SphereSLAM backend.
+     *
+     * Kept separate from [wallFeatureMap], whose points are in the legacy ARCore fingerprint frame.
+     * These points are in the exact same centred KPM-page frame as [sphereSlamFingerprint]. A new
+     * standalone reference therefore invalidates both together.
+     */
+    val sphereSlamWallFeatureMap: WallFeatureMap? = null,
+    val sphereSlamWallFeatureMapFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+
     val refinementPaths: List<RefinementPath> = emptyList(),
 
     // Legacy visual state grouped to fix binary compatibility issues with large data classes.
