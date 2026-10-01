@@ -369,16 +369,23 @@ fun SphereSlamStandaloneOverlay(
             physicallyMetric = activeReferencePhysicallyMetric,
         )
     }
-    val atlasReferenceImages by produceState(
-        initialValue = emptyList<SphereSlamStandaloneAtlasReferenceImage>(),
-        persistedAtlasPages,
+    // Snapshot persisted native state once per canonical page. Autosaves/grown-page commits publish
+    // new project objects while THIS analyzer already owns the fresher live state; keying the effect
+    // to those emissions would tear down tracking every few seconds.
+    val initialMobileGsWallFeatureMap = remember(reference) { mobileGsWallFeatureMap }
+    val initialMobileGsWallFeatureMapFrameVersion =
+        remember(reference) { mobileGsWallFeatureMapFrameVersion }
+    val initialPersistedAtlasPages = remember(reference) { persistedAtlasPages }
+    val atlasReferenceImages by produceState<List<SphereSlamStandaloneAtlasReferenceImage>?>(
+        initialValue = null,
+        initialPersistedAtlasPages,
     ) {
         val expectedFrame =
             com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION
         val loaded = withContext(Dispatchers.IO) {
             val valid = mutableListOf<SphereSlamStandaloneAtlasReferenceImage>()
             val invalid = mutableListOf<Pair<Int, Uri>>()
-            persistedAtlasPages.sortedBy { it.pageNo }.forEach { page ->
+            initialPersistedAtlasPages.sortedBy { it.pageNo }.forEach { page ->
                 if (page.frameVersion != expectedFrame) {
                     invalid += page.pageNo to page.referenceUri
                     return@forEach
@@ -548,7 +555,8 @@ fun SphereSlamStandaloneOverlay(
 
     DisposableEffect(cameraController, cameraId) {
         val id = cameraId
-        if (id == null) {
+        val restoredAtlas = atlasReferenceImages
+        if (id == null || restoredAtlas == null) {
             onDispose {}
         } else {
             val previousPinchToZoom = cameraController.isPinchToZoomEnabled
@@ -569,8 +577,6 @@ fun SphereSlamStandaloneOverlay(
         referenceImage,
         mobileGsFingerprint,
         mobileGsFingerprintFrameVersion,
-        mobileGsWallFeatureMap,
-        mobileGsWallFeatureMapFrameVersion,
         atlasReferenceImages,
     ) {
         val id = cameraId
@@ -584,12 +590,12 @@ fun SphereSlamStandaloneOverlay(
                 context = context,
                 cameraId = id,
                 referenceImage = referenceImage,
-                atlasReferenceImages = atlasReferenceImages,
+                atlasReferenceImages = restoredAtlas,
                 slamManager = slamManager,
                 mobileGsFingerprint = mobileGsFingerprint,
                 mobileGsFingerprintFrameVersion = mobileGsFingerprintFrameVersion,
-                mobileGsWallFeatureMap = mobileGsWallFeatureMap,
-                mobileGsWallFeatureMapFrameVersion = mobileGsWallFeatureMapFrameVersion,
+                mobileGsWallFeatureMap = initialMobileGsWallFeatureMap,
+                mobileGsWallFeatureMapFrameVersion = initialMobileGsWallFeatureMapFrameVersion,
                 onReferenceReady = { registered: SphereSlamStandaloneSession.Reference ->
                     val g = registered.geometry
                     mainHandler.post {
