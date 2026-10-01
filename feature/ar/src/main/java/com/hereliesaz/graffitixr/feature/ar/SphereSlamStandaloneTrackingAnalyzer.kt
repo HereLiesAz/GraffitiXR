@@ -75,7 +75,7 @@ data class SphereSlamStandaloneFrame(
  * rotation delta to the view rotation and translation column, preserving the held camera centre
  * during a pure rotation. It never double-integrates accelerometer values or invents displacement.
  */
-class SphereSlamStandaloneTrackingAnalyzer(
+internal class SphereSlamStandaloneTrackingAnalyzer(
     private val context: Context,
     private val cameraId: String,
     private val referenceImage: SphereSlamStandaloneReferenceImage,
@@ -172,7 +172,6 @@ class SphereSlamStandaloneTrackingAnalyzer(
             val rawIntrinsics = CameraIntrinsicsEstimator.estimate(
                 context,
                 cameraId,
-                cameraTimestampSource.name,
                 rawWidth,
                 rawHeight,
             ) ?: return
