@@ -323,7 +323,8 @@ Remaining:
   explicit GL-thread clear command instead of leaving the previous texture resident.
 - [x] Verify rapid clear/replace ordering with a single-slot atomic texture-command mailbox; unit
   tests prove the latest clear or replacement wins.
-- [ ] Verify design aspect changes recalculate base extent without resetting user adjustment.
+- [x] Verify design aspect changes recalculate only the tested aspect-fit base extent; user
+  pan/scale/rotation remain in the separate persisted ModeAdjustment.
 - [ ] Confirm touch/gesture coordinates still line up when CameraX preview is letterboxed/cropped.
 - [ ] Add GL/instrumentation tests for standalone texture clear/replace if test infrastructure permits.
 - [ ] Test extreme but allowed pan/scale/rotation values for NaN/overflow/clipping behavior.
