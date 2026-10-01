@@ -17,8 +17,10 @@ class ArRailBackendPolicyTest {
         assertFalse(p.backendResolved)
         assertFalse(p.targetRailEnabled)
         assertFalse(p.coopCalibrationAvailable)
+        assertFalse(p.modePreviewExportAvailable)
         assertNotNull(p.targetDisabledReason)
         assertNotNull(p.coopDisabledReason)
+        assertNotNull(p.exportDisabledReason)
     }
 
     @Test
@@ -31,8 +33,10 @@ class ArRailBackendPolicyTest {
         assertFalse(p.standalone)
         assertTrue(p.targetRailEnabled)
         assertTrue(p.coopCalibrationAvailable)
+        assertTrue(p.modePreviewExportAvailable)
         assertNull(p.targetDisabledReason)
         assertNull(p.coopDisabledReason)
+        assertNull(p.exportDisabledReason)
     }
 
     @Test
@@ -45,7 +49,9 @@ class ArRailBackendPolicyTest {
         assertTrue(p.standalone)
         assertFalse(p.targetRailEnabled)
         assertFalse(p.coopCalibrationAvailable)
+        assertFalse(p.modePreviewExportAvailable)
         assertTrue(p.targetDisabledReason!!.contains("Wall Target"))
         assertTrue(p.coopDisabledReason!!.contains("ARCore calibration"))
+        assertTrue(p.exportDisabledReason!!.contains("not implemented"))
     }
 }
