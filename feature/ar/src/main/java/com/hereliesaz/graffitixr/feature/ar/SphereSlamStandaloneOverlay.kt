@@ -327,6 +327,27 @@ fun SphereSlamStandaloneOverlay(
         }
     }
 
+    // CameraController implements pinch-to-camera-zoom itself. That would change the effective
+    // intrinsics behind KPM while GraffitiXR's own pinch gesture is supposed to scale the artwork.
+    // Keep the standalone camera calibrated at 1x for this composition only, and restore the shared
+    // controller state when leaving standalone AR.
+    DisposableEffect(cameraController, cameraId) {
+        val id = cameraId
+        if (id == null) {
+            onDispose {}
+        } else {
+            val previousPinchToZoom = cameraController.isPinchToZoomEnabled
+            val previousZoomRatio = cameraController.zoomState.value?.zoomRatio ?: 1f
+            cameraController.setPinchToZoomEnabled(false)
+            cameraController.cameraControl?.setZoomRatio(1f)
+
+            onDispose {
+                cameraController.setPinchToZoomEnabled(previousPinchToZoom)
+                cameraController.cameraControl?.setZoomRatio(previousZoomRatio)
+            }
+        }
+    }
+
     DisposableEffect(cameraController, cameraId, referenceImage) {
         val id = cameraId
         if (id == null) {

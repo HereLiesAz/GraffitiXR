@@ -120,10 +120,13 @@ Remaining:
   - [ ] 4:3 sensor → landscape display;
   - [ ] 16:9/other cropped CameraX stream;
   - [ ] front camera if the app ever allows it; otherwise explicitly lock standalone AR to back camera.
-- [ ] Verify CameraX crop/zoom does not invalidate the intrinsics used by KPM.
+- [x] Prevent CameraX crop/zoom from invalidating the intrinsics used by KPM for the supported
+  standalone path: apply ImageProxy crop explicitly and lock camera zoom at 1x while tracking.
   - [x] Apply `ImageProxy.cropRect` to the luma pixels before rotation.
   - [x] Shift `cx/cy` by the crop origin before rotating intrinsics.
-  - [ ] Verify/handle effective intrinsics if CameraX digital zoom changes the sensor crop/scale.
+  - [x] Prevent CameraX digital zoom from changing standalone calibration: standalone AR disables
+    CameraController pinch-to-zoom and resets the camera to 1x while active, restoring the shared
+    controller's previous zoom behavior on exit.
 - [x] If CameraX applies an ImageProxy crop region, incorporate that crop into `fx/fy/cx/cy`.
 - [ ] Verify lens distortion is acceptable with the current zero-distortion KPM camera model.
 - [ ] If not, populate artoolkitX distortion parameters from Camera2 calibration metadata or undistort

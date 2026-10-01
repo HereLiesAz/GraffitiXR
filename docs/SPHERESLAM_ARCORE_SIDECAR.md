@@ -67,6 +67,8 @@ This branch now has a first functional Mode B path as well as Mode A:
   rotated into display orientation;
 - Camera2 intrinsics are shifted by the same crop origin and rotated through the same display
   transform as the pixels;
+- CameraController pinch-to-zoom is disabled and camera zoom is reset to 1x while standalone
+  tracking is active, so KPM calibration cannot be invalidated by an unmodeled digital zoom;
 - a rectified wall target becomes a calibrated KPM reference page;
 - KPM's camera-from-page 3x4 is converted with artoolkitX's own right-handed OpenGL convention;
 - the KPM lower-left page frame is shifted to a centered renderer frame;
