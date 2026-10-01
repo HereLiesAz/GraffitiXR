@@ -25,6 +25,7 @@ import com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
 import com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
 import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder
+import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintFrame
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
@@ -1151,7 +1152,13 @@ class ArViewModel @Inject constructor(
                         sphereSlamFingerprintFrameVersion =
                             project?.sphereSlamFingerprintFrameVersion
                                 ?: com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                        sphereSlamWallFeatureMap = project?.sphereSlamWallFeatureMap,
+                        sphereSlamWallFeatureMapFrameVersion =
+                            project?.sphereSlamWallFeatureMapFrameVersion
+                                ?: com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                     )
+                    lastStandaloneSavedMapPointCount =
+                        project?.sphereSlamWallFeatureMap?.pointCount ?: 0
                 }
                 if (project != null) {
                     loadedProjectId = project.id
@@ -1993,6 +2000,11 @@ class ArViewModel @Inject constructor(
                             sphereSlamFingerprint = standaloneFingerprint,
                             sphereSlamFingerprintFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                            // A new canonical page is a new standalone object frame. Never carry a
+                            // grown map across that boundary, even when the raw coordinates look sane.
+                            sphereSlamWallFeatureMap = null,
+                            sphereSlamWallFeatureMapFrameVersion =
+                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                         )
                     }
                 }
@@ -2099,6 +2111,9 @@ class ArViewModel @Inject constructor(
                             // after the page is gone would let a later standalone runtime restore a
                             // coordinate frame it can no longer reconstruct or verify.
                             sphereSlamFingerprint = null,
+                            sphereSlamWallFeatureMap = null,
+                            sphereSlamWallFeatureMapFrameVersion =
+                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                         )
                     }
                 }
@@ -3300,6 +3315,9 @@ class ArViewModel @Inject constructor(
 
     @Volatile private var lastStandaloneGuideKey: String? = null
     @Volatile private var lastStandaloneNativeUiUpdateMs: Long = Long.MIN_VALUE
+    @Volatile private var lastStandaloneSavedMapPointCount: Int = 0
+    @Volatile private var lastStandaloneMapSaveMs: Long = Long.MIN_VALUE
+    private val standaloneMapSaveInFlight = AtomicBoolean(false)
 
     /**
      * Register the artwork validator for the ARCore-independent MobileGS path.
@@ -3359,6 +3377,8 @@ class ArViewModel @Inject constructor(
         val reloc = slamManager.getRelocDiagnostics()
         val corrob = slamManager.getCorroborationDiagnostics()
         val wallPoints = slamManager.getWallKeypointCount()
+        val mapPoints = slamManager.getMapPointCount()
+        maybePersistStandaloneWallFeatureMap(now, mapPoints)
 
         _uiState.update { state ->
             state.copy(
@@ -3370,6 +3390,63 @@ class ArViewModel @Inject constructor(
                 corroborationDiagnostics = corrob,
                 wallFingerprintPoints = wallPoints,
             )
+        }
+    }
+
+    private fun maybePersistStandaloneWallFeatureMap(nowMs: Long, mapPointCount: Int) {
+        if (mapPointCount <= 0 || mapPointCount == lastStandaloneSavedMapPointCount) return
+        if (
+            lastStandaloneMapSaveMs != Long.MIN_VALUE &&
+            nowMs - lastStandaloneMapSaveMs < STANDALONE_MAP_SAVE_INTERVAL_MS
+        ) return
+        val startingProject = projectRepository.currentProject.value ?: return
+        val referenceUri = startingProject.sphereSlamReferenceUri ?: return
+        if (startingProject.sphereSlamFingerprint == null) return
+        if (!standaloneMapSaveInFlight.compareAndSet(false, true)) return
+
+        viewModelScope.launch(dispatchers.io) {
+            try {
+                val map = slamManager.getWallFeatureMap() ?: return@launch
+                if (!StandaloneFingerprintFrame.isCenteredPageAnchor(map.anchor)) {
+                    appendDiag(
+                        "SphereSLAM standalone map save refused: native map anchor is not centered-page identity",
+                    )
+                    return@launch
+                }
+                var committed = false
+                projectRepository.updateProject { current ->
+                    if (
+                        current.id != startingProject.id ||
+                        current.sphereSlamReferenceUri != referenceUri ||
+                        current.sphereSlamFingerprint == null
+                    ) {
+                        current
+                    } else {
+                        committed = true
+                        current.copy(
+                            sphereSlamWallFeatureMap = map,
+                            sphereSlamWallFeatureMapFrameVersion =
+                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                        )
+                    }
+                }
+                if (committed) {
+                    lastStandaloneSavedMapPointCount = map.pointCount
+                    lastStandaloneMapSaveMs = android.os.SystemClock.elapsedRealtime()
+                    appendDiag(
+                        "SphereSLAM MobileGS map saved frame=centered-page " +
+                            "version=" +
+                            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION +
+                            " points=" + map.pointCount,
+                    )
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to persist standalone SphereSLAM wall map")
+            } finally {
+                standaloneMapSaveInFlight.set(false)
+            }
         }
     }
 
@@ -3750,6 +3827,7 @@ class ArViewModel @Inject constructor(
          * the user staring at a dead camera; giving up after retries still leaves them informed via
          * [_feedback] rather than silently stuck.
          */
+        private const val STANDALONE_MAP_SAVE_INTERVAL_MS = 2_000L
         const val LOCK_TIMEOUT_MAX_RETRIES = 3
         const val LOCK_TIMEOUT_RETRY_DELAY_MS = 200L
     }
