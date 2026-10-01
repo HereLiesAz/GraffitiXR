@@ -603,27 +603,33 @@ thread count, and temperature.
 
 Remaining:
 
-- [ ] Distinguish:
-  - [ ] native library unavailable;
-  - [ ] camera unavailable;
-  - [ ] intrinsics unavailable;
-  - [ ] reference too weak;
-  - [ ] no current page match;
-  - [ ] stale observation;
-  - [ ] excessive reprojection error;
-  - [ ] insufficient inliers;
-  - [ ] persisted target missing/corrupt.
-- [ ] Surface concise artist-facing messages for recoverable failures.
-- [ ] Keep detailed numeric reasons in diagnostics/logs.
-- [ ] Add one-copy diagnostic dump that includes backend, camera calibration, KPM state, page ID,
-  inliers, reprojection error, observation age, and physical-scale status.
+- [x] Distinguish:
+  - [x] native library unavailable;
+  - [x] camera unavailable (including a 5-second camera-ID acquisition timeout instead of an
+    infinite Preparing state);
+  - [x] intrinsics unavailable;
+  - [x] reference too weak;
+  - [x] no current page match;
+  - [x] stale observation;
+  - [x] excessive reprojection error;
+  - [x] insufficient inliers;
+  - [x] persisted target missing/corrupt;
+  - [x] catastrophic/non-finite pose continuity rejection.
+- [x] Surface concise artist-facing messages for recoverable/transient failures without turning
+  ordinary visual misses into fatal modals.
+- [x] Keep detailed numeric reasons in diagnostics/logs, including inliers, reprojection error,
+  observation age, match duration, camera calibration, and weak-reference feature counts.
+- [x] Add one-copy diagnostic dump from standalone failure/reacquisition UI with backend, camera
+  calibration, KPM state, page ID, inliers, reprojection error, observation age, match duration,
+  physical-scale status, and current failure detail.
 - [ ] Verify permission revocation while standalone AR is open.
 - [ ] Verify camera interruption by another app.
 - [ ] Verify app background/foreground during LOCKED, IMU_BRIDGE, and REACQUIRING states.
-- [ ] Verify process death during target persistence cannot leave a truncated/half-installed
-  canonical target.
-- [ ] Verify a missing native KPM build degrades with a clear unsupported-build message, not an
-  infinite spinner.
+- [x] Verify process-death boundaries for target persistence: an uncommitted candidate cannot
+  replace the old reference, while committed metadata remains authoritative even if old-file cleanup
+  had not yet run.
+- [x] Missing native KPM linkage is classified as NATIVE_LIBRARY_UNAVAILABLE and surfaces the
+  explicit unsupported-build message instead of a generic tracking failure.
 
 ---
 
