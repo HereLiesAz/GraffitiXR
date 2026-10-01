@@ -38,8 +38,9 @@ class CoopPeerWallPoseTest {
         reloc[17] = 30f
         reloc[18] = 3f
 
-        val solved = assertNotNull(CoopPeerWallPoseSolver.solve(reloc, spatial(fingerprintFromWall)))
-            .let { requireNotNull(it) }
+        val maybeSolved = CoopPeerWallPoseSolver.solve(reloc, spatial(fingerprintFromWall))
+        assertNotNull(maybeSolved)
+        val solved = requireNotNull(maybeSolved)
         val expected = PoseMath.multiply(
             MetricMarks.glViewToCv(pnpCv),
             fingerprintFromWall,
