@@ -288,6 +288,7 @@ class ArViewModelTest {
             sphereSlamReferenceUri = oldUri,
             sphereSlamReferenceWidthMeters = 1f,
             sphereSlamReferencePhysicallyMetric = false,
+            sphereSlamAnchorGeneration = 7L,
         )
         val flow = MutableStateFlow<com.hereliesaz.graffitixr.common.model.GraffitiProject?>(project)
         every { projectRepository.currentProject } returns flow
@@ -313,6 +314,11 @@ class ArViewModelTest {
         assertEquals(newUri, updated.sphereSlamReferenceUri)
         assertEquals(2.5f, updated.sphereSlamReferenceWidthMeters, 0f)
         assertTrue(updated.sphereSlamReferencePhysicallyMetric)
+        assertEquals(8L, updated.sphereSlamAnchorGeneration)
+        assertEquals(
+            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+            updated.sphereSlamAnchorFrameVersion,
+        )
         coVerify {
             projectManager.deleteSphereSlamReference(context, "slam", oldUri)
         }
@@ -422,6 +428,7 @@ class ArViewModelTest {
             sphereSlamReferenceUri = uri,
             sphereSlamReferenceWidthMeters = 2.5f,
             sphereSlamReferencePhysicallyMetric = true,
+            sphereSlamAnchorGeneration = 11L,
         )
         val flow = MutableStateFlow<com.hereliesaz.graffitixr.common.model.GraffitiProject?>(project)
         every { projectRepository.currentProject } returns flow
@@ -445,6 +452,7 @@ class ArViewModelTest {
         assertNull(updated.sphereSlamReferenceUri)
         assertEquals(1f, updated.sphereSlamReferenceWidthMeters, 0f)
         assertFalse(updated.sphereSlamReferencePhysicallyMetric)
+        assertEquals(12L, updated.sphereSlamAnchorGeneration)
         assertEquals("Wall", updated.name)
         coVerify {
             projectManager.deleteSphereSlamReference(context, "slam", uri)
