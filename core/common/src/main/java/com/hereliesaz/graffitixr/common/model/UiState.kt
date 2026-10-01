@@ -226,6 +226,9 @@ data class ArUiState(
     val sphereSlamReferenceUri: Uri? = null,
     val sphereSlamReferenceWidthMeters: Float = 1f,
     val sphereSlamReferencePhysicallyMetric: Boolean = false,
+    val sphereSlamAnchorGeneration: Long = 0L,
+    val sphereSlamAnchorFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+    val sphereSlamPlacementAnchorGeneration: Long = 0L,
     // Separate from the ARCore/capture-camera fingerprint; see GraffitiProject.sphereSlamFingerprint.
     val sphereSlamFingerprint: Fingerprint? = null,
     val sphereSlamFingerprintFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
