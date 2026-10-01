@@ -229,8 +229,11 @@ Remaining:
   aborted/project-switched recaptures delete their uncommitted candidate instead.
 - [x] Add project/data tests for legacy projects without standalone fields, versioned reference
   write/delete lifecycle, and import URI relocation with standalone scale metadata.
-- [ ] Add a full repository-level save/load replacement-race test for standalone target metadata.
-- [ ] Add process-death restoration test.
+- [x] Add repository/viewmodel replacement-race tests: URI + width + metric flag commit together,
+  a competing recapture wins without being deleted, and an uncommitted candidate is cleaned up.
+- [x] Add process-death boundary tests: before metadata commit the old reference remains
+  authoritative; after metadata commit the new reference remains authoritative even if old-file
+  cleanup has not happened yet.
 
 **ACCEPTANCE:** an artist can create, review, save, reopen, replace, export, import, and reacquire a
 standalone wall target without touching an ARCore-specific UI dead end.
