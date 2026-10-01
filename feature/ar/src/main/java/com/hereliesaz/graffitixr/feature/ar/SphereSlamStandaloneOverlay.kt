@@ -82,6 +82,7 @@ fun SphereSlamStandaloneOverlay(
     onReferenceCaptured: (Bitmap, Float, Boolean) -> Unit = { _, _, _ -> },
     adjustment: ModeAdjustment? = null,
     onUnitsPerPixel: (Float) -> Unit = {},
+    onDiagnostic: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -367,6 +368,9 @@ fun SphereSlamStandaloneOverlay(
                         referenceHeightUnits = g.heightMeters
                         referenceReady = true
                     }
+                },
+                onDiagnostic = { text ->
+                    mainHandler.post { onDiagnostic(text) }
                 },
                 onFrameTracked = { frame ->
                     // Renderer state is atomic/volatile and intentionally updated directly from the

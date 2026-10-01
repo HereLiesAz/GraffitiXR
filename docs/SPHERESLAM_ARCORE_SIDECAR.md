@@ -318,6 +318,12 @@ final shared-library link. The continuation branch mirrors upstream ARUtil's bun
 support sources and links NDK zlib. Keep this CI path enabled; otherwise native KPM regressions can
 silently pass normal builds that never initialize the submodule.
 
+## Standalone calibration diagnostics
+
+Whenever the effective CameraX calibration changes, the standalone analyzer emits one line through
+the existing AR diagnostic log with camera ID, raw/crop/display dimensions, display rotation, and
+`fx/fy/cx/cy`. It deliberately does not log every frame.
+
 ## Lifecycle
 
 The `SphereSlamTracker` lifetime follows `ArRenderer`.

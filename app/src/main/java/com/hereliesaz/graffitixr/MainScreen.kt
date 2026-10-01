@@ -179,6 +179,7 @@ fun MainScreen(
                             },
                             adjustment = standaloneAdj,
                             onUnitsPerPixel = { standaloneArUnitsPerPixel = it },
+                            onDiagnostic = { text -> arViewModel.appendDiag(text) },
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {

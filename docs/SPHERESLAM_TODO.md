@@ -143,8 +143,8 @@ Remaining:
 - [ ] Verify lens distortion is acceptable with the current zero-distortion KPM camera model.
 - [ ] If not, populate artoolkitX distortion parameters from Camera2 calibration metadata or undistort
   frames before KPM.
-- [ ] Add a diagnostic line exposing standalone frame width/height, rotation, fx/fy/cx/cy, and
-  camera ID for field bug reports.
+- [x] Add a diagnostic line exposing standalone camera ID, raw/crop/display frame dimensions,
+  rotation, and fx/fy/cx/cy for field bug reports. It emits only when effective calibration changes.
 - [ ] Test display rotation while tracking; ensure session rebuild/recalibration happens if required.
 - [ ] Test device auto-rotate disabled and confirm image/intrinsic orientation remains internally
   consistent.

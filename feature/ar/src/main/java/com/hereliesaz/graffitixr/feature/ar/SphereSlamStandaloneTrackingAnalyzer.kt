@@ -76,10 +76,27 @@ class SphereSlamStandaloneTrackingAnalyzer(
     private val referenceImage: SphereSlamStandaloneReferenceImage,
     private val onFrameTracked: (SphereSlamStandaloneFrame?) -> Unit,
     private val onReferenceReady: (SphereSlamStandaloneSession.Reference) -> Unit = {},
+    private val onDiagnostic: (String) -> Unit = {},
     private val onFatalError: (Throwable) -> Unit = {},
     private val bridge: GyroOrientationBridge = GyroOrientationBridge(context),
     private val maxBridgeMs: Long = 400L,
 ) : ImageAnalysis.Analyzer, AutoCloseable {
+
+    private data class DiagnosticKey(
+        val rawWidth: Int,
+        val rawHeight: Int,
+        val cropLeft: Int,
+        val cropTop: Int,
+        val cropWidth: Int,
+        val cropHeight: Int,
+        val rotationDegrees: Int,
+        val displayWidth: Int,
+        val displayHeight: Int,
+        val fx: Float,
+        val fy: Float,
+        val cx: Float,
+        val cy: Float,
+    )
 
     private data class SessionKey(
         val width: Int,
@@ -92,6 +109,7 @@ class SphereSlamStandaloneTrackingAnalyzer(
 
     private var session: SphereSlamStandaloneSession? = null
     private var sessionKey: SessionKey? = null
+    private var lastDiagnosticKey: DiagnosticKey? = null
     private var lastGood: SphereSlamStandaloneFrame? = null
     private var frameBuffer: ByteBuffer? = null
     @Volatile private var closed = false
@@ -156,6 +174,16 @@ class SphereSlamStandaloneTrackingAnalyzer(
                 width = rotated.width,
                 height = rotated.height,
             )
+            emitCalibrationDiagnosticIfChanged(
+                rawWidth = rawWidth,
+                rawHeight = rawHeight,
+                cropLeft = crop.left,
+                cropTop = crop.top,
+                cropWidth = crop.width(),
+                cropHeight = crop.height(),
+                rotationDegrees = rotationDeg,
+                intrinsics = intrinsics,
+            )
 
             val active = ensureSession(intrinsics)
             val pendingImuReference = bridge.captureReferenceCandidate(rotationDeg)
@@ -197,6 +225,55 @@ class SphereSlamStandaloneTrackingAnalyzer(
         } finally {
             image.close()
         }
+    }
+
+    private fun emitCalibrationDiagnosticIfChanged(
+        rawWidth: Int,
+        rawHeight: Int,
+        cropLeft: Int,
+        cropTop: Int,
+        cropWidth: Int,
+        cropHeight: Int,
+        rotationDegrees: Int,
+        intrinsics: CameraIntrinsics,
+    ) {
+        val key = DiagnosticKey(
+            rawWidth = rawWidth,
+            rawHeight = rawHeight,
+            cropLeft = cropLeft,
+            cropTop = cropTop,
+            cropWidth = cropWidth,
+            cropHeight = cropHeight,
+            rotationDegrees = rotationDegrees,
+            displayWidth = intrinsics.width,
+            displayHeight = intrinsics.height,
+            fx = intrinsics.fx,
+            fy = intrinsics.fy,
+            cx = intrinsics.cx,
+            cy = intrinsics.cy,
+        )
+        if (key == lastDiagnosticKey) return
+        lastDiagnosticKey = key
+        onDiagnostic(
+            java.lang.String.format(
+                java.util.Locale.US,
+                "SphereSLAM standalone camera=%s raw=%dx%d crop=(%d,%d %dx%d) display=%dx%d rot=%d fx=%.2f fy=%.2f cx=%.2f cy=%.2f",
+                cameraId,
+                rawWidth,
+                rawHeight,
+                cropLeft,
+                cropTop,
+                cropWidth,
+                cropHeight,
+                intrinsics.width,
+                intrinsics.height,
+                rotationDegrees,
+                intrinsics.fx,
+                intrinsics.fy,
+                intrinsics.cx,
+                intrinsics.cy,
+            ),
+        )
     }
 
     private fun ensureSession(intrinsics: CameraIntrinsics): SphereSlamStandaloneSession {
@@ -300,6 +377,7 @@ class SphereSlamStandaloneTrackingAnalyzer(
         session?.close()
         session = null
         sessionKey = null
+        lastDiagnosticKey = null
         frameBuffer = null
     }
 }
