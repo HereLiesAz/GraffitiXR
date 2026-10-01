@@ -1141,6 +1141,8 @@ class ArViewModel @Inject constructor(
         }
         viewModelScope.launch {
             projectRepository.currentProject.collect { project ->
+                lastStandaloneSavedMapPointCount =
+                    project?.sphereSlamWallFeatureMap?.pointCount ?: 0
                 _uiState.update {
                     it.copy(
                         sphereSlamReferenceUri = project?.sphereSlamReferenceUri,
@@ -1157,8 +1159,6 @@ class ArViewModel @Inject constructor(
                             project?.sphereSlamWallFeatureMapFrameVersion
                                 ?: com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                     )
-                    lastStandaloneSavedMapPointCount =
-                        project?.sphereSlamWallFeatureMap?.pointCount ?: 0
                 }
                 if (project != null) {
                     loadedProjectId = project.id
