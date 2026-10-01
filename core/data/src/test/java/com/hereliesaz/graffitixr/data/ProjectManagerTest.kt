@@ -309,6 +309,83 @@ class ProjectManagerTest {
         assertEquals(30, targetFiles?.size ?: -1)
     }
 
+
+    // --- Standalone SphereSLAM reference persistence ---
+
+    @Test
+    fun `SphereSLAM reference writes are versioned and cleanup is project scoped`() = runTest {
+        val bitmap = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
+
+        val first = manager.saveSphereSlamReference(mockContext, "slam_project", bitmap)
+        val second = manager.saveSphereSlamReference(mockContext, "slam_project", bitmap)
+
+        val firstFile = File(requireNotNull(first.path))
+        val secondFile = File(requireNotNull(second.path))
+        assertTrue(firstFile.name.startsWith("sphereslam_reference_"))
+        assertTrue(firstFile.name.endsWith(".png"))
+        assertTrue(secondFile.name.startsWith("sphereslam_reference_"))
+        assertTrue(firstFile.name != secondFile.name)
+        assertTrue(firstFile.exists())
+        assertTrue(secondFile.exists())
+
+        manager.deleteSphereSlamReference(mockContext, "slam_project", first)
+        assertFalse(firstFile.exists())
+        assertTrue(secondFile.exists())
+
+        val outside = File(tempFilesDir, "sphereslam_reference_outside.png").apply {
+            writeBytes(byteArrayOf(1, 2, 3))
+        }
+        manager.deleteSphereSlamReference(mockContext, "slam_project", Uri.fromFile(outside))
+        assertTrue("cleanup must not escape the project directory", outside.exists())
+    }
+
+    @Test
+    fun `SphereSLAM cleanup accepts the legacy fixed reference filename`() = runTest {
+        val root = File(tempFilesDir, "projects/legacy_slam").also { it.mkdirs() }
+        val legacy = File(root, "sphereslam_reference.png").apply {
+            writeBytes(byteArrayOf(1, 2, 3))
+        }
+
+        manager.deleteSphereSlamReference(mockContext, "legacy_slam", Uri.fromFile(legacy))
+
+        assertFalse(legacy.exists())
+    }
+
+    @Test
+    fun `legacy project without SphereSLAM fields gets safe standalone defaults`() = runTest {
+        val projectDir = File(tempFilesDir, "projects/pre_slam").also { it.mkdirs() }
+        File(projectDir, "project.json").writeText(
+            """{"id":"pre_slam","name":"Old project"}""",
+        )
+
+        val loaded = manager.loadProjectMetadata(mockContext, "pre_slam")
+
+        assertNull(loaded?.sphereSlamReferenceUri)
+        assertEquals(1f, loaded?.sphereSlamReferenceWidthMeters ?: 0f, 0f)
+        assertFalse(loaded?.sphereSlamReferencePhysicallyMetric ?: true)
+    }
+
+    @Test
+    fun `import rebases versioned SphereSLAM reference URI`() = runTest {
+        val manifest =
+            """{"id":"slam_import","name":"Wall","sphereSlamReferenceUri":"file:///sender/files/projects/slam_import/sphereslam_reference_abc.png","sphereSlamReferenceWidthMeters":2.5,"sphereSlamReferencePhysicallyMetric":true}"""
+                .toByteArray()
+        val imported = importZip(
+            zipOf(
+                "project.json" to manifest,
+                "sphereslam_reference_abc.png" to byteArrayOf(1, 2, 3, 4),
+            ),
+        )
+
+        val reference = imported?.sphereSlamReferenceUri?.path?.let(::File)
+        assertEquals(
+            File(tempFilesDir, "projects/slam_import/sphereslam_reference_abc.png").canonicalFile,
+            reference?.canonicalFile,
+        )
+        assertEquals(2.5f, imported?.sphereSlamReferenceWidthMeters ?: 0f, 0f)
+        assertTrue(imported?.sphereSlamReferencePhysicallyMetric == true)
+    }
+
     // --- Zip extraction temp-file cleanup (duplicate entry names) ---
 
     @Test
