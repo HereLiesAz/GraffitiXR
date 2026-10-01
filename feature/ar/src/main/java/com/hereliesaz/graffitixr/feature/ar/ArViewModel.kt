@@ -1135,6 +1135,7 @@ class ArViewModel @Inject constructor(
                             project?.sphereSlamReferenceWidthMeters ?: 1f,
                         sphereSlamReferencePhysicallyMetric =
                             project?.sphereSlamReferencePhysicallyMetric ?: false,
+                        sphereSlamFingerprint = project?.sphereSlamFingerprint,
                     )
                 }
                 if (project != null) {
@@ -1445,6 +1446,12 @@ class ArViewModel @Inject constructor(
                 "ambientScan=${_uiState.value.ambientScanEnabled} sessionExists=${session != null}"
         )
         if (enabled) {
+            // Standalone SphereSLAM uses the same native MobileGS instance but installs a page-frame
+            // fingerprint into it. Force the normal ARCore fingerprint loader to touch native again
+            // on ARCore entry even when the project id/value itself did not change.
+            loadedFingerprint = null
+            loadFingerprintIfExists()
+
             val now = System.currentTimeMillis()
             arEntryTimestampMs = now
             lastTrackingTimestampMs = now

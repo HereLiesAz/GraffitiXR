@@ -218,6 +218,8 @@ fun MainScreen(
                         com.hereliesaz.graffitixr.feature.ar.SphereSlamStandaloneOverlay(
                             cameraController = cameraController,
                             designBitmap = standaloneTexture,
+                            slamManager = slamManager,
+                            mobileGsFingerprint = arUiState.sphereSlamFingerprint,
                             persistedReferenceUri = arUiState.sphereSlamReferenceUri,
                             persistedReferenceWidthMeters = arUiState.sphereSlamReferenceWidthMeters,
                             persistedReferencePhysicallyMetric =

@@ -44,7 +44,9 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.viewinterop.AndroidView
+import com.hereliesaz.graffitixr.common.model.Fingerprint
 import com.hereliesaz.graffitixr.common.model.ModeAdjustment
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import com.hereliesaz.graffitixr.design.theme.rememberAppStrings
 import com.hereliesaz.graffitixr.feature.ar.rendering.HomographyOverlayRenderer
@@ -82,6 +84,8 @@ private val SPHERESLAM_DEFAULT_UNWARP_POINTS = listOf(
 fun SphereSlamStandaloneOverlay(
     cameraController: LifecycleCameraController,
     designBitmap: Bitmap?,
+    slamManager: SlamManager,
+    mobileGsFingerprint: Fingerprint? = null,
     persistedReferenceUri: Uri? = null,
     persistedReferenceWidthMeters: Float = 1f,
     persistedReferencePhysicallyMetric: Boolean = false,
@@ -462,7 +466,7 @@ fun SphereSlamStandaloneOverlay(
         }
     }
 
-    DisposableEffect(cameraController, cameraId, referenceImage) {
+    DisposableEffect(cameraController, cameraId, referenceImage, mobileGsFingerprint) {
         val id = cameraId
         if (id == null) {
             onDispose {}
@@ -474,6 +478,8 @@ fun SphereSlamStandaloneOverlay(
                 context = context,
                 cameraId = id,
                 referenceImage = referenceImage,
+                slamManager = slamManager,
+                mobileGsFingerprint = mobileGsFingerprint,
                 onReferenceReady = { registered: SphereSlamStandaloneSession.Reference ->
                     val g = registered.geometry
                     mainHandler.post {
