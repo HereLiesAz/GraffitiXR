@@ -20,9 +20,11 @@ editor holds at most one) chosen/replaced in **Design**; every other mode is a *
 design, carrying its own **mode adjustment** (position/tone applied to the whole design for that
 lens only). AR mode has two backends: ARCore-supported devices keep the existing ARCore +
 MobileGS/fingerprint path; ARCore-unavailable devices use CameraX + SphereSLAM/KPM to register the
-design to a captured wall page. The standalone path persists/rebuilds that KPM target but does not
-yet feed its page frame into MobileGS, so teleological fingerprint/self-grow parity is still an
-explicit backend gap. Nothing touches the network unless you explicitly start a **co-op** session.
+design to a captured wall page. The standalone path uses the same centered KPM wall frame for
+MobileGS, self-grow, the persistent feature map, and a bounded multi-page atlas; ARCore-only
+depth/planes/anchors are replaced or explicitly unavailable rather than emulated.
+ ARCore and standalone AR adjustments are persisted separately because their wall coordinate frames
+are deliberately not assumed equivalent before hybrid/cross-backend calibration. Nothing touches the network unless you explicitly start a **co-op** session.
 
 ---
 
@@ -47,11 +49,15 @@ adjustment/anchoring lens is active.
 | Continuous pose | ARCore | calibrated SphereSLAM/KPM page match |
 | Short visual miss | ARCore tracking/fusion | rotation-only IMU bridge, max 400 ms |
 | Persisted wall target | ARCore target/fingerprint data | versioned rectified SphereSLAM reference PNG + width/metric metadata |
-| MobileGS fingerprint / self-grow | existing path | **not wired yet**; page↔fingerprint frame bridge is required first |
+| MobileGS fingerprint / self-grow | existing path | centered-page fingerprint + self-grow + separately persisted wall map |
+| Wall extent | ARCore planes / hit tests / depth where available | canonical KPM page/atlas; screen hits use calibrated ray→z=0 wall intersection |
+| Depth / distance | ARCore depth / proved hardware stereo / triangulated depth | unavailable; normalized KPM scale is never presented as depth |
+| Anchor object | local ARCore `Anchor` + fusion | canonical centered wall frame + persisted generation/version |
+| Perception debug | ARCore planes, feature points, accumulated scan cloud | KPM page/inliers/reprojection error/age/match-time/tracking-state diagnostics |
 | Target rail action | ARCore tap-to-target flow | disabled; use the on-screen **Wall Target** capture |
 | Co-op Host/Join | existing ARCore coordinate-frame path | disabled until standalone↔peer calibration exists |
 | AR preview export | composited GL framebuffer | disabled until CameraX + transparent GL can be composited correctly |
-| Pan/scale/rotation/tone/lock | supported | supported through the same persisted `ModeAdjustment[AR]` |
+| Pan/scale/rotation/tone/lock | `modeAdjustments[AR]` | `sphereSlamModeAdjustment`; the same controls/undo UI swap to the active backend's persisted adjustment, and standalone spatial placement is generation-bound to its canonical wall |
 
 A normalized standalone target width gives self-consistent registration but is **not physical metres**.
 Physical distance/size claims are valid only when the captured target width was explicitly measured.
@@ -104,7 +110,9 @@ the further along the painting, the tighter the teleological lock — see §6.
 `CycleRotationAxis` intent advances it. A `RotationAxisFeedback` overlay shows the current axis.
 
 **Tap-to-distance:** the reticle + distance chips light up when `(isHardwareStereoActive || currentCenterDepth > 0f)`
-— i.e. on devices exposing hardware stereo depth or a valid triangulated centre depth. (Renamed from
+on the ARCore backend — i.e. on devices exposing proved hardware stereo depth or a valid
+triangulated centre depth. Standalone SphereSLAM explicitly clears these flags and does not turn KPM
+page scale into a distance. (Renamed from
 `isDualLensActive`: the old flag lit as soon as the software-stereo path's buffers allocated, advertising
 depth on devices that had none; `StereoDepthProvider`/`StereoProcessor` were removed and the flag collapsed
 into `isHardwareStereoActive`, the only one that was ever real.)
@@ -450,9 +458,11 @@ Deutsch, Italiano, 日本語, Português, Magyar, Español, 简体中文, 繁體
 Provider-based abstraction (`GlassesSessionState`, `Xreal*Provider`) targeting **Meta Ray-Bans** and
 **Xreal Air/Ultra**. ~640 LOC of overlays + calibration exist.
 
-**Status (deferred):** `glassesWorldHitForTimestamp` currently hit-tests the same phone-screen point for
-source and destination, so Procrustes alignment returns identity. A real fix needs a glasses-side world
-lookup (substantial native/SDK integration). Treat glasses support as experimental until that lands.
+**Status (deferred):** on ARCore, `glassesWorldHitForTimestamp` currently hit-tests the same
+phone-screen point for source and destination, so Procrustes alignment returns identity. A real fix
+needs a glasses-side world lookup (substantial native/SDK integration). Standalone refuses wearable
+calibration before entering the ARCore hit-test path; cross-backend calibration belongs to the
+co-op/wearable calibration work rather than pretending the page frame is already the glasses frame.
 
 ---
 

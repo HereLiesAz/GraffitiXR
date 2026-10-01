@@ -56,6 +56,32 @@ import androidx.core.net.toUri
  * tracing specifically: an outline is the form you trace, and isolation removes a background that
  * would otherwise be projected onto the wall.
  */
+internal fun ModeAdjustment.withoutSpatialPlacement(): ModeAdjustment = copy(
+    offsetX = 0f,
+    offsetY = 0f,
+    scale = 1f,
+    rotation = 0f,
+    rotationX = 0f,
+    rotationY = 0f,
+    isTransformLocked = false,
+)
+
+internal fun standaloneArAdjustmentForProject(project: GraffitiProject): ModeAdjustment? {
+    val saved =
+        project.sphereSlamModeAdjustment
+            ?: project.modeAdjustments[EditorMode.AR.name]
+            ?: return null
+    val hasStandaloneFrame = project.sphereSlamReferenceUri != null
+    return if (
+        hasStandaloneFrame &&
+        project.sphereSlamPlacementAnchorGeneration != project.sphereSlamAnchorGeneration
+    ) {
+        saved.withoutSpatialPlacement()
+    } else {
+        saved
+    }
+}
+
 @HiltViewModel
 class EditorViewModel @Inject constructor(
     private val projectRepository: ProjectRepository,
@@ -161,6 +187,15 @@ class EditorViewModel @Inject constructor(
     private var anchorHalfExtentMeters: Pair<Float, Float>? = null
 
     /**
+     * Wall generation the in-memory AR spatial adjustment is currently authored against.
+     * Tone lives in the same ModeAdjustment but is frame-independent, so a recapture only resets
+     * the spatial fields; the first subsequent AR placement edit binds them to the new generation.
+     */
+    private var standaloneArPlacementGeneration: Long = 0L
+    private var observedStandaloneAnchor: Pair<String, Long>? = null
+    private var standaloneArBackendActive: Boolean = false
+
+    /**
      * The design exactly as imported, before Outline or subject isolation.
      *
      * The effects are toggles, so they must be reversible without loss: re-deriving from this each
@@ -221,9 +256,18 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.main) {
             projectRepository.currentProject.collect { project ->
                 if (project != null) {
-                    if (_uiState.value.projectId != project.id) loadProject(project)
+                    if (_uiState.value.projectId != project.id) {
+                        loadProject(project)
+                    } else if (
+                        observedStandaloneAnchor !=
+                            (project.id to project.sphereSlamAnchorGeneration)
+                    ) {
+                        onStandaloneAnchorGenerationChanged(project)
+                    }
                 } else {
                     cancelProjectWork()
+                    standaloneArPlacementGeneration = 0L
+                    observedStandaloneAnchor = null
                     dispatch(EditorIntent.ClearProject)
                     history.clear()
                     updateHistoryCounts()
@@ -234,6 +278,7 @@ class EditorViewModel @Inject constructor(
 
     private fun loadProject(project: GraffitiProject) {
         cancelProjectWork()
+        observedStandaloneAnchor = project.id to project.sphereSlamAnchorGeneration
         // This only runs on a genuine project switch (the caller already checked projectId
         // changed) — so anything scoped to the PREVIOUS project must be invalidated here, or it
         // leaks into the new one. Undo history is the sharpest case: left uncleared, pressing
@@ -259,9 +304,15 @@ class EditorViewModel @Inject constructor(
 
         dispatch(EditorIntent.LoadedProject(project.id, loaded))
 
+        standaloneArPlacementGeneration = project.sphereSlamPlacementAnchorGeneration
         val loadedModeAdjustments = project.modeAdjustments.mapNotNull { (key, value) ->
-            runCatching { EditorMode.valueOf(key) }.getOrNull()?.let { it to value }
-        }.toMap()
+            val mode = runCatching { EditorMode.valueOf(key) }.getOrNull() ?: return@mapNotNull null
+            mode to value
+        }.toMap().toMutableMap()
+        if (standaloneArBackendActive) {
+            loadedModeAdjustments[EditorMode.AR] =
+                standaloneArAdjustmentForProject(project) ?: ModeAdjustment()
+        }
         dispatch(EditorIntent.SetAllModeAdjustments(loadedModeAdjustments))
 
         val pendingUri = loaded?.takeIf { it.bitmap == null }?.uri
@@ -296,6 +347,46 @@ class EditorViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private fun onStandaloneAnchorGenerationChanged(project: GraffitiProject) {
+        observedStandaloneAnchor = project.id to project.sphereSlamAnchorGeneration
+        standaloneArPlacementGeneration = project.sphereSlamPlacementAnchorGeneration
+        if (!standaloneArBackendActive) return
+
+        val current = _uiState.value.modeAdjustments[EditorMode.AR]
+        if (
+            current != null &&
+            project.sphereSlamPlacementAnchorGeneration != project.sphereSlamAnchorGeneration
+        ) {
+            dispatch(EditorIntent.SetModeAdjustment(EditorMode.AR, current.withoutSpatialPlacement()))
+        }
+
+        // Only standalone history is invalidated. ARCore's independent placement remains valid.
+        clearTransformStash()
+        history.clear()
+        updateHistoryCounts()
+    }
+
+    /**
+     * Swap the AR adjustment exposed to the existing gesture/undo UI between backend-specific
+     * persistence slots. The controls remain identical; their coordinate state does not.
+     */
+    fun setStandaloneArBackendActive(active: Boolean) {
+        if (standaloneArBackendActive == active) return
+        standaloneArBackendActive = active
+        val project = projectRepository.currentProject.value ?: return
+        standaloneArPlacementGeneration = project.sphereSlamPlacementAnchorGeneration
+
+        val adjustment = if (active) {
+            standaloneArAdjustmentForProject(project) ?: ModeAdjustment()
+        } else {
+            project.modeAdjustments[EditorMode.AR.name] ?: ModeAdjustment()
+        }
+        dispatch(EditorIntent.SetModeAdjustment(EditorMode.AR, adjustment))
+        clearTransformStash()
+        history.clear()
+        updateHistoryCounts()
     }
 
     fun setEditorMode(mode: EditorMode) = dispatch(EditorIntent.SetEditorMode(mode))
@@ -626,6 +717,11 @@ class EditorViewModel @Inject constructor(
     fun saveProject(name: String? = null, onComplete: (Boolean) -> Unit = {}) {
         val snapshot = _uiState.value
         val currentProject = projectRepository.currentProject.value
+        // These belong to the SAME logical editor snapshot. Reading either later on IO can pair an
+        // old spatial transform with a newer wall generation if recapture completes while this save
+        // is queued. Snapshot them before launching, exactly like the UI state above.
+        val snapshotStandaloneActive = standaloneArBackendActive
+        val snapshotPlacementGeneration = standaloneArPlacementGeneration
         viewModelScope.launch(dispatchers.main) {
             try {
                 editorSaveMutex.withLock {
@@ -634,6 +730,9 @@ class EditorViewModel @Inject constructor(
                         check(projectRepository.currentProject.value?.id == currentProject?.id) { "Project changed while saving" }
                         val updatedDesign = snapshot.design?.toOverlayLayer()
                         val modeAdjustments = snapshot.modeAdjustments.mapKeys { it.key.name }
+                        val placementGeneration = snapshotPlacementGeneration
+                        val standaloneActive = snapshotStandaloneActive
+                        val standaloneAdjustment = snapshot.modeAdjustments[EditorMode.AR]
 
                         // Paths derive from the (immutable) project id.
                         val projectId = currentProject?.id ?: GraffitiProject(name = name ?: "New Project").id
@@ -658,12 +757,41 @@ class EditorViewModel @Inject constructor(
                             // clobber the new project with the old one's design.
                             projectRepository.updateProject { current ->
                                 if (current.id != projectId) current
-                                else current.copy(
-                                    name = name ?: current.name,
-                                    design = updatedDesign,
-                                    modeAdjustments = modeAdjustments,
-                                    lastModified = System.currentTimeMillis(),
-                                )
+                                else {
+                                    val persistedModeAdjustments =
+                                        if (standaloneActive) {
+                                            val withoutAr = modeAdjustments - EditorMode.AR.name
+                                            val arCore = current.modeAdjustments[EditorMode.AR.name]
+                                            if (arCore != null) {
+                                                withoutAr + (EditorMode.AR.name to arCore)
+                                            } else {
+                                                withoutAr
+                                            }
+                                        } else {
+                                            modeAdjustments
+                                        }
+                                    current.copy(
+                                        name = name ?: current.name,
+                                        design = updatedDesign,
+                                        modeAdjustments = persistedModeAdjustments,
+                                        sphereSlamModeAdjustment =
+                                            if (standaloneActive) {
+                                                standaloneAdjustment
+                                            } else {
+                                                current.sphereSlamModeAdjustment
+                                            },
+                                        sphereSlamPlacementAnchorGeneration =
+                                            if (
+                                                standaloneActive &&
+                                                current.sphereSlamReferenceUri != null
+                                            ) {
+                                                placementGeneration
+                                            } else {
+                                                current.sphereSlamPlacementAnchorGeneration
+                                            },
+                                        lastModified = System.currentTimeMillis(),
+                                    )
+                                }
                             }
                             check(projectRepository.currentProject.value?.id == projectId) {
                                 "Project changed while saving"
@@ -914,6 +1042,23 @@ class EditorViewModel @Inject constructor(
 
     // ── Placement ─────────────────────────────────────────────────────────────
 
+    /**
+     * Before changing AR spatial placement, make sure the in-memory transform belongs to the current
+     * standalone wall generation. On the first edit after a recapture, discard only stale spatial
+     * fields (tone survives) and bind subsequent saves to the new canonical wall frame.
+     */
+    private fun prepareArPlacementEdit() {
+        if (!standaloneArBackendActive) return
+        val project = projectRepository.currentProject.value ?: return
+        if (project.sphereSlamReferenceUri == null) return
+        val generation = project.sphereSlamAnchorGeneration
+        if (standaloneArPlacementGeneration != generation) {
+            val current = _uiState.value.modeAdjustments[EditorMode.AR] ?: ModeAdjustment()
+            dispatch(EditorIntent.SetModeAdjustment(EditorMode.AR, current.withoutSpatialPlacement()))
+        }
+        standaloneArPlacementGeneration = generation
+    }
+
     fun setAnchorExtent(halfW: Float, halfH: Float) {
         anchorHalfExtentMeters = Pair(halfW, halfH)
     }
@@ -953,6 +1098,7 @@ class EditorViewModel @Inject constructor(
      * like any other placement change, so undo also backs it out.
      */
     override fun onResetClicked() {
+        if (_uiState.value.editorMode == EditorMode.AR) prepareArPlacementEdit()
         pushHistory()
         dispatch(EditorIntent.ToggleTransformReset)
         saveProject()
@@ -977,16 +1123,19 @@ class EditorViewModel @Inject constructor(
     }
 
     fun onModeTransformGesture(mode: EditorMode, pan: Offset, zoom: Float, rotationDelta: Float) {
+        if (mode == EditorMode.AR) prepareArPlacementEdit()
         dispatch(EditorIntent.ApplyModeTransformGesture(mode, pan, zoom, rotationDelta))
     }
 
     /** Toggle the per-mode transform lock — pins/unpins the whole-design position for [mode]. */
     fun onToggleModeTransformLocked(mode: EditorMode) {
+        if (mode == EditorMode.AR) prepareArPlacementEdit()
         dispatch(EditorIntent.ToggleModeTransformLocked(mode))
         saveProject()
     }
 
     override fun onGestureStart() {
+        if (_uiState.value.editorMode == EditorMode.AR) prepareArPlacementEdit()
         pushHistory()
         dispatch(EditorIntent.BeginGesture)
     }
@@ -1035,6 +1184,7 @@ class EditorViewModel @Inject constructor(
      */
     fun applyArFit(dx: Float, dy: Float, dThetaRad: Float, scaleRatio: Float) {
         if (!scaleRatio.isFinite() || scaleRatio <= 0f || !dx.isFinite() || !dy.isFinite() || !dThetaRad.isFinite()) return
+        prepareArPlacementEdit()
         val cur = _uiState.value.modeAdjustments[EditorMode.AR] ?: ModeAdjustment()
         if (cur.isTransformLocked) return
         // Snapshot AR explicitly: the fit may land while another mode is on screen.

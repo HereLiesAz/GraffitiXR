@@ -143,6 +143,31 @@ data class GraffitiProject(
     val sphereSlamReferencePhysicallyMetric: Boolean = false,
 
     /**
+     * Backend-neutral standalone wall anchor identity.
+     *
+     * The standalone "anchor" is the canonical centered SphereSLAM page frame itself, not an
+     * ARCore Anchor object. [sphereSlamAnchorGeneration] increments whenever canonical page 0 is
+     * replaced or invalidated, so any cached pose/placement tied to an older wall can be rejected
+     * deterministically. [sphereSlamAnchorFrameVersion] declares the coordinate semantics.
+     */
+    val sphereSlamAnchorGeneration: Long = 0L,
+    val sphereSlamAnchorFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+    /**
+     * Anchor generation the persisted AR-mode design adjustment was authored against.
+     * A mismatch means the adjustment belongs to an older standalone wall frame and must not render.
+     */
+    val sphereSlamPlacementAnchorGeneration: Long = 0L,
+    /**
+     * Standalone AR's whole-design adjustment. Kept separate from modeAdjustments[AR] because an
+     * ARCore anchor frame and a centered SphereSLAM page frame are not interchangeable until the
+     * explicit cross-backend calibration work exists.
+     *
+     * Null is the migration value for projects created before the split; standalone initially copies
+     * the legacy AR adjustment, then persists its own value on the first edit/save.
+     */
+    val sphereSlamModeAdjustment: ModeAdjustment? = null,
+
+    /**
      * MobileGS reloc seed built from the SAME rectified page as [sphereSlamReferenceUri].
      *
      * Kept separate from [fingerprint]: the legacy/ARCore fingerprint stores object points in a

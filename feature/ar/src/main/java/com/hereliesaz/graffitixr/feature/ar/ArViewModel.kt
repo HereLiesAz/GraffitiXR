@@ -907,6 +907,14 @@ class ArViewModel @Inject constructor(
     // ── Glasses session lifecycle ─────────────────────────────────────────────
 
     fun startGlassesSession() {
+        if (
+            _uiState.value.isArCoreAvailabilityResolved &&
+            !_uiState.value.isArCoreAvailable
+        ) {
+            _glassesSessionState.value =
+                GlassesSessionState.Fallback("Standalone wall calibration for glasses is not implemented yet")
+            return
+        }
         // The Meta wearables SDK (mwdat-camera) requires API 29+. The library
         // is overridden in the manifest so the app can install on API 26+, but
         // we must avoid invoking it on those devices at runtime.
@@ -961,6 +969,14 @@ class ArViewModel @Inject constructor(
     }
 
     fun submitCalibrationTap(screenPoint: PointF) {
+        if (
+            _uiState.value.isArCoreAvailabilityResolved &&
+            !_uiState.value.isArCoreAvailable
+        ) {
+            _glassesSessionState.value =
+                GlassesSessionState.Fallback("Standalone wall calibration for glasses is not implemented yet")
+            return
+        }
         viewModelScope.launch {
             val phonePoint = arCoreHitTestToWorld(screenPoint) ?: return@launch
             val glassesPoint = glassesWorldHitForTimestamp(System.nanoTime(), screenPoint) ?: return@launch
@@ -1148,6 +1164,12 @@ class ArViewModel @Inject constructor(
                             project?.sphereSlamReferenceWidthMeters ?: 1f,
                         sphereSlamReferencePhysicallyMetric =
                             project?.sphereSlamReferencePhysicallyMetric ?: false,
+                        sphereSlamAnchorGeneration = project?.sphereSlamAnchorGeneration ?: 0L,
+                        sphereSlamAnchorFrameVersion =
+                            project?.sphereSlamAnchorFrameVersion
+                                ?: com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                        sphereSlamPlacementAnchorGeneration =
+                            project?.sphereSlamPlacementAnchorGeneration ?: 0L,
                         sphereSlamFingerprint = project?.sphereSlamFingerprint,
                         sphereSlamFingerprintFrameVersion =
                             project?.sphereSlamFingerprintFrameVersion
@@ -1458,8 +1480,15 @@ class ArViewModel @Inject constructor(
      * not mean the product's AR mode is unavailable.
      */
     fun setArMode(enabled: Boolean, context: Context) {
-        if (enabled && !_uiState.value.isArCoreAvailable) {
-            Timber.w("setArMode(true) ignored: standalone SphereSLAM owns AR on this device")
+        val capability = _uiState.value
+        if (
+            enabled &&
+            (!capability.isArCoreAvailabilityResolved || !capability.isArCoreAvailable)
+        ) {
+            Timber.w(
+                "setArMode(true) ignored: ARCore capability is unresolved/unavailable; " +
+                    "CameraX + SphereSLAM owns the safe path",
+            )
             return
         }
         isInArMode = enabled
@@ -1574,10 +1603,26 @@ class ArViewModel @Inject constructor(
                 // few seconds and off the main thread, so a device whose motion-stereo thrashes can't
                 // ANR — and we only adopt stereo if it works. Cancelling this job (AR exit / pause)
                 // cancels the probe too.
-                if (context != null && isInArMode && session == null && !isDestroying && stereoCapable == null) {
+                val capability = _uiState.value
+                val arCoreReady =
+                    capability.isArCoreAvailabilityResolved && capability.isArCoreAvailable
+                if (
+                    context != null &&
+                    isInArMode &&
+                    session == null &&
+                    !isDestroying &&
+                    stereoCapable == null &&
+                    arCoreReady
+                ) {
                     probeStereoCapability(context)
                 }
-                if (isInArMode && session == null && context != null && !isDestroying) {
+                if (
+                    isInArMode &&
+                    session == null &&
+                    context != null &&
+                    !isDestroying &&
+                    arCoreReady
+                ) {
                     // Wait for the camera to actually be FREE before ARCore opens it. AR entry calls
                     // cameraController.unbind() (CameraX) whose camera-device close is ASYNCHRONOUS, so
                     // opening the ARCore session immediately races CameraX's release: ARCore gets the
@@ -1869,6 +1914,16 @@ class ArViewModel @Inject constructor(
      * install. Must be called while no live session holds the camera.
      */
     private suspend fun probeStereoCapability(context: Context) {
+        val capability = _uiState.value
+        if (
+            !capability.isArCoreAvailabilityResolved ||
+            !capability.isArCoreAvailable
+        ) {
+            appendDiag(
+                "probe: skipped; ARCore-only depth probe requires positively resolved ARCore capability",
+            )
+            return
+        }
         if (stereoCapable != null) return
         if (!stereoProbeInFlight.compareAndSet(false, true)) return
         try {
@@ -1997,6 +2052,10 @@ class ArViewModel @Inject constructor(
                             sphereSlamReferenceUri = candidateUri,
                             sphereSlamReferenceWidthMeters = referenceWidthMeters,
                             sphereSlamReferencePhysicallyMetric = physicallyMetric,
+                            sphereSlamAnchorGeneration = current.sphereSlamAnchorGeneration + 1L,
+                            sphereSlamAnchorFrameVersion =
+                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                            sphereSlamPlacementAnchorGeneration = 0L,
                             sphereSlamFingerprint = standaloneFingerprint,
                             sphereSlamFingerprintFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
@@ -2117,6 +2176,10 @@ class ArViewModel @Inject constructor(
                             sphereSlamReferenceUri = null,
                             sphereSlamReferenceWidthMeters = 1f,
                             sphereSlamReferencePhysicallyMetric = false,
+                            sphereSlamAnchorGeneration = current.sphereSlamAnchorGeneration + 1L,
+                            sphereSlamAnchorFrameVersion =
+                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                            sphereSlamPlacementAnchorGeneration = 0L,
                             // The seed's object points are defined by this exact page. Keeping it
                             // after the page is gone would let a later standalone runtime restore a
                             // coordinate frame it can no longer reconstruct or verify.
@@ -3565,6 +3628,11 @@ class ArViewModel @Inject constructor(
             state.copy(
                 isScanning = isTracking,
                 isArReady = state.isArReady || isTracking,
+                // Never leak stale ARCore depth/perception state into standalone. KPM normalized
+                // scale is not depth, and the standalone CameraX path currently has no depth source.
+                isDepthApiSupported = false,
+                isHardwareStereoActive = false,
+                currentCenterDepth = -1f,
                 paintingProgress = progress,
                 featureProgress = featureProgress,
                 relocDiagnostics = reloc,

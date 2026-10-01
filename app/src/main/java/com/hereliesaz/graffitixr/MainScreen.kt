@@ -116,6 +116,22 @@ fun MainScreen(
             }
         }
 
+        // The same AR controls drive two different coordinate frames. Keep their persisted
+        // adjustments separate and swap which one EditorViewModel exposes to gestures/undo when
+        // backend ownership changes.
+        LaunchedEffect(
+            uiState.projectId,
+            uiState.editorMode,
+            arUiState.isArCoreAvailabilityResolved,
+            arUiState.isArCoreAvailable,
+        ) {
+            editorViewModel.setStandaloneArBackendActive(
+                uiState.editorMode == EditorMode.AR &&
+                    arUiState.isArCoreAvailabilityResolved &&
+                    !arUiState.isArCoreAvailable,
+            )
+        }
+
         if (hasCameraPermission && isCameraActive && uiState.editorMode != EditorMode.TRACE) {
             when (uiState.editorMode) {
                 EditorMode.AR -> {
@@ -193,6 +209,8 @@ fun MainScreen(
                         val standaloneDesign = uiState.design?.takeIf {
                             it.isVisible && it.bitmap != null
                         }
+                        // EditorViewModel exposes the SphereSLAM-specific adjustment while this
+                        // backend owns AR; ARCore's independent adjustment remains persisted offscreen.
                         val standaloneAdj = uiState.modeAdjustments[EditorMode.AR]
                         var standaloneTexture by remember { mutableStateOf<AndroidBitmap?>(null) }
 

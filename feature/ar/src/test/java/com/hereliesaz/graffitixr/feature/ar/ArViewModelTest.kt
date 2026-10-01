@@ -288,6 +288,7 @@ class ArViewModelTest {
             sphereSlamReferenceUri = oldUri,
             sphereSlamReferenceWidthMeters = 1f,
             sphereSlamReferencePhysicallyMetric = false,
+            sphereSlamAnchorGeneration = 7L,
         )
         val flow = MutableStateFlow<com.hereliesaz.graffitixr.common.model.GraffitiProject?>(project)
         every { projectRepository.currentProject } returns flow
@@ -313,6 +314,11 @@ class ArViewModelTest {
         assertEquals(newUri, updated.sphereSlamReferenceUri)
         assertEquals(2.5f, updated.sphereSlamReferenceWidthMeters, 0f)
         assertTrue(updated.sphereSlamReferencePhysicallyMetric)
+        assertEquals(8L, updated.sphereSlamAnchorGeneration)
+        assertEquals(
+            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+            updated.sphereSlamAnchorFrameVersion,
+        )
         coVerify {
             projectManager.deleteSphereSlamReference(context, "slam", oldUri)
         }
@@ -422,6 +428,7 @@ class ArViewModelTest {
             sphereSlamReferenceUri = uri,
             sphereSlamReferenceWidthMeters = 2.5f,
             sphereSlamReferencePhysicallyMetric = true,
+            sphereSlamAnchorGeneration = 11L,
         )
         val flow = MutableStateFlow<com.hereliesaz.graffitixr.common.model.GraffitiProject?>(project)
         every { projectRepository.currentProject } returns flow
@@ -445,6 +452,7 @@ class ArViewModelTest {
         assertNull(updated.sphereSlamReferenceUri)
         assertEquals(1f, updated.sphereSlamReferenceWidthMeters, 0f)
         assertFalse(updated.sphereSlamReferencePhysicallyMetric)
+        assertEquals(12L, updated.sphereSlamAnchorGeneration)
         assertEquals("Wall", updated.name)
         coVerify {
             projectManager.deleteSphereSlamReference(context, "slam", uri)
@@ -488,6 +496,23 @@ class ArViewModelTest {
     }
 
     // ==================== Session Lifecycle Tests ====================
+
+    @Suppress("UNCHECKED_CAST")
+    @Test
+    fun `ARCore runtime refuses entry while capability is unresolved`() = runTest {
+        val field = viewModel.javaClass.getDeclaredField("_uiState")
+        field.isAccessible = true
+        val flow = field.get(viewModel) as MutableStateFlow<ArUiState>
+        flow.value = flow.value.copy(
+            isArCoreAvailable = true,
+            isArCoreAvailabilityResolved = false,
+        )
+
+        viewModel.setArMode(true, context)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(getPrivateField(viewModel, "isInArMode") as Boolean)
+    }
 
     @Test
     fun `session resumes only when in AR mode and activity is resumed`() = runTest {
@@ -866,7 +891,10 @@ class ArViewModelTest {
         val field = viewModel.javaClass.getDeclaredField("_uiState")
         field.isAccessible = true
         val flow = field.get(viewModel) as MutableStateFlow<ArUiState>
-        flow.value = flow.value.copy(isArCoreAvailable = true)
+        flow.value = flow.value.copy(
+            isArCoreAvailable = true,
+            isArCoreAvailabilityResolved = true,
+        )
     }
 
     private fun setPrivateField(obj: Any, fieldName: String, value: Any?) {

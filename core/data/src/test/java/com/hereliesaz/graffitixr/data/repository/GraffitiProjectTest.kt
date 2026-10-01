@@ -152,6 +152,34 @@ class GraffitiProjectTest {
     }
 
     @Test
+    fun `serialization preserves standalone anchor and placement generations`() {
+        val project = GraffitiProject(
+            id = "standalone-anchor",
+            sphereSlamAnchorGeneration = 9L,
+            sphereSlamAnchorFrameVersion =
+                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+            sphereSlamPlacementAnchorGeneration = 8L,
+            sphereSlamModeAdjustment = com.hereliesaz.graffitixr.common.model.ModeAdjustment(
+                offsetX = 0.6f,
+                offsetY = -0.2f,
+                scale = 1.4f,
+                rotation = 12f,
+                opacity = 0.7f,
+            ),
+        )
+
+        val decoded = json.decodeFromString<GraffitiProject>(json.encodeToString(project))
+
+        assertEquals(9L, decoded.sphereSlamAnchorGeneration)
+        assertEquals(
+            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+            decoded.sphereSlamAnchorFrameVersion,
+        )
+        assertEquals(8L, decoded.sphereSlamPlacementAnchorGeneration)
+        assertEquals(project.sphereSlamModeAdjustment, decoded.sphereSlamModeAdjustment)
+    }
+
+    @Test
     fun `serialization preserves per-host rail expansion`() {
         val expansion = mapOf("host.design" to true, "design.layers" to false)
         val project = GraffitiProject(id = "id", name = "n", railExpansion = expansion)
