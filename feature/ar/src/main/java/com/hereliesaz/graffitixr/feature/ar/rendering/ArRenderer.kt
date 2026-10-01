@@ -1643,7 +1643,7 @@ class ArRenderer(
             // (The world-mapping indicator is now the camera-background "ink develop" reveal, applied
             // in BackgroundRenderer.draw(frame, scanActive) above — no separate overlay here.)
 
-            slamManager.setArCoreTrackingState(isTracking)
+            slamManager.setTrackingPoseValid(isTracking)
 
             // --- Democratic Consensus Transformation + smoothed reloc fusion ---
             // Backbone: ARCore consensus once anchored, else the native cached pose (as before).
