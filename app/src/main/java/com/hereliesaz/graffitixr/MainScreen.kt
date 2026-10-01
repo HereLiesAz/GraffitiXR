@@ -253,6 +253,7 @@ fun MainScreen(
                             persistedReferenceWidthMeters = arUiState.sphereSlamReferenceWidthMeters,
                             persistedReferencePhysicallyMetric =
                                 arUiState.sphereSlamReferencePhysicallyMetric,
+                            persistedAtlasPages = arUiState.sphereSlamAtlasPages,
                             onReferenceCaptured = { bitmap, widthMeters, physicallyMetric ->
                                 arViewModel.saveSphereSlamReference(
                                     bitmap,
@@ -262,6 +263,9 @@ fun MainScreen(
                             },
                             onPersistedReferenceInvalid = { uri ->
                                 arViewModel.clearSphereSlamReferenceIfMatches(uri)
+                            },
+                            onPersistedAtlasPageInvalid = { pageNo, uri ->
+                                arViewModel.clearSphereSlamAtlasPageIfMatches(pageNo, uri)
                             },
                             adjustment = standaloneAdj,
                             onUnitsPerPixel = { standaloneArUnitsPerPixel = it },
