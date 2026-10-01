@@ -63,8 +63,12 @@ This branch now has a first functional Mode B path as well as Mode A:
 
 - AR mode stays visible on devices where ARCore resolves unsupported;
 - CameraX owns the standalone camera;
-- the Y plane is packed with its real row/pixel stride and rotated into display orientation;
-- Camera2 intrinsics are rotated through the same display transform as the pixels;
+- the Y plane is cropped by `ImageProxy.cropRect`, packed with its real row/pixel stride, then
+  rotated into display orientation;
+- Camera2 intrinsics are shifted by the same crop origin and rotated through the same display
+  transform as the pixels;
+- CameraController pinch-to-zoom is disabled and camera zoom is reset to 1x while standalone
+  tracking is active, so KPM calibration cannot be invalidated by an unmodeled digital zoom;
 - a rectified wall target becomes a calibrated KPM reference page;
 - KPM's camera-from-page 3x4 is converted with artoolkitX's own right-handed OpenGL convention;
 - the KPM lower-left page frame is shifted to a centered renderer frame;
@@ -72,12 +76,15 @@ This branch now has a first functional Mode B path as well as Mode A:
 - the design is rendered directly from that wall-relative view/projection pair;
 - the existing fused game-rotation sensor bridges visual losses for at most 400 ms without
   inventing translational motion;
-- the rectified canonical wall page is persisted as `sphereslam_reference.png` in the project and
-  restored on reopen/import, rebuilding the KPM atlas locally.
+- the rectified wall page is persisted as a versioned `sphereslam_reference_<uuid>.png`; its URI
+  and scale metadata are committed together and restored on reopen/import, rebuilding the KPM atlas
+  locally.
 
-The initial standalone target uses a normalized 1.0-unit page width, so registration is internally
-consistent but distance readouts are **not** physically metric yet. A future measured-width/depth
-path can set the same API to a true physical width without changing the pose math.
+After rectification, standalone target capture now asks for the real width represented by the page.
+A validated measured width is converted into KPM DPI and persisted with
+`sphereSlamReferencePhysicallyMetric=true`, so KPM translation/design scale can be physically
+metric. The artist can explicitly skip measurement; that path uses normalized 1.0-unit width with
+the metric flag false and must never be displayed as a real-world distance.
 
 The app manifest already marks ARCore optional, so installability on non-ARCore devices is preserved.
 
@@ -303,6 +310,110 @@ Today both can observe the same wall camera frames:
 This is intentional redundancy. The two systems can later be compared and fused instead of forcing
 one to impersonate the other.
 
+## Native release-build validation
+
+The release-build CI now checks out the pinned artoolkitX submodule so CI exercises the real KPM
+native path instead of the no-submodule stub. The first run after PR #1961 compiled KPM and the
+explicit AR source set successfully, then exposed missing transitive ARUtil dependencies at the
+final shared-library link. The continuation branch mirrors upstream ARUtil's bundled minizip/SHA-1
+support sources and links NDK zlib. Keep this CI path enabled; otherwise native KPM regressions can
+silently pass normal builds that never initialize the submodule.
+
+## Crash-safe standalone reference persistence
+
+Recapture never overwrites the currently referenced wall image in place. It writes a new versioned
+PNG, commits `sphereSlamReferenceUri`, width, and physical-scale flag together through the
+repository's atomic project update, and only then deletes the previous reference best-effort. If the
+project changes or the metadata save fails, the uncommitted candidate is deleted and the previous
+reference remains authoritative.
+
+Regression tests cover both process-death boundaries: an uncommitted new image cannot replace the
+old project reference, while a committed new URI remains authoritative even if the old file is
+still present because cleanup had not yet run.
+
+## Import and co-op reference transport
+
+The portable artifact is the rectified SphereSLAM reference PNG plus its width/metric metadata in
+`project.json`. Imports and co-op spectator loads copy that PNG into the destination project and
+rebase `sphereSlamReferenceUri` before use. KPM atlases and native session handles are rebuilt
+locally and are never persisted or transferred.
+
+## Missing or corrupt persisted reference
+
+If the saved reference URI cannot be decoded, the standalone UI asks for a new target and calls a
+compare-guarded repository cleanup. Only the matching SphereSLAM URI/width/metric fields are reset;
+all other project data is preserved. If a newer recapture has already replaced the URI, the stale
+failure callback becomes a no-op.
+
+
+## Standalone target quality
+
+A newly rectified target is preflighted before native registration for minimum size, luminance
+contrast, blur (Laplacian variance), and severe clipped exposure. Exposure is a warning; size,
+contrast, and blur are blockers. Native KPM registration is still authoritative: the generated
+reference feature count must meet an initial floor of 16. A replacement is persisted only after
+that native check passes, so a weak recapture cannot overwrite the previous valid saved target.
+
+## Standalone failure diagnostics
+
+Standalone failures are classified rather than collapsed into one generic KPM error. The runtime
+distinguishes native-library unavailability, camera/camera-calibration unavailability, weak
+references, no page match, stale observations, excessive reprojection error, insufficient inliers,
+pose jumps, corrupt persisted targets, and unexpected internal failures. Transient visual-quality
+failures feed the reacquisition HUD; recoverable setup/data failures get concise artist-facing
+guidance; true native/internal failures remain modal.
+
+Failure and calibration transitions also retain numeric diagnostics. The failure/reacquisition UI
+offers **Copy Diagnostics**, producing one text payload with the standalone backend, camera ID and
+intrinsics, raw/crop/display frame geometry, timestamp source, tracking state, last KPM page/inliers/
+error/age/match duration, physical-scale status, and current failure detail. Camera-ID acquisition
+reports CAMERA_UNAVAILABLE after five seconds rather than spinning indefinitely, while continuing to
+accept a late CameraX bind if it recovers.
+
+## Standalone observation age
+
+For Camera2 devices that declare `SENSOR_INFO_TIMESTAMP_SOURCE_REALTIME`, the analyzer compares
+the CameraX frame timestamp with `SystemClock.elapsedRealtimeNanos()` after KPM matching and rejects
+observations older than 250 ms. Devices reporting UNKNOWN timestamp source are not forced into a
+made-up clock conversion: absolute age is logged as unavailable, while KPM processing duration is
+still measured. Accepted-match metrics are rate-limited to one diagnostic line every five seconds.
+
+## AR rail capability contract
+
+AR mode remains reachable regardless of ARCore availability, but individual actions are gated by
+what the active backend can actually do. Standalone keeps the shared Light, Lock, Magic, design,
+project, and settings actions. The legacy ARCore Target rail action is disabled and points the artist
+to the standalone on-screen Wall Target capture. Co-op Host/Join remain disabled until an explicit
+standalone-to-peer coordinate-frame calibration exists, while Leave remains reachable for an
+already-active session. AR preview Export is also disabled on standalone until CameraX and the
+transparent GL overlay can be composited into the same mode screenshot; exporting only artwork
+layers would be misleading.
+
+## Standalone tracking-state contract
+
+The standalone runtime exposes explicit `INITIALIZING`, `LOCKED`, `IMU_BRIDGE`,
+`REACQUIRING`, `LOST`, and `FATAL` states. Initial acquisition and post-loss reacquisition
+require two consecutive accepted visual poses. A brief miss from `LOCKED` uses the short
+rotation-only IMU bridge; after the bridge expires the state becomes `REACQUIRING`, then `LOST`
+after 2 seconds without recovery. State changes are surfaced in the standalone HUD and existing AR
+diagnostic log.
+
+## Standalone pose acceptance
+
+The CameraX standalone path applies an explicit app-level KPM acceptance policy before publishing a
+pose. Defaults mirror the pinned artoolkitX binary path: at least 4 inliers and ICP/reprojection
+error no greater than 10.0. Non-finite matrices/errors are also rejected. A second continuity gate rejects catastrophic
+frame-to-frame jumps using reference-page widths (scale-independent for measured and normalized
+targets) and rotation angle. Reacquisition has deliberately looser limits than locked tracking.
+Rejections enter the same short IMU-bridge/loss path as a missing visual match and are logged only
+when the rejection reason changes. Observation-age gating remains a separate TODO item.
+
+## Standalone calibration diagnostics
+
+Whenever the effective CameraX calibration changes, the standalone analyzer emits one line through
+the existing AR diagnostic log with camera ID, raw/crop/display dimensions, display rotation, and
+`fx/fy/cx/cy`. It deliberately does not log every frame.
+
 ## Lifecycle
 
 The `SphereSlamTracker` lifetime follows `ArRenderer`.
@@ -343,8 +454,8 @@ Implemented for initial standalone wall tracking:
 
 Still required for full standalone parity:
 
-- physical scale acquisition (measured target width, depth alternative, or another explicit source)
-  before any UI reports real-world metres;
+- on-device validation of measured target scale at several distances before relying on it for
+  measurement-sensitive UI;
 - integration with GraffitiXR's normal target-review/fingerprint workflow instead of the current
   standalone capture/unwarp surface;
 - MobileGS/fingerprint integration in an explicitly defined standalone wall coordinate frame;

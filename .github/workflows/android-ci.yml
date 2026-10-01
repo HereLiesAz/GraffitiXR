@@ -68,6 +68,9 @@ jobs:
         # MobileGS-owned lock (gEngineMutex is a shared_mutex and no longer serialises them).
         run: python3 tools/check_native_locking.py
 
+      - name: SphereSLAM architecture invariants
+        run: python3 tools/check_sphereslam_architecture.py
+
       - name: Run detekt
         # config/detekt/detekt.yml (maxIssues: 0) existed but was never wired into CI, so it was
         # never actually enforced. continue-on-error is deliberate here: the detekt Gradle plugin

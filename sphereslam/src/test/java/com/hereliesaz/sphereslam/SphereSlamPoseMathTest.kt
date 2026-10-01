@@ -17,6 +17,23 @@ class SphereSlamPoseMathTest {
     }
 
     @Test
+    fun dpiAndPageGeometry_roundTripSeveralPhysicalWidths() {
+        val widthsMeters = listOf(0.25f, 1f, 2.5f, 12f)
+        for (widthMeters in widthsMeters) {
+            val dpi = SphereSlamPoseMath.dpiForReferenceWidth(
+                referenceWidthPixels = 1600,
+                referenceWidthMeters = widthMeters,
+            )
+            val geometry = SphereSlamPoseMath.pageGeometry(
+                widthPixels = 1600,
+                heightPixels = 900,
+                referenceDpi = dpi,
+            )
+            assertEquals(widthMeters, geometry.widthMeters, 0.0001f)
+        }
+    }
+
+    @Test
     fun pageGeometry_usesSameScaleAsKpmReferenceGeneration() {
         val geometry = SphereSlamPoseMath.pageGeometry(
             widthPixels = 1000,

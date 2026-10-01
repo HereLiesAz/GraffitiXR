@@ -7,6 +7,7 @@ import com.hereliesaz.graffitixr.common.model.CaptureEnvironment
 import com.hereliesaz.graffitixr.common.model.DeviceAttitude
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.common.model.LocationFix
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -20,6 +21,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -108,6 +110,20 @@ class ProjectManagerTest {
 
         manager.deleteProject(mockContext, "del_project")
         assertFalse(File(tempFilesDir, "projects/del_project").exists())
+    }
+
+    @Test
+    fun `deleteProject removes versioned SphereSLAM reference with project directory`() = runTest {
+        val bitmap = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
+        manager.saveProject(mockContext, GraffitiProject(id = "delete_slam", name = "Wall"))
+        val uri = manager.saveSphereSlamReference(mockContext, "delete_slam", bitmap)
+        val file = File(requireNotNull(uri.path))
+        assertTrue(file.exists())
+
+        manager.deleteProject(mockContext, "delete_slam")
+
+        assertFalse(file.exists())
+        assertFalse(File(tempFilesDir, "projects/delete_slam").exists())
     }
 
     @Test
@@ -307,6 +323,210 @@ class ProjectManagerTest {
         assertFalse(File(tempFilesDir, "projects/capture_only/project.json").exists())
         val targetFiles = File(tempFilesDir, "projects/capture_only").listFiles { f -> f.name.startsWith("target_") }
         assertEquals(30, targetFiles?.size ?: -1)
+    }
+
+
+    // --- Standalone SphereSLAM reference persistence ---
+
+    @Test
+    fun `SphereSLAM reference writes are versioned and cleanup is project scoped`() = runTest {
+        val bitmap = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
+
+        val first = manager.saveSphereSlamReference(mockContext, "slam_project", bitmap)
+        val second = manager.saveSphereSlamReference(mockContext, "slam_project", bitmap)
+
+        val firstFile = File(requireNotNull(first.path))
+        val secondFile = File(requireNotNull(second.path))
+        assertTrue(firstFile.name.startsWith("sphereslam_reference_"))
+        assertTrue(firstFile.name.endsWith(".png"))
+        assertTrue(secondFile.name.startsWith("sphereslam_reference_"))
+        assertTrue(firstFile.name != secondFile.name)
+        assertTrue(firstFile.exists())
+        assertTrue(secondFile.exists())
+
+        manager.deleteSphereSlamReference(mockContext, "slam_project", first)
+        assertFalse(firstFile.exists())
+        assertTrue(secondFile.exists())
+
+        val outside = File(tempFilesDir, "sphereslam_reference_outside.png").apply {
+            writeBytes(byteArrayOf(1, 2, 3))
+        }
+        manager.deleteSphereSlamReference(mockContext, "slam_project", Uri.fromFile(outside))
+        assertTrue("cleanup must not escape the project directory", outside.exists())
+    }
+
+    @Test
+    fun `SphereSLAM cleanup accepts the legacy fixed reference filename`() = runTest {
+        val root = File(tempFilesDir, "projects/legacy_slam").also { it.mkdirs() }
+        val legacy = File(root, "sphereslam_reference.png").apply {
+            writeBytes(byteArrayOf(1, 2, 3))
+        }
+
+        manager.deleteSphereSlamReference(mockContext, "legacy_slam", Uri.fromFile(legacy))
+
+        assertFalse(legacy.exists())
+    }
+
+    @Test
+    fun `legacy project without SphereSLAM fields gets safe standalone defaults`() = runTest {
+        val projectDir = File(tempFilesDir, "projects/pre_slam").also { it.mkdirs() }
+        File(projectDir, "project.json").writeText(
+            """{"id":"pre_slam","name":"Old project"}""",
+        )
+
+        val loaded = manager.loadProjectMetadata(mockContext, "pre_slam")
+
+        assertNull(loaded?.sphereSlamReferenceUri)
+        assertEquals(1f, loaded?.sphereSlamReferenceWidthMeters ?: 0f, 0f)
+        assertFalse(loaded?.sphereSlamReferencePhysicallyMetric ?: true)
+    }
+
+    @Test
+    fun `import rebases versioned SphereSLAM reference URI`() = runTest {
+        val manifest =
+            """{"id":"slam_import","name":"Wall","sphereSlamReferenceUri":"file:///sender/files/projects/slam_import/sphereslam_reference_abc.png","sphereSlamReferenceWidthMeters":2.5,"sphereSlamReferencePhysicallyMetric":true}"""
+                .toByteArray()
+        val imported = importZip(
+            zipOf(
+                "project.json" to manifest,
+                "sphereslam_reference_abc.png" to byteArrayOf(1, 2, 3, 4),
+            ),
+        )
+
+        val reference = imported?.sphereSlamReferenceUri?.path?.let(::File)
+        assertEquals(
+            File(tempFilesDir, "projects/slam_import/sphereslam_reference_abc.png").canonicalFile,
+            reference?.canonicalFile,
+        )
+        assertEquals(2.5f, imported?.sphereSlamReferenceWidthMeters ?: 0f, 0f)
+        assertTrue(imported?.sphereSlamReferencePhysicallyMetric == true)
+    }
+
+    @Test
+    fun `process death before SphereSLAM metadata commit restores previous reference`() = runTest {
+        val bitmap = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
+        val oldUri = manager.saveSphereSlamReference(mockContext, "slam_crash_before", bitmap)
+        manager.saveProject(
+            mockContext,
+            GraffitiProject(
+                id = "slam_crash_before",
+                name = "Wall",
+                sphereSlamReferenceUri = oldUri,
+                sphereSlamReferenceWidthMeters = 1.25f,
+                sphereSlamReferencePhysicallyMetric = true,
+            ),
+        )
+
+        // This write represents the candidate file existing when the process dies before the
+        // repository can commit its URI + scale metadata.
+        val orphanCandidate =
+            manager.saveSphereSlamReference(mockContext, "slam_crash_before", bitmap)
+
+        val restored = manager.loadProjectMetadata(mockContext, "slam_crash_before")
+        assertEquals(oldUri, restored?.sphereSlamReferenceUri)
+        assertEquals(1.25f, restored?.sphereSlamReferenceWidthMeters ?: 0f, 0f)
+        assertTrue(File(requireNotNull(oldUri.path)).exists())
+        assertTrue(File(requireNotNull(orphanCandidate.path)).exists())
+    }
+
+    @Test
+    fun `process death after SphereSLAM metadata commit restores new reference even if old file remains`() = runTest {
+        val bitmap = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
+        val oldUri = manager.saveSphereSlamReference(mockContext, "slam_crash_after", bitmap)
+        val newUri = manager.saveSphereSlamReference(mockContext, "slam_crash_after", bitmap)
+        manager.saveProject(
+            mockContext,
+            GraffitiProject(
+                id = "slam_crash_after",
+                name = "Wall",
+                sphereSlamReferenceUri = newUri,
+                sphereSlamReferenceWidthMeters = 2.75f,
+                sphereSlamReferencePhysicallyMetric = true,
+            ),
+        )
+
+        // Simulate death before best-effort cleanup of oldUri.
+        val restored = manager.loadProjectMetadata(mockContext, "slam_crash_after")
+        assertEquals(newUri, restored?.sphereSlamReferenceUri)
+        assertEquals(2.75f, restored?.sphereSlamReferenceWidthMeters ?: 0f, 0f)
+        assertTrue(File(requireNotNull(oldUri.path)).exists())
+        assertTrue(File(requireNotNull(newUri.path)).exists())
+    }
+
+    @Test
+    fun `duplicate-id import rebases SphereSLAM reference into newly assigned project id`() = runTest {
+        manager.saveProject(
+            mockContext,
+            GraffitiProject(id = "same_slam", name = "Existing"),
+        )
+        val manifest =
+            """{"id":"same_slam","name":"Imported","sphereSlamReferenceUri":"file:///sender/files/projects/same_slam/sphereslam_reference_abc.png","sphereSlamReferenceWidthMeters":2.0,"sphereSlamReferencePhysicallyMetric":true}"""
+                .toByteArray()
+
+        val imported = importZip(
+            zipOf(
+                "project.json" to manifest,
+                "sphereslam_reference_abc.png" to byteArrayOf(9, 8, 7),
+            ),
+        )
+
+        assertNotNull(imported)
+        assertTrue(imported!!.id != "same_slam")
+        assertEquals(
+            File(
+                tempFilesDir,
+                "projects/${imported.id}/sphereslam_reference_abc.png",
+            ).canonicalFile,
+            File(requireNotNull(imported.sphereSlamReferenceUri?.path)).canonicalFile,
+        )
+        assertNull(
+            manager.loadProjectMetadata(mockContext, "same_slam")?.sphereSlamReferenceUri,
+        )
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `spectator transfer rebases SphereSLAM reference into coop project`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        try {
+            val captured = mutableListOf<GraffitiProject>()
+            val repo =
+                mockk<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>(relaxed = true)
+            coEvery { repo.createProject(any<GraffitiProject>()) } coAnswers {
+                captured += firstArg<GraffitiProject>()
+            }
+            val provider =
+                mockk<javax.inject.Provider<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>>()
+            every { provider.get() } returns repo
+            val coopManager = ProjectManager(mockContext, uriProvider, provider)
+
+            val manifest =
+                """{"id":"host_slam","name":"Host","sphereSlamReferenceUri":"file:///host/files/projects/host_slam/sphereslam_reference_abc.png","sphereSlamReferenceWidthMeters":1.75,"sphereSlamReferencePhysicallyMetric":true}"""
+                    .toByteArray()
+
+            val loaded = coopManager.loadAsSpectator(
+                zipOf(
+                    "project.json" to manifest,
+                    "sphereslam_reference_abc.png" to byteArrayOf(1, 3, 5, 7),
+                ),
+            )
+
+            assertTrue(loaded)
+            assertEquals(1, captured.size)
+            val spectator = captured.single()
+            assertEquals("coop_host_slam", spectator.id)
+            assertEquals(
+                File(
+                    tempFilesDir,
+                    "projects/coop_host_slam/sphereslam_reference_abc.png",
+                ).canonicalFile,
+                File(requireNotNull(spectator.sphereSlamReferenceUri?.path)).canonicalFile,
+            )
+            assertEquals(1.75f, spectator.sphereSlamReferenceWidthMeters, 0f)
+            assertTrue(spectator.sphereSlamReferencePhysicallyMetric)
+        } finally {
+            Dispatchers.resetMain()
+        }
     }
 
     // --- Zip extraction temp-file cleanup (duplicate entry names) ---

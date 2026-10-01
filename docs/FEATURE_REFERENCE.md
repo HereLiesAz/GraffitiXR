@@ -18,10 +18,11 @@ is exactly **one design** (the older multi-layer model — a stack with an activ
 removed; the design is still represented by the `Layer` type for its per-image properties, but the
 editor holds at most one) chosen/replaced in **Design**; every other mode is a *lens* onto that same
 design, carrying its own **mode adjustment** (position/tone applied to the whole design for that
-lens only). AR mode adds spatial anchoring: an offline **fingerprint** of your marks lets the
-overlay **snap back** to the wall after tracking loss, and a **teleological** loop re-grows that
-fingerprint from your progress so the anchor survives the reference being painted over. Nothing
-touches the network unless you explicitly start a **co-op** session.
+lens only). AR mode has two backends: ARCore-supported devices keep the existing ARCore +
+MobileGS/fingerprint path; ARCore-unavailable devices use CameraX + SphereSLAM/KPM to register the
+design to a captured wall page. The standalone path persists/rebuilds that KPM target but does not
+yet feed its page frame into MobileGS, so teleological fingerprint/self-grow parity is still an
+explicit backend gap. Nothing touches the network unless you explicitly start a **co-op** session.
 
 ---
 
@@ -32,11 +33,28 @@ adjustment/anchoring lens is active.
 
 | Mode | Purpose | Anchoring | Primary output |
 |---|---|---|---|
-| **AR** | Anchor the design to a real wall for painting at scale | Full — fingerprint + SLAM snap-back | On-wall overlay; composited PNG via `glReadPixels` |
+| **AR** | Anchor the design to a real wall for painting at scale | ARCore: anchor + MobileGS fingerprint; standalone: SphereSLAM/KPM planar wall page + short IMU bridge | On-wall overlay; ARCore supports composited `glReadPixels` export, standalone preview export is currently disabled |
 | **MOCKUP** | Compose the design onto a static wall photo | None (static image) | Flattened preview image |
 | **OVERLAY** | Classic non-AR tracing — reference over live camera | None (screen-space) | Sensor still + composited layers (CameraX) |
 | **TRACE** | Phone-as-lightbox for copying onto paper | Locked screen-space | Transparent-background PNG |
 | **DESIGN** | Where the single design is chosen/replaced and edited | N/A (canvas) | The project itself |
+
+### 1.0a AR backend capability split
+
+| Capability | ARCore-supported AR | ARCore-unavailable standalone AR |
+|---|---|---|
+| Camera owner | ARCore `Session` / `ArRenderer` | CameraX |
+| Continuous pose | ARCore | calibrated SphereSLAM/KPM page match |
+| Short visual miss | ARCore tracking/fusion | rotation-only IMU bridge, max 400 ms |
+| Persisted wall target | ARCore target/fingerprint data | versioned rectified SphereSLAM reference PNG + width/metric metadata |
+| MobileGS fingerprint / self-grow | existing path | **not wired yet**; page↔fingerprint frame bridge is required first |
+| Target rail action | ARCore tap-to-target flow | disabled; use the on-screen **Wall Target** capture |
+| Co-op Host/Join | existing ARCore coordinate-frame path | disabled until standalone↔peer calibration exists |
+| AR preview export | composited GL framebuffer | disabled until CameraX + transparent GL can be composited correctly |
+| Pan/scale/rotation/tone/lock | supported | supported through the same persisted `ModeAdjustment[AR]` |
+
+A normalized standalone target width gives self-consistent registration but is **not physical metres**.
+Physical distance/size claims are valid only when the captured target width was explicitly measured.
 
 As of this writing, DESIGN does not have its own dedicated entry in the mode-switcher host on the
 Rail; it's reached indirectly (e.g. importing an image via the top-level **Open** action switches
@@ -277,9 +295,12 @@ read as describing a live pipeline in this app.
 
 ---
 
-## 6. Relocalization & Teleological SLAM (the differentiator)
+## 6. Relocalization & Teleological SLAM (ARCore/MobileGS path)
 
-This is what "pocket-ready" means in practice. Detailed math in `RELOC_MAP_DESIGN.md`,
+This section describes the current MobileGS fingerprint path used with ARCore. Standalone
+SphereSLAM AR currently rebuilds a persisted KPM wall page and reacquires that page directly; it
+does not yet mix its page-relative pose with MobileGS because the coordinate-frame conversion is
+not defined or validated. Detailed math in `RELOC_MAP_DESIGN.md`,
 `SELF_GROWING_FINGERPRINT.md`, `TELEOLOGICAL_SLAM.md`, `NATIVE_ENGINE.md`.
 
 - **Fingerprint capture.** When you lock onto a wall, the native engine (`MobileGS`, C++17) captures an
@@ -441,7 +462,8 @@ Mode-aware; the Export rail item dispatches per mode.
 
 | Mode | Method | Result |
 |---|---|---|
-| AR | `glReadPixels` on the composited GL framebuffer | Camera + wall-anchored overlay (what you see, minus Compose UI) |
+| AR (ARCore) | `glReadPixels` on the composited GL framebuffer | Camera + wall-anchored overlay (what you see, minus Compose UI) |
+| AR (standalone SphereSLAM) | Disabled for now | CameraX + transparent-GL compositing is not implemented yet; the rail explains this rather than exporting layers-only |
 | OVERLAY | CameraX `ImageCapture.takePicture` + composite layers at screen positions | Sensor still with layers on top |
 | MOCKUP | Standard composite | Flattened mockup |
 | TRACE | Transparent-background PNG | Line art with no backdrop fill |
@@ -471,7 +493,8 @@ Strictly decoupled multi-module Clean Architecture (`settings.gradle.kts`):
 | Module | Responsibility |
 |---|---|
 | `:app` | Navigation, camera orchestration, Hilt DI, `MainActivity` |
-| `:feature:ar` | ARCore session, `ArRenderer`, SLAM data processing, glasses session |
+| `:feature:ar` | ARCore session/`ArRenderer` plus standalone CameraX + SphereSLAM/KPM AR orchestration, tracking HUD/diagnostics, and glasses session |
+| `:sphereslam` | Shared calibrated artoolkitX KPM engine: asynchronous ARCore sidecar and synchronous standalone wall-page session |
 | `:feature:editor` | Multi-layer manipulation, tools, GPU Liquify, stencil UI, export |
 | `:feature:dashboard` | Project library, onboarding, settings screens |
 | `:core:nativebridge` | Native C++ engine (`MobileGS`), JNI bridge, relocalization threads, `YuvConverter` |

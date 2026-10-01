@@ -1,8 +1,9 @@
 # SphereSLAM Implementation TODO
 
-Status: active implementation plan for `feat/sphereslam-parallel-arcore`.
+Status: active implementation plan. Initial standalone work merged to `main` in PR #1961;
+continuation work is on `feat/sphereslam-todo-continuation`.
 
-Checkpoint used to write this list: `c8756d5f63d3f6c5bf98bae9b17c393a784d3cd8`.
+Checklist refreshed from `main` at `706ccb7ec949afe055156d23d6a0cc7a8c7126bd`.
 
 This is the authoritative remaining-work list for GraffitiXR's SphereSLAM integration. It covers both:
 
@@ -36,11 +37,16 @@ These are invariants, not optional cleanup.
 - [x] Never silently replace ARCore view/projection matrices with a KPM observation in hybrid mode.
 - [x] Treat long standalone visual loss as LOST/REACQUIRING instead of freezing the last pose.
 - [x] Do not integrate phone accelerometer translation as fake dead reckoning.
-- [ ] Add an automated architecture test that fails if non-ARCore AR mode is hidden again.
-- [ ] Add an automated architecture test that fails if the standalone branch constructs an ARCore
+- [x] Add an automated architecture test that fails if non-ARCore AR mode is hidden again.
+- [x] Add an automated architecture test that fails if the standalone branch constructs an ARCore
   `Session`.
-- [ ] Add an automated architecture test that fails if hybrid SphereSLAM writes directly into the
+- [x] Add an automated architecture test that fails if hybrid SphereSLAM writes directly into the
   primary renderer pose without going through the explicit fusion seam.
+
+The three architecture guards above are enforced by
+`tools/check_sphereslam_architecture.py` in both Android CI and Merged Build & Release. The check
+is deliberately strict: any future hybrid observation consumption must introduce/update an explicit
+fusion seam rather than bypassing the guard.
 
 ---
 
@@ -48,15 +54,17 @@ These are invariants, not optional cleanup.
 
 This must happen before treating the branch as merge-ready.
 
-- [ ] Rebase/merge the one automatic version-bump commit currently ahead on `main`.
-- [ ] Resolve any resulting source/doc conflicts without changing the dual-backend architecture.
-- [ ] Run `:sphereslam:test`.
-- [ ] Run `:feature:ar:testDebugUnitTest` or the repository's actual equivalent unit-test task.
-- [ ] Run the app module's JVM/unit tests.
-- [ ] Run the repository's native locking/static checks that cover `MobileGS` / JNI.
+- [x] Rebase/merge the newer `main` commits into the standalone implementation before merge.
+- [x] Resolve the resulting native/doc conflicts without changing the dual-backend architecture.
+- [x] Run `:sphereslam:test` (covered by the repository-wide Gradle `test` task in Android CI).
+- [x] Run `:feature:ar:testDebugUnitTest` or the repository's actual equivalent unit-test task
+  (covered by the repository-wide Gradle `test` task in Android CI).
+- [x] Run the app module's JVM/unit tests (repository-wide Gradle `test` passed).
+- [x] Run the repository's native locking/static checks that cover `MobileGS` / JNI.
 - [ ] Compile the native `:core:nativebridge` target for every release ABI.
 - [ ] Build at least one debug APK containing artoolkitX KPM.
-- [ ] Build the normal release artifact(s).
+- [x] Build the normal release artifact(s): Android CI `release-build` completed
+  `assembleRelease` successfully with the real artoolkitX submodule initialized.
 - [ ] Inspect the merged manifest and confirm:
   - [ ] `android.hardware.camera.ar` remains `required="false"`;
   - [ ] `com.google.ar.core` remains optional;
@@ -64,10 +72,37 @@ This must happen before treating the branch as merge-ready.
 - [ ] Confirm ProGuard/R8 does not strip the KPM JNI entry points or standalone classes.
 - [ ] Confirm no duplicate native symbol/source issue was introduced by the explicit artoolkitX AR
   source list.
-- [ ] Add/enable CI for this branch/PR so the above checks are not dependent on a local machine.
+- [x] Add/enable CI for branch/PR validation; PR #1961 ran Android CI with the artoolkitX
+  submodule enabled in the release-build job.
+- [x] Re-run release CI after the ARUtil/minizip/SHA-1 support-source fix; the release build
+  completed successfully, proving the previous undefined-symbol failure is resolved.
 
 **ACCEPTANCE:** branch compiles, tests run, native libraries package for supported ABIs, and the
 merged manifest still permits installation on non-ARCore hardware.
+
+### CI findings — 2026-10-01
+
+PR #1961's first submodule-enabled `assembleRelease` run proved that the embedded artoolkitX build
+now compiles all KPM + explicit AR sources through creation of `libarx_kpm.a`. The final
+`libgraffitixr.so` link then failed because PR #1960 added `ARUtil/file_utils.c` without the
+support objects that upstream ARUtil links with it:
+
+- bundled minizip: `ioapi.c`, `unzip.c`, `zip.c`, `crypt.c`;
+- SHA-1: `uuid/uuid_sha1.c`;
+- Android/NDK zlib: `libz`.
+
+The continuation branch now matches those transitive upstream dependencies rather than suppressing
+individual unresolved symbols. This item remains unchecked until CI completes the final link.
+
+A later superseded CI run also caught an extra closing brace introduced while adding
+`ImageProxy.cropRect` support in `LumaFrameTransform.kt`; that Kotlin syntax regression was fixed
+at `42ec45ff` before continuing. Keep the full `test` task in the loop even when a change looks
+like pure camera math.
+
+The first architecture-guard run then produced a false negative because the checker treated the
+first nested Compose `} else {` as the end of the outer non-ARCore branch. The application source
+still mounted `SphereSlamStandaloneOverlay`; the guard now anchors the block end at the distinct
+outer ARCore branch (`var glView`) instead. This was a checker defect, not a runtime regression.
 
 ---
 
@@ -86,6 +121,7 @@ Implemented foundation:
 - [x] KPM page origin is shifted from lower-left to the centered renderer frame.
 - [x] KPM millimetres are converted to renderer units.
 - [x] Unit tests cover luma packing/quarter-turn rotation.
+- [x] Unit tests cover CameraX crop-before-rotation and principal-point crop adjustment.
 - [x] Unit tests cover KPM→OpenGL sign/layout conversion.
 - [x] Unit tests cover page centering and page scale math.
 
@@ -96,13 +132,19 @@ Remaining:
   - [ ] 4:3 sensor → landscape display;
   - [ ] 16:9/other cropped CameraX stream;
   - [ ] front camera if the app ever allows it; otherwise explicitly lock standalone AR to back camera.
-- [ ] Verify CameraX crop/zoom does not invalidate the intrinsics used by KPM.
-- [ ] If CameraX applies a crop region, incorporate that crop into `fx/fy/cx/cy`.
+- [x] Prevent CameraX crop/zoom from invalidating the intrinsics used by KPM for the supported
+  standalone path: apply ImageProxy crop explicitly and lock camera zoom at 1x while tracking.
+  - [x] Apply `ImageProxy.cropRect` to the luma pixels before rotation.
+  - [x] Shift `cx/cy` by the crop origin before rotating intrinsics.
+  - [x] Prevent CameraX digital zoom from changing standalone calibration: standalone AR disables
+    CameraController pinch-to-zoom and resets the camera to 1x while active, restoring the shared
+    controller's previous zoom behavior on exit.
+- [x] If CameraX applies an ImageProxy crop region, incorporate that crop into `fx/fy/cx/cy`.
 - [ ] Verify lens distortion is acceptable with the current zero-distortion KPM camera model.
 - [ ] If not, populate artoolkitX distortion parameters from Camera2 calibration metadata or undistort
   frames before KPM.
-- [ ] Add a diagnostic line exposing standalone frame width/height, rotation, fx/fy/cx/cy, and
-  camera ID for field bug reports.
+- [x] Add a diagnostic line exposing standalone camera ID, raw/crop/display frame dimensions,
+  rotation, and fx/fy/cx/cy for field bug reports. It emits only when effective calibration changes.
 - [ ] Test display rotation while tracking; ensure session rebuild/recalibration happens if required.
 - [ ] Test device auto-rotate disabled and confirm image/intrinsic orientation remains internally
   consistent.
@@ -121,21 +163,25 @@ Current behavior is deliberately normalized, not physically metric.
 - [x] Non-metric standalone mode does not claim a real physical measurement in the implementation
   contract.
 
-Remaining:
+Remaining / status:
 
-- [ ] Choose the first physical-scale input supported in UI:
-  - [ ] measured target width entered by the user; **recommended first implementation**;
-  - [ ] two-point wall measurement;
-  - [ ] hardware depth where available without ARCore;
-  - [ ] another independently verifiable source.
-- [ ] Add the chosen scale field(s) to project data with backward-compatible defaults.
-- [ ] Add UI for entering/capturing the scale.
-- [ ] Validate scale bounds and reject zero/negative/implausible values.
-- [ ] Pass real width to `SphereSlamStandaloneSession.addReference`.
-- [ ] Persist `sphereSlamReferencePhysicallyMetric=true` only after successful scale acquisition.
-- [ ] Update standalone distance/measurement UI so it is enabled only for physically metric targets.
-- [ ] Add unit tests proving the same pixel reference yields correct KPM DPI for several physical
-  widths.
+- [x] Choose the first physical-scale input: measured rectified-target width entered by the artist.
+  The alternatives (two-point measurement / hardware depth) can be added later without changing the
+  KPM scale contract.
+- [x] Add the chosen scale fields to project data with backward-compatible defaults
+  (`sphereSlamReferenceWidthMeters` + `sphereSlamReferencePhysicallyMetric`).
+- [x] Add capture UI that asks for the real target width after four-corner rectification.
+- [x] Validate scale bounds and reject non-finite, zero/negative, and implausible values
+  (accepted range: 0.05–100 m).
+- [x] Pass the entered real width to `SphereSlamStandaloneSession.addReference`.
+- [x] Persist `sphereSlamReferencePhysicallyMetric=true` only when a validated measured width is
+  accepted.
+- [x] Preserve an explicit "Continue Without Physical Scale" path using normalized 1.0-unit scale
+  with the metric flag false.
+- [ ] Update standalone distance/measurement UI so it is enabled only for physically metric targets
+  when such a readout is added.
+- [x] Add unit tests proving the same pixel reference round-trips through KPM DPI for several
+  physical widths, plus validation-boundary tests for the capture input.
 - [ ] Add an on-device ruler/tape-measure validation at multiple camera distances.
 
 **ACCEPTANCE:** camera translation and rendered design dimensions agree with a physical measurement
@@ -166,19 +212,28 @@ Remaining:
   - [ ] ARCore anchor creation;
   - [ ] point cloud/plane coaching.
 - [ ] Hide or replace only the truly unavailable steps, not the entire workflow.
-- [ ] Add target-quality checks before accepting a KPM page:
-  - [ ] minimum image dimensions;
-  - [ ] minimum detected KPM feature count;
-  - [ ] texture/contrast threshold;
-  - [ ] blur threshold;
-  - [ ] excessive over/under-exposure warning.
-- [ ] Provide a useful user-facing reason when page registration yields too few features.
-- [ ] Preserve the previous valid target if a replacement capture fails.
-- [ ] Confirm recapture atomically replaces persisted standalone target metadata and image.
-- [ ] Delete/garbage-collect superseded standalone reference files if filenames ever become
-  versioned rather than canonical.
-- [ ] Add tests for project save/load/import with and without standalone target metadata.
-- [ ] Add process-death restoration test.
+- [x] Add target-quality checks before accepting a KPM page:
+  - [x] minimum image dimensions/pixel count;
+  - [x] minimum native-generated KPM feature count (16 initial conservative floor);
+  - [x] texture/contrast threshold using luma standard deviation;
+  - [x] blur threshold using Laplacian variance;
+  - [x] excessive over/under-exposure warning using clipped-pixel fraction.
+- [x] Provide useful user-facing reasons for small/flat/blurry captures and too few native KPM
+  features.
+- [x] Preserve the previous valid target if a replacement fails native KPM feature validation;
+  persistence happens only after the replacement page passes native registration.
+- [x] Confirm recapture logically atomically replaces persisted standalone target metadata and
+  image: write a new versioned PNG, atomically commit URI + scale fields through the repository,
+  then delete the previous file.
+- [x] Delete/garbage-collect superseded standalone reference files best-effort after metadata commit;
+  aborted/project-switched recaptures delete their uncommitted candidate instead.
+- [x] Add project/data tests for legacy projects without standalone fields, versioned reference
+  write/delete lifecycle, and import URI relocation with standalone scale metadata.
+- [x] Add repository/viewmodel replacement-race tests: URI + width + metric flag commit together,
+  a competing recapture wins without being deleted, and an uncommitted candidate is cleaned up.
+- [x] Add process-death boundary tests: before metadata commit the old reference remains
+  authoritative; after metadata commit the new reference remains authoritative even if old-file
+  cleanup has not happened yet.
 
 **ACCEPTANCE:** an artist can create, review, save, reopen, replace, export, import, and reacquire a
 standalone wall target without touching an ARCore-specific UI dead end.
@@ -199,23 +254,30 @@ Implemented:
 Remaining:
 
 - [ ] Measure actual KPM cadence/latency on target devices.
-- [ ] Record KPM observation age in standalone diagnostics.
-- [ ] Gate stale KPM matches by timestamp, not just callback order.
-- [ ] Add configurable minimum inlier count for standalone acceptance.
-- [ ] Add configurable maximum reprojection error for standalone acceptance.
-- [ ] Add pose-jump rejection:
-  - [ ] maximum angular jump per frame;
-  - [ ] maximum translation jump per frame;
-  - [ ] separate relaxed thresholds during explicit reacquisition.
-- [ ] Add hysteresis so a single weak frame does not flap LOCKED↔LOST.
-- [ ] Define and expose standalone tracking states:
-  - [ ] INITIALIZING;
-  - [ ] LOCKED;
-  - [ ] IMU_BRIDGE;
-  - [ ] REACQUIRING;
-  - [ ] LOST;
-  - [ ] FATAL/UNAVAILABLE.
-- [ ] Feed those states into the existing AR HUD/diagnostics where possible.
+- [x] Record KPM observation age in standalone diagnostics when Camera2 declares a REALTIME
+  timestamp source; also record KPM match-processing duration on every device.
+- [x] Gate stale KPM matches by timestamp when Camera2 declares
+  `SENSOR_INFO_TIMESTAMP_SOURCE_REALTIME` (250 ms default ceiling). UNKNOWN timestamp sources are
+  never compared to `elapsedRealtimeNanos()`; absolute age is reported as unavailable rather than
+  guessed.
+- [x] Add configurable minimum inlier count for standalone acceptance. Default is 4, matching the
+  pinned artoolkitX binary KPM minimum correspondence count.
+- [x] Add configurable maximum reprojection/ICP error for standalone acceptance. Default is 10.0,
+  matching the pinned artoolkitX `kpmUtilGetPose_binary` rejection threshold.
+- [x] Add pose-jump rejection:
+  - [x] maximum angular jump per frame (90° default catastrophic-jump ceiling);
+  - [x] maximum translation jump per frame in reference-page widths (2 page widths default);
+  - [x] separate relaxed thresholds during explicit reacquisition (175° / 8 page widths).
+- [x] Add hysteresis so a single weak frame does not flap LOCKED↔LOST: acquisition/reacquisition
+  requires two consecutive accepted visual poses and a short miss enters IMU_BRIDGE first.
+- [x] Define and expose standalone tracking states:
+  - [x] INITIALIZING;
+  - [x] LOCKED;
+  - [x] IMU_BRIDGE;
+  - [x] REACQUIRING;
+  - [x] LOST;
+  - [x] FATAL.
+- [x] Feed those states into the standalone AR HUD and existing diagnostic log.
 - [ ] Evaluate whether KPM-only continuous wall tracking is sufficiently smooth for the intended
   wall-painting use case.
 - [ ] If not, add a true frame-to-frame visual/inertial tracker behind the same standalone pose
@@ -252,18 +314,31 @@ Implemented:
 
 Remaining:
 
-- [ ] Verify every rail/control available in AR mode either:
-  - [ ] works on both backends; or
-  - [ ] is explicitly disabled with a backend-specific reason.
-- [ ] Verify transform lock prevents standalone pan/scale/rotate exactly as it does in ARCore mode.
-- [ ] Verify undo/redo behavior for standalone mode adjustments.
-- [ ] Verify design visibility toggling clears the standalone GL texture rather than leaving the last
-  texture resident/visible.
-- [ ] Verify replacing/removing the design updates the standalone GL texture immediately.
-- [ ] Verify design aspect changes recalculate base extent without resetting user adjustment.
-- [ ] Confirm touch/gesture coordinates still line up when CameraX preview is letterboxed/cropped.
+- [x] Verify every AR rail/control against backend capability:
+  - [x] Light, Lock, Magic, design controls, and project/library/settings actions use shared state and
+    remain available on standalone.
+  - [x] legacy ARCore Target is disabled on standalone with “Use the on-screen Wall Target capture”.
+  - [x] Co-op Host/Join are disabled on standalone with an explicit calibration-required reason
+    until a standalone↔peer frame transform exists; Leave remains reachable for an active session.
+  - [x] AR mode preview Export is disabled on standalone with an explicit reason until CameraX +
+    transparent-GL compositing is implemented, rather than silently exporting layers-only.
+- [x] Verify transform lock prevents standalone pan/scale/rotate: both AR backends consume the same
+  `modeAdjustments[AR]`, and the shared reducer rejects AR transform gestures while locked.
+- [x] Verify undo/redo behavior for standalone mode adjustments with an explicit AR-mode gesture
+  history test; standalone and ARCore consume the same restored adjustment.
+- [x] Verify design visibility/removal clears the standalone GL texture: null design now posts an
+  explicit GL-thread clear command instead of leaving the previous texture resident.
+- [x] Verify rapid clear/replace ordering with a single-slot atomic texture-command mailbox; unit
+  tests prove the latest clear or replacement wins.
+- [x] Verify design aspect changes recalculate only the tested aspect-fit base extent; user
+  pan/scale/rotation remain in the separate persisted ModeAdjustment.
+- [x] Correct and test standalone gesture coordinates for CameraX `FIT_CENTER` letterboxing:
+  camera-frame wall-units/pixel are converted to screen wall-units/pixel using the actual fitted
+  viewport height; crop handling remains in the calibrated frame transform.
 - [ ] Add GL/instrumentation tests for standalone texture clear/replace if test infrastructure permits.
-- [ ] Test extreme but allowed pan/scale/rotation values for NaN/overflow/clipping behavior.
+- [x] Sanitize and test standalone renderer transforms: non-finite values fall back safely, scale
+  uses the shared 0.1–10 editor bounds, rotations normalize, and pathological finite pan values are
+  bounded before GL matrix construction.
 
 **ACCEPTANCE:** the same project adjustment produces the same intended artwork placement and visual
 treatment on ARCore and standalone backends, modulo explicitly documented backend capabilities.
@@ -278,26 +353,33 @@ Implemented:
 - [x] persisted reference width.
 - [x] persisted physical-metric flag.
 - [x] routine saves preserve standalone reference metadata.
-- [x] canonical reference PNG is stored inside the project directory.
+- [x] versioned reference PNG is stored inside the project directory and selected by
+  `sphereSlamReferenceUri`.
 - [x] `.gxr` export naturally includes the reference image.
 - [x] import relocates the reference URI.
 
 Remaining:
 
-- [ ] Add migration tests for projects created before the standalone fields existed.
-- [ ] Add migration tests for malformed/missing `sphereslam_reference.png`.
-- [ ] On missing/corrupt reference, clear only standalone target state and preserve the rest of the
-  project.
-- [ ] Verify duplicate/imported project IDs do not point at another project's reference file.
-- [ ] Verify project deletion removes the standalone reference.
-- [ ] Verify project copy/duplicate flows, if any, copy and rebase the standalone reference.
-- [ ] Verify co-op bulk project transfer includes and rebases the standalone reference.
-- [ ] Decide whether co-op peers need the raw reference PNG, a serialized KPM atlas, or both.
-- [ ] Do not persist raw native KPM handles.
-- [ ] If a serialized KPM dataset is later persisted:
-  - [ ] version its format;
-  - [ ] store the source image/calibration alongside it for rebuild;
-  - [ ] invalidate it when camera/page calibration assumptions change.
+- [x] Add migration/default test for projects created before the standalone fields existed.
+- [x] Add coverage for missing/corrupt URI handling plus legacy/default project behavior; legacy
+  fixed `sphereslam_reference.png` files are accepted by guarded cleanup.
+- [x] On missing/corrupt reference, clear only standalone target URI/scale fields and preserve the
+  rest of the project. Cleanup uses a compare guard so a stale failure callback cannot erase a newer
+  recapture.
+- [x] Verify duplicate-ID imports rebase the SphereSLAM URI into the newly assigned local project
+  directory and leave the existing project untouched.
+- [x] Verify project deletion removes the standalone reference with the project directory.
+- [x] Verify project copy/duplicate flows: there is no separate project-duplicate operation in the
+  repository; the two copy-like paths are duplicate-ID import and co-op spectator load, both covered
+  by explicit SphereSLAM URI-rebasing tests.
+- [x] Verify co-op bulk project transfer includes and rebases the standalone reference into the
+  spectator project directory.
+- [x] Decide co-op storage contract: transfer the raw rectified reference PNG + scale metadata and
+  rebuild KPM locally; do not serialize a native atlas.
+- [x] Do not persist raw native KPM handles.
+- [x] No serialized KPM dataset is persisted in the current design. If that policy changes later,
+  the dataset must be versioned, retain source image/calibration for rebuild, and invalidate on
+  camera/page calibration changes.
 
 **ACCEPTANCE:** no save/import/export/delete/peer-transfer operation can silently orphan or point a
 project at the wrong standalone wall page.
@@ -521,27 +603,33 @@ thread count, and temperature.
 
 Remaining:
 
-- [ ] Distinguish:
-  - [ ] native library unavailable;
-  - [ ] camera unavailable;
-  - [ ] intrinsics unavailable;
-  - [ ] reference too weak;
-  - [ ] no current page match;
-  - [ ] stale observation;
-  - [ ] excessive reprojection error;
-  - [ ] insufficient inliers;
-  - [ ] persisted target missing/corrupt.
-- [ ] Surface concise artist-facing messages for recoverable failures.
-- [ ] Keep detailed numeric reasons in diagnostics/logs.
-- [ ] Add one-copy diagnostic dump that includes backend, camera calibration, KPM state, page ID,
-  inliers, reprojection error, observation age, and physical-scale status.
+- [x] Distinguish:
+  - [x] native library unavailable;
+  - [x] camera unavailable (including a 5-second camera-ID acquisition timeout instead of an
+    infinite Preparing state);
+  - [x] intrinsics unavailable;
+  - [x] reference too weak;
+  - [x] no current page match;
+  - [x] stale observation;
+  - [x] excessive reprojection error;
+  - [x] insufficient inliers;
+  - [x] persisted target missing/corrupt;
+  - [x] catastrophic/non-finite pose continuity rejection.
+- [x] Surface concise artist-facing messages for recoverable/transient failures without turning
+  ordinary visual misses into fatal modals.
+- [x] Keep detailed numeric reasons in diagnostics/logs, including inliers, reprojection error,
+  observation age, match duration, camera calibration, and weak-reference feature counts.
+- [x] Add one-copy diagnostic dump from standalone failure/reacquisition UI with backend, camera
+  calibration, KPM state, page ID, inliers, reprojection error, observation age, match duration,
+  physical-scale status, and current failure detail.
 - [ ] Verify permission revocation while standalone AR is open.
 - [ ] Verify camera interruption by another app.
 - [ ] Verify app background/foreground during LOCKED, IMU_BRIDGE, and REACQUIRING states.
-- [ ] Verify process death during target persistence cannot leave a truncated/half-installed
-  canonical target.
-- [ ] Verify a missing native KPM build degrades with a clear unsupported-build message, not an
-  infinite spinner.
+- [x] Verify process-death boundaries for target persistence: an uncommitted candidate cannot
+  replace the old reference, while committed metadata remains authoritative even if old-file cleanup
+  had not yet run.
+- [x] Missing native KPM linkage is classified as NATIVE_LIBRARY_UNAVAILABLE and surfaces the
+  explicit unsupported-build message instead of a generic tracking failure.
 
 ---
 
@@ -563,9 +651,13 @@ Still required:
 
 ### JVM/pure math
 
-- [ ] standalone acceptance-gate tests for inliers/error/age;
-- [ ] pose-jump gate tests;
-- [ ] tracking-state hysteresis tests;
+- [x] standalone acceptance-gate tests for REALTIME observation age/staleness and UNKNOWN-source
+  no-guess behavior;
+- [x] standalone acceptance-gate tests for inliers/error/non-finite poses;
+- [x] pose-jump gate tests, including scale-independent page-width translation and relaxed
+  reacquisition thresholds;
+- [x] tracking-state hysteresis tests for initial lock, bridge, reacquisition, LOST timeout, and
+  fatal/reset behavior;
 - [ ] standalone page↔MobileGS frame conversion tests;
 - [ ] hybrid page↔ARCore frame conversion tests;
 - [ ] timestamp pairing/interpolation tests;
@@ -664,7 +756,8 @@ For every device run, record:
 
 - [x] architecture document describes dual backend.
 - [x] release checklist now expects AR mode on non-ARCore devices.
-- [x] project data docs mention `sphereslam_reference.png`.
+- [x] project data docs describe versioned `sphereslam_reference_<uuid>.png` references and
+  crash-safe swap semantics.
 - [x] KPM public API comments describe hybrid + standalone roles.
 
 Remaining:

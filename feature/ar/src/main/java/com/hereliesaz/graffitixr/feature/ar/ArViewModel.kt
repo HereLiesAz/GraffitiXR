@@ -1889,8 +1889,12 @@ class ArViewModel @Inject constructor(
 
     /**
      * Save the rectified page that lets the standalone SphereSLAM path relocalize this project on a
-     * later visit. File IO and the repository update run off Main; tracking can begin immediately
-     * from the in-memory bitmap while this persists.
+     * later visit.
+     *
+     * The image is written to a new versioned file first. Only then does the repository atomically
+     * commit URI + width + metric flag together. The old file is deleted only after that metadata
+     * commit succeeds. A project switch or competing recapture makes the transform a no-op and the
+     * uncommitted new file is removed instead.
      */
     fun saveSphereSlamReference(
         bitmap: Bitmap,
@@ -1898,21 +1902,52 @@ class ArViewModel @Inject constructor(
         physicallyMetric: Boolean = false,
     ) {
         require(referenceWidthMeters.isFinite() && referenceWidthMeters > 0f)
-        val projectId = projectRepository.currentProject.value?.id ?: return
+        val startingProject = projectRepository.currentProject.value ?: return
+        val projectId = startingProject.id
+        val expectedPreviousUri = startingProject.sphereSlamReferenceUri
+
         viewModelScope.launch(dispatchers.io) {
+            var newUri: android.net.Uri? = null
+            var transformApplied = false
+            var metadataCommitted = false
             try {
-                val uri = projectManager.saveSphereSlamReference(appContext, projectId, bitmap)
+                newUri = projectManager.saveSphereSlamReference(appContext, projectId, bitmap)
+                val candidateUri = newUri
                 projectRepository.updateProject { current ->
-                    if (current.id != projectId) current
-                    else current.copy(
-                        sphereSlamReferenceUri = uri,
-                        sphereSlamReferenceWidthMeters = referenceWidthMeters,
-                        sphereSlamReferencePhysicallyMetric = physicallyMetric,
+                    if (
+                        current.id != projectId ||
+                        current.sphereSlamReferenceUri != expectedPreviousUri
+                    ) {
+                        current
+                    } else {
+                        transformApplied = true
+                        current.copy(
+                            sphereSlamReferenceUri = candidateUri,
+                            sphereSlamReferenceWidthMeters = referenceWidthMeters,
+                            sphereSlamReferencePhysicallyMetric = physicallyMetric,
+                        )
+                    }
+                }
+                metadataCommitted = transformApplied
+
+                if (metadataCommitted) {
+                    projectManager.deleteSphereSlamReference(
+                        appContext,
+                        projectId,
+                        expectedPreviousUri,
                     )
+                } else {
+                    projectManager.deleteSphereSlamReference(appContext, projectId, newUri)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
+                if (!metadataCommitted) {
+                    projectManager.deleteSphereSlamReference(appContext, projectId, newUri)
+                }
                 throw e
             } catch (e: Exception) {
+                if (!metadataCommitted) {
+                    projectManager.deleteSphereSlamReference(appContext, projectId, newUri)
+                }
                 Timber.e(e, "Failed to persist standalone SphereSLAM reference")
                 _feedback.tryEmit(
                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
@@ -1920,6 +1955,44 @@ class ArViewModel @Inject constructor(
                         e,
                     ),
                 )
+            }
+        }
+    }
+
+    /**
+     * Clear only the standalone reference fields when the URI that failed to restore is still the
+     * project's current reference. A newer recapture wins the compare and is left untouched.
+     */
+    fun clearSphereSlamReferenceIfMatches(expectedUri: android.net.Uri) {
+        val projectId = projectRepository.currentProject.value?.id ?: return
+        viewModelScope.launch(dispatchers.io) {
+            var cleared = false
+            try {
+                projectRepository.updateProject { current ->
+                    if (
+                        current.id != projectId ||
+                        current.sphereSlamReferenceUri != expectedUri
+                    ) {
+                        current
+                    } else {
+                        cleared = true
+                        current.copy(
+                            sphereSlamReferenceUri = null,
+                            sphereSlamReferenceWidthMeters = 1f,
+                            sphereSlamReferencePhysicallyMetric = false,
+                        )
+                    }
+                }
+                if (cleared) {
+                    projectManager.deleteSphereSlamReference(appContext, projectId, expectedUri)
+                    appendDiag(
+                        "SphereSLAM standalone cleared missing/corrupt persisted reference",
+                    )
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to clear invalid standalone SphereSLAM reference")
             }
         }
     }

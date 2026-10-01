@@ -1,6 +1,8 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsics
@@ -44,12 +46,15 @@ data class SphereSlamStandaloneFrame(
     val viewMatrix: FloatArray,
     val projMatrix: FloatArray,
     val frameAspect: Float,
+    val frameHeightPixels: Int,
     val timestampNs: Long,
     val pageNo: Int,
     val reprojectionError: Float,
     val inlierCount: Int,
     /** Wall/render units represented by one vertical display-frame pixel at the target centre. */
     val unitsPerPixel: Float,
+    val observationAgeMs: Float?,
+    val matchDurationMs: Float,
     val source: SphereSlamStandalonePoseSource,
 ) {
     init {
@@ -70,16 +75,44 @@ data class SphereSlamStandaloneFrame(
  * rotation delta to the view rotation and translation column, preserving the held camera centre
  * during a pure rotation. It never double-integrates accelerometer values or invents displacement.
  */
-class SphereSlamStandaloneTrackingAnalyzer(
+internal class SphereSlamStandaloneTrackingAnalyzer(
     private val context: Context,
     private val cameraId: String,
     private val referenceImage: SphereSlamStandaloneReferenceImage,
     private val onFrameTracked: (SphereSlamStandaloneFrame?) -> Unit,
     private val onReferenceReady: (SphereSlamStandaloneSession.Reference) -> Unit = {},
+    private val onDiagnostic: (String) -> Unit = {},
+    private val onCalibrationChanged: (StandaloneCalibrationDiagnostics) -> Unit = {},
+    private val onFailure: (StandaloneFailureEvent) -> Unit = {},
+    private val onTrackingStateChanged: (StandaloneTrackingState) -> Unit = {},
     private val onFatalError: (Throwable) -> Unit = {},
+    private val poseAcceptancePolicy: StandalonePoseAcceptancePolicy =
+        StandalonePoseAcceptancePolicy(),
+    private val observationAgePolicy: StandaloneObservationAgePolicy =
+        StandaloneObservationAgePolicy(),
+    private val targetQualityConfig: StandaloneTargetQualityConfig =
+        StandaloneTargetQualityConfig(),
     private val bridge: GyroOrientationBridge = GyroOrientationBridge(context),
+    private val trackingStateMachine: StandaloneTrackingStateMachine =
+        StandaloneTrackingStateMachine(),
     private val maxBridgeMs: Long = 400L,
 ) : ImageAnalysis.Analyzer, AutoCloseable {
+
+    private data class DiagnosticKey(
+        val rawWidth: Int,
+        val rawHeight: Int,
+        val cropLeft: Int,
+        val cropTop: Int,
+        val cropWidth: Int,
+        val cropHeight: Int,
+        val rotationDegrees: Int,
+        val displayWidth: Int,
+        val displayHeight: Int,
+        val fx: Float,
+        val fy: Float,
+        val cx: Float,
+        val cy: Float,
+    )
 
     private data class SessionKey(
         val width: Int,
@@ -90,15 +123,28 @@ class SphereSlamStandaloneTrackingAnalyzer(
         val cy: Float,
     )
 
+    private val cameraTimestampSource: StandaloneCameraTimestampSource =
+        resolveCameraTimestampSource(context, cameraId)
+
     private var session: SphereSlamStandaloneSession? = null
     private var sessionKey: SessionKey? = null
+    private var lastDiagnosticKey: DiagnosticKey? = null
+    private var lastPoseRejection: StandalonePoseRejection? = null
+    private var lastFailureReason: StandaloneFailureReason? = null
+    private var lastReportedTrackingState: StandaloneTrackingState? = null
+    private var lastAcceptedVisualView: FloatArray? = null
     private var lastGood: SphereSlamStandaloneFrame? = null
+    private var lastMetricsDiagnosticMs = Long.MIN_VALUE
+    private var staleObservationReported = false
     private var frameBuffer: ByteBuffer? = null
     @Volatile private var closed = false
     @Volatile private var fatal = false
 
     fun start() {
-        if (!closed) bridge.start()
+        if (!closed) {
+            bridge.start()
+            reportTrackingState(trackingStateMachine.state)
+        }
     }
 
     override fun analyze(image: ImageProxy) {
@@ -110,13 +156,19 @@ class SphereSlamStandaloneTrackingAnalyzer(
             val rawWidth = image.width
             val rawHeight = image.height
             val rotationDeg = image.imageInfo.rotationDegrees
+            val crop = image.cropRect
+            if (crop.width() <= 0 || crop.height() <= 0) return
 
-            val rotated = LumaFrameTransform.packAndRotate(
+            val rotated = LumaFrameTransform.packCropAndRotate(
                 source = y.buffer,
-                width = rawWidth,
-                height = rawHeight,
+                sourceWidth = rawWidth,
+                sourceHeight = rawHeight,
                 rowStride = y.rowStride,
                 pixelStride = y.pixelStride,
+                cropLeft = crop.left,
+                cropTop = crop.top,
+                cropWidth = crop.width(),
+                cropHeight = crop.height(),
                 rotationDegrees = rotationDeg,
             )
 
@@ -125,14 +177,29 @@ class SphereSlamStandaloneTrackingAnalyzer(
                 cameraId,
                 rawWidth,
                 rawHeight,
-            ) ?: return
+            ) ?: run {
+                reportFailure(
+                    StandaloneFailureClassifier.event(
+                        StandaloneFailureReason.INTRINSICS_UNAVAILABLE,
+                        "camera=$cameraId raw=${rawWidth}x${rawHeight}",
+                    ),
+                )
+                return
+            }
+            val croppedIntrinsics = cropCameraIntrinsics(
+                intrinsics = rawIntrinsics,
+                cropLeft = crop.left,
+                cropTop = crop.top,
+                cropWidth = crop.width(),
+                cropHeight = crop.height(),
+            )
             val ri = CaptureRotation.rotateIntrinsics(
-                rawIntrinsics.fx,
-                rawIntrinsics.fy,
-                rawIntrinsics.cx,
-                rawIntrinsics.cy,
-                rawWidth.toFloat(),
-                rawHeight.toFloat(),
+                croppedIntrinsics.fx,
+                croppedIntrinsics.fy,
+                croppedIntrinsics.cx,
+                croppedIntrinsics.cy,
+                croppedIntrinsics.width.toFloat(),
+                croppedIntrinsics.height.toFloat(),
                 rotationDeg,
             )
             val intrinsics = CameraIntrinsics(
@@ -143,6 +210,16 @@ class SphereSlamStandaloneTrackingAnalyzer(
                 width = rotated.width,
                 height = rotated.height,
             )
+            emitCalibrationDiagnosticIfChanged(
+                rawWidth = rawWidth,
+                rawHeight = rawHeight,
+                cropLeft = crop.left,
+                cropTop = crop.top,
+                cropWidth = crop.width(),
+                cropHeight = crop.height(),
+                rotationDegrees = rotationDeg,
+                intrinsics = intrinsics,
+            )
 
             val active = ensureSession(intrinsics)
             val pendingImuReference = bridge.captureReferenceCandidate(rotationDeg)
@@ -150,13 +227,73 @@ class SphereSlamStandaloneTrackingAnalyzer(
             val projection = ProjectionMatrix.buildFrom(intrinsics)
             val direct = directFrame(rotated.bytes)
 
+            val matchStartNs = android.os.SystemClock.elapsedRealtimeNanos()
             val pose = active.match(direct, timestampNs)
+            val matchEndNs = android.os.SystemClock.elapsedRealtimeNanos()
+            val matchDurationMs = (matchEndNs - matchStartNs).toFloat() / 1_000_000f
+            val observationAge = observationAgePolicy.evaluate(
+                frameTimestampNs = timestampNs,
+                nowElapsedRealtimeNs = matchEndNs,
+                source = cameraTimestampSource,
+            )
+
             if (pose != null) {
+                if (observationAge.stale) {
+                    staleObservationReported = true
+                    reportFailure(
+                        StandaloneFailureClassifier.event(
+                            StandaloneFailureReason.STALE_OBSERVATION,
+                            "ageMs=${observationAge.ageMs} matchMs=$matchDurationMs",
+                        ),
+                    )
+                    publishVisualMiss(projection, rotated, timestampNs)
+                    return
+                }
+                staleObservationReported = false
+                val acceptance = poseAcceptancePolicy.evaluate(
+                    viewMatrix = pose.viewMatrix,
+                    inlierCount = pose.inlierCount,
+                    reprojectionError = pose.reprojectionError,
+                    previousViewMatrix = lastAcceptedVisualView,
+                    referenceWidthUnits = pose.reference.geometry.widthMeters,
+                    // Once the short visual bridge has expired, the next legitimate wall return may
+                    // be far from the previous camera pose. Keep continuity gates deliberately
+                    // looser for that explicit reacquisition case.
+                    reacquiring = trackingStateMachine.state == StandaloneTrackingState.REACQUIRING ||
+                        trackingStateMachine.state == StandaloneTrackingState.LOST,
+                )
+                if (!acceptance.accepted) {
+                    val rejection = acceptance.rejection
+                    if (rejection != null) {
+                        lastPoseRejection = rejection
+                        reportFailure(
+                            StandaloneFailureClassifier.fromPoseRejection(
+                                rejection,
+                                "page=${pose.pageNo} inliers=${pose.inlierCount} " +
+                                    "error=${pose.reprojectionError}",
+                            ),
+                        )
+                    }
+                    publishVisualMiss(projection, rotated, timestampNs)
+                    return
+                }
+
+                lastPoseRejection = null
+                lastFailureReason = null
+                lastAcceptedVisualView = pose.viewMatrix.copyOf()
+                val state = trackingStateMachine.onAcceptedVisual(android.os.SystemClock.elapsedRealtime())
+                reportTrackingState(state)
+                if (state != StandaloneTrackingState.LOCKED) {
+                    onFrameTracked(null)
+                    return
+                }
+
                 pendingImuReference?.let(bridge::commitReference)
                 val tracked = SphereSlamStandaloneFrame(
                     viewMatrix = pose.viewMatrix,
                     projMatrix = projection,
                     frameAspect = rotated.width.toFloat() / rotated.height.toFloat(),
+                    frameHeightPixels = rotated.height,
                     timestampNs = timestampNs,
                     pageNo = pose.pageNo,
                     reprojectionError = pose.reprojectionError,
@@ -166,24 +303,151 @@ class SphereSlamStandaloneTrackingAnalyzer(
                         projection,
                         rotated.height,
                     ),
+                    observationAgeMs = observationAge.ageMs,
+                    matchDurationMs = matchDurationMs,
                     source = SphereSlamStandalonePoseSource.KPM,
                 )
                 lastGood = tracked
+                emitMatchMetricsIfDue(tracked)
                 onFrameTracked(tracked)
                 return
             }
 
-            onFrameTracked(bridgeLastGood(projection, rotated, timestampNs))
+            reportFailure(
+                StandaloneFailureClassifier.event(
+                    StandaloneFailureReason.NO_CURRENT_PAGE_MATCH,
+                    "matchMs=$matchDurationMs frameTimestampNs=$timestampNs",
+                ),
+            )
+            publishVisualMiss(projection, rotated, timestampNs)
         } catch (t: Throwable) {
             if (!closed) {
                 fatal = true
                 Timber.e(t, "Standalone SphereSLAM analyzer failed")
+                reportFailure(StandaloneFailureClassifier.fromThrowable(t))
+                reportTrackingState(trackingStateMachine.onFatal())
                 onFrameTracked(null)
                 onFatalError(t)
             }
         } finally {
             image.close()
         }
+    }
+
+    private fun publishVisualMiss(
+        projection: FloatArray,
+        frame: RotatedLuma,
+        timestampNs: Long,
+    ) {
+        val bridged = bridgeLastGood(projection, frame, timestampNs)
+        val state = trackingStateMachine.onVisualMiss(
+            bridgeAvailable = bridged != null,
+            nowMs = android.os.SystemClock.elapsedRealtime(),
+        )
+        reportTrackingState(state)
+        onFrameTracked(if (state == StandaloneTrackingState.IMU_BRIDGE) bridged else null)
+    }
+
+    private fun reportFailure(event: StandaloneFailureEvent) {
+        if (event.reason == lastFailureReason) return
+        lastFailureReason = event.reason
+        onFailure(event)
+        onDiagnostic(
+            "SphereSLAM standalone failure=${event.reason} severity=${event.severity}" +
+                if (event.diagnostic.isBlank()) "" else " ${event.diagnostic}",
+        )
+    }
+
+    private fun reportTrackingState(state: StandaloneTrackingState) {
+        if (state == lastReportedTrackingState) return
+        lastReportedTrackingState = state
+        onTrackingStateChanged(state)
+        onDiagnostic("SphereSLAM standalone state=$state")
+    }
+
+    private fun emitMatchMetricsIfDue(frame: SphereSlamStandaloneFrame) {
+        val nowMs = android.os.SystemClock.elapsedRealtime()
+        if (lastMetricsDiagnosticMs != Long.MIN_VALUE && nowMs - lastMetricsDiagnosticMs < 5_000L) {
+            return
+        }
+        lastMetricsDiagnosticMs = nowMs
+        val age = frame.observationAgeMs?.let {
+            java.lang.String.format(java.util.Locale.US, "%.1f", it)
+        } ?: "unavailable"
+        onDiagnostic(
+            "SphereSLAM standalone KPM page=${frame.pageNo} inliers=${frame.inlierCount} " +
+                "error=${frame.reprojectionError} ageMs=$age " +
+                "matchMs=${java.lang.String.format(java.util.Locale.US, "%.1f", frame.matchDurationMs)}",
+        )
+    }
+
+    private fun emitCalibrationDiagnosticIfChanged(
+        rawWidth: Int,
+        rawHeight: Int,
+        cropLeft: Int,
+        cropTop: Int,
+        cropWidth: Int,
+        cropHeight: Int,
+        rotationDegrees: Int,
+        intrinsics: CameraIntrinsics,
+    ) {
+        val key = DiagnosticKey(
+            rawWidth = rawWidth,
+            rawHeight = rawHeight,
+            cropLeft = cropLeft,
+            cropTop = cropTop,
+            cropWidth = cropWidth,
+            cropHeight = cropHeight,
+            rotationDegrees = rotationDegrees,
+            displayWidth = intrinsics.width,
+            displayHeight = intrinsics.height,
+            fx = intrinsics.fx,
+            fy = intrinsics.fy,
+            cx = intrinsics.cx,
+            cy = intrinsics.cy,
+        )
+        if (key == lastDiagnosticKey) return
+        lastDiagnosticKey = key
+        onDiagnostic(
+            java.lang.String.format(
+                java.util.Locale.US,
+                "SphereSLAM standalone camera=%s timestampSource=%s raw=%dx%d crop=(%d,%d %dx%d) display=%dx%d rot=%d fx=%.2f fy=%.2f cx=%.2f cy=%.2f",
+                cameraId,
+                cameraTimestampSource.name,
+                rawWidth,
+                rawHeight,
+                cropLeft,
+                cropTop,
+                cropWidth,
+                cropHeight,
+                intrinsics.width,
+                intrinsics.height,
+                rotationDegrees,
+                intrinsics.fx,
+                intrinsics.fy,
+                intrinsics.cx,
+                intrinsics.cy,
+            ),
+        )
+        onCalibrationChanged(
+            StandaloneCalibrationDiagnostics(
+                cameraId = cameraId,
+                timestampSource = cameraTimestampSource,
+                rawWidth = rawWidth,
+                rawHeight = rawHeight,
+                cropLeft = cropLeft,
+                cropTop = cropTop,
+                cropWidth = cropWidth,
+                cropHeight = cropHeight,
+                displayWidth = intrinsics.width,
+                displayHeight = intrinsics.height,
+                rotationDegrees = rotationDegrees,
+                fx = intrinsics.fx,
+                fy = intrinsics.fy,
+                cx = intrinsics.cx,
+                cy = intrinsics.cy,
+            ),
+        )
     }
 
     private fun ensureSession(intrinsics: CameraIntrinsics): SphereSlamStandaloneSession {
@@ -224,6 +488,16 @@ class SphereSlamStandaloneTrackingAnalyzer(
                 referenceWidthMeters = referenceImage.referenceWidthMeters,
                 physicallyMetric = referenceImage.physicallyMetric,
             )
+            if (reference.featureCount < targetQualityConfig.minKpmFeatures) {
+                throw StandaloneReferenceTooWeakException(
+                    featureCount = reference.featureCount,
+                    minimumFeatureCount = targetQualityConfig.minKpmFeatures,
+                )
+            }
+            onDiagnostic(
+                "SphereSLAM standalone reference features=${reference.featureCount} " +
+                    "minimum=${targetQualityConfig.minKpmFeatures}",
+            )
             session = created
             sessionKey = key
             onReferenceReady(reference)
@@ -250,7 +524,10 @@ class SphereSlamStandaloneTrackingAnalyzer(
             viewMatrix = rotateViewPoseKeepingCameraCenter(held.viewMatrix, delta),
             projMatrix = projection,
             frameAspect = frame.width.toFloat() / frame.height.toFloat(),
+            frameHeightPixels = frame.height,
             timestampNs = timestampNs,
+            observationAgeMs = held.observationAgeMs,
+            matchDurationMs = held.matchDurationMs,
             source = SphereSlamStandalonePoseSource.IMU_BRIDGE,
         )
     }
@@ -278,6 +555,21 @@ class SphereSlamStandaloneTrackingAnalyzer(
         return buffer
     }
 
+    private fun resolveCameraTimestampSource(
+        context: Context,
+        cameraId: String,
+    ): StandaloneCameraTimestampSource = runCatching {
+        val manager = context.getSystemService(CameraManager::class.java)
+        when (
+            manager.getCameraCharacteristics(cameraId)
+                .get(CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE)
+        ) {
+            CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE_REALTIME ->
+                StandaloneCameraTimestampSource.REALTIME
+            else -> StandaloneCameraTimestampSource.UNKNOWN
+        }
+    }.getOrDefault(StandaloneCameraTimestampSource.UNKNOWN)
+
     override fun close() {
         if (closed) return
         closed = true
@@ -287,6 +579,14 @@ class SphereSlamStandaloneTrackingAnalyzer(
         session?.close()
         session = null
         sessionKey = null
+        lastDiagnosticKey = null
+        lastPoseRejection = null
+        lastFailureReason = null
+        lastReportedTrackingState = null
+        trackingStateMachine.reset()
+        lastAcceptedVisualView = null
+        lastMetricsDiagnosticMs = Long.MIN_VALUE
+        staleObservationReported = false
         frameBuffer = null
     }
 }

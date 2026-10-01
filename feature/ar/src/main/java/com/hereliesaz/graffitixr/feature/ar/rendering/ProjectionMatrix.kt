@@ -5,9 +5,9 @@ import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsics
 
 /**
  * Builds an [OverlayRenderer]-ready OpenGL projection matrix from pinhole camera intrinsics — the
- * piece ARCore's `Camera.getProjectionMatrix()` supplies for free and CameraX doesn't, needed for
- * [com.hereliesaz.graffitixr.feature.ar.BridgedHomographyTracker]'s fallback pose to render through
- * the same [OverlayRenderer.draw] path AR mode uses.
+ * piece ARCore's `Camera.getProjectionMatrix()` supplies for free and CameraX doesn't. It is used
+ * by both standalone SphereSLAM AR and the legacy homography Overlay tracker so their CameraX poses
+ * render through the same [OverlayRenderer.draw] path.
  *
  * Unlike the device-IMU alignment in `GyroOrientationBridge` (asserted from platform guarantees,
  * not yet device-verified), this conversion is pure, closed-form math, derived and pin-tested here

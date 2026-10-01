@@ -31,6 +31,7 @@ class SphereSlamStandaloneSessionTest {
         assertEquals(1f, reference.geometry.widthMeters, 0.0001f)
         assertEquals(0.5f, reference.geometry.heightMeters, 0.0001f)
         assertFalse(reference.physicallyMetric)
+        assertEquals(64, reference.featureCount)
 
         engine.nextMatch = PlanarMatch(
             pageNo = 0,

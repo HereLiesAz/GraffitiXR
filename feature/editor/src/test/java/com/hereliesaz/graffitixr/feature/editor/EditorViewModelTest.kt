@@ -10,6 +10,7 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.graffitixr.common.model.EditorMode
+import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
@@ -405,6 +406,70 @@ class EditorViewModelTest {
         viewModel.onUndoClicked()
         testDispatcher.scheduler.advanceUntilIdle()
         assertEquals(androidx.compose.ui.graphics.BlendMode.SrcOver, viewModel.uiState.value.design!!.blendMode)
+    }
+
+    @Test
+    fun `AR transform lock blocks shared mode gesture used by both AR backends`() = runTest {
+        viewModel.setEditorMode(EditorMode.AR)
+        addDesign()
+        viewModel.onToggleModeTransformLocked(EditorMode.AR)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val locked = viewModel.uiState.value.modeAdjustments[EditorMode.AR]!!
+        assertTrue(locked.isTransformLocked)
+
+        viewModel.onModeTransformGesture(
+            EditorMode.AR,
+            pan = Offset(0.5f, -0.25f),
+            zoom = 2f,
+            rotationDelta = 30f,
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val after = viewModel.uiState.value.modeAdjustments[EditorMode.AR]!!
+        assertEquals(0f, after.offsetX, 1e-4f)
+        assertEquals(0f, after.offsetY, 1e-4f)
+        assertEquals(1f, after.scale, 1e-4f)
+        assertEquals(0f, after.rotation, 1e-4f)
+        assertTrue(viewModel.uiState.value.showLockedFeedback)
+    }
+
+    @Test
+    fun `AR mode gesture undo and redo restore the shared standalone adjustment`() = runTest {
+        viewModel.setEditorMode(EditorMode.AR)
+        addDesign()
+
+        viewModel.onGestureStart()
+        viewModel.onModeTransformGesture(
+            EditorMode.AR,
+            pan = Offset(0.4f, -0.2f),
+            zoom = 1.5f,
+            rotationDelta = 20f,
+        )
+        viewModel.onGestureEnd()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        var adjustment = viewModel.uiState.value.modeAdjustments[EditorMode.AR]!!
+        assertEquals(0.4f, adjustment.offsetX, 1e-4f)
+        assertEquals(-0.2f, adjustment.offsetY, 1e-4f)
+        assertEquals(1.5f, adjustment.scale, 1e-4f)
+        assertEquals(20f, adjustment.rotation, 1e-4f)
+
+        viewModel.onUndoClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        adjustment = viewModel.uiState.value.modeAdjustments[EditorMode.AR] ?: ModeAdjustment()
+        assertEquals(0f, adjustment.offsetX, 1e-4f)
+        assertEquals(0f, adjustment.offsetY, 1e-4f)
+        assertEquals(1f, adjustment.scale, 1e-4f)
+        assertEquals(0f, adjustment.rotation, 1e-4f)
+
+        viewModel.onRedoClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        adjustment = viewModel.uiState.value.modeAdjustments[EditorMode.AR]!!
+        assertEquals(0.4f, adjustment.offsetX, 1e-4f)
+        assertEquals(-0.2f, adjustment.offsetY, 1e-4f)
+        assertEquals(1.5f, adjustment.scale, 1e-4f)
+        assertEquals(20f, adjustment.rotation, 1e-4f)
     }
 
     @Test

@@ -14,10 +14,10 @@ This document lists key files in the repository and their purposes.
 
 ## Application (`:app`)
 *   `MainActivity.kt`: Entry point. Holds `ArViewModel by viewModels()` for `onResume/onPause` ARCore lifecycle. Configures the AzNavRail (10.18) via `azTheme()`, `azConfig()`, `azAdvanced(helpEnabled = true, helpList = …)`, registers the rail items (`ConfigureRailItems`), and the reactive guidance graph (`ConfigureGuidance`). Captures the host-provided `AzGuidanceController` from `LocalAzGuidanceController.current` so the Help item can replay the tour. Passes `arViewModel` and `onRendererCreated` into `MainScreen`.
-*   `MainScreen.kt`: `ArViewport` composable. Manages mode-based rendering (AR = `GLSurfaceView` —
-    `ArRenderer` handles the camera feed and the AR overlay composite; Overlay = CameraX or, on the
-    small number of ARCore-unavailable devices, a planar homography tracker; Mockup/Trace = static).
-    Shows live tracking state chip in AR mode.
+*   `MainScreen.kt`: `ArViewport` composable. Selects the AR backend after ARCore capability
+    resolves: supported devices keep the existing ARCore `ArRenderer`; unsupported devices keep AR
+    mode and layer `SphereSlamStandaloneOverlay` over CameraX. Overlay mode remains CameraX and can
+    use its separate legacy homography tracker on non-ARCore devices; Mockup/Trace are static.
 *   `MainViewModel.kt`: Cross-cutting state — touch lock, `CaptureStep` wizard for target creation, and the persisted first-run flag for the AR-unavailable explainer.
 *   `GuidanceDefinitions.kt`: The reactive status-driven guidance graph (AzNavRail 10.18) that replaced the old scripted-tutorial API and the hand-built onboarding coach. Declares `azStatus`/`azEdge`/`azGoal`/`azSuppressGuide` reusing the existing `onboarding_*` strings; per-mode goals self-activate on mode entry and persist completion.
 *   `HelpItemsBuilder.kt`: Builds the `helpList` map for the rail's help overlay (rail-item id → help text).
@@ -64,19 +64,44 @@ This document lists key files in the repository and their purposes.
 *   `src/main/cpp/LowLightEnhancer.cpp`: Low-light frame enhancement for feature detection.
 *   `src/main/cpp/MlasStub.cpp`: Build-time stub patching a missing ONNX Runtime symbol.
 
+### `:sphereslam`
+
+*   `SphereSlamStandaloneSession.kt`: synchronous calibrated KPM page session used by CameraX
+    standalone AR; returns the pose for the exact submitted frame.
+*   `SphereSlamTracker.kt`: asynchronous lower-rate KPM sidecar used beside ARCore.
+*   `KpmSphereSlamEngine.kt` / `KpmBridge.kt`: shared KPM engine/JNI ownership for both roles.
+*   `SphereSlamPoseMath.kt`: page DPI/scale and KPM camera-from-page → centered OpenGL view
+    conversion.
+*   The native KPM atlas/session is rebuildable state and is never persisted; projects store the
+    rectified reference PNG plus scale metadata.
+
 ## Feature Modules
 
 ### `:feature:ar`
-*   `ArViewModel.kt`: ARCore session lifecycle (`initArSession`, `attachSessionToRenderer`, `resumeArSession`, `pauseArSession`), GPS, flashlight, tracking state, keyframe capture.
-*   `rendering/ArRenderer.kt`: `GLSurfaceView.Renderer`. Initialises `BackgroundRenderer`; calls
-    `setArCoreTrackingState`, `updateCamera`, `feedYuvFrame`/`feedColorFrame` each frame, and composes
-    the AR overlay via `PoseFusion` — no `draw()` call, no map to render. `onTrackingUpdated: (Boolean)`
-    callback reports state to `ArViewModel`.
-*   `rendering/BackgroundRenderer.kt`: OpenGL ES shader that renders ARCore's `EXTERNAL_OES` camera texture full-screen.
-*   `CameraPreview.kt`: CameraX preview composable — used in Overlay mode on ARCore-available devices.
-*   `computervision/DualAnalyzer.kt`: `ImageAnalysis.Analyzer` for relocalization callbacks and light estimation.
-*   `src/test/.../DualAnalyzerTest.kt`: Unit tests for SLAM callback, light throttle, luminosity path.
-*   `src/test/.../ArViewModelTest.kt`: Unit tests for session management, flashlight, GPS, keyframe.
+*   `ArViewModel.kt`: ARCore session lifecycle for the ARCore backend plus shared flashlight/GPS
+    state and crash-safe standalone SphereSLAM reference persistence.
+*   `rendering/ArRenderer.kt`: ARCore `GLSurfaceView.Renderer`. Initialises `BackgroundRenderer`;
+    calls `setArCoreTrackingState`, `updateCamera`, `feedYuvFrame`/`feedColorFrame`, and composes
+    the ARCore overlay via `PoseFusion`.
+*   `SphereSlamStandaloneOverlay.kt`: non-ARCore AR surface. Owns rectified wall-target capture,
+    CameraX analyzer lifecycle, KPM/reacquisition HUD, GL overlay, target restore, and copyable
+    diagnostics.
+*   `SphereSlamStandaloneTrackingAnalyzer.kt`: synchronous display-oriented CameraX luma →
+    calibrated KPM pose pipeline with quality gates, observation-age checks, pose-jump rejection,
+    tracking-state hysteresis, and the short rotation-only IMU bridge.
+*   `StandaloneFailure.kt` / `StandaloneDiagnostics.kt`: typed standalone failure taxonomy and the
+    compact diagnostic dump contract.
+*   `rendering/HomographyOverlayRenderer.kt`: transparent CameraX GL overlay renderer shared by
+    standalone SphereSLAM AR and the legacy homography Overlay tracker.
+*   `rendering/BackgroundRenderer.kt`: OpenGL ES shader that renders ARCore's `EXTERNAL_OES`
+    camera texture full-screen.
+*   `CameraPreview.kt`: shared CameraX preview for Overlay and standalone SphereSLAM AR.
+*   `HomographyFallbackOverlay.kt` / `HomographyArTracker.kt`: legacy planar live tracking used by
+    Overlay mode on non-ARCore devices; not the standalone AR backend.
+*   `computervision/DualAnalyzer.kt`: ARCore-side `ImageAnalysis.Analyzer` for relocalization
+    callbacks and light estimation.
+*   `src/test/.../ArViewModelTest.kt` and standalone tests: lifecycle/persistence, calibration,
+    tracking-state, failure, renderer-math, and KPM policy coverage.
 
 ### `:feature:editor`
 *   `EditorViewModel.kt`: Placement and legibility for the single design image (there is no
@@ -89,7 +114,9 @@ This document lists key files in the repository and their purposes.
 *   `ProjectLibraryScreen.kt`: Full-screen project list UI.
 
 ---
-*Documentation updated on 2026-09-04: removed the Persistent Voxel Memory / `slamManager.draw()` /
+*Documentation updated on 2026-10-01: added the dual ARCore/SphereSLAM backend ownership and
+standalone CameraX/KPM files. Earlier 2026-09-04 update removed the Persistent Voxel Memory /
+`slamManager.draw()` /
 `VoxelHash.*` / `StereoProcessor.cpp` claims (none of those files or methods exist), corrected the
 `:core:nativebridge` and `:feature:ar` sections against the current native/Kotlin source. Prior
 update: 2026-03-17, website redesign and Stencil generation integration phase.*
