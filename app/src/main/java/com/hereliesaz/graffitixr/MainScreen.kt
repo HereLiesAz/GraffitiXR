@@ -193,7 +193,29 @@ fun MainScreen(
                         val standaloneDesign = uiState.design?.takeIf {
                             it.isVisible && it.bitmap != null
                         }
-                        val standaloneAdj = uiState.modeAdjustments[EditorMode.AR]
+                        val rawStandaloneAdj = uiState.modeAdjustments[EditorMode.AR]
+                        // Spatial AR placement belongs to one canonical standalone wall generation.
+                        // Tone is frame-independent, so a recapture preserves the look but refuses
+                        // the old pan/scale/rotation until the artist places it in the new frame.
+                        val standaloneAdj =
+                            if (
+                                rawStandaloneAdj != null &&
+                                arUiState.sphereSlamReferenceUri != null &&
+                                arUiState.sphereSlamPlacementAnchorGeneration !=
+                                    arUiState.sphereSlamAnchorGeneration
+                            ) {
+                                rawStandaloneAdj.copy(
+                                    offsetX = 0f,
+                                    offsetY = 0f,
+                                    scale = 1f,
+                                    rotation = 0f,
+                                    rotationX = 0f,
+                                    rotationY = 0f,
+                                    isTransformLocked = false,
+                                )
+                            } else {
+                                rawStandaloneAdj
+                            }
                         var standaloneTexture by remember { mutableStateOf<AndroidBitmap?>(null) }
 
                         // Match ARCore mode's texture treatment: tone fields are baked into the
