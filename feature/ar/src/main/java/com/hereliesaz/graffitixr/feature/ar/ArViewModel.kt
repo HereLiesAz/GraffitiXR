@@ -24,7 +24,9 @@ import com.hereliesaz.graffitixr.common.util.imageStats
 import com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
 import com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
+import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import com.google.ar.core.Config
@@ -46,6 +48,7 @@ import com.hereliesaz.graffitixr.feature.ar.coop.calibration.Procrustes
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import com.hereliesaz.sphereslam.SphereSlam
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.data.ProjectManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -64,6 +67,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.design.R as DesignR
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -1093,6 +1097,18 @@ class ArViewModel @Inject constructor(
             val result = ArAvailabilityChecker.check(appContext)
             val supported = result == ArAvailabilityChecker.Result.Supported ||
                 result == ArAvailabilityChecker.Result.NeedsInstallOrUpdate
+            if (!supported) {
+                // The native MobileGS instance is process-global. Project loading may have installed
+                // an ARCore/capture-camera fingerprint while ARCore capability was still UNKNOWN.
+                // Clear that frame BEFORE publishing "ARCore unavailable"; the standalone analyzer
+                // starts only after this state update and will then install the centered page-frame
+                // fingerprint deterministically.
+                loadedFingerprint = null
+                slamManager.clearWallFingerprint()
+                slamManager.clearWallFeatureMap()
+                slamManager.overlayMarkCenterLocal = null
+                slamManager.captureAnchorCam = null
+            }
             _uiState.update {
                 it.copy(
                     isArCoreAvailable = supported,
@@ -1100,6 +1116,27 @@ class ArViewModel @Inject constructor(
                 )
             }
             Timber.i("ArCore availability resolved: $result (supported=$supported)")
+        }
+        viewModelScope.launch(dispatchers.io) {
+            // ARCore and SphereSLAM are independent optional capabilities. In particular, a phone
+            // reporting ARCore unsupported must not be routed into standalone AR merely because the
+            // Kotlin classes are present: stripped/dev packaging can omit the native KPM objects.
+            //
+            // isAvailable() proves the JNI entry points are linked; smokeTest() exercises native
+            // handle creation/destruction so a partially packaged binary also fails closed.
+            val available = runCatching {
+                SphereSlam.isAvailable() && SphereSlam.smokeTest(640, 480)
+            }.onFailure { error ->
+                Timber.w(error, "SphereSLAM/KPM runtime capability probe failed")
+            }.getOrDefault(false)
+
+            _uiState.update {
+                it.copy(
+                    isSphereSlamAvailable = available,
+                    isSphereSlamAvailabilityResolved = true,
+                )
+            }
+            Timber.i("SphereSLAM/KPM availability resolved: available=$available")
         }
         viewModelScope.launch {
             projectRepository.currentProject.collect { project ->
@@ -1110,12 +1147,21 @@ class ArViewModel @Inject constructor(
                             project?.sphereSlamReferenceWidthMeters ?: 1f,
                         sphereSlamReferencePhysicallyMetric =
                             project?.sphereSlamReferencePhysicallyMetric ?: false,
+                        sphereSlamFingerprint = project?.sphereSlamFingerprint,
+                        sphereSlamFingerprintFrameVersion =
+                            project?.sphereSlamFingerprintFrameVersion
+                                ?: com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                     )
                 }
                 if (project != null) {
                     loadedProjectId = project.id
-                    loadMapIfExists()
-                    loadFingerprintIfExists()
+                    // Once ARCore is known unavailable, the standalone analyzer exclusively owns the
+                    // native wall fingerprint. Re-running these ARCore loaders on every project save
+                    // would race it and reinterpret capture-camera maps in the centered page frame.
+                    if (_uiState.value.isArCoreAvailable) {
+                        loadMapIfExists()
+                        loadFingerprintIfExists()
+                    }
                 }
             }
         }
@@ -1420,6 +1466,12 @@ class ArViewModel @Inject constructor(
                 "ambientScan=${_uiState.value.ambientScanEnabled} sessionExists=${session != null}"
         )
         if (enabled) {
+            // Standalone SphereSLAM uses the same native MobileGS instance but installs a page-frame
+            // fingerprint into it. Force the normal ARCore fingerprint loader to touch native again
+            // on ARCore entry even when the project id/value itself did not change.
+            loadedFingerprint = null
+            loadFingerprintIfExists()
+
             val now = System.currentTimeMillis()
             arEntryTimestampMs = now
             lastTrackingTimestampMs = now
@@ -1909,8 +1961,20 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.io) {
             var newUri: android.net.Uri? = null
             var transformApplied = false
-            var metadataCommitted = false
             try {
+                // Build the MobileGS seed from the KPM-validated rectified page before committing
+                // metadata. A failure here does NOT invalidate KPM wall tracking; it merely leaves
+                // the optional MobileGS seed absent for this reference.
+                val standaloneFingerprint = runCatching {
+                    StandaloneFingerprintBuilder.build(
+                        slam = slamManager,
+                        bitmap = bitmap,
+                        referenceWidthMeters = referenceWidthMeters,
+                    )
+                }.onFailure { error ->
+                    Timber.w(error, "Standalone MobileGS fingerprint seed build failed")
+                }.getOrNull()
+
                 newUri = projectManager.saveSphereSlamReference(appContext, projectId, bitmap)
                 val candidateUri = newUri
                 projectRepository.updateProject { current ->
@@ -1921,16 +1985,19 @@ class ArViewModel @Inject constructor(
                         current
                     } else {
                         transformApplied = true
+                        lastStandaloneGuideKey = null
                         current.copy(
                             sphereSlamReferenceUri = candidateUri,
                             sphereSlamReferenceWidthMeters = referenceWidthMeters,
                             sphereSlamReferencePhysicallyMetric = physicallyMetric,
+                            sphereSlamFingerprint = standaloneFingerprint,
+                            sphereSlamFingerprintFrameVersion =
+                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                         )
                     }
                 }
-                metadataCommitted = transformApplied
 
-                if (metadataCommitted) {
+                if (transformApplied) {
                     projectManager.deleteSphereSlamReference(
                         appContext,
                         projectId,
@@ -1940,13 +2007,27 @@ class ArViewModel @Inject constructor(
                     projectManager.deleteSphereSlamReference(appContext, projectId, newUri)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
-                if (!metadataCommitted) {
-                    projectManager.deleteSphereSlamReference(appContext, projectId, newUri)
+                // updateProject persists project.json before it publishes currentProject. A
+                // cancellation can therefore arrive after either half of that commit. Reconcile
+                // against both in-memory and on-disk metadata before deleting either image.
+                withContext(NonCancellable) {
+                    reconcileInterruptedSphereSlamReferenceSave(
+                        projectId = projectId,
+                        expectedPreviousUri = expectedPreviousUri,
+                        candidateUri = newUri,
+                    )
                 }
                 throw e
             } catch (e: Exception) {
-                if (!metadataCommitted) {
-                    projectManager.deleteSphereSlamReference(appContext, projectId, newUri)
+                // The same ambiguity exists for an exception thrown after the atomic project.json
+                // replacement but before updateProject returns. Never decide from a local boolean
+                // alone whether the candidate is safe to delete.
+                withContext(NonCancellable) {
+                    reconcileInterruptedSphereSlamReferenceSave(
+                        projectId = projectId,
+                        expectedPreviousUri = expectedPreviousUri,
+                        candidateUri = newUri,
+                    )
                 }
                 Timber.e(e, "Failed to persist standalone SphereSLAM reference")
                 _feedback.tryEmit(
@@ -1956,6 +2037,40 @@ class ArViewModel @Inject constructor(
                     ),
                 )
             }
+        }
+    }
+
+    /**
+     * Resolve an interrupted standalone-reference swap from authoritative state.
+     *
+     * [ProjectRepositoryImpl.updateProject] writes project.json before publishing currentProject,
+     * so interruption can leave either source one step ahead of the other. If either source already
+     * points at [candidateUri], the candidate is committed and must be kept; the superseded image can
+     * be removed. Otherwise the candidate never became authoritative and is safe to delete.
+     */
+    private suspend fun reconcileInterruptedSphereSlamReferenceSave(
+        projectId: String,
+        expectedPreviousUri: android.net.Uri?,
+        candidateUri: android.net.Uri?,
+    ) {
+        val candidate = candidateUri ?: return
+        val currentCommitted =
+            projectRepository.currentProject.value?.let { current ->
+                current.id == projectId && current.sphereSlamReferenceUri == candidate
+            } == true
+        val diskCommitted = runCatching {
+            projectManager.loadProjectMetadata(appContext, projectId)
+                ?.sphereSlamReferenceUri == candidate
+        }.getOrDefault(false)
+
+        if (currentCommitted || diskCommitted) {
+            projectManager.deleteSphereSlamReference(
+                appContext,
+                projectId,
+                expectedPreviousUri,
+            )
+        } else {
+            projectManager.deleteSphereSlamReference(appContext, projectId, candidate)
         }
     }
 
@@ -1980,6 +2095,10 @@ class ArViewModel @Inject constructor(
                             sphereSlamReferenceUri = null,
                             sphereSlamReferenceWidthMeters = 1f,
                             sphereSlamReferencePhysicallyMetric = false,
+                            // The seed's object points are defined by this exact page. Keeping it
+                            // after the page is gone would let a later standalone runtime restore a
+                            // coordinate frame it can no longer reconstruct or verify.
+                            sphereSlamFingerprint = null,
                         )
                     }
                 }
@@ -3176,6 +3295,81 @@ class ArViewModel @Inject constructor(
                 artworkRegInFlight.set(false)
             }
             tryAutoFit()
+        }
+    }
+
+    @Volatile private var lastStandaloneGuideKey: String? = null
+    @Volatile private var lastStandaloneNativeUiUpdateMs: Long = Long.MIN_VALUE
+
+    /**
+     * Register the artwork validator for the ARCore-independent MobileGS path.
+     *
+     * This is intentionally descriptors-only: the standalone wall fingerprint already carries
+     * metric/normalized 3D page points, while the artwork image has no depth map of its own. Native
+     * MobileGS explicitly supports this mode for painting progress and falls back to global
+     * clean-wall↔artwork matching until standalone design-placement gating is proven.
+     *
+     * Do NOT call [tryAutoFit] here. Its pose/frame assumptions are still the ARCore fingerprint
+     * contract and are tracked separately in SPHERESLAM_TODO.md.
+     */
+    fun updateStandalonePaintingGuide(bitmap: Bitmap, designKey: String? = null) {
+        if (designKey != null && designKey == lastStandaloneGuideKey) return
+        if (!artworkRegInFlight.compareAndSet(false, true)) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                slamManager.setArtworkFingerprint(
+                    bitmap,
+                    null,
+                    0,
+                    0,
+                    0,
+                    FloatArray(4),
+                    FloatArray(16),
+                )
+                lastStandaloneGuideKey = designKey
+                Timber.i("Standalone MobileGS artwork guide registered: key=$designKey")
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                Timber.e(e, "Failed to register standalone MobileGS artwork guide")
+            } finally {
+                artworkRegInFlight.set(false)
+            }
+        }
+    }
+
+    /**
+     * Mirror the native MobileGS state into the backend-neutral AR UI while standalone CameraX/KPM
+     * is active. The JNI getters are the same ones ARCore mode already samples in [setTrackingState].
+     *
+     * Called at camera cadence, but native painting progress changes at reloc cadence (~1–2 Hz), so
+     * cap UI/native polling at 10 Hz to avoid pointless JNI traffic.
+     */
+    fun onStandaloneTrackingTick(isTracking: Boolean) {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastStandaloneNativeUiUpdateMs < 100L) return
+        lastStandaloneNativeUiUpdateMs = now
+
+        val progress = if (isTracking) {
+            slamManager.getPaintingProgress()
+        } else {
+            _uiState.value.paintingProgress
+        }
+        val featureProgress = slamManager.getFeatureProgress()
+        val reloc = slamManager.getRelocDiagnostics()
+        val corrob = slamManager.getCorroborationDiagnostics()
+        val wallPoints = slamManager.getWallKeypointCount()
+
+        _uiState.update { state ->
+            state.copy(
+                isScanning = isTracking,
+                isArReady = state.isArReady || isTracking,
+                paintingProgress = progress,
+                featureProgress = featureProgress,
+                relocDiagnostics = reloc,
+                corroborationDiagnostics = corrob,
+                wallFingerprintPoints = wallPoints,
+            )
         }
     }
 

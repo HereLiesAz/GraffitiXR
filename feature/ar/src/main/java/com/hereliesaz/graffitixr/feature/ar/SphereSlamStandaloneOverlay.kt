@@ -12,6 +12,7 @@ import android.os.Looper
 import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
+import androidx.camera.core.CameraSelector
 import androidx.camera.view.LifecycleCameraController
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -43,7 +44,9 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.viewinterop.AndroidView
+import com.hereliesaz.graffitixr.common.model.Fingerprint
 import com.hereliesaz.graffitixr.common.model.ModeAdjustment
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import com.hereliesaz.graffitixr.design.theme.rememberAppStrings
 import com.hereliesaz.graffitixr.feature.ar.rendering.HomographyOverlayRenderer
@@ -81,6 +84,10 @@ private val SPHERESLAM_DEFAULT_UNWARP_POINTS = listOf(
 fun SphereSlamStandaloneOverlay(
     cameraController: LifecycleCameraController,
     designBitmap: Bitmap?,
+    slamManager: SlamManager,
+    mobileGsFingerprint: Fingerprint? = null,
+    mobileGsFingerprintFrameVersion: Int =
+        com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     persistedReferenceUri: Uri? = null,
     persistedReferenceWidthMeters: Float = 1f,
     persistedReferencePhysicallyMetric: Boolean = false,
@@ -88,6 +95,7 @@ fun SphereSlamStandaloneOverlay(
     onPersistedReferenceInvalid: (Uri) -> Unit = {},
     adjustment: ModeAdjustment? = null,
     onUnitsPerPixel: (Float) -> Unit = {},
+    onTrackingTick: (Boolean) -> Unit = {},
     onDiagnostic: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -114,6 +122,9 @@ fun SphereSlamStandaloneOverlay(
     var referenceReady by remember { mutableStateOf(false) }
     var referenceWidthUnits by remember { mutableStateOf(0f) }
     var referenceHeightUnits by remember { mutableStateOf(0f) }
+    var designBaseHalfExtents by remember {
+        mutableStateOf<StandaloneDesignHalfExtents?>(null)
+    }
     var trackingState by remember {
         mutableStateOf(StandaloneTrackingState.INITIALIZING)
     }
@@ -140,10 +151,14 @@ fun SphereSlamStandaloneOverlay(
     }
 
     fun resetCapture() {
-        referenceBitmap?.let {
-            previousReferenceBitmap = it
-            previousReferenceWidthMeters = activeReferenceWidthMeters
-            previousReferencePhysicallyMetric = activeReferencePhysicallyMetric
+        // Only a page that completed native KPM registration is a safe rollback candidate.
+        // Keeping an unvalidated bitmap here can create an infinite weak-target restore loop.
+        if (referenceReady) {
+            referenceBitmap?.let {
+                previousReferenceBitmap = it
+                previousReferenceWidthMeters = activeReferenceWidthMeters
+                previousReferencePhysicallyMetric = activeReferencePhysicallyMetric
+            }
         }
         rawCaptureBitmap = null
         pendingReferenceBitmap = null
@@ -382,8 +397,48 @@ fun SphereSlamStandaloneOverlay(
             pageHeightUnits = referenceHeightUnits,
             designWidthPx = designBitmap?.width,
             designHeightPx = designBitmap?.height,
-        ) ?: return@LaunchedEffect
-        glRenderer.setExtent(fit.halfWidth, fit.halfHeight)
+        )
+        designBaseHalfExtents = fit
+        if (fit != null) glRenderer.setExtent(fit.halfWidth, fit.halfHeight)
+    }
+
+    // Push the SAME wall-local rigid placement/extents used by the standalone renderer into
+    // MobileGS. This turns corroboration from global descriptor search into the spatially gated
+    // path and gives self-grow an unambiguous fingerprint-frame Φ when that experiment is enabled.
+    LaunchedEffect(
+        slamManager,
+        mobileGsFingerprint,
+        designBitmap,
+        designBaseHalfExtents,
+        adjustment?.offsetX,
+        adjustment?.offsetY,
+        adjustment?.scale,
+        adjustment?.rotation,
+    ) {
+        val placement = if (mobileGsFingerprint == null || designBitmap == null) {
+            null
+        } else {
+            standaloneDesignPlacement(
+                base = designBaseHalfExtents,
+                panX = adjustment?.offsetX ?: 0f,
+                panY = adjustment?.offsetY ?: 0f,
+                scale = adjustment?.scale ?: 1f,
+                storedClockwiseRotationDeg = adjustment?.rotation ?: 0f,
+            )
+        }
+        slamManager.setDesignPlacement(
+            placement?.fingerprintFromDesign,
+            placement?.halfWidth ?: 0f,
+            placement?.halfHeight ?: 0f,
+        )
+    }
+
+    DisposableEffect(slamManager) {
+        onDispose {
+            // MobileGS is process-global; never let this project's placement leak into another mode
+            // or project after the standalone composition leaves.
+            slamManager.setDesignPlacement(null, 0f, 0f)
+        }
     }
 
     val cameraId by produceState<String?>(initialValue = null, cameraController, reference) {
@@ -432,6 +487,14 @@ fun SphereSlamStandaloneOverlay(
     // intrinsics behind KPM while GraffitiXR's own pinch gesture is supposed to scale the artwork.
     // Keep the standalone camera calibrated at 1x for this composition only, and restore the shared
     // controller state when leaving standalone AR.
+    DisposableEffect(cameraController) {
+        val previousSelector = cameraController.cameraSelector
+        cameraController.cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+        onDispose {
+            cameraController.cameraSelector = previousSelector
+        }
+    }
+
     DisposableEffect(cameraController, cameraId) {
         val id = cameraId
         if (id == null) {
@@ -449,7 +512,13 @@ fun SphereSlamStandaloneOverlay(
         }
     }
 
-    DisposableEffect(cameraController, cameraId, referenceImage) {
+    DisposableEffect(
+        cameraController,
+        cameraId,
+        referenceImage,
+        mobileGsFingerprint,
+        mobileGsFingerprintFrameVersion,
+    ) {
         val id = cameraId
         if (id == null) {
             onDispose {}
@@ -461,6 +530,9 @@ fun SphereSlamStandaloneOverlay(
                 context = context,
                 cameraId = id,
                 referenceImage = referenceImage,
+                slamManager = slamManager,
+                mobileGsFingerprint = mobileGsFingerprint,
+                mobileGsFingerprintFrameVersion = mobileGsFingerprintFrameVersion,
                 onReferenceReady = { registered: SphereSlamStandaloneSession.Reference ->
                     val g = registered.geometry
                     mainHandler.post {
@@ -530,6 +602,7 @@ fun SphereSlamStandaloneOverlay(
                             )
                         }
                         onUnitsPerPixel(screenUnitsPerPixel)
+                        onTrackingTick(frame != null)
                     }
                 },
                 onFatalError = { error ->
@@ -542,10 +615,17 @@ fun SphereSlamStandaloneOverlay(
                                     previousReferencePhysicallyMetric
                                 referenceNeedsPersistence = false
                                 previousReferenceBitmap = null
+                                referenceReady = false
+                                trackingState = StandaloneTrackingState.INITIALIZING
+                                currentFailure = null
+                                fatalMessage = null
                                 referenceBitmap = old
-                                fatalMessage =
-                                    "New target had only ${error.featureCount} KPM features; " +
-                                        "restored the previous target."
+                                onDiagnostic(
+                                    "SphereSLAM replacement target rejected: " +
+                                        "features=${error.featureCount} " +
+                                        "minimum=${error.minimumFeatureCount}; " +
+                                        "restored previous validated target",
+                                )
                             } else {
                                 fatalMessage =
                                     "That target has too little trackable detail " +

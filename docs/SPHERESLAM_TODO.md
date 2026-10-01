@@ -61,15 +61,20 @@ This must happen before treating the branch as merge-ready.
   (covered by the repository-wide Gradle `test` task in Android CI).
 - [x] Run the app module's JVM/unit tests (repository-wide Gradle `test` passed).
 - [x] Run the repository's native locking/static checks that cover `MobileGS` / JNI.
-- [ ] Compile the native `:core:nativebridge` target for every release ABI.
+- [x] Compile the native `:core:nativebridge` target for every release ABI. Android CI release
+  packaging verified `libgraffitixr.so` plus the KPM JNI symbols in both `arm64-v8a` and
+  `armeabi-v7a`.
 - [ ] Build at least one debug APK containing artoolkitX KPM.
 - [x] Build the normal release artifact(s): Android CI `release-build` completed
   `assembleRelease` successfully with the real artoolkitX submodule initialized.
-- [ ] Inspect the merged manifest and confirm:
-  - [ ] `android.hardware.camera.ar` remains `required="false"`;
-  - [ ] `com.google.ar.core` remains optional;
-  - [ ] no new required hardware feature excludes non-ARCore devices.
-- [ ] Confirm ProGuard/R8 does not strip the KPM JNI entry points or standalone classes.
+- [x] Inspect the merged manifest and confirm (enforced by `check_sphereslam_manifest.py` in the
+  successful release-build job):
+  - [x] `android.hardware.camera.ar` remains `required="false"`;
+  - [x] `com.google.ar.core` remains optional;
+  - [x] no new required hardware feature excludes non-ARCore devices.
+- [x] Confirm ProGuard/R8 does not strip the KPM JNI entry points or standalone classes:
+  `check_sphereslam_apk.py --variant release` passed against the shrunk release APK and found all
+  required JNI symbols plus the preserved KPM/SphereSLAM DEX descriptors.
 - [ ] Confirm no duplicate native symbol/source issue was introduced by the explicit artoolkitX AR
   source list.
 - [x] Add/enable CI for branch/PR validation; PR #1961 ran Android CI with the artoolkitX
@@ -92,7 +97,10 @@ support objects that upstream ARUtil links with it:
 - Android/NDK zlib: `libz`.
 
 The continuation branch now matches those transitive upstream dependencies rather than suppressing
-individual unresolved symbols. This item remains unchecked until CI completes the final link.
+individual unresolved symbols. Android CI subsequently completed `assembleRelease`, linked the final
+`libgraffitixr.so`, verified KPM JNI symbols in both supported ARM ABIs, verified the shrunk DEX
+classes, and passed the non-ARCore merged-manifest check. The remaining unchecked build items are the
+debug-APK packaging run and the explicit duplicate-source/static-contract execution.
 
 A later superseded CI run also caught an extra closing brace introduced while adding
 `ImageProxy.cropRect` support in `LumaFrameTransform.kt`; that Kotlin syntax regression was fixed
@@ -131,7 +139,9 @@ Remaining:
   - [ ] 4:3 sensor → portrait display;
   - [ ] 4:3 sensor → landscape display;
   - [ ] 16:9/other cropped CameraX stream;
-  - [ ] front camera if the app ever allows it; otherwise explicitly lock standalone AR to back camera.
+  - [x] front camera is not a supported standalone path; standalone AR explicitly forces
+    `CameraSelector.DEFAULT_BACK_CAMERA` while active and restores the shared controller selector
+    on exit.
 - [x] Prevent CameraX crop/zoom from invalidating the intrinsics used by KPM for the supported
   standalone path: apply ImageProxy crop explicitly and lock camera zoom at 1x while tracking.
   - [x] Apply `ImageProxy.cropRect` to the luma pixels before rotation.
@@ -230,7 +240,9 @@ Remaining:
 - [x] Add project/data tests for legacy projects without standalone fields, versioned reference
   write/delete lifecycle, and import URI relocation with standalone scale metadata.
 - [x] Add repository/viewmodel replacement-race tests: URI + width + metric flag commit together,
-  a competing recapture wins without being deleted, and an uncommitted candidate is cleaned up.
+  a competing recapture wins without being deleted, an uncommitted candidate is cleaned up, and
+  cancellation delivered immediately after metadata commit reconciles current/on-disk state before
+  deciding which PNG is safe to delete.
 - [x] Add process-death boundary tests: before metadata commit the old reference remains
   authoritative; after metadata commit the new reference remains authoritative even if old-file
   cleanup has not happened yet.
@@ -397,33 +409,44 @@ Current rule:
 
 Required work:
 
-- [ ] Define the standalone fingerprint coordinate frame.
-  - [ ] Recommended: centered SphereSLAM page frame, with physical scale when known.
-- [ ] Define an explicit transform between:
-  - [ ] KPM page frame;
-  - [ ] standalone renderer wall frame;
-  - [ ] MobileGS fingerprint frame.
-- [ ] Unit-test that transform with known synthetic poses.
-- [ ] Decide how standalone creates the first MobileGS fingerprint:
-  - [ ] generate 3D points directly on the KPM page plane; or
-  - [ ] adapt `MetricFingerprintBuilder` to accept the standalone wall frame.
-- [ ] Ensure descriptor pixels and 3D points are generated from the same display-oriented image.
-- [ ] Set MobileGS live intrinsics from the standalone display-oriented CameraX calibration.
-- [ ] Feed CameraX YUV/color frames to MobileGS only after the frame contract above is satisfied.
-- [ ] Feed standalone camera view/projection to `slamManager.updateCamera` only after its world/frame
+- [x] Define the standalone fingerprint coordinate frame.
+  - [x] Centered SphereSLAM page frame, with physical scale when known.
+- [x] Define an explicit transform between:
+  - [x] KPM page frame;
+  - [x] standalone renderer wall frame;
+  - [x] MobileGS fingerprint frame.
+- [x] Unit-test that transform with known synthetic poses.
+- [x] Encode the frame contract in `StandaloneFingerprintFrame`: KPM lower-left millimetres are
+  centred with the same half-pixel convention as artoolkitX, renderer wall space and MobileGS
+  standalone object space are identical, and the standalone wall/anchor relationship is identity.
+  JVM tests pin pixel/KPM equivalence, Y-up orientation, and the identity frame bridge.
+- [x] Decide how standalone creates the first MobileGS fingerprint:
+  - [x] generate 3D points directly on the KPM page plane;
+  - [x] do not adapt the ARCore capture-camera builder; use a dedicated standalone page builder.
+- [x] Ensure descriptor pixels and 3D points are generated from the same rectified page image used to seed KPM; live matching uses the same display-oriented CameraX frame contract.
+- [x] Set MobileGS live intrinsics from the standalone display-oriented CameraX calibration.
+- [x] Feed the exact cropped/rotated display luma frame to MobileGS only after the frame contract above is satisfied.
+- [x] Feed accepted standalone camera view/projection to `slamManager.updateCamera` only after its world/frame
   semantics match what MobileGS expects.
 - [ ] Rename or generalize `setArCoreTrackingState` before using it for standalone tracking health;
   do not lie to native code by setting an "ARCore" flag when ARCore does not exist.
 - [ ] Audit every native branch conditioned on `mIsArCoreTracking` and decide the standalone
   equivalent explicitly.
-- [ ] Restore existing saved ARCore fingerprints safely on standalone devices:
+- [x] Restore existing saved ARCore fingerprints safely on standalone devices:
   - [ ] either provide a validated frame conversion; or
-  - [ ] mark them ARCore-frame-only and require a standalone target/fingerprint conversion step.
-- [ ] Define behavior for projects that contain both ARCore fingerprint data and a standalone page.
-- [ ] Feed paint-progress/distortion-head/corroboration only after coordinate alignment is proven.
+  - [x] treat `fingerprint` as ARCore/capture-camera-frame-only and require the separate standalone page/`sphereSlamFingerprint` path.
+- [x] Define behavior for projects that contain both ARCore fingerprint data and a standalone page: keep separate persisted fingerprints and install only the active backend's frame into native MobileGS.
+- [x] Feed baseline paint-progress/corroboration after centered-page alignment is proven; spatially gated self-grow remains disabled pending the checks below.
+  - [x] Standalone artwork registration is descriptors-only (no fake depth); native global matching drives progress until design-placement gating is validated.
+
+- [x] Standalone design placement now feeds the existing gated corroboration/Φ path using the exact
+  centered-page rigid transform and scale-included extents; unit tests pin the CW→right-handed
+  rotation and no-scale-in-matrix contract.
+- [x] Remove the legacy self-grow assumption that a valid wall plane must have nonzero distance from
+  the fingerprint origin; centered standalone pages intentionally lie on z=0 through that origin.
 - [ ] Verify self-grow adds points in the standalone fingerprint frame.
 - [ ] Verify saved wall feature maps preserve that frame across process restarts.
-- [ ] Add diagnostics identifying fingerprint frame/version/backend.
+- [x] Add diagnostics identifying fingerprint frame/version/backend; standalone seed logs `backend=standalone-kpm frame=centered-page version=1` and refuses unknown versions.
 
 **ACCEPTANCE:** MobileGS can consume standalone frames without any implicit ARCore-world assumption,
 and return-visit / paint-progress results agree spatially with the KPM wall pose.

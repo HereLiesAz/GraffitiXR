@@ -4,8 +4,10 @@ package com.hereliesaz.graffitixr.feature.ar.pose
  * Runtime tracking choice for GraffitiXR AR.
  *
  * This policy deliberately separates "SphereSLAM KPM relocalization is linked" from
- * "SphereSLAM can run the entire AR experience without ARCore". The latter requires a continuous
- * metric 6-DoF pose source, raw-camera/IMU pipeline, and ARCore-independent wall anchoring.
+ * "the packaged standalone wall-tracking runtime is ready". GraffitiXR's current standalone path
+ * uses calibrated KPM as the primary per-frame wall pose, CameraX for raw frames, a short IMU
+ * rotation bridge across visual misses, and an ARCore-independent wall transform. It is therefore
+ * a usable standalone wall backend even though broader world-scale VIO parity remains future work.
  */
 enum class TrackingMode {
     /** ARCore owns continuous pose; SphereSLAM contributes relocalization/correction observations. */
@@ -22,8 +24,9 @@ enum class TrackingMode {
 }
 
 /**
- * Capabilities are intentionally split so a successful KPM native-link probe can never
- * accidentally enable standalone mode before continuous SphereSLAM tracking is actually ready.
+ * Capabilities remain split because hybrid relocalization and standalone product readiness are
+ * different policy questions. In the current build both depend on KPM linkage, while standalone
+ * additionally depends on the CameraX wall-tracking path being shipped/enabled by the caller.
  */
 data class TrackingCapabilities(
     val arCoreAvailable: Boolean,

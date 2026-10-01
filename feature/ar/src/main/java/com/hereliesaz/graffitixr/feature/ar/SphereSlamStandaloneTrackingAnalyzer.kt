@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
+import com.hereliesaz.graffitixr.common.model.Fingerprint
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import androidx.camera.core.ImageAnalysis
@@ -10,6 +11,8 @@ import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsicsEstimator
 import com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation
 import com.hereliesaz.graffitixr.feature.ar.rendering.ProjectionMatrix
 import com.hereliesaz.graffitixr.feature.ar.util.RotationDeltaMath
+import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintFrame
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.sphereslam.SphereSlamCalibration
 import com.hereliesaz.sphereslam.SphereSlamStandaloneSession
 import java.nio.ByteBuffer
@@ -79,6 +82,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private val context: Context,
     private val cameraId: String,
     private val referenceImage: SphereSlamStandaloneReferenceImage,
+    private val slamManager: SlamManager? = null,
+    private val mobileGsFingerprint: Fingerprint? = null,
+    private val mobileGsFingerprintFrameVersion: Int =
+        com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     private val onFrameTracked: (SphereSlamStandaloneFrame?) -> Unit,
     private val onReferenceReady: (SphereSlamStandaloneSession.Reference) -> Unit = {},
     private val onDiagnostic: (String) -> Unit = {},
@@ -220,6 +227,12 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 rotationDegrees = rotationDeg,
                 intrinsics = intrinsics,
             )
+            slamManager?.setLiveIntrinsics(
+                intrinsics.fx,
+                intrinsics.fy,
+                intrinsics.cx,
+                intrinsics.cy,
+            )
 
             val active = ensureSession(intrinsics)
             val pendingImuReference = bridge.captureReferenceCandidate(rotationDeg)
@@ -246,6 +259,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                             "ageMs=${observationAge.ageMs} matchMs=$matchDurationMs",
                         ),
                     )
+                    feedMobileGsFrame(direct, rotated, timestampNs, projection, null)
                     publishVisualMiss(projection, rotated, timestampNs)
                     return
                 }
@@ -274,6 +288,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                             ),
                         )
                     }
+                    feedMobileGsFrame(direct, rotated, timestampNs, projection, null)
                     publishVisualMiss(projection, rotated, timestampNs)
                     return
                 }
@@ -283,6 +298,13 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 lastAcceptedVisualView = pose.viewMatrix.copyOf()
                 val state = trackingStateMachine.onAcceptedVisual(android.os.SystemClock.elapsedRealtime())
                 reportTrackingState(state)
+                feedMobileGsFrame(
+                    direct,
+                    rotated,
+                    timestampNs,
+                    projection,
+                    pose.viewMatrix,
+                )
                 if (state != StandaloneTrackingState.LOCKED) {
                     onFrameTracked(null)
                     return
@@ -313,6 +335,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 return
             }
 
+            feedMobileGsFrame(direct, rotated, timestampNs, projection, null)
             reportFailure(
                 StandaloneFailureClassifier.event(
                     StandaloneFailureReason.NO_CURRENT_PAGE_MATCH,
@@ -495,9 +518,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 )
             }
             onDiagnostic(
-                "SphereSLAM standalone reference features=${reference.featureCount} " +
-                    "minimum=${targetQualityConfig.minKpmFeatures}",
+                "SphereSLAM standalone reference features=" + reference.featureCount +
+                    " minimum=" + targetQualityConfig.minKpmFeatures,
             )
+            configureMobileGs(intrinsics)
             session = created
             sessionKey = key
             onReferenceReady(reference)
@@ -506,6 +530,79 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             created.close()
             throw t
         }
+    }
+
+    private fun configureMobileGs(intrinsics: CameraIntrinsics) {
+        val slam = slamManager ?: return
+        slam.ensureInitialized()
+        slam.setArCoreTrackingState(false)
+        slam.setLiveIntrinsics(intrinsics.fx, intrinsics.fy, intrinsics.cx, intrinsics.cy)
+
+        val fp = mobileGsFingerprint
+        val expectedFrameVersion =
+            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION
+        if (fp != null && mobileGsFingerprintFrameVersion != expectedFrameVersion) {
+            slam.clearWallFingerprint()
+            slam.overlayMarkCenterLocal = null
+            slam.captureAnchorCam = null
+            onDiagnostic(
+                "SphereSLAM MobileGS seed refused backend=standalone-kpm " +
+                    "frame=centered-page version=" + mobileGsFingerprintFrameVersion +
+                    " expected=" + expectedFrameVersion,
+            )
+            return
+        }
+        if (fp == null || fp.descriptorsRows <= 0 || fp.points3d.size != fp.descriptorsRows * 3) {
+            // Native MobileGS is process-global. A standalone project with no seed must explicitly
+            // clear a prior project's fingerprint rather than continuing to match the wrong wall.
+            slam.clearWallFingerprint()
+            slam.overlayMarkCenterLocal = null
+            slam.captureAnchorCam = null
+            return
+        }
+
+        slam.restoreWallFingerprintMetric(
+            descriptorsData = fp.descriptorsData,
+            rows = fp.descriptorsRows,
+            cols = fp.descriptorsCols,
+            type = fp.descriptorsType,
+            points3d = fp.points3d.toFloatArray(),
+            anchorMatrix = StandaloneFingerprintFrame.anchorFromFingerprint(),
+            intrinsics = floatArrayOf(intrinsics.fx, intrinsics.fy, intrinsics.cx, intrinsics.cy),
+            // Deliberately empty: the optional native rectifier interprets this as an ARCore
+            // capture-camera view. Standalone points already live in the durable page/wall frame.
+            viewMatrix = FloatArray(0),
+            regions = ByteArray(0),
+        )
+        slam.overlayMarkCenterLocal =
+            fp.markCenterLocal.takeIf { it.size == 3 }?.toFloatArray()
+        slam.captureAnchorCam = null
+        onDiagnostic(
+            "SphereSLAM MobileGS seed backend=standalone-kpm frame=centered-page " +
+                "version=" + mobileGsFingerprintFrameVersion +
+                " rows=" + fp.descriptorsRows + " type=" + fp.descriptorsType,
+        )
+    }
+
+    private fun feedMobileGsFrame(
+        luma: ByteBuffer,
+        frame: RotatedLuma,
+        timestampNs: Long,
+        projection: FloatArray,
+        acceptedView: FloatArray?,
+    ) {
+        val slam = slamManager ?: return
+        if (mobileGsFingerprint == null) return
+
+        // PnP does not need a pose prior. Publish a view only when KPM accepted THIS frame; on a
+        // visual miss, feeding the pixels without a new camera pose is safer than labelling stale
+        // pose state as current.
+        if (acceptedView != null) {
+            slam.updateCamera(acceptedView, projection, timestampNs)
+        }
+        val copy = luma.duplicate()
+        copy.rewind()
+        slam.feedLumaFrame(copy, frame.width, frame.height, timestampNs)
     }
 
     private fun bridgeLastGood(

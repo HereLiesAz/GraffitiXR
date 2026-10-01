@@ -646,6 +646,25 @@ class SlamManager @Inject constructor(
         }
     }
 
+    /**
+     * Feed a tightly packed, display-oriented grayscale frame directly to MobileGS relocalization.
+     *
+     * This exists for the standalone CameraX path, whose pixels have already been cropped and
+     * rotated into the exact frame used by SphereSLAM/KPM and [setLiveIntrinsics]. Routing that
+     * image back through the raw YUV API would reintroduce the uncropped sensor frame and make PnP
+     * pair display-frame intrinsics with different pixels.
+     */
+    fun feedLumaFrame(
+        lumaBuffer: ByteBuffer,
+        width: Int,
+        height: Int,
+        timestampNs: Long,
+    ) {
+        if (lumaBuffer.isDirect && width > 0 && height > 0) {
+            nativeFeedLumaFrame(lumaBuffer, width, height, timestampNs)
+        }
+    }
+
     fun feedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int, timestampNs: Long, cvRotateCode: Int? = null) {
         if (colorBuffer.isDirect) {
             nativeFeedColorFrame(colorBuffer, width, height, timestampNs, cvRotateCode ?: -1)
@@ -902,6 +921,13 @@ class SlamManager @Inject constructor(
         uvPixelStride: Int,
         timestampNs: Long,
         cvRotateCode: Int
+    )
+
+    private external fun nativeFeedLumaFrame(
+        lumaBuffer: ByteBuffer,
+        width: Int,
+        height: Int,
+        timestampNs: Long,
     )
     private external fun nativeFeedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int, timestampNs: Long, cvRotateCode: Int)
     private external fun nativeDestroy()

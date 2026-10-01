@@ -11,6 +11,7 @@ import com.hereliesaz.graffitixr.common.wearable.WearableManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import com.hereliesaz.sphereslam.SphereSlam
 import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Paint
@@ -71,6 +72,9 @@ class ArViewModelTest {
         Dispatchers.setMain(testDispatcher)
         mockkObject(NativeLibLoader)
         every { NativeLibLoader.loadAll() } returns Unit
+        mockkObject(SphereSlam)
+        every { SphereSlam.isAvailable() } returns true
+        every { SphereSlam.smokeTest(any(), any()) } returns true
         mockkStatic(Bitmap::class)
         mockkStatic(Canvas::class)
         mockkConstructor(Canvas::class)
@@ -110,6 +114,7 @@ class ArViewModelTest {
         unmockkStatic(Matrix::class)
         unmockkStatic(Paint::class)
         unmockkConstructor(Paint::class)
+        unmockkObject(SphereSlam)
         unmockkObject(NativeLibLoader)
     }
 
@@ -125,6 +130,16 @@ class ArViewModelTest {
         val state = viewModel.uiState.first()
         assertFalse(state.isScanning)
         assertFalse(state.isFlashlightOn)
+    }
+
+    @Test
+    fun `init resolves SphereSLAM packaged runtime capability`() = runTest {
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.isSphereSlamAvailabilityResolved)
+        assertTrue(viewModel.uiState.value.isSphereSlamAvailable)
+        verify { SphereSlam.isAvailable() }
+        verify { SphereSlam.smokeTest(640, 480) }
     }
 
     @Test
@@ -265,8 +280,8 @@ class ArViewModelTest {
 
     @Test
     fun `SphereSLAM recapture commits URI and scale together then deletes old reference`() = runTest {
-        val oldUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_old.png")
-        val newUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_new.png")
+        val oldUri = mockk<Uri>(relaxed = true)
+        val newUri = mockk<Uri>(relaxed = true)
         val project = com.hereliesaz.graffitixr.common.model.GraffitiProject(
             id = "slam",
             name = "Wall",
@@ -307,10 +322,56 @@ class ArViewModelTest {
     }
 
     @Test
+    fun `cancellation after SphereSLAM metadata commit keeps candidate and deletes old reference`() = runTest {
+        val oldUri = mockk<Uri>(relaxed = true)
+        val candidateUri = mockk<Uri>(relaxed = true)
+        val project = com.hereliesaz.graffitixr.common.model.GraffitiProject(
+            id = "slam",
+            name = "Wall",
+            sphereSlamReferenceUri = oldUri,
+            sphereSlamReferenceWidthMeters = 1f,
+            sphereSlamReferencePhysicallyMetric = false,
+        )
+        val flow = MutableStateFlow<com.hereliesaz.graffitixr.common.model.GraffitiProject?>(project)
+        every { projectRepository.currentProject } returns flow
+        coEvery { projectManager.saveSphereSlamReference(context, "slam", any()) } returns candidateUri
+        coEvery { projectManager.loadProjectMetadata(context, "slam") } returns null
+        coEvery {
+            projectRepository.updateProject(
+                any<(com.hereliesaz.graffitixr.common.model.GraffitiProject) ->
+                    com.hereliesaz.graffitixr.common.model.GraffitiProject>(),
+            )
+        } coAnswers {
+            val transform = firstArg<
+                (com.hereliesaz.graffitixr.common.model.GraffitiProject) ->
+                    com.hereliesaz.graffitixr.common.model.GraffitiProject
+            >()
+            // Simulate ProjectRepositoryImpl's order: disk commit, then currentProject publish.
+            // Cancellation is delivered immediately after that publication but before the caller
+            // can set any local "committed" flag.
+            flow.value = transform(requireNotNull(flow.value))
+            throw kotlinx.coroutines.CancellationException("cancel after commit")
+        }
+
+        viewModel.saveSphereSlamReference(mockk(relaxed = true), 2.5f, true)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(candidateUri, flow.value?.sphereSlamReferenceUri)
+        assertEquals(2.5f, flow.value?.sphereSlamReferenceWidthMeters ?: 0f, 0f)
+        assertTrue(flow.value?.sphereSlamReferencePhysicallyMetric == true)
+        coVerify {
+            projectManager.deleteSphereSlamReference(context, "slam", oldUri)
+        }
+        coVerify(exactly = 0) {
+            projectManager.deleteSphereSlamReference(context, "slam", candidateUri)
+        }
+    }
+
+    @Test
     fun `competing SphereSLAM recapture keeps newer metadata and deletes uncommitted candidate`() = runTest {
-        val oldUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_old.png")
-        val newerUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_newer.png")
-        val candidateUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_candidate.png")
+        val oldUri = mockk<Uri>(relaxed = true)
+        val newerUri = mockk<Uri>(relaxed = true)
+        val candidateUri = mockk<Uri>(relaxed = true)
         val original = com.hereliesaz.graffitixr.common.model.GraffitiProject(
             id = "slam",
             name = "Wall",
@@ -354,7 +415,7 @@ class ArViewModelTest {
 
     @Test
     fun `invalid persisted SphereSLAM URI clears only matching standalone fields`() = runTest {
-        val uri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_old.png")
+        val uri = mockk<Uri>(relaxed = true)
         val project = com.hereliesaz.graffitixr.common.model.GraffitiProject(
             id = "slam",
             name = "Wall",
@@ -392,8 +453,8 @@ class ArViewModelTest {
 
     @Test
     fun `stale invalid-reference callback cannot clear a newer SphereSLAM recapture`() = runTest {
-        val oldUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_old.png")
-        val newUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_new.png")
+        val oldUri = mockk<Uri>(relaxed = true)
+        val newUri = mockk<Uri>(relaxed = true)
         val project = com.hereliesaz.graffitixr.common.model.GraffitiProject(
             id = "slam",
             name = "Wall",

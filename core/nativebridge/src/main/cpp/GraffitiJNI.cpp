@@ -675,6 +675,43 @@ Java_com_hereliesaz_graffitixr_nativebridge_YuvConverter_nativeYuvToRgbaBitmap(
 }
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedLumaFrame(
+        JNIEnv* env, jobject thiz, jobject lumaBuffer, jint width, jint height, jlong timestampNs) {
+    (void)timestampNs; // retained for Kotlin/JNI frame-clock symmetry; reloc does not consume it yet.
+
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine || width <= 0 || height <= 0) return;
+
+    uint8_t* data = static_cast<uint8_t*>(env->GetDirectBufferAddress(lumaBuffer));
+    if (!data) return;
+
+    const jlong cap = env->GetDirectBufferCapacity(lumaBuffer);
+    const size_t needed = static_cast<size_t>(width) * static_cast<size_t>(height);
+    if (cap > 0 && static_cast<size_t>(cap) < needed) {
+        LOGE("nativeFeedLumaFrame: buffer too small (cap=%lld, need=%zu)",
+             static_cast<long long>(cap), needed);
+        return;
+    }
+
+    // Avoid even the gray->RGB conversion while the reloc worker is busy or no fingerprint exists.
+    if (!gSlamEngine->relocWantsFrame()) return;
+
+    try {
+        cv::Mat gray(height, width, CV_8UC1, data);
+        // runRelocPass currently owns one RGB->gray normalization path shared with ARCore YUV/color
+        // feeds and the low-light enhancer. Preserve that contract here rather than adding a subtly
+        // different detector path for standalone frames.
+        cv::Mat rgb;
+        cv::cvtColor(gray, rgb, cv::COLOR_GRAY2RGB);
+        gSlamEngine->scheduleRelocCheck(rgb);
+    } catch (const std::exception& e) {
+        LOGE("nativeFeedLumaFrame: exception: %s", e.what());
+    } catch (...) {
+        LOGE("nativeFeedLumaFrame: unknown exception");
+    }
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
         JNIEnv* env, jobject thiz, jobject colorBuffer, jint width, jint height, jlong timestampNs, jint cvRotateCode) {
     (void)timestampNs; // not currently consumed here; kept for JNI signature stability.

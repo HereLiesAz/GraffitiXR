@@ -25,7 +25,7 @@ class ProjectRepositoryImplTest {
         val context = mockk<Context>(relaxed = true)
         val repo = ProjectRepositoryImpl(context, manager)
         repo.createProject(GraffitiProject(id = "saved", name = "Original"))
-        coEvery { manager.saveProject(context, any(), any(), any()) } throws java.io.IOException("Full")
+        coEvery { manager.saveProjectExact(context, any()) } throws java.io.IOException("Full")
         try {
             repo.updateProject { it.copy(name = "Unsaved") }
             org.junit.Assert.fail("Expected save failure")
@@ -41,7 +41,7 @@ class ProjectRepositoryImplTest {
         repo.createProject(GraffitiProject(id = "saved"))
         val started = kotlinx.coroutines.CompletableDeferred<Unit>()
         val finish = kotlinx.coroutines.CompletableDeferred<Unit>()
-        coEvery { manager.saveProject(context, any(), any(), any()) } coAnswers {
+        coEvery { manager.saveProjectExact(context, any()) } coAnswers {
             started.complete(Unit)
             finish.await()
         }
@@ -106,7 +106,10 @@ class ProjectRepositoryImplTest {
         assertEquals(0.5f, repo.currentProject.value?.progressPercentage)
         // ...and what actually got PERSISTED is the transformed project, not the pre-transform one.
         coVerify {
-            mockManager.saveProject(context, match<GraffitiProject> { it.name == "Merged" && it.progressPercentage == 0.5f })
+            mockManager.saveProjectExact(
+                context,
+                match<GraffitiProject> { it.name == "Merged" && it.progressPercentage == 0.5f },
+            )
         }
     }
 
@@ -120,7 +123,7 @@ class ProjectRepositoryImplTest {
         repo.updateProject { current -> current.copy(name = "Should never apply") }
 
         assertEquals(null, repo.currentProject.value)
-        coVerify(exactly = 0) { mockManager.saveProject(context, any(), any()) }
+        coVerify(exactly = 0) { mockManager.saveProjectExact(context, any()) }
     }
 
     /**

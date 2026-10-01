@@ -91,7 +91,47 @@ class ProjectManager @Inject constructor(
         }
     }
 
-    suspend fun saveProject(context: Context, projectData: GraffitiProject, targetImages: List<Bitmap>? = null, thumbnail: Bitmap? = null) = withContext(Dispatchers.IO) {
+    suspend fun saveProject(
+        context: Context,
+        projectData: GraffitiProject,
+        targetImages: List<Bitmap>? = null,
+        thumbnail: Bitmap? = null,
+    ) = saveProjectInternal(
+        context = context,
+        projectData = projectData,
+        targetImages = targetImages,
+        thumbnail = thumbnail,
+        preserveExistingCaptureState = true,
+    )
+
+    /**
+     * Persist an authoritative read-modify-write snapshot exactly as supplied.
+     *
+     * [saveProject] intentionally preserves capture/target fields when an older whole-object writer
+     * omits them. That legacy safety net must NOT run for ProjectRepository's mutex-serialized
+     * transform updates: null can be an explicit state transition (for example, clearing a missing
+     * SphereSLAM reference), and resurrecting the old on-disk value makes memory and project.json
+     * disagree. The repository uses this exact path only after transforming its current state under
+     * the save mutex.
+     */
+    suspend fun saveProjectExact(
+        context: Context,
+        projectData: GraffitiProject,
+    ) = saveProjectInternal(
+        context = context,
+        projectData = projectData,
+        targetImages = null,
+        thumbnail = null,
+        preserveExistingCaptureState = false,
+    )
+
+    private suspend fun saveProjectInternal(
+        context: Context,
+        projectData: GraffitiProject,
+        targetImages: List<Bitmap>?,
+        thumbnail: Bitmap?,
+        preserveExistingCaptureState: Boolean,
+    ) = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/${projectData.id}")
         if (!root.exists()) root.mkdirs()
 
@@ -105,7 +145,7 @@ class ProjectManager @Inject constructor(
         // map and cloud anchor id can each legitimately be set on a routine (non-fingerprint) save
         // (e.g. the passive wall-map save), so those instead only fall back to the on-disk value when
         // the incoming project doesn't set one, same as the legacy target-fingerprint references.
-        val incoming = if (projectData.fingerprint == null) {
+        val incoming = if (preserveExistingCaptureState && projectData.fingerprint == null) {
             val existing = try {
                 val f = File(root, "project.json")
                 if (f.exists()) json.decodeFromString<GraffitiProject>(f.readText()) else null
@@ -137,6 +177,26 @@ class ProjectManager @Inject constructor(
                         if (projectData.sphereSlamReferenceUri != null)
                             projectData.sphereSlamReferencePhysicallyMetric
                         else existing.sphereSlamReferencePhysicallyMetric,
+                    // A new canonical page defines a new standalone object frame. Preserve an old
+                    // seed only while the canonical reference URI itself is unchanged.
+                    sphereSlamFingerprint =
+                        if (
+                            projectData.sphereSlamReferenceUri != null &&
+                            projectData.sphereSlamReferenceUri != existing.sphereSlamReferenceUri
+                        ) {
+                            projectData.sphereSlamFingerprint
+                        } else {
+                            projectData.sphereSlamFingerprint ?: existing.sphereSlamFingerprint
+                        },
+                    sphereSlamFingerprintFrameVersion =
+                        if (
+                            projectData.sphereSlamReferenceUri != null &&
+                            projectData.sphereSlamReferenceUri != existing.sphereSlamReferenceUri
+                        ) {
+                            projectData.sphereSlamFingerprintFrameVersion
+                        } else {
+                            existing.sphereSlamFingerprintFrameVersion
+                        },
                     wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
                     paintMarks = projectData.paintMarks ?: existing.paintMarks,
                     paintGrid = projectData.paintGrid ?: existing.paintGrid,
