@@ -197,6 +197,26 @@ class ProjectManager @Inject constructor(
                         } else {
                             existing.sphereSlamFingerprintFrameVersion
                         },
+                    // The standalone wide-wall map is expressed in the SAME centred page frame as
+                    // sphereSlamFingerprint. A new canonical page must never inherit the old map.
+                    sphereSlamWallFeatureMap =
+                        if (
+                            projectData.sphereSlamReferenceUri != null &&
+                            projectData.sphereSlamReferenceUri != existing.sphereSlamReferenceUri
+                        ) {
+                            projectData.sphereSlamWallFeatureMap
+                        } else {
+                            projectData.sphereSlamWallFeatureMap ?: existing.sphereSlamWallFeatureMap
+                        },
+                    sphereSlamWallFeatureMapFrameVersion =
+                        if (
+                            projectData.sphereSlamReferenceUri != null &&
+                            projectData.sphereSlamReferenceUri != existing.sphereSlamReferenceUri
+                        ) {
+                            projectData.sphereSlamWallFeatureMapFrameVersion
+                        } else {
+                            existing.sphereSlamWallFeatureMapFrameVersion
+                        },
                     wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
                     paintMarks = projectData.paintMarks ?: existing.paintMarks,
                     paintGrid = projectData.paintGrid ?: existing.paintGrid,
