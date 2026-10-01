@@ -2065,6 +2065,10 @@ class ArViewModel @Inject constructor(
                             sphereSlamReferenceUri = null,
                             sphereSlamReferenceWidthMeters = 1f,
                             sphereSlamReferencePhysicallyMetric = false,
+                            // The seed's object points are defined by this exact page. Keeping it
+                            // after the page is gone would let a later standalone runtime restore a
+                            // coordinate frame it can no longer reconstruct or verify.
+                            sphereSlamFingerprint = null,
                         )
                     }
                 }

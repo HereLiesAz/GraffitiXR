@@ -87,7 +87,11 @@ class ProjectRepositoryImpl @Inject constructor(
         if (updated == current) return@withLock
         // Publish only after the write succeeds. Switching/deleting uses the same lock, so a
         // queued write cannot save a different project or resurrect a deleted one.
-        projectManager.saveProject(context, updated)
+        //
+        // This is an authoritative snapshot derived from CURRENT state under saveMutex, so persist
+        // it exactly. ProjectManager.saveProject's preserve-on-null compatibility path is for stale
+        // whole-object writers; using it here resurrects fields a transform intentionally cleared.
+        projectManager.saveProjectExact(context, updated)
         _currentProject.value = updated
     }
 
