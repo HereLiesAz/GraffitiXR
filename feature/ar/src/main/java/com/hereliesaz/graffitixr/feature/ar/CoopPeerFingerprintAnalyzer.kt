@@ -13,6 +13,15 @@ import java.nio.ByteBuffer
 import kotlin.math.abs
 import timber.log.Timber
 
+internal fun shouldHoldCoopPeerPose(
+    lastFreshSolveMs: Long,
+    nowMs: Long,
+    maxHoldMs: Long = 400L,
+): Boolean =
+    lastFreshSolveMs != Long.MIN_VALUE &&
+        nowMs >= lastFreshSolveMs &&
+        nowMs - lastFreshSolveMs <= maxHoldMs
+
 /**
  * CameraX tracker used when a standalone phone joins an ARCore-hosted co-op session.
  *
@@ -153,8 +162,11 @@ internal class CoopPeerFingerprintAnalyzer(
             // would make the mural ride the screen after the peer target leaves view.
             val nowMs = android.os.SystemClock.elapsedRealtime()
             val held = lastGood?.takeIf {
-                lastFreshSolveMs != Long.MIN_VALUE &&
-                    nowMs - lastFreshSolveMs <= MAX_PEER_POSE_HOLD_MS
+                shouldHoldCoopPeerPose(
+                    lastFreshSolveMs = lastFreshSolveMs,
+                    nowMs = nowMs,
+                    maxHoldMs = MAX_PEER_POSE_HOLD_MS,
+                )
             }
             if (held == null) lastGood = null
             onFrameTracked(held)
