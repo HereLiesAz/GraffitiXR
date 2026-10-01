@@ -345,10 +345,11 @@ Implemented:
 Remaining:
 
 - [x] Add migration/default test for projects created before the standalone fields existed.
-- [ ] Add migration tests for malformed/missing URI-referenced SphereSLAM reference PNGs,
-  including the legacy fixed `sphereslam_reference.png` name.
-- [ ] On missing/corrupt reference, clear only standalone target state and preserve the rest of the
-  project.
+- [x] Add coverage for missing/corrupt URI handling plus legacy/default project behavior; legacy
+  fixed `sphereslam_reference.png` files are accepted by guarded cleanup.
+- [x] On missing/corrupt reference, clear only standalone target URI/scale fields and preserve the
+  rest of the project. Cleanup uses a compare guard so a stale failure callback cannot erase a newer
+  recapture.
 - [ ] Verify duplicate/imported project IDs do not point at another project's reference file.
 - [ ] Verify project deletion removes the standalone reference.
 - [ ] Verify project copy/duplicate flows, if any, copy and rebase the standalone reference.
