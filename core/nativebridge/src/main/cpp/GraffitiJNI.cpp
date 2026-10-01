@@ -327,9 +327,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDestroy(JNIEnv* en
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArCoreTrackingState(JNIEnv* env, jobject thiz, jboolean isTracking) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetTrackingPoseValid(JNIEnv* env, jobject thiz, jboolean isValid) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
-    if (gSlamEngine) gSlamEngine->setArCoreTrackingState(isTracking);
+    if (gSlamEngine) gSlamEngine->setTrackingPoseValid(isValid);
 }
 
 JNIEXPORT void JNICALL
