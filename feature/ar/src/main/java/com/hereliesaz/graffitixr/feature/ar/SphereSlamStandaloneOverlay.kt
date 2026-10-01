@@ -100,6 +100,7 @@ fun SphereSlamStandaloneOverlay(
     onReferenceCaptured: (Bitmap, Float, Boolean) -> Unit = { _, _, _ -> },
     onPersistedReferenceInvalid: (Uri) -> Unit = {},
     onPersistedAtlasPageInvalid: (Int, Uri) -> Unit = { _, _ -> },
+    onAtlasPageCaptured: (StandaloneAtlasGrowthCandidate) -> Unit = {},
     adjustment: ModeAdjustment? = null,
     onUnitsPerPixel: (Float) -> Unit = {},
     onTrackingTick: (Boolean) -> Unit = {},
@@ -607,6 +608,9 @@ fun SphereSlamStandaloneOverlay(
                             previousReferenceBitmap = null
                         }
                     }
+                },
+                onAtlasPageAdded = { candidate ->
+                    mainHandler.post { onAtlasPageCaptured(candidate) }
                 },
                 onDiagnostic = { text ->
                     mainHandler.post { onDiagnostic(text) }
