@@ -535,7 +535,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private fun configureMobileGs(intrinsics: CameraIntrinsics) {
         val slam = slamManager ?: return
         slam.ensureInitialized()
-        slam.setArCoreTrackingState(false)
+        slam.setTrackingPoseValid(false)
         slam.setLiveIntrinsics(intrinsics.fx, intrinsics.fy, intrinsics.cx, intrinsics.cy)
 
         val fp = mobileGsFingerprint
@@ -592,6 +592,11 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         acceptedView: FloatArray?,
     ) {
         val slam = slamManager ?: return
+        // This flag describes the freshness of updateCamera(), not which backend produced it.
+        // A rejected/missing KPM observation must invalidate the previous view before the same
+        // frame's pixels enter MobileGS, otherwise rectification or future pose-dependent helpers
+        // can silently pair a stale pose with a new image.
+        slam.setTrackingPoseValid(acceptedView != null)
         if (mobileGsFingerprint == null) return
 
         // PnP does not need a pose prior. Publish a view only when KPM accepted THIS frame; on a
@@ -670,6 +675,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     override fun close() {
         if (closed) return
         closed = true
+        slamManager?.setTrackingPoseValid(false)
         bridge.stop()
         bridge.clearReference()
         lastGood = null
