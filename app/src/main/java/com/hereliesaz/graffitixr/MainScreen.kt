@@ -267,8 +267,20 @@ fun MainScreen(
                             onPersistedAtlasPageInvalid = { pageNo, uri ->
                                 arViewModel.clearSphereSlamAtlasPageIfMatches(pageNo, uri)
                             },
-                            onAtlasPageCaptured = { candidate ->
-                                arViewModel.saveSphereSlamAtlasPage(candidate)
+                            onAtlasPageCaptured = {
+                                    bitmap,
+                                    pageNo,
+                                    referenceWidthUnits,
+                                    physicallyMetric,
+                                    canonicalFromPage,
+                                ->
+                                arViewModel.saveSphereSlamAtlasPage(
+                                    bitmap = bitmap,
+                                    pageNo = pageNo,
+                                    referenceWidthUnits = referenceWidthUnits,
+                                    physicallyMetric = physicallyMetric,
+                                    canonicalFromPage = canonicalFromPage,
+                                )
                             },
                             adjustment = standaloneAdj,
                             onUnitsPerPixel = { standaloneArUnitsPerPixel = it },
