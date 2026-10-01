@@ -204,6 +204,8 @@ class ProjectManager @Inject constructor(
                         } else {
                             existing.sphereSlamPlacementAnchorGeneration
                         },
+                    sphereSlamModeAdjustment =
+                        projectData.sphereSlamModeAdjustment ?: existing.sphereSlamModeAdjustment,
                     // A new canonical page defines a new standalone object frame. Preserve an old
                     // seed only while the canonical reference URI itself is unchanged.
                     sphereSlamFingerprint =
