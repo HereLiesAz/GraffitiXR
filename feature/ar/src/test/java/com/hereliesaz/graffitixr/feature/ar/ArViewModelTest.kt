@@ -497,6 +497,23 @@ class ArViewModelTest {
 
     // ==================== Session Lifecycle Tests ====================
 
+    @Suppress("UNCHECKED_CAST")
+    @Test
+    fun `ARCore runtime refuses entry while capability is unresolved`() = runTest {
+        val field = viewModel.javaClass.getDeclaredField("_uiState")
+        field.isAccessible = true
+        val flow = field.get(viewModel) as MutableStateFlow<ArUiState>
+        flow.value = flow.value.copy(
+            isArCoreAvailable = true,
+            isArCoreAvailabilityResolved = false,
+        )
+
+        viewModel.setArMode(true, context)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(getPrivateField(viewModel, "isInArMode") as Boolean)
+    }
+
     @Test
     fun `session resumes only when in AR mode and activity is resumed`() = runTest {
         setPrivateField(viewModel, "session", session)
