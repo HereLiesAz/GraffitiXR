@@ -587,9 +587,8 @@ Every AR feature now has an explicit backend answer.
   renderer's historical `cloudAnchor` name refers to a local ARCore anchor.
 - [x] Standalone therefore advertises no cloud-anchor capability. Project/fingerprint/KPM assets
   remain shareable independently.
-- [x] Standalone co-op Host/Join stays explicitly disabled until section 12 defines cross-backend
-  calibration; disabling unavailable cloud/ARCore calibration does not remove local wall tracking or
-  project export/import.
+- [x] Cloud-anchor absence does not disable co-op: section 12 now gives Host/Join an explicit
+  backend-neutral wall-frame calibration contract.
 
 ### Point clouds / perception debug
 
@@ -607,19 +606,30 @@ equivalent.
 
 ## 12. Co-op / multi-device standalone behavior
 
-- [ ] Define the coordinate object shared by a standalone host.
-- [ ] Include standalone reference image/scale/frame metadata in the initial project snapshot.
-- [ ] Define standalone-host → ARCore-guest calibration.
-- [ ] Define ARCore-host → standalone-guest calibration.
-- [ ] Define standalone-host → standalone-guest calibration.
-- [ ] Reuse Procrustes/other existing calibration only after input frames are explicitly defined.
-- [ ] Reject peer calibration when either side lacks a physically meaningful scale and the operation
-  requires metric alignment.
-- [ ] Decide whether normalized-scale standalone peers can still share a wall by page-relative
-  correspondence.
-- [ ] Add protocol versioning if new calibration payload fields are required.
-- [ ] Maintain backward compatibility or produce a clear incompatible-peer error.
-- [ ] Test reconnect/resync with standalone project assets.
+- [x] Define the shared coordinate object: the host's durable **wall-local frame**, never either
+  device's transient world origin. `CoopSpatialFrame.fingerprintFromWall` is the only peer-PnP
+  bridge into that object.
+- [x] Include standalone reference image/scale/frame metadata in the initial project snapshot. The
+  existing project ZIP already carries page 0 + atlas images and their canonical transforms;
+  protocol v3 adds the explicit scale/backend/frame descriptor beside those bytes.
+- [x] Define standalone-host → ARCore-guest calibration: peer PnP is composed through identity
+  `fingerprintFromWall`; physically metric standalone pages are accepted and normalized pages are
+  rejected before bulk transfer.
+- [x] Define ARCore-host → standalone-guest calibration: CameraX feeds the host MobileGS fingerprint,
+  then `CV_TO_GL * cameraFromFingerprint * fingerprintFromWall` yields camera-from-host-wall.
+- [x] Define standalone-host → standalone-guest calibration: the shared KPM page/atlas is already in
+  the same canonical centered wall frame; normalized page units are valid because both peers consume
+  that exact page coordinate object.
+- [x] Do not reuse Procrustes implicitly. Existing wearable Procrustes remains a separate explicitly
+  framed calibration; co-op's planar wall bridge is direct and does not need a world-world solve.
+- [x] Reject peer calibration when physical scale is missing and metric alignment is required.
+- [x] Allow normalized standalone ↔ standalone sharing by page-relative correspondence only.
+- [x] Bump the co-op wire protocol to v3 for backend + wall-frame metadata.
+- [x] Produce a clear incompatible-peer result: v2 peers fail VersionMismatch and incompatible v3
+  backend/scale pairs fail SpatialIncompatible instead of guessing.
+- [x] Reconnect/resync reuses the same spatial descriptor and fresh project ZIP; if the host target
+  changes, the session ends with SpatialFrameChanged rather than rebasing the guest silently.
+  Project ZIP relocation already covers standalone page-0 and atlas URIs.
 
 **ACCEPTANCE:** co-op never silently combines coordinates from different backends/scales as though
 they were the same frame.
