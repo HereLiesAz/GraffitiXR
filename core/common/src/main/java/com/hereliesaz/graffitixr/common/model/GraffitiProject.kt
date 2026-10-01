@@ -19,6 +19,32 @@ import java.util.UUID
  */
 const val SPHERE_SLAM_FINGERPRINT_FRAME_VERSION: Int = 1
 
+/**
+ * One additional standalone KPM page registered into the canonical centered-wall frame.
+ *
+ * Page 0 remains [GraffitiProject.sphereSlamReferenceUri] for backwards compatibility. Grown pages
+ * use stable positive IDs and store their rigid canonical-from-page transform explicitly, so a
+ * match can always be rebased to page 0's immutable wall coordinates.
+ */
+@Serializable
+data class SphereSlamAtlasPage(
+    val pageNo: Int,
+    @Serializable(with = UriSerializer::class)
+    val referenceUri: Uri,
+    val referenceWidthMeters: Float,
+    val physicallyMetric: Boolean,
+    val canonicalFromPage: List<Float>,
+    val frameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+) {
+    init {
+        require(pageNo > 0) { "grown SphereSLAM atlas pages use positive page IDs" }
+        require(referenceWidthMeters.isFinite() && referenceWidthMeters > 0f)
+        require(canonicalFromPage.size == 16 && canonicalFromPage.all { it.isFinite() }) {
+            "canonicalFromPage must be a finite 4x4 transform"
+        }
+    }
+}
+
 
 /**
  * Data class representing GPS coordinates and accuracy.
@@ -136,6 +162,12 @@ data class GraffitiProject(
      */
     val sphereSlamWallFeatureMap: WallFeatureMap? = null,
     val sphereSlamWallFeatureMapFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+
+    /**
+     * Additional KPM pages beyond canonical page 0. Every transform targets page 0's exact centered
+     * wall frame; changing page 0 invalidates this entire list.
+     */
+    val sphereSlamAtlasPages: List<SphereSlamAtlasPage> = emptyList(),
 
     val refinementPaths: List<RefinementPath> = emptyList(),
 
