@@ -1,6 +1,8 @@
 package com.hereliesaz.graffitixr.core.collaboration
 
 import com.hereliesaz.graffitixr.common.model.CoopSessionState
+import com.hereliesaz.graffitixr.common.model.CoopSpatialFrame
+import com.hereliesaz.graffitixr.common.model.CoopTrackingBackend
 import com.hereliesaz.graffitixr.common.model.Op
 import com.hereliesaz.graffitixr.core.collaboration.session.GuestSession
 import com.hereliesaz.graffitixr.core.collaboration.session.HostSession
@@ -30,19 +32,22 @@ data class ProjectSnapshot(
     val fingerprintBytes: ByteArray,
     val projectBytes: ByteArray,
     val layerCount: Int,
+    val spatialFrame: CoopSpatialFrame,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is ProjectSnapshot) return false
         return fingerprintBytes.contentEquals(other.fingerprintBytes) &&
             projectBytes.contentEquals(other.projectBytes) &&
-            layerCount == other.layerCount
+            layerCount == other.layerCount &&
+            spatialFrame == other.spatialFrame
     }
 
     override fun hashCode(): Int {
         var result = fingerprintBytes.contentHashCode()
         result = 31 * result + projectBytes.contentHashCode()
         result = 31 * result + layerCount
+        result = 31 * result + spatialFrame.hashCode()
         return result
     }
 }
@@ -113,7 +118,12 @@ class CollaborationManager @Inject constructor() {
     suspend fun joinFromQr(
         qr: String,
         localDeviceName: String,
-        onBulkReceived: suspend (fingerprint: ByteArray, project: ByteArray) -> Unit,
+        localBackend: CoopTrackingBackend,
+        onBulkReceived: suspend (
+            fingerprint: ByteArray,
+            project: ByteArray,
+            spatialFrame: CoopSpatialFrame,
+        ) -> Unit,
         onOp: suspend (Op) -> Unit,
     ) {
         check(hostSession == null && guestSession == null) { "already in a session" }
@@ -124,6 +134,7 @@ class CollaborationManager @Inject constructor() {
             token = payload.token,
             protocolVersion = payload.protocolVersion,
             localDeviceName = localDeviceName,
+            localBackend = localBackend,
             onBulkReceived = onBulkReceived,
             onOp = onOp,
         )

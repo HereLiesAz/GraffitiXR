@@ -172,3 +172,40 @@ toggle and without re-capturing, so the saved target is preserved. Pre-Phase-2 f
 `docs/NATIVE_ENGINE.md`), removed GPU-accelerated Liquify (no implementing code), corrected the
 module dependency graph and the AR data-flow diagram against current source. Prior update:
 2026-06-22, SLAM right-size and documentation-accuracy pass.*
+
+
+## Cross-backend co-op wall frame
+
+Co-op protocol v3 shares one **host wall-local coordinate object**, not either device's transient
+ARCore/SphereSLAM world origin. The wire descriptor is
+`core/common/.../CoopSpatialFrame.kt`:
+
+- `hostBackend` says whether the host wall came from ARCore or standalone SphereSLAM.
+- `scale` says whether translations are metric metres or normalized page units.
+- `fingerprintFromWall` is the durable transform from host wall-local coordinates into the
+  MobileGS fingerprint object frame.
+- `anchorRevision` identifies the exact host target. A recapture is a new coordinate object and
+  ends the running co-op session; reconnect never silently rebases it.
+
+For an ARCore host, `fingerprintFromWall` is the persisted
+`Fingerprint.captureAnchorCam = V_cv(capture) * anchorModel`. For a standalone host it is identity,
+because standalone fingerprint points already live directly in the centered canonical KPM wall
+frame.
+
+A peer MobileGS solve is therefore backend-neutral:
+
+```
+cameraGL_from_hostWall =
+    CV_TO_GL * pnpCV_camera_from_fingerprint * fingerprintFromWall
+```
+
+That same equation drives ARCore guest anchoring and the CameraX-only
+`CoopPeerFingerprintAnalyzer` used by an ARCore-host -> standalone-guest session. A standalone
+host -> standalone guest normally uses the shared KPM page/atlas directly; its project ZIP already
+contains page 0, atlas images, scale metadata, and canonical page transforms.
+
+Scale compatibility fails closed. A normalized standalone page may be shared with another
+standalone peer because both consume the same page-relative coordinate object. It may **not** be
+injected into ARCore's metre world. Protocol v3 rejects that pairing as `SpatialIncompatible`
+before bulk transfer. Protocol-v2 peers are rejected as `VersionMismatch`; retaining compatibility
+would recreate the frame ambiguity v3 exists to remove.

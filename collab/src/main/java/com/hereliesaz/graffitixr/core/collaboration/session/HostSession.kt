@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.core.collaboration.session
 
 import android.util.Log
 import com.hereliesaz.graffitixr.common.model.CoopSessionState
+import com.hereliesaz.graffitixr.common.model.CoopSpatialFrame
 import com.hereliesaz.graffitixr.common.model.Op
 import com.hereliesaz.graffitixr.core.collaboration.ProjectSnapshot
 import com.hereliesaz.graffitixr.core.collaboration.wire.BulkAckPayload
@@ -54,6 +55,9 @@ internal class HostSession(
     private val snapshotProvider: () -> ProjectSnapshot,
 ) : Session() {
 
+    /** Spatial identity fixed for the lifetime of this host session. */
+    private val hostedSpatialFrame: CoopSpatialFrame
+
     init {
         // The guest rejects bulk transfers above this cap with a bare require() that surfaces as
         // an unexplained NetworkLost on its side; failing fast here turns an oversized project
@@ -62,6 +66,7 @@ internal class HostSession(
         // actually sends one, since the project this check saw at construction is not necessarily
         // the one sent later.
         val probe = snapshotProvider()
+        hostedSpatialFrame = probe.spatialFrame
         require(probe.projectBytes.size <= Limits.MAX_BULK_BYTES && probe.fingerprintBytes.size <= Limits.MAX_BULK_BYTES) {
             "project too large to host: ${probe.projectBytes.size}B project / ${probe.fingerprintBytes.size}B fingerprint " +
                 "(cap ${Limits.MAX_BULK_BYTES}B)"
@@ -320,6 +325,14 @@ internal class HostSession(
             )
             socket.close(); return
         }
+        if (!hostedSpatialFrame.supportsGuest(hello.localBackend)) {
+            writeFrameTimed(
+                output,
+                FrameType.HELLO_REJECTED,
+                OpCodec.encode(HelloRejectedPayload(HelloRejectedPayload.RejectReason.SpatialIncompatible)),
+            )
+            socket.close(); return
+        }
 
         // Single guest only. A reconnecting guest is fine because enterReconnecting() nulls
         // clientSocket before the new connection; a *second* concurrent guest is rejected so
@@ -428,6 +441,13 @@ internal class HostSession(
         // window in dropStaleQueueEntries.
         val seqCutoff = seqCounter.get()
         val snapshot = snapshotProvider()
+        if (snapshot.spatialFrame != hostedSpatialFrame) {
+            // A recapture changes the coordinate object itself. Continuing under one session id
+            // would make the guest apply later design deltas in the old wall frame. End the session
+            // instead; a new Host action advertises the new frame explicitly.
+            close(CoopSessionState.EndReason.SpatialFrameChanged)
+            throw CancellationException("host wall frame changed during co-op session")
+        }
         require(
             snapshot.projectBytes.size <= Limits.MAX_BULK_BYTES &&
                 snapshot.fingerprintBytes.size <= Limits.MAX_BULK_BYTES,
@@ -452,6 +472,7 @@ internal class HostSession(
                     layerCount = snapshot.layerCount,
                     fingerprintBytes = snapshot.fingerprintBytes.size,
                     projectBytes = snapshot.projectBytes.size,
+                    spatialFrame = snapshot.spatialFrame,
                 )
             ),
         )

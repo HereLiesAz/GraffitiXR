@@ -97,6 +97,10 @@ fun SphereSlamStandaloneOverlay(
     persistedReferenceWidthMeters: Float = 1f,
     persistedReferencePhysicallyMetric: Boolean = false,
     persistedAtlasPages: List<SphereSlamAtlasPage> = emptyList(),
+    /** Protocol-v3 host wall frame when this device is a standalone co-op guest. */
+    coopPeerSpatialFrame: com.hereliesaz.graffitixr.common.model.CoopSpatialFrame? = null,
+    /** Host MobileGS fingerprint; required for ARCore-host -> standalone-guest alignment. */
+    coopPeerFingerprint: ByteArray? = null,
     onReferenceCaptured: (Bitmap, Float, Boolean) -> Unit = { _, _, _ -> },
     onPersistedReferenceInvalid: (Uri) -> Unit = {},
     onPersistedAtlasPageInvalid: (Int, Uri) -> Unit = { _, _ -> },
@@ -221,7 +225,13 @@ fun SphereSlamStandaloneOverlay(
     }
 
     val reference = referenceBitmap
-    if (reference == null) {
+    val peerOnlyTracking =
+        reference == null &&
+            coopPeerSpatialFrame?.hostBackend ==
+                com.hereliesaz.graffitixr.common.model.CoopTrackingBackend.ARCORE &&
+            coopPeerSpatialFrame.fingerprintAvailable &&
+            !coopPeerFingerprint.isNullOrEmpty()
+    if (reference == null && !peerOnlyTracking) {
         val pending = pendingReferenceBitmap
         if (pending != null) {
             val measuredWidth = StandaloneReferenceScale.parseMeters(referenceWidthInput)
@@ -362,13 +372,15 @@ fun SphereSlamStandaloneOverlay(
     }
 
     val referenceImage = remember(reference) {
-        SphereSlamStandaloneReferenceImage(
-            luma = bitmapToLuma(reference),
-            width = reference.width,
-            height = reference.height,
-            referenceWidthMeters = activeReferenceWidthMeters,
-            physicallyMetric = activeReferencePhysicallyMetric,
-        )
+        reference?.let {
+            SphereSlamStandaloneReferenceImage(
+                luma = bitmapToLuma(it),
+                width = it.width,
+                height = it.height,
+                referenceWidthMeters = activeReferenceWidthMeters,
+                physicallyMetric = activeReferencePhysicallyMetric,
+            )
+        }
     }
     // Snapshot persisted native state once per canonical page. Autosaves/grown-page commits publish
     // new project objects while THIS analyzer already owns the fresher live state; keying the effect
@@ -450,15 +462,53 @@ fun SphereSlamStandaloneOverlay(
         )
     }
 
-    LaunchedEffect(glRenderer, designBitmap, referenceWidthUnits, referenceHeightUnits) {
-        val fit = fitStandaloneDesignHalfExtents(
-            pageWidthUnits = referenceWidthUnits,
-            pageHeightUnits = referenceHeightUnits,
-            designWidthPx = designBitmap?.width,
-            designHeightPx = designBitmap?.height,
-        )
+    LaunchedEffect(
+        glRenderer,
+        designBitmap,
+        referenceWidthUnits,
+        referenceHeightUnits,
+        peerOnlyTracking,
+        coopPeerSpatialFrame,
+    ) {
+        val peerWidth = coopPeerSpatialFrame?.referenceWidthUnits
+        val fit =
+            if (
+                peerOnlyTracking &&
+                peerWidth != null &&
+                peerWidth > 0f &&
+                designBitmap != null
+            ) {
+                // ARCore publishes referenceWidthUnits as the host design's persisted metric width.
+                // Use it exactly: applying the normal page-fit 80% margin here would make an
+                // ARCore-hosted mural shrink on a standalone guest despite correct pose alignment.
+                val halfW = peerWidth * 0.5f
+                StandaloneDesignHalfExtents(
+                    halfWidth = halfW,
+                    halfHeight = halfW * designBitmap.height.toFloat() / designBitmap.width.toFloat(),
+                )
+            } else {
+                fitStandaloneDesignHalfExtents(
+                    pageWidthUnits = referenceWidthUnits,
+                    pageHeightUnits = referenceHeightUnits,
+                    designWidthPx = designBitmap?.width,
+                    designHeightPx = designBitmap?.height,
+                )
+            }
         designBaseHalfExtents = fit
         if (fit != null) glRenderer.setExtent(fit.halfWidth, fit.halfHeight)
+    }
+
+    LaunchedEffect(peerOnlyTracking, coopPeerSpatialFrame) {
+        if (peerOnlyTracking) {
+            val frame = requireNotNull(coopPeerSpatialFrame)
+            activeReferenceWidthMeters = frame.referenceWidthUnits
+            activeReferencePhysicallyMetric =
+                frame.scale == com.hereliesaz.graffitixr.common.model.CoopSpatialScale.METRIC
+            referenceWidthUnits = frame.referenceWidthUnits
+            referenceHeightUnits = frame.referenceWidthUnits
+            referenceReady = true
+            trackingState = StandaloneTrackingState.REACQUIRING
+        }
     }
 
     // Push the SAME wall-local rigid placement/extents used by the standalone renderer into
@@ -542,6 +592,45 @@ fun SphereSlamStandaloneOverlay(
         onDiagnostic("SphereSLAM standalone diagnostic dump copied")
     }
 
+    fun consumeTrackedFrame(frame: SphereSlamStandaloneFrame?) {
+        // Renderer state is atomic/volatile and intentionally updated directly from the analysis
+        // worker. Compose state belongs to Main and is posted there separately.
+        if (frame == null) {
+            glRenderer.clearPose()
+        } else {
+            glRenderer.updatePose(frame.viewMatrix, frame.projMatrix, frame.frameAspect)
+        }
+        val screenUnitsPerPixel = frame?.let {
+            val size = surfaceSize.get()
+            standaloneScreenUnitsPerPixel(
+                frameUnitsPerPixel = it.unitsPerPixel,
+                frameHeightPixels = it.frameHeightPixels,
+                frameAspect = it.frameAspect,
+                surfaceWidthPixels = size.width,
+                surfaceHeightPixels = size.height,
+            )
+        } ?: 0f
+        mainHandler.post {
+            if (peerOnlyTracking) {
+                trackingState =
+                    if (frame != null) StandaloneTrackingState.LOCKED
+                    else StandaloneTrackingState.REACQUIRING
+            }
+            if (frame != null) {
+                matchDiagnostics = StandaloneMatchDiagnostics(
+                    pageNo = frame.pageNo,
+                    inliers = frame.inlierCount,
+                    reprojectionError = frame.reprojectionError,
+                    observationAgeMs = frame.observationAgeMs,
+                    matchDurationMs = frame.matchDurationMs,
+                    source = frame.source,
+                )
+            }
+            onUnitsPerPixel(screenUnitsPerPixel)
+            onTrackingTick(frame != null)
+        }
+    }
+
     // CameraController implements pinch-to-camera-zoom itself. That would change the effective
     // intrinsics behind KPM while GraffitiXR's own pinch gesture is supposed to scale the artwork.
     // Keep the standalone camera calibrated at 1x for this composition only, and restore the shared
@@ -578,6 +667,9 @@ fun SphereSlamStandaloneOverlay(
         mobileGsFingerprint,
         mobileGsFingerprintFrameVersion,
         atlasReferenceImages,
+        peerOnlyTracking,
+        coopPeerSpatialFrame,
+        coopPeerFingerprint,
     ) {
         val id = cameraId
         val restoredAtlas = atlasReferenceImages
@@ -587,10 +679,31 @@ fun SphereSlamStandaloneOverlay(
             val executor = Executors.newSingleThreadExecutor { runnable ->
                 Thread(runnable, "sphereslam-standalone-camera").apply { isDaemon = true }
             }
-            val analyzer = SphereSlamStandaloneTrackingAnalyzer(
+            if (peerOnlyTracking) {
+                val peerSpatial = requireNotNull(coopPeerSpatialFrame)
+                val peerFingerprint = requireNotNull(coopPeerFingerprint)
+                val analyzer = CoopPeerFingerprintAnalyzer(
+                    context = context,
+                    cameraId = id,
+                    slam = slamManager,
+                    peerFingerprint = peerFingerprint,
+                    spatialFrame = peerSpatial,
+                    onFrameTracked = ::consumeTrackedFrame,
+                    onDiagnostic = { text -> mainHandler.post { onDiagnostic(text) } },
+                )
+                cameraController.setImageAnalysisAnalyzer(executor, analyzer)
+                onDispose {
+                    cameraController.clearImageAnalysisAnalyzer()
+                    mainHandler.removeCallbacksAndMessages(null)
+                    executor.execute { analyzer.close() }
+                    executor.shutdown()
+                    glRenderer.clearPose()
+                }
+            } else {
+                val analyzer = SphereSlamStandaloneTrackingAnalyzer(
                 context = context,
                 cameraId = id,
-                referenceImage = referenceImage,
+                referenceImage = requireNotNull(referenceImage),
                 atlasReferenceImages = restoredAtlas,
                 slamManager = slamManager,
                 mobileGsFingerprint = mobileGsFingerprint,
@@ -647,39 +760,7 @@ fun SphereSlamStandaloneOverlay(
                         }
                     }
                 },
-                onFrameTracked = { frame ->
-                    // Renderer state is atomic/volatile and intentionally updated directly from the
-                    // analysis worker. Compose state belongs to Main and is posted there separately.
-                    if (frame == null) {
-                        glRenderer.clearPose()
-                    } else {
-                        glRenderer.updatePose(frame.viewMatrix, frame.projMatrix, frame.frameAspect)
-                    }
-                    val screenUnitsPerPixel = frame?.let {
-                        val size = surfaceSize.get()
-                        standaloneScreenUnitsPerPixel(
-                            frameUnitsPerPixel = it.unitsPerPixel,
-                            frameHeightPixels = it.frameHeightPixels,
-                            frameAspect = it.frameAspect,
-                            surfaceWidthPixels = size.width,
-                            surfaceHeightPixels = size.height,
-                        )
-                    } ?: 0f
-                    mainHandler.post {
-                        if (frame != null) {
-                            matchDiagnostics = StandaloneMatchDiagnostics(
-                                pageNo = frame.pageNo,
-                                inliers = frame.inlierCount,
-                                reprojectionError = frame.reprojectionError,
-                                observationAgeMs = frame.observationAgeMs,
-                                matchDurationMs = frame.matchDurationMs,
-                                source = frame.source,
-                            )
-                        }
-                        onUnitsPerPixel(screenUnitsPerPixel)
-                        onTrackingTick(frame != null)
-                    }
-                },
+                onFrameTracked = ::consumeTrackedFrame,
                 onFatalError = { error ->
                     mainHandler.post {
                         if (error is StandaloneReferenceTooWeakException) {
@@ -727,6 +808,7 @@ fun SphereSlamStandaloneOverlay(
                 executor.execute { analyzer.close() }
                 executor.shutdown()
                 glRenderer.clearPose()
+            }
             }
         }
     }

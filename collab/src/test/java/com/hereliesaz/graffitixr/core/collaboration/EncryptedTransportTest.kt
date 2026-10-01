@@ -1,6 +1,8 @@
 package com.hereliesaz.graffitixr.core.collaboration
 
 import com.hereliesaz.graffitixr.common.model.CoopSessionState
+import com.hereliesaz.graffitixr.common.model.CoopSpatialFrame
+import com.hereliesaz.graffitixr.common.model.CoopTrackingBackend
 import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.Op
 import com.hereliesaz.graffitixr.core.collaboration.session.GuestSession
@@ -31,6 +33,7 @@ class EncryptedTransportTest {
                 fingerprintBytes = ByteArray(64) { it.toByte() },
                 projectBytes = project,
                 layerCount = 0,
+                spatialFrame = testSpatialFrame(),
             )
         },
     )
@@ -39,13 +42,14 @@ class EncryptedTransportTest {
         port: Int,
         token: String,
         onOp: suspend (Op) -> Unit = {},
-        onBulk: suspend (ByteArray, ByteArray) -> Unit = { _, _ -> },
+        onBulk: suspend (ByteArray, ByteArray, CoopSpatialFrame) -> Unit = { _, _, _ -> },
     ) = GuestSession(
         host = "127.0.0.1",
         port = port,
         token = token,
         protocolVersion = 2,
         localDeviceName = "guest",
+        localBackend = CoopTrackingBackend.ARCORE,
         onBulkReceived = onBulk,
         onOp = onOp,
         reconnectWindowMs = 2_000L,
@@ -64,7 +68,7 @@ class EncryptedTransportTest {
 
         // A correct-token guest can still join afterward.
         var bulkOk = false
-        val goodGuest = newGuest(port, token = "correct", onBulk = { _, _ -> bulkOk = true })
+        val goodGuest = newGuest(port, token = "correct", onBulk = { _, _, _ -> bulkOk = true })
         goodGuest.connect()
         withTimeout(10_000) { while (!bulkOk) delay(50) }
 
@@ -105,7 +109,7 @@ class EncryptedTransportTest {
         val guest = newGuest(
             proxyPort,
             token = "tok",
-            onBulk = { _, _ -> bulkOk = true },
+            onBulk = { _, _, _ -> bulkOk = true },
             onOp = { op -> synchronized(received) { received.add(op) } },
         )
         guest.connect()

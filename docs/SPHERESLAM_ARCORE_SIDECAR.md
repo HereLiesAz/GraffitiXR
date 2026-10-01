@@ -383,9 +383,11 @@ still measured. Accepted-match metrics are rate-limited to one diagnostic line e
 AR mode remains reachable regardless of ARCore availability, but individual actions are gated by
 what the active backend can actually do. Standalone keeps the shared Light, Lock, Magic, design,
 project, and settings actions. The legacy ARCore Target rail action is disabled and points the artist
-to the standalone on-screen Wall Target capture. Co-op Host/Join remain disabled until an explicit
-standalone-to-peer coordinate-frame calibration exists, while Leave remains reachable for an
-already-active session. AR preview Export is also disabled on standalone until CameraX and the
+to the standalone on-screen Wall Target capture. Co-op Host/Join use protocol-v3 explicit host
+wall-frame metadata: measured standalone pages can pair cross-backend, normalized pages can pair
+standalone↔standalone, and incompatible scale/backend combinations fail before bulk transfer. Leave
+remains reachable for an already-active session. AR preview Export is still disabled on standalone
+until CameraX and the
 transparent GL overlay can be composited into the same mode screenshot; exporting only artwork
 layers would be misleading.
 

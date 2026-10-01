@@ -1,6 +1,8 @@
 package com.hereliesaz.graffitixr.core.collaboration.session
 
 import com.hereliesaz.graffitixr.common.model.CoopSessionState
+import com.hereliesaz.graffitixr.common.model.CoopSpatialFrame
+import com.hereliesaz.graffitixr.common.model.CoopTrackingBackend
 import com.hereliesaz.graffitixr.common.model.Op
 import com.hereliesaz.graffitixr.core.collaboration.wire.*
 import kotlinx.coroutines.*
@@ -18,7 +20,12 @@ internal class GuestSession(
     private val token: String,
     private val protocolVersion: Int,
     private val localDeviceName: String,
-    private val onBulkReceived: suspend (fingerprint: ByteArray, project: ByteArray) -> Unit,
+    private val localBackend: CoopTrackingBackend,
+    private val onBulkReceived: suspend (
+        fingerprint: ByteArray,
+        project: ByteArray,
+        spatialFrame: CoopSpatialFrame,
+    ) -> Unit,
     private val onOp: suspend (Op) -> Unit,
     // How long (and how often) to retry reconnecting before giving up. Injectable so tests can
     // use a short, deterministic window instead of waiting the full production 30s.
@@ -109,6 +116,7 @@ internal class GuestSession(
                         proof = proof,
                         clientVersion = protocolVersion,
                         deviceName = localDeviceName,
+                        localBackend = localBackend,
                         lastAppliedSeq = if (isReconnect) lastAppliedSeq else 0L,
                     )
                 ),
@@ -173,6 +181,7 @@ internal class GuestSession(
                     val reason = when (rej.reason) {
                         HelloRejectedPayload.RejectReason.BadToken -> CoopSessionState.EndReason.BadToken
                         HelloRejectedPayload.RejectReason.VersionMismatch -> CoopSessionState.EndReason.VersionMismatch
+                        HelloRejectedPayload.RejectReason.SpatialIncompatible -> CoopSessionState.EndReason.SpatialIncompatible
                         HelloRejectedPayload.RejectReason.AlreadyHosting -> CoopSessionState.EndReason.HostClosed
                     }
                     close(reason)
@@ -201,6 +210,9 @@ internal class GuestSession(
     ) {
         require(begin.type == FrameType.BULK_BEGIN)
         val beginPayload = OpCodec.decode<BulkBeginPayload>(begin.payload)
+        require(beginPayload.spatialFrame.supportsGuest(localBackend)) {
+            "host spatial frame is incompatible with $localBackend"
+        }
 
         val fingerprint = receiveChunked(input, crypto, FrameType.BULK_FINGERPRINT, beginPayload.fingerprintBytes)
         val project = receiveChunked(input, crypto, FrameType.BULK_PROJECT, beginPayload.projectBytes)
@@ -210,7 +222,7 @@ internal class GuestSession(
 
         writeSecure(output, crypto, FrameType.BULK_ACK, OpCodec.encode(BulkAckPayload(0L)))
 
-        onBulkReceived(fingerprint, project)
+        onBulkReceived(fingerprint, project, beginPayload.spatialFrame)
     }
 
     private fun receiveChunked(input: InputStream, crypto: SessionCrypto, expectedType: FrameType, totalBytes: Int): ByteArray {

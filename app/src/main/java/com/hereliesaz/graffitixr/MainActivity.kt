@@ -2034,11 +2034,10 @@ class MainActivity : ComponentActivity() {
                     // implemented and unreachable: the "Magic Wand" the adjustments panel's doc
                     // still described had been removed from that panel's action row.
                     azRailSubItem(id = "mode.ar.magic", hostId = "mode.ar", text = navStrings.magic, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { editorViewModel.onMagicClicked() })
-                    // Co-op requires an explicit shared coordinate frame. ARCore has that
-                    // calibration path today; standalone SphereSLAM does not yet. Keep Host/Join
-                    // visibly unavailable rather than letting peers silently combine unrelated
-                    // wall/page frames. An already-active session keeps the container reachable so
-                    // Leave is never trapped behind a disabled host item.
+                    // Co-op requires an explicit shared coordinate frame. Protocol v3 now supplies
+                    // that host wall-frame/backend/scale contract for both ARCore and standalone.
+                    // The policy still gates unresolved capability; incompatible peers are rejected
+                    // during handshake rather than silently combining unrelated wall/page frames.
                     val coopBackendBlocked = !arRailPolicy.coopCalibrationAvailable
                     val coopContainerBlocked =
                         coopBackendBlocked && arUiState.coopRole == CoopRole.NONE

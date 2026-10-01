@@ -15,9 +15,9 @@ internal data class ArRailBackendPolicy(
  * Capability policy for AR-only rail tools.
  *
  * The standalone backend owns target capture inside SphereSlamStandaloneOverlay, so the legacy
- * ARCore Target rail action must not arm MainViewModel's ARCore tap-to-anchor flow. Co-op is more
- * strict: until a standalone page frame can be explicitly calibrated to a peer frame, Host/Join
- * must stay disabled rather than silently treating unrelated coordinate systems as equivalent.
+ * ARCore Target rail action must not arm MainViewModel's ARCore tap-to-anchor flow. Co-op uses the
+ * protocol-v3 explicit host wall-frame descriptor, so standalone Host/Join are available once the
+ * backend itself is resolved; incompatible metric/normalized pairings are rejected at handshake.
  */
 internal fun arRailBackendPolicy(
     arCoreAvailabilityResolved: Boolean,
@@ -52,8 +52,8 @@ internal fun arRailBackendPolicy(
         standalone = true,
         targetRailEnabled = false,
         targetDisabledReason = "Use the on-screen Wall Target capture",
-        coopCalibrationAvailable = false,
-        coopDisabledReason = "ARCore calibration required for co-op",
+        coopCalibrationAvailable = true,
+        coopDisabledReason = null,
         modePreviewExportAvailable = false,
         exportDisabledReason = "Standalone camera + overlay export is not implemented yet",
     )

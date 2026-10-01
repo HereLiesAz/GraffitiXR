@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.core.collaboration
 
 import com.hereliesaz.graffitixr.common.model.BrushStroke
 import com.hereliesaz.graffitixr.common.model.CoopSessionState
+import com.hereliesaz.graffitixr.common.model.CoopTrackingBackend
 import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.Op
 import com.hereliesaz.graffitixr.core.collaboration.session.GuestSession
@@ -35,7 +36,12 @@ class SessionRobustnessTest {
         protocolVersion = 1,
         localDeviceName = "host",
         projectId = "p1",
-        snapshotProvider = { ProjectSnapshot(fingerprintBytes = fingerprint, projectBytes = project, layerCount = 0) },
+        snapshotProvider = { ProjectSnapshot(
+            fingerprintBytes = fingerprint,
+            projectBytes = project,
+            layerCount = 0,
+            spatialFrame = testSpatialFrame(),
+        ) },
     )
 
     @Test
@@ -64,7 +70,8 @@ class SessionRobustnessTest {
             token = "tok",
             protocolVersion = 1,
             localDeviceName = "guest",
-            onBulkReceived = { _, _ -> bulkOk = true },
+            localBackend = CoopTrackingBackend.ARCORE,
+            onBulkReceived = { _, _, _ -> bulkOk = true },
             onOp = { },
         )
         guest.connect()
@@ -96,7 +103,8 @@ class SessionRobustnessTest {
         token = "tok",
         protocolVersion = 1,
         localDeviceName = "guest",
-        onBulkReceived = { _, _ -> onBulk() },
+        localBackend = CoopTrackingBackend.ARCORE,
+        onBulkReceived = { _, _, _ -> onBulk() },
         onOp = onOp,
         reconnectWindowMs = 15_000L,
         reconnectIntervalMs = 300L,
@@ -216,7 +224,7 @@ class SessionRobustnessTest {
             fun readEnc(): Frame.FrameRead = crypto.open((Frame.read(input) ?: error("EOF")).payload)
 
             if (payload.lastAppliedSeq == 0L) {
-                writeEnc(FrameType.BULK_BEGIN, OpCodec.encode(BulkBeginPayload("p1", 0, 0, 0)))
+                writeEnc(FrameType.BULK_BEGIN, OpCodec.encode(BulkBeginPayload("p1", 0, 0, 0, testSpatialFrame())))
                 writeEnc(FrameType.BULK_END, ByteArray(0))
                 val ack = readEnc()
                 assertEquals(FrameType.BULK_ACK, ack.type)
@@ -248,7 +256,8 @@ class SessionRobustnessTest {
             token = "tok",
             protocolVersion = 1,
             localDeviceName = "guest",
-            onBulkReceived = { _, _ -> bulkCount++ },
+            localBackend = CoopTrackingBackend.ARCORE,
+            onBulkReceived = { _, _, _ -> bulkCount++ },
             onOp = { },
             reconnectWindowMs = 15_000L,
             reconnectIntervalMs = 200L,

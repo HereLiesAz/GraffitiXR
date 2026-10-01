@@ -61,6 +61,8 @@ data class SphereSlamStandaloneAtlasReferenceImage(
 enum class SphereSlamStandalonePoseSource {
     KPM,
     IMU_BRIDGE,
+    /** MobileGS PnP against a protocol-v3 co-op peer fingerprint. */
+    PEER_FINGERPRINT,
 }
 
 data class SphereSlamStandaloneFrame(
