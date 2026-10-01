@@ -327,6 +327,10 @@ repository's atomic project update, and only then deletes the previous reference
 project changes or the metadata save fails, the uncommitted candidate is deleted and the previous
 reference remains authoritative.
 
+Regression tests cover both process-death boundaries: an uncommitted new image cannot replace the
+old project reference, while a committed new URI remains authoritative even if the old file is
+still present because cleanup had not yet run.
+
 ## Import and co-op reference transport
 
 The portable artifact is the rectified SphereSLAM reference PNG plus its width/metric metadata in
