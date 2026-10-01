@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.viewModelScope
 import com.google.ar.core.Session
@@ -16,6 +17,7 @@ import android.graphics.Paint
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -257,6 +259,82 @@ class ArViewModelTest {
         assertTrue(state.tapMarks.isEmpty())
         assertNull(state.annotatedCaptureBitmap)
         assertNull(state.tempCaptureBitmap)
+    }
+
+    // ==================== Standalone SphereSLAM persistence tests ====================
+
+    @Test
+    fun `invalid persisted SphereSLAM URI clears only matching standalone fields`() = runTest {
+        val uri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_old.png")
+        val project = com.hereliesaz.graffitixr.common.model.GraffitiProject(
+            id = "slam",
+            name = "Wall",
+            sphereSlamReferenceUri = uri,
+            sphereSlamReferenceWidthMeters = 2.5f,
+            sphereSlamReferencePhysicallyMetric = true,
+        )
+        val flow = MutableStateFlow<com.hereliesaz.graffitixr.common.model.GraffitiProject?>(project)
+        every { projectRepository.currentProject } returns flow
+        coEvery {
+            projectRepository.updateProject(
+                any<(com.hereliesaz.graffitixr.common.model.GraffitiProject) ->
+                    com.hereliesaz.graffitixr.common.model.GraffitiProject>(),
+            )
+        } coAnswers {
+            val transform = firstArg<
+                (com.hereliesaz.graffitixr.common.model.GraffitiProject) ->
+                    com.hereliesaz.graffitixr.common.model.GraffitiProject
+            >()
+            flow.value = transform(requireNotNull(flow.value))
+        }
+
+        viewModel.clearSphereSlamReferenceIfMatches(uri)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val updated = requireNotNull(flow.value)
+        assertNull(updated.sphereSlamReferenceUri)
+        assertEquals(1f, updated.sphereSlamReferenceWidthMeters, 0f)
+        assertFalse(updated.sphereSlamReferencePhysicallyMetric)
+        assertEquals("Wall", updated.name)
+        coVerify {
+            projectManager.deleteSphereSlamReference(context, "slam", uri)
+        }
+    }
+
+    @Test
+    fun `stale invalid-reference callback cannot clear a newer SphereSLAM recapture`() = runTest {
+        val oldUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_old.png")
+        val newUri = Uri.parse("file:///tmp/projects/slam/sphereslam_reference_new.png")
+        val project = com.hereliesaz.graffitixr.common.model.GraffitiProject(
+            id = "slam",
+            name = "Wall",
+            sphereSlamReferenceUri = newUri,
+            sphereSlamReferenceWidthMeters = 3f,
+            sphereSlamReferencePhysicallyMetric = true,
+        )
+        val flow = MutableStateFlow<com.hereliesaz.graffitixr.common.model.GraffitiProject?>(project)
+        every { projectRepository.currentProject } returns flow
+        coEvery {
+            projectRepository.updateProject(
+                any<(com.hereliesaz.graffitixr.common.model.GraffitiProject) ->
+                    com.hereliesaz.graffitixr.common.model.GraffitiProject>(),
+            )
+        } coAnswers {
+            val transform = firstArg<
+                (com.hereliesaz.graffitixr.common.model.GraffitiProject) ->
+                    com.hereliesaz.graffitixr.common.model.GraffitiProject
+            >()
+            flow.value = transform(requireNotNull(flow.value))
+        }
+
+        viewModel.clearSphereSlamReferenceIfMatches(oldUri)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(newUri, flow.value?.sphereSlamReferenceUri)
+        assertEquals(3f, flow.value?.sphereSlamReferenceWidthMeters ?: 0f, 0f)
+        coVerify(exactly = 0) {
+            projectManager.deleteSphereSlamReference(any(), any(), any())
+        }
     }
 
     // ==================== Session Lifecycle Tests ====================
