@@ -89,6 +89,11 @@ This document lists key files in the repository and their purposes.
 *   `SphereSlamStandaloneTrackingAnalyzer.kt`: synchronous display-oriented CameraX luma →
     calibrated KPM pose pipeline with quality gates, observation-age checks, pose-jump rejection,
     tracking-state hysteresis, and the short rotation-only IMU bridge.
+*   `StandaloneWallHitTest.kt`: ARCore-independent screen-pixel → canonical wall intersection.
+    Back-projects calibrated CameraX rays onto SphereSLAM z=0 and accepts only visually locked,
+    registered page/atlas coverage; no synthetic depth or ARCore `Frame.hitTest`.
+*   `StandaloneAtlasGrowth.kt`: chooses/rectifies additional KPM wall pages and registers each into
+    page 0's immutable canonical frame.
 *   `StandaloneFailure.kt` / `StandaloneDiagnostics.kt`: typed standalone failure taxonomy and the
     compact diagnostic dump contract.
 *   `rendering/HomographyOverlayRenderer.kt`: transparent CameraX GL overlay renderer shared by
