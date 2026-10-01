@@ -111,4 +111,3 @@ internal object LumaFrameTransform {
         return RotatedLuma(out, outWidth, outHeight)
     }
 }
-}
