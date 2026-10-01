@@ -145,8 +145,10 @@ does not construct an ARCore `Anchor` or depend on `Frame.hitTest`; when a scree
 is needed, `StandaloneWallHitTest` intersects the calibrated CameraX ray with canonical z=0 and
 accepts only registered page coverage while visually locked. ARCore Depth/stereo probes and
 planes/point-cloud debug renderers stay behind the ARCore branch. Standalone exposes KPM
-page/inlier/error/age diagnostics instead, and its persisted anchor/placement generations prevent a
-recapture from reusing transforms authored in the superseded wall frame.
+page/inlier/error/age diagnostics instead. ARCore and standalone persist separate AR adjustments:
+`modeAdjustments[AR]` remains ARCore's coordinate state, while `sphereSlamModeAdjustment` is
+generation-bound to the canonical KPM wall. Recapture therefore cannot reuse standalone transforms
+from the superseded wall or erase a still-valid ARCore placement.
 
 ## Relocalization and Drift Correction
 
