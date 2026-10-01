@@ -717,6 +717,11 @@ class EditorViewModel @Inject constructor(
     fun saveProject(name: String? = null, onComplete: (Boolean) -> Unit = {}) {
         val snapshot = _uiState.value
         val currentProject = projectRepository.currentProject.value
+        // These belong to the SAME logical editor snapshot. Reading either later on IO can pair an
+        // old spatial transform with a newer wall generation if recapture completes while this save
+        // is queued. Snapshot them before launching, exactly like the UI state above.
+        val snapshotStandaloneActive = standaloneArBackendActive
+        val snapshotPlacementGeneration = standaloneArPlacementGeneration
         viewModelScope.launch(dispatchers.main) {
             try {
                 editorSaveMutex.withLock {
@@ -725,8 +730,8 @@ class EditorViewModel @Inject constructor(
                         check(projectRepository.currentProject.value?.id == currentProject?.id) { "Project changed while saving" }
                         val updatedDesign = snapshot.design?.toOverlayLayer()
                         val modeAdjustments = snapshot.modeAdjustments.mapKeys { it.key.name }
-                        val placementGeneration = standaloneArPlacementGeneration
-                        val standaloneActive = standaloneArBackendActive
+                        val placementGeneration = snapshotPlacementGeneration
+                        val standaloneActive = snapshotStandaloneActive
                         val standaloneAdjustment = snapshot.modeAdjustments[EditorMode.AR]
 
                         // Paths derive from the (immutable) project id.
