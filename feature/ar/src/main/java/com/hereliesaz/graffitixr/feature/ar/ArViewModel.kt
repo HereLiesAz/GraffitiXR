@@ -2481,21 +2481,61 @@ class ArViewModel @Inject constructor(
      */
     suspend fun saveProjectWallMap() {
         val projectId = loadedProjectId ?: return
-        if (projectRepository.currentProject.value?.id != projectId) return
+        val currentProject = projectRepository.currentProject.value ?: return
+        if (currentProject.id != projectId) return
+
         val map = slamManager.getWallFeatureMap()?.takeIf { it.pointCount > 0 }
-        // The teleological reference set: painted design features. Persisted so a return visit
-        // relocalizes on the paint, not only on marks that may since have been painted over.
-        val paint = slamManager.getPaintMarks()
-        val grid = slamManager.exportPaintGrid()?.let { java.util.Base64.getEncoder().encodeToString(it) }
-        if (map == null && paint == null && grid == null) return
-        projectRepository.updateProject {
-            if (it.id == projectId) {
-                it.copy(
-                    wallFeatureMap = map ?: it.wallFeatureMap,
-                    paintMarks = paint ?: it.paintMarks,
-                    paintGrid = grid ?: it.paintGrid,
+        val ui = _uiState.value
+        val standaloneBackend =
+            ui.isArCoreAvailabilityResolved &&
+                !ui.isArCoreAvailable &&
+                currentProject.sphereSlamReferenceUri != null &&
+                currentProject.sphereSlamFingerprint != null
+
+        if (standaloneBackend) {
+            if (map == null) return
+            if (!StandaloneFingerprintFrame.isCenteredPageAnchor(map.anchor)) {
+                appendDiag(
+                    "SphereSLAM explicit map save refused: native map anchor is not centered-page identity",
                 )
-            } else it
+                return
+            }
+            projectRepository.updateProject { project ->
+                if (
+                    project.id == projectId &&
+                    project.sphereSlamReferenceUri == currentProject.sphereSlamReferenceUri
+                ) {
+                    project.copy(
+                        sphereSlamWallFeatureMap = map,
+                        sphereSlamWallFeatureMapFrameVersion =
+                            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                    )
+                } else {
+                    project
+                }
+            }
+            lastStandaloneSavedMapRevision = slamManager.getWallFeatureMapRevision()
+            lastStandaloneMapSaveMs = android.os.SystemClock.elapsedRealtime()
+            lastSavedProgress = slamManager.getPaintingProgress()
+            return
+        }
+
+        // ARCore/capture-frame persistence. Never execute this branch for the standalone native
+        // map above: wallFeatureMap/paintMarks belong to the legacy ARCore fingerprint frame.
+        val paint = slamManager.getPaintMarks()
+        val grid = slamManager.exportPaintGrid()
+            ?.let { java.util.Base64.getEncoder().encodeToString(it) }
+        if (map == null && paint == null && grid == null) return
+        projectRepository.updateProject { project ->
+            if (project.id == projectId) {
+                project.copy(
+                    wallFeatureMap = map ?: project.wallFeatureMap,
+                    paintMarks = paint ?: project.paintMarks,
+                    paintGrid = grid ?: project.paintGrid,
+                )
+            } else {
+                project
+            }
         }
         paint?.let { lastSavedPaintCount.set(it.pointCount) }
         lastSavedProgress = slamManager.getPaintingProgress()
