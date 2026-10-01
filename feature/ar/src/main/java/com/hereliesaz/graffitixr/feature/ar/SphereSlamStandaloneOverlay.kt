@@ -33,9 +33,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.viewinterop.AndroidView
@@ -45,6 +47,7 @@ import com.hereliesaz.graffitixr.design.theme.rememberAppStrings
 import com.hereliesaz.graffitixr.feature.ar.rendering.HomographyOverlayRenderer
 import com.hereliesaz.sphereslam.SphereSlamStandaloneSession
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -90,6 +93,7 @@ fun SphereSlamStandaloneOverlay(
     val strings = rememberAppStrings()
     val scope = rememberCoroutineScope()
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
+    val surfaceSize = remember { AtomicReference(IntSize.Zero) }
 
     var rawCaptureBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var pendingReferenceBitmap by remember { mutableStateOf<Bitmap?>(null) }
@@ -425,8 +429,18 @@ fun SphereSlamStandaloneOverlay(
                     } else {
                         glRenderer.updatePose(frame.viewMatrix, frame.projMatrix, frame.frameAspect)
                     }
+                    val screenUnitsPerPixel = frame?.let {
+                        val size = surfaceSize.get()
+                        standaloneScreenUnitsPerPixel(
+                            frameUnitsPerPixel = it.unitsPerPixel,
+                            frameHeightPixels = it.frameHeightPixels,
+                            frameAspect = it.frameAspect,
+                            surfaceWidthPixels = size.width,
+                            surfaceHeightPixels = size.height,
+                        )
+                    } ?: 0f
                     mainHandler.post {
-                        onUnitsPerPixel(frame?.unitsPerPixel ?: 0f)
+                        onUnitsPerPixel(screenUnitsPerPixel)
                     }
                 },
                 onFatalError = { error ->
@@ -487,7 +501,9 @@ fun SphereSlamStandaloneOverlay(
             }
         },
         onRelease = { view -> view.queueEvent { glRenderer.release() } },
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .onSizeChanged { surfaceSize.set(it) },
     )
 
     if (!referenceReady || trackingState == StandaloneTrackingState.INITIALIZING) {
