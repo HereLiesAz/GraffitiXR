@@ -35,6 +35,7 @@ class SphereSlamStandaloneSession(
         val pageNo: Int,
         val imageNo: Int,
         val geometry: SphereSlamPoseMath.PageGeometry,
+        val featureCount: Int,
         /**
          * True only when the width supplied by the caller is an actual physical measurement.
          * False means the pose is internally scaled and visually stable, but distance values are not
@@ -88,7 +89,7 @@ class SphereSlamStandaloneSession(
         require(!references.containsKey(pageNo)) { "page $pageNo is already registered" }
         val dpi = SphereSlamPoseMath.dpiForReferenceWidth(width, referenceWidthMeters)
         val geometry = SphereSlamPoseMath.pageGeometry(width, height, dpi)
-        engine.addPage(
+        val featureCount = engine.addPage(
             luma,
             width,
             height,
@@ -103,6 +104,7 @@ class SphereSlamStandaloneSession(
             pageNo = pageNo,
             imageNo = imageNo,
             geometry = geometry,
+            featureCount = featureCount,
             physicallyMetric = physicallyMetric,
         ).also { references[pageNo] = it }
     }
