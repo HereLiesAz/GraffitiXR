@@ -176,8 +176,18 @@ if(EXISTS ${ARX_ROOT}/KPM/include/ARX/KPM/kpm.h)
         ${ARX_ROOT}/AR/vTridiag.c
         ${ARX_ROOT}/AR/matrixCode.c
     )
+
+    # artoolkitX's libAR normally owns JNI_OnLoad when built as a standalone Android shared
+    # library. GraffitiXR already owns the process loader in GraffitiJNI.cpp, so keep arUtil.c's
+    # helper functions while renaming only that colliding loader symbol in the embedded build.
+    set_source_files_properties(
+        ${ARX_ROOT}/AR/arUtil.c
+        PROPERTIES COMPILE_DEFINITIONS "JNI_OnLoad=arxEmbeddedJniOnLoad"
+    )
+
     set(ARX_SUPPORT_SRC
         ${ARX_ROOT}/ARUtil/log.c
+        ${ARX_ROOT}/ARUtil/file_utils.c
     )
 
     add_library(arx_kpm STATIC
