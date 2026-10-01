@@ -16,11 +16,56 @@ The relocalizer's real constants live in `core/nativebridge/src/main/cpp/include
 
 ## Sensor input pipeline
 
-### Color frame (`feedYuvFrame` / `feedColorFrame`)
-The live camera feed, offloaded to `relocThreadFunc` for background ORB/SuperPoint matching against the stored fingerprint and a `solvePnPRansac` pose solve.
+### ARCore + MobileGS path
 
-### Depth (hardware stereo where available)
-Depth is used for triangulating the fingerprint's 3D points at capture time on devices with real hardware stereo; there is no separate mapping/fusion pipeline that consumes it afterward.
+#### Color frame (`feedYuvFrame` / `feedColorFrame`)
+The ARCore camera feed is offloaded to `relocThreadFunc` for background ORB/SuperPoint matching
+against the stored fingerprint and a `solvePnPRansac` pose solve.
+
+#### Depth (hardware stereo where available)
+Depth is used for triangulating the fingerprint's 3D points at capture time on devices with real
+hardware stereo; there is no separate mapping/fusion pipeline that consumes it afterward.
+
+### Standalone CameraX + SphereSLAM/KPM path
+
+On devices where ARCore is unavailable, AR mode does **not** construct an ARCore `Session`.
+`MainScreen` keeps CameraX bound and mounts `SphereSlamStandaloneOverlay`:
+
+1. the artist captures a textured wall patch and marks four corners;
+2. `PerspectiveProcessor` rectifies that patch into the canonical page image;
+3. image-quality preflight rejects undersized, flat, or blurry targets and warns on severe clipped
+   exposure;
+4. the artist can enter the real measured page width, or explicitly continue with normalized
+   1.0-unit scale;
+5. `SphereSlamStandaloneTrackingAnalyzer` packs the real `ImageProxy.cropRect` Y plane, rotates it
+   into display orientation, estimates Camera2 intrinsics for the raw CameraX frame, applies the crop,
+   and rotates `fx/fy/cx/cy` into the same display frame;
+6. `SphereSlamStandaloneSession` builds a calibrated artoolkitX KPM page and synchronously matches
+   each analyzed frame;
+7. KPM camera-from-page is converted to a centered, right-handed OpenGL wall-relative view matrix;
+8. the transparent `HomographyOverlayRenderer` draws the design over `CameraPreview`;
+9. a visual miss can use the rotation-only gyro bridge for at most 400 ms, then the overlay clears
+   and enters explicit reacquisition.
+
+KPM acceptance defaults mirror the pinned artoolkitX binary pose path: at least 4 inliers and
+reprojection/ICP error no greater than 10.0. The app additionally rejects stale REALTIME-timestamp
+observations and catastrophic pose jumps.
+
+#### Persistence
+
+The portable standalone artifact is a versioned rectified
+`sphereslam_reference_<uuid>.png` plus width/physical-scale metadata in `project.json`. Native KPM
+handles/atlases are never serialized; they are rebuilt from the page image on reopen/import/co-op
+project transfer.
+
+#### MobileGS boundary — intentionally not connected yet
+
+Do **not** feed standalone CameraX frames or KPM view matrices into MobileGS merely because the
+methods exist. Existing MobileGS fingerprints are expressed in the ARCore/fingerprint coordinate
+frame, while the standalone pose is expressed in the centered KPM page frame. Until the
+page↔fingerprint transform is explicitly defined, persisted, and unit-tested, mixing them would
+produce plausible-looking but wrong relocalization/corroboration. Standalone AR therefore remains
+wall-page KPM tracking only at this boundary.
 
 ## Tuning guide
 
@@ -36,4 +81,6 @@ Cause: the fingerprint's stored intrinsics were captured at one display rotation
 Fix: re-capture the target at the orientation painting will actually happen in, or file this as the open bug it currently is if it reproduces.
 
 ---
-*Rewritten 2026-09-04 to describe the relocalizer actually in the tree — the previous "Persistent Voxel Memory" tuning guide (voxel size, stochastic sampling, `MAX_SPLATS`, `feedArCoreDepth`) had no corresponding code anywhere in `core/nativebridge`.*
+*Updated 2026-10-01 with the standalone CameraX + SphereSLAM/KPM data flow and explicit MobileGS
+frame-boundary rule. Rewritten 2026-09-04 to describe the relocalizer actually in the tree — the
+previous "Persistent Voxel Memory" tuning guide (voxel size, stochastic sampling, `MAX_SPLATS`, `feedArCoreDepth`) had no corresponding code anywhere in `core/nativebridge`.*
