@@ -21,8 +21,7 @@ class StandaloneArPlacementGenerationTest {
             sphereSlamReferenceUri = uri,
             sphereSlamAnchorGeneration = 8L,
             sphereSlamPlacementAnchorGeneration = 7L,
-            modeAdjustments = mapOf(
-                EditorMode.AR.name to ModeAdjustment(
+            sphereSlamModeAdjustment = ModeAdjustment(
                     offsetX = 2f,
                     offsetY = -1f,
                     scale = 3f,
@@ -36,7 +35,6 @@ class StandaloneArPlacementGenerationTest {
                     isInverted = true,
                     isTransformLocked = true,
                 ),
-            ),
         )
 
         val restored = requireNotNull(standaloneArAdjustmentForProject(project))
@@ -65,7 +63,7 @@ class StandaloneArPlacementGenerationTest {
             sphereSlamReferenceUri = uri,
             sphereSlamAnchorGeneration = 4L,
             sphereSlamPlacementAnchorGeneration = 4L,
-            modeAdjustments = mapOf(EditorMode.AR.name to adjustment),
+            sphereSlamModeAdjustment = adjustment,
         )
 
         assertEquals(adjustment, standaloneArAdjustmentForProject(project))
