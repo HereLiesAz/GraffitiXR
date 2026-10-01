@@ -98,8 +98,18 @@ if(EXISTS ${ARX_ROOT}/KPM/include/ARX/KPM/kpm.h)
     file(GLOB_RECURSE ARX_AR_C_SRC CONFIGURE_DEPENDS
         ${ARX_ROOT}/AR/*.c
     )
+
+    # libAR defines JNI_OnLoad when it is built as its own Android shared library. Here libAR is
+    # embedded inside GraffitiXR's existing native library, which already owns JNI_OnLoad in
+    # GraffitiJNI.cpp. Keep arUtil.c's helpers but namespace only that otherwise-colliding symbol.
+    set_source_files_properties(
+        ${ARX_ROOT}/AR/arUtil.c
+        PROPERTIES COMPILE_DEFINITIONS "JNI_OnLoad=arxEmbeddedJniOnLoad"
+    )
+
     set(ARX_SUPPORT_SRC
         ${ARX_ROOT}/ARUtil/log.c
+        ${ARX_ROOT}/ARUtil/file_utils.c
     )
 
     add_library(arx_kpm STATIC
