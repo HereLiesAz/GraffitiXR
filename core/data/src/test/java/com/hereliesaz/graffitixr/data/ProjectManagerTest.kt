@@ -7,7 +7,9 @@ import com.hereliesaz.graffitixr.common.model.CaptureEnvironment
 import com.hereliesaz.graffitixr.common.model.DeviceAttitude
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.common.model.LocationFix
+import io.mockk.coEvery
 import io.mockk.every
+import io.mockk.firstArg
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -384,6 +386,82 @@ class ProjectManagerTest {
         )
         assertEquals(2.5f, imported?.sphereSlamReferenceWidthMeters ?: 0f, 0f)
         assertTrue(imported?.sphereSlamReferencePhysicallyMetric == true)
+    }
+
+    @Test
+    fun `duplicate-id import rebases SphereSLAM reference into newly assigned project id`() = runTest {
+        manager.saveProject(
+            mockContext,
+            GraffitiProject(id = "same_slam", name = "Existing"),
+        )
+        val manifest =
+            """{"id":"same_slam","name":"Imported","sphereSlamReferenceUri":"file:///sender/files/projects/same_slam/sphereslam_reference_abc.png","sphereSlamReferenceWidthMeters":2.0,"sphereSlamReferencePhysicallyMetric":true}"""
+                .toByteArray()
+
+        val imported = importZip(
+            zipOf(
+                "project.json" to manifest,
+                "sphereslam_reference_abc.png" to byteArrayOf(9, 8, 7),
+            ),
+        )
+
+        assertNotNull(imported)
+        assertTrue(imported!!.id != "same_slam")
+        assertEquals(
+            File(
+                tempFilesDir,
+                "projects/${imported.id}/sphereslam_reference_abc.png",
+            ).canonicalFile,
+            File(requireNotNull(imported.sphereSlamReferenceUri?.path)).canonicalFile,
+        )
+        assertNull(
+            manager.loadProjectMetadata(mockContext, "same_slam")?.sphereSlamReferenceUri,
+        )
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `spectator transfer rebases SphereSLAM reference into coop project`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        try {
+            val captured = mutableListOf<GraffitiProject>()
+            val repo =
+                mockk<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>(relaxed = true)
+            coEvery { repo.createProject(any()) } coAnswers {
+                captured += firstArg<GraffitiProject>()
+            }
+            val provider =
+                mockk<javax.inject.Provider<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>>()
+            every { provider.get() } returns repo
+            val coopManager = ProjectManager(mockContext, uriProvider, provider)
+
+            val manifest =
+                """{"id":"host_slam","name":"Host","sphereSlamReferenceUri":"file:///host/files/projects/host_slam/sphereslam_reference_abc.png","sphereSlamReferenceWidthMeters":1.75,"sphereSlamReferencePhysicallyMetric":true}"""
+                    .toByteArray()
+
+            val loaded = coopManager.loadAsSpectator(
+                zipOf(
+                    "project.json" to manifest,
+                    "sphereslam_reference_abc.png" to byteArrayOf(1, 3, 5, 7),
+                ),
+            )
+
+            assertTrue(loaded)
+            assertEquals(1, captured.size)
+            val spectator = captured.single()
+            assertEquals("coop_host_slam", spectator.id)
+            assertEquals(
+                File(
+                    tempFilesDir,
+                    "projects/coop_host_slam/sphereslam_reference_abc.png",
+                ).canonicalFile,
+                File(requireNotNull(spectator.sphereSlamReferenceUri?.path)).canonicalFile,
+            )
+            assertEquals(1.75f, spectator.sphereSlamReferenceWidthMeters, 0f)
+            assertTrue(spectator.sphereSlamReferencePhysicallyMetric)
+        } finally {
+            Dispatchers.resetMain()
+        }
     }
 
     // --- Zip extraction temp-file cleanup (duplicate entry names) ---
