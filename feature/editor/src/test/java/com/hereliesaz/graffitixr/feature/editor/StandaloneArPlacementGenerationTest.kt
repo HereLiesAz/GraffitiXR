@@ -1,6 +1,5 @@
 package com.hereliesaz.graffitixr.feature.editor
 
-import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import io.mockk.every
