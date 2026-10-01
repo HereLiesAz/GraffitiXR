@@ -401,13 +401,17 @@ Current rule:
 
 Required work:
 
-- [ ] Define the standalone fingerprint coordinate frame.
-  - [ ] Recommended: centered SphereSLAM page frame, with physical scale when known.
-- [ ] Define an explicit transform between:
-  - [ ] KPM page frame;
-  - [ ] standalone renderer wall frame;
-  - [ ] MobileGS fingerprint frame.
-- [ ] Unit-test that transform with known synthetic poses.
+- [x] Define the standalone fingerprint coordinate frame.
+  - [x] Centered SphereSLAM page frame, with physical scale when known.
+- [x] Define an explicit transform between:
+  - [x] KPM page frame;
+  - [x] standalone renderer wall frame;
+  - [x] MobileGS fingerprint frame.
+- [x] Unit-test that transform with known synthetic poses.
+- [x] Encode the frame contract in `StandaloneFingerprintFrame`: KPM lower-left millimetres are
+  centred with the same half-pixel convention as artoolkitX, renderer wall space and MobileGS
+  standalone object space are identical, and the standalone wall/anchor relationship is identity.
+  JVM tests pin pixel/KPM equivalence, Y-up orientation, and the identity frame bridge.
 - [ ] Decide how standalone creates the first MobileGS fingerprint:
   - [ ] generate 3D points directly on the KPM page plane; or
   - [ ] adapt `MetricFingerprintBuilder` to accept the standalone wall frame.
