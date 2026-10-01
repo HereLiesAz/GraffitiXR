@@ -1,8 +1,9 @@
 # SphereSLAM Implementation TODO
 
-Status: active implementation plan for `feat/sphereslam-parallel-arcore`.
+Status: active implementation plan. Initial standalone work merged to `main` in PR #1961;
+continuation work is on `feat/sphereslam-todo-continuation`.
 
-Checkpoint used to write this list: `c8756d5f63d3f6c5bf98bae9b17c393a784d3cd8`.
+Checklist refreshed from `main` at `706ccb7ec949afe055156d23d6a0cc7a8c7126bd`.
 
 This is the authoritative remaining-work list for GraffitiXR's SphereSLAM integration. It covers both:
 
@@ -48,8 +49,8 @@ These are invariants, not optional cleanup.
 
 This must happen before treating the branch as merge-ready.
 
-- [ ] Rebase/merge the one automatic version-bump commit currently ahead on `main`.
-- [ ] Resolve any resulting source/doc conflicts without changing the dual-backend architecture.
+- [x] Rebase/merge the newer `main` commits into the standalone implementation before merge.
+- [x] Resolve the resulting native/doc conflicts without changing the dual-backend architecture.
 - [ ] Run `:sphereslam:test`.
 - [ ] Run `:feature:ar:testDebugUnitTest` or the repository's actual equivalent unit-test task.
 - [ ] Run the app module's JVM/unit tests.
@@ -64,10 +65,27 @@ This must happen before treating the branch as merge-ready.
 - [ ] Confirm ProGuard/R8 does not strip the KPM JNI entry points or standalone classes.
 - [ ] Confirm no duplicate native symbol/source issue was introduced by the explicit artoolkitX AR
   source list.
-- [ ] Add/enable CI for this branch/PR so the above checks are not dependent on a local machine.
+- [x] Add/enable CI for branch/PR validation; PR #1961 ran Android CI with the artoolkitX
+  submodule enabled in the release-build job.
+- [ ] Re-run release CI after the ARUtil/minizip/SHA-1 support-source fix added on
+  `feat/sphereslam-todo-continuation`.
 
 **ACCEPTANCE:** branch compiles, tests run, native libraries package for supported ABIs, and the
 merged manifest still permits installation on non-ARCore hardware.
+
+### CI findings — 2026-10-01
+
+PR #1961's first submodule-enabled `assembleRelease` run proved that the embedded artoolkitX build
+now compiles all KPM + explicit AR sources through creation of `libarx_kpm.a`. The final
+`libgraffitixr.so` link then failed because PR #1960 added `ARUtil/file_utils.c` without the
+support objects that upstream ARUtil links with it:
+
+- bundled minizip: `ioapi.c`, `unzip.c`, `zip.c`, `crypt.c`;
+- SHA-1: `uuid/uuid_sha1.c`;
+- Android/NDK zlib: `libz`.
+
+The continuation branch now matches those transitive upstream dependencies rather than suppressing
+individual unresolved symbols. This item remains unchecked until CI completes the final link.
 
 ---
 

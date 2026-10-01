@@ -36,6 +36,7 @@ if(EXISTS ${ARX_ROOT}/KPM/include/ARX/KPM/kpm.h)
 
     find_library(log-lib log)
     find_library(m-lib m)
+    find_library(z-lib z)
 
     # artoolkitX normally generates this header from its top-level CMake. We build only the KPM/AR
     # subset, so generate the same header locally with the pinned source version and the features this
@@ -185,9 +186,17 @@ if(EXISTS ${ARX_ROOT}/KPM/include/ARX/KPM/kpm.h)
         PROPERTIES COMPILE_DEFINITIONS "JNI_OnLoad=arxEmbeddedJniOnLoad"
     )
 
+    # arUtil.c / arPattLoad.c use ARUtil file helpers. Match the transitive support sources from
+    # upstream ARUtil/CMakeLists.txt instead of linking file_utils.c alone: file_utils owns ZIP
+    # helpers and SHA-1 calls, while the bundled minizip implementation depends on zlib.
     set(ARX_SUPPORT_SRC
         ${ARX_ROOT}/ARUtil/log.c
         ${ARX_ROOT}/ARUtil/file_utils.c
+        ${ARX_ROOT}/ARUtil/uuid/uuid_sha1.c
+        ${ARX_ROOT}/ARUtil/crypt.c
+        ${ARX_ROOT}/ARUtil/ioapi.c
+        ${ARX_ROOT}/ARUtil/unzip.c
+        ${ARX_ROOT}/ARUtil/zip.c
     )
 
     add_library(arx_kpm STATIC
@@ -198,6 +207,7 @@ if(EXISTS ${ARX_ROOT}/KPM/include/ARX/KPM/kpm.h)
 
     target_compile_definitions(arx_kpm PRIVATE
         ARX_TARGET_PLATFORM_ANDROID=1
+        NOCRYPT=1
     )
     target_include_directories(arx_kpm PUBLIC
         ${ARX_GENERATED_INCLUDE}
@@ -212,6 +222,7 @@ if(EXISTS ${ARX_ROOT}/KPM/include/ARX/KPM/kpm.h)
         ${ARX_JPEG_LIB}
         ${log-lib}
         ${m-lib}
+        ${z-lib}
     )
 
     target_link_libraries(graffitixr arx_kpm)

@@ -303,6 +303,15 @@ Today both can observe the same wall camera frames:
 This is intentional redundancy. The two systems can later be compared and fused instead of forcing
 one to impersonate the other.
 
+## Native release-build validation
+
+The release-build CI now checks out the pinned artoolkitX submodule so CI exercises the real KPM
+native path instead of the no-submodule stub. The first run after PR #1961 compiled KPM and the
+explicit AR source set successfully, then exposed missing transitive ARUtil dependencies at the
+final shared-library link. The continuation branch mirrors upstream ARUtil's bundled minizip/SHA-1
+support sources and links NDK zlib. Keep this CI path enabled; otherwise native KPM regressions can
+silently pass normal builds that never initialize the submodule.
+
 ## Lifecycle
 
 The `SphereSlamTracker` lifetime follows `ArRenderer`.
