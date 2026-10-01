@@ -61,7 +61,7 @@ real camera and motion sensors. Confirm:
   same persisted AR adjustment model as the ARCore path.
 - A brief visual miss can use the short IMU bridge; a longer miss clears the stale overlay and shows
   reacquisition instead of freezing the last pose indefinitely.
-- Leaving and reopening the project restores `sphereslam_reference.png` and can reacquire the
+- Leaving and reopening the project restores the URI-referenced `sphereslam_reference_<uuid>.png` and can reacquire the
   target without recapturing it.
 - Exporting/importing the project relocates the stored SphereSLAM reference URI to the imported
   project directory and can reacquire the target there.
