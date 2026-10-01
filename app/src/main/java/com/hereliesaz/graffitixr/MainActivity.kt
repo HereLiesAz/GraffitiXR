@@ -1853,6 +1853,10 @@ class MainActivity : ComponentActivity() {
         onExportRequested: () -> Unit,
     ) {
         val navStrings = strings.nav
+        val arRailPolicy = arRailBackendPolicy(
+            arCoreAvailabilityResolved = arUiState.isArCoreAvailabilityResolved,
+            arCoreAvailable = arUiState.isArCoreAvailable,
+        )
         val requestPermissions = {
             val perms = mutableListOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
             permissionLauncher.launch(perms.toTypedArray())
@@ -1998,11 +2002,13 @@ class MainActivity : ComponentActivity() {
                     azRailSubItem(
                         id = "target.create",
                         hostId = "mode.ar",
-                        text = navStrings.grid,
+                        text = arRailPolicy.targetDisabledReason?.let {
+                            "${navStrings.grid} — $it"
+                        } ?: navStrings.grid,
                         color = navItemColor,
                         classifiers = setOf("toggle"),
                         shape = AzButtonShape.NONE,
-                        disabled = showLibrary || !arUiState.isArCoreAvailable,
+                        disabled = showLibrary || !arRailPolicy.targetRailEnabled,
                         onClick = {
                             if (isWaitingForTap) {
                                 mainViewModel.cancelTapMode()
@@ -2028,21 +2034,40 @@ class MainActivity : ComponentActivity() {
                     // implemented and unreachable: the "Magic Wand" the adjustments panel's doc
                     // still described had been removed from that panel's action row.
                     azRailSubItem(id = "mode.ar.magic", hostId = "mode.ar", text = navStrings.magic, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { editorViewModel.onMagicClicked() })
-                    // Co-op ▸ { Host, Join, Leave } — share this AR coordinate system with a nearby peer.
-                    azRailSubHostItem(id = "coop", hostId = "mode.ar", text = navStrings.coop, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary)
+                    // Co-op requires an explicit shared coordinate frame. ARCore has that
+                    // calibration path today; standalone SphereSLAM does not yet. Keep Host/Join
+                    // visibly unavailable rather than letting peers silently combine unrelated
+                    // wall/page frames. An already-active session keeps the container reachable so
+                    // Leave is never trapped behind a disabled host item.
+                    val coopBackendBlocked = !arRailPolicy.coopCalibrationAvailable
+                    val coopContainerBlocked =
+                        coopBackendBlocked && arUiState.coopRole == CoopRole.NONE
+                    azRailSubHostItem(
+                        id = "coop",
+                        hostId = "mode.ar",
+                        text = if (coopContainerBlocked) {
+                            "${navStrings.coop} — ${arRailPolicy.coopDisabledReason}"
+                        } else {
+                            navStrings.coop
+                        },
+                        color = navItemColor,
+                        shape = AzButtonShape.NONE,
+                        disabled = showLibrary || coopContainerBlocked,
+                    )
                     azRailSubItem(
                         id = "coop.host", hostId = "coop", text = navStrings.hostCoop,
                         color = navItemColor,
                         classifiers = setOf("toggle"),
                         shape = AzButtonShape.NONE,
-                        disabled = showLibrary || (!(arUiState.isAnchorEstablished && arUiState.splatCount > 0) &&
-                            arUiState.coopRole != CoopRole.HOST),
+                        disabled = showLibrary || coopBackendBlocked ||
+                            (!(arUiState.isAnchorEstablished && arUiState.splatCount > 0) &&
+                                arUiState.coopRole != CoopRole.HOST),
                         onClick = { if (arUiState.coopRole != CoopRole.HOST) arViewModel.startHosting() },
                     )
                     azRailSubItem(
                         id = "coop.join", hostId = "coop", text = navStrings.joinCoop,
                         color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE,
-                        disabled = showLibrary,
+                        disabled = showLibrary || coopBackendBlocked,
                         onClick = {
                             if (arUiState.coopRole != CoopRole.GUEST) {
                                 if (hasCameraPermission) onShowJoinScanner() else requestPermissions()
@@ -2126,12 +2151,29 @@ class MainActivity : ComponentActivity() {
             )
             azRailSubItem(id = "proj.new", hostId = "host.project", text = navStrings.new, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { dashboardViewModel.onNewProjectTriggered() })
             azRailSubItem(id = "proj.save", hostId = "host.project", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { showSettings = false; showSaveDialog = true })
-            azRailSubItem(id = "proj.export", hostId = "host.project", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = {
-                // Export is mode-dispatched by the caller so it has access to the CameraX
-                // controller (Overlay stills) and a coroutine scope (AR/Overlay both suspend on
-                // asynchronous captures). This handler just tells the caller "user pressed Export".
-                onExportRequested()
-            })
+            val standaloneArExportBlocked =
+                editorUiState.editorMode == EditorMode.AR &&
+                    !arRailPolicy.modePreviewExportAvailable
+            azRailSubItem(
+                id = "proj.export",
+                hostId = "host.project",
+                text = if (standaloneArExportBlocked) {
+                    "${navStrings.export} — ${arRailPolicy.exportDisabledReason}"
+                } else {
+                    navStrings.export
+                },
+                color = navItemColor,
+                shape = AzButtonShape.NONE,
+                disabled = showLibrary || standaloneArExportBlocked,
+                onClick = {
+                    // Export is mode-dispatched by the caller so it has access to the CameraX
+                    // controller (Overlay stills) and a coroutine scope (AR/Overlay both suspend on
+                    // asynchronous captures). Standalone AR is disabled here until CameraX + GL can
+                    // be composited; silently exporting "layers only" would violate the rail action's
+                    // documented mode-screenshot contract.
+                    onExportRequested()
+                },
+            )
             azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true } })
             azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { showSettings = true })
 
