@@ -1,7 +1,7 @@
 # SphereSLAM Implementation TODO
 
 Status: active implementation plan. Initial standalone work merged to `main` in PR #1961;
-continuation work is on `feat/sphereslam-todo-continuation`.
+current MobileGS frame integration continues on `feat/sphereslam-mobilegs-frame-integration`.
 
 Checklist refreshed from `main` at `706ccb7ec949afe055156d23d6a0cc7a8c7126bd`.
 
@@ -428,10 +428,12 @@ Required work:
 - [x] Feed the exact cropped/rotated display luma frame to MobileGS only after the frame contract above is satisfied.
 - [x] Feed accepted standalone camera view/projection to `slamManager.updateCamera` only after its world/frame
   semantics match what MobileGS expects.
-- [ ] Rename or generalize `setArCoreTrackingState` before using it for standalone tracking health;
-  do not lie to native code by setting an "ARCore" flag when ARCore does not exist.
-- [ ] Audit every native branch conditioned on `mIsArCoreTracking` and decide the standalone
-  equivalent explicitly.
+- [x] Rename/generalize `setArCoreTrackingState` to backend-neutral `setTrackingPoseValid`;
+  standalone marks it true only for a KPM pose accepted for the same CameraX frame.
+- [x] Audit every native branch formerly conditioned on `mIsArCoreTracking`. There was one:
+  plane-guided rectification. It now requires backend-neutral current-pose validity **and**
+  `mHasFingerprintView`; standalone deliberately has no capture-camera view and therefore does not
+  run the ARCore capture-view rectifier.
 - [x] Restore existing saved ARCore fingerprints safely on standalone devices:
   - [ ] either provide a validated frame conversion; or
   - [x] treat `fingerprint` as ARCore/capture-camera-frame-only and require the separate standalone page/`sphereSlamFingerprint` path.
@@ -444,8 +446,14 @@ Required work:
   rotation and no-scale-in-matrix contract.
 - [x] Remove the legacy self-grow assumption that a valid wall plane must have nonzero distance from
   the fingerprint origin; centered standalone pages intentionally lie on z=0 through that origin.
-- [ ] Verify self-grow adds points in the standalone fingerprint frame.
-- [ ] Verify saved wall feature maps preserve that frame across process restarts.
+- [x] Verify self-grow adds points in the standalone fingerprint frame. Native back-projection
+  computes camera/rays in fingerprint object space and appends the resulting intersection directly;
+  for standalone that object space is the centered KPM page frame. The architecture check pins the
+  direct write.
+- [x] Verify saved wall feature maps preserve that frame across process restarts. Standalone maps now
+  use a separate persisted `sphereSlamWallFeatureMap` slot/version, export the identity
+  fingerprint-anchor transform, and are refused on restore/save if the anchor is not centered-page
+  identity.
 - [x] Add diagnostics identifying fingerprint frame/version/backend; standalone seed logs `backend=standalone-kpm frame=centered-page version=1` and refuses unknown versions.
 
 **ACCEPTANCE:** MobileGS can consume standalone frames without any implicit ARCore-world assumption,

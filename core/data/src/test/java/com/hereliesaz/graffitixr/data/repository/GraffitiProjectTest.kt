@@ -90,6 +90,68 @@ class GraffitiProjectTest {
     }
 
     @Test
+    fun `serialization preserves standalone wall map and frame version`() {
+        val identity = floatArrayOf(
+            1f, 0f, 0f, 0f,
+            0f, 1f, 0f, 0f,
+            0f, 0f, 1f, 0f,
+            0f, 0f, 0f, 1f,
+        )
+        val map = WallFeatureMap(
+            points3d = floatArrayOf(-0.4f, 0.1f, 0f, 0.7f, -0.2f, 0f),
+            descriptorsData = ByteArray(64) { ((it * 7) % 251).toByte() },
+            descriptorsRows = 2,
+            descriptorsCols = 32,
+            descriptorsType = 0,
+            confidence = floatArrayOf(0.8f, 0.6f),
+            obsCount = intArrayOf(3, 2),
+            anchor = identity,
+            intrinsics = floatArrayOf(620f, 618f, 320f, 240f),
+        )
+        val project = GraffitiProject(
+            id = "standalone-map",
+            sphereSlamWallFeatureMap = map,
+            sphereSlamWallFeatureMapFrameVersion =
+                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+        )
+
+        val decoded = json.decodeFromString<GraffitiProject>(json.encodeToString(project))
+
+        assertEquals(map, decoded.sphereSlamWallFeatureMap)
+        assertEquals(
+            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+            decoded.sphereSlamWallFeatureMapFrameVersion,
+        )
+    }
+
+    @Test
+    fun `serialization preserves SphereSLAM atlas page transforms and IDs`() {
+        val atlasUri = mockk<android.net.Uri>()
+        every { atlasUri.toString() } returns "file://atlas-page"
+        every { android.net.Uri.parse("file://atlas-page") } returns atlasUri
+        val page = com.hereliesaz.graffitixr.common.model.SphereSlamAtlasPage(
+            pageNo = 3,
+            referenceUri = atlasUri,
+            referenceWidthMeters = 0.8f,
+            physicallyMetric = true,
+            canonicalFromPage = listOf(
+                1f, 0f, 0f, 0f,
+                0f, 1f, 0f, 0f,
+                0f, 0f, 1f, 0f,
+                1.2f, -0.3f, 0f, 1f,
+            ),
+        )
+        val project = GraffitiProject(
+            id = "atlas",
+            sphereSlamAtlasPages = listOf(page),
+        )
+
+        val decoded = json.decodeFromString<GraffitiProject>(json.encodeToString(project))
+
+        assertEquals(listOf(page), decoded.sphereSlamAtlasPages)
+    }
+
+    @Test
     fun `serialization preserves per-host rail expansion`() {
         val expansion = mapOf("host.design" to true, "design.layers" to false)
         val project = GraffitiProject(id = "id", name = "n", railExpansion = expansion)

@@ -45,7 +45,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.viewinterop.AndroidView
 import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.WallFeatureMap
 import com.hereliesaz.graffitixr.common.model.ModeAdjustment
+import com.hereliesaz.graffitixr.common.model.SphereSlamAtlasPage
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import com.hereliesaz.graffitixr.design.theme.rememberAppStrings
@@ -88,11 +90,18 @@ fun SphereSlamStandaloneOverlay(
     mobileGsFingerprint: Fingerprint? = null,
     mobileGsFingerprintFrameVersion: Int =
         com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+    mobileGsWallFeatureMap: WallFeatureMap? = null,
+    mobileGsWallFeatureMapFrameVersion: Int =
+        com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     persistedReferenceUri: Uri? = null,
     persistedReferenceWidthMeters: Float = 1f,
     persistedReferencePhysicallyMetric: Boolean = false,
+    persistedAtlasPages: List<SphereSlamAtlasPage> = emptyList(),
     onReferenceCaptured: (Bitmap, Float, Boolean) -> Unit = { _, _, _ -> },
     onPersistedReferenceInvalid: (Uri) -> Unit = {},
+    onPersistedAtlasPageInvalid: (Int, Uri) -> Unit = { _, _ -> },
+    onAtlasPageCaptured: (Bitmap, Int, Float, Boolean, FloatArray) -> Unit =
+        { _, _, _, _, _ -> },
     adjustment: ModeAdjustment? = null,
     onUnitsPerPixel: (Float) -> Unit = {},
     onTrackingTick: (Boolean) -> Unit = {},
@@ -361,6 +370,56 @@ fun SphereSlamStandaloneOverlay(
             physicallyMetric = activeReferencePhysicallyMetric,
         )
     }
+    // Snapshot persisted native state once per canonical page. Autosaves/grown-page commits publish
+    // new project objects while THIS analyzer already owns the fresher live state; keying the effect
+    // to those emissions would tear down tracking every few seconds.
+    val initialMobileGsWallFeatureMap = remember(reference) { mobileGsWallFeatureMap }
+    val initialMobileGsWallFeatureMapFrameVersion =
+        remember(reference) { mobileGsWallFeatureMapFrameVersion }
+    val initialPersistedAtlasPages = remember(reference) { persistedAtlasPages }
+    val atlasReferenceImages by produceState<List<SphereSlamStandaloneAtlasReferenceImage>?>(
+        initialValue = null,
+        initialPersistedAtlasPages,
+    ) {
+        val expectedFrame =
+            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION
+        val loaded = withContext(Dispatchers.IO) {
+            val valid = mutableListOf<SphereSlamStandaloneAtlasReferenceImage>()
+            val invalid = mutableListOf<Pair<Int, Uri>>()
+            initialPersistedAtlasPages.sortedBy { it.pageNo }.forEach { page ->
+                if (page.frameVersion != expectedFrame) {
+                    invalid += page.pageNo to page.referenceUri
+                    return@forEach
+                }
+                val bitmap = runCatching {
+                    context.contentResolver.openInputStream(page.referenceUri)
+                        ?.use(BitmapFactory::decodeStream)
+                }.getOrNull()
+                if (bitmap == null) {
+                    invalid += page.pageNo to page.referenceUri
+                } else {
+                    valid += SphereSlamStandaloneAtlasReferenceImage(
+                        pageNo = page.pageNo,
+                        luma = bitmapToLuma(bitmap),
+                        width = bitmap.width,
+                        height = bitmap.height,
+                        referenceWidthMeters = page.referenceWidthMeters,
+                        physicallyMetric = page.physicallyMetric,
+                        canonicalFromPage = page.canonicalFromPage.toFloatArray(),
+                    )
+                }
+            }
+            valid to invalid
+        }
+        loaded.second.forEach { (pageNo, uri) ->
+            onPersistedAtlasPageInvalid(pageNo, uri)
+            onDiagnostic(
+                "SphereSLAM atlas page refused page=" + pageNo +
+                    " reason=missing-corrupt-or-frame-version",
+            )
+        }
+        value = loaded.first
+    }
     val glRenderer = remember(context) { HomographyOverlayRenderer(context) }
 
     LaunchedEffect(glRenderer, designBitmap) {
@@ -518,9 +577,11 @@ fun SphereSlamStandaloneOverlay(
         referenceImage,
         mobileGsFingerprint,
         mobileGsFingerprintFrameVersion,
+        atlasReferenceImages,
     ) {
         val id = cameraId
-        if (id == null) {
+        val restoredAtlas = atlasReferenceImages
+        if (id == null || restoredAtlas == null) {
             onDispose {}
         } else {
             val executor = Executors.newSingleThreadExecutor { runnable ->
@@ -530,9 +591,12 @@ fun SphereSlamStandaloneOverlay(
                 context = context,
                 cameraId = id,
                 referenceImage = referenceImage,
+                atlasReferenceImages = restoredAtlas,
                 slamManager = slamManager,
                 mobileGsFingerprint = mobileGsFingerprint,
                 mobileGsFingerprintFrameVersion = mobileGsFingerprintFrameVersion,
+                mobileGsWallFeatureMap = initialMobileGsWallFeatureMap,
+                mobileGsWallFeatureMapFrameVersion = initialMobileGsWallFeatureMapFrameVersion,
                 onReferenceReady = { registered: SphereSlamStandaloneSession.Reference ->
                     val g = registered.geometry
                     mainHandler.post {
@@ -550,6 +614,17 @@ fun SphereSlamStandaloneOverlay(
                             referenceNeedsPersistence = false
                             previousReferenceBitmap = null
                         }
+                    }
+                },
+                onAtlasPageAdded = { candidate ->
+                    mainHandler.post {
+                        onAtlasPageCaptured(
+                            candidate.bitmap,
+                            candidate.pageNo,
+                            candidate.referenceWidthUnits,
+                            candidate.physicallyMetric,
+                            candidate.canonicalFromPage.copyOf(),
+                        )
                     }
                 },
                 onDiagnostic = { text ->

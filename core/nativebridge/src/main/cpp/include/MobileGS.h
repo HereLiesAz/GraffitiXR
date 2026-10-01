@@ -39,7 +39,10 @@ public:
     // JNI/Kotlin call sites don't need to change.
     void updateDeviceMotion(float* angularVel, float* linearVel);
 
-    void setArCoreTrackingState(bool isTracking);
+    // Backend-neutral validity for the pose most recently supplied through updateCamera().
+    // True means the pose belongs to THIS camera frame and is safe for pose-dependent helpers;
+    // false means updateCamera may still contain the last accepted pose and must not be treated live.
+    void setTrackingPoseValid(bool isValid);
     void restoreWallFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
     // Ingest a fingerprint built from triangulated metric marks (no depth source): also fixes the
     // fingerprint anchor pose and the intrinsics the reloc PnP should use.
@@ -70,6 +73,7 @@ public:
                                const float* anchorMatrix16, const float* intrinsics4);
     void clearWallFeatureMap();
     int getMapPointCount() const { std::lock_guard<std::mutex> lock(mMutex); return (int)mMapPoints3D.size(); }
+    uint64_t getWallFeatureMapRevision() const { return mMapRevision.load(std::memory_order_relaxed); }
     // Phase 3b: pack the live feature map (points/descriptors/confidence/obs + co-registration) into a
     // self-describing little-endian blob for .gxr persistence; empty if there's no map. Race-free (one lock).
     std::vector<uint8_t> exportWallFeatureMap() const;
@@ -581,7 +585,8 @@ private:
                           const cv::Mat& descs, double fx, double fy, double cx, double cy);
 
     mutable std::mutex mMutex;
-    std::atomic<bool> mIsArCoreTracking{false};
+    // Deliberately backend-neutral. ARCore and standalone KPM both drive this through the same seam.
+    std::atomic<bool> mHasTrackingPose{false};
 
     cv::Ptr<cv::ORB> mFeatureDetector;
     cv::Ptr<cv::DescriptorMatcher> mMatcher;    // BruteForce-Hamming for ORB (CV_8U)
@@ -717,6 +722,9 @@ private:
     std::vector<int> mMapObs;
     float mMapAnchorMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     float mMapIntrinsics[4] = {0,0,0,0};
+    // Increments on every map-content mutation, including confidence/observation-only updates.
+    // Point count alone is not a valid dirty signal once the map reaches its fixed capacity.
+    std::atomic<uint64_t> mMapRevision{0};
     // Phase 2b flag: when true, relocThreadFunc also matches the frustum-gated map and merges those
     // correspondences into PnP. Default OFF so the map has zero effect on reloc until device-validated.
     std::atomic<bool> mMapRelocEnabled{false};

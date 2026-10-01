@@ -379,8 +379,8 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
     }
 
     // Plane-guided rectification (perspective robustness for oblique views). The marks lie on a
-    // known plane and VIO gives a pose, so the oblique-vs-frontal distortion is a homography we can
-    // pre-cancel: warp the live frame into the fingerprint's frontal frame, match, and ADD the
+    // known plane and the active tracking backend gives a pose, so the oblique-vs-frontal distortion
+    // is a homography we can pre-cancel: warp the live frame into the fingerprint's frontal frame, match, and ADD the
     // correspondences mapped back to the current image (RANSAC filters any that don't fit).
     // Published so the diagnostics can show whether this pass is actually running. It was dead in
     // practice for a long time (nothing set mHasFingerprintView on the live capture path), so
@@ -390,7 +390,11 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
     // check purely for local readability -- this attempt is known reachable at this point.)
     mLastRelocObliquityDeg.store(-1, std::memory_order_relaxed);
     mLastRelocRectifiedCorr.store(0, std::memory_order_relaxed);
-    if (hasFpView && mIsArCoreTracking.load(std::memory_order_relaxed) && wallKps3d.size() >= 12) {
+    // Standalone fingerprints deliberately do not set hasFpView: their object points already live in
+    // the durable centred page frame, so there is no ARCore capture-camera view to rectify against.
+    // The backend-neutral validity flag only says relocView is current; hasFpView separately proves
+    // the stored capture-view contract exists and is compatible.
+    if (hasFpView && mHasTrackingPose.load(std::memory_order_relaxed) && wallKps3d.size() >= 12) {
         cv::Mat Hcur_fp, Hfp_cur; double obliqDeg = 0.0;
         const bool haveH = computeRectifyHomography(relocView, Hcur_fp, Hfp_cur, obliqDeg);
         if (haveH) mLastRelocObliquityDeg.store((int)(obliqDeg + 0.5), std::memory_order_relaxed);
@@ -815,12 +819,19 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
     if (mWallKeypoints3D.size() < 8) return;                                   // need the fingerprint plane
     if (!mMapDescriptors.empty() && mMapDescriptors.type() != descs.type()) return;
     if (mMapPoints3D.size() != (size_t)mMapDescriptors.rows) return;  // corrupted map: bail rather than crash
+    bool mapMutated = false;
 
     // Keep the parallel arrays aligned with the points: a restored map may have carried points +
     // descriptors but empty confidence/obs (both optional in WallFeatureMap). Without this, the add
     // path below would desync them from mMapPoints3D and corrupt per-point confidence.
-    if (mMapConfidence.size() != mMapPoints3D.size()) mMapConfidence.resize(mMapPoints3D.size(), 1.0f);
-    if (mMapObs.size() != mMapPoints3D.size()) mMapObs.resize(mMapPoints3D.size(), 1);
+    if (mMapConfidence.size() != mMapPoints3D.size()) {
+        mMapConfidence.resize(mMapPoints3D.size(), 1.0f);
+        mapMutated = true;
+    }
+    if (mMapObs.size() != mMapPoints3D.size()) {
+        mMapObs.resize(mMapPoints3D.size(), 1);
+        mapMutated = true;
+    }
 
     // Confidence-prune when at capacity so the map keeps refreshing within the cap (drop points that
     // never earned a re-observation). Compacts all four parallel arrays + the descriptor matrix.
@@ -842,6 +853,7 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
                 mMapDescriptors.row((int)i).copyTo(nd.row((int)idx));
             }
         }
+        if (kept.size() != mMapPoints3D.size()) mapMutated = true;
         mMapPoints3D.swap(np); mMapConfidence.swap(nc); mMapObs.swap(no); mMapDescriptors = nd;
     }
 
@@ -871,8 +883,10 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
             if (m[0].distance < kRelocLoweRatio * m[1].distance) {
                 int ti = m[0].trainIdx, qi = m[0].queryIdx;
                 if (ti >= 0 && ti < (int)mMapConfidence.size() && qi >= 0 && qi < (int)matched.size()) {
-                    mMapConfidence[ti] = std::min(1.0f, mMapConfidence[ti] + 0.1f);
+                    const float oldConfidence = mMapConfidence[ti];
+                    mMapConfidence[ti] = std::min(1.0f, oldConfidence + 0.1f);
                     mMapObs[ti] += 1;
+                    mapMutated = true;
                     matched[qi] = 1;
                 }
             }
@@ -894,16 +908,20 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
         float t = glm::dot(n, cc - camCenter) / denom;
         if (t <= 0.f) continue;            // plane intersection behind the camera
         glm::vec3 P = camCenter + t * dir;
+        // P is already in the fingerprint object frame. For standalone that is the centred
+        // SphereSLAM page frame; storing it verbatim is the frame-preservation contract.
         mMapPoints3D.push_back(cv::Point3f(P.x, P.y, P.z));
         mMapConfidence.push_back(0.1f);
         mMapObs.push_back(1);
         mMapDescriptors.push_back(descs.row((int)i));
+        mapMutated = true;
         ++added;
     }
 
     // Co-register the map to the fingerprint anchor + intrinsics (same frame as the points above).
     memcpy(mMapAnchorMatrix, mFingerprintAnchorMatrix, 16 * sizeof(float));
     mMapIntrinsics[0]=(float)fx; mMapIntrinsics[1]=(float)fy; mMapIntrinsics[2]=(float)cx; mMapIntrinsics[3]=(float)cy;
+    if (mapMutated) mMapRevision.fetch_add(1, std::memory_order_relaxed);
     if (added > 0) LOGI("Map build: +%d pts (map now %zu)", added, mMapPoints3D.size());
 }
 
@@ -1274,7 +1292,10 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         }
         inliers = mPnpInlierCount.load(std::memory_order_relaxed);
         pnpMatches = mPnpMatchCount.load(std::memory_order_relaxed);
-        const float* M = mPnpCamFromFpWorld;      // camera_from_fpWorld, column-major (OpenCV frame)
+        // camera_from_fingerprint-object, column-major (OpenCV camera frame). No backend/world
+        // conversion happens here. For standalone SphereSLAM, the object frame is exactly the
+        // centred KPM page frame, so every ray intersection below is written back in that frame.
+        const float* M = mPnpCamFromFpWorld;
         R = cv::Matx33d(M[0], M[4], M[8], M[1], M[5], M[9], M[2], M[6], M[10]);
         t = cv::Vec3d(M[12], M[13], M[14]);
         fx = mFingerprintIntrinsics[0]; fy = mFingerprintIntrinsics[1];
@@ -1416,7 +1437,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     LOGI("Teleological self-grow: promoted %zu marks (wall now %zu; F_out +%d, F_in +%d, band +%d)",
          promoted, wallNow, outsideN, insideN, bandN);
 }
-void MobileGS::setArCoreTrackingState(bool t) { mIsArCoreTracking.store(t, std::memory_order_relaxed); }
+void MobileGS::setTrackingPoseValid(bool valid) { mHasTrackingPose.store(valid, std::memory_order_relaxed); }
 
 void MobileGS::destroy() {
     mRelocRunning = false;
@@ -1590,6 +1611,7 @@ void MobileGS::restoreWallFeatureMap(const cv::Mat& d, const std::vector<cv::Poi
     memcpy(mMapAnchorMatrix, anchorMatrix16 ? anchorMatrix16 : kIdentity16, 16 * sizeof(float));
     if (intrinsics4) memcpy(mMapIntrinsics, intrinsics4, 4 * sizeof(float));
     else             memset(mMapIntrinsics, 0, 4 * sizeof(float));
+    mMapRevision.fetch_add(1, std::memory_order_relaxed);
 }
 
 void MobileGS::clearWallFeatureMap() {
@@ -1602,6 +1624,7 @@ void MobileGS::clearWallFeatureMap() {
     static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     memcpy(mMapAnchorMatrix, kIdentity16, 16 * sizeof(float));
     memset(mMapIntrinsics, 0, 4 * sizeof(float));
+    mMapRevision.fetch_add(1, std::memory_order_relaxed);
 }
 
 std::vector<uint8_t> MobileGS::exportFingerprint() {

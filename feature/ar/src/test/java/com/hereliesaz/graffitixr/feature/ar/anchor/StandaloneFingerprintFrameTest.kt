@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
 import com.hereliesaz.sphereslam.SphereSlamPoseMath
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -91,5 +92,23 @@ class StandaloneFingerprintFrameTest {
         )
         assertArrayEquals(identity, StandaloneFingerprintFrame.fingerprintFromAnchor(), 0f)
         assertArrayEquals(identity, StandaloneFingerprintFrame.anchorFromFingerprint(), 0f)
+        assertTrue(StandaloneFingerprintFrame.isCenteredPageAnchor(identity))
+    }
+
+    @Test
+    fun persistedMapAnchor_rejectsAnyForeignFrameTransform() {
+        val translated = StandaloneFingerprintFrame.anchorFromFingerprint().also {
+            it[12] = 0.25f
+        }
+        val rotated = StandaloneFingerprintFrame.anchorFromFingerprint().also {
+            it[0] = 0f
+            it[1] = 1f
+            it[4] = -1f
+            it[5] = 0f
+        }
+
+        assertFalse(StandaloneFingerprintFrame.isCenteredPageAnchor(translated))
+        assertFalse(StandaloneFingerprintFrame.isCenteredPageAnchor(rotated))
+        assertFalse(StandaloneFingerprintFrame.isCenteredPageAnchor(FloatArray(0)))
     }
 }

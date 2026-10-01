@@ -59,6 +59,57 @@ class SphereSlamStandaloneSessionTest {
     }
 
     @Test
+    fun secondPageMatch_isRebasedIntoCanonicalWallFrame() {
+        val engine = FakeEngine()
+        val session = SphereSlamStandaloneSession(
+            frameWidth = 4,
+            frameHeight = 2,
+            calibration = SphereSlamCalibration(4f, 4f, 2f, 1f),
+            engineFactory = SphereSlamStandaloneSession.EngineFactory { _, _, _ -> engine },
+        )
+        session.addReference(
+            ByteBuffer.allocateDirect(8),
+            4,
+            2,
+            1f,
+            true,
+            pageNo = 0,
+        )
+        session.addReference(
+            ByteBuffer.allocateDirect(8),
+            4,
+            2,
+            1f,
+            true,
+            pageNo = 1,
+            canonicalFromPage = SphereSlamPoseMath.identity4().also {
+                // Page 1 is one metre to the right of canonical page 0.
+                it[12] = 1f
+            },
+        )
+        engine.nextMatch = PlanarMatch(
+            pageNo = 1,
+            cameraFromPage3x4 = floatArrayOf(
+                1f, 0f, 0f, 0f,
+                0f, 1f, 0f, 0f,
+                0f, 0f, 1f, 1000f,
+            ),
+            reprojectionError = 0.2f,
+            inlierCount = 24,
+        )
+
+        val pose = requireNotNull(session.match(ByteBuffer.allocateDirect(8), 99L))
+
+        assertEquals(1, pose.pageNo)
+        // The page-local camera is centered over page 1. In canonical coordinates that page sits at
+        // +1m X, so camera-from-canonical carries -1m X while retaining the page-centering Y/Z.
+        assertEquals(-0.5f, pose.viewMatrix[12], 0.0001f)
+        assertEquals(-0.25f, pose.viewMatrix[13], 0.0001f)
+        assertEquals(-1f, pose.viewMatrix[14], 0.0001f)
+        session.close()
+    }
+
+    @Test
     fun reset_dropsOldPageGeometryAndCreatesFreshEngine() {
         val engines = ArrayDeque(listOf(FakeEngine(), FakeEngine()))
         val session = SphereSlamStandaloneSession(

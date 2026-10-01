@@ -197,6 +197,37 @@ class ProjectManager @Inject constructor(
                         } else {
                             existing.sphereSlamFingerprintFrameVersion
                         },
+                    // The standalone wide-wall map is expressed in the SAME centred page frame as
+                    // sphereSlamFingerprint. A new canonical page must never inherit the old map.
+                    sphereSlamWallFeatureMap =
+                        if (
+                            projectData.sphereSlamReferenceUri != null &&
+                            projectData.sphereSlamReferenceUri != existing.sphereSlamReferenceUri
+                        ) {
+                            projectData.sphereSlamWallFeatureMap
+                        } else {
+                            projectData.sphereSlamWallFeatureMap ?: existing.sphereSlamWallFeatureMap
+                        },
+                    sphereSlamWallFeatureMapFrameVersion =
+                        if (
+                            projectData.sphereSlamReferenceUri != null &&
+                            projectData.sphereSlamReferenceUri != existing.sphereSlamReferenceUri
+                        ) {
+                            projectData.sphereSlamWallFeatureMapFrameVersion
+                        } else {
+                            existing.sphereSlamWallFeatureMapFrameVersion
+                        },
+                    sphereSlamAtlasPages =
+                        if (
+                            projectData.sphereSlamReferenceUri != null &&
+                            projectData.sphereSlamReferenceUri != existing.sphereSlamReferenceUri
+                        ) {
+                            projectData.sphereSlamAtlasPages
+                        } else if (projectData.sphereSlamAtlasPages.isNotEmpty()) {
+                            projectData.sphereSlamAtlasPages
+                        } else {
+                            existing.sphereSlamAtlasPages
+                        },
                     wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
                     paintMarks = projectData.paintMarks ?: existing.paintMarks,
                     paintGrid = projectData.paintGrid ?: existing.paintGrid,
@@ -344,6 +375,44 @@ class ProjectManager @Inject constructor(
         if (file.parentFile == root && validName) {
             runCatching { file.delete() }
         }
+    }
+
+    /** Write one additional rectified KPM page without changing canonical page 0. */
+    suspend fun saveSphereSlamAtlasPage(
+        context: Context,
+        projectId: String,
+        pageNo: Int,
+        bitmap: Bitmap,
+    ): Uri = withContext(Dispatchers.IO) {
+        require(pageNo > 0)
+        val root = File(context.filesDir, "projects/$projectId").also { if (!it.exists()) it.mkdirs() }
+        val target = File(root, "sphereslam_page_${pageNo}_${UUID.randomUUID()}.png")
+        val tmp = File.createTempFile("sphereslam_page_${pageNo}_", ".tmp", root)
+        try {
+            FileOutputStream(tmp).use { out ->
+                check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) {
+                    "Could not encode SphereSLAM atlas page"
+                }
+                out.flush()
+                out.fd.sync()
+            }
+            check(tmp.renameTo(target)) { "Could not install SphereSLAM atlas page" }
+        } finally {
+            if (tmp.exists()) tmp.delete()
+        }
+        uriProvider.getUriForFile(target)
+    }
+
+    suspend fun deleteSphereSlamAtlasPage(
+        context: Context,
+        projectId: String,
+        uri: Uri?,
+    ) = withContext(Dispatchers.IO) {
+        val path = uri?.path ?: return@withContext
+        val root = File(context.filesDir, "projects/$projectId").canonicalFile
+        val file = File(path).canonicalFile
+        val validName = file.name.startsWith("sphereslam_page_") && file.extension == "png"
+        if (file.parentFile == root && validName) runCatching { file.delete() }
     }
 
     /**
@@ -634,6 +703,9 @@ class ProjectManager @Inject constructor(
                 thumbnailUri = localUri(migrated.thumbnailUri),
                 targetImageUris = migrated.targetImageUris.map { localUri(it)!! },
                 sphereSlamReferenceUri = localUri(migrated.sphereSlamReferenceUri),
+                sphereSlamAtlasPages = migrated.sphereSlamAtlasPages.map { page ->
+                    page.copy(referenceUri = localUri(page.referenceUri)!!)
+                },
                 evolutionImageUris = migrated.evolutionImageUris.map { localUri(it)!! },
                 targetFingerprintPath = migrated.targetFingerprintPath?.let { localPath(it).absolutePath },
             )

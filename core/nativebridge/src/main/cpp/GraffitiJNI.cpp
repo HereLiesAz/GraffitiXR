@@ -327,9 +327,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDestroy(JNIEnv* en
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArCoreTrackingState(JNIEnv* env, jobject thiz, jboolean isTracking) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetTrackingPoseValid(JNIEnv* env, jobject thiz, jboolean isValid) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
-    if (gSlamEngine) gSlamEngine->setArCoreTrackingState(isTracking);
+    if (gSlamEngine) gSlamEngine->setTrackingPoseValid(isValid);
 }
 
 JNIEXPORT void JNICALL
@@ -1044,6 +1044,12 @@ JNIEXPORT jint JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetMapPointCount(JNIEnv*, jobject) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     return gSlamEngine ? gSlamEngine->getMapPointCount() : 0;
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetWallFeatureMapRevision(JNIEnv*, jobject) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    return gSlamEngine ? static_cast<jlong>(gSlamEngine->getWallFeatureMapRevision()) : 0;
 }
 
 JNIEXPORT void JNICALL

@@ -35,6 +35,12 @@ class SphereSlamStandaloneSession(
         val pageNo: Int,
         val imageNo: Int,
         val geometry: SphereSlamPoseMath.PageGeometry,
+        /**
+         * Rigid transform from this centered page frame into the immutable canonical wall frame.
+         * Page 0 uses identity; every grown page must be registered into that same root before it is
+         * admitted to the atlas.
+         */
+        val canonicalFromPage: FloatArray,
         val featureCount: Int,
         /**
          * True only when the width supplied by the caller is an actual physical measurement.
@@ -84,9 +90,13 @@ class SphereSlamStandaloneSession(
         pageNo: Int = 0,
         imageNo: Int = 0,
         maxFeatures: Int = 5000,
+        canonicalFromPage: FloatArray = SphereSlamPoseMath.identity4(),
     ): Reference {
         requireOpen()
         require(!references.containsKey(pageNo)) { "page $pageNo is already registered" }
+        require(canonicalFromPage.size == 16 && canonicalFromPage.all { it.isFinite() }) {
+            "canonicalFromPage must be a finite 4x4 transform"
+        }
         val dpi = SphereSlamPoseMath.dpiForReferenceWidth(width, referenceWidthMeters)
         val geometry = SphereSlamPoseMath.pageGeometry(width, height, dpi)
         val featureCount = engine.addPage(
@@ -104,6 +114,7 @@ class SphereSlamStandaloneSession(
             pageNo = pageNo,
             imageNo = imageNo,
             geometry = geometry,
+            canonicalFromPage = canonicalFromPage.copyOf(),
             featureCount = featureCount,
             physicallyMetric = physicallyMetric,
         ).also { references[pageNo] = it }
@@ -119,13 +130,20 @@ class SphereSlamStandaloneSession(
         val match = engine.match(luma) ?: return null
         val reference = references[match.pageNo] ?: return null
         val g = reference.geometry
+        val cameraFromPage = SphereSlamPoseMath.pageToOpenGlViewMeters(
+            match.cameraFromPage3x4,
+            pageCenterXmm = g.centerXmm,
+            pageCenterYmm = g.centerYmm,
+        )
         return Pose(
             timestampNs = timestampNs,
             pageNo = match.pageNo,
-            viewMatrix = SphereSlamPoseMath.pageToOpenGlViewMeters(
-                match.cameraFromPage3x4,
-                pageCenterXmm = g.centerXmm,
-                pageCenterYmm = g.centerYmm,
+            // Every KPM page owns a local centred coordinate system. Rebase that local view into
+            // the one canonical wall frame before it escapes the session so renderer, MobileGS,
+            // paint progress and persistence never observe a page-dependent coordinate jump.
+            viewMatrix = SphereSlamPoseMath.pageViewToCanonicalView(
+                cameraFromPage,
+                reference.canonicalFromPage,
             ),
             reprojectionError = match.reprojectionError,
             inlierCount = match.inlierCount,

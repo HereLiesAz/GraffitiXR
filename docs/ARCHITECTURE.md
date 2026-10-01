@@ -92,7 +92,7 @@ full ARCore feature set is still in progress. See
 Each ARCore tracking frame, roughly:
 
 ~~~
-camera.trackingState ────────────────────────► setArCoreTrackingState(isTracking)
+camera.trackingState ────────────────────────► setTrackingPoseValid(isTracking)
 camera.getViewMatrix/ProjectionMatrix ───────► slamManager.updateCamera(view, proj, timestampNs)
                                               │
                                               ├────────────────────────► primary ARCore renderer pose
@@ -114,6 +114,13 @@ frame.acquireCameraImage() [YUV] ────────────┼► slam
                                               ▼
                                    ArRenderer draws camera background + AR overlay
 ~~~
+
+**MobileGS pose-validity seam:** `setTrackingPoseValid` means only that the most recent
+`updateCamera` pose belongs to the current camera frame. ARCore drives it from
+`camera.trackingState`; standalone drives it from same-frame accepted KPM observations. It is not a
+backend identity flag. The plane-guided capture-view rectifier additionally requires a stored
+fingerprint capture view, so it remains intentionally unavailable to centered-page standalone
+fingerprints.
 
 **Tracking backend selection:** on ARCore-capable devices, `ArCorePoseSource` supplies the live
 renderer pose while SphereSLAM runs asynchronously beside it. On ARCore-unavailable devices,

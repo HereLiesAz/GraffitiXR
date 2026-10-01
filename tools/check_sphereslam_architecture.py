@@ -8,6 +8,8 @@ invariants that are easy to accidentally regress during UI/renderer refactors:
 2. The standalone CameraX + SphereSLAM branch never constructs or imports an ARCore Session.
 3. Hybrid SphereSLAM remains observation-only in ArRenderer until an explicit fusion component is
    introduced; it must not write directly into the primary ARCore view/projection matrices.
+4. MobileGS tracking validity is backend-neutral, and standalone self-grow/map points remain in the
+   centred SphereSLAM fingerprint frame rather than passing through an ARCore-world conversion.
 
 If a future, legitimate architecture change trips this check, update the check together with the
 new explicit seam. Do not simply weaken/remove it.
@@ -34,6 +36,15 @@ main_activity = read("app/src/main/java/com/hereliesaz/graffitixr/MainActivity.k
 main_screen = read("app/src/main/java/com/hereliesaz/graffitixr/MainScreen.kt")
 ar_renderer = read(
     "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/rendering/ArRenderer.kt"
+)
+standalone_analyzer = read(
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/SphereSlamStandaloneTrackingAnalyzer.kt"
+)
+mobile_gs_cpp = read("core/nativebridge/src/main/cpp/MobileGS.cpp")
+mobile_gs_h = read("core/nativebridge/src/main/cpp/include/MobileGS.h")
+graffiti_jni = read("core/nativebridge/src/main/cpp/GraffitiJNI.cpp")
+slam_manager = read(
+    "core/nativebridge/src/main/java/com/hereliesaz/graffitixr/nativebridge/SlamManager.kt"
 )
 
 # 1. AR reachability must not be gated by ARCore availability.
@@ -103,6 +114,35 @@ for direct_token in ("latestObservation", "pageToCamera3x4", "SphereSlamPoseMath
             f"ArRenderer directly references {direct_token}; hybrid KPM correction must enter "
             "through the explicit fusion seam rather than primary matrices."
         )
+
+# 4. MobileGS frame/tracking state must be backend-neutral and preserve standalone object space.
+for path, text in {
+    "MobileGS.cpp": mobile_gs_cpp,
+    "MobileGS.h": mobile_gs_h,
+    "GraffitiJNI.cpp": graffiti_jni,
+    "SlamManager.kt": slam_manager,
+    "ArRenderer.kt": ar_renderer,
+    "SphereSlamStandaloneTrackingAnalyzer.kt": standalone_analyzer,
+}.items():
+    for legacy in ("setArCoreTrackingState", "mIsArCoreTracking", "nativeSetArCoreTrackingState"):
+        if legacy in text:
+            fail(f"{path} still contains legacy backend-specific tracking symbol {legacy}.")
+
+if "setTrackingPoseValid(acceptedView != null)" not in standalone_analyzer:
+    fail(
+        "Standalone analyzer no longer marks MobileGS pose validity from the accepted KPM pose "
+        "for the same frame."
+    )
+if "mWallKeypoints3D.push_back(newPts[i]);" not in mobile_gs_cpp:
+    fail(
+        "MobileGS self-grow no longer appends back-projected points directly in fingerprint space; "
+        "review standalone centred-page frame preservation."
+    )
+if "mMapPoints3D.push_back(cv::Point3f(P.x, P.y, P.z));" not in mobile_gs_cpp:
+    fail(
+        "MobileGS feature-map growth no longer stores the fingerprint-frame intersection directly; "
+        "review standalone centred-page frame preservation."
+    )
 
 if FAILURES:
     print("SphereSLAM architecture invariant check FAILED:", file=sys.stderr)

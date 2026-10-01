@@ -246,10 +246,14 @@ fun MainScreen(
                             mobileGsFingerprint = arUiState.sphereSlamFingerprint,
                             mobileGsFingerprintFrameVersion =
                                 arUiState.sphereSlamFingerprintFrameVersion,
+                            mobileGsWallFeatureMap = arUiState.sphereSlamWallFeatureMap,
+                            mobileGsWallFeatureMapFrameVersion =
+                                arUiState.sphereSlamWallFeatureMapFrameVersion,
                             persistedReferenceUri = arUiState.sphereSlamReferenceUri,
                             persistedReferenceWidthMeters = arUiState.sphereSlamReferenceWidthMeters,
                             persistedReferencePhysicallyMetric =
                                 arUiState.sphereSlamReferencePhysicallyMetric,
+                            persistedAtlasPages = arUiState.sphereSlamAtlasPages,
                             onReferenceCaptured = { bitmap, widthMeters, physicallyMetric ->
                                 arViewModel.saveSphereSlamReference(
                                     bitmap,
@@ -259,6 +263,24 @@ fun MainScreen(
                             },
                             onPersistedReferenceInvalid = { uri ->
                                 arViewModel.clearSphereSlamReferenceIfMatches(uri)
+                            },
+                            onPersistedAtlasPageInvalid = { pageNo, uri ->
+                                arViewModel.clearSphereSlamAtlasPageIfMatches(pageNo, uri)
+                            },
+                            onAtlasPageCaptured = {
+                                    bitmap,
+                                    pageNo,
+                                    referenceWidthUnits,
+                                    physicallyMetric,
+                                    canonicalFromPage,
+                                ->
+                                arViewModel.saveSphereSlamAtlasPage(
+                                    bitmap = bitmap,
+                                    pageNo = pageNo,
+                                    referenceWidthUnits = referenceWidthUnits,
+                                    physicallyMetric = physicallyMetric,
+                                    canonicalFromPage = canonicalFromPage,
+                                )
                             },
                             adjustment = standaloneAdj,
                             onUnitsPerPixel = { standaloneArUnitsPerPixel = it },

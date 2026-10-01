@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
 import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.WallFeatureMap
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import androidx.camera.core.ImageAnalysis
@@ -37,6 +38,23 @@ data class SphereSlamStandaloneReferenceImage(
         require(width > 0 && height > 0)
         require(luma.size == width * height)
         require(referenceWidthMeters.isFinite() && referenceWidthMeters > 0f)
+    }
+}
+
+data class SphereSlamStandaloneAtlasReferenceImage(
+    val pageNo: Int,
+    val luma: ByteArray,
+    val width: Int,
+    val height: Int,
+    val referenceWidthMeters: Float,
+    val physicallyMetric: Boolean,
+    val canonicalFromPage: FloatArray,
+) {
+    init {
+        require(pageNo > 0)
+        require(width > 0 && height > 0 && luma.size == width * height)
+        require(referenceWidthMeters.isFinite() && referenceWidthMeters > 0f)
+        require(canonicalFromPage.size == 16 && canonicalFromPage.all { it.isFinite() })
     }
 }
 
@@ -82,12 +100,17 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private val context: Context,
     private val cameraId: String,
     private val referenceImage: SphereSlamStandaloneReferenceImage,
+    private val atlasReferenceImages: List<SphereSlamStandaloneAtlasReferenceImage> = emptyList(),
     private val slamManager: SlamManager? = null,
     private val mobileGsFingerprint: Fingerprint? = null,
     private val mobileGsFingerprintFrameVersion: Int =
         com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+    private val mobileGsWallFeatureMap: WallFeatureMap? = null,
+    private val mobileGsWallFeatureMapFrameVersion: Int =
+        com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     private val onFrameTracked: (SphereSlamStandaloneFrame?) -> Unit,
     private val onReferenceReady: (SphereSlamStandaloneSession.Reference) -> Unit = {},
+    private val onAtlasPageAdded: (StandaloneAtlasGrowthCandidate) -> Unit = {},
     private val onDiagnostic: (String) -> Unit = {},
     private val onCalibrationChanged: (StandaloneCalibrationDiagnostics) -> Unit = {},
     private val onFailure: (StandaloneFailureEvent) -> Unit = {},
@@ -144,6 +167,18 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private var lastMetricsDiagnosticMs = Long.MIN_VALUE
     private var staleObservationReported = false
     private var frameBuffer: ByteBuffer? = null
+    private val runtimeAtlasPages = linkedMapOf<Int, SphereSlamStandaloneAtlasReferenceImage>().apply {
+        atlasReferenceImages.sortedBy { it.pageNo }.forEach { page ->
+            put(
+                page.pageNo,
+                page.copy(
+                    luma = page.luma.copyOf(),
+                    canonicalFromPage = page.canonicalFromPage.copyOf(),
+                ),
+            )
+        }
+    }
+    private var lastAtlasGrowthMs = Long.MIN_VALUE
     @Volatile private var closed = false
     @Volatile private var fatal = false
 
@@ -311,6 +346,12 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 }
 
                 pendingImuReference?.let(bridge::commitReference)
+                maybeGrowAtlas(
+                    active = active,
+                    frame = rotated,
+                    pose = pose,
+                    intrinsics = intrinsics,
+                )
                 val tracked = SphereSlamStandaloneFrame(
                     viewMatrix = pose.viewMatrix,
                     projMatrix = projection,
@@ -521,6 +562,31 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 "SphereSLAM standalone reference features=" + reference.featureCount +
                     " minimum=" + targetQualityConfig.minKpmFeatures,
             )
+
+            val stablePages = runtimeAtlasPages.values.sortedBy { it.pageNo }
+            require(stablePages.map { it.pageNo }.distinct().size == stablePages.size) {
+                "SphereSLAM atlas contains duplicate page IDs"
+            }
+            stablePages.forEach { page ->
+                val pageBuffer = ByteBuffer.allocateDirect(page.luma.size).apply {
+                    put(page.luma)
+                    flip()
+                }
+                val added = created.addReference(
+                    luma = pageBuffer,
+                    width = page.width,
+                    height = page.height,
+                    referenceWidthMeters = page.referenceWidthMeters,
+                    physicallyMetric = page.physicallyMetric,
+                    pageNo = page.pageNo,
+                    canonicalFromPage = page.canonicalFromPage,
+                )
+                onDiagnostic(
+                    "SphereSLAM atlas page=" + page.pageNo +
+                        " features=" + added.featureCount +
+                        " frame=canonical-centered-page",
+                )
+            }
             configureMobileGs(intrinsics)
             session = created
             sessionKey = key
@@ -532,10 +598,141 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         }
     }
 
+    private fun maybeGrowAtlas(
+        active: SphereSlamStandaloneSession,
+        frame: RotatedLuma,
+        pose: SphereSlamStandaloneSession.Pose,
+        intrinsics: CameraIntrinsics,
+    ) {
+        if (
+            runtimeAtlasPages.size + 1 >= StandaloneAtlasGrowth.MAX_PAGES ||
+            pose.inlierCount < StandaloneAtlasGrowth.MIN_GROW_INLIERS ||
+            pose.reprojectionError > StandaloneAtlasGrowth.MAX_GROW_REPROJECTION_ERROR
+        ) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (
+            lastAtlasGrowthMs != Long.MIN_VALUE &&
+            now - lastAtlasGrowthMs < StandaloneAtlasGrowth.MIN_GROW_INTERVAL_MS
+        ) return
+
+        val rootWidth = referenceImage.referenceWidthMeters
+        val rootHeight =
+            rootWidth * referenceImage.height.toFloat() / referenceImage.width.toFloat()
+        val existing = buildList {
+            add(
+                StandaloneAtlasPageWindow(
+                    pageNo = 0,
+                    centerX = 0f,
+                    centerY = 0f,
+                    width = rootWidth,
+                    height = rootHeight,
+                ),
+            )
+            runtimeAtlasPages.values.forEach { page ->
+                add(
+                    StandaloneAtlasPageWindow(
+                        pageNo = page.pageNo,
+                        centerX = page.canonicalFromPage[12],
+                        centerY = page.canonicalFromPage[13],
+                        width = page.referenceWidthMeters,
+                        height =
+                            page.referenceWidthMeters * page.height.toFloat() / page.width.toFloat(),
+                    ),
+                )
+            }
+        }
+        val geometry = StandaloneAtlasGrowth.propose(
+            cameraFromCanonicalOpenGl = pose.viewMatrix,
+            intrinsics = intrinsics,
+            frameWidth = frame.width,
+            frameHeight = frame.height,
+            rootWidthUnits = rootWidth,
+            rootHeightUnits = rootHeight,
+            existingPages = existing,
+        ) ?: return
+
+        // Rectification/OpenCV is intentionally infrequent and stays on CameraX's analysis worker.
+        // Mark the attempt now so a low-texture edge of the wall cannot trigger this cost every frame.
+        lastAtlasGrowthMs = now
+        val rectified = StandaloneAtlasGrowth.rectify(
+            frameLuma = frame.bytes,
+            frameWidth = frame.width,
+            frameHeight = frame.height,
+            geometry = geometry,
+        ) ?: return
+        val bitmap = rectified.first
+        val luma = rectified.second
+        val quality = StandaloneTargetQuality.analyze(luma, bitmap.width, bitmap.height)
+        if (StandaloneTargetQuality.blockingMessage(quality) != null) {
+            onDiagnostic(
+                "SphereSLAM atlas growth skipped reason=target-quality " +
+                    "center=(" + geometry.centerX + "," + geometry.centerY + ")",
+            )
+            return
+        }
+
+        val pageNo = (runtimeAtlasPages.keys.maxOrNull() ?: 0) + 1
+        val canonicalFromPage =
+            StandaloneAtlasGrowth.canonicalFromPage(geometry.centerX, geometry.centerY)
+        val page = SphereSlamStandaloneAtlasReferenceImage(
+            pageNo = pageNo,
+            luma = luma,
+            width = bitmap.width,
+            height = bitmap.height,
+            referenceWidthMeters = geometry.width,
+            physicallyMetric = referenceImage.physicallyMetric,
+            canonicalFromPage = canonicalFromPage,
+        )
+        val buffer = ByteBuffer.allocateDirect(luma.size).apply {
+            put(luma)
+            flip()
+        }
+        val added = active.addReference(
+            luma = buffer,
+            width = page.width,
+            height = page.height,
+            referenceWidthMeters = page.referenceWidthMeters,
+            physicallyMetric = page.physicallyMetric,
+            pageNo = page.pageNo,
+            canonicalFromPage = page.canonicalFromPage,
+        )
+        if (added.featureCount < targetQualityConfig.minKpmFeatures) {
+            // KPM has no remove-page call. Rebuild on the next frame from the persisted/runtime set,
+            // deliberately excluding this weak candidate.
+            active.close()
+            session = null
+            sessionKey = null
+            onDiagnostic(
+                "SphereSLAM atlas growth rejected page=" + pageNo +
+                    " features=" + added.featureCount +
+                    " minimum=" + targetQualityConfig.minKpmFeatures,
+            )
+            return
+        }
+
+        runtimeAtlasPages[pageNo] = page
+        onDiagnostic(
+            "SphereSLAM atlas grew page=" + pageNo +
+                " frame=canonical-centered-page center=(" +
+                geometry.centerX + "," + geometry.centerY + ")" +
+                " features=" + added.featureCount,
+        )
+        onAtlasPageAdded(
+            StandaloneAtlasGrowthCandidate(
+                pageNo = pageNo,
+                bitmap = bitmap,
+                luma = luma,
+                referenceWidthUnits = page.referenceWidthMeters,
+                physicallyMetric = page.physicallyMetric,
+                canonicalFromPage = page.canonicalFromPage.copyOf(),
+            ),
+        )
+    }
+
     private fun configureMobileGs(intrinsics: CameraIntrinsics) {
         val slam = slamManager ?: return
         slam.ensureInitialized()
-        slam.setArCoreTrackingState(false)
+        slam.setTrackingPoseValid(false)
         slam.setLiveIntrinsics(intrinsics.fx, intrinsics.fy, intrinsics.cx, intrinsics.cy)
 
         val fp = mobileGsFingerprint
@@ -543,6 +740,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION
         if (fp != null && mobileGsFingerprintFrameVersion != expectedFrameVersion) {
             slam.clearWallFingerprint()
+            slam.clearWallFeatureMap()
             slam.overlayMarkCenterLocal = null
             slam.captureAnchorCam = null
             onDiagnostic(
@@ -554,8 +752,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         }
         if (fp == null || fp.descriptorsRows <= 0 || fp.points3d.size != fp.descriptorsRows * 3) {
             // Native MobileGS is process-global. A standalone project with no seed must explicitly
-            // clear a prior project's fingerprint rather than continuing to match the wrong wall.
+            // clear a prior project's fingerprint AND its wide-wall map rather than continuing to
+            // match coordinates from the previous project's frame.
             slam.clearWallFingerprint()
+            slam.clearWallFeatureMap()
             slam.overlayMarkCenterLocal = null
             slam.captureAnchorCam = null
             return
@@ -577,6 +777,34 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         slam.overlayMarkCenterLocal =
             fp.markCenterLocal.takeIf { it.size == 3 }?.toFloatArray()
         slam.captureAnchorCam = null
+
+        val map = mobileGsWallFeatureMap
+        val mapFrameOk =
+            mobileGsWallFeatureMapFrameVersion == expectedFrameVersion &&
+                map != null &&
+                StandaloneFingerprintFrame.isCenteredPageAnchor(map.anchor)
+        if (mapFrameOk) {
+            val compatibleMap = requireNotNull(map)
+            slam.restoreWallFeatureMap(compatibleMap)
+            onDiagnostic(
+                "SphereSLAM MobileGS map restored backend=standalone-kpm frame=centered-page " +
+                    "version=" + mobileGsWallFeatureMapFrameVersion +
+                    " points=" + compatibleMap.pointCount,
+            )
+        } else {
+            // Empty is normal for a new project. A non-empty incompatible map is deliberately
+            // dropped rather than converted: no implicit ARCore-world -> centred-page transform
+            // exists, and guessing one would poison wide-area relocalization after restart.
+            slam.clearWallFeatureMap()
+            if (map != null) {
+                onDiagnostic(
+                    "SphereSLAM MobileGS map refused backend=standalone-kpm frame=centered-page " +
+                        "version=" + mobileGsWallFeatureMapFrameVersion +
+                        " expected=" + expectedFrameVersion +
+                        " anchorIdentity=" + StandaloneFingerprintFrame.isCenteredPageAnchor(map.anchor),
+                )
+            }
+        }
         onDiagnostic(
             "SphereSLAM MobileGS seed backend=standalone-kpm frame=centered-page " +
                 "version=" + mobileGsFingerprintFrameVersion +
@@ -592,6 +820,11 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         acceptedView: FloatArray?,
     ) {
         val slam = slamManager ?: return
+        // This flag describes the freshness of updateCamera(), not which backend produced it.
+        // A rejected/missing KPM observation must invalidate the previous view before the same
+        // frame's pixels enter MobileGS, otherwise rectification or future pose-dependent helpers
+        // can silently pair a stale pose with a new image.
+        slam.setTrackingPoseValid(acceptedView != null)
         if (mobileGsFingerprint == null) return
 
         // PnP does not need a pose prior. Publish a view only when KPM accepted THIS frame; on a
@@ -670,6 +903,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     override fun close() {
         if (closed) return
         closed = true
+        slamManager?.setTrackingPoseValid(false)
         bridge.stop()
         bridge.clearReference()
         lastGood = null
@@ -685,6 +919,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         lastMetricsDiagnosticMs = Long.MIN_VALUE
         staleObservationReported = false
         frameBuffer = null
+        runtimeAtlasPages.clear()
     }
 }
 

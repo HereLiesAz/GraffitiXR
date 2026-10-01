@@ -21,6 +21,12 @@ Both are reachable only from the diagnostic overlay (Settings > diagnostic overl
 ### 4. Optional persistent wall feature map
 `WallFeatureMap` (`setMapRelocEnabled`/`setMapBuildEnabled`, `IMPLEMENTATION.md` phases 2b/3) is a second, longer-lived relocalization source that can be built and matched against across sessions. Off by default like the two mechanisms above.
 
+For standalone SphereSLAM, both self-grown fingerprint points and feature-map growth are written
+directly in the centered KPM-page fingerprint frame (+X right, +Y up, +Z wall normal). The
+standalone map is persisted separately from the ARCore-frame map and must carry an identity
+fingerprint-anchor transform on save and restore; incompatible anchors are refused rather than
+implicitly converted.
+
 ## Memory Management
 - The fingerprint itself is small (a few thousand descriptor+point pairs at most); there is no fixed-size point-cloud or voxel budget to speak of beyond `kMaxWallMarks`.
 
