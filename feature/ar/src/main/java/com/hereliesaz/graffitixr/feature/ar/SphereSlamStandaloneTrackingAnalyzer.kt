@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
 import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.WallFeatureMap
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import androidx.camera.core.ImageAnalysis
@@ -85,6 +86,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private val slamManager: SlamManager? = null,
     private val mobileGsFingerprint: Fingerprint? = null,
     private val mobileGsFingerprintFrameVersion: Int =
+        com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+    private val mobileGsWallFeatureMap: WallFeatureMap? = null,
+    private val mobileGsWallFeatureMapFrameVersion: Int =
         com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     private val onFrameTracked: (SphereSlamStandaloneFrame?) -> Unit,
     private val onReferenceReady: (SphereSlamStandaloneSession.Reference) -> Unit = {},
@@ -543,6 +547,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION
         if (fp != null && mobileGsFingerprintFrameVersion != expectedFrameVersion) {
             slam.clearWallFingerprint()
+            slam.clearWallFeatureMap()
             slam.overlayMarkCenterLocal = null
             slam.captureAnchorCam = null
             onDiagnostic(
@@ -554,8 +559,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         }
         if (fp == null || fp.descriptorsRows <= 0 || fp.points3d.size != fp.descriptorsRows * 3) {
             // Native MobileGS is process-global. A standalone project with no seed must explicitly
-            // clear a prior project's fingerprint rather than continuing to match the wrong wall.
+            // clear a prior project's fingerprint AND its wide-wall map rather than continuing to
+            // match coordinates from the previous project's frame.
             slam.clearWallFingerprint()
+            slam.clearWallFeatureMap()
             slam.overlayMarkCenterLocal = null
             slam.captureAnchorCam = null
             return
@@ -577,6 +584,33 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         slam.overlayMarkCenterLocal =
             fp.markCenterLocal.takeIf { it.size == 3 }?.toFloatArray()
         slam.captureAnchorCam = null
+
+        val map = mobileGsWallFeatureMap
+        val mapFrameOk =
+            mobileGsWallFeatureMapFrameVersion == expectedFrameVersion &&
+                map != null &&
+                StandaloneFingerprintFrame.isCenteredPageAnchor(map.anchor)
+        if (mapFrameOk) {
+            slam.restoreWallFeatureMap(map!!)
+            onDiagnostic(
+                "SphereSLAM MobileGS map restored backend=standalone-kpm frame=centered-page " +
+                    "version=" + mobileGsWallFeatureMapFrameVersion +
+                    " points=" + map.pointCount,
+            )
+        } else {
+            // Empty is normal for a new project. A non-empty incompatible map is deliberately
+            // dropped rather than converted: no implicit ARCore-world -> centred-page transform
+            // exists, and guessing one would poison wide-area relocalization after restart.
+            slam.clearWallFeatureMap()
+            if (map != null) {
+                onDiagnostic(
+                    "SphereSLAM MobileGS map refused backend=standalone-kpm frame=centered-page " +
+                        "version=" + mobileGsWallFeatureMapFrameVersion +
+                        " expected=" + expectedFrameVersion +
+                        " anchorIdentity=" + StandaloneFingerprintFrame.isCenteredPageAnchor(map.anchor),
+                )
+            }
+        }
         onDiagnostic(
             "SphereSLAM MobileGS seed backend=standalone-kpm frame=centered-page " +
                 "version=" + mobileGsFingerprintFrameVersion +
