@@ -81,7 +81,7 @@ This document lists key files in the repository and their purposes.
 *   `ArViewModel.kt`: ARCore session lifecycle for the ARCore backend plus shared flashlight/GPS
     state and crash-safe standalone SphereSLAM reference persistence.
 *   `rendering/ArRenderer.kt`: ARCore `GLSurfaceView.Renderer`. Initialises `BackgroundRenderer`;
-    calls `setArCoreTrackingState`, `updateCamera`, `feedYuvFrame`/`feedColorFrame`, and composes
+    calls backend-neutral `setTrackingPoseValid`, `updateCamera`, `feedYuvFrame`/`feedColorFrame`, and composes
     the ARCore overlay via `PoseFusion`.
 *   `SphereSlamStandaloneOverlay.kt`: non-ARCore AR surface. Owns rectified wall-target capture,
     CameraX analyzer lifecycle, KPM/reacquisition HUD, GL overlay, target restore, and copyable
