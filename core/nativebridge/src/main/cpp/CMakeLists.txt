@@ -95,13 +95,91 @@ if(EXISTS ${ARX_ROOT}/KPM/include/ARX/KPM/kpm.h)
         ${ARX_ROOT}/KPM/FreakMatcher/framework/logger.cpp
         ${ARX_ROOT}/KPM/FreakMatcher/framework/timers.cpp
     )
-    file(GLOB_RECURSE ARX_AR_C_SRC CONFIGURE_DEPENDS
-        ${ARX_ROOT}/AR/*.c
+    # Match upstream AR/CMakeLists.txt instead of recursively compiling every .c file in AR.
+    # The explicit list is boring on purpose: native build surprises are more boring.
+    set(ARX_AR_SRC
+        ${ARX_ROOT}/AR/ar3DCreateHandle.c
+        ${ARX_ROOT}/AR/ar3DUtil.c
+        ${ARX_ROOT}/AR/arCreateHandle.c
+        ${ARX_ROOT}/AR/arDetectMarker.c
+        ${ARX_ROOT}/AR/arDetectMarker2.c
+        ${ARX_ROOT}/AR/arFilterTransMat.c
+        ${ARX_ROOT}/AR/arGetLine.c
+        ${ARX_ROOT}/AR/arGetMarkerInfo.c
+        ${ARX_ROOT}/AR/arGetTransMat.c
+        ${ARX_ROOT}/AR/arGetTransMatStereo.c
+        ${ARX_ROOT}/AR/arImageProc.c
+        ${ARX_ROOT}/AR/arLabeling.c
+        ${ARX_ROOT}/AR/arLabelingSub/arLabelingSubDBIC.c
+        ${ARX_ROOT}/AR/arLabelingSub/arLabelingSubDBRC.c
+        ${ARX_ROOT}/AR/arLabelingSub/arLabelingSubDBZ.c
+        ${ARX_ROOT}/AR/arLabelingSub/arLabelingSubDWIC.c
+        ${ARX_ROOT}/AR/arLabelingSub/arLabelingSubDWRC.c
+        ${ARX_ROOT}/AR/arLabelingSub/arLabelingSubDWZ.c
+        ${ARX_ROOT}/AR/arLabelingSub/arLabelingSubEBIC.c
+        ${ARX_ROOT}/AR/arLabelingSub/arLabelingSubEBRC.c
+        ${ARX_ROOT}/AR/arLabelingSub/arLabelingSubEBZ.c
+        ${ARX_ROOT}/AR/arLabelingSub/arLabelingSubEWIC.c
+        ${ARX_ROOT}/AR/arLabelingSub/arLabelingSubEWRC.c
+        ${ARX_ROOT}/AR/arLabelingSub/arLabelingSubEWZ.c
+        ${ARX_ROOT}/AR/arMultiEditConfig.c
+        ${ARX_ROOT}/AR/arMultiFreeConfig.c
+        ${ARX_ROOT}/AR/arMultiGetTransMat.c
+        ${ARX_ROOT}/AR/arMultiGetTransMatStereo.c
+        ${ARX_ROOT}/AR/arMultiReadConfigFile.c
+        ${ARX_ROOT}/AR/arPattAttach.c
+        ${ARX_ROOT}/AR/arPattCreateHandle.c
+        ${ARX_ROOT}/AR/arPattGetID.c
+        ${ARX_ROOT}/AR/arPattLoad.c
+        ${ARX_ROOT}/AR/arPattSave.c
+        ${ARX_ROOT}/AR/arRefineCorners.cpp
+        ${ARX_ROOT}/AR/arUtil.c
+        ${ARX_ROOT}/AR/icpCalibStereo.c
+        ${ARX_ROOT}/AR/icpCore.c
+        ${ARX_ROOT}/AR/icpHandle.c
+        ${ARX_ROOT}/AR/icpPoint.c
+        ${ARX_ROOT}/AR/icpPointRobust.c
+        ${ARX_ROOT}/AR/icpStereoHandle.c
+        ${ARX_ROOT}/AR/icpStereoPoint.c
+        ${ARX_ROOT}/AR/icpStereoPointRobust.c
+        ${ARX_ROOT}/AR/icpUtil.c
+        ${ARX_ROOT}/AR/mAlloc.c
+        ${ARX_ROOT}/AR/mAllocDup.c
+        ${ARX_ROOT}/AR/mAllocInv.c
+        ${ARX_ROOT}/AR/mAllocMul.c
+        ${ARX_ROOT}/AR/mAllocTrans.c
+        ${ARX_ROOT}/AR/mAllocUnit.c
+        ${ARX_ROOT}/AR/mDet.c
+        ${ARX_ROOT}/AR/mDisp.c
+        ${ARX_ROOT}/AR/mDup.c
+        ${ARX_ROOT}/AR/mFree.c
+        ${ARX_ROOT}/AR/mInv.c
+        ${ARX_ROOT}/AR/mMul.c
+        ${ARX_ROOT}/AR/mPCA.c
+        ${ARX_ROOT}/AR/mSelfInv.c
+        ${ARX_ROOT}/AR/mTrans.c
+        ${ARX_ROOT}/AR/mUnit.c
+        ${ARX_ROOT}/AR/paramChangeSize.c
+        ${ARX_ROOT}/AR/paramClear.c
+        ${ARX_ROOT}/AR/paramDecomp.c
+        ${ARX_ROOT}/AR/paramDisp.c
+        ${ARX_ROOT}/AR/paramDistortion.c
+        ${ARX_ROOT}/AR/paramFile.c
+        ${ARX_ROOT}/AR/paramGetPerspective.c
+        ${ARX_ROOT}/AR/paramGL.c
+        ${ARX_ROOT}/AR/paramLT.c
+        ${ARX_ROOT}/AR/vAlloc.c
+        ${ARX_ROOT}/AR/vDisp.c
+        ${ARX_ROOT}/AR/vFree.c
+        ${ARX_ROOT}/AR/vHouse.c
+        ${ARX_ROOT}/AR/vInnerP.c
+        ${ARX_ROOT}/AR/vTridiag.c
+        ${ARX_ROOT}/AR/matrixCode.c
     )
 
-    # libAR defines JNI_OnLoad when it is built as its own Android shared library. Here libAR is
-    # embedded inside GraffitiXR's existing native library, which already owns JNI_OnLoad in
-    # GraffitiJNI.cpp. Keep arUtil.c's helpers but namespace only that otherwise-colliding symbol.
+    # artoolkitX's libAR normally owns JNI_OnLoad when built as a standalone Android shared
+    # library. GraffitiXR already owns the process loader in GraffitiJNI.cpp, so keep arUtil.c's
+    # helper functions while renaming only that colliding loader symbol in the embedded build.
     set_source_files_properties(
         ${ARX_ROOT}/AR/arUtil.c
         PROPERTIES COMPILE_DEFINITIONS "JNI_OnLoad=arxEmbeddedJniOnLoad"
@@ -114,7 +192,7 @@ if(EXISTS ${ARX_ROOT}/KPM/include/ARX/KPM/kpm.h)
 
     add_library(arx_kpm STATIC
         ${ARX_KPM_SRC}
-        ${ARX_AR_C_SRC}
+        ${ARX_AR_SRC}
         ${ARX_SUPPORT_SRC}
     )
 

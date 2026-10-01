@@ -15,6 +15,7 @@ Its contents, all produced by `ProjectManager`:
 | `project.json` | `ProjectManager.saveProject` | The full `GraffitiProject` (see below), kotlinx.serialization JSON, pretty-printed. |
 | `thumbnail.png` | `saveProject` (when a thumbnail bitmap is passed) | PNG, quality 80. |
 | `target_<unique>.png` | `saveProject` / `ProjectManager.appendTargetImage` | One PNG per captured target image (quality 100). Filenames are unique per file (`File.createTempFile`), not sequentially numbered — nothing round-trips the filename itself, only the URI stored in `project.json`. |
+| `sphereslam_reference.png` | `ProjectManager.saveSphereSlamReference` | Canonical rectified planar wall page for ARCore-independent SphereSLAM/KPM tracking. Re-capture replaces this file; `sphereSlamReferenceUri` plus scale metadata in `project.json` restore it on reopen/import. |
 | arbitrary filenames | `ProjectRepository.saveArtifact` | Design-layer image exports and other editor-written artifacts (e.g. `feature/editor`'s `EditorViewModel`), written as raw bytes under the same project directory. |
 
 There is **no separate binary map/voxel/splat file of any kind**. The persistent wall-feature map

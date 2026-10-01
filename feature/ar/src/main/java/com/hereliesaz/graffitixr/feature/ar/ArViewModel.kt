@@ -1103,6 +1103,15 @@ class ArViewModel @Inject constructor(
         }
         viewModelScope.launch {
             projectRepository.currentProject.collect { project ->
+                _uiState.update {
+                    it.copy(
+                        sphereSlamReferenceUri = project?.sphereSlamReferenceUri,
+                        sphereSlamReferenceWidthMeters =
+                            project?.sphereSlamReferenceWidthMeters ?: 1f,
+                        sphereSlamReferencePhysicallyMetric =
+                            project?.sphereSlamReferencePhysicallyMetric ?: false,
+                    )
+                }
                 if (project != null) {
                     loadedProjectId = project.id
                     loadMapIfExists()
@@ -1388,13 +1397,17 @@ class ArViewModel @Inject constructor(
         )
     }
 
+    /**
+     * Enter/leave the **ARCore-backed** runtime.
+     *
+     * MainScreen calls this only in the ARCore-capable branch. AR mode itself is not ARCore-only:
+     * unsupported devices keep this ViewModel's ARCore session state false and run CameraX +
+     * SphereSLAM directly. The availability guard therefore protects Session construction; it does
+     * not mean the product's AR mode is unavailable.
+     */
     fun setArMode(enabled: Boolean, context: Context) {
         if (enabled && !_uiState.value.isArCoreAvailable) {
-            // ARCore is not supported on this device. Refuse to enter AR mode
-            // rather than crashing inside Session(context). The mode chooser
-            // already hides AR for unsupported devices; this is defense in
-            // depth in case it's reached via deep link, restored state, etc.
-            Timber.w("setArMode(true) ignored: ARCore unavailable on this device")
+            Timber.w("setArMode(true) ignored: standalone SphereSLAM owns AR on this device")
             return
         }
         isInArMode = enabled
@@ -1871,6 +1884,43 @@ class ArViewModel @Inject constructor(
             } ?: false
         } finally {
             try { appCtx.unbindService(conn) } catch (_: Exception) {}
+        }
+    }
+
+    /**
+     * Save the rectified page that lets the standalone SphereSLAM path relocalize this project on a
+     * later visit. File IO and the repository update run off Main; tracking can begin immediately
+     * from the in-memory bitmap while this persists.
+     */
+    fun saveSphereSlamReference(
+        bitmap: Bitmap,
+        referenceWidthMeters: Float = 1f,
+        physicallyMetric: Boolean = false,
+    ) {
+        require(referenceWidthMeters.isFinite() && referenceWidthMeters > 0f)
+        val projectId = projectRepository.currentProject.value?.id ?: return
+        viewModelScope.launch(dispatchers.io) {
+            try {
+                val uri = projectManager.saveSphereSlamReference(appContext, projectId, bitmap)
+                projectRepository.updateProject { current ->
+                    if (current.id != projectId) current
+                    else current.copy(
+                        sphereSlamReferenceUri = uri,
+                        sphereSlamReferenceWidthMeters = referenceWidthMeters,
+                        sphereSlamReferencePhysicallyMetric = physicallyMetric,
+                    )
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to persist standalone SphereSLAM reference")
+                _feedback.tryEmit(
+                    com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                        "Wall tracking works for this session, but the SphereSLAM target couldn't be saved.",
+                        e,
+                    ),
+                )
+            }
         }
     }
 

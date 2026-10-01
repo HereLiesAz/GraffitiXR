@@ -570,6 +570,14 @@ bootstrap silently inside a backlog cleanup pass. Recommended next step for whoe
 up: decide which of those four infra investments the project wants (they are not mutually
 exclusive, but do not share setup cost), then this list becomes actionable.
 
+### Active SphereSLAM implementation backlog
+
+The complete dependency-ordered SphereSLAM hybrid + standalone checklist lives in
+[`docs/SPHERESLAM_TODO.md`](docs/SPHERESLAM_TODO.md). Treat that file as authoritative for
+SphereSLAM implementation, validation, device coverage, MobileGS coordinate-frame integration,
+physical scale, hybrid fusion, co-op, performance, documentation, cleanup, and merge criteria.
+Do not maintain a second competing SphereSLAM TODO list here.
+
 ### Sequencing notes
 
 Phases 1–3 are independent of each other and of Phase 4; can proceed immediately and in

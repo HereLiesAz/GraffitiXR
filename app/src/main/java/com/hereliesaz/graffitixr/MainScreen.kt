@@ -78,6 +78,9 @@ fun MainScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val rendererRef = remember { mutableStateOf<ArRenderer?>(null) }
+    // ARCore mode publishes metres/pixel through ArRenderer. Standalone SphereSLAM has no
+    // ArRenderer, so its CameraX/KPM path publishes the same wall-unit/pixel quantity here.
+    var standaloneArUnitsPerPixel by remember { mutableFloatStateOf(0f) }
 
     val bgColor = if (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY) Transparent else uiState.canvasBackground
     Box(modifier = Modifier.fillMaxSize().background(bgColor)) {
@@ -116,282 +119,346 @@ fun MainScreen(
         if (hasCameraPermission && isCameraActive && uiState.editorMode != EditorMode.TRACE) {
             when (uiState.editorMode) {
                 EditorMode.AR -> {
-                    var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
-
-                    DisposableEffect(uiState.editorMode) {
-                        // Release the CameraX (editor/overlay) camera BEFORE ARCore opens the
-                        // device. Otherwise the two camera clients race for the device: ARCore
-                        // opening evicts CameraX (ERROR_CAMERA_DEVICE) and CameraX's in-flight
-                        // capture-session open then throws an uncaught camera SecurityException
-                        // ("Attempt to use camera from a different process than original client"),
-                        // hard-crashing the app on AR entry.
-                        runCatching { cameraController.unbind() }
-                        arViewModel.setArMode(true, context)
-                        onDispose {
-                            // Fully close the session (not just pause) when leaving AR — e.g. into
-                            // the library to load a project, then back via Trace. A paused-but-open
-                            // session gets resumed on re-entry instead of rebuilt, which on many
-                            // devices comes back as a black/uninitialised camera. exitArMode() tears
-                            // it down so the next AR entry creates a fresh session.
-                            arViewModel.exitArMode()
-                            // Reset in-flight capture state so stale isWaitingForTap doesn't
-                            // block gestures on AR re-entry.
-                            mainViewModel.cancelTapMode()
+                    if (!arUiState.isArCoreAvailabilityResolved) {
+                        // Do not start an ARCore Session until capability resolution completes.
+                        // CameraX is safe on every supported install and becomes the standalone
+                        // SphereSLAM camera if ARCore resolves unavailable.
+                        CameraPreview(
+                            controller = cameraController,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else if (!arUiState.isArCoreAvailable) {
+                        // ARCore is optional. Keep the user in AR mode and let CameraX +
+                        // SphereSLAM/KPM own wall tracking instead of redirecting to Overlay mode.
+                        LaunchedEffect(arUiState.isFlashlightOn) {
+                            cameraController.enableTorch(arUiState.isFlashlightOn)
                         }
-                    }
+                        CameraPreview(
+                            controller = cameraController,
+                            modifier = Modifier.fillMaxSize(),
+                        )
 
-                    // Enter AR with the Target button pre-selected when no target exists yet, so the
-                    // first screen tap (once tracking allows) creates the target without a detour to
-                    // the rail. If a target was already created, stay in normal layer-editing mode.
-                    LaunchedEffect(mainUiState.hasExistingTarget) {
-                        // Only act once the project state is resolved (non-null). `== false` means a
-                        // loaded project with no saved target, so pre-select the Target button.
-                        // Skip if a target was already created this session (survives AR exit/re-entry).
-                        if (mainUiState.hasExistingTarget == false
-                            && !mainUiState.isCapturingTarget
-                            && !mainUiState.targetCapturedThisSession) {
-                            mainViewModel.startTargetCapture()
+                        val standaloneDesign = uiState.design?.takeIf {
+                            it.isVisible && it.bitmap != null
                         }
-                    }
+                        val standaloneAdj = uiState.modeAdjustments[EditorMode.AR]
+                        var standaloneTexture by remember { mutableStateOf<AndroidBitmap?>(null) }
 
-                    // Method-aware layer defaults: on AR entry and whenever the mural method
-                    // changes, the matching representation defaults on and the other two off.
-                    // Keyed on the method, so a user who manually enables another layer keeps it
-                    // until the method changes again.
-
-                    DisposableEffect(lifecycleOwner, glView) {
-                        if (glView == null) return@DisposableEffect onDispose {}
-
-                        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-                            glView?.onResume()
-                        }
-
-                        val observer = LifecycleEventObserver { _, event ->
-                            when (event) {
-                                Lifecycle.Event.ON_RESUME -> glView?.onResume()
-                                Lifecycle.Event.ON_PAUSE -> glView?.onPause()
-                                else -> {}
-                            }
-                        }
-                        lifecycleOwner.lifecycle.addObserver(observer)
-                        onDispose {
-                            lifecycleOwner.lifecycle.removeObserver(observer)
-                        }
-                    }
-
-                    LaunchedEffect(arUiState.isFlashlightOn, rendererRef.value) {
-                        rendererRef.value?.updateFlashlight(arUiState.isFlashlightOn)
-                    }
-
-                    // Dead-camera watchdog. On some devices (e.g. Samsung SM-A236U) the camera HAL
-                    // never feeds ARCore — the session opens but no frame ever lands (frame.timestamp
-                    // stays 0). Left alone, ARCore's internal camera pipe keeps thrashing the device
-                    // through ERROR_CAMERA_DEVICE/reopen cycles, which can end in an uncatchable
-                    // teardown crash. If no frame has arrived after the timeout, leave AR: switching
-                    // editorMode off AR disposes this branch, whose onDispose calls exitArMode() for a
-                    // clean teardown. Keyed on the renderer so it (re)starts with each AR session and
-                    // is cancelled the moment we leave AR.
-                    LaunchedEffect(rendererRef.value) {
-                        val r = rendererRef.value ?: return@LaunchedEffect
-                        val startMs = android.os.SystemClock.elapsedRealtime()
-                        while (true) {
-                            kotlinx.coroutines.delay(1000)
-                            // Read via a :feature:ar helper that returns a Long — :app can't access
-                            // ARCore's Frame type (it's an implementation dep of :feature:ar).
-                            val ts = com.hereliesaz.graffitixr.feature.ar.lastArFrameTimestampNs(r)
-                            if (ts > 0L) break // camera is streaming — healthy, stop watching
-                            val elapsed = android.os.SystemClock.elapsedRealtime() - startMs
-                            if (com.hereliesaz.graffitixr.feature.ar.ArCameraHealth.isCameraDead(elapsed, ts)) {
-                                // Tell AR the HAL never streamed: the next AR entry this process drops
-                                // to ARCore's safest default camera config (skips the fps-variant swap),
-                                // a best-effort recovery for budget HALs (e.g. Galaxy A26) that open a
-                                // config but never feed it.
-                                arViewModel.onCameraStreamStalled()
-                                Toast.makeText(
-                                    context,
-                                    context.getString(DesignR.string.camera_stalled_error),
-                                    Toast.LENGTH_LONG
-                                ).show()
-                                editorViewModel.setEditorMode(EditorMode.DESIGN)
-                                break
-                            }
-                        }
-                    }
-
-                    val visibleDesign = uiState.design?.takeIf { it.isVisible && it.bitmap != null }
-
-                    // Push the AR whole-design adjustment (set via the rail's "Layer" item) to the
-                    // renderer, which applies it as an in-plane move/scale/rotate of the overlay along
-                    // the wall plane. Offsets are stored in world meters (converted at the gesture site).
-                    val arOverlayAdj = uiState.modeAdjustments[EditorMode.AR]
-                    LaunchedEffect(arOverlayAdj, rendererRef.value) {
-                        rendererRef.value?.let { r ->
-                            r.overlayPanX = arOverlayAdj?.offsetX ?: 0f
-                            r.overlayPanY = arOverlayAdj?.offsetY ?: 0f
-                            r.overlayScale = arOverlayAdj?.scale ?: 1f
-                            // Model stores rotationZ CW+ (Compose/y-down convention). The AR
-                            // renderer rotates around a camera-facing wall-local +Z, which is
-                            // CCW+ under the right-hand rule — negate here so a CW slider drag
-                            // and a CW gesture both rotate the overlay CW on the wall.
-                            r.overlayRotationDeg = -(arOverlayAdj?.rotation ?: 0f)
-                            r.overlayRotationX = arOverlayAdj?.rotationX ?: 0f
-                            r.overlayRotationY = arOverlayAdj?.rotationY ?: 0f
-                        }
-                    }
-
-                    // Tone/opacity/invert live on modeAdjustments[AR], not on the renderer, so a
-                    // slider change has to re-composite the wall texture. Include the tone-only
-                    // fields in the key list; the geometric fields (offset/scale/rotation) do NOT
-                    // affect the bitmap contents (the renderer applies them on the quad), so
-                    // omitting them avoids a full re-composite on every pan/zoom gesture.
-                    // remember() keyed on the primitive tone fields so the list + 5 boxes are only
-                    // allocated when a slider actually moves — MainScreen recomposes at tracking
-                    // rate (~15fps), so a per-frame allocation storm here shows up in GC.
-                    val arToneKey = remember(
-                        arOverlayAdj?.brightness, arOverlayAdj?.contrast, arOverlayAdj?.saturation,
-                        arOverlayAdj?.opacity, arOverlayAdj?.isInverted,
-                    ) {
-                        arOverlayAdj?.let {
-                            listOf(it.brightness, it.contrast, it.saturation, it.opacity, it.isInverted)
-                        }
-                    }
-                    LaunchedEffect(visibleDesign, arUiState.isAnchorEstablished, arToneKey) {
-                        if (!arUiState.isAnchorEstablished || visibleDesign == null) {
-                            rendererRef.value?.updateOverlayBitmap(null)
-                            return@LaunchedEffect
-                        }
-
-                        val composite = withContext(Dispatchers.Default) {
-                            compositeDesignForAr(visibleDesign, arOverlayAdj)
-                        }
-                        rendererRef.value?.updateOverlayBitmap(composite)
-                    }
-
-                    // Split from the effect above, and NOT keyed on the tone: brightness, contrast,
-                    // saturation, opacity and invert are how the artist wants the overlay to LOOK on
-                    // screen, not what the artwork is. Registering the toned composite as the
-                    // validator meant nudging the opacity slider re-ran the detector and re-registered
-                    // the design, which resets painting progress — cheap before Phase 4, when the
-                    // published value was the current frame's ratio and reappeared on the next reloc
-                    // tick, and expensive after it, when progress accumulates over confirmed features
-                    // and has to climb back one feature at a time. A tone slider must not cost the
-                    // artist their progress bar.
-                    //
-                    // Composites a second time rather than sharing the bitmap above, because the two
-                    // now legitimately differ. Only on a layer change, which is rare — the recompose
-                    // storm this file worries about elsewhere is driven by the tone key, and that no
-                    // longer reaches here.
-                    // Auto-fit (see ArViewModel.designFits): applied as an ordinary, undoable AR edit.
-                    LaunchedEffect(Unit) {
-                        arViewModel.designFits.collect { fit ->
-                            editorViewModel.applyArFit(fit.dx, fit.dy, fit.dThetaRad, fit.scale)
-                        }
-                    }
-                    LaunchedEffect(visibleDesign, arUiState.isAnchorEstablished) {
-                        if (!arUiState.isAnchorEstablished || visibleDesign == null) {
-                            return@LaunchedEffect
-                        }
-                        val guide = withContext(Dispatchers.Default) {
-                            compositeDesignForAr(visibleDesign)
-                        }
-                        arViewModel.updatePaintingGuide(guide, visibleDesign.uri?.toString())
-                    }
-
-                    AndroidView(
-                        factory = { ctx ->
-                            val renderer = ArRenderer(
-                                context = ctx,
-                                slamManager = slamManager,
-                                onTargetCaptured = { bmp, cw, ch, depth, dw, dh, stride, intr, viewMat, rot, tapDist, wallPlane, environment ->
-                                    arViewModel.onTargetCaptured(
-                                        bmp, depth,
-                                        cw, ch,
-                                        dw, dh, stride,
-                                        intr, viewMat, rot, tapDist, wallPlane, environment
-                                    )
-                                },
-                                onTrackingUpdated = { isTracking, mappedPoints, isDepthSupported, yaw, distanceMeters, relDir, isHardwareStereo, centerDepth ->
-                                    arViewModel.setTrackingState(
-                                        isTracking, mappedPoints, isDepthSupported, yaw, distanceMeters, relDir,
-                                        isHardwareStereo, centerDepth
-                                    )
-                                },
-                                onLightUpdated = { level ->
-                                    arViewModel.updateLightLevel(level)
-                                    slamManager.updateLightLevel(level)
-                                },
-                                onDiag = { text ->
-                                    arViewModel.appendDiag(text)
-                                },
-                                onAnchorEstablished = {
-                                    arViewModel.onPrimaryAnchorEstablished()
-                                },
-                                onPlaneDetected = {
-                                    arViewModel.onFirstPlaneDetected()
-                                },
-                                onDoodleLocked = {
-                                    arViewModel.onDoodleLocked()
-                                },
-                                onFlashlightUnavailable = {
-                                    arViewModel.onFlashlightUnavailable()
-                                },
-                                onDesignFootprintChanged = { footprint ->
-                                    arViewModel.onDesignFootprintChanged(footprint)
+                        // Match ARCore mode's texture treatment: tone fields are baked into the
+                        // texture, while pan/scale/rotation stay geometric in the renderer.
+                        LaunchedEffect(
+                            standaloneDesign,
+                            standaloneAdj?.brightness,
+                            standaloneAdj?.contrast,
+                            standaloneAdj?.saturation,
+                            standaloneAdj?.opacity,
+                            standaloneAdj?.isInverted,
+                        ) {
+                            standaloneTexture = if (standaloneDesign == null) {
+                                null
+                            } else {
+                                withContext(Dispatchers.Default) {
+                                    compositeDesignForAr(standaloneDesign, standaloneAdj)
                                 }
-                            )
-                            renderer.hideVisualization = isExporting
-                            rendererRef.value = renderer
-                            arViewModel.attachSessionToRenderer(renderer)
-                            val view = GLSurfaceView(ctx).apply {
-                                setEGLContextClientVersion(3)
-                                setZOrderMediaOverlay(true)
-                                holder.setFormat(PixelFormat.TRANSLUCENT)
-                                setRenderer(renderer)
-                                renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
                             }
-                            glView = view
-                            view
-                        },
-                        update = { view ->
+                        }
+
+                        com.hereliesaz.graffitixr.feature.ar.SphereSlamStandaloneOverlay(
+                            cameraController = cameraController,
+                            designBitmap = standaloneTexture,
+                            persistedReferenceUri = arUiState.sphereSlamReferenceUri,
+                            persistedReferenceWidthMeters = arUiState.sphereSlamReferenceWidthMeters,
+                            persistedReferencePhysicallyMetric =
+                                arUiState.sphereSlamReferencePhysicallyMetric,
+                            onReferenceCaptured = { bitmap, widthMeters, physicallyMetric ->
+                                arViewModel.saveSphereSlamReference(
+                                    bitmap,
+                                    widthMeters,
+                                    physicallyMetric,
+                                )
+                            },
+                            adjustment = standaloneAdj,
+                            onUnitsPerPixel = { standaloneArUnitsPerPixel = it },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
+    
+                        DisposableEffect(uiState.editorMode) {
+                            // Release the CameraX (editor/overlay) camera BEFORE ARCore opens the
+                            // device. Otherwise the two camera clients race for the device: ARCore
+                            // opening evicts CameraX (ERROR_CAMERA_DEVICE) and CameraX's in-flight
+                            // capture-session open then throws an uncaught camera SecurityException
+                            // ("Attempt to use camera from a different process than original client"),
+                            // hard-crashing the app on AR entry.
+                            runCatching { cameraController.unbind() }
+                            arViewModel.setArMode(true, context)
+                            onDispose {
+                                // Fully close the session (not just pause) when leaving AR — e.g. into
+                                // the library to load a project, then back via Trace. A paused-but-open
+                                // session gets resumed on re-entry instead of rebuilt, which on many
+                                // devices comes back as a black/uninitialised camera. exitArMode() tears
+                                // it down so the next AR entry creates a fresh session.
+                                arViewModel.exitArMode()
+                                // Reset in-flight capture state so stale isWaitingForTap doesn't
+                                // block gestures on AR re-entry.
+                                mainViewModel.cancelTapMode()
+                            }
+                        }
+    
+                        // Enter AR with the Target button pre-selected when no target exists yet, so the
+                        // first screen tap (once tracking allows) creates the target without a detour to
+                        // the rail. If a target was already created, stay in normal layer-editing mode.
+                        LaunchedEffect(mainUiState.hasExistingTarget) {
+                            // Only act once the project state is resolved (non-null). `== false` means a
+                            // loaded project with no saved target, so pre-select the Target button.
+                            // Skip if a target was already created this session (survives AR exit/re-entry).
+                            if (mainUiState.hasExistingTarget == false
+                                && !mainUiState.isCapturingTarget
+                                && !mainUiState.targetCapturedThisSession) {
+                                mainViewModel.startTargetCapture()
+                            }
+                        }
+    
+                        // Method-aware layer defaults: on AR entry and whenever the mural method
+                        // changes, the matching representation defaults on and the other two off.
+                        // Keyed on the method, so a user who manually enables another layer keeps it
+                        // until the method changes again.
+    
+                        DisposableEffect(lifecycleOwner, glView) {
+                            if (glView == null) return@DisposableEffect onDispose {}
+    
+                            if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                                glView?.onResume()
+                            }
+    
+                            val observer = LifecycleEventObserver { _, event ->
+                                when (event) {
+                                    Lifecycle.Event.ON_RESUME -> glView?.onResume()
+                                    Lifecycle.Event.ON_PAUSE -> glView?.onPause()
+                                    else -> {}
+                                }
+                            }
+                            lifecycleOwner.lifecycle.addObserver(observer)
+                            onDispose {
+                                lifecycleOwner.lifecycle.removeObserver(observer)
+                            }
+                        }
+    
+                        LaunchedEffect(arUiState.isFlashlightOn, rendererRef.value) {
+                            rendererRef.value?.updateFlashlight(arUiState.isFlashlightOn)
+                        }
+    
+                        // Dead-camera watchdog. On some devices (e.g. Samsung SM-A236U) the camera HAL
+                        // never feeds ARCore — the session opens but no frame ever lands (frame.timestamp
+                        // stays 0). Left alone, ARCore's internal camera pipe keeps thrashing the device
+                        // through ERROR_CAMERA_DEVICE/reopen cycles, which can end in an uncatchable
+                        // teardown crash. If no frame has arrived after the timeout, leave AR: switching
+                        // editorMode off AR disposes this branch, whose onDispose calls exitArMode() for a
+                        // clean teardown. Keyed on the renderer so it (re)starts with each AR session and
+                        // is cancelled the moment we leave AR.
+                        LaunchedEffect(rendererRef.value) {
+                            val r = rendererRef.value ?: return@LaunchedEffect
+                            val startMs = android.os.SystemClock.elapsedRealtime()
+                            while (true) {
+                                kotlinx.coroutines.delay(1000)
+                                // Read via a :feature:ar helper that returns a Long — :app can't access
+                                // ARCore's Frame type (it's an implementation dep of :feature:ar).
+                                val ts = com.hereliesaz.graffitixr.feature.ar.lastArFrameTimestampNs(r)
+                                if (ts > 0L) break // camera is streaming — healthy, stop watching
+                                val elapsed = android.os.SystemClock.elapsedRealtime() - startMs
+                                if (com.hereliesaz.graffitixr.feature.ar.ArCameraHealth.isCameraDead(elapsed, ts)) {
+                                    // Tell AR the HAL never streamed: the next AR entry this process drops
+                                    // to ARCore's safest default camera config (skips the fps-variant swap),
+                                    // a best-effort recovery for budget HALs (e.g. Galaxy A26) that open a
+                                    // config but never feed it.
+                                    arViewModel.onCameraStreamStalled()
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(DesignR.string.camera_stalled_error),
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                    editorViewModel.setEditorMode(EditorMode.DESIGN)
+                                    break
+                                }
+                            }
+                        }
+    
+                        val visibleDesign = uiState.design?.takeIf { it.isVisible && it.bitmap != null }
+    
+                        // Push the AR whole-design adjustment (set via the rail's "Layer" item) to the
+                        // renderer, which applies it as an in-plane move/scale/rotate of the overlay along
+                        // the wall plane. Offsets are stored in world meters (converted at the gesture site).
+                        val arOverlayAdj = uiState.modeAdjustments[EditorMode.AR]
+                        LaunchedEffect(arOverlayAdj, rendererRef.value) {
                             rendererRef.value?.let { r ->
-                                r.ambientScanEnabled = arUiState.ambientScanEnabled
-                                r.captureRequested = arUiState.isCaptureRequested
-                                r.isCapturingTarget = mainUiState.isCapturingTarget
-                                r.isInPlaneRealignment = mainUiState.isInPlaneRealignment
-                                r.hideVisualization = isExporting
-                                r.visitedSectorsMask = arUiState.visitedSectorsMask
-                                r.scanPhase = arUiState.scanPhase
-                                r.doodleLockActive = doodleDetectActive
-                                // Independent in-world perception layers (Settings, default on).
-                                r.showFeaturePoints = uiState.showFeaturePoints
-                                r.showPlaneGrids = uiState.showPlaneGrids
-                                r.showPoints = uiState.showPoints
-                                // Perception throttle: system triggers (OR-ed in the VM) + the lag
-                                // trigger's enable flag (evaluated renderer-side).
-                                r.systemThrottle = arUiState.perceptionSystemThrottle
-                                r.lagThrottleEnabled = arUiState.throttleOnLag
-                                // Adaptive idle rate: policy ceilings from the VM + the live
-                                // interaction flag (so a gesture instantly forces full rate).
-                                r.adaptiveRateEnabled = arUiState.adaptiveRateEnabled
-                                r.idleRateCeilingFps = arUiState.idleRateCeilingFps
-                                r.activeRateCeilingFps = arUiState.activeRateCeilingFps
-                                r.gestureInProgress = uiState.gestureInProgress
+                                r.overlayPanX = arOverlayAdj?.offsetX ?: 0f
+                                r.overlayPanY = arOverlayAdj?.offsetY ?: 0f
+                                r.overlayScale = arOverlayAdj?.scale ?: 1f
+                                // Model stores rotationZ CW+ (Compose/y-down convention). The AR
+                                // renderer rotates around a camera-facing wall-local +Z, which is
+                                // CCW+ under the right-hand rule — negate here so a CW slider drag
+                                // and a CW gesture both rotate the overlay CW on the wall.
+                                r.overlayRotationDeg = -(arOverlayAdj?.rotation ?: 0f)
+                                r.overlayRotationX = arOverlayAdj?.rotationX ?: 0f
+                                r.overlayRotationY = arOverlayAdj?.rotationY ?: 0f
                             }
-                        },
-                        onRelease = { view ->
-                            // The AR view is leaving composition (mode switch / teardown).
-                            // Free GL objects on the GL thread while the context is still
-                            // alive, then run non-GL teardown (cancels the renderer's
-                            // coroutine scope and detaches the session).
-                            rendererRef.value?.let { r ->
-                                r.isDestroying = true
-                                view.queueEvent { r.releaseGlResources() }
-                                r.destroy()
+                        }
+    
+                        // Tone/opacity/invert live on modeAdjustments[AR], not on the renderer, so a
+                        // slider change has to re-composite the wall texture. Include the tone-only
+                        // fields in the key list; the geometric fields (offset/scale/rotation) do NOT
+                        // affect the bitmap contents (the renderer applies them on the quad), so
+                        // omitting them avoids a full re-composite on every pan/zoom gesture.
+                        // remember() keyed on the primitive tone fields so the list + 5 boxes are only
+                        // allocated when a slider actually moves — MainScreen recomposes at tracking
+                        // rate (~15fps), so a per-frame allocation storm here shows up in GC.
+                        val arToneKey = remember(
+                            arOverlayAdj?.brightness, arOverlayAdj?.contrast, arOverlayAdj?.saturation,
+                            arOverlayAdj?.opacity, arOverlayAdj?.isInverted,
+                        ) {
+                            arOverlayAdj?.let {
+                                listOf(it.brightness, it.contrast, it.saturation, it.opacity, it.isInverted)
                             }
-                            rendererRef.value = null
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
+                        }
+                        LaunchedEffect(visibleDesign, arUiState.isAnchorEstablished, arToneKey) {
+                            if (!arUiState.isAnchorEstablished || visibleDesign == null) {
+                                rendererRef.value?.updateOverlayBitmap(null)
+                                return@LaunchedEffect
+                            }
+    
+                            val composite = withContext(Dispatchers.Default) {
+                                compositeDesignForAr(visibleDesign, arOverlayAdj)
+                            }
+                            rendererRef.value?.updateOverlayBitmap(composite)
+                        }
+    
+                        // Split from the effect above, and NOT keyed on the tone: brightness, contrast,
+                        // saturation, opacity and invert are how the artist wants the overlay to LOOK on
+                        // screen, not what the artwork is. Registering the toned composite as the
+                        // validator meant nudging the opacity slider re-ran the detector and re-registered
+                        // the design, which resets painting progress — cheap before Phase 4, when the
+                        // published value was the current frame's ratio and reappeared on the next reloc
+                        // tick, and expensive after it, when progress accumulates over confirmed features
+                        // and has to climb back one feature at a time. A tone slider must not cost the
+                        // artist their progress bar.
+                        //
+                        // Composites a second time rather than sharing the bitmap above, because the two
+                        // now legitimately differ. Only on a layer change, which is rare — the recompose
+                        // storm this file worries about elsewhere is driven by the tone key, and that no
+                        // longer reaches here.
+                        // Auto-fit (see ArViewModel.designFits): applied as an ordinary, undoable AR edit.
+                        LaunchedEffect(Unit) {
+                            arViewModel.designFits.collect { fit ->
+                                editorViewModel.applyArFit(fit.dx, fit.dy, fit.dThetaRad, fit.scale)
+                            }
+                        }
+                        LaunchedEffect(visibleDesign, arUiState.isAnchorEstablished) {
+                            if (!arUiState.isAnchorEstablished || visibleDesign == null) {
+                                return@LaunchedEffect
+                            }
+                            val guide = withContext(Dispatchers.Default) {
+                                compositeDesignForAr(visibleDesign)
+                            }
+                            arViewModel.updatePaintingGuide(guide, visibleDesign.uri?.toString())
+                        }
+    
+                        AndroidView(
+                            factory = { ctx ->
+                                val renderer = ArRenderer(
+                                    context = ctx,
+                                    slamManager = slamManager,
+                                    onTargetCaptured = { bmp, cw, ch, depth, dw, dh, stride, intr, viewMat, rot, tapDist, wallPlane, environment ->
+                                        arViewModel.onTargetCaptured(
+                                            bmp, depth,
+                                            cw, ch,
+                                            dw, dh, stride,
+                                            intr, viewMat, rot, tapDist, wallPlane, environment
+                                        )
+                                    },
+                                    onTrackingUpdated = { isTracking, mappedPoints, isDepthSupported, yaw, distanceMeters, relDir, isHardwareStereo, centerDepth ->
+                                        arViewModel.setTrackingState(
+                                            isTracking, mappedPoints, isDepthSupported, yaw, distanceMeters, relDir,
+                                            isHardwareStereo, centerDepth
+                                        )
+                                    },
+                                    onLightUpdated = { level ->
+                                        arViewModel.updateLightLevel(level)
+                                        slamManager.updateLightLevel(level)
+                                    },
+                                    onDiag = { text ->
+                                        arViewModel.appendDiag(text)
+                                    },
+                                    onAnchorEstablished = {
+                                        arViewModel.onPrimaryAnchorEstablished()
+                                    },
+                                    onPlaneDetected = {
+                                        arViewModel.onFirstPlaneDetected()
+                                    },
+                                    onDoodleLocked = {
+                                        arViewModel.onDoodleLocked()
+                                    },
+                                    onFlashlightUnavailable = {
+                                        arViewModel.onFlashlightUnavailable()
+                                    },
+                                    onDesignFootprintChanged = { footprint ->
+                                        arViewModel.onDesignFootprintChanged(footprint)
+                                    }
+                                )
+                                renderer.hideVisualization = isExporting
+                                rendererRef.value = renderer
+                                arViewModel.attachSessionToRenderer(renderer)
+                                val view = GLSurfaceView(ctx).apply {
+                                    setEGLContextClientVersion(3)
+                                    setZOrderMediaOverlay(true)
+                                    holder.setFormat(PixelFormat.TRANSLUCENT)
+                                    setRenderer(renderer)
+                                    renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                                }
+                                glView = view
+                                view
+                            },
+                            update = { view ->
+                                rendererRef.value?.let { r ->
+                                    r.ambientScanEnabled = arUiState.ambientScanEnabled
+                                    r.captureRequested = arUiState.isCaptureRequested
+                                    r.isCapturingTarget = mainUiState.isCapturingTarget
+                                    r.isInPlaneRealignment = mainUiState.isInPlaneRealignment
+                                    r.hideVisualization = isExporting
+                                    r.visitedSectorsMask = arUiState.visitedSectorsMask
+                                    r.scanPhase = arUiState.scanPhase
+                                    r.doodleLockActive = doodleDetectActive
+                                    // Independent in-world perception layers (Settings, default on).
+                                    r.showFeaturePoints = uiState.showFeaturePoints
+                                    r.showPlaneGrids = uiState.showPlaneGrids
+                                    r.showPoints = uiState.showPoints
+                                    // Perception throttle: system triggers (OR-ed in the VM) + the lag
+                                    // trigger's enable flag (evaluated renderer-side).
+                                    r.systemThrottle = arUiState.perceptionSystemThrottle
+                                    r.lagThrottleEnabled = arUiState.throttleOnLag
+                                    // Adaptive idle rate: policy ceilings from the VM + the live
+                                    // interaction flag (so a gesture instantly forces full rate).
+                                    r.adaptiveRateEnabled = arUiState.adaptiveRateEnabled
+                                    r.idleRateCeilingFps = arUiState.idleRateCeilingFps
+                                    r.activeRateCeilingFps = arUiState.activeRateCeilingFps
+                                    r.gestureInProgress = uiState.gestureInProgress
+                                }
+                            },
+                            onRelease = { view ->
+                                // The AR view is leaving composition (mode switch / teardown).
+                                // Free GL objects on the GL thread while the context is still
+                                // alive, then run non-GL teardown (cancels the renderer's
+                                // coroutine scope and detaches the session).
+                                rendererRef.value?.let { r ->
+                                    r.isDestroying = true
+                                    view.queueEvent { r.releaseGlResources() }
+                                    r.destroy()
+                                }
+                                rendererRef.value = null
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
 
                 EditorMode.OVERLAY -> {
@@ -626,7 +693,8 @@ fun MainScreen(
                                         // wall-up (opposite screen +Y), so x passes through and y
                                         // is negated so the artwork follows the finger.
                                         val adjustedPan = if (uiState.editorMode == EditorMode.AR) {
-                                            val mpp = rendererRef.value?.currentMetersPerPixel ?: 0f
+                                            val mpp = rendererRef.value?.currentMetersPerPixel
+                                                ?: standaloneArUnitsPerPixel
                                             androidx.compose.ui.geometry.Offset(pan.x * mpp, -pan.y * mpp)
                                         } else pan
                                         editorViewModel.onModeTransformGesture(uiState.editorMode, adjustedPan, zoom, turn)

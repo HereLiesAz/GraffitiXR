@@ -90,12 +90,14 @@ jobs:
     # The shipped variant: minify + shrink + proguard keep rules (incl. JNI reflection) and the
     # android.r8.forceDisableFullMode workaround were never exercised by CI, so an R8 break that
     # strips a JNI method would reach users unnoticed. Unsigned here (no keystore needed); this
-    # proves the release variant builds, it does not publish anything.
+    # proves the release variant builds, including the embedded artoolkitX/KPM native path.
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          submodules: recursive
 
       - name: Derive CI versionCode
         # Above every versionCode published from version.properties (14730 at the switch), and

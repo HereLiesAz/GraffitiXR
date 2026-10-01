@@ -61,7 +61,11 @@ data class PlanarMatch(
 }
 
 /**
- * Side-by-side native tracker API. ARCore is not routed through this interface and is not replaced.
+ * Native calibrated planar-tracker API shared by both runtime modes.
+ *
+ * In hybrid mode it produces relocalization observations beside ARCore. In standalone mode its
+ * camera-from-wall result is converted into the primary wall-relative view matrix. ARCore itself is
+ * never routed through this interface.
  */
 interface SphereSlamEngine : AutoCloseable {
     val frameWidth: Int

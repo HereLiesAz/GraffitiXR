@@ -3,9 +3,11 @@ package com.hereliesaz.sphereslam
 import com.hereliesaz.graffitixr.nativebridge.KpmBridge
 
 /**
- * Public entry point for the native SphereSLAM sibling path.
+ * Public entry point for GraffitiXR's native SphereSLAM/KPM path.
  *
- * ARCore remains owned by feature/ar and continues to operate independently.
+ * On ARCore-capable devices this is a sibling relocalizer beside ARCore. On devices where ARCore
+ * cannot run, the same native KPM engine is used by the CameraX standalone wall-tracking path.
+ * ARCore remains owned by feature/ar and is never routed through this API.
  */
 object SphereSlam {
     fun isAvailable(): Boolean = KpmBridge.isAvailable()

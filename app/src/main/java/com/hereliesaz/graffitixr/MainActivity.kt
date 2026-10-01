@@ -89,7 +89,6 @@ import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorPanel
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.ModeAdjustment
-import com.hereliesaz.graffitixr.onboarding.ArUnavailableOverlay
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.hereliesaz.graffitixr.common.security.SecurityProviderState
@@ -637,21 +636,8 @@ class MainActivity : ComponentActivity() {
                     arViewModel.setCameraPermission(hasCameraPermission)
                 }
 
-                // If a project (or restored state) puts the user in AR mode on a
-                // device where ARCore is unsupported, route them to OVERLAY —
-                // the closest non-AR experience, since both render artwork on
-                // top of the live camera feed.
-                LaunchedEffect(arUiState.isArCoreAvailabilityResolved, arUiState.isArCoreAvailable, currentRoute) {
-                    if (arUiState.isArCoreAvailabilityResolved &&
-                        !arUiState.isArCoreAvailable &&
-                        currentRoute == EditorMode.AR.name
-                    ) {
-                        navController.navigate(EditorMode.OVERLAY.name) {
-                            popUpTo(EditorMode.AR.name) { inclusive = true }
-                            launchSingleTop = true
-                        }
-                    }
-                }
+                // ARCore is optional. A restored AR route stays in AR mode; MainScreen selects the
+                // CameraX + SphereSLAM standalone backend when ARCore is unavailable.
 
                 LaunchedEffect(arViewModel, editorViewModel) {
                     // Also flushes, in order, any spectator ops that arrived before this effect ran.
@@ -1006,29 +992,9 @@ class MainActivity : ComponentActivity() {
                         // ConfigureGuidance) is rendered automatically by AzHostActivityLayout; nothing
                         // needs to be mounted here.
 
-                        // First-launch explainer for devices where ARCore is
-                        // unavailable. Modal-gated identically to the per-mode
-                        // onboarding above, and dismissed-once via the same
-                        // completedTutorials DataStore set (collected above).
-                        val arExplainerKey = "ar_unavailable_explainer"
-                        var arExplainerDismissedThisSession by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-                        val arUnavailableLines = remember {
-                            context.resources.getStringArray(DesignR.array.onboarding_ar_unavailable).toList()
-                        }
-                        if (!anyModalActive &&
-                            arUiState.isArCoreAvailabilityResolved &&
-                            !arUiState.isArCoreAvailable &&
-                            arExplainerKey !in completedTutorials &&
-                            !arExplainerDismissedThisSession
-                        ) {
-                            ArUnavailableOverlay(
-                                lines = arUnavailableLines,
-                                onDismiss = {
-                                    arExplainerDismissedThisSession = true
-                                    mainViewModel.markTutorialCompletePersistent(arExplainerKey)
-                                }
-                            )
-                        }
+                        // ARCore absence is no longer an "AR unavailable" condition. The standalone
+                        // SphereSLAM target-capture UI appears inside AR mode instead, so the old
+                        // unavailable explainer must not tell these users that AR cannot run.
 
                         // First-run photo explainer: shown once, before the OS photo picker ever
                         // appears, so a brand-new user isn't ambushed by an unexplained system dialog.
@@ -2009,7 +1975,9 @@ class MainActivity : ComponentActivity() {
             // navigates into it via `route`; the mode's TOOLS are registered only while it is active,
             // and expandWhen opens the folder on entry so those tools are reachable. Each mode's
             // expansion is persisted per-host via onExpandedChange, matching the Design folder above.
-            val showArModeEntry = !arUiState.isArCoreAvailabilityResolved || arUiState.isArCoreAvailable
+            // ARCore is no longer the reachability gate: unsupported devices use the standalone
+            // CameraX + SphereSLAM wall tracker.
+            val showArModeEntry = true
             if (showArModeEntry) {
                 // AR navigates to AR mode and contains its tools.
                 azRailHostItem(
@@ -2034,7 +2002,7 @@ class MainActivity : ComponentActivity() {
                         color = navItemColor,
                         classifiers = setOf("toggle"),
                         shape = AzButtonShape.NONE,
-                        disabled = showLibrary,
+                        disabled = showLibrary || !arUiState.isArCoreAvailable,
                         onClick = {
                             if (isWaitingForTap) {
                                 mainViewModel.cancelTapMode()

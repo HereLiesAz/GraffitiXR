@@ -94,6 +94,19 @@ data class GraffitiProject(
     val thumbnailUri: Uri? = null,
 
     val targetImageUris: List<@Serializable(with = UriSerializer::class) Uri> = emptyList(),
+
+    /**
+     * Rectified wall reference used by the ARCore-independent SphereSLAM/KPM tracker.
+     *
+     * Kept separate from [targetImageUris]: this is the canonical page that must be restored on a
+     * later visit, not capture-history UI. The width may be a real measurement or a normalized
+     * renderer unit; [sphereSlamReferencePhysicallyMetric] tells consumers which.
+     */
+    @Serializable(with = UriSerializer::class)
+    val sphereSlamReferenceUri: Uri? = null,
+    val sphereSlamReferenceWidthMeters: Float = 1f,
+    val sphereSlamReferencePhysicallyMetric: Boolean = false,
+
     val refinementPaths: List<RefinementPath> = emptyList(),
 
     // Legacy visual state grouped to fix binary compatibility issues with large data classes.

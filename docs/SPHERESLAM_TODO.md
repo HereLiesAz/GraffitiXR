@@ -1,0 +1,754 @@
+# SphereSLAM Implementation TODO
+
+Status: active implementation plan for `feat/sphereslam-parallel-arcore`.
+
+Checkpoint used to write this list: `c8756d5f63d3f6c5bf98bae9b17c393a784d3cd8`.
+
+This is the authoritative remaining-work list for GraffitiXR's SphereSLAM integration. It covers both:
+
+- **Hybrid mode** — ARCore remains the primary continuous pose source; SphereSLAM/KPM is an explicit
+  wall-recognition / relocalization / correction input.
+- **Standalone mode** — on devices where ARCore cannot run, CameraX + SphereSLAM/KPM provide the
+  wall-relative AR path without constructing an ARCore `Session`.
+
+The list is intentionally granular. An unchecked box should correspond to one reviewable code,
+test, device-validation, or product-decision unit rather than a broad theme.
+
+## Status legend
+
+- [x] implemented on the current branch;
+- [ ] implementation or validation still required;
+- **BLOCKED BY:** prerequisite that must land first;
+- **ACCEPTANCE:** observable condition required before the item is considered done.
+
+---
+
+## 0. Preserve the architecture
+
+These are invariants, not optional cleanup.
+
+- [x] Keep ARCore as the primary continuous tracker on ARCore-capable devices.
+- [x] Keep ARCore optional at the product/install level.
+- [x] Keep AR mode reachable when ARCore is unsupported.
+- [x] Route unsupported devices to CameraX + standalone SphereSLAM instead of redirecting to Overlay.
+- [x] Keep hybrid KPM matching off the ARCore GL/render thread.
+- [x] Keep standalone KPM matching off the Compose/Main thread.
+- [x] Never silently replace ARCore view/projection matrices with a KPM observation in hybrid mode.
+- [x] Treat long standalone visual loss as LOST/REACQUIRING instead of freezing the last pose.
+- [x] Do not integrate phone accelerometer translation as fake dead reckoning.
+- [ ] Add an automated architecture test that fails if non-ARCore AR mode is hidden again.
+- [ ] Add an automated architecture test that fails if the standalone branch constructs an ARCore
+  `Session`.
+- [ ] Add an automated architecture test that fails if hybrid SphereSLAM writes directly into the
+  primary renderer pose without going through the explicit fusion seam.
+
+---
+
+## 1. Build and branch verification
+
+This must happen before treating the branch as merge-ready.
+
+- [ ] Rebase/merge the one automatic version-bump commit currently ahead on `main`.
+- [ ] Resolve any resulting source/doc conflicts without changing the dual-backend architecture.
+- [ ] Run `:sphereslam:test`.
+- [ ] Run `:feature:ar:testDebugUnitTest` or the repository's actual equivalent unit-test task.
+- [ ] Run the app module's JVM/unit tests.
+- [ ] Run the repository's native locking/static checks that cover `MobileGS` / JNI.
+- [ ] Compile the native `:core:nativebridge` target for every release ABI.
+- [ ] Build at least one debug APK containing artoolkitX KPM.
+- [ ] Build the normal release artifact(s).
+- [ ] Inspect the merged manifest and confirm:
+  - [ ] `android.hardware.camera.ar` remains `required="false"`;
+  - [ ] `com.google.ar.core` remains optional;
+  - [ ] no new required hardware feature excludes non-ARCore devices.
+- [ ] Confirm ProGuard/R8 does not strip the KPM JNI entry points or standalone classes.
+- [ ] Confirm no duplicate native symbol/source issue was introduced by the explicit artoolkitX AR
+  source list.
+- [ ] Add/enable CI for this branch/PR so the above checks are not dependent on a local machine.
+
+**ACCEPTANCE:** branch compiles, tests run, native libraries package for supported ABIs, and the
+merged manifest still permits installation on non-ARCore hardware.
+
+---
+
+## 2. Standalone camera/calibration correctness
+
+Implemented foundation:
+
+- [x] CameraX owns the camera when ARCore is unavailable.
+- [x] CameraX Y-plane row stride is honored.
+- [x] CameraX Y-plane pixel stride is honored.
+- [x] 0/90/180/270 display rotation is applied to luminance.
+- [x] Camera2 intrinsics are rotated through the same transform as the pixels.
+- [x] KPM receives tightly packed direct luminance.
+- [x] KPM runtime session uses calibrated `ARParamLT`.
+- [x] KPM camera-from-page 3x4 is converted using artoolkitX's RH OpenGL convention.
+- [x] KPM page origin is shifted from lower-left to the centered renderer frame.
+- [x] KPM millimetres are converted to renderer units.
+- [x] Unit tests cover luma packing/quarter-turn rotation.
+- [x] Unit tests cover KPM→OpenGL sign/layout conversion.
+- [x] Unit tests cover page centering and page scale math.
+
+Remaining:
+
+- [ ] Validate Camera2 estimated intrinsics against real CameraX output sizes on at least:
+  - [ ] 4:3 sensor → portrait display;
+  - [ ] 4:3 sensor → landscape display;
+  - [ ] 16:9/other cropped CameraX stream;
+  - [ ] front camera if the app ever allows it; otherwise explicitly lock standalone AR to back camera.
+- [ ] Verify CameraX crop/zoom does not invalidate the intrinsics used by KPM.
+- [ ] If CameraX applies a crop region, incorporate that crop into `fx/fy/cx/cy`.
+- [ ] Verify lens distortion is acceptable with the current zero-distortion KPM camera model.
+- [ ] If not, populate artoolkitX distortion parameters from Camera2 calibration metadata or undistort
+  frames before KPM.
+- [ ] Add a diagnostic line exposing standalone frame width/height, rotation, fx/fy/cx/cy, and
+  camera ID for field bug reports.
+- [ ] Test display rotation while tracking; ensure session rebuild/recalibration happens if required.
+- [ ] Test device auto-rotate disabled and confirm image/intrinsic orientation remains internally
+  consistent.
+
+**ACCEPTANCE:** a known planar target stays registered through all supported device orientations
+without a systematic mirrored, rotated, cropped, or scale-shifted pose.
+
+---
+
+## 3. Standalone physical scale
+
+Current behavior is deliberately normalized, not physically metric.
+
+- [x] KPM page DPI can be derived from an explicit reference width.
+- [x] The persisted reference records whether its width is physically metric.
+- [x] Non-metric standalone mode does not claim a real physical measurement in the implementation
+  contract.
+
+Remaining:
+
+- [ ] Choose the first physical-scale input supported in UI:
+  - [ ] measured target width entered by the user; **recommended first implementation**;
+  - [ ] two-point wall measurement;
+  - [ ] hardware depth where available without ARCore;
+  - [ ] another independently verifiable source.
+- [ ] Add the chosen scale field(s) to project data with backward-compatible defaults.
+- [ ] Add UI for entering/capturing the scale.
+- [ ] Validate scale bounds and reject zero/negative/implausible values.
+- [ ] Pass real width to `SphereSlamStandaloneSession.addReference`.
+- [ ] Persist `sphereSlamReferencePhysicallyMetric=true` only after successful scale acquisition.
+- [ ] Update standalone distance/measurement UI so it is enabled only for physically metric targets.
+- [ ] Add unit tests proving the same pixel reference yields correct KPM DPI for several physical
+  widths.
+- [ ] Add an on-device ruler/tape-measure validation at multiple camera distances.
+
+**ACCEPTANCE:** camera translation and rendered design dimensions agree with a physical measurement
+within an explicitly documented tolerance.
+
+---
+
+## 4. Standalone target-capture workflow parity
+
+Implemented:
+
+- [x] Capture a wall target from CameraX.
+- [x] Four-corner perspective unwarp.
+- [x] Build KPM page from the rectified image.
+- [x] Recapture replaces the active standalone page.
+- [x] Canonical standalone page persists in the project.
+- [x] Reopen rebuilds the KPM atlas from the persisted page.
+- [x] Import relocates the persisted page URI to the imported project directory.
+
+Remaining:
+
+- [ ] Integrate standalone target capture into the normal AR target workflow/state machine instead of
+  maintaining a separate minimal capture UI.
+- [ ] Reuse the same capture/review language and error states where the concepts are equivalent.
+- [ ] Define what standalone does for ARCore-only target steps:
+  - [ ] plane hit test;
+  - [ ] depth sample;
+  - [ ] ARCore anchor creation;
+  - [ ] point cloud/plane coaching.
+- [ ] Hide or replace only the truly unavailable steps, not the entire workflow.
+- [ ] Add target-quality checks before accepting a KPM page:
+  - [ ] minimum image dimensions;
+  - [ ] minimum detected KPM feature count;
+  - [ ] texture/contrast threshold;
+  - [ ] blur threshold;
+  - [ ] excessive over/under-exposure warning.
+- [ ] Provide a useful user-facing reason when page registration yields too few features.
+- [ ] Preserve the previous valid target if a replacement capture fails.
+- [ ] Confirm recapture atomically replaces persisted standalone target metadata and image.
+- [ ] Delete/garbage-collect superseded standalone reference files if filenames ever become
+  versioned rather than canonical.
+- [ ] Add tests for project save/load/import with and without standalone target metadata.
+- [ ] Add process-death restoration test.
+
+**ACCEPTANCE:** an artist can create, review, save, reopen, replace, export, import, and reacquire a
+standalone wall target without touching an ARCore-specific UI dead end.
+
+---
+
+## 5. Standalone pose continuity and loss handling
+
+Implemented:
+
+- [x] KPM provides wall-relative 6-DoF while the page is visible.
+- [x] Fused game-rotation sensor bridges short KPM misses.
+- [x] IMU bridge is rotation-only.
+- [x] IMU bridge rotates view translation consistently with the held camera center.
+- [x] Bridge expires after 400 ms.
+- [x] Expired visual loss clears the rendered pose.
+
+Remaining:
+
+- [ ] Measure actual KPM cadence/latency on target devices.
+- [ ] Record KPM observation age in standalone diagnostics.
+- [ ] Gate stale KPM matches by timestamp, not just callback order.
+- [ ] Add configurable minimum inlier count for standalone acceptance.
+- [ ] Add configurable maximum reprojection error for standalone acceptance.
+- [ ] Add pose-jump rejection:
+  - [ ] maximum angular jump per frame;
+  - [ ] maximum translation jump per frame;
+  - [ ] separate relaxed thresholds during explicit reacquisition.
+- [ ] Add hysteresis so a single weak frame does not flap LOCKED↔LOST.
+- [ ] Define and expose standalone tracking states:
+  - [ ] INITIALIZING;
+  - [ ] LOCKED;
+  - [ ] IMU_BRIDGE;
+  - [ ] REACQUIRING;
+  - [ ] LOST;
+  - [ ] FATAL/UNAVAILABLE.
+- [ ] Feed those states into the existing AR HUD/diagnostics where possible.
+- [ ] Evaluate whether KPM-only continuous wall tracking is sufficiently smooth for the intended
+  wall-painting use case.
+- [ ] If not, add a true frame-to-frame visual/inertial tracker behind the same standalone pose
+  interface rather than extending IMU bridge duration.
+- [ ] If a continuous tracker is added:
+  - [ ] timestamp-align camera frames and IMU samples;
+  - [ ] define initialization/reset behavior;
+  - [ ] define KPM relocalization correction into that tracker;
+  - [ ] keep KPM page recognition independent of frame-to-frame VIO state.
+
+**ACCEPTANCE:** normal hand motion is smooth, short occlusions recover without a visible snap, long
+occlusions never present stale placement as live tracking, and reacquisition is deterministic.
+
+---
+
+## 6. Standalone artwork rendering/control parity
+
+Implemented:
+
+- [x] Transparent GL overlay above CameraX preview.
+- [x] Persisted AR `ModeAdjustment` is used in standalone mode.
+- [x] Brightness is applied.
+- [x] Contrast is applied.
+- [x] Saturation is applied.
+- [x] Opacity is applied.
+- [x] Invert is applied.
+- [x] Pan is applied in wall units.
+- [x] Scale is applied.
+- [x] In-plane Z rotation is applied with screen↔GL sign conversion.
+- [x] X perspective rotation is applied.
+- [x] Y perspective rotation is applied.
+- [x] Gesture drag gets standalone wall-units-per-pixel instead of ARCore-only metres-per-pixel.
+- [x] Artwork is aspect-fit inside the standalone reference page before user transforms.
+
+Remaining:
+
+- [ ] Verify every rail/control available in AR mode either:
+  - [ ] works on both backends; or
+  - [ ] is explicitly disabled with a backend-specific reason.
+- [ ] Verify transform lock prevents standalone pan/scale/rotate exactly as it does in ARCore mode.
+- [ ] Verify undo/redo behavior for standalone mode adjustments.
+- [ ] Verify design visibility toggling clears the standalone GL texture rather than leaving the last
+  texture resident/visible.
+- [ ] Verify replacing/removing the design updates the standalone GL texture immediately.
+- [ ] Verify design aspect changes recalculate base extent without resetting user adjustment.
+- [ ] Confirm touch/gesture coordinates still line up when CameraX preview is letterboxed/cropped.
+- [ ] Add GL/instrumentation tests for standalone texture clear/replace if test infrastructure permits.
+- [ ] Test extreme but allowed pan/scale/rotation values for NaN/overflow/clipping behavior.
+
+**ACCEPTANCE:** the same project adjustment produces the same intended artwork placement and visual
+treatment on ARCore and standalone backends, modulo explicitly documented backend capabilities.
+
+---
+
+## 7. Standalone project/data lifecycle
+
+Implemented:
+
+- [x] `sphereSlamReferenceUri` project field.
+- [x] persisted reference width.
+- [x] persisted physical-metric flag.
+- [x] routine saves preserve standalone reference metadata.
+- [x] canonical reference PNG is stored inside the project directory.
+- [x] `.gxr` export naturally includes the reference image.
+- [x] import relocates the reference URI.
+
+Remaining:
+
+- [ ] Add migration tests for projects created before the standalone fields existed.
+- [ ] Add migration tests for malformed/missing `sphereslam_reference.png`.
+- [ ] On missing/corrupt reference, clear only standalone target state and preserve the rest of the
+  project.
+- [ ] Verify duplicate/imported project IDs do not point at another project's reference file.
+- [ ] Verify project deletion removes the standalone reference.
+- [ ] Verify project copy/duplicate flows, if any, copy and rebase the standalone reference.
+- [ ] Verify co-op bulk project transfer includes and rebases the standalone reference.
+- [ ] Decide whether co-op peers need the raw reference PNG, a serialized KPM atlas, or both.
+- [ ] Do not persist raw native KPM handles.
+- [ ] If a serialized KPM dataset is later persisted:
+  - [ ] version its format;
+  - [ ] store the source image/calibration alongside it for rebuild;
+  - [ ] invalidate it when camera/page calibration assumptions change.
+
+**ACCEPTANCE:** no save/import/export/delete/peer-transfer operation can silently orphan or point a
+project at the wrong standalone wall page.
+
+---
+
+## 8. MobileGS / fingerprint integration in standalone mode
+
+This is the highest-risk remaining integration because coordinate frames must not be mixed.
+
+Current rule:
+
+- [x] Do **not** feed standalone CameraX frames into MobileGS and pretend an ARCore-world fingerprint
+  and a KPM-page pose share a coordinate frame.
+
+Required work:
+
+- [ ] Define the standalone fingerprint coordinate frame.
+  - [ ] Recommended: centered SphereSLAM page frame, with physical scale when known.
+- [ ] Define an explicit transform between:
+  - [ ] KPM page frame;
+  - [ ] standalone renderer wall frame;
+  - [ ] MobileGS fingerprint frame.
+- [ ] Unit-test that transform with known synthetic poses.
+- [ ] Decide how standalone creates the first MobileGS fingerprint:
+  - [ ] generate 3D points directly on the KPM page plane; or
+  - [ ] adapt `MetricFingerprintBuilder` to accept the standalone wall frame.
+- [ ] Ensure descriptor pixels and 3D points are generated from the same display-oriented image.
+- [ ] Set MobileGS live intrinsics from the standalone display-oriented CameraX calibration.
+- [ ] Feed CameraX YUV/color frames to MobileGS only after the frame contract above is satisfied.
+- [ ] Feed standalone camera view/projection to `slamManager.updateCamera` only after its world/frame
+  semantics match what MobileGS expects.
+- [ ] Rename or generalize `setArCoreTrackingState` before using it for standalone tracking health;
+  do not lie to native code by setting an "ARCore" flag when ARCore does not exist.
+- [ ] Audit every native branch conditioned on `mIsArCoreTracking` and decide the standalone
+  equivalent explicitly.
+- [ ] Restore existing saved ARCore fingerprints safely on standalone devices:
+  - [ ] either provide a validated frame conversion; or
+  - [ ] mark them ARCore-frame-only and require a standalone target/fingerprint conversion step.
+- [ ] Define behavior for projects that contain both ARCore fingerprint data and a standalone page.
+- [ ] Feed paint-progress/distortion-head/corroboration only after coordinate alignment is proven.
+- [ ] Verify self-grow adds points in the standalone fingerprint frame.
+- [ ] Verify saved wall feature maps preserve that frame across process restarts.
+- [ ] Add diagnostics identifying fingerprint frame/version/backend.
+
+**ACCEPTANCE:** MobileGS can consume standalone frames without any implicit ARCore-world assumption,
+and return-visit / paint-progress results agree spatially with the KPM wall pose.
+
+---
+
+## 9. Standalone wall-map growth beyond one page
+
+Current implementation rebuilds one canonical KPM page.
+
+- [ ] Define when an additional page should be captured:
+  - [ ] minimum baseline from existing pages;
+  - [ ] sufficient KPM/feature quality;
+  - [ ] sufficient overlap for frame registration;
+  - [ ] not while tracking confidence is low.
+- [ ] Assign stable page IDs.
+- [ ] Store page-to-canonical-wall transforms.
+- [ ] Add pages without resetting the canonical wall frame.
+- [ ] Match against the atlas and report which page produced the pose.
+- [ ] Convert every matched page pose back into the same canonical wall frame.
+- [ ] Cap page count / memory usage.
+- [ ] Define page eviction/compaction policy.
+- [ ] Persist page images or a rebuildable page dataset.
+- [ ] Restore page atlas on project reopen.
+- [ ] Include atlas assets in export/import.
+- [ ] Add corruption/version handling.
+- [ ] Test moving far enough that the original page exits view while a grown page remains visible.
+- [ ] Test returning from a grown page to the original page without a coordinate jump.
+- [ ] Test loop consistency across three or more overlapping pages.
+
+**ACCEPTANCE:** an artist can move across a wall larger than the original target while the artwork
+remains in one stable wall coordinate frame.
+
+---
+
+## 10. Hybrid SphereSLAM → ARCore fusion
+
+Hybrid observation production exists; correction does not.
+
+Already available:
+
+- [x] asynchronous hybrid KPM matcher;
+- [x] calibrated KPM session;
+- [x] KPM observation timestamp;
+- [x] page ID;
+- [x] reprojection error;
+- [x] inlier count;
+- [x] ARCore remains primary pose source.
+
+Required work:
+
+- [ ] Seed hybrid KPM page with a physically correct scale rather than the adapter's legacy 72-DPI
+  default.
+- [ ] Reuse the tested KPM→OpenGL conversion in the hybrid path.
+- [ ] Define the transform from KPM page frame to the ARCore anchor/world frame at capture time.
+- [ ] Persist that capture-time page↔ARCore relation.
+- [ ] Maintain short ARCore pose history keyed by frame timestamp.
+- [ ] Pair each KPM observation with the corresponding/interpolated ARCore pose.
+- [ ] Reject KPM observations older than the allowed fusion age.
+- [ ] Define confidence gates:
+  - [ ] minimum inliers;
+  - [ ] maximum reprojection error;
+  - [ ] maximum correction translation;
+  - [ ] maximum correction angle;
+  - [ ] repeated-observation agreement requirement.
+- [ ] Add a formal SphereSLAM correction observation type.
+- [ ] Feed accepted corrections into `PoseFusion`, not directly into renderer matrices.
+- [ ] Define correction strength/smoothing.
+- [ ] Ensure a rejected/failed KPM observation leaves ARCore behavior unchanged.
+- [ ] Add fusion diagnostics: accepted/rejected reason, age, inliers, error, delta angle/translation.
+- [ ] Unit-test known page/ARCore transforms and correction deltas.
+- [ ] On-device test forced ARCore drift/relocalization with KPM visible.
+- [ ] Verify no visible jump when KPM and ARCore already agree.
+- [ ] Verify stale/wrong-wall KPM cannot drag the anchor away.
+
+**ACCEPTANCE:** SphereSLAM can improve/recover wall registration in hybrid mode through
+`PoseFusion` while ARCore remains the continuous backbone and KPM failure is harmless.
+
+---
+
+## 11. ARCore-only feature audit and standalone equivalents
+
+Every AR feature needs a deliberate answer.
+
+### Plane / hit-test behavior
+
+- [ ] Inventory every `Frame.hitTest` / ARCore plane consumer.
+- [ ] For wall placement, replace required hit tests with ray→standalone-wall-plane intersection.
+- [ ] Define behavior when the standalone wall is not locked.
+- [ ] Test taps near page boundaries and outside the reference image.
+
+### Depth
+
+- [ ] Inventory every ARCore Depth API consumer.
+- [ ] Categorize each as:
+  - [ ] required for core wall placement;
+  - [ ] optional enhancement;
+  - [ ] diagnostics only.
+- [ ] Provide Camera2/depth-sensor alternative where realistically available.
+- [ ] Otherwise disable the feature honestly in standalone mode.
+- [ ] Never fabricate a depth value from normalized KPM scale.
+
+### Anchors
+
+- [ ] Replace `com.google.ar.core.Anchor` dependencies required by core placement with a backend-
+  neutral wall/anchor transform.
+- [ ] Add standalone anchor generation/version to state.
+- [ ] Ensure recapture invalidates the old standalone anchor generation.
+- [ ] Ensure design placement is persisted relative to the correct backend-neutral wall frame.
+
+### Cloud anchors
+
+- [ ] Decide whether cloud anchors are:
+  - [ ] unavailable in standalone mode; or
+  - [ ] replaced by project/fingerprint/KPM sharing.
+- [ ] Disable cloud-anchor UI when no valid equivalent exists.
+- [ ] Ensure disabling it does not disable local/co-op wall sharing that can work without ARCore.
+
+### Point clouds / perception debug
+
+- [ ] Decide what standalone perception/debug view displays.
+- [ ] Do not show empty ARCore point/plane layers as if the tracker failed.
+- [ ] Expose KPM keypoints/inliers/page boundary if useful for diagnostics.
+
+**ACCEPTANCE:** no AR-mode button or background code path on a non-ARCore device reaches an
+ARCore-only API without an explicit capability guard/equivalent.
+
+---
+
+## 12. Co-op / multi-device standalone behavior
+
+- [ ] Define the coordinate object shared by a standalone host.
+- [ ] Include standalone reference image/scale/frame metadata in the initial project snapshot.
+- [ ] Define standalone-host → ARCore-guest calibration.
+- [ ] Define ARCore-host → standalone-guest calibration.
+- [ ] Define standalone-host → standalone-guest calibration.
+- [ ] Reuse Procrustes/other existing calibration only after input frames are explicitly defined.
+- [ ] Reject peer calibration when either side lacks a physically meaningful scale and the operation
+  requires metric alignment.
+- [ ] Decide whether normalized-scale standalone peers can still share a wall by page-relative
+  correspondence.
+- [ ] Add protocol versioning if new calibration payload fields are required.
+- [ ] Maintain backward compatibility or produce a clear incompatible-peer error.
+- [ ] Test reconnect/resync with standalone project assets.
+
+**ACCEPTANCE:** co-op never silently combines coordinates from different backends/scales as though
+they were the same frame.
+
+---
+
+## 13. Performance / thermal / memory
+
+- [ ] Measure standalone KPM matching time at representative CameraX resolutions.
+- [ ] Measure UI/preview FPS with KPM active.
+- [ ] Measure native heap and Java heap while tracking.
+- [ ] Confirm direct frame buffers are reused rather than allocated each frame.
+- [ ] Confirm pending work cannot queue unboundedly.
+- [ ] Add adaptive standalone analysis cadence if KPM exceeds the frame budget.
+- [ ] Preserve low latency over maximum throughput: drop stale frames instead of queueing them.
+- [ ] Measure battery/thermal behavior over a realistic mural session.
+- [ ] Verify background/pause stops CameraX analysis and IMU sampling.
+- [ ] Verify resume recreates/calibrates the standalone session cleanly.
+- [ ] Verify repeated AR enter/exit does not leak KPM sessions, executors, GL textures, or sensors.
+- [ ] Measure atlas memory before enabling multi-page growth.
+- [ ] Set explicit atlas/page limits from measurements.
+
+**ACCEPTANCE:** a sustained standalone session remains responsive and bounded in latency, memory,
+thread count, and temperature.
+
+---
+
+## 14. Failure handling and user-facing diagnostics
+
+- [x] Fatal KPM/native failure produces a standalone error instead of crashing.
+- [x] Tracking loss exposes reacquisition state.
+- [x] User can recapture the target from standalone UI.
+
+Remaining:
+
+- [ ] Distinguish:
+  - [ ] native library unavailable;
+  - [ ] camera unavailable;
+  - [ ] intrinsics unavailable;
+  - [ ] reference too weak;
+  - [ ] no current page match;
+  - [ ] stale observation;
+  - [ ] excessive reprojection error;
+  - [ ] insufficient inliers;
+  - [ ] persisted target missing/corrupt.
+- [ ] Surface concise artist-facing messages for recoverable failures.
+- [ ] Keep detailed numeric reasons in diagnostics/logs.
+- [ ] Add one-copy diagnostic dump that includes backend, camera calibration, KPM state, page ID,
+  inliers, reprojection error, observation age, and physical-scale status.
+- [ ] Verify permission revocation while standalone AR is open.
+- [ ] Verify camera interruption by another app.
+- [ ] Verify app background/foreground during LOCKED, IMU_BRIDGE, and REACQUIRING states.
+- [ ] Verify process death during target persistence cannot leave a truncated/half-installed
+  canonical target.
+- [ ] Verify a missing native KPM build degrades with a clear unsupported-build message, not an
+  infinite spinner.
+
+---
+
+## 15. Automated test backlog
+
+Already added:
+
+- [x] KPM page scale math.
+- [x] KPM→OpenGL pose conversion.
+- [x] centered page transform.
+- [x] standalone session fake-engine test.
+- [x] luma stride packing.
+- [x] luma 90/180/270 rotation.
+- [x] IMU-held view/translation rotation.
+- [x] asynchronous hybrid tracker packing/publication tests.
+- [x] tracking-mode selector tests already present on the branch.
+
+Still required:
+
+### JVM/pure math
+
+- [ ] standalone acceptance-gate tests for inliers/error/age;
+- [ ] pose-jump gate tests;
+- [ ] tracking-state hysteresis tests;
+- [ ] standalone page↔MobileGS frame conversion tests;
+- [ ] hybrid page↔ARCore frame conversion tests;
+- [ ] timestamp pairing/interpolation tests;
+- [ ] physical-scale migration tests;
+- [ ] multi-page canonical-frame conversion tests.
+
+### Android/Robolectric/instrumented
+
+- [ ] Camera2 crop/intrinsic test;
+- [ ] CameraX camera-ID acquisition test;
+- [ ] target persistence/readback test;
+- [ ] project import URI relocation test;
+- [ ] process recreation test;
+- [ ] GL texture clear/replace test;
+- [ ] lifecycle analyzer/IMU teardown test;
+- [ ] backend routing test on ARCore-unavailable environment.
+
+### Native
+
+- [ ] KPM JNI smoke test on packaged APK;
+- [ ] KPM add-page/match known-image integration test;
+- [ ] native buffer-size guard tests;
+- [ ] MobileGS standalone-frame integration tests after frame conversion exists;
+- [ ] native thread/teardown race test.
+
+If the repo still lacks the required Android/native test infrastructure, create that infrastructure
+as its own reviewable change rather than marking these tests impossible.
+
+---
+
+## 16. Real-device validation matrix
+
+At minimum test:
+
+### ARCore-capable
+
+- [ ] one modern Pixel/Google reference-class device;
+- [ ] one Samsung device;
+- [ ] portrait;
+- [ ] landscape;
+- [ ] target capture;
+- [ ] KPM sidecar seeded;
+- [ ] normal ARCore placement unchanged;
+- [ ] forced KPM failure leaves ARCore healthy;
+- [ ] forced ARCore relocalization while KPM sees the target.
+
+### ARCore-unsupported
+
+- [ ] at least one real API-26+ device that cannot run ARCore;
+- [ ] fresh project capture;
+- [ ] saved-project reopen;
+- [ ] export/import;
+- [ ] target reacquisition;
+- [ ] walk toward wall;
+- [ ] walk away from wall;
+- [ ] lateral motion;
+- [ ] moderate oblique view;
+- [ ] brief occlusion (<400 ms);
+- [ ] long occlusion (>400 ms);
+- [ ] target exits and re-enters frame;
+- [ ] device rotation;
+- [ ] app background/foreground;
+- [ ] process kill/relaunch;
+- [ ] pan/scale/Z rotation;
+- [ ] X/Y perspective rotation;
+- [ ] tone/opacity/invert;
+- [ ] flashlight;
+- [ ] permission revoke/restore;
+- [ ] low light;
+- [ ] repetitive/weak-texture wall;
+- [ ] high-detail wall.
+
+### Cross-version/project
+
+- [ ] project created before SphereSLAM fields;
+- [ ] project created on ARCore device opened on standalone device;
+- [ ] standalone project opened on ARCore device;
+- [ ] project round-tripped through `.gxr`;
+- [ ] co-op transfer once standalone payload support lands.
+
+For every device run, record:
+
+- app version/commit;
+- device/model/API;
+- camera ID/resolution;
+- fx/fy/cx/cy;
+- backend selected;
+- physical-scale status;
+- KPM inliers/error;
+- lock/recovery behavior;
+- any visible registration error.
+
+---
+
+## 17. Documentation cleanup
+
+- [x] architecture document describes dual backend.
+- [x] release checklist now expects AR mode on non-ARCore devices.
+- [x] project data docs mention `sphereslam_reference.png`.
+- [x] KPM public API comments describe hybrid + standalone roles.
+
+Remaining:
+
+- [ ] Update every stale comment that calls CameraX/homography the only "ARCore fallback".
+- [ ] Update `file_descriptions.md` with standalone classes and ownership.
+- [ ] Update `FEATURE_REFERENCE.md` with backend capability differences.
+- [ ] Update `SLAM_SETUP.md` with standalone CameraX/KPM data flow.
+- [ ] Update `NATIVE_ENGINE.md` once MobileGS standalone frame semantics are implemented.
+- [ ] Document physical-scale UX when chosen.
+- [ ] Document standalone tracking-state diagnostics and thresholds when finalized.
+- [ ] Document co-op cross-backend semantics when implemented.
+- [ ] Remove any obsolete statement that AR mode is hidden when ARCore is missing.
+
+---
+
+## 18. Code cleanup after correctness is proven
+
+Do not do these before behavior is tested; they are architecture cleanup, not prerequisites for the
+first standalone device validation.
+
+- [ ] Make asynchronous `SphereSlamTracker` delegate through `SphereSlamEngine` instead of talking
+  directly to `KpmBridge`.
+- [ ] Consolidate duplicated KPM session/reference setup between hybrid and standalone wrappers.
+- [ ] Promote a backend-neutral pose/tracking interface only after its actual hybrid/standalone
+  consumers are stable.
+- [ ] Rename homography-fallback renderer classes if they become shared standalone rendering
+  infrastructure.
+- [ ] Remove obsolete AR-unavailable onboarding resources only after confirming no other flow uses
+  them.
+- [ ] Remove dead ARCore-only fallback routing code after device tests prove the new backend
+  selection.
+- [ ] Keep native ownership/destruction in one abstraction and one thread per KPM session.
+- [ ] Avoid a broad rewrite of `ArRenderer`; preserve the known-good ARCore path.
+
+---
+
+## 19. Merge criteria
+
+Do **not** merge the standalone feature merely because it compiles.
+
+Minimum merge criteria:
+
+- [ ] branch rebased/current with `main`;
+- [ ] unit/native/build CI green;
+- [ ] ARCore regression smoke test passes;
+- [ ] at least one real non-ARCore device can:
+  - [ ] enter AR mode;
+  - [ ] capture a target;
+  - [ ] lock the artwork;
+  - [ ] move the phone with stable registration;
+  - [ ] lose and reacquire the target;
+  - [ ] manipulate the artwork;
+  - [ ] reopen the project and reacquire without recapture.
+- [ ] no UI reports normalized standalone scale as physical metres;
+- [ ] no known coordinate-frame mixing between KPM, ARCore, and MobileGS;
+- [ ] release checklist reflects the behavior actually shipped;
+- [ ] unresolved parity gaps are documented as explicit backend limitations, not silently broken
+  controls.
+
+Full parity milestone, after initial standalone merge:
+
+- [ ] physical scale;
+- [ ] MobileGS/fingerprint integration;
+- [ ] wide-area/multi-page wall tracking;
+- [ ] hybrid KPM correction through `PoseFusion`;
+- [ ] deliberate equivalents/degradations for all ARCore-only features;
+- [ ] co-op cross-backend calibration;
+- [ ] sustained-session performance/thermal validation.
+
+---
+
+## Recommended implementation order
+
+1. **Build/CI validation** — find compile/API errors before adding more behavior.
+2. **Physical scale** — required before metric integration and trustworthy distance.
+3. **Standalone target workflow parity** — remove the temporary separate capture UX.
+4. **Standalone confidence/loss gates** — make the pose stream defensible.
+5. **MobileGS standalone coordinate bridge + fingerprint generation**.
+6. **MobileGS camera feed / paint-progress / self-grow**.
+7. **Multi-page wall atlas growth**.
+8. **ARCore-only feature/equivalent audit**.
+9. **Co-op cross-backend calibration**.
+10. **Hybrid KPM→PoseFusion correction** — independent enough to proceed in parallel once the page
+    scale and coordinate transform are defined.
+11. **Performance/device matrix**.
+12. **Cleanup/refactor only after the behavior above is proven**.

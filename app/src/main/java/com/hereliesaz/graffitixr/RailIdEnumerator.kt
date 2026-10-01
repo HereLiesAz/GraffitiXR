@@ -8,12 +8,10 @@ import com.hereliesaz.graffitixr.common.model.EditorMode
  *
  * Conditional registration in ConfigureRailItems is mirrored here. Each mode's sub-host is
  * registered whenever its mode is reachable (it is the navigation entry); that mode's tools are
- * registered only while it is active. `mode.ar` is the one sub-host that is NOT unconditional even
- * by that looser standard — it is gated on ARCore availability (`showArModeEntry` in
- * ConfigureRailItems) and can be absent from the rail entirely on a resolved-unavailable device.
- * That's harmless today only because a separate effect routes the user out of AR mode before
- * anything could address the missing id — this enumerator still includes it unconditionally
- * because the set is meant as the *universe* of legal IDs across all reachable devices, and code
+ * registered only while it is active. `mode.ar` is now always reachable: ARCore-capable devices
+ * use the ARCore + SphereSLAM hybrid backend and ARCore-unavailable devices use the standalone
+ * CameraX + SphereSLAM backend. This enumerator includes the same id unconditionally because the set
+ * is the *universe* of legal IDs across all reachable devices, and code
  * addressing `mode.ar` elsewhere shouldn't look like it's referencing an orphan. The other two
  * items gated on more than the mode — `coop.leave` (needs an active session) and `wall.clear`
  * (needs a wall photo) — are included for the same reason.

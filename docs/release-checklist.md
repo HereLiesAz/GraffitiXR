@@ -45,16 +45,33 @@ Confirm:
 
 ## Smoke test on a non-ARCore device
 
-Install the AAB on a device or emulator without ARCore (an Android 8.0 / API 26
-emulator without Google Play Services for AR is the easiest). Confirm:
+Install the AAB on a device without Google Play Services for AR / ARCore support.
+An emulator is useful for install/routing checks, but the wall-lock checks require a
+real camera and motion sensors. Confirm:
 
 - App installs and launches.
-- AR mode is **absent** from the mode chooser rail.
-- The first-launch "ARCore not supported" overlay appears once and is
-  dismissed by tapping; relaunching the app does not show it again.
-- Trace, Mockup, and Live Overlay all work; camera preview shows live frames.
+- AR mode is **present** in the mode chooser rail.
+- Entering AR does not redirect to Overlay mode and does not attempt to create an
+  ARCore `Session`.
+- CameraX preview streams normally.
+- "Capture Wall Target" captures a wall patch and the four-corner unwarp can be confirmed.
+- A textured target produces a SphereSLAM/KPM lock and the artwork remains registered while
+  translating/rotating the phone within the target's useful viewing range.
+- Pan, pinch-scale, in-plane rotation, X/Y perspective rotation, tone, opacity, and invert use the
+  same persisted AR adjustment model as the ARCore path.
+- A brief visual miss can use the short IMU bridge; a longer miss clears the stale overlay and shows
+  reacquisition instead of freezing the last pose indefinitely.
+- Leaving and reopening the project restores `sphereslam_reference.png` and can reacquire the
+  target without recapturing it.
+- Exporting/importing the project relocates the stored SphereSLAM reference URI to the imported
+  project directory and can reacquire the target there.
+- No standalone UI reports physical metres unless
+  `sphereSlamReferencePhysicallyMetric == true`.
 
 ## Smoke test on an ARCore-supported device
 
-- AR mode is present and entering it initializes a session.
-- Anchoring, scan-fog, and capture flows all behave normally.
+- AR mode is present and entering it initializes an ARCore session.
+- `ArCorePoseSource` remains the primary continuous renderer pose.
+- SphereSLAM runs beside ARCore; loss/failure of KPM does not break normal ARCore tracking.
+- Existing anchor, target capture, scan/fingerprint, depth/plane, relocalization, and teardown flows
+  behave normally.

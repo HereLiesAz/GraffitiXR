@@ -6,19 +6,25 @@ import com.hereliesaz.sphereslam.SphereSlam
 /**
  * Registry/bring-up entry point for pose producers.
  *
- * ARCore remains the existing production pose source through [ArCorePoseSource]. SphereSLAM is added
- * beside it, not underneath it and not in place of it. The two paths deliberately stay independent
- * behind [PoseSource].
+ * Runtime architecture is capability-dependent:
  *
- * SphereSLAM Phase 2 exposes calibrated artoolkitX KPM page generation/matching as its own library.
- * It is not automatically selected yet and the ARCore render path is untouched.
+ * - with ARCore, [ArCorePoseSource] remains the primary continuous pose source and SphereSLAM runs
+ *   beside it for wall relocalization/correction;
+ * - without ARCore, SphereSLAM is required to become the primary standalone [PoseSource] so AR mode
+ *   remains functional without constructing an ARCore Session.
+ *
+ * SphereSLAM Phase 2 currently exposes calibrated artoolkitX KPM page generation/matching only.
+ * That is enough for the hybrid relocalization sidecar, but it is not yet the continuous metric
+ * 6-DoF tracker required for standalone mode. Selection must therefore distinguish "KPM available"
+ * from "standalone SphereSLAM ready".
  */
 object PoseSourceRegistry {
     private const val TAG = "POSEPROBE"
 
     /**
-     * Opt-in native link probe invoked by -PposeProbe=true. This checks only the SphereSLAM/KPM
-     * sibling path; it never changes, replaces, or wraps the active [ArCorePoseSource].
+     * Opt-in native link probe invoked by -PposeProbe=true. This checks only the currently
+     * implemented SphereSLAM/KPM relocalization capability. A passing probe does not mean the
+     * standalone SphereSLAM pose backend is complete or safe to select.
      */
     fun probe() {
         Thread({
@@ -37,7 +43,7 @@ object PoseSourceRegistry {
             Log.i(
                 TAG,
                 "probe: SphereSLAM/KPM link smoke test " +
-                    if (ok) "PASSED (ARCore unchanged)" else "FAILED",
+                    if (ok) "PASSED (KPM available; standalone pose readiness not implied)" else "FAILED",
             )
         }, "pose-probe").start()
     }

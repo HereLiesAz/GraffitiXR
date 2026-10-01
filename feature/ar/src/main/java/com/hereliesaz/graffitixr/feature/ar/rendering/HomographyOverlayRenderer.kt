@@ -48,7 +48,18 @@ class HomographyOverlayRenderer(context: Context) : android.opengl.GLSurfaceView
     @Volatile private var surfaceWidth = 0
     @Volatile private var surfaceHeight = 0
 
-    private val identity4 = FloatArray(16).also { Matrix.setIdentityM(it, 0) }
+    // Whole-design transform. Defaults preserve the existing homography-fallback behavior.
+    @Volatile private var panX = 0f
+    @Volatile private var panY = 0f
+    @Volatile private var designScale = 1f
+    @Volatile private var rotationZDeg = 0f
+    @Volatile private var rotationXDeg = 0f
+    @Volatile private var rotationYDeg = 0f
+
+    private val model4 = FloatArray(16).also { Matrix.setIdentityM(it, 0) }
+    private val contentRotation4 = FloatArray(16)
+    private val contentRotationTemp4 = FloatArray(16)
+    private val contentRotationMul4 = FloatArray(16)
 
     /** Push a newly tracked pose — called from any thread (typically the CameraX analyzer thread). */
     fun updatePose(viewMatrix: FloatArray, projMatrix: FloatArray, frameAspect: Float) {
@@ -70,6 +81,26 @@ class HomographyOverlayRenderer(context: Context) : android.opengl.GLSurfaceView
         extentHalfW = halfW
         extentHalfH = halfH
         extentDirty = true
+    }
+
+    /**
+     * Apply the same whole-design geometry used by ARCore mode to this wall-relative renderer.
+     * Translation is in the tracker's wall units; Z rotation is OpenGL/right-handed (CCW+).
+     */
+    fun setTransform(
+        panX: Float,
+        panY: Float,
+        scale: Float,
+        rotationZDeg: Float,
+        rotationXDeg: Float = 0f,
+        rotationYDeg: Float = 0f,
+    ) {
+        this.panX = panX
+        this.panY = panY
+        this.designScale = scale.coerceAtLeast(0.001f)
+        this.rotationZDeg = rotationZDeg
+        this.rotationXDeg = rotationXDeg
+        this.rotationYDeg = rotationYDeg
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -98,7 +129,41 @@ class HomographyOverlayRenderer(context: Context) : android.opengl.GLSurfaceView
         val frame = latestFrame.get() ?: return
         val viewport = letterboxViewport(surfaceWidth, surfaceHeight, frame.frameAspect)
         if (viewport != null) GLES30.glViewport(viewport[0], viewport[1], viewport[2], viewport[3])
-        overlayRenderer.draw(frame.viewMatrix, frame.projMatrix, identity4)
+
+        Matrix.setIdentityM(model4, 0)
+        Matrix.translateM(model4, 0, panX, panY, 0f)
+        Matrix.rotateM(model4, 0, rotationZDeg, 0f, 0f, 1f)
+        Matrix.scaleM(model4, 0, designScale, designScale, 1f)
+        overlayRenderer.draw(
+            frame.viewMatrix,
+            frame.projMatrix,
+            model4,
+            contentRotation = buildContentRotation(rotationXDeg, rotationYDeg),
+        )
+    }
+
+    private fun buildContentRotation(rx: Float, ry: Float): FloatArray? {
+        if (rx == 0f && ry == 0f) return null
+        val d = OverlayRenderer.QUAD_HALF_EXTENT * 3.0f
+
+        Matrix.setIdentityM(contentRotation4, 0)
+        if (ry != 0f) {
+            val rad = Math.toRadians(ry.toDouble())
+            contentRotation4[0] = kotlin.math.cos(rad).toFloat()
+            contentRotation4[3] = kotlin.math.sin(rad).toFloat() / d
+        }
+
+        if (rx != 0f) {
+            val rad = Math.toRadians(rx.toDouble())
+            Matrix.setIdentityM(contentRotationTemp4, 0)
+            contentRotationTemp4[5] = kotlin.math.cos(rad).toFloat()
+            contentRotationTemp4[7] = kotlin.math.sin(rad).toFloat() / d
+            Matrix.multiplyMM(
+                contentRotationMul4, 0, contentRotation4, 0, contentRotationTemp4, 0,
+            )
+            System.arraycopy(contentRotationMul4, 0, contentRotation4, 0, 16)
+        }
+        return contentRotation4
     }
 
     /** Deletes every GL object this owns. Must run on the GL thread (e.g. via `view.queueEvent`). */

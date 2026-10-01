@@ -17,6 +17,8 @@ graph TD
     App --> CoreCollab[":android_collaboration_module"]
 
     FeatureAR --> CoreNative
+    FeatureAR --> SphereSLAM[":sphereslam"]
+    SphereSLAM --> CoreNative
     FeatureAR --> CoreCollab
     FeatureAR --> CoreDomain[":core:domain"]
     FeatureAR --> CoreData[":core:data"]
@@ -68,6 +70,23 @@ distortion-head model for painting-progress/confidence (`docs/DISTORTION_HEAD.md
 off by default — drift correction and self-growing fingerprint (`docs/TELEOLOGICAL_SLAM.md`). OpenCV
 is a Maven Central dependency (`org.opencv:opencv`), not a vendored/embedded copy.
 
+### `:sphereslam`
+Native tracking/relocalization module built around the pinned artoolkitX integration. It has two
+architectural roles:
+
+- **ARCore-capable devices:** run beside `ArCorePoseSource` for wall recognition/relocalization and
+  later explicit pose correction.
+- **ARCore-unavailable devices:** provide the standalone wall-tracking backend without an ARCore
+  `Session`. The current implementation is page-relative KPM + a short rotation-only IMU bridge;
+  physical scale, MobileGS frame integration, and wider wall-map continuity remain tracked work.
+
+The code now implements both the calibrated hybrid KPM sidecar and an initial standalone
+wall-target path. On non-ARCore devices CameraX supplies display-oriented luminance + intrinsics,
+KPM supplies the wall-relative 6-DoF pose while the target is visible, and the fused game-rotation
+sensor bridges very short visual dropouts without inventing translation. Standalone parity with the
+full ARCore feature set is still in progress. See
+[`SPHERESLAM_ARCORE_SIDECAR.md`](SPHERESLAM_ARCORE_SIDECAR.md).
+
 ## Data Flow (AR Pipeline)
 
 Each ARCore tracking frame, roughly:
@@ -75,24 +94,44 @@ Each ARCore tracking frame, roughly:
 ~~~
 camera.trackingState ────────────────────────► setArCoreTrackingState(isTracking)
 camera.getViewMatrix/ProjectionMatrix ───────► slamManager.updateCamera(view, proj, timestampNs)
-frame.acquireCameraImage() [YUV] ────────────► slamManager.feedYuvFrame(...) (relocalization thread)
                                               │
-                                    MobileGS::runRelocPass() (background thread)
-                                              │  ├─ ORB/SuperPoint match against the wall fingerprint
-                                              │  ├─ solvePnPRansac → camera_from_fpWorld
-                                              │  └─ distortion-head crop → painting progress / confidence
+                                              ├────────────────────────► primary ARCore renderer pose
+                                              │
+frame.acquireCameraImage() [YUV] ────────────┼► slamManager.feedYuvFrame(...) (relocalization thread)
+                                              │         │
+                                              │   MobileGS::runRelocPass() (background thread)
+                                              │         ├─ ORB/SuperPoint match
+                                              │         ├─ solvePnPRansac
+                                              │         └─ distortion-head crop
+                                              │
+                                              └► SphereSLAM/KPM sidecar (~10 Hz when seeded)
+                                                        ├─ calibrated planar keypoint match
+                                                        └─ page-relative observation only
+                                                             (not fused into primary pose yet)
                                               │
                                      PoseFusion.currentAnchor() (Kotlin, feature:ar)
-                                              │  blends the ARCore-consensus pose with the reloc pose
+                                              │  existing ARCore + MobileGS fusion
                                               ▼
                                    ArRenderer draws camera background + AR overlay
 ~~~
 
+**Tracking backend selection:** on ARCore-capable devices, `ArCorePoseSource` supplies the live
+renderer pose while SphereSLAM runs asynchronously beside it. On ARCore-unavailable devices,
+`MainScreen` keeps AR mode reachable and switches camera ownership to CameraX; the standalone
+SphereSLAM analyzer converts each successful KPM wall match directly into the OpenGL view matrix
+used by the transparent overlay renderer. A short fused-gyro bridge covers brief visual misses.
+The detailed contract, calibration assumptions, threading model, and remaining parity work are
+documented in
+[`SPHERESLAM_ARCORE_SIDECAR.md`](SPHERESLAM_ARCORE_SIDECAR.md).
+
 **Camera ownership:**
-- `EditorMode.AR` → ARCore `Session` owns the camera.
-- `EditorMode.OVERLAY` → CameraX owns the camera (ARCore-available devices still use the ARCore
-  session; devices without ARCore fall back to a planar homography tracker over the same OpenCV
-  pipeline — see `docs/UI_UX.md`).
+- `EditorMode.AR`, hybrid mode → ARCore `Session` owns the camera and SphereSLAM consumes frames
+  acquired from that session.
+- `EditorMode.AR`, standalone mode → CameraX owns the camera; calibrated KPM supplies the
+  wall-relative pose while the page is visible and a short fused-gyro bridge covers brief visual
+  misses. The remaining parity work is tracked in `docs/SPHERESLAM_TODO.md`.
+- `EditorMode.OVERLAY` → CameraX owns the camera (devices without ARCore can continue using the
+  planar homography/OpenCV overlay path described in `docs/UI_UX.md`).
 
 ## Relocalization and Drift Correction
 

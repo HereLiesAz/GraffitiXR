@@ -5,11 +5,16 @@ package com.hereliesaz.graffitixr.feature.ar.pose
  * relocalization, paint-mark tracking — none of which care where the pose came from, only that it is
  * a correctly scaled 6-DoF view).
  *
- * Today the only implementation is [ArCorePoseSource], which wraps ARCore's visual-inertial odometry.
- * The reason this interface exists is the devices ARCore cannot reach (no Google Play Services for AR,
- * uncertified OEMs): a future `NativePoseSource` — an on-device VIO running on raw CameraX frames plus
- * the IMU (e.g. an embedded ORB-SLAM3 / OpenVINS, or a commercial engine) — would implement this same
- * contract and feed the identical consumer, so the SLAM pipeline above the seam is untouched.
+ * Today the only complete continuous implementation is [ArCorePoseSource], which wraps ARCore's
+ * visual-inertial odometry. The required second implementation is a standalone SphereSLAM pose
+ * source for devices ARCore cannot reach (no Google Play Services for AR, uncertified OEMs, or
+ * unsupported hardware). It will run from raw CameraX frames plus IMU data, implement this same
+ * contract, and feed the identical consumer so the rendering/relocalization pipeline above the seam
+ * does not care whether ARCore exists.
+ *
+ * Do not confuse the current SphereSLAM KPM page matcher with that complete pose source: KPM is a
+ * relocalization observation. Standalone operation additionally requires continuous metric 6-DoF
+ * tracking and an ARCore-independent wall/anchor model.
  *
  * ## The contract a producer must satisfy
  *
