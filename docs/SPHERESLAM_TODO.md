@@ -327,7 +327,9 @@ Remaining:
   tests prove the latest clear or replacement wins.
 - [x] Verify design aspect changes recalculate only the tested aspect-fit base extent; user
   pan/scale/rotation remain in the separate persisted ModeAdjustment.
-- [ ] Confirm touch/gesture coordinates still line up when CameraX preview is letterboxed/cropped.
+- [x] Correct and test standalone gesture coordinates for CameraX `FIT_CENTER` letterboxing:
+  camera-frame wall-units/pixel are converted to screen wall-units/pixel using the actual fitted
+  viewport height; crop handling remains in the calibrated frame transform.
 - [ ] Add GL/instrumentation tests for standalone texture clear/replace if test infrastructure permits.
 - [x] Sanitize and test standalone renderer transforms: non-finite values fall back safely, scale
   uses the shared 0.1–10 editor bounds, rotations normalize, and pathological finite pan values are
