@@ -543,50 +543,64 @@ Required work:
 
 ## 11. ARCore-only feature audit and standalone equivalents
 
-Every AR feature needs a deliberate answer.
+Every AR feature now has an explicit backend answer.
 
 ### Plane / hit-test behavior
 
-- [ ] Inventory every `Frame.hitTest` / ARCore plane consumer.
-- [ ] For wall placement, replace required hit tests with ray→standalone-wall-plane intersection.
-- [ ] Define behavior when the standalone wall is not locked.
-- [ ] Test taps near page boundaries and outside the reference image.
+- [x] Inventory every `Frame.hitTest` / ARCore plane consumer. The live consumers are confined to
+  `ArRenderer`: ARCore anchor establishment and ARCore/wearable calibration.
+- [x] Core standalone wall placement requires no ARCore hit at all: capturing page 0 establishes the
+  canonical wall frame directly. For screen-space wall queries, `StandaloneWallHitTest` performs
+  calibrated CameraX ray → canonical z=0 intersection against registered KPM page bounds.
+- [x] When the standalone wall is not visually locked, standalone hit-test returns null; it never
+  extrapolates from a stale/bridged pose.
+- [x] Unit tests cover page boundary acceptance, outside-atlas rejection, grown-page coverage, and
+  unlocked-wall refusal.
 
 ### Depth
 
-- [ ] Inventory every ARCore Depth API consumer.
-- [ ] Categorize each as:
-  - [ ] required for core wall placement;
-  - [ ] optional enhancement;
-  - [ ] diagnostics only.
-- [ ] Provide Camera2/depth-sensor alternative where realistically available.
-- [ ] Otherwise disable the feature honestly in standalone mode.
-- [ ] Never fabricate a depth value from normalized KPM scale.
+- [x] Inventory ARCore Depth consumers: `ArRenderer.acquireDepthImage16Bits`, the isolated
+  `StereoProbeService` capability probe, and recording/evaluation depth metadata.
+- [x] Categorize depth as an ARCore enhancement/diagnostic, not a requirement for standalone core
+  wall placement; KPM supplies planar registration without claiming camera-to-wall metric depth.
+- [x] Evaluate a Camera2/depth-sensor substitute: no portable standalone depth provider is currently
+  integrated, so the capability is deliberately unavailable rather than guessed from device scale.
+- [x] The ARCore-only stereo/depth probe is skipped on standalone, and each standalone tracking tick
+  clears `isDepthApiSupported`, `isHardwareStereoActive`, and `currentCenterDepth`.
+- [x] Normalized KPM scale is never surfaced as a depth measurement.
 
 ### Anchors
 
-- [ ] Replace `com.google.ar.core.Anchor` dependencies required by core placement with a backend-
-  neutral wall/anchor transform.
-- [ ] Add standalone anchor generation/version to state.
-- [ ] Ensure recapture invalidates the old standalone anchor generation.
-- [ ] Ensure design placement is persisted relative to the correct backend-neutral wall frame.
+- [x] Standalone core placement has no `com.google.ar.core.Anchor`; the canonical centered KPM wall
+  frame is the backend-neutral wall anchor.
+- [x] Persist `sphereSlamAnchorGeneration` + frame version with the project.
+- [x] Recapture or invalid-reference cleanup increments the generation and invalidates atlas/map
+  state tied to the superseded page.
+- [x] Persist AR design placement with `sphereSlamPlacementAnchorGeneration`. A generation mismatch
+  preserves tone but zeros spatial placement, clears stale undo/redo/reset history, and requires the
+  next placement edit to bind to the current wall generation.
 
 ### Cloud anchors
 
-- [ ] Decide whether cloud anchors are:
-  - [ ] unavailable in standalone mode; or
-  - [ ] replaced by project/fingerprint/KPM sharing.
-- [ ] Disable cloud-anchor UI when no valid equivalent exists.
-- [ ] Ensure disabling it does not disable local/co-op wall sharing that can work without ARCore.
+- [x] There is no implemented Google Cloud Anchor host/resolve pipeline in this repository; the
+  renderer's historical `cloudAnchor` name refers to a local ARCore anchor.
+- [x] Standalone therefore advertises no cloud-anchor capability. Project/fingerprint/KPM assets
+  remain shareable independently.
+- [x] Standalone co-op Host/Join stays explicitly disabled until section 12 defines cross-backend
+  calibration; disabling unavailable cloud/ARCore calibration does not remove local wall tracking or
+  project export/import.
 
 ### Point clouds / perception debug
 
-- [ ] Decide what standalone perception/debug view displays.
-- [ ] Do not show empty ARCore point/plane layers as if the tracker failed.
-- [ ] Expose KPM keypoints/inliers/page boundary if useful for diagnostics.
+- [x] ARCore `PlaneRenderer`, `PointCloudRenderer`, and `ArDebugRenderer` exist only inside
+  `ArRenderer`, which the standalone branch never constructs.
+- [x] Standalone therefore never renders empty ARCore planes/points as a tracking failure.
+- [x] Standalone diagnostics expose the useful native evidence instead: KPM page id, inlier count,
+  reprojection error, observation age, match duration, tracking state, and failure reason.
 
 **ACCEPTANCE:** no AR-mode button or background code path on a non-ARCore device reaches an
-ARCore-only API without an explicit capability guard/equivalent.
+ARCore-only hit-test/depth/anchor/perception API without an explicit capability guard or standalone
+equivalent.
 
 ---
 
