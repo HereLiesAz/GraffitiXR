@@ -246,6 +246,9 @@ fun MainScreen(
                             mobileGsFingerprint = arUiState.sphereSlamFingerprint,
                             mobileGsFingerprintFrameVersion =
                                 arUiState.sphereSlamFingerprintFrameVersion,
+                            mobileGsWallFeatureMap = arUiState.sphereSlamWallFeatureMap,
+                            mobileGsWallFeatureMapFrameVersion =
+                                arUiState.sphereSlamWallFeatureMapFrameVersion,
                             persistedReferenceUri = arUiState.sphereSlamReferenceUri,
                             persistedReferenceWidthMeters = arUiState.sphereSlamReferenceWidthMeters,
                             persistedReferencePhysicallyMetric =
