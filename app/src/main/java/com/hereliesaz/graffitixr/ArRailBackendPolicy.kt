@@ -66,3 +66,15 @@ internal fun arRailBackendPolicy(
         exportDisabledReason = "Standalone camera + overlay export is not implemented yet",
     )
 }
+
+internal fun coopHostReady(
+    policy: ArRailBackendPolicy,
+    arCoreAnchorEstablished: Boolean,
+    arCorePointCount: Int,
+    standaloneReferencePresent: Boolean,
+): Boolean =
+    if (policy.standalone) {
+        policy.coopCalibrationAvailable && standaloneReferencePresent
+    } else {
+        policy.coopCalibrationAvailable && arCoreAnchorEstablished && arCorePointCount > 0
+    }
