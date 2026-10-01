@@ -34,6 +34,7 @@ internal class CoopPeerFingerprintAnalyzer(
     private var directBuffer: ByteBuffer? = null
     private var lastSeq = 0f
     private var lastGood: SphereSlamStandaloneFrame? = null
+    private var lastFreshSolveMs = Long.MIN_VALUE
     @Volatile private var closed = false
 
     init {
@@ -141,14 +142,22 @@ internal class CoopPeerFingerprintAnalyzer(
                     source = SphereSlamStandalonePoseSource.PEER_FINGERPRINT,
                 )
                 lastGood = tracked
+                lastFreshSolveMs = android.os.SystemClock.elapsedRealtime()
                 onFrameTracked(tracked)
                 return
             }
 
-            // Native relocalization is intentionally throttled/asynchronous. Hold its most recent
-            // wall pose between fresh solves rather than flashing the overlay off every unsolved
-            // CameraX frame; a new solve replaces it atomically.
-            onFrameTracked(lastGood)
+            // Native relocalization is intentionally throttled/asynchronous, so a tiny hold prevents
+            // flashing between worker solves. It MUST be bounded: after the same 400 ms window used
+            // by the normal standalone visual bridge, the pose is stale camera state and keeping it
+            // would make the mural ride the screen after the peer target leaves view.
+            val nowMs = android.os.SystemClock.elapsedRealtime()
+            val held = lastGood?.takeIf {
+                lastFreshSolveMs != Long.MIN_VALUE &&
+                    nowMs - lastFreshSolveMs <= MAX_PEER_POSE_HOLD_MS
+            }
+            if (held == null) lastGood = null
+            onFrameTracked(held)
         } catch (t: Throwable) {
             if (!closed) {
                 Timber.w(t, "Co-op peer fingerprint analysis failed")
@@ -164,6 +173,10 @@ internal class CoopPeerFingerprintAnalyzer(
         if (frameHeight <= 0 || projection[5] == 0f) return 0f
         val depth = abs(view[14])
         return depth * 2f * (1f / projection[5]) / frameHeight.toFloat()
+    }
+
+    private companion object {
+        const val MAX_PEER_POSE_HOLD_MS = 400L
     }
 
     override fun close() {
