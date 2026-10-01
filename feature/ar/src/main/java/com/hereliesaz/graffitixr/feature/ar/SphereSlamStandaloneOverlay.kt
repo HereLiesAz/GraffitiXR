@@ -67,6 +67,15 @@ private val SPHERESLAM_DEFAULT_UNWARP_POINTS = listOf(
     Offset(0.25f, 0.75f),
 )
 
+internal fun shouldUseCoopPeerFingerprint(
+    spatialFrame: com.hereliesaz.graffitixr.common.model.CoopSpatialFrame?,
+    peerFingerprint: ByteArray?,
+): Boolean =
+    spatialFrame?.hostBackend ==
+        com.hereliesaz.graffitixr.common.model.CoopTrackingBackend.ARCORE &&
+        spatialFrame.fingerprintAvailable &&
+        peerFingerprint?.isNotEmpty() == true
+
 /**
  * First functional no-ARCore AR path.
  *
@@ -230,10 +239,7 @@ fun SphereSlamStandaloneOverlay(
     // would align the guest to the wrong wall. Peer geometry therefore wins solely from the live
     // protocol-v3 session contract; local/persisted page state is irrelevant while it is active.
     val peerOnlyTracking =
-        coopPeerSpatialFrame?.hostBackend ==
-            com.hereliesaz.graffitixr.common.model.CoopTrackingBackend.ARCORE &&
-            coopPeerSpatialFrame.fingerprintAvailable &&
-            coopPeerFingerprint?.isNotEmpty() == true
+        shouldUseCoopPeerFingerprint(coopPeerSpatialFrame, coopPeerFingerprint)
     if (reference == null && !peerOnlyTracking) {
         val pending = pendingReferenceBitmap
         if (pending != null) {
