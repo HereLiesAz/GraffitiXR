@@ -230,7 +230,9 @@ Remaining:
 - [x] Add project/data tests for legacy projects without standalone fields, versioned reference
   write/delete lifecycle, and import URI relocation with standalone scale metadata.
 - [x] Add repository/viewmodel replacement-race tests: URI + width + metric flag commit together,
-  a competing recapture wins without being deleted, and an uncommitted candidate is cleaned up.
+  a competing recapture wins without being deleted, an uncommitted candidate is cleaned up, and
+  cancellation delivered immediately after metadata commit reconciles current/on-disk state before
+  deciding which PNG is safe to delete.
 - [x] Add process-death boundary tests: before metadata commit the old reference remains
   authoritative; after metadata commit the new reference remains authoritative even if old-file
   cleanup has not happened yet.
