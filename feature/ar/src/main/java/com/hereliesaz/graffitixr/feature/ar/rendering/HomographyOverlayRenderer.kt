@@ -120,12 +120,20 @@ class HomographyOverlayRenderer(context: Context) : android.opengl.GLSurfaceView
         rotationXDeg: Float = 0f,
         rotationYDeg: Float = 0f,
     ) {
-        this.panX = panX
-        this.panY = panY
-        this.designScale = scale.coerceAtLeast(0.001f)
-        this.rotationZDeg = rotationZDeg
-        this.rotationXDeg = rotationXDeg
-        this.rotationYDeg = rotationYDeg
+        val sanitized = StandaloneRenderTransformSanitizer.sanitize(
+            panX = panX,
+            panY = panY,
+            scale = scale,
+            rotationZDeg = rotationZDeg,
+            rotationXDeg = rotationXDeg,
+            rotationYDeg = rotationYDeg,
+        )
+        this.panX = sanitized.panX
+        this.panY = sanitized.panY
+        this.designScale = sanitized.scale
+        this.rotationZDeg = sanitized.rotationZDeg
+        this.rotationXDeg = sanitized.rotationXDeg
+        this.rotationYDeg = sanitized.rotationYDeg
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
