@@ -255,15 +255,16 @@ Remaining:
   - [x] maximum angular jump per frame (90° default catastrophic-jump ceiling);
   - [x] maximum translation jump per frame in reference-page widths (2 page widths default);
   - [x] separate relaxed thresholds during explicit reacquisition (175° / 8 page widths).
-- [ ] Add hysteresis so a single weak frame does not flap LOCKED↔LOST.
-- [ ] Define and expose standalone tracking states:
-  - [ ] INITIALIZING;
-  - [ ] LOCKED;
-  - [ ] IMU_BRIDGE;
-  - [ ] REACQUIRING;
-  - [ ] LOST;
-  - [ ] FATAL/UNAVAILABLE.
-- [ ] Feed those states into the existing AR HUD/diagnostics where possible.
+- [x] Add hysteresis so a single weak frame does not flap LOCKED↔LOST: acquisition/reacquisition
+  requires two consecutive accepted visual poses and a short miss enters IMU_BRIDGE first.
+- [x] Define and expose standalone tracking states:
+  - [x] INITIALIZING;
+  - [x] LOCKED;
+  - [x] IMU_BRIDGE;
+  - [x] REACQUIRING;
+  - [x] LOST;
+  - [x] FATAL.
+- [x] Feed those states into the standalone AR HUD and existing diagnostic log.
 - [ ] Evaluate whether KPM-only continuous wall tracking is sufficiently smooth for the intended
   wall-painting use case.
 - [ ] If not, add a true frame-to-frame visual/inertial tracker behind the same standalone pose
@@ -615,7 +616,8 @@ Still required:
 - [x] standalone acceptance-gate tests for inliers/error/non-finite poses;
 - [x] pose-jump gate tests, including scale-independent page-width translation and relaxed
   reacquisition thresholds;
-- [ ] tracking-state hysteresis tests;
+- [x] tracking-state hysteresis tests for initial lock, bridge, reacquisition, LOST timeout, and
+  fatal/reset behavior;
 - [ ] standalone page↔MobileGS frame conversion tests;
 - [ ] hybrid page↔ARCore frame conversion tests;
 - [ ] timestamp pairing/interpolation tests;

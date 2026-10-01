@@ -318,6 +318,15 @@ final shared-library link. The continuation branch mirrors upstream ARUtil's bun
 support sources and links NDK zlib. Keep this CI path enabled; otherwise native KPM regressions can
 silently pass normal builds that never initialize the submodule.
 
+## Standalone tracking-state contract
+
+The standalone runtime exposes explicit `INITIALIZING`, `LOCKED`, `IMU_BRIDGE`,
+`REACQUIRING`, `LOST`, and `FATAL` states. Initial acquisition and post-loss reacquisition
+require two consecutive accepted visual poses. A brief miss from `LOCKED` uses the short
+rotation-only IMU bridge; after the bridge expires the state becomes `REACQUIRING`, then `LOST`
+after 2 seconds without recovery. State changes are surfaced in the standalone HUD and existing AR
+diagnostic log.
+
 ## Standalone pose acceptance
 
 The CameraX standalone path applies an explicit app-level KPM acceptance policy before publishing a

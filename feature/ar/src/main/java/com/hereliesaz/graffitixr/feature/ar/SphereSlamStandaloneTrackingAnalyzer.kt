@@ -77,10 +77,13 @@ class SphereSlamStandaloneTrackingAnalyzer(
     private val onFrameTracked: (SphereSlamStandaloneFrame?) -> Unit,
     private val onReferenceReady: (SphereSlamStandaloneSession.Reference) -> Unit = {},
     private val onDiagnostic: (String) -> Unit = {},
+    private val onTrackingStateChanged: (StandaloneTrackingState) -> Unit = {},
     private val onFatalError: (Throwable) -> Unit = {},
     private val poseAcceptancePolicy: StandalonePoseAcceptancePolicy =
         StandalonePoseAcceptancePolicy(),
     private val bridge: GyroOrientationBridge = GyroOrientationBridge(context),
+    private val trackingStateMachine: StandaloneTrackingStateMachine =
+        StandaloneTrackingStateMachine(),
     private val maxBridgeMs: Long = 400L,
 ) : ImageAnalysis.Analyzer, AutoCloseable {
 
@@ -113,6 +116,7 @@ class SphereSlamStandaloneTrackingAnalyzer(
     private var sessionKey: SessionKey? = null
     private var lastDiagnosticKey: DiagnosticKey? = null
     private var lastPoseRejection: StandalonePoseRejection? = null
+    private var lastReportedTrackingState: StandaloneTrackingState? = null
     private var lastAcceptedVisualView: FloatArray? = null
     private var lastGood: SphereSlamStandaloneFrame? = null
     private var frameBuffer: ByteBuffer? = null
@@ -120,7 +124,10 @@ class SphereSlamStandaloneTrackingAnalyzer(
     @Volatile private var fatal = false
 
     fun start() {
-        if (!closed) bridge.start()
+        if (!closed) {
+            bridge.start()
+            reportTrackingState(trackingStateMachine.state)
+        }
     }
 
     override fun analyze(image: ImageProxy) {
@@ -206,7 +213,8 @@ class SphereSlamStandaloneTrackingAnalyzer(
                     // Once the short visual bridge has expired, the next legitimate wall return may
                     // be far from the previous camera pose. Keep continuity gates deliberately
                     // looser for that explicit reacquisition case.
-                    reacquiring = lastGood == null && lastAcceptedVisualView != null,
+                    reacquiring = trackingStateMachine.state == StandaloneTrackingState.REACQUIRING ||
+                        trackingStateMachine.state == StandaloneTrackingState.LOST,
                 )
                 if (!acceptance.accepted) {
                     val rejection = acceptance.rejection
@@ -218,12 +226,19 @@ class SphereSlamStandaloneTrackingAnalyzer(
                                 "error=${pose.reprojectionError}",
                         )
                     }
-                    onFrameTracked(bridgeLastGood(projection, rotated, timestampNs))
+                    publishVisualMiss(projection, rotated, timestampNs)
                     return
                 }
 
                 lastPoseRejection = null
                 lastAcceptedVisualView = pose.viewMatrix.copyOf()
+                val state = trackingStateMachine.onAcceptedVisual(android.os.SystemClock.elapsedRealtime())
+                reportTrackingState(state)
+                if (state != StandaloneTrackingState.LOCKED) {
+                    onFrameTracked(null)
+                    return
+                }
+
                 pendingImuReference?.let(bridge::commitReference)
                 val tracked = SphereSlamStandaloneFrame(
                     viewMatrix = pose.viewMatrix,
@@ -245,17 +260,39 @@ class SphereSlamStandaloneTrackingAnalyzer(
                 return
             }
 
-            onFrameTracked(bridgeLastGood(projection, rotated, timestampNs))
+            publishVisualMiss(projection, rotated, timestampNs)
         } catch (t: Throwable) {
             if (!closed) {
                 fatal = true
                 Timber.e(t, "Standalone SphereSLAM analyzer failed")
+                reportTrackingState(trackingStateMachine.onFatal())
                 onFrameTracked(null)
                 onFatalError(t)
             }
         } finally {
             image.close()
         }
+    }
+
+    private fun publishVisualMiss(
+        projection: FloatArray,
+        frame: RotatedLuma,
+        timestampNs: Long,
+    ) {
+        val bridged = bridgeLastGood(projection, frame, timestampNs)
+        val state = trackingStateMachine.onVisualMiss(
+            bridgeAvailable = bridged != null,
+            nowMs = android.os.SystemClock.elapsedRealtime(),
+        )
+        reportTrackingState(state)
+        onFrameTracked(if (state == StandaloneTrackingState.IMU_BRIDGE) bridged else null)
+    }
+
+    private fun reportTrackingState(state: StandaloneTrackingState) {
+        if (state == lastReportedTrackingState) return
+        lastReportedTrackingState = state
+        onTrackingStateChanged(state)
+        onDiagnostic("SphereSLAM standalone state=$state")
     }
 
     private fun emitCalibrationDiagnosticIfChanged(
@@ -410,6 +447,8 @@ class SphereSlamStandaloneTrackingAnalyzer(
         sessionKey = null
         lastDiagnosticKey = null
         lastPoseRejection = null
+        lastReportedTrackingState = null
+        trackingStateMachine.reset()
         lastAcceptedVisualView = null
         frameBuffer = null
     }

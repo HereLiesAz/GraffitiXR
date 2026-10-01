@@ -102,7 +102,9 @@ fun SphereSlamStandaloneOverlay(
     var referenceReady by remember { mutableStateOf(false) }
     var referenceWidthUnits by remember { mutableStateOf(0f) }
     var referenceHeightUnits by remember { mutableStateOf(0f) }
-    var isTrackingLost by remember { mutableStateOf(true) }
+    var trackingState by remember {
+        mutableStateOf(StandaloneTrackingState.INITIALIZING)
+    }
     var fatalMessage by remember { mutableStateOf<String?>(null) }
 
     fun resetCapture() {
@@ -112,7 +114,7 @@ fun SphereSlamStandaloneOverlay(
         referenceBitmap = null
         unwarpPoints = SPHERESLAM_DEFAULT_UNWARP_POINTS
         referenceReady = false
-        isTrackingLost = true
+        trackingState = StandaloneTrackingState.INITIALIZING
         fatalMessage = null
     }
 
@@ -372,6 +374,9 @@ fun SphereSlamStandaloneOverlay(
                 onDiagnostic = { text ->
                     mainHandler.post { onDiagnostic(text) }
                 },
+                onTrackingStateChanged = { state ->
+                    mainHandler.post { trackingState = state }
+                },
                 onFrameTracked = { frame ->
                     // Renderer state is atomic/volatile and intentionally updated directly from the
                     // analysis worker. Compose state belongs to Main and is posted there separately.
@@ -381,7 +386,6 @@ fun SphereSlamStandaloneOverlay(
                         glRenderer.updatePose(frame.viewMatrix, frame.projMatrix, frame.frameAspect)
                     }
                     mainHandler.post {
-                        isTrackingLost = frame == null
                         onUnitsPerPixel(frame?.unitsPerPixel ?: 0f)
                     }
                 },
@@ -424,10 +428,10 @@ fun SphereSlamStandaloneOverlay(
         modifier = modifier.fillMaxSize(),
     )
 
-    if (!referenceReady) {
+    if (!referenceReady || trackingState == StandaloneTrackingState.INITIALIZING) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Text(
-                text = "Preparing wall tracker…",
+                text = if (!referenceReady) "Preparing wall tracker…" else "Finding wall target…",
                 color = Color.White,
                 modifier = Modifier
                     .padding(top = 32.dp)
@@ -435,22 +439,32 @@ fun SphereSlamStandaloneOverlay(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             )
         }
-    } else if (isTrackingLost) {
+    } else if (
+        trackingState == StandaloneTrackingState.IMU_BRIDGE ||
+        trackingState == StandaloneTrackingState.REACQUIRING ||
+        trackingState == StandaloneTrackingState.LOST
+    ) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = strings.ar.reacquiringTarget,
+                    text = if (trackingState == StandaloneTrackingState.LOST) {
+                        "Wall target lost"
+                    } else {
+                        strings.ar.reacquiringTarget
+                    },
                     color = Color.White,
                     modifier = Modifier
                         .padding(top = 32.dp)
                         .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                 )
-                Button(
-                    onClick = { resetCapture() },
-                    modifier = Modifier.padding(top = 12.dp),
-                ) {
-                    Text("Recapture Target")
+                if (trackingState == StandaloneTrackingState.LOST) {
+                    Button(
+                        onClick = { resetCapture() },
+                        modifier = Modifier.padding(top = 12.dp),
+                    ) {
+                        Text("Recapture Target")
+                    }
                 }
             }
         }
