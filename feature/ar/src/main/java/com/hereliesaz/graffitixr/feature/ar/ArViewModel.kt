@@ -2202,12 +2202,25 @@ class ArViewModel @Inject constructor(
      * atomically to project.json. If the project/page-0 changed while IO was in flight, the new file
      * is discarded and the stale candidate cannot contaminate the new atlas.
      */
-    fun saveSphereSlamAtlasPage(candidate: StandaloneAtlasGrowthCandidate) {
+    fun saveSphereSlamAtlasPage(
+        bitmap: Bitmap,
+        pageNo: Int,
+        referenceWidthUnits: Float,
+        physicallyMetric: Boolean,
+        canonicalFromPage: FloatArray,
+    ) {
         val startingProject = projectRepository.currentProject.value ?: return
         val projectId = startingProject.id
         val canonicalUri = startingProject.sphereSlamReferenceUri ?: return
-        if (candidate.pageNo <= 0 || candidate.canonicalFromPage.size != 16) return
-        if (startingProject.sphereSlamAtlasPages.any { it.pageNo == candidate.pageNo }) return
+        if (
+            pageNo <= 0 ||
+            !referenceWidthUnits.isFinite() ||
+            referenceWidthUnits <= 0f ||
+            canonicalFromPage.size != 16 ||
+            canonicalFromPage.any { !it.isFinite() }
+        ) return
+        if (startingProject.sphereSlamAtlasPages.any { it.pageNo == pageNo }) return
+        val pageTransform = canonicalFromPage.copyOf()
 
         viewModelScope.launch(dispatchers.io) {
             var uri: android.net.Uri? = null
@@ -2216,22 +2229,22 @@ class ArViewModel @Inject constructor(
                 uri = projectManager.saveSphereSlamAtlasPage(
                     appContext,
                     projectId,
-                    candidate.pageNo,
-                    candidate.bitmap,
+                    pageNo,
+                    bitmap,
                 )
                 val savedUri = requireNotNull(uri)
                 val page = com.hereliesaz.graffitixr.common.model.SphereSlamAtlasPage(
-                    pageNo = candidate.pageNo,
+                    pageNo = pageNo,
                     referenceUri = savedUri,
-                    referenceWidthMeters = candidate.referenceWidthUnits,
-                    physicallyMetric = candidate.physicallyMetric,
-                    canonicalFromPage = candidate.canonicalFromPage.toList(),
+                    referenceWidthMeters = referenceWidthUnits,
+                    physicallyMetric = physicallyMetric,
+                    canonicalFromPage = pageTransform.toList(),
                 )
                 projectRepository.updateProject { current ->
                     if (
                         current.id != projectId ||
                         current.sphereSlamReferenceUri != canonicalUri ||
-                        current.sphereSlamAtlasPages.any { it.pageNo == candidate.pageNo }
+                        current.sphereSlamAtlasPages.any { it.pageNo == pageNo }
                     ) {
                         current
                     } else {
@@ -2244,7 +2257,7 @@ class ArViewModel @Inject constructor(
                 }
                 if (committed) {
                     appendDiag(
-                        "SphereSLAM atlas page persisted page=" + candidate.pageNo +
+                        "SphereSLAM atlas page persisted page=" + pageNo +
                             " frame=canonical-centered-page",
                     )
                 }
