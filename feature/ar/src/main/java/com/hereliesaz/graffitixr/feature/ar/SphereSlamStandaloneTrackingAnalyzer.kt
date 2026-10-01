@@ -82,6 +82,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private val onFrameTracked: (SphereSlamStandaloneFrame?) -> Unit,
     private val onReferenceReady: (SphereSlamStandaloneSession.Reference) -> Unit = {},
     private val onDiagnostic: (String) -> Unit = {},
+    private val onFailure: (StandaloneFailureEvent) -> Unit = {},
     private val onTrackingStateChanged: (StandaloneTrackingState) -> Unit = {},
     private val onFatalError: (Throwable) -> Unit = {},
     private val poseAcceptancePolicy: StandalonePoseAcceptancePolicy =
@@ -128,6 +129,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private var sessionKey: SessionKey? = null
     private var lastDiagnosticKey: DiagnosticKey? = null
     private var lastPoseRejection: StandalonePoseRejection? = null
+    private var lastFailureReason: StandaloneFailureReason? = null
     private var lastReportedTrackingState: StandaloneTrackingState? = null
     private var lastAcceptedVisualView: FloatArray? = null
     private var lastGood: SphereSlamStandaloneFrame? = null
@@ -172,9 +174,18 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             val rawIntrinsics = CameraIntrinsicsEstimator.estimate(
                 context,
                 cameraId,
+                cameraTimestampSource.name,
                 rawWidth,
                 rawHeight,
-            ) ?: return
+            ) ?: run {
+                reportFailure(
+                    StandaloneFailureClassifier.event(
+                        StandaloneFailureReason.INTRINSICS_UNAVAILABLE,
+                        "camera=$cameraId raw=${rawWidth}x${rawHeight}",
+                    ),
+                )
+                return
+            }
             val croppedIntrinsics = cropCameraIntrinsics(
                 intrinsics = rawIntrinsics,
                 cropLeft = crop.left,
@@ -228,13 +239,13 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
 
             if (pose != null) {
                 if (observationAge.stale) {
-                    if (!staleObservationReported) {
-                        staleObservationReported = true
-                        onDiagnostic(
-                            "SphereSLAM standalone rejected stale observation " +
-                                "ageMs=${observationAge.ageMs} matchMs=$matchDurationMs",
-                        )
-                    }
+                    staleObservationReported = true
+                    reportFailure(
+                        StandaloneFailureClassifier.event(
+                            StandaloneFailureReason.STALE_OBSERVATION,
+                            "ageMs=${observationAge.ageMs} matchMs=$matchDurationMs",
+                        ),
+                    )
                     publishVisualMiss(projection, rotated, timestampNs)
                     return
                 }
@@ -253,12 +264,14 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 )
                 if (!acceptance.accepted) {
                     val rejection = acceptance.rejection
-                    if (rejection != null && rejection != lastPoseRejection) {
+                    if (rejection != null) {
                         lastPoseRejection = rejection
-                        onDiagnostic(
-                            "SphereSLAM standalone KPM rejected=$rejection " +
+                        reportFailure(
+                            StandaloneFailureClassifier.fromPoseRejection(
+                                rejection,
                                 "page=${pose.pageNo} inliers=${pose.inlierCount} " +
-                                "error=${pose.reprojectionError}",
+                                    "error=${pose.reprojectionError}",
+                            ),
                         )
                     }
                     publishVisualMiss(projection, rotated, timestampNs)
@@ -266,6 +279,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 }
 
                 lastPoseRejection = null
+                lastFailureReason = null
                 lastAcceptedVisualView = pose.viewMatrix.copyOf()
                 val state = trackingStateMachine.onAcceptedVisual(android.os.SystemClock.elapsedRealtime())
                 reportTrackingState(state)
@@ -299,11 +313,18 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 return
             }
 
+            reportFailure(
+                StandaloneFailureClassifier.event(
+                    StandaloneFailureReason.NO_CURRENT_PAGE_MATCH,
+                    "matchMs=$matchDurationMs frameTimestampNs=$timestampNs",
+                ),
+            )
             publishVisualMiss(projection, rotated, timestampNs)
         } catch (t: Throwable) {
             if (!closed) {
                 fatal = true
                 Timber.e(t, "Standalone SphereSLAM analyzer failed")
+                reportFailure(StandaloneFailureClassifier.fromThrowable(t))
                 reportTrackingState(trackingStateMachine.onFatal())
                 onFrameTracked(null)
                 onFatalError(t)
@@ -325,6 +346,16 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         )
         reportTrackingState(state)
         onFrameTracked(if (state == StandaloneTrackingState.IMU_BRIDGE) bridged else null)
+    }
+
+    private fun reportFailure(event: StandaloneFailureEvent) {
+        if (event.reason == lastFailureReason) return
+        lastFailureReason = event.reason
+        onFailure(event)
+        onDiagnostic(
+            "SphereSLAM standalone failure=${event.reason} severity=${event.severity}" +
+                if (event.diagnostic.isBlank()) "" else " ${event.diagnostic}",
+        )
     }
 
     private fun reportTrackingState(state: StandaloneTrackingState) {
@@ -530,6 +561,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         sessionKey = null
         lastDiagnosticKey = null
         lastPoseRejection = null
+        lastFailureReason = null
         lastReportedTrackingState = null
         trackingStateMachine.reset()
         lastAcceptedVisualView = null

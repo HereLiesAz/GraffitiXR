@@ -94,8 +94,10 @@ internal object StandaloneFailureClassifier {
             StandalonePoseRejection.TRANSLATION_JUMP,
             StandalonePoseRejection.ANGULAR_JUMP ->
                 StandaloneFailureReason.POSE_JUMP
+            // A single malformed native pose is rejected like a continuity jump and reacquired;
+            // it should not permanently kill an otherwise healthy session.
             StandalonePoseRejection.NON_FINITE ->
-                StandaloneFailureReason.INTERNAL_FAILURE
+                StandaloneFailureReason.POSE_JUMP
         },
         diagnostic = diagnostic,
     )
