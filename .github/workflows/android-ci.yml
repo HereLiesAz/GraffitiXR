@@ -71,6 +71,9 @@ jobs:
       - name: SphereSLAM architecture invariants
         run: python3 tools/check_sphereslam_architecture.py
 
+      - name: SphereSLAM build contract
+        run: python3 tools/check_sphereslam_build_contract.py
+
       - name: Run detekt
         # config/detekt/detekt.yml (maxIssues: 0) existed but was never wired into CI, so it was
         # never actually enforced. continue-on-error is deliberate here: the detekt Gradle plugin
@@ -121,6 +124,12 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease --build-cache --no-daemon --stacktrace
 
+      - name: Verify SphereSLAM release packaging
+        run: python3 tools/check_sphereslam_apk.py --variant release
+
+      - name: Verify non-ARCore release manifest
+        run: python3 tools/check_sphereslam_manifest.py --variant release
+
   build-and-release:
     needs: unit-tests
     runs-on: ubuntu-latest
@@ -136,6 +145,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          submodules: recursive
 
       - name: Derive CI versionCode
         # Above every versionCode published from version.properties (14730 at the switch), and
@@ -189,6 +199,10 @@ jobs:
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
           cat build.log
           exit $EXIT_CODE
+
+      - name: Verify SphereSLAM debug packaging
+        if: success()
+        run: python3 tools/check_sphereslam_apk.py --variant debug
 
       - name: Report Failure to Jules
         if: failure() && steps.gradle-build.outcome == 'failure'
