@@ -39,7 +39,10 @@ public:
     // JNI/Kotlin call sites don't need to change.
     void updateDeviceMotion(float* angularVel, float* linearVel);
 
-    void setArCoreTrackingState(bool isTracking);
+    // Backend-neutral validity for the pose most recently supplied through updateCamera().
+    // True means the pose belongs to THIS camera frame and is safe for pose-dependent helpers;
+    // false means updateCamera may still contain the last accepted pose and must not be treated live.
+    void setTrackingPoseValid(bool isValid);
     void restoreWallFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
     // Ingest a fingerprint built from triangulated metric marks (no depth source): also fixes the
     // fingerprint anchor pose and the intrinsics the reloc PnP should use.
@@ -581,7 +584,8 @@ private:
                           const cv::Mat& descs, double fx, double fy, double cx, double cy);
 
     mutable std::mutex mMutex;
-    std::atomic<bool> mIsArCoreTracking{false};
+    // Deliberately backend-neutral. ARCore and standalone KPM both drive this through the same seam.
+    std::atomic<bool> mHasTrackingPose{false};
 
     cv::Ptr<cv::ORB> mFeatureDetector;
     cv::Ptr<cv::DescriptorMatcher> mMatcher;    // BruteForce-Hamming for ORB (CV_8U)
