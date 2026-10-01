@@ -128,11 +128,20 @@ class CollaborationManager @Inject constructor() {
     ) {
         check(hostSession == null && guestSession == null) { "already in a session" }
         val payload = QrPayload.parse(qr)
+        if (payload.protocolVersion != ProtocolVersion.CURRENT) {
+            _state.value = CoopSessionState.Ended(CoopSessionState.EndReason.VersionMismatch)
+            throw IllegalArgumentException(
+                "co-op protocol mismatch: QR=${payload.protocolVersion} local=${ProtocolVersion.CURRENT}"
+            )
+        }
         val session = GuestSession(
             host = payload.host,
             port = payload.port,
             token = payload.token,
-            protocolVersion = payload.protocolVersion,
+            // Advertise THIS client's schema, never echo the QR's. The equality check above makes
+            // this mostly documentary, but it prevents a future caller from reintroducing the v2/v3
+            // bug by treating peer metadata as local protocol capability.
+            protocolVersion = ProtocolVersion.CURRENT,
             localDeviceName = localDeviceName,
             localBackend = localBackend,
             onBulkReceived = onBulkReceived,
