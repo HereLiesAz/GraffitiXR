@@ -12,6 +12,7 @@ import android.os.Looper
 import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
+import androidx.camera.core.CameraSelector
 import androidx.camera.view.LifecycleCameraController
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -436,6 +437,14 @@ fun SphereSlamStandaloneOverlay(
     // intrinsics behind KPM while GraffitiXR's own pinch gesture is supposed to scale the artwork.
     // Keep the standalone camera calibrated at 1x for this composition only, and restore the shared
     // controller state when leaving standalone AR.
+    DisposableEffect(cameraController) {
+        val previousSelector = cameraController.cameraSelector
+        cameraController.cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+        onDispose {
+            cameraController.cameraSelector = previousSelector
+        }
+    }
+
     DisposableEffect(cameraController, cameraId) {
         val id = cameraId
         if (id == null) {
