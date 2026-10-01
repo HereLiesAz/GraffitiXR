@@ -1,13 +1,5 @@
 package com.hereliesaz.graffitixr.common.model
 
-/**
- * Persisted frame contract for [GraffitiProject.sphereSlamFingerprint].
- *
- * v1 = centered rectified KPM page: +X image-right, +Y image-up, +Z wall normal, with the exact
- * artoolkitX half-pixel page mapping. Bump this BEFORE changing point semantics.
- */
-const val SPHERE_SLAM_FINGERPRINT_FRAME_VERSION: Int = 1
-
 import android.net.Uri
 import android.os.Parcelable
 import androidx.compose.ui.geometry.Offset
@@ -18,6 +10,15 @@ import com.hereliesaz.graffitixr.common.serialization.UriSerializer
 import kotlinx.parcelize.Parcelize
 import kotlinx.serialization.Serializable
 import java.util.UUID
+
+/**
+ * Persisted frame contract for [GraffitiProject.sphereSlamFingerprint].
+ *
+ * v1 = centered rectified KPM page: +X image-right, +Y image-up, +Z wall normal, with the exact
+ * artoolkitX half-pixel page mapping. Bump this BEFORE changing point semantics.
+ */
+const val SPHERE_SLAM_FINGERPRINT_FRAME_VERSION: Int = 1
+
 
 /**
  * Data class representing GPS coordinates and accuracy.
