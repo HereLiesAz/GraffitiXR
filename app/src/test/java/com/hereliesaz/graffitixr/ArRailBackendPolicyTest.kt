@@ -40,7 +40,7 @@ class ArRailBackendPolicyTest {
     }
 
     @Test
-    fun `standalone backend redirects target capture and blocks uncalibrated coop`() {
+    fun `standalone backend redirects target capture and enables calibrated coop`() {
         val p = arRailBackendPolicy(
             arCoreAvailabilityResolved = true,
             arCoreAvailable = false,
@@ -48,10 +48,10 @@ class ArRailBackendPolicyTest {
         assertTrue(p.backendResolved)
         assertTrue(p.standalone)
         assertFalse(p.targetRailEnabled)
-        assertFalse(p.coopCalibrationAvailable)
+        assertTrue(p.coopCalibrationAvailable)
         assertFalse(p.modePreviewExportAvailable)
         assertTrue(p.targetDisabledReason!!.contains("Wall Target"))
-        assertTrue(p.coopDisabledReason!!.contains("ARCore calibration"))
+        assertNull(p.coopDisabledReason)
         assertTrue(p.exportDisabledReason!!.contains("not implemented"))
     }
 }
