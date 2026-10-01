@@ -29,12 +29,17 @@ internal data class StandaloneWallRegion(
 }
 
 /**
- * Backend-neutral standalone replacement for ARCore Frame.hitTest on the known wall.
+ * Canonical-wall ray intersection for standalone consumers that genuinely need a screen-point hit.
  *
- * The KPM pose already gives camera-from-canonical-wall. This function back-projects one display
- * pixel through the calibrated CameraX pinhole model, intersects the ray with canonical z=0, and
- * accepts the hit only when it lands inside a registered KPM page. It never invents a hit while the
- * wall is unlocked and never treats normalized KPM scale as physical depth.
+ * Standalone wall establishment itself is NOT tap-to-place: target capture + KPM establish the
+ * canonical wall, and ordinary artwork placement uses wall-local gesture offsets. Consequently this
+ * helper is intentionally not wired to a synthetic "tap to anchor" action merely to imitate ARCore.
+ * It exists for shared features that require a screen point (future cross-backend calibration,
+ * measurement, etc.). Such a caller must pass a visually locked same-frame KPM pose.
+ *
+ * The function back-projects one display pixel through the calibrated CameraX pinhole model,
+ * intersects the ray with canonical z=0, and accepts the hit only inside a registered KPM page. It
+ * never invents a hit while unlocked and never treats normalized KPM scale as physical depth.
  */
 internal object StandaloneWallHitTest {
     fun hit(
