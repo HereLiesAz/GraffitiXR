@@ -2101,7 +2101,9 @@ class ArViewModel @Inject constructor(
      * project's current reference. A newer recapture wins the compare and is left untouched.
      */
     fun clearSphereSlamReferenceIfMatches(expectedUri: android.net.Uri) {
-        val projectId = projectRepository.currentProject.value?.id ?: return
+        val startingProject = projectRepository.currentProject.value ?: return
+        val projectId = startingProject.id
+        val atlasPages = startingProject.sphereSlamAtlasPages
         viewModelScope.launch(dispatchers.io) {
             var cleared = false
             try {
@@ -2130,6 +2132,13 @@ class ArViewModel @Inject constructor(
                 }
                 if (cleared) {
                     projectManager.deleteSphereSlamReference(appContext, projectId, expectedUri)
+                    atlasPages.forEach { page ->
+                        projectManager.deleteSphereSlamAtlasPage(
+                            appContext,
+                            projectId,
+                            page.referenceUri,
+                        )
+                    }
                     appendDiag(
                         "SphereSLAM standalone cleared missing/corrupt persisted reference",
                     )
@@ -2138,6 +2147,50 @@ class ArViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "Failed to clear invalid standalone SphereSLAM reference")
+            }
+        }
+    }
+
+    /**
+     * Drop one corrupt/incompatible grown page without disturbing canonical page 0 or its frame.
+     * Compare both stable page ID and URI so a stale decode callback cannot delete a recaptured page.
+     */
+    fun clearSphereSlamAtlasPageIfMatches(pageNo: Int, expectedUri: android.net.Uri) {
+        val projectId = projectRepository.currentProject.value?.id ?: return
+        viewModelScope.launch(dispatchers.io) {
+            var removed = false
+            try {
+                projectRepository.updateProject { current ->
+                    if (current.id != projectId) {
+                        current
+                    } else {
+                        val matching = current.sphereSlamAtlasPages.any {
+                            it.pageNo == pageNo && it.referenceUri == expectedUri
+                        }
+                        if (!matching) {
+                            current
+                        } else {
+                            removed = true
+                            current.copy(
+                                sphereSlamAtlasPages = current.sphereSlamAtlasPages.filterNot {
+                                    it.pageNo == pageNo && it.referenceUri == expectedUri
+                                },
+                            )
+                        }
+                    }
+                }
+                if (removed) {
+                    projectManager.deleteSphereSlamAtlasPage(
+                        appContext,
+                        projectId,
+                        expectedUri,
+                    )
+                    appendDiag("SphereSLAM atlas page removed page=$pageNo")
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to clear invalid SphereSLAM atlas page")
             }
         }
     }
