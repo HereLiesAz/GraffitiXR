@@ -272,6 +272,8 @@ fun MainScreen(
                             persistedReferencePhysicallyMetric =
                                 arUiState.sphereSlamReferencePhysicallyMetric,
                             persistedAtlasPages = arUiState.sphereSlamAtlasPages,
+                            coopPeerSpatialFrame = arUiState.coopPeerSpatialFrame,
+                            coopPeerFingerprint = arUiState.coopPeerFingerprint,
                             onReferenceCaptured = { bitmap, widthMeters, physicallyMetric ->
                                 arViewModel.saveSphereSlamReference(
                                     bitmap,
