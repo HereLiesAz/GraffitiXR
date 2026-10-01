@@ -15,7 +15,8 @@ Its contents, all produced by `ProjectManager`:
 | `project.json` | `ProjectManager.saveProject` | The full `GraffitiProject` (see below), kotlinx.serialization JSON, pretty-printed. |
 | `thumbnail.png` | `saveProject` (when a thumbnail bitmap is passed) | PNG, quality 80. |
 | `target_<unique>.png` | `saveProject` / `ProjectManager.appendTargetImage` | One PNG per captured target image (quality 100). Filenames are unique per file (`File.createTempFile`), not sequentially numbered — nothing round-trips the filename itself, only the URI stored in `project.json`. |
-| `sphereslam_reference_<uuid>.png` | `ProjectManager.saveSphereSlamReference` | Versioned rectified planar wall page for ARCore-independent SphereSLAM/KPM tracking. `project.json` points at the currently committed file via `sphereSlamReferenceUri`; recapture writes a new file first, atomically commits URI + scale metadata, then deletes the superseded file best-effort. |
+| `sphereslam_reference_<uuid>.png` | `ProjectManager.saveSphereSlamReference` | Versioned canonical rectified wall page for ARCore-independent SphereSLAM/KPM tracking. `project.json` stores URI, scale, anchor generation/frame version, and placement generation; recapture installs a new file, bumps the anchor generation, invalidates old spatial placement, then deletes superseded page/atlas files best-effort. |
+| `sphereslam_page_<pageNo>_<uuid>.png` | `ProjectManager.saveSphereSlamAtlasPage` | Additional rectified KPM atlas pages. Each project record stores a stable page id plus `canonicalFromPage`, so every page matches back into page 0's immutable canonical wall frame. |
 | arbitrary filenames | `ProjectRepository.saveArtifact` | Design-layer image exports and other editor-written artifacts (e.g. `feature/editor`'s `EditorViewModel`), written as raw bytes under the same project directory. |
 
 There is **no separate binary map/voxel/splat file of any kind**. The persistent wall-feature map
@@ -34,8 +35,9 @@ A `.gxr` file is a **plain ZIP archive** (`java.util.zip.ZipOutputStream`/`ZipIn
 custom container, no magic header) whose entries are exactly the files in a project directory,
 zipped flat into the archive root — `ProjectManager.zipFolder` strips the project-id path segment,
 so the ZIP root directly contains `project.json`, `thumbnail.png`, `target_*.png`, the currently
-referenced `sphereslam_reference_<uuid>.png` (plus any orphan left by interrupted cleanup), and
-artifact files, with no top-level folder wrapping them.
+referenced `sphereslam_reference_<uuid>.png`, any referenced `sphereslam_page_*.png` atlas pages
+(plus any orphan left by interrupted cleanup), and artifact files, with no top-level folder wrapping
+them.
 
 - **Export** (`ProjectManager.exportProjectToUri`): zips the project directory as-is to a
   user-chosen URI.
@@ -71,6 +73,11 @@ missing from an old file just uses its Kotlin default). Notably:
   `descriptorsRows`/`descriptorsCols`/`descriptorsType` to reconstruct an OpenCV `Mat`.
 - `wallFeatureMap: WallFeatureMap?` carries the passively-built wide-area feature map the same
   way — flat `FloatArray`/`ByteArray`/`IntArray` fields, not a separate file (see §1).
+- `sphereSlamAnchorGeneration` + `sphereSlamAnchorFrameVersion` identify the canonical standalone
+  wall frame; `sphereSlamPlacementAnchorGeneration` says which generation the persisted AR spatial
+  placement belongs to. A mismatch invalidates pan/scale/rotation while leaving tone intact.
+- `sphereSlamAtlasPages` carries stable page IDs, page-image URIs, physical/normalized scale, frame
+  version, and the rigid `canonicalFromPage` transform used to rebase KPM matches.
 - `captureEnvironment: CaptureEnvironment?` carries device attitude, ARCore poses, frame
   orientation, and a location fix at capture time (all independently optional/nullable — see the
   KDoc on `CaptureEnvironment` for why).
