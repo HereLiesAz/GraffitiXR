@@ -1,6 +1,7 @@
 package com.hereliesaz.sphereslam
 
 import java.nio.ByteBuffer
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -106,6 +107,65 @@ class SphereSlamStandaloneSessionTest {
         assertEquals(-0.5f, pose.viewMatrix[12], 0.0001f)
         assertEquals(-0.25f, pose.viewMatrix[13], 0.0001f)
         assertEquals(-1f, pose.viewMatrix[14], 0.0001f)
+        session.close()
+    }
+
+    @Test
+    fun switchingAcrossThreePages_keepsExactlyOneCanonicalCameraPose() {
+        val engine = FakeEngine()
+        val session = SphereSlamStandaloneSession(
+            frameWidth = 4,
+            frameHeight = 2,
+            calibration = SphereSlamCalibration(4f, 4f, 2f, 1f),
+            engineFactory = SphereSlamStandaloneSession.EngineFactory { _, _, _ -> engine },
+        )
+        session.addReference(ByteBuffer.allocateDirect(8), 4, 2, 1f, true, pageNo = 0)
+        session.addReference(
+            ByteBuffer.allocateDirect(8),
+            4,
+            2,
+            1f,
+            true,
+            pageNo = 1,
+            canonicalFromPage = SphereSlamPoseMath.identity4().also { it[12] = 1f },
+        )
+        session.addReference(
+            ByteBuffer.allocateDirect(8),
+            4,
+            2,
+            1f,
+            true,
+            pageNo = 2,
+            canonicalFromPage = SphereSlamPoseMath.identity4().also { it[12] = 2f },
+        )
+
+        fun match(pageNo: Int, pageLocalTxMm: Float): FloatArray {
+            engine.nextMatch = PlanarMatch(
+                pageNo = pageNo,
+                cameraFromPage3x4 = floatArrayOf(
+                    1f, 0f, 0f, pageLocalTxMm,
+                    0f, 1f, 0f, 0f,
+                    0f, 0f, 1f, 1000f,
+                ),
+                reprojectionError = 0.2f,
+                inlierCount = 24,
+            )
+            return requireNotNull(
+                session.match(ByteBuffer.allocateDirect(8), pageNo.toLong()),
+            ).viewMatrix
+        }
+
+        // Same physical camera position, described in each page's local KPM coordinates.
+        val fromRoot = match(pageNo = 0, pageLocalTxMm = -2000f)
+        val fromPage1 = match(pageNo = 1, pageLocalTxMm = -1000f)
+        val fromPage2 = match(pageNo = 2, pageLocalTxMm = 0f)
+
+        assertArrayEquals(fromRoot, fromPage1, 0.0001f)
+        assertArrayEquals(fromRoot, fromPage2, 0.0001f)
+        assertEquals(-1.5f, fromRoot[12], 0.0001f)
+        assertEquals(-0.25f, fromRoot[13], 0.0001f)
+        assertEquals(-1f, fromRoot[14], 0.0001f)
+
         session.close()
     }
 
