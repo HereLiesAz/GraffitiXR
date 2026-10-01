@@ -1480,8 +1480,15 @@ class ArViewModel @Inject constructor(
      * not mean the product's AR mode is unavailable.
      */
     fun setArMode(enabled: Boolean, context: Context) {
-        if (enabled && !_uiState.value.isArCoreAvailable) {
-            Timber.w("setArMode(true) ignored: standalone SphereSLAM owns AR on this device")
+        val capability = _uiState.value
+        if (
+            enabled &&
+            (!capability.isArCoreAvailabilityResolved || !capability.isArCoreAvailable)
+        ) {
+            Timber.w(
+                "setArMode(true) ignored: ARCore capability is unresolved/unavailable; " +
+                    "CameraX + SphereSLAM owns the safe path",
+            )
             return
         }
         isInArMode = enabled
@@ -1596,10 +1603,26 @@ class ArViewModel @Inject constructor(
                 // few seconds and off the main thread, so a device whose motion-stereo thrashes can't
                 // ANR — and we only adopt stereo if it works. Cancelling this job (AR exit / pause)
                 // cancels the probe too.
-                if (context != null && isInArMode && session == null && !isDestroying && stereoCapable == null) {
+                val capability = _uiState.value
+                val arCoreReady =
+                    capability.isArCoreAvailabilityResolved && capability.isArCoreAvailable
+                if (
+                    context != null &&
+                    isInArMode &&
+                    session == null &&
+                    !isDestroying &&
+                    stereoCapable == null &&
+                    arCoreReady
+                ) {
                     probeStereoCapability(context)
                 }
-                if (isInArMode && session == null && context != null && !isDestroying) {
+                if (
+                    isInArMode &&
+                    session == null &&
+                    context != null &&
+                    !isDestroying &&
+                    arCoreReady
+                ) {
                     // Wait for the camera to actually be FREE before ARCore opens it. AR entry calls
                     // cameraController.unbind() (CameraX) whose camera-device close is ASYNCHRONOUS, so
                     // opening the ARCore session immediately races CameraX's release: ARCore gets the
@@ -1891,11 +1914,14 @@ class ArViewModel @Inject constructor(
      * install. Must be called while no live session holds the camera.
      */
     private suspend fun probeStereoCapability(context: Context) {
+        val capability = _uiState.value
         if (
-            _uiState.value.isArCoreAvailabilityResolved &&
-            !_uiState.value.isArCoreAvailable
+            !capability.isArCoreAvailabilityResolved ||
+            !capability.isArCoreAvailable
         ) {
-            appendDiag("probe: skipped; ARCore-only depth probe is unavailable on standalone backend")
+            appendDiag(
+                "probe: skipped; ARCore-only depth probe requires positively resolved ARCore capability",
+            )
             return
         }
         if (stereoCapable != null) return
