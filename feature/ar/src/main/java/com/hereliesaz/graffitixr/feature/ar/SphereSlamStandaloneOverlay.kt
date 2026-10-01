@@ -92,6 +92,11 @@ fun SphereSlamStandaloneOverlay(
 
     var rawCaptureBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var pendingReferenceBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var pendingReferenceWarning by remember { mutableStateOf<String?>(null) }
+    var referenceNeedsPersistence by remember { mutableStateOf(false) }
+    var previousReferenceBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var previousReferenceWidthMeters by remember { mutableStateOf(1f) }
+    var previousReferencePhysicallyMetric by remember { mutableStateOf(false) }
     var referenceWidthInput by remember { mutableStateOf("") }
     var unwarpPoints by remember { mutableStateOf(SPHERESLAM_DEFAULT_UNWARP_POINTS) }
     var referenceBitmap by remember { mutableStateOf<Bitmap?>(null) }
@@ -108,8 +113,15 @@ fun SphereSlamStandaloneOverlay(
     var fatalMessage by remember { mutableStateOf<String?>(null) }
 
     fun resetCapture() {
+        referenceBitmap?.let {
+            previousReferenceBitmap = it
+            previousReferenceWidthMeters = activeReferenceWidthMeters
+            previousReferencePhysicallyMetric = activeReferencePhysicallyMetric
+        }
         rawCaptureBitmap = null
         pendingReferenceBitmap = null
+        pendingReferenceWarning = null
+        referenceNeedsPersistence = false
         referenceWidthInput = ""
         referenceBitmap = null
         unwarpPoints = SPHERESLAM_DEFAULT_UNWARP_POINTS
@@ -129,6 +141,7 @@ fun SphereSlamStandaloneOverlay(
         if (restored != null) {
             activeReferenceWidthMeters = persistedReferenceWidthMeters
             activeReferencePhysicallyMetric = persistedReferencePhysicallyMetric
+            referenceNeedsPersistence = false
             referenceBitmap = restored
         }
     }
@@ -138,8 +151,8 @@ fun SphereSlamStandaloneOverlay(
         activeReferencePhysicallyMetric = physicallyMetric
         pendingReferenceBitmap = null
         referenceWidthInput = ""
+        referenceNeedsPersistence = true
         referenceBitmap = bitmap
-        onReferenceCaptured(bitmap, widthMeters, physicallyMetric)
     }
 
     val reference = referenceBitmap
@@ -172,6 +185,13 @@ fun SphereSlamStandaloneOverlay(
                             "Enter a width from 0.05 m to 100 m.",
                             color = Color.White,
                             modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
+                    pendingReferenceWarning?.let { warning ->
+                        Text(
+                            warning,
+                            color = Color.White,
+                            modifier = Modifier.padding(top = 8.dp),
                         )
                     }
                     Button(
@@ -247,11 +267,21 @@ fun SphereSlamStandaloneOverlay(
                                 fatalMessage = "Couldn't rectify that target — mark four clear corners."
                                 rawCaptureBitmap = null
                             } else {
-                                // Do not start KPM yet. The next step either supplies the real width
-                                // represented by this rectified page or explicitly chooses normalized
-                                // visual scale. This prevents us from silently calling 1.0 "one metre".
-                                pendingReferenceBitmap = unwarped
-                                rawCaptureBitmap = null
+                                val report = StandaloneTargetQuality.analyze(
+                                    luma = bitmapToLuma(unwarped),
+                                    width = unwarped.width,
+                                    height = unwarped.height,
+                                )
+                                val blockingMessage = StandaloneTargetQuality.blockingMessage(report)
+                                if (blockingMessage != null) {
+                                    fatalMessage = blockingMessage
+                                    rawCaptureBitmap = null
+                                } else {
+                                    pendingReferenceWarning =
+                                        StandaloneTargetQuality.warningMessage(report)
+                                    pendingReferenceBitmap = unwarped
+                                    rawCaptureBitmap = null
+                                }
                             }
                         }
                     }
@@ -369,6 +399,17 @@ fun SphereSlamStandaloneOverlay(
                         referenceWidthUnits = g.widthMeters
                         referenceHeightUnits = g.heightMeters
                         referenceReady = true
+                        if (referenceNeedsPersistence) {
+                            referenceBitmap?.let { accepted ->
+                                onReferenceCaptured(
+                                    accepted,
+                                    activeReferenceWidthMeters,
+                                    activeReferencePhysicallyMetric,
+                                )
+                            }
+                            referenceNeedsPersistence = false
+                            previousReferenceBitmap = null
+                        }
                     }
                 },
                 onDiagnostic = { text ->
@@ -391,9 +432,31 @@ fun SphereSlamStandaloneOverlay(
                 },
                 onFatalError = { error ->
                     mainHandler.post {
-                        fatalMessage = when (error) {
-                            is UnsatisfiedLinkError -> "SphereSLAM isn't available in this build."
-                            else -> "SphereSLAM couldn't track this target. Recapture a textured wall patch."
+                        if (error is StandaloneReferenceTooWeakException) {
+                            val old = previousReferenceBitmap
+                            if (old != null) {
+                                activeReferenceWidthMeters = previousReferenceWidthMeters
+                                activeReferencePhysicallyMetric =
+                                    previousReferencePhysicallyMetric
+                                referenceNeedsPersistence = false
+                                previousReferenceBitmap = null
+                                referenceBitmap = old
+                                fatalMessage =
+                                    "New target had only ${error.featureCount} KPM features; " +
+                                        "restored the previous target."
+                            } else {
+                                fatalMessage =
+                                    "That target has too little trackable detail " +
+                                        "(${error.featureCount} KPM features; need " +
+                                        "${error.minimumFeatureCount}). Recapture a richer wall patch."
+                            }
+                        } else {
+                            fatalMessage = when (error) {
+                                is UnsatisfiedLinkError ->
+                                    "SphereSLAM isn't available in this build."
+                                else ->
+                                    "SphereSLAM couldn't track this target. Recapture a textured wall patch."
+                            }
                         }
                     }
                 },
