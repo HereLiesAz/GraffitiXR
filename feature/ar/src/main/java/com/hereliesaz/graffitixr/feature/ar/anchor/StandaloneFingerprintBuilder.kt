@@ -11,7 +11,7 @@ import org.opencv.core.CvType
 import org.opencv.core.KeyPoint
 import org.opencv.core.Mat
 import org.opencv.core.MatOfKeyPoint
-import org.opencv.features2d.ORB
+import org.opencv.features.ORB
 import org.opencv.imgproc.Imgproc
 
 /**
@@ -221,8 +221,6 @@ object StandaloneFingerprintBuilder {
             mask.release()
             keypoints.release()
             descriptors.release()
-            orb.clear()
-            clahe.clear()
         }
     }
 }
