@@ -1,6 +1,8 @@
 package com.hereliesaz.graffitixr.core.collaboration.wire
 
 import com.hereliesaz.graffitixr.common.model.CoopSessionState
+import com.hereliesaz.graffitixr.common.model.CoopSpatialFrame
+import com.hereliesaz.graffitixr.common.model.CoopTrackingBackend
 import com.hereliesaz.graffitixr.common.model.Op
 import kotlinx.serialization.Serializable
 
@@ -15,6 +17,7 @@ internal data class HelloPayload(
     val proof: ByteArray,
     val clientVersion: Int,
     val deviceName: String,
+    val localBackend: CoopTrackingBackend,
     val lastAppliedSeq: Long = 0L,
 ) {
     override fun equals(other: Any?): Boolean {
@@ -22,7 +25,7 @@ internal data class HelloPayload(
         if (other !is HelloPayload) return false
         return guestNonce.contentEquals(other.guestNonce) && proof.contentEquals(other.proof) &&
             clientVersion == other.clientVersion && deviceName == other.deviceName &&
-            lastAppliedSeq == other.lastAppliedSeq
+            localBackend == other.localBackend && lastAppliedSeq == other.lastAppliedSeq
     }
 
     override fun hashCode(): Int {
@@ -30,6 +33,7 @@ internal data class HelloPayload(
         result = 31 * result + proof.contentHashCode()
         result = 31 * result + clientVersion
         result = 31 * result + deviceName.hashCode()
+        result = 31 * result + localBackend.hashCode()
         result = 31 * result + lastAppliedSeq.hashCode()
         return result
     }
@@ -77,7 +81,7 @@ internal data class HelloOkPayload(
 @Serializable
 internal data class HelloRejectedPayload(val reason: RejectReason) {
     @Serializable
-    enum class RejectReason { BadToken, VersionMismatch, AlreadyHosting }
+    enum class RejectReason { BadToken, VersionMismatch, AlreadyHosting, SpatialIncompatible }
 }
 
 @Serializable
@@ -86,6 +90,7 @@ internal data class BulkBeginPayload(
     val layerCount: Int,
     val fingerprintBytes: Int,
     val projectBytes: Int,
+    val spatialFrame: CoopSpatialFrame,
 )
 
 @Serializable
