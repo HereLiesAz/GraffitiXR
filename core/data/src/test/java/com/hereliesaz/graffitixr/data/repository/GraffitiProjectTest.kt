@@ -125,6 +125,33 @@ class GraffitiProjectTest {
     }
 
     @Test
+    fun `serialization preserves SphereSLAM atlas page transforms and IDs`() {
+        val atlasUri = mockk<android.net.Uri>()
+        every { atlasUri.toString() } returns "file://atlas-page"
+        every { android.net.Uri.parse("file://atlas-page") } returns atlasUri
+        val page = com.hereliesaz.graffitixr.common.model.SphereSlamAtlasPage(
+            pageNo = 3,
+            referenceUri = atlasUri,
+            referenceWidthMeters = 0.8f,
+            physicallyMetric = true,
+            canonicalFromPage = listOf(
+                1f, 0f, 0f, 0f,
+                0f, 1f, 0f, 0f,
+                0f, 0f, 1f, 0f,
+                1.2f, -0.3f, 0f, 1f,
+            ),
+        )
+        val project = GraffitiProject(
+            id = "atlas",
+            sphereSlamAtlasPages = listOf(page),
+        )
+
+        val decoded = json.decodeFromString<GraffitiProject>(json.encodeToString(project))
+
+        assertEquals(listOf(page), decoded.sphereSlamAtlasPages)
+    }
+
+    @Test
     fun `serialization preserves per-host rail expansion`() {
         val expansion = mapOf("host.design" to true, "design.layers" to false)
         val project = GraffitiProject(id = "id", name = "n", railExpansion = expansion)
