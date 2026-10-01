@@ -347,13 +347,20 @@ Still required for full standalone parity:
   before any UI reports real-world metres;
 - integration with GraffitiXR's normal target-review/fingerprint workflow instead of the current
   standalone capture/unwarp surface;
-- the normal AR design pan/scale/rotate/tone controls applied to the standalone renderer;
-- MobileGS paint-progress/corroboration integration on the standalone camera feed;
+- MobileGS/fingerprint integration in an explicitly defined standalone wall coordinate frame;
 - saved wide-area/self-growing wall-map pages beyond the canonical target;
 - equivalents or deliberate degradations for ARCore plane/depth/cloud-anchor-only features;
-- co-op calibration on the standalone coordinate frame;
+- co-op calibration across standalone/ARCore coordinate frames;
 - device validation on actually ARCore-unsupported hardware, including rotation changes, occlusion,
   process recreation, export/import, and return-visit reacquisition.
+
+Standalone AR design adjustments are already wired on this branch: tone/opacity/invert are baked
+into the texture, while pan/scale/Z rotation/X-Y perspective rotation are applied geometrically by
+the standalone GL renderer. Gesture pan uses the standalone wall-units-per-pixel value when no
+`ArRenderer` exists.
+
+The complete granular implementation/validation checklist is
+[`SPHERESLAM_TODO.md`](SPHERESLAM_TODO.md).
 
 There is also one cleanup item: the asynchronous runtime adapter currently talks to
 `KpmBridge` directly while the merged library already exposes `SphereSlamEngine`. A later cleanup
@@ -404,16 +411,19 @@ Future changes should preserve all of these:
 
 ## Next implementation slice
 
-The next safe slice is not "replace ARCore pose."
+Do not treat one broad "finish SphereSLAM" task as reviewable work. The authoritative dependency-
+ordered checklist is [`SPHERESLAM_TODO.md`](SPHERESLAM_TODO.md).
 
-It is:
+The immediate order is:
 
-1. make target capture provide physical wall scale to the KPM page;
-2. define and test the artoolkitX-camera → GraffitiXR/ARCore coordinate conversion;
-3. timestamp-pair a KPM observation with ARCore pose history;
-4. expose a correction observation to the existing fusion layer;
-5. gate correction on inliers, reprojection error, age, and consistency;
-6. validate on-device by walking toward/away from the same wall and forcing an ARCore
-   relocalization event.
+1. get branch build/unit/native CI green;
+2. establish physical standalone page scale;
+3. finish standalone target-workflow and tracking-confidence/loss gates;
+4. define/test the standalone KPM-page ↔ MobileGS fingerprint frame before feeding standalone
+   camera frames into MobileGS;
+5. then add standalone MobileGS paint-progress/self-grow and wide-area page growth;
+6. in parallel, once physical page scale is known, implement hybrid KPM → `PoseFusion` correction
+   through explicit timestamp/frame conversion and confidence gates.
 
-Only after that validation should SphereSLAM be allowed to correct the rendered anchor.
+SphereSLAM must never be allowed to correct the hybrid rendered anchor before those conversion and
+confidence tests pass.

@@ -76,9 +76,9 @@ architectural roles:
 
 - **ARCore-capable devices:** run beside `ArCorePoseSource` for wall recognition/relocalization and
   later explicit pose correction.
-- **ARCore-unavailable devices:** become the complete standalone tracking backend, providing a
-  continuous metric 6-DoF `PoseSource`, wall anchoring, and relocalization without an ARCore
-  `Session`.
+- **ARCore-unavailable devices:** provide the standalone wall-tracking backend without an ARCore
+  `Session`. The current implementation is page-relative KPM + a short rotation-only IMU bridge;
+  physical scale, MobileGS frame integration, and wider wall-map continuity remain tracked work.
 
 The code now implements both the calibrated hybrid KPM sidecar and an initial standalone
 wall-target path. On non-ARCore devices CameraX supplies display-oriented luminance + intrinsics,
@@ -127,9 +127,9 @@ documented in
 **Camera ownership:**
 - `EditorMode.AR`, hybrid mode → ARCore `Session` owns the camera and SphereSLAM consumes frames
   acquired from that session.
-- `EditorMode.AR`, standalone mode (required, not yet complete) → CameraX/raw camera owns the
-  camera; SphereSLAM + IMU supply the primary pose and wall transform without creating an ARCore
-  `Session`.
+- `EditorMode.AR`, standalone mode → CameraX owns the camera; calibrated KPM supplies the
+  wall-relative pose while the page is visible and a short fused-gyro bridge covers brief visual
+  misses. The remaining parity work is tracked in `docs/SPHERESLAM_TODO.md`.
 - `EditorMode.OVERLAY` → CameraX owns the camera (devices without ARCore can continue using the
   planar homography/OpenCV overlay path described in `docs/UI_UX.md`).
 
