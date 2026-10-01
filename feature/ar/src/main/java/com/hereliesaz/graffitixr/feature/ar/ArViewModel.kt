@@ -1397,13 +1397,17 @@ class ArViewModel @Inject constructor(
         )
     }
 
+    /**
+     * Enter/leave the **ARCore-backed** runtime.
+     *
+     * MainScreen calls this only in the ARCore-capable branch. AR mode itself is not ARCore-only:
+     * unsupported devices keep this ViewModel's ARCore session state false and run CameraX +
+     * SphereSLAM directly. The availability guard therefore protects Session construction; it does
+     * not mean the product's AR mode is unavailable.
+     */
     fun setArMode(enabled: Boolean, context: Context) {
         if (enabled && !_uiState.value.isArCoreAvailable) {
-            // ARCore is not supported on this device. Refuse to enter AR mode
-            // rather than crashing inside Session(context). The mode chooser
-            // already hides AR for unsupported devices; this is defense in
-            // depth in case it's reached via deep link, restored state, etc.
-            Timber.w("setArMode(true) ignored: ARCore unavailable on this device")
+            Timber.w("setArMode(true) ignored: standalone SphereSLAM owns AR on this device")
             return
         }
         isInArMode = enabled
