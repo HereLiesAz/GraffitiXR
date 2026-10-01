@@ -22,7 +22,6 @@ import timber.log.Timber
  *    is perfectly centered or distortion-free. That approximation is shared by the CameraX
  *    tracking paths and is not photogrammetry-grade calibration; see the standalone SphereSLAM
  *    calibration checklist before treating it as physically exact.
- *    photogrammetry-grade calibration.
  *
  * The two paths are defined against different denominators. `LENS_INTRINSIC_CALIBRATION`'s
  * `[cx, cy]` (and the array its `[fx, fy]` are scaled from) is specified relative to
