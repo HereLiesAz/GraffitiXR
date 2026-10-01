@@ -671,8 +671,14 @@ class SlamManager @Inject constructor(
         }
     }
 
-    fun setArCoreTrackingState(isTracking: Boolean) {
-        nativeSetArCoreTrackingState(isTracking)
+    /**
+     * Whether the pose most recently supplied through [updateCamera] belongs to the current frame.
+     *
+     * Backend-neutral by design: ARCore sets this from its camera tracking state; standalone
+     * SphereSLAM sets it true only for a KPM pose accepted for the same CameraX frame.
+     */
+    fun setTrackingPoseValid(isValid: Boolean) {
+        nativeSetTrackingPoseValid(isValid)
     }
 
     fun loadSuperPoint(assetManager: AssetManager): Boolean = nativeLoadSuperPoint(assetManager)
@@ -840,7 +846,7 @@ class SlamManager @Inject constructor(
         timestampNs: Long
     )
     private external fun nativeUpdateLightLevel(level: Float)
-    private external fun nativeSetArCoreTrackingState(isTracking: Boolean)
+    private external fun nativeSetTrackingPoseValid(isValid: Boolean)
     private external fun nativeLoadSuperPoint(assetManager: AssetManager): Boolean
     private external fun nativeLoadDistortionHead(assetManager: AssetManager): Boolean
     private external fun nativeLoadLowLightEnhancer(assetManager: AssetManager)
