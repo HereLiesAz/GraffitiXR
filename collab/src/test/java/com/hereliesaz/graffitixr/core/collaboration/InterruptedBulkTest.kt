@@ -2,6 +2,7 @@
 package com.hereliesaz.graffitixr.core.collaboration
 
 import com.hereliesaz.graffitixr.common.model.CoopSessionState
+import com.hereliesaz.graffitixr.common.model.CoopTrackingBackend
 import com.hereliesaz.graffitixr.core.collaboration.session.GuestSession
 import com.hereliesaz.graffitixr.core.collaboration.session.HostSession
 import kotlinx.coroutines.TimeoutCancellationException
@@ -29,7 +30,12 @@ class InterruptedBulkTest {
             localDeviceName = "host",
             projectId = "p1",
             snapshotProvider = {
-                ProjectSnapshot(fingerprintBytes = fingerprint, projectBytes = projectBytes, layerCount = 0)
+                ProjectSnapshot(
+                    fingerprintBytes = fingerprint,
+                    projectBytes = projectBytes,
+                    layerCount = 0,
+                    spatialFrame = testSpatialFrame(),
+                )
             },
         )
         val port = host.startListening()
@@ -40,7 +46,8 @@ class InterruptedBulkTest {
             token = "tok",
             protocolVersion = 1,
             localDeviceName = "guest",
-            onBulkReceived = { _, _ -> },
+            localBackend = CoopTrackingBackend.ARCORE,
+            onBulkReceived = { _, _, _ -> },
             onOp = { },
             // Short, deterministic reconnect window so the test doesn't wait the production 30s.
             reconnectWindowMs = 1_000L,
