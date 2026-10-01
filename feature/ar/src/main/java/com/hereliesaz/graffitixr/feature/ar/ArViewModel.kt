@@ -401,7 +401,34 @@ class ArViewModel @Inject constructor(
 
                         // Project assets next: a standalone host's canonical KPM page/atlas arrives
                         // inside this archive and must exist before the CameraX analyzer can restore it.
-                        if (!projectManager.loadAsSpectator(project)) {
+                        if (
+                            !projectManager.loadAsSpectator(project) { spectator ->
+                                normalizeCoopSpectatorProject(
+                                    project = spectator,
+                                    spatialFrame = spatialFrame,
+                                    guestBackend = localBackend,
+                                    imageDimensions = { uri ->
+                                        val opts = android.graphics.BitmapFactory.Options().apply {
+                                            inJustDecodeBounds = true
+                                        }
+                                        runCatching {
+                                            appContext.contentResolver.openInputStream(uri)?.use { input ->
+                                                android.graphics.BitmapFactory.decodeStream(
+                                                    input,
+                                                    null,
+                                                    opts,
+                                                )
+                                            }
+                                        }
+                                        if (opts.outWidth > 0 && opts.outHeight > 0) {
+                                            opts.outWidth to opts.outHeight
+                                        } else {
+                                            null
+                                        }
+                                    },
+                                )
+                            }
+                        ) {
                             _feedback.tryEmit(
                                 com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
                                     "Couldn't load the host's project — the session was ended.", null
