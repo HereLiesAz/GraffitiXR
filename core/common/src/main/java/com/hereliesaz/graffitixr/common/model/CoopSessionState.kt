@@ -16,6 +16,8 @@ sealed class CoopSessionState {
         HostClosed,
         ProtocolError,
         VersionMismatch,
+        SpatialIncompatible,
+        SpatialFrameChanged,
         BadToken,
     }
 }
