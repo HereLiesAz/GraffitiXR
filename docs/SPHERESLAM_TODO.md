@@ -329,7 +329,9 @@ Remaining:
   pan/scale/rotation remain in the separate persisted ModeAdjustment.
 - [ ] Confirm touch/gesture coordinates still line up when CameraX preview is letterboxed/cropped.
 - [ ] Add GL/instrumentation tests for standalone texture clear/replace if test infrastructure permits.
-- [ ] Test extreme but allowed pan/scale/rotation values for NaN/overflow/clipping behavior.
+- [x] Sanitize and test standalone renderer transforms: non-finite values fall back safely, scale
+  uses the shared 0.1–10 editor bounds, rotations normalize, and pathological finite pan values are
+  bounded before GL matrix construction.
 
 **ACCEPTANCE:** the same project adjustment produces the same intended artwork placement and visual
 treatment on ARCore and standalone backends, modulo explicitly documented backend capabilities.
