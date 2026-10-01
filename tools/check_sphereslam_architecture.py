@@ -175,8 +175,13 @@ for required in ("wallLocked", "coveredRegions", "Vec3(x, y, 0f)"):
 
 if 'GlassesSessionState.Fallback("Standalone wall calibration for glasses is not implemented yet")' not in ar_view_model:
     fail("Standalone wearable calibration no longer fails closed before the ARCore hit-test path.")
-if "probe: skipped; ARCore-only depth probe is unavailable on standalone backend" not in ar_view_model:
-    fail("Standalone runtime no longer explicitly skips the ARCore-only stereo/depth probe.")
+if (
+    "probe: skipped; ARCore-only depth probe requires positively resolved ARCore capability"
+    not in ar_view_model
+):
+    fail("ARCore-only stereo/depth probe no longer requires positively resolved ARCore capability.")
+if "(!capability.isArCoreAvailabilityResolved || !capability.isArCoreAvailable)" not in ar_view_model:
+    fail("setArMode no longer fails closed while ARCore availability is unresolved/unavailable.")
 for required in (
     "isDepthApiSupported = false",
     "isHardwareStereoActive = false",
