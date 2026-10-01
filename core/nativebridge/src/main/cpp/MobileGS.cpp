@@ -1299,7 +1299,13 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         return;
     }
 
-    // Wall plane (n·X = pdist, pdist>0) in the fingerprint frame, fit to the existing marks.
+    // Wall plane (n·X = pdist) in the fingerprint frame, fit to the existing marks.
+    //
+    // Do NOT require pdist>0. The legacy ARCore fingerprint lives in capture-camera coordinates and
+    // naturally puts a wall in front of the origin, but the standalone SphereSLAM fingerprint is a
+    // CENTERED WALL frame by design: all canonical page points lie on z=0, so its valid wall plane
+    // passes exactly through the object-frame origin. Ray/plane intersection below only requires
+    // that the CAMERA centre not lie on the wall and that the ray not be parallel to it.
     cv::Mat data((int)wall.size(), 3, CV_32F);
     for (int i = 0; i < (int)wall.size(); ++i) {
         data.at<float>(i,0) = wall[i].x; data.at<float>(i,1) = wall[i].y; data.at<float>(i,2) = wall[i].z;
@@ -1313,7 +1319,10 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     if (nn < 1e-6) { mGrowOutcome.store(kGrowNoGeometry, std::memory_order_relaxed); return; }
     n /= nn;
     double pdist = n.dot(cen); if (pdist < 0) { n = -n; pdist = -pdist; }
-    if (pdist < 1e-3) { mGrowOutcome.store(kGrowNoGeometry, std::memory_order_relaxed); return; }
+    if (!std::isfinite(pdist)) {
+        mGrowOutcome.store(kGrowNoGeometry, std::memory_order_relaxed);
+        return;
+    }
 
     // fp_from_cam = [R^T | -R^T t]: camera centre and per-pixel ray in the fingerprint frame.
     cv::Matx33d Rt = R.t();

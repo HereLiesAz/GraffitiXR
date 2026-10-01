@@ -439,6 +439,11 @@ Required work:
 - [x] Feed baseline paint-progress/corroboration after centered-page alignment is proven; spatially gated self-grow remains disabled pending the checks below.
   - [x] Standalone artwork registration is descriptors-only (no fake depth); native global matching drives progress until design-placement gating is validated.
 
+- [x] Standalone design placement now feeds the existing gated corroboration/Φ path using the exact
+  centered-page rigid transform and scale-included extents; unit tests pin the CW→right-handed
+  rotation and no-scale-in-matrix contract.
+- [x] Remove the legacy self-grow assumption that a valid wall plane must have nonzero distance from
+  the fingerprint origin; centered standalone pages intentionally lie on z=0 through that origin.
 - [ ] Verify self-grow adds points in the standalone fingerprint frame.
 - [ ] Verify saved wall feature maps preserve that frame across process restarts.
 - [x] Add diagnostics identifying fingerprint frame/version/backend; standalone seed logs `backend=standalone-kpm frame=centered-page version=1` and refuses unknown versions.

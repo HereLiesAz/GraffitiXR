@@ -122,6 +122,9 @@ fun SphereSlamStandaloneOverlay(
     var referenceReady by remember { mutableStateOf(false) }
     var referenceWidthUnits by remember { mutableStateOf(0f) }
     var referenceHeightUnits by remember { mutableStateOf(0f) }
+    var designBaseHalfExtents by remember {
+        mutableStateOf<StandaloneDesignHalfExtents?>(null)
+    }
     var trackingState by remember {
         mutableStateOf(StandaloneTrackingState.INITIALIZING)
     }
@@ -394,8 +397,48 @@ fun SphereSlamStandaloneOverlay(
             pageHeightUnits = referenceHeightUnits,
             designWidthPx = designBitmap?.width,
             designHeightPx = designBitmap?.height,
-        ) ?: return@LaunchedEffect
-        glRenderer.setExtent(fit.halfWidth, fit.halfHeight)
+        )
+        designBaseHalfExtents = fit
+        if (fit != null) glRenderer.setExtent(fit.halfWidth, fit.halfHeight)
+    }
+
+    // Push the SAME wall-local rigid placement/extents used by the standalone renderer into
+    // MobileGS. This turns corroboration from global descriptor search into the spatially gated
+    // path and gives self-grow an unambiguous fingerprint-frame Φ when that experiment is enabled.
+    LaunchedEffect(
+        slamManager,
+        mobileGsFingerprint,
+        designBitmap,
+        designBaseHalfExtents,
+        adjustment?.offsetX,
+        adjustment?.offsetY,
+        adjustment?.scale,
+        adjustment?.rotation,
+    ) {
+        val placement = if (mobileGsFingerprint == null || designBitmap == null) {
+            null
+        } else {
+            standaloneDesignPlacement(
+                base = designBaseHalfExtents,
+                panX = adjustment?.offsetX ?: 0f,
+                panY = adjustment?.offsetY ?: 0f,
+                scale = adjustment?.scale ?: 1f,
+                storedClockwiseRotationDeg = adjustment?.rotation ?: 0f,
+            )
+        }
+        slamManager.setDesignPlacement(
+            placement?.fingerprintFromDesign,
+            placement?.halfWidth ?: 0f,
+            placement?.halfHeight ?: 0f,
+        )
+    }
+
+    DisposableEffect(slamManager) {
+        onDispose {
+            // MobileGS is process-global; never let this project's placement leak into another mode
+            // or project after the standalone composition leaves.
+            slamManager.setDesignPlacement(null, 0f, 0f)
+        }
     }
 
     val cameraId by produceState<String?>(initialValue = null, cameraController, reference) {
