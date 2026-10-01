@@ -352,17 +352,18 @@ Remaining:
   recapture.
 - [x] Verify duplicate-ID imports rebase the SphereSLAM URI into the newly assigned local project
   directory and leave the existing project untouched.
-- [ ] Verify project deletion removes the standalone reference.
-- [ ] Verify project copy/duplicate flows, if any, copy and rebase the standalone reference.
+- [x] Verify project deletion removes the standalone reference with the project directory.
+- [x] Verify project copy/duplicate flows: there is no separate project-duplicate operation in the
+  repository; the two copy-like paths are duplicate-ID import and co-op spectator load, both covered
+  by explicit SphereSLAM URI-rebasing tests.
 - [x] Verify co-op bulk project transfer includes and rebases the standalone reference into the
   spectator project directory.
 - [x] Decide co-op storage contract: transfer the raw rectified reference PNG + scale metadata and
   rebuild KPM locally; do not serialize a native atlas.
 - [x] Do not persist raw native KPM handles.
-- [ ] If a serialized KPM dataset is later persisted:
-  - [ ] version its format;
-  - [ ] store the source image/calibration alongside it for rebuild;
-  - [ ] invalidate it when camera/page calibration assumptions change.
+- [x] No serialized KPM dataset is persisted in the current design. If that policy changes later,
+  the dataset must be versioned, retain source image/calibration for rebuild, and invalidate on
+  camera/page calibration changes.
 
 **ACCEPTANCE:** no save/import/export/delete/peer-transfer operation can silently orphan or point a
 project at the wrong standalone wall page.
