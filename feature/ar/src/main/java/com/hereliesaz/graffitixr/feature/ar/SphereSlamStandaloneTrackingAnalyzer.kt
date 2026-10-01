@@ -82,6 +82,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private val onFrameTracked: (SphereSlamStandaloneFrame?) -> Unit,
     private val onReferenceReady: (SphereSlamStandaloneSession.Reference) -> Unit = {},
     private val onDiagnostic: (String) -> Unit = {},
+    private val onCalibrationChanged: (StandaloneCalibrationDiagnostics) -> Unit = {},
     private val onFailure: (StandaloneFailureEvent) -> Unit = {},
     private val onTrackingStateChanged: (StandaloneTrackingState) -> Unit = {},
     private val onFatalError: (Throwable) -> Unit = {},
@@ -413,6 +414,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 java.util.Locale.US,
                 "SphereSLAM standalone camera=%s timestampSource=%s raw=%dx%d crop=(%d,%d %dx%d) display=%dx%d rot=%d fx=%.2f fy=%.2f cx=%.2f cy=%.2f",
                 cameraId,
+                cameraTimestampSource.name,
                 rawWidth,
                 rawHeight,
                 cropLeft,
@@ -426,6 +428,25 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 intrinsics.fy,
                 intrinsics.cx,
                 intrinsics.cy,
+            ),
+        )
+        onCalibrationChanged(
+            StandaloneCalibrationDiagnostics(
+                cameraId = cameraId,
+                timestampSource = cameraTimestampSource,
+                rawWidth = rawWidth,
+                rawHeight = rawHeight,
+                cropLeft = cropLeft,
+                cropTop = cropTop,
+                cropWidth = cropWidth,
+                cropHeight = cropHeight,
+                displayWidth = intrinsics.width,
+                displayHeight = intrinsics.height,
+                rotationDegrees = rotationDegrees,
+                fx = intrinsics.fx,
+                fy = intrinsics.fy,
+                cx = intrinsics.cx,
+                cy = intrinsics.cy,
             ),
         )
     }

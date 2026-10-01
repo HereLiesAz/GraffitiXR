@@ -1,5 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.PixelFormat
@@ -117,6 +119,12 @@ fun SphereSlamStandaloneOverlay(
     }
     var fatalMessage by remember { mutableStateOf<String?>(null) }
     var currentFailure by remember { mutableStateOf<StandaloneFailureEvent?>(null) }
+    var calibrationDiagnostics by remember {
+        mutableStateOf<StandaloneCalibrationDiagnostics?>(null)
+    }
+    var matchDiagnostics by remember {
+        mutableStateOf<StandaloneMatchDiagnostics?>(null)
+    }
 
     fun applyFailure(event: StandaloneFailureEvent, emitDiagnostic: Boolean = true) {
         currentFailure = event
@@ -147,6 +155,8 @@ fun SphereSlamStandaloneOverlay(
         referenceReady = false
         trackingState = StandaloneTrackingState.INITIALIZING
         currentFailure = null
+        calibrationDiagnostics = null
+        matchDiagnostics = null
         fatalMessage = null
     }
 
@@ -404,6 +414,20 @@ fun SphereSlamStandaloneOverlay(
         }
     }
 
+    fun copyDiagnostics() {
+        val dump = standaloneDiagnosticDump(
+            calibration = calibrationDiagnostics,
+            trackingState = trackingState,
+            match = matchDiagnostics,
+            physicallyMetric = activeReferencePhysicallyMetric,
+            referenceWidthUnits = activeReferenceWidthMeters,
+            failure = currentFailure,
+        )
+        context.getSystemService(ClipboardManager::class.java)
+            ?.setPrimaryClip(ClipData.newPlainText("GraffitiXR SphereSLAM diagnostics", dump))
+        onDiagnostic("SphereSLAM standalone diagnostic dump copied")
+    }
+
     // CameraController implements pinch-to-camera-zoom itself. That would change the effective
     // intrinsics behind KPM while GraffitiXR's own pinch gesture is supposed to scale the artwork.
     // Keep the standalone camera calibrated at 1x for this composition only, and restore the shared
@@ -459,6 +483,9 @@ fun SphereSlamStandaloneOverlay(
                 onDiagnostic = { text ->
                     mainHandler.post { onDiagnostic(text) }
                 },
+                onCalibrationChanged = { calibration ->
+                    mainHandler.post { calibrationDiagnostics = calibration }
+                },
                 onFailure = { event ->
                     mainHandler.post { applyFailure(event, emitDiagnostic = false) }
                 },
@@ -492,6 +519,16 @@ fun SphereSlamStandaloneOverlay(
                         )
                     } ?: 0f
                     mainHandler.post {
+                        if (frame != null) {
+                            matchDiagnostics = StandaloneMatchDiagnostics(
+                                pageNo = frame.pageNo,
+                                inliers = frame.inlierCount,
+                                reprojectionError = frame.reprojectionError,
+                                observationAgeMs = frame.observationAgeMs,
+                                matchDurationMs = frame.matchDurationMs,
+                                source = frame.source,
+                            )
+                        }
                         onUnitsPerPixel(screenUnitsPerPixel)
                     }
                 },
@@ -557,17 +594,24 @@ fun SphereSlamStandaloneOverlay(
 
     if (!referenceReady || trackingState == StandaloneTrackingState.INITIALIZING) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-            Text(
-                text = currentFailure
-                    ?.takeIf { it.severity != StandaloneFailureSeverity.FATAL }
-                    ?.userMessage
-                    ?: if (!referenceReady) "Preparing wall tracker…" else "Finding wall target…",
-                color = Color.White,
-                modifier = Modifier
-                    .padding(top = 32.dp)
-                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = currentFailure
+                        ?.takeIf { it.severity != StandaloneFailureSeverity.FATAL }
+                        ?.userMessage
+                        ?: if (!referenceReady) "Preparing wall tracker…" else "Finding wall target…",
+                    color = Color.White,
+                    modifier = Modifier
+                        .padding(top = 32.dp)
+                        .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+                if (currentFailure != null) {
+                    TextButton(onClick = { copyDiagnostics() }) {
+                        Text("Copy Diagnostics")
+                    }
+                }
+            }
         }
     } else if (
         trackingState == StandaloneTrackingState.IMU_BRIDGE ||
@@ -599,6 +643,9 @@ fun SphereSlamStandaloneOverlay(
                         Text("Recapture Target")
                     }
                 }
+                TextButton(onClick = { copyDiagnostics() }) {
+                    Text("Copy Diagnostics")
+                }
             }
         }
     }
@@ -617,6 +664,9 @@ fun SphereSlamStandaloneOverlay(
                     modifier = Modifier.padding(top = 12.dp),
                 ) {
                     Text("Recapture Target")
+                }
+                TextButton(onClick = { copyDiagnostics() }) {
+                    Text("Copy Diagnostics")
                 }
             }
         }
