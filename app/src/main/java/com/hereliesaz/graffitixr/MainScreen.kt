@@ -127,6 +127,58 @@ fun MainScreen(
                             controller = cameraController,
                             modifier = Modifier.fillMaxSize(),
                         )
+                    } else if (
+                        !arUiState.isArCoreAvailable &&
+                        !arUiState.isSphereSlamAvailabilityResolved
+                    ) {
+                        // ARCore is known unavailable, but don't claim the fallback until the native
+                        // KPM smoke probe completes. CameraX is safe to keep warm while this resolves.
+                        CameraPreview(
+                            controller = cameraController,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.TopCenter,
+                        ) {
+                            androidx.compose.material3.Text(
+                                text = "Preparing SphereSLAM…",
+                                color = Color.White,
+                                modifier = Modifier
+                                    .padding(top = 32.dp)
+                                    .background(
+                                        Color.Black.copy(alpha = 0.55f),
+                                        androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+                                    )
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                            )
+                        }
+                    } else if (
+                        !arUiState.isArCoreAvailable &&
+                        !arUiState.isSphereSlamAvailable
+                    ) {
+                        // This is a packaging/runtime capability failure, not "ARCore unsupported".
+                        // Keep AR reachable so the failure is explicit and diagnosable rather than
+                        // silently redirecting the artist into a different editor mode.
+                        CameraPreview(
+                            controller = cameraController,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            androidx.compose.material3.Text(
+                                text = "SphereSLAM tracking isn't available in this build.",
+                                color = Color.White,
+                                modifier = Modifier
+                                    .background(
+                                        Color.Black.copy(alpha = 0.75f),
+                                        androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                                    )
+                                    .padding(20.dp),
+                            )
+                        }
                     } else if (!arUiState.isArCoreAvailable) {
                         // ARCore is optional. Keep the user in AR mode and let CameraX +
                         // SphereSLAM/KPM own wall tracking instead of redirecting to Overlay mode.

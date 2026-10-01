@@ -47,6 +47,7 @@ import com.hereliesaz.graffitixr.feature.ar.coop.calibration.Procrustes
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import com.hereliesaz.sphereslam.SphereSlam
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.data.ProjectManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -1102,6 +1103,27 @@ class ArViewModel @Inject constructor(
                 )
             }
             Timber.i("ArCore availability resolved: $result (supported=$supported)")
+        }
+        viewModelScope.launch(dispatchers.io) {
+            // ARCore and SphereSLAM are independent optional capabilities. In particular, a phone
+            // reporting ARCore unsupported must not be routed into standalone AR merely because the
+            // Kotlin classes are present: stripped/dev packaging can omit the native KPM objects.
+            //
+            // isAvailable() proves the JNI entry points are linked; smokeTest() exercises native
+            // handle creation/destruction so a partially packaged binary also fails closed.
+            val available = runCatching {
+                SphereSlam.isAvailable() && SphereSlam.smokeTest(640, 480)
+            }.onFailure { error ->
+                Timber.w(error, "SphereSLAM/KPM runtime capability probe failed")
+            }.getOrDefault(false)
+
+            _uiState.update {
+                it.copy(
+                    isSphereSlamAvailable = available,
+                    isSphereSlamAvailabilityResolved = true,
+                )
+            }
+            Timber.i("SphereSLAM/KPM availability resolved: available=$available")
         }
         viewModelScope.launch {
             projectRepository.currentProject.collect { project ->

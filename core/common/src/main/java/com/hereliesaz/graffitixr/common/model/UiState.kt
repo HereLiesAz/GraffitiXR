@@ -213,6 +213,13 @@ data class ArUiState(
     // the screen can show CameraX safely, then chooses ARCore+SphereSLAM or standalone SphereSLAM.
     val isArCoreAvailabilityResolved: Boolean = false,
 
+    // Native SphereSLAM/KPM runtime capability is resolved independently from ARCore. A non-ARCore
+    // phone may enter standalone AR only after this probe has proved the packaged KPM JNI path can
+    // actually create/match a calibrated session. Keeping the two resolution flags separate avoids
+    // treating "ARCore unsupported" as proof that the fallback binary exists.
+    val isSphereSlamAvailable: Boolean = false,
+    val isSphereSlamAvailabilityResolved: Boolean = false,
+
     // Persisted canonical wall page for the ARCore-independent SphereSLAM path. Null means this
     // project has not captured a standalone target yet. Width is only a physical measurement when
     // the accompanying flag is true; the initial implementation stores a normalized 1.0-unit page.
