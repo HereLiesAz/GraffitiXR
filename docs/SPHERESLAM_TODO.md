@@ -212,14 +212,16 @@ Remaining:
   - [ ] ARCore anchor creation;
   - [ ] point cloud/plane coaching.
 - [ ] Hide or replace only the truly unavailable steps, not the entire workflow.
-- [ ] Add target-quality checks before accepting a KPM page:
-  - [ ] minimum image dimensions;
-  - [ ] minimum detected KPM feature count;
-  - [ ] texture/contrast threshold;
-  - [ ] blur threshold;
-  - [ ] excessive over/under-exposure warning.
-- [ ] Provide a useful user-facing reason when page registration yields too few features.
-- [ ] Preserve the previous valid target if a replacement capture fails.
+- [x] Add target-quality checks before accepting a KPM page:
+  - [x] minimum image dimensions/pixel count;
+  - [x] minimum native-generated KPM feature count (16 initial conservative floor);
+  - [x] texture/contrast threshold using luma standard deviation;
+  - [x] blur threshold using Laplacian variance;
+  - [x] excessive over/under-exposure warning using clipped-pixel fraction.
+- [x] Provide useful user-facing reasons for small/flat/blurry captures and too few native KPM
+  features.
+- [x] Preserve the previous valid target if a replacement fails native KPM feature validation;
+  persistence happens only after the replacement page passes native registration.
 - [ ] Confirm recapture atomically replaces persisted standalone target metadata and image.
 - [ ] Delete/garbage-collect superseded standalone reference files if filenames ever become
   versioned rather than canonical.
