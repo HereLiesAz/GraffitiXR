@@ -10,6 +10,7 @@ import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.common.model.OverlayLayer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class CoopSpectatorProjectNormalizerTest {
@@ -124,7 +125,7 @@ class CoopSpectatorProjectNormalizerTest {
     }
 
     @Test
-    fun `standalone to ARCore refuses to invent metric base width when dimensions are missing`() {
+    fun `standalone to ARCore rejects unknowable metric design size instead of screen fitting`() {
         val project = GraffitiProject(
             sphereSlamReferenceUri = pageUri,
             sphereSlamReferenceWidthMeters = 2f,
@@ -134,13 +135,13 @@ class CoopSpectatorProjectNormalizerTest {
             arDesignHalfWidthM = -1f,
         )
 
-        val normalized = normalizeCoopSpectatorProject(
-            project,
-            spatial(CoopTrackingBackend.SPHERESLAM, CoopSpatialScale.METRIC, 2f),
-            CoopTrackingBackend.ARCORE,
-        ) { null }
-
-        assertEquals(-1f, normalized.arDesignHalfWidthM, 0f)
+        assertThrows(IllegalArgumentException::class.java) {
+            normalizeCoopSpectatorProject(
+                project,
+                spatial(CoopTrackingBackend.SPHERESLAM, CoopSpatialScale.METRIC, 2f),
+                CoopTrackingBackend.ARCORE,
+            ) { null }
+        }
     }
 
     private fun spatial(
