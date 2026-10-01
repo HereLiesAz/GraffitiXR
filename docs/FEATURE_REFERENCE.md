@@ -22,7 +22,9 @@ lens only). AR mode has two backends: ARCore-supported devices keep the existing
 MobileGS/fingerprint path; ARCore-unavailable devices use CameraX + SphereSLAM/KPM to register the
 design to a captured wall page. The standalone path uses the same centered KPM wall frame for
 MobileGS, self-grow, the persistent feature map, and a bounded multi-page atlas; ARCore-only
-depth/planes/anchors are replaced or explicitly unavailable rather than emulated. Nothing touches the network unless you explicitly start a **co-op** session.
+depth/planes/anchors are replaced or explicitly unavailable rather than emulated.
+ ARCore and standalone AR adjustments are persisted separately because their wall coordinate frames
+are deliberately not assumed equivalent before hybrid/cross-backend calibration. Nothing touches the network unless you explicitly start a **co-op** session.
 
 ---
 
@@ -55,7 +57,7 @@ adjustment/anchoring lens is active.
 | Target rail action | ARCore tap-to-target flow | disabled; use the on-screen **Wall Target** capture |
 | Co-op Host/Join | existing ARCore coordinate-frame path | disabled until standalone↔peer calibration exists |
 | AR preview export | composited GL framebuffer | disabled until CameraX + transparent GL can be composited correctly |
-| Pan/scale/rotation/tone/lock | supported | supported through the same `ModeAdjustment[AR]`; spatial placement is generation-bound to the current standalone wall while tone survives recapture |
+| Pan/scale/rotation/tone/lock | `modeAdjustments[AR]` | `sphereSlamModeAdjustment`; the same controls/undo UI swap to the active backend's persisted adjustment, and standalone spatial placement is generation-bound to its canonical wall |
 
 A normalized standalone target width gives self-consistent registration but is **not physical metres**.
 Physical distance/size claims are valid only when the captured target width was explicitly measured.
