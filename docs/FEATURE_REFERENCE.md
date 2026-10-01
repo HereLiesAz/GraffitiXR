@@ -55,7 +55,7 @@ adjustment/anchoring lens is active.
 | Anchor object | local ARCore `Anchor` + fusion | canonical centered wall frame + persisted generation/version |
 | Perception debug | ARCore planes, feature points, accumulated scan cloud | KPM page/inliers/reprojection error/age/match-time/tracking-state diagnostics |
 | Target rail action | ARCore tap-to-target flow | disabled; use the on-screen **Wall Target** capture |
-| Co-op Host/Join | existing ARCore coordinate-frame path | disabled until standalone↔peer calibration exists |
+| Co-op Host/Join | protocol-v3 host wall frame + peer fingerprint | protocol-v3 host wall frame; standalone↔standalone may use normalized page units, cross-backend requires metric scale + peer fingerprint |
 | AR preview export | composited GL framebuffer | disabled until CameraX + transparent GL can be composited correctly |
 | Pan/scale/rotation/tone/lock | `modeAdjustments[AR]` | `sphereSlamModeAdjustment`; the same controls/undo UI swap to the active backend's persisted adjustment, and standalone spatial placement is generation-bound to its canonical wall |
 
@@ -433,8 +433,10 @@ Robust LAN peer-to-peer sync for collaborative painting — **no cloud, no accou
   `MainActivity`; the search button launches it). `LocalIp.discover()` picks the default-route source
   address (UDP-connect trick) so pairing advertises a LAN-reachable IP on multi-interface devices
   (cellular + Wi-Fi, VPN).
-- **Transport security (protocol v2):** token-derived **AES-256-GCM per frame**, nonce/proof handshake,
-  **no token ever on the wire**. HKDF key derivation; frame/op codec in `collab/.../wire`.
+- **Transport security:** protocol v2 introduced token-derived **AES-256-GCM per frame**, nonce/proof
+  handshake, **no token ever on the wire**, and HKDF key derivation. Protocol **v3** keeps that
+  transport and adds an explicit host wall-frame/backend/scale descriptor so cross-backend peers
+  cannot silently treat unrelated coordinates as equivalent.
 - **Robustness:** accept-loop survives bad handshakes; ops are lossless across reconnects (seq + encode +
   buffer at enqueue); 15 s socket read timeouts; guests re-sync on host `sessionId` change; bounded
   pre-handler spectator-op buffering. Import/spectator load is hardened against Zip-Slip.
