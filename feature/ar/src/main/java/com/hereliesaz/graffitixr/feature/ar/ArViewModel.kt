@@ -1158,6 +1158,7 @@ class ArViewModel @Inject constructor(
                         sphereSlamWallFeatureMapFrameVersion =
                             project?.sphereSlamWallFeatureMapFrameVersion
                                 ?: com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                        sphereSlamAtlasPages = project?.sphereSlamAtlasPages.orEmpty(),
                     )
                 }
                 if (project != null) {
@@ -1964,6 +1965,7 @@ class ArViewModel @Inject constructor(
         val startingProject = projectRepository.currentProject.value ?: return
         val projectId = startingProject.id
         val expectedPreviousUri = startingProject.sphereSlamReferenceUri
+        val supersededAtlasPages = startingProject.sphereSlamAtlasPages
 
         viewModelScope.launch(dispatchers.io) {
             var newUri: android.net.Uri? = null
@@ -2005,6 +2007,7 @@ class ArViewModel @Inject constructor(
                             sphereSlamWallFeatureMap = null,
                             sphereSlamWallFeatureMapFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                            sphereSlamAtlasPages = emptyList(),
                         )
                     }
                 }
@@ -2015,6 +2018,13 @@ class ArViewModel @Inject constructor(
                         projectId,
                         expectedPreviousUri,
                     )
+                    supersededAtlasPages.forEach { page ->
+                        projectManager.deleteSphereSlamAtlasPage(
+                            appContext,
+                            projectId,
+                            page.referenceUri,
+                        )
+                    }
                 } else {
                     projectManager.deleteSphereSlamReference(appContext, projectId, newUri)
                 }
@@ -2114,6 +2124,7 @@ class ArViewModel @Inject constructor(
                             sphereSlamWallFeatureMap = null,
                             sphereSlamWallFeatureMapFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                            sphereSlamAtlasPages = emptyList(),
                         )
                     }
                 }
