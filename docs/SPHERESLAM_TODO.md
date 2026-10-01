@@ -222,9 +222,11 @@ Remaining:
   features.
 - [x] Preserve the previous valid target if a replacement fails native KPM feature validation;
   persistence happens only after the replacement page passes native registration.
-- [ ] Confirm recapture atomically replaces persisted standalone target metadata and image.
-- [ ] Delete/garbage-collect superseded standalone reference files if filenames ever become
-  versioned rather than canonical.
+- [x] Confirm recapture logically atomically replaces persisted standalone target metadata and
+  image: write a new versioned PNG, atomically commit URI + scale fields through the repository,
+  then delete the previous file.
+- [x] Delete/garbage-collect superseded standalone reference files best-effort after metadata commit;
+  aborted/project-switched recaptures delete their uncommitted candidate instead.
 - [ ] Add tests for project save/load/import with and without standalone target metadata.
 - [ ] Add process-death restoration test.
 
@@ -333,14 +335,16 @@ Implemented:
 - [x] persisted reference width.
 - [x] persisted physical-metric flag.
 - [x] routine saves preserve standalone reference metadata.
-- [x] canonical reference PNG is stored inside the project directory.
+- [x] versioned reference PNG is stored inside the project directory and selected by
+  `sphereSlamReferenceUri`.
 - [x] `.gxr` export naturally includes the reference image.
 - [x] import relocates the reference URI.
 
 Remaining:
 
 - [ ] Add migration tests for projects created before the standalone fields existed.
-- [ ] Add migration tests for malformed/missing `sphereslam_reference.png`.
+- [ ] Add migration tests for malformed/missing URI-referenced SphereSLAM reference PNGs,
+  including the legacy fixed `sphereslam_reference.png` name.
 - [ ] On missing/corrupt reference, clear only standalone target state and preserve the rest of the
   project.
 - [ ] Verify duplicate/imported project IDs do not point at another project's reference file.
@@ -723,7 +727,8 @@ For every device run, record:
 
 - [x] architecture document describes dual backend.
 - [x] release checklist now expects AR mode on non-ARCore devices.
-- [x] project data docs mention `sphereslam_reference.png`.
+- [x] project data docs describe versioned `sphereslam_reference_<uuid>.png` references and
+  crash-safe swap semantics.
 - [x] KPM public API comments describe hybrid + standalone roles.
 
 Remaining:
