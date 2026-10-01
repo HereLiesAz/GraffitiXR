@@ -15,7 +15,7 @@ Its contents, all produced by `ProjectManager`:
 | `project.json` | `ProjectManager.saveProject` | The full `GraffitiProject` (see below), kotlinx.serialization JSON, pretty-printed. |
 | `thumbnail.png` | `saveProject` (when a thumbnail bitmap is passed) | PNG, quality 80. |
 | `target_<unique>.png` | `saveProject` / `ProjectManager.appendTargetImage` | One PNG per captured target image (quality 100). Filenames are unique per file (`File.createTempFile`), not sequentially numbered — nothing round-trips the filename itself, only the URI stored in `project.json`. |
-| `sphereslam_reference.png` | `ProjectManager.saveSphereSlamReference` | Canonical rectified planar wall page for ARCore-independent SphereSLAM/KPM tracking. Re-capture replaces this file; `sphereSlamReferenceUri` plus scale metadata in `project.json` restore it on reopen/import. |
+| `sphereslam_reference_<uuid>.png` | `ProjectManager.saveSphereSlamReference` | Versioned rectified planar wall page for ARCore-independent SphereSLAM/KPM tracking. `project.json` points at the currently committed file via `sphereSlamReferenceUri`; recapture writes a new file first, atomically commits URI + scale metadata, then deletes the superseded file best-effort. |
 | arbitrary filenames | `ProjectRepository.saveArtifact` | Design-layer image exports and other editor-written artifacts (e.g. `feature/editor`'s `EditorViewModel`), written as raw bytes under the same project directory. |
 
 There is **no separate binary map/voxel/splat file of any kind**. The persistent wall-feature map
@@ -33,7 +33,8 @@ file and renames it over the target, so a crash mid-write can never leave a trun
 A `.gxr` file is a **plain ZIP archive** (`java.util.zip.ZipOutputStream`/`ZipInputStream`, no
 custom container, no magic header) whose entries are exactly the files in a project directory,
 zipped flat into the archive root — `ProjectManager.zipFolder` strips the project-id path segment,
-so the ZIP root directly contains `project.json`, `thumbnail.png`, `target_*.png`, and any
+so the ZIP root directly contains `project.json`, `thumbnail.png`, `target_*.png`, the currently
+referenced `sphereslam_reference_<uuid>.png` (plus any orphan left by interrupted cleanup), and
 artifact files, with no top-level folder wrapping them.
 
 - **Export** (`ProjectManager.exportProjectToUri`): zips the project directory as-is to a
