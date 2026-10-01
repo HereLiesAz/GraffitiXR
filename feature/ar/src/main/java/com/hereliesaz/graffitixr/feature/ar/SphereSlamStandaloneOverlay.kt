@@ -100,7 +100,8 @@ fun SphereSlamStandaloneOverlay(
     onReferenceCaptured: (Bitmap, Float, Boolean) -> Unit = { _, _, _ -> },
     onPersistedReferenceInvalid: (Uri) -> Unit = {},
     onPersistedAtlasPageInvalid: (Int, Uri) -> Unit = { _, _ -> },
-    onAtlasPageCaptured: (StandaloneAtlasGrowthCandidate) -> Unit = {},
+    onAtlasPageCaptured: (Bitmap, Int, Float, Boolean, FloatArray) -> Unit =
+        { _, _, _, _, _ -> },
     adjustment: ModeAdjustment? = null,
     onUnitsPerPixel: (Float) -> Unit = {},
     onTrackingTick: (Boolean) -> Unit = {},
@@ -555,8 +556,7 @@ fun SphereSlamStandaloneOverlay(
 
     DisposableEffect(cameraController, cameraId) {
         val id = cameraId
-        val restoredAtlas = atlasReferenceImages
-        if (id == null || restoredAtlas == null) {
+        if (id == null) {
             onDispose {}
         } else {
             val previousPinchToZoom = cameraController.isPinchToZoomEnabled
@@ -580,7 +580,8 @@ fun SphereSlamStandaloneOverlay(
         atlasReferenceImages,
     ) {
         val id = cameraId
-        if (id == null) {
+        val restoredAtlas = atlasReferenceImages
+        if (id == null || restoredAtlas == null) {
             onDispose {}
         } else {
             val executor = Executors.newSingleThreadExecutor { runnable ->
@@ -616,7 +617,15 @@ fun SphereSlamStandaloneOverlay(
                     }
                 },
                 onAtlasPageAdded = { candidate ->
-                    mainHandler.post { onAtlasPageCaptured(candidate) }
+                    mainHandler.post {
+                        onAtlasPageCaptured(
+                            candidate.bitmap,
+                            candidate.pageNo,
+                            candidate.referenceWidthUnits,
+                            candidate.physicallyMetric,
+                            candidate.canonicalFromPage.copyOf(),
+                        )
+                    }
                 },
                 onDiagnostic = { text ->
                     mainHandler.post { onDiagnostic(text) }
