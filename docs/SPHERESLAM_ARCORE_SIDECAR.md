@@ -76,8 +76,9 @@ This branch now has a first functional Mode B path as well as Mode A:
 - the design is rendered directly from that wall-relative view/projection pair;
 - the existing fused game-rotation sensor bridges visual losses for at most 400 ms without
   inventing translational motion;
-- the rectified canonical wall page is persisted as `sphereslam_reference.png` in the project and
-  restored on reopen/import, rebuilding the KPM atlas locally.
+- the rectified wall page is persisted as a versioned `sphereslam_reference_<uuid>.png`; its URI
+  and scale metadata are committed together and restored on reopen/import, rebuilding the KPM atlas
+  locally.
 
 After rectification, standalone target capture now asks for the real width represented by the page.
 A validated measured width is converted into KPM DPI and persisted with
@@ -317,6 +318,14 @@ explicit AR source set successfully, then exposed missing transitive ARUtil depe
 final shared-library link. The continuation branch mirrors upstream ARUtil's bundled minizip/SHA-1
 support sources and links NDK zlib. Keep this CI path enabled; otherwise native KPM regressions can
 silently pass normal builds that never initialize the submodule.
+
+## Crash-safe standalone reference persistence
+
+Recapture never overwrites the currently referenced wall image in place. It writes a new versioned
+PNG, commits `sphereSlamReferenceUri`, width, and physical-scale flag together through the
+repository's atomic project update, and only then deletes the previous reference best-effort. If the
+project changes or the metadata save fails, the uncommitted candidate is deleted and the previous
+reference remains authoritative.
 
 ## Standalone target quality
 
