@@ -375,7 +375,22 @@ class ArViewModel @Inject constructor(
                     localDeviceName = android.os.Build.MODEL,
                     localBackend = localBackend,
                     onBulkReceived = { fingerprint, project, spatialFrame ->
-                        // Project assets first: a standalone host's canonical KPM page/atlas arrives
+                        // Claim native tracking ownership BEFORE loadAsSpectator publishes the host
+                        // project. That publication wakes the generic project collector; if it sees
+                        // an ARCore guest without this marker it can asynchronously restore an older
+                        // project.fingerprint over the just-received peer geometry.
+                        _uiState.update {
+                            it.copy(
+                                coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.GUEST,
+                                coopPeerSpatialFrame = spatialFrame,
+                                coopPeerFingerprint =
+                                    if (localBackend ==
+                                        com.hereliesaz.graffitixr.common.model.CoopTrackingBackend.SPHERESLAM
+                                    ) fingerprint.copyOf() else null,
+                            )
+                        }
+
+                        // Project assets next: a standalone host's canonical KPM page/atlas arrives
                         // inside this archive and must exist before the CameraX analyzer can restore it.
                         if (!projectManager.loadAsSpectator(project)) {
                             _feedback.tryEmit(
@@ -403,22 +418,12 @@ class ArViewModel @Inject constructor(
                             slamManager.alignToPeer(fingerprint)
                             slamManager.captureAnchorCam =
                                 spatialFrame.fingerprintFromWall.toFloatArray()
-                            _uiState.update {
-                                it.copy(
-                                    coopPeerSpatialFrame = spatialFrame,
-                                    coopPeerFingerprint = null,
-                                )
-                            }
+                            // coopPeerSpatialFrame/role were published before spectator load so the
+                            // generic project loader could not race this peer installation.
                         } else {
                             // Standalone consumes the shared KPM page when the host is SphereSLAM.
-                            // For an ARCore host it instead feeds this peer fingerprint through
-                            // MobileGS and composes PnP through fingerprintFromWall.
-                            _uiState.update {
-                                it.copy(
-                                    coopPeerSpatialFrame = spatialFrame,
-                                    coopPeerFingerprint = fingerprint.copyOf(),
-                                )
-                            }
+                            // For an ARCore host it instead feeds the peer fingerprint already stored
+                            // above through MobileGS and composes PnP through fingerprintFromWall.
                         }
                     },
                     onOp = { op -> dispatchSpectatorOp(op) },
@@ -432,10 +437,18 @@ class ArViewModel @Inject constructor(
                 observeDroppedGuestEdits()
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
+                val managerTerminal =
+                    collaborationManager.state.value as?
+                        com.hereliesaz.graffitixr.common.model.CoopSessionState.Ended
                 _uiState.update {
                     it.copy(
-                        coopSessionState =
-                            com.hereliesaz.graffitixr.common.model.CoopSessionState.Ended(
+                        coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.NONE,
+                        coopPeerSpatialFrame = null,
+                        coopPeerFingerprint = null,
+                        // Preserve a deliberate VersionMismatch/SpatialIncompatible decision from
+                        // the transport instead of flattening every failed join into NetworkLost.
+                        coopSessionState = managerTerminal
+                            ?: com.hereliesaz.graffitixr.common.model.CoopSessionState.Ended(
                                 com.hereliesaz.graffitixr.common.model.CoopSessionState.EndReason.NetworkLost
                             )
                     )
