@@ -2195,6 +2195,71 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Commit a live-grown KPM page without ever changing canonical page 0.
+     *
+     * The PNG is installed first, then its stable page ID + canonical transform are committed
+     * atomically to project.json. If the project/page-0 changed while IO was in flight, the new file
+     * is discarded and the stale candidate cannot contaminate the new atlas.
+     */
+    fun saveSphereSlamAtlasPage(candidate: StandaloneAtlasGrowthCandidate) {
+        val startingProject = projectRepository.currentProject.value ?: return
+        val projectId = startingProject.id
+        val canonicalUri = startingProject.sphereSlamReferenceUri ?: return
+        if (candidate.pageNo <= 0 || candidate.canonicalFromPage.size != 16) return
+        if (startingProject.sphereSlamAtlasPages.any { it.pageNo == candidate.pageNo }) return
+
+        viewModelScope.launch(dispatchers.io) {
+            var uri: android.net.Uri? = null
+            var committed = false
+            try {
+                uri = projectManager.saveSphereSlamAtlasPage(
+                    appContext,
+                    projectId,
+                    candidate.pageNo,
+                    candidate.bitmap,
+                )
+                val savedUri = requireNotNull(uri)
+                val page = com.hereliesaz.graffitixr.common.model.SphereSlamAtlasPage(
+                    pageNo = candidate.pageNo,
+                    referenceUri = savedUri,
+                    referenceWidthMeters = candidate.referenceWidthUnits,
+                    physicallyMetric = candidate.physicallyMetric,
+                    canonicalFromPage = candidate.canonicalFromPage.toList(),
+                )
+                projectRepository.updateProject { current ->
+                    if (
+                        current.id != projectId ||
+                        current.sphereSlamReferenceUri != canonicalUri ||
+                        current.sphereSlamAtlasPages.any { it.pageNo == candidate.pageNo }
+                    ) {
+                        current
+                    } else {
+                        committed = true
+                        current.copy(
+                            sphereSlamAtlasPages =
+                                (current.sphereSlamAtlasPages + page).sortedBy { it.pageNo },
+                        )
+                    }
+                }
+                if (committed) {
+                    appendDiag(
+                        "SphereSLAM atlas page persisted page=" + candidate.pageNo +
+                            " frame=canonical-centered-page",
+                    )
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to persist grown SphereSLAM atlas page")
+            } finally {
+                if (!committed && uri != null) {
+                    projectManager.deleteSphereSlamAtlasPage(appContext, projectId, uri)
+                }
+            }
+        }
+    }
+
     fun setCameraPermission(granted: Boolean) {
         _uiState.update { it.copy(hasCameraPermission = granted) }
     }
