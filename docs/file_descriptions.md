@@ -68,10 +68,12 @@ This document lists key files in the repository and their purposes.
 
 *   `SphereSlamStandaloneSession.kt`: synchronous calibrated KPM page session used by CameraX
     standalone AR; returns the pose for the exact submitted frame.
-*   `SphereSlamTracker.kt`: asynchronous lower-rate KPM sidecar used beside ARCore.
+*   `SphereSlamTracker.kt`: asynchronous lower-rate KPM sidecar used beside ARCore. Live-camera
+    calibration and reference-image dimensions are independent, so a perspective-rectified metric
+    page can be smaller than the camera frame; only the newest pending live frame is retained.
 *   `KpmSphereSlamEngine.kt` / `KpmBridge.kt`: shared KPM engine/JNI ownership for both roles.
-*   `SphereSlamPoseMath.kt`: page DPI/scale and KPM camera-from-page → centered OpenGL view
-    conversion.
+*   `SphereSlamPoseMath.kt`: page DPI/physical scale and KPM camera-from-page → centered
+    right-handed OpenGL view conversion.
 *   The native KPM atlas/session is rebuildable state and is never persisted; projects store the
     rectified reference PNG plus scale metadata.
 
@@ -81,8 +83,21 @@ This document lists key files in the repository and their purposes.
 *   `ArViewModel.kt`: ARCore session lifecycle for the ARCore backend plus shared flashlight/GPS
     state and crash-safe standalone SphereSLAM reference persistence.
 *   `rendering/ArRenderer.kt`: ARCore `GLSurfaceView.Renderer`. Initialises `BackgroundRenderer`;
-    calls backend-neutral `setTrackingPoseValid`, `updateCamera`, `feedYuvFrame`/`feedColorFrame`, and composes
-    the ARCore overlay via `PoseFusion`.
+    keeps `ArCorePoseSource` as the primary camera pose, calls backend-neutral
+    `setTrackingPoseValid`/`updateCamera`/`feedYuvFrame`, owns the asynchronous hybrid KPM sidecar,
+    and composes only accepted timestamp-aligned corrections through `PoseFusion`.
+*   `HybridMetricKpmReference.kt`: derives a physical rectangle from the ARCore wall plane,
+    perspective-rectifies the captured sensor image to that physical aspect, and computes explicit
+    KPM DPI/centered page geometry; a raw perspective photo is never treated as metric.
+*   `anchor/HybridPageFrame.kt`: pure ARCore/KPM frame conversion
+    (`world_from_page`, `page_from_artwork`) with world-rebase-invariant math.
+*   `anchor/HybridPoseHistory.kt`: bounded timestamp history pairing asynchronous KPM observations
+    with the raw sensor-camera ARCore view and unfused artwork backbone from the same clock.
+*   `anchor/HybridKpmCorrection.kt`: metric/age/inlier/reprojection/timestamp gates plus conversion
+    of an accepted KPM observation into a corrected artwork anchor for `PoseFusion`.
+*   `anchor/PoseFusion.kt`: stores drift fixes as anchor-local corrections. It accepts both the
+    legacy MobileGS PnP path and timestamp-aligned hybrid KPM corrections; neither path writes
+    renderer camera matrices.
 *   `SphereSlamStandaloneOverlay.kt`: non-ARCore AR surface. Owns rectified wall-target capture,
     CameraX analyzer lifecycle, KPM/reacquisition HUD, GL overlay, target restore, and copyable
     diagnostics.
@@ -105,8 +120,9 @@ This document lists key files in the repository and their purposes.
     Overlay mode on non-ARCore devices; not the standalone AR backend.
 *   `computervision/DualAnalyzer.kt`: ARCore-side `ImageAnalysis.Analyzer` for relocalization
     callbacks and light estimation.
-*   `src/test/.../ArViewModelTest.kt` and standalone tests: lifecycle/persistence, calibration,
-    tracking-state, failure, renderer-math, and KPM policy coverage.
+*   `src/test/.../ArViewModelTest.kt` plus standalone/hybrid tests: lifecycle/persistence,
+    calibration, tracking-state/failure, metric KPM page geometry, page↔ARCore frame invariance,
+    timestamp pairing, correction gates, and PoseFusion world-rebase behavior.
 
 ### `:feature:editor`
 *   `EditorViewModel.kt`: Placement and legibility for the single design image (there is no
@@ -119,8 +135,8 @@ This document lists key files in the repository and their purposes.
 *   `ProjectLibraryScreen.kt`: Full-screen project list UI.
 
 ---
-*Documentation updated on 2026-10-01: added the dual ARCore/SphereSLAM backend ownership and
-standalone CameraX/KPM files. Earlier 2026-09-04 update removed the Persistent Voxel Memory /
+*Documentation updated on 2026-10-01: added the dual ARCore/SphereSLAM backend ownership,
+standalone CameraX/KPM files, co-op frame calibration, and metric hybrid KPM→PoseFusion files. Earlier 2026-09-04 update removed the Persistent Voxel Memory /
 `slamManager.draw()` /
 `VoxelHash.*` / `StereoProcessor.cpp` claims (none of those files or methods exist), corrected the
 `:core:nativebridge` and `:feature:ar` sections against the current native/Kotlin source. Prior
