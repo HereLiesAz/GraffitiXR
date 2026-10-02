@@ -74,17 +74,17 @@ is a Maven Central dependency (`org.opencv:opencv`), not a vendored/embedded cop
 Native tracking/relocalization module built around the pinned artoolkitX integration. It has two
 architectural roles:
 
-- **ARCore-capable devices:** run beside `ArCorePoseSource` for wall recognition/relocalization and
-  later explicit pose correction.
+- **ARCore-capable devices:** run beside `ArCorePoseSource` as a lower-rate metric wall
+  relocalization source. Accepted KPM observations can correct the artwork anchor only through
+  `HybridKpmCorrection → PoseFusion`; ARCore remains the continuous camera pose.
 - **ARCore-unavailable devices:** provide the standalone wall-tracking backend without an ARCore
-  `Session`. The current implementation is page-relative KPM + a short rotation-only IMU bridge;
-  physical scale, MobileGS frame integration, and wider wall-map continuity remain tracked work.
+  `Session`. CameraX + synchronous KPM supply wall-relative 6-DoF while a page is visible, a short
+  rotation-only IMU bridge covers brief misses, MobileGS uses the same centered page frame, and a
+  bounded multi-page atlas extends coverage without changing the canonical wall frame.
 
-The code now implements both the calibrated hybrid KPM sidecar and an initial standalone
-wall-target path. On non-ARCore devices CameraX supplies display-oriented luminance + intrinsics,
-KPM supplies the wall-relative 6-DoF pose while the target is visible, and the fused game-rotation
-sensor bridges very short visual dropouts without inventing translation. Standalone parity with the
-full ARCore feature set is still in progress. See
+Both roles are implemented. Standalone still has explicit capability differences from ARCore
+(depth/planes/cloud-anchor/perception APIs), and long visual loss still requires reacquisition rather
+than pretending to have free-space inertial translation. See
 [`SPHERESLAM_ARCORE_SIDECAR.md`](SPHERESLAM_ARCORE_SIDECAR.md).
 
 ## Data Flow (AR Pipeline)
@@ -92,27 +92,31 @@ full ARCore feature set is still in progress. See
 Each ARCore tracking frame, roughly:
 
 ~~~
-camera.trackingState ────────────────────────► setTrackingPoseValid(isTracking)
-camera.getViewMatrix/ProjectionMatrix ───────► slamManager.updateCamera(view, proj, timestampNs)
-                                              │
-                                              ├────────────────────────► primary ARCore renderer pose
-                                              │
-frame.acquireCameraImage() [YUV] ────────────┼► slamManager.feedYuvFrame(...) (relocalization thread)
-                                              │         │
-                                              │   MobileGS::runRelocPass() (background thread)
-                                              │         ├─ ORB/SuperPoint match
-                                              │         ├─ solvePnPRansac
-                                              │         └─ distortion-head crop
-                                              │
-                                              └► SphereSLAM/KPM sidecar (~10 Hz when seeded)
-                                                        ├─ calibrated planar keypoint match
-                                                        └─ page-relative observation only
-                                                             (not fused into primary pose yet)
-                                              │
-                                     PoseFusion.currentAnchor() (Kotlin, feature:ar)
-                                              │  existing ARCore + MobileGS fusion
-                                              ▼
-                                   ArRenderer draws camera background + AR overlay
+camera.trackingState ─────────────────────────► setTrackingPoseValid(isTracking)
+ArCorePoseSource.sample(view, proj, timestamp) ─► PRIMARY renderer camera pose
+camera.pose.inverse() + consensus backbone ───► HybridPoseHistory[timestamp]
+                                                │
+frame.acquireCameraImage() [raw YUV] ──────────┼► MobileGS.feedYuvFrame(...)
+                                                │      └─ ORB/SuperPoint + solvePnPRansac
+                                                │
+                                                └► SphereSlamTracker (~10 Hz, worker)
+                                                       └─ metric KPM page observation
+                                                                  │
+                                                                  ▼
+                                                     HybridKpmCorrection
+                                             page frame + timestamp + quality gates
+                                                                  │
+                                  accepted ────────────────────────┘
+                                     ▼
+                      PoseFusion.currentAnchorFromHybridObservation()
+                                     │
+                         else MobileGS PoseFusion fallback
+                                     │
+                         else hold standing local correction
+                                     ▼
+                      artwork anchorMatrix in ARCore world
+                                     │
+                     ArRenderer draws ARCore camera + overlay
 ~~~
 
 **MobileGS pose-validity seam:** `setTrackingPoseValid` means only that the most recent
@@ -152,12 +156,26 @@ from the superseded wall or erase a still-valid ARCore placement.
 
 ## Relocalization and Drift Correction
 
-The engine uses a dedicated background thread (`relocThreadFunc`) to continuously match the current
-camera frame against the stored wall fingerprint. On a high-confidence PnP match it can correct
-global drift and "snap" the overlay back into place — see
-[`TELEOLOGICAL_SLAM.md`](TELEOLOGICAL_SLAM.md) for the actual gating and defaults; the mechanism
-runs unconditionally, but its downstream drift-correction consumer is a diagnostic-only, off-by-
-default toggle today.
+There are now two explicit correction sources behind the same off-by-default drift-correction
+switch:
+
+1. **Metric hybrid KPM** — a target capture with a real ARCore wall plane is rectified into a
+   physically-scaled KPM page. Each worker observation is paired with the nearest raw sensor-camera
+   ARCore view + unfused consensus backbone from the same timestamp (40 ms maximum mismatch), then
+   gated for metric frame, age (≤500 ms), inliers (≥12), and reprojection error (≤4 px).
+   `HybridKpmCorrection` converts it into a corrected artwork anchor at the observation timestamp;
+   `PoseFusion` stores only the resulting anchor-local correction.
+2. **MobileGS** — the existing fingerprint background thread (`relocThreadFunc`) continuously
+   matches ORB/SuperPoint descriptors and solves PnP. Its existing `captureAnchorCam` correction
+   path remains the fallback when no fresh accepted KPM observation exists.
+
+If neither source supplies a fresh correction, the standing anchor-local correction is carried by
+the live ARCore consensus backbone; with no standing correction the raw consensus is used. KPM is
+never allowed to replace ARCore's camera view/projection or continue as primary tracking while
+ARCore is paused.
+
+See [`SPHERESLAM_ARCORE_SIDECAR.md`](SPHERESLAM_ARCORE_SIDECAR.md) for KPM frame/scale contracts
+and [`TELEOLOGICAL_SLAM.md`](TELEOLOGICAL_SLAM.md) for MobileGS corroboration/self-grow behavior.
 
 **Return-visit anchoring.** When a project with a saved capture pose (`captureAnchorCam`) is
 reopened and no anchor exists yet, the renderer turns two consecutive agreeing high-confidence
@@ -167,11 +185,10 @@ toggle and without re-capturing, so the saved target is preserved. Pre-Phase-2 f
 (no capture pose) cannot use it. Not yet validated on device.
 
 ---
-*Documentation updated on 2026-09-04: removed the fictional Persistent Voxel Memory /
-`slamManager.draw()` architecture (deleted from the codebase; never actually built per
-`docs/NATIVE_ENGINE.md`), removed GPU-accelerated Liquify (no implementing code), corrected the
-module dependency graph and the AR data-flow diagram against current source. Prior update:
-2026-06-22, SLAM right-size and documentation-accuracy pass.*
+*Documentation updated on 2026-10-01: documented standalone atlas/MobileGS/co-op frame ownership and
+the metric hybrid KPM→PoseFusion correction seam, including timestamp pairing and ARCore-primary
+camera ownership. Earlier 2026-09-04 update removed the fictional Persistent Voxel Memory /
+`slamManager.draw()` architecture and corrected the module graph against source.*
 
 
 ## Cross-backend co-op wall frame
