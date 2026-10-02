@@ -214,7 +214,12 @@ fun SphereSlamStandaloneOverlay(
         ) {
             awaitingReferencePersistence = false
             persistenceBaselineUri = null
-            onReferenceRegistrationChanged(true)
+            // If this commit introduced a MobileGS seed, the analyzer must first restart with that
+            // NEW seed and only its onReferenceReady callback may unlock Host. If no seed exists,
+            // KPM-only standalone sharing is valid and the page registration already succeeded.
+            if (mobileGsFingerprint == null) {
+                onReferenceRegistrationChanged(true)
+            }
         }
     }
 
@@ -417,13 +422,23 @@ fun SphereSlamStandaloneOverlay(
             )
         }
     }
+    // A fresh candidate page exists before its project commit clears the OLD page's seed/map/atlas.
+    // Never let those old coordinates cross into the candidate analyzer. Once the new versioned URI
+    // lands, awaitingReferencePersistence flips false and we snapshot the freshly committed state.
+    val candidateUncommitted = referenceNeedsPersistence || awaitingReferencePersistence
+    val runtimeMobileGsFingerprint =
+        if (candidateUncommitted) null else mobileGsFingerprint
     // Snapshot persisted native state once per canonical page. Autosaves/grown-page commits publish
-    // new project objects while THIS analyzer already owns the fresher live state; keying the effect
-    // to those emissions would tear down tracking every few seconds.
-    val initialMobileGsWallFeatureMap = remember(reference) { mobileGsWallFeatureMap }
+    // new project objects while THIS analyzer already owns the fresher live state; keying ordinary
+    // autosaves into the effect would tear down tracking every few seconds.
+    val initialMobileGsWallFeatureMap = remember(reference, awaitingReferencePersistence) {
+        if (awaitingReferencePersistence) null else mobileGsWallFeatureMap
+    }
     val initialMobileGsWallFeatureMapFrameVersion =
-        remember(reference) { mobileGsWallFeatureMapFrameVersion }
-    val initialPersistedAtlasPages = remember(reference) { persistedAtlasPages }
+        remember(reference, awaitingReferencePersistence) { mobileGsWallFeatureMapFrameVersion }
+    val initialPersistedAtlasPages = remember(reference, awaitingReferencePersistence) {
+        if (awaitingReferencePersistence) emptyList() else persistedAtlasPages
+    }
     val atlasReferenceImages by produceState<List<SphereSlamStandaloneAtlasReferenceImage>?>(
         initialValue = null,
         initialPersistedAtlasPages,
@@ -551,7 +566,7 @@ fun SphereSlamStandaloneOverlay(
     // path and gives self-grow an unambiguous fingerprint-frame Φ when that experiment is enabled.
     LaunchedEffect(
         slamManager,
-        mobileGsFingerprint,
+        runtimeMobileGsFingerprint,
         designBitmap,
         designBaseHalfExtents,
         adjustment?.offsetX,
@@ -559,7 +574,7 @@ fun SphereSlamStandaloneOverlay(
         adjustment?.scale,
         adjustment?.rotation,
     ) {
-        val placement = if (mobileGsFingerprint == null || designBitmap == null) {
+        val placement = if (runtimeMobileGsFingerprint == null || designBitmap == null) {
             null
         } else {
             standaloneDesignPlacement(
@@ -699,7 +714,7 @@ fun SphereSlamStandaloneOverlay(
         cameraController,
         cameraId,
         referenceImage,
-        mobileGsFingerprint,
+        runtimeMobileGsFingerprint,
         mobileGsFingerprintFrameVersion,
         atlasReferenceImages,
         peerOnlyTracking,
@@ -741,7 +756,7 @@ fun SphereSlamStandaloneOverlay(
                 referenceImage = requireNotNull(referenceImage),
                 atlasReferenceImages = restoredAtlas,
                 slamManager = slamManager,
-                mobileGsFingerprint = mobileGsFingerprint,
+                mobileGsFingerprint = runtimeMobileGsFingerprint,
                 mobileGsFingerprintFrameVersion = mobileGsFingerprintFrameVersion,
                 mobileGsWallFeatureMap = initialMobileGsWallFeatureMap,
                 mobileGsWallFeatureMapFrameVersion = initialMobileGsWallFeatureMapFrameVersion,
