@@ -38,6 +38,8 @@ internal object HybridMetricKpmReference {
         val outputHeight: Int,
         val referenceDpi: Float,
         val pageGeometry: SphereSlamPoseMath.PageGeometry,
+        /** Column-major OpenGL camera-from-centered-page at capture. */
+        val cameraFromPageGl: FloatArray,
     )
 
     data class Reference(
@@ -149,6 +151,18 @@ internal object HybridMetricKpmReference {
         val heightMeters = halfH * 2f
         if (widthMeters < MIN_SIDE_M || heightMeters < MIN_SIDE_M) return null
 
+        // KPM's centered page axes are +X right / +Y image-up. In the CV camera frame ex and ey
+        // already describe those axes; ez = ex × ey points from the wall toward the camera. Convert
+        // camera-row convention exactly once into the OpenGL camera frame used everywhere else.
+        val ez = normalize(cross(ex, ey)) ?: return null
+        val cameraFromPageCv = floatArrayOf(
+            ex[0], ex[1], ex[2], 0f,
+            ey[0], ey[1], ey[2], 0f,
+            ez[0], ez[1], ez[2], 0f,
+            c[0], c[1], c[2], 1f,
+        )
+        val cameraFromPageGl = MetricMarks.glViewToCv(cameraFromPageCv)
+
         val sourceWidthPx = max(
             pixelDistance(src[0], src[1]),
             pixelDistance(src[3], src[2]),
@@ -172,6 +186,7 @@ internal object HybridMetricKpmReference {
             outputHeight = outH,
             referenceDpi = dpi,
             pageGeometry = page,
+            cameraFromPageGl = cameraFromPageGl,
         )
     }
 
@@ -221,6 +236,11 @@ internal object HybridMetricKpmReference {
     private fun sub(a: FloatArray, b: FloatArray) = floatArrayOf(a[0]-b[0], a[1]-b[1], a[2]-b[2])
     private fun add(a: FloatArray, b: FloatArray) = floatArrayOf(a[0]+b[0], a[1]+b[1], a[2]+b[2])
     private fun scale(a: FloatArray, s: Float) = floatArrayOf(a[0]*s, a[1]*s, a[2]*s)
+    private fun cross(a: FloatArray, b: FloatArray) = floatArrayOf(
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    )
     private fun normalize(a: FloatArray): FloatArray? {
         val n = kotlin.math.sqrt(dot(a, a))
         if (!n.isFinite() || n <= 1e-5f) return null
