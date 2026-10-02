@@ -71,10 +71,10 @@ internal fun coopHostReady(
     policy: ArRailBackendPolicy,
     arCoreAnchorEstablished: Boolean,
     arCorePointCount: Int,
-    standaloneReferencePresent: Boolean,
+    standaloneReferenceRegistered: Boolean,
 ): Boolean =
     if (policy.standalone) {
-        policy.coopCalibrationAvailable && standaloneReferencePresent
+        policy.coopCalibrationAvailable && standaloneReferenceRegistered
     } else {
         policy.coopCalibrationAvailable && arCoreAnchorEstablished && arCorePointCount > 0
     }
