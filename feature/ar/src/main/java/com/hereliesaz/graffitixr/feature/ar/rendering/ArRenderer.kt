@@ -1723,11 +1723,8 @@ class ArRenderer(
                     val worldFromPage = FloatArray(16)
                     pageAnchor.pose.toMatrix(worldFromPage, 0)
                     hybridPageFromArtworkAnchor =
-                        com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath.multiply(
-                            com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
-                                .rigidInverse(worldFromPage),
-                            backbone,
-                        )
+                        com.hereliesaz.graffitixr.feature.ar.anchor.HybridPageFrame
+                            .pageFromArtwork(worldFromPage, backbone)
                     Timber.i("ARDIAG hybrid KPM page↔artwork frame frozen")
                 }
             }
@@ -2379,11 +2376,11 @@ class ArRenderer(
                                 // page origin beside the artwork anchor. No world origin is shared
                                 // with KPM and no raw KPM pose ever becomes the renderer camera pose.
                                 val worldFromPage =
-                                    com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath.multiply(
-                                        com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
-                                            .rigidInverse(mappingViewMatrix),
-                                        geometry.cameraFromPageGl,
-                                    )
+                                    com.hereliesaz.graffitixr.feature.ar.anchor.HybridPageFrame
+                                        .worldFromPage(
+                                            sensorView = mappingViewMatrix,
+                                            cameraFromPage = geometry.cameraFromPageGl,
+                                        )
                                 hybridPageAnchor = createWorldAnchor(activeSession, worldFromPage)
                                 Timber.i(
                                     "ARDIAG hybrid KPM metric reference " +
