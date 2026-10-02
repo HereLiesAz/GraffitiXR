@@ -144,6 +144,27 @@ class CoopSpectatorProjectNormalizerTest {
         }
     }
 
+    @Test
+    fun `normalized standalone frame is rejected again at ARCore spectator normalization`() {
+        val project = GraffitiProject(
+            sphereSlamReferenceUri = pageUri,
+            sphereSlamReferenceWidthMeters = 1f,
+            sphereSlamReferencePhysicallyMetric = false,
+            sphereSlamModeAdjustment = ModeAdjustment(),
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            normalizeCoopSpectatorProject(
+                project,
+                spatial(
+                    CoopTrackingBackend.SPHERESLAM,
+                    CoopSpatialScale.NORMALIZED_PAGE,
+                    1f,
+                ),
+                CoopTrackingBackend.ARCORE,
+            ) { null }
+        }
+    }
+
     private fun spatial(
         host: CoopTrackingBackend,
         scale: CoopSpatialScale,
