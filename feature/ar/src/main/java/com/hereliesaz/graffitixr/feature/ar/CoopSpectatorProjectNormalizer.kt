@@ -38,7 +38,9 @@ internal fun normalizeCoopSpectatorProject(
         CoopTrackingBackend.ARCORE -> {
             // supportsGuest() already rejects normalized standalone pages for ARCore. Repeat the
             // condition here so this pure normalizer fails closed if it is ever called directly.
-            if (spatialFrame.scale != CoopSpatialScale.METRIC) return project
+            require(spatialFrame.scale == CoopSpatialScale.METRIC) {
+                "ARCore guest cannot consume normalized standalone page units"
+            }
 
             val halfWidth = standaloneBaseHalfWidthMeters(project, imageDimensions)
                 ?: project.arDesignHalfWidthM.takeIf { it.isFinite() && it > 0f }
