@@ -22,6 +22,8 @@ internal data class ArRailBackendPolicy(
 internal fun arRailBackendPolicy(
     arCoreAvailabilityResolved: Boolean,
     arCoreAvailable: Boolean,
+    sphereSlamAvailabilityResolved: Boolean,
+    sphereSlamAvailable: Boolean,
 ): ArRailBackendPolicy {
     if (!arCoreAvailabilityResolved) {
         return ArRailBackendPolicy(
@@ -47,14 +49,32 @@ internal fun arRailBackendPolicy(
             exportDisabledReason = null,
         )
     }
+    val standaloneRuntimeReady =
+        sphereSlamAvailabilityResolved && sphereSlamAvailable
     return ArRailBackendPolicy(
         backendResolved = true,
         standalone = true,
         targetRailEnabled = false,
         targetDisabledReason = "Use the on-screen Wall Target capture",
-        coopCalibrationAvailable = true,
-        coopDisabledReason = null,
+        coopCalibrationAvailable = standaloneRuntimeReady,
+        coopDisabledReason = when {
+            !sphereSlamAvailabilityResolved -> "Checking standalone wall tracker…"
+            !sphereSlamAvailable -> "Standalone wall tracking is unavailable on this build"
+            else -> null
+        },
         modePreviewExportAvailable = false,
         exportDisabledReason = "Standalone camera + overlay export is not implemented yet",
     )
 }
+
+internal fun coopHostReady(
+    policy: ArRailBackendPolicy,
+    arCoreAnchorEstablished: Boolean,
+    arCorePointCount: Int,
+    standaloneReferenceRegistered: Boolean,
+): Boolean =
+    if (policy.standalone) {
+        policy.coopCalibrationAvailable && standaloneReferenceRegistered
+    } else {
+        policy.coopCalibrationAvailable && arCoreAnchorEstablished && arCorePointCount > 0
+    }

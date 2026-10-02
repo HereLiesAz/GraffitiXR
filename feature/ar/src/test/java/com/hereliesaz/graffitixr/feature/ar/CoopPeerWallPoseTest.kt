@@ -6,8 +6,10 @@ import com.hereliesaz.graffitixr.common.model.CoopTrackingBackend
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricMarks
 import com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CoopPeerWallPoseTest {
@@ -56,6 +58,27 @@ class CoopPeerWallPoseTest {
         reloc[17] = 20f
         reloc[18] = 1f
         assertNull(CoopPeerWallPoseSolver.solve(reloc, spatial()))
+    }
+
+    @Test
+    fun `peer pose hold expires at standalone visual bridge budget`() {
+        assertTrue(shouldHoldCoopPeerPose(lastFreshSolveMs = 1_000L, nowMs = 1_400L))
+        assertFalse(shouldHoldCoopPeerPose(lastFreshSolveMs = 1_000L, nowMs = 1_401L))
+        assertFalse(shouldHoldCoopPeerPose(lastFreshSolveMs = Long.MIN_VALUE, nowMs = 1_000L))
+        assertFalse(shouldHoldCoopPeerPose(lastFreshSolveMs = 2_000L, nowMs = 1_999L))
+    }
+
+    @Test
+    fun `ARCore host peer fingerprint selection ignores stale local page state`() {
+        val frame = spatial()
+        assertTrue(shouldUseCoopPeerFingerprint(frame, byteArrayOf(1, 2, 3)))
+        assertFalse(shouldUseCoopPeerFingerprint(frame, byteArrayOf()))
+        assertFalse(
+            shouldUseCoopPeerFingerprint(
+                frame.copy(hostBackend = CoopTrackingBackend.SPHERESLAM),
+                byteArrayOf(1),
+            )
+        )
     }
 
     private fun identity() = floatArrayOf(

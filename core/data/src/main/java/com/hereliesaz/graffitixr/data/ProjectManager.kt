@@ -834,7 +834,16 @@ class ProjectManager @Inject constructor(
      * and edited it locally holds a project with that same id, and joining the session must not
      * overwrite their work. Repeated bulks (reconnects) replace the spectator copy, as they should.
      */
-    suspend fun loadAsSpectator(bytes: ByteArray): Boolean = withContext(Dispatchers.IO) {
+    suspend fun loadAsSpectator(
+        bytes: ByteArray,
+        /**
+         * Session-only normalization applied after archive URIs are relocated but BEFORE the
+         * spectator project is published. This is intentionally scoped to the spectator copy: it
+         * lets co-op map backend-specific placement fields without ever mutating the user's local
+         * project or the host archive on disk.
+         */
+        transform: (GraffitiProject) -> GraffitiProject = { it },
+    ): Boolean = withContext(Dispatchers.IO) {
         if (bytes.isEmpty()) return@withContext false
         var loaded = false
 
@@ -892,8 +901,12 @@ class ProjectManager @Inject constructor(
 
                 // Relocate against the HOST's id (the archive's paths carry it), then re-key.
                 val relocated = relocateProjectFiles(project, destDir).copy(id = localId)
+                val normalized = transform(relocated)
+                require(normalized.id == localId) {
+                    "spectator transform must preserve isolated project id"
+                }
                 withContext(Dispatchers.Main) {
-                    projectRepositoryProvider.get().createProject(relocated)
+                    projectRepositoryProvider.get().createProject(normalized)
                 }
                 loaded = true
             }

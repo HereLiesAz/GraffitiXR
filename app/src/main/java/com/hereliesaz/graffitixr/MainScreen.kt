@@ -305,6 +305,9 @@ fun MainScreen(
                             adjustment = standaloneAdj,
                             onUnitsPerPixel = { standaloneArUnitsPerPixel = it },
                             onTrackingTick = { arViewModel.onStandaloneTrackingTick(it) },
+                            onReferenceRegistrationChanged = {
+                                arViewModel.onStandaloneReferenceRegistrationChanged(it)
+                            },
                             onDiagnostic = { text -> arViewModel.appendDiag(text) },
                             modifier = Modifier.fillMaxSize(),
                         )

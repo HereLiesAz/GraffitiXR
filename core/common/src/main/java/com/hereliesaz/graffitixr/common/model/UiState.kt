@@ -226,6 +226,12 @@ data class ArUiState(
     val sphereSlamReferenceUri: Uri? = null,
     val sphereSlamReferenceWidthMeters: Float = 1f,
     val sphereSlamReferencePhysicallyMetric: Boolean = false,
+    /**
+     * Runtime-only proof that the CURRENT page-0 reference completed native KPM registration.
+     * A persisted URI alone is not readiness: it may be corrupt, still decoding, or superseded by
+     * an in-flight recapture. Co-op Host uses this latch so it cannot freeze stale peer geometry.
+     */
+    val isSphereSlamReferenceRegistered: Boolean = false,
     val sphereSlamAnchorGeneration: Long = 0L,
     val sphereSlamAnchorFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     val sphereSlamPlacementAnchorGeneration: Long = 0L,

@@ -67,6 +67,15 @@ private val SPHERESLAM_DEFAULT_UNWARP_POINTS = listOf(
     Offset(0.25f, 0.75f),
 )
 
+internal fun shouldUseCoopPeerFingerprint(
+    spatialFrame: com.hereliesaz.graffitixr.common.model.CoopSpatialFrame?,
+    peerFingerprint: ByteArray?,
+): Boolean =
+    spatialFrame?.hostBackend ==
+        com.hereliesaz.graffitixr.common.model.CoopTrackingBackend.ARCORE &&
+        spatialFrame.fingerprintAvailable &&
+        peerFingerprint?.isNotEmpty() == true
+
 /**
  * First functional no-ARCore AR path.
  *
@@ -109,6 +118,7 @@ fun SphereSlamStandaloneOverlay(
     adjustment: ModeAdjustment? = null,
     onUnitsPerPixel: (Float) -> Unit = {},
     onTrackingTick: (Boolean) -> Unit = {},
+    onReferenceRegistrationChanged: (Boolean) -> Unit = {},
     onDiagnostic: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -133,6 +143,11 @@ fun SphereSlamStandaloneOverlay(
         mutableStateOf(persistedReferencePhysicallyMetric)
     }
     var referenceReady by remember { mutableStateOf(false) }
+    // A freshly captured page is native-registered BEFORE its versioned PNG/project metadata commit
+    // completes. Keep Host disabled across that gap; only the persisted URI transition for this
+    // candidate proves native geometry and durable project bytes now name the same page.
+    var awaitingReferencePersistence by remember { mutableStateOf(false) }
+    var persistenceBaselineUri by remember { mutableStateOf<Uri?>(null) }
     var referenceWidthUnits by remember { mutableStateOf(0f) }
     var referenceHeightUnits by remember { mutableStateOf(0f) }
     var designBaseHalfExtents by remember {
@@ -164,6 +179,9 @@ fun SphereSlamStandaloneOverlay(
     }
 
     fun resetCapture() {
+        onReferenceRegistrationChanged(false)
+        awaitingReferencePersistence = false
+        persistenceBaselineUri = null
         // Only a page that completed native KPM registration is a safe rollback candidate.
         // Keeping an unvalidated bitmap here can create an infinite weak-target restore loop.
         if (referenceReady) {
@@ -186,6 +204,27 @@ fun SphereSlamStandaloneOverlay(
         calibrationDiagnostics = null
         matchDiagnostics = null
         fatalMessage = null
+    }
+
+    LaunchedEffect(persistedReferenceUri, awaitingReferencePersistence) {
+        if (
+            awaitingReferencePersistence &&
+            persistedReferenceUri != null &&
+            persistedReferenceUri != persistenceBaselineUri
+        ) {
+            awaitingReferencePersistence = false
+            persistenceBaselineUri = null
+            // If this commit introduced a MobileGS seed, the analyzer must first restart with that
+            // NEW seed and only its onReferenceReady callback may unlock Host. If no seed exists,
+            // KPM-only standalone sharing is valid and the page registration already succeeded.
+            if (mobileGsFingerprint == null) {
+                onReferenceRegistrationChanged(true)
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { onReferenceRegistrationChanged(false) }
     }
 
     LaunchedEffect(persistedReferenceUri) {
@@ -216,6 +255,7 @@ fun SphereSlamStandaloneOverlay(
     }
 
     fun acceptReference(bitmap: Bitmap, widthMeters: Float, physicallyMetric: Boolean) {
+        onReferenceRegistrationChanged(false)
         activeReferenceWidthMeters = widthMeters
         activeReferencePhysicallyMetric = physicallyMetric
         pendingReferenceBitmap = null
@@ -225,12 +265,12 @@ fun SphereSlamStandaloneOverlay(
     }
 
     val reference = referenceBitmap
+    // An active ARCore-hosted co-op session is authoritative even if the imported host archive
+    // happens to retain an OLD standalone page from some earlier capture. Tracking that stale page
+    // would align the guest to the wrong wall. Peer geometry therefore wins solely from the live
+    // protocol-v3 session contract; local/persisted page state is irrelevant while it is active.
     val peerOnlyTracking =
-        reference == null &&
-            coopPeerSpatialFrame?.hostBackend ==
-                com.hereliesaz.graffitixr.common.model.CoopTrackingBackend.ARCORE &&
-            coopPeerSpatialFrame.fingerprintAvailable &&
-            !coopPeerFingerprint.isNullOrEmpty()
+        shouldUseCoopPeerFingerprint(coopPeerSpatialFrame, coopPeerFingerprint)
     if (reference == null && !peerOnlyTracking) {
         val pending = pendingReferenceBitmap
         if (pending != null) {
@@ -382,13 +422,23 @@ fun SphereSlamStandaloneOverlay(
             )
         }
     }
+    // A fresh candidate page exists before its project commit clears the OLD page's seed/map/atlas.
+    // Never let those old coordinates cross into the candidate analyzer. Once the new versioned URI
+    // lands, awaitingReferencePersistence flips false and we snapshot the freshly committed state.
+    val candidateUncommitted = referenceNeedsPersistence || awaitingReferencePersistence
+    val runtimeMobileGsFingerprint =
+        if (candidateUncommitted) null else mobileGsFingerprint
     // Snapshot persisted native state once per canonical page. Autosaves/grown-page commits publish
-    // new project objects while THIS analyzer already owns the fresher live state; keying the effect
-    // to those emissions would tear down tracking every few seconds.
-    val initialMobileGsWallFeatureMap = remember(reference) { mobileGsWallFeatureMap }
+    // new project objects while THIS analyzer already owns the fresher live state; keying ordinary
+    // autosaves into the effect would tear down tracking every few seconds.
+    val initialMobileGsWallFeatureMap = remember(reference, candidateUncommitted) {
+        if (candidateUncommitted) null else mobileGsWallFeatureMap
+    }
     val initialMobileGsWallFeatureMapFrameVersion =
-        remember(reference) { mobileGsWallFeatureMapFrameVersion }
-    val initialPersistedAtlasPages = remember(reference) { persistedAtlasPages }
+        remember(reference, candidateUncommitted) { mobileGsWallFeatureMapFrameVersion }
+    val initialPersistedAtlasPages = remember(reference, candidateUncommitted) {
+        if (candidateUncommitted) emptyList() else persistedAtlasPages
+    }
     val atlasReferenceImages by produceState<List<SphereSlamStandaloneAtlasReferenceImage>?>(
         initialValue = null,
         initialPersistedAtlasPages,
@@ -516,7 +566,7 @@ fun SphereSlamStandaloneOverlay(
     // path and gives self-grow an unambiguous fingerprint-frame Φ when that experiment is enabled.
     LaunchedEffect(
         slamManager,
-        mobileGsFingerprint,
+        runtimeMobileGsFingerprint,
         designBitmap,
         designBaseHalfExtents,
         adjustment?.offsetX,
@@ -524,7 +574,7 @@ fun SphereSlamStandaloneOverlay(
         adjustment?.scale,
         adjustment?.rotation,
     ) {
-        val placement = if (mobileGsFingerprint == null || designBitmap == null) {
+        val placement = if (runtimeMobileGsFingerprint == null || designBitmap == null) {
             null
         } else {
             standaloneDesignPlacement(
@@ -664,7 +714,7 @@ fun SphereSlamStandaloneOverlay(
         cameraController,
         cameraId,
         referenceImage,
-        mobileGsFingerprint,
+        runtimeMobileGsFingerprint,
         mobileGsFingerprintFrameVersion,
         atlasReferenceImages,
         peerOnlyTracking,
@@ -706,7 +756,7 @@ fun SphereSlamStandaloneOverlay(
                 referenceImage = requireNotNull(referenceImage),
                 atlasReferenceImages = restoredAtlas,
                 slamManager = slamManager,
-                mobileGsFingerprint = mobileGsFingerprint,
+                mobileGsFingerprint = runtimeMobileGsFingerprint,
                 mobileGsFingerprintFrameVersion = mobileGsFingerprintFrameVersion,
                 mobileGsWallFeatureMap = initialMobileGsWallFeatureMap,
                 mobileGsWallFeatureMapFrameVersion = initialMobileGsWallFeatureMapFrameVersion,
@@ -717,6 +767,8 @@ fun SphereSlamStandaloneOverlay(
                         referenceHeightUnits = g.heightMeters
                         referenceReady = true
                         if (referenceNeedsPersistence) {
+                            awaitingReferencePersistence = true
+                            persistenceBaselineUri = persistedReferenceUri
                             referenceBitmap?.let { accepted ->
                                 onReferenceCaptured(
                                     accepted,
@@ -726,6 +778,10 @@ fun SphereSlamStandaloneOverlay(
                             }
                             referenceNeedsPersistence = false
                             previousReferenceBitmap = null
+                        } else {
+                            // Restored page: durable metadata already points at this exact candidate,
+                            // so successful addReference/configureMobileGs is the final readiness gate.
+                            onReferenceRegistrationChanged(true)
                         }
                     }
                 },
