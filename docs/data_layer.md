@@ -21,14 +21,29 @@ it without depending on `app/`).
   - `layers: List<OverlayLayer>` — read-only migration path for projects saved when this app still
     held a layer list; collapsed into `design` on load (`ProjectManager.migrateInMemory`) and never
     written again.
-  - `targetImageUris`, `sphereSlamReferenceUri`/scale metadata, `fingerprint`, `wallFeatureMap`, `captureEnvironment`,
-    `fingerprintIntrinsics`/`fingerprintAnchor`/`fingerprintViewMatrix` — everything captured about
-    the AR target: the marks descriptor blob, the passively-built wide-area feature map, and the
-    device/camera state at capture time (see `CaptureEnvironment.kt`'s KDoc for why each group is
-    independently optional).
+  - `targetImageUris`, ARCore `fingerprint`/`wallFeatureMap`/`captureEnvironment`,
+    `fingerprintIntrinsics`/`fingerprintAnchor`/`fingerprintViewMatrix`, plus the separate
+    standalone SphereSLAM fields (`sphereSlamReferenceUri`, physical-scale flag/width, anchor
+    generation, `sphereSlamFingerprint`, `sphereSlamWallFeatureMap`, and atlas-page metadata) —
+    everything durable about either AR backend's wall target. ARCore and standalone target frames
+    are intentionally persisted separately rather than inferred interchangeable.
+    `CaptureEnvironment.kt` documents why the capture-side groups are independently optional.
   - `gpsData`, `sensorData`, `calibrationSnapshots`, `drawingPaths`, `refinementPaths`,
     `modeAdjustments`, `railExpansion` — contextual/UI state that rides along with the project so it
     restores exactly as the user left it.
+
+### Hybrid KPM runtime state (not project-persisted yet)
+
+The ARCore hybrid KPM correction added in PR #1970 deliberately does **not** add project fields yet.
+Its perspective-rectified metric page, dedicated ARCore page anchor, timestamp history, and frozen
+`page_from_artwork` relation exist only for the live renderer/session. On process death or project
+reopen, ARCore returns through the already-durable MobileGS fingerprint/`captureAnchorCam` path;
+hybrid KPM becomes available again after a new target capture builds a fresh metric page.
+
+This separation is intentional until the project format gets an explicit versioned hybrid-page
+artifact + frame relation. Do not serialize the hybrid page into the standalone
+`sphereSlamReferenceUri` slot: that slot is the canonical non-ARCore wall coordinate object and
+mixing the two would recreate the backend-frame ambiguity the separate fields prevent.
 
 ### `OverlayLayer` (Serializable)
 - **Location:** `OverlayLayer.kt`
