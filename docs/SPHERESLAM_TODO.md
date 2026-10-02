@@ -892,9 +892,10 @@ first standalone device validation.
 
 ---
 
-## 19. Merge criteria
+## 19. Validation / next-release criteria
 
-Do **not** merge the standalone feature merely because it compiles.
+The standalone feature is already merged. These are the remaining criteria before treating the
+dual-backend SphereSLAM work as production-validated rather than software-complete.
 
 Minimum merge criteria:
 
@@ -915,30 +916,40 @@ Minimum merge criteria:
 - [ ] unresolved parity gaps are documented as explicit backend limitations, not silently broken
   controls.
 
-Full parity milestone, after initial standalone merge:
+Software parity milestone after the initial standalone merge:
 
-- [ ] physical scale;
-- [ ] MobileGS/fingerprint integration;
-- [ ] wide-area/multi-page wall tracking;
-- [ ] hybrid KPM correction through `PoseFusion`;
-- [ ] deliberate equivalents/degradations for all ARCore-only features;
-- [ ] co-op cross-backend calibration;
-- [ ] sustained-session performance/thermal validation.
+- [x] physical-scale model (measured metric or explicitly normalized; real-device measurement
+  validation still open);
+- [x] MobileGS/fingerprint integration in the centered standalone page frame;
+- [x] bounded wide-area/multi-page wall atlas growth and restore;
+- [x] hybrid metric KPM correction through `PoseFusion` (durable hybrid reopen + device validation
+  still open in §10);
+- [x] deliberate equivalents/degradations for ARCore-only features;
+- [x] co-op protocol-v3 cross-backend calibration;
+- [ ] sustained-session performance/thermal/device validation.
 
 ---
 
 ## Recommended implementation order
 
-1. **Build/CI validation** — find compile/API errors before adding more behavior.
-2. **Physical scale** — required before metric integration and trustworthy distance.
-3. **Standalone target workflow parity** — remove the temporary separate capture UX.
-4. **Standalone confidence/loss gates** — make the pose stream defensible.
-5. **MobileGS standalone coordinate bridge + fingerprint generation**.
-6. **MobileGS camera feed / paint-progress / self-grow**.
-7. **Multi-page wall atlas growth**.
-8. **ARCore-only feature/equivalent audit**.
-9. **Co-op cross-backend calibration**.
-10. **Hybrid KPM→PoseFusion correction** — independent enough to proceed in parallel once the page
-    scale and coordinate transform are defined.
-11. **Performance/device matrix**.
-12. **Cleanup/refactor only after the behavior above is proven**.
+Completed software dependencies:
+
+1. [x] Build/CI foundation.
+2. [x] Physical-scale model.
+3. [x] Standalone target workflow.
+4. [x] Standalone confidence/loss gates.
+5. [x] MobileGS standalone coordinate bridge + fingerprint generation.
+6. [x] MobileGS camera feed / paint-progress / self-grow integration.
+7. [x] Multi-page wall atlas growth.
+8. [x] ARCore-only feature/equivalent audit.
+9. [x] Co-op cross-backend calibration.
+10. [x] Hybrid metric KPM→PoseFusion correction software path.
+
+Next dependency:
+
+11. [ ] **Performance/device matrix and remaining real-device acceptance** — includes standalone
+    sustained-session measurements, atlas walk-off/return, hybrid forced-drift/wrong-wall/no-jump,
+    permission/interruption/lifecycle, and non-ARCore hardware.
+12. [ ] **Cleanup/refactor only after those behavior tests are proven** — keep the current explicit
+    frame seams until measurements/device runs show they are safe to consolidate.
+
