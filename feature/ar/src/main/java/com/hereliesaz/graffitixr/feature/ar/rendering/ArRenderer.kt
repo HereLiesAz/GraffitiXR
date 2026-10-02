@@ -788,7 +788,7 @@ class ArRenderer(
         return contentRotationScratch
     }
 
-    private fun resetHybridReference() {
+    private fun resetHybridReference(detachPageAnchor: Boolean = true) {
         // Stop the old page synchronously BEFORE any asynchronous replacement work. Otherwise an
         // in-flight matcher can publish a perfectly valid observation from the superseded wall.
         sphereSlamTracker.clearReference()
@@ -797,12 +797,29 @@ class ArRenderer(
         hybridPoseHistory.clear()
         hybridPageFromArtworkAnchor = null
         lastHybridObservationTimestampNs = Long.MIN_VALUE
+
+        // Capture-time replacement calls this from onDrawFrame while sessionLock is already held, so
+        // detaching here is serialized with every other ARCore call. Off-GL teardown passes false and
+        // performs the native Anchor.detach only after its bounded sessionLock acquisition below.
+        if (detachPageAnchor) {
+            try {
+                hybridPageAnchor?.detach()
+            } catch (_: Exception) {
+                // Session teardown / an already-detached anchor is harmless here.
+            }
+            hybridPageAnchor = null
+        }
+    }
+
+    /** Must be called only while [sessionLock] is held. */
+    private fun detachHybridPageAnchorLocked() {
         try {
             hybridPageAnchor?.detach()
         } catch (_: Exception) {
-            // Session teardown / an already-detached anchor is harmless here.
+            // Best-effort teardown; the owning Session may already be closing.
+        } finally {
+            hybridPageAnchor = null
         }
-        hybridPageAnchor = null
     }
 
     private fun createWorldAnchor(
@@ -3202,12 +3219,16 @@ class ArRenderer(
         watchdog?.interrupt()
         watchdog = null
         backgroundScope.cancel("Renderer detached and destroyed.")
-        resetHybridReference()
+        // Clear all non-ARCore hybrid state immediately, but do NOT call Anchor.detach() here: destroy
+        // runs off the GL thread and onDrawFrame may currently hold sessionLock inside a native ARCore
+        // call. The page anchor is detached only after the bounded lock succeeds below.
+        resetHybridReference(detachPageAnchor = false)
         sphereSlamTracker.close()
-        // Bounded acquisition only. If the GL thread is wedged mid-frame holding the lock,
-        // fall through and null the @Volatile session anyway: isDestroying (checked at the
-        // top of onDrawFrame) already stops any NEW frame from touching it, and the wedged
-        // frame captured its own local reference — blocking the caller helps nothing.
+        // Bounded acquisition only. If the GL thread is wedged mid-frame holding the lock, null the
+        // @Volatile session and drop Java references without making ANY off-lock ARCore native calls.
+        // isDestroying stops future frames; the ViewModel/session owner performs the eventual session
+        // close after renderer handoff. Unsafe best-effort Anchor.detach is worse than leaving cleanup
+        // to Session.close on this timeout path.
         val locked = try {
             sessionLock.tryLock(500, TimeUnit.MILLISECONDS)
         } catch (_: InterruptedException) {
@@ -3215,13 +3236,15 @@ class ArRenderer(
         }
         try {
             session = null
-            // anchorOrchestrator.clear() calls Anchor.detach() — a real ARCore native call — on this
-            // (main) thread, so it needs the same best-effort serialization against onDrawFrame as
-            // nulling `session` above, not a separate unlocked call afterwards. Kept inside this same
-            // bounded try/finally rather than given its own lock attempt: best-effort and bounded
-            // either way, since blocking here is the exact freeze this method's own doc says an
-            // unconditional lock caused.
-            anchorOrchestrator.clear()
+            if (locked) {
+                detachHybridPageAnchorLocked()
+                // clear() also calls Anchor.detach(), so it belongs under exactly the same lock.
+                anchorOrchestrator.clear()
+            } else {
+                // Do not retain an ARCore Anchor from a renderer that is now dead. Deliberately no
+                // native detach here because serialization could not be proven.
+                hybridPageAnchor = null
+            }
         } finally {
             if (locked) sessionLock.unlock()
         }
