@@ -463,12 +463,13 @@ The `SphereSlamTracker` lifetime follows `ArRenderer`.
 
 On renderer destruction:
 
-- the current hybrid page is synchronously disabled;
-- pending SphereSLAM frames and latest observations are discarded;
-- the dedicated ARCore page anchor is detached;
-- timestamp history/page↔artwork runtime state is cleared;
-- native KPM session destruction is scheduled on the SphereSLAM worker;
-- the worker executor is shut down.
+- the current hybrid page is synchronously disabled and pending/latest KPM observations are dropped;
+- timestamp history/page↔artwork runtime state is cleared before teardown waits on ARCore;
+- the dedicated ARCore page anchor is detached only while holding the same bounded `sessionLock`
+  that serializes `onDrawFrame` and every other off-GL ARCore native call;
+- if that bounded lock times out, teardown makes **no** unsafe off-lock `Anchor.detach()` call: the
+  Java reference is dropped and native cleanup is left to the owning `Session.close()`;
+- native KPM session destruction is scheduled on the SphereSLAM worker and its executor shuts down.
 
 ARCore teardown remains controlled by the renderer/session locking already present in
 `:feature:ar`.
