@@ -1,9 +1,11 @@
 # SphereSLAM Implementation TODO
 
-Status: active implementation plan. Initial standalone work merged to `main` in PR #1961;
-current MobileGS frame integration continues on `feat/sphereslam-mobilegs-frame-integration`.
+Status: active implementation + validation plan. Standalone, MobileGS frame integration,
+multi-page atlas, ARCore-equivalent audit, and co-op protocol-v3 calibration are on `main`;
+hybrid metric KPM→PoseFusion correction is implemented on
+`feat/sphereslam-hybrid-posefusion` / PR #1970.
 
-Checklist refreshed from `main` at `706ccb7ec949afe055156d23d6a0cc7a8c7126bd`.
+Checklist refreshed against `main` after co-op repair PR #1968 and the current hybrid branch.
 
 This is the authoritative remaining-work list for GraffitiXR's SphereSLAM integration. It covers both:
 
@@ -498,46 +500,74 @@ frames. Physical walk-off/return validation remains in the later real-device val
 
 ## 10. Hybrid SphereSLAM → ARCore fusion
 
-Hybrid observation production exists; correction does not.
+The software correction path is implemented. ARCore remains the continuous camera pose source; KPM
+never writes renderer view/projection matrices. A metric KPM observation may only adjust the artwork
+anchor through the explicit timestamp/frame conversion and `PoseFusion` seam, and only while ARCore
+itself is tracking. The existing drift-correction switch still gates downstream correction and
+remains off by default.
 
-Already available:
+Implemented:
 
-- [x] asynchronous hybrid KPM matcher;
-- [x] calibrated KPM session;
-- [x] KPM observation timestamp;
-- [x] page ID;
-- [x] reprojection error;
-- [x] inlier count;
-- [x] ARCore remains primary pose source.
-
-Required work:
-
-- [ ] Seed hybrid KPM page with a physically correct scale rather than the adapter's legacy 72-DPI
-  default.
-- [ ] Reuse the tested KPM→OpenGL conversion in the hybrid path.
-- [ ] Define the transform from KPM page frame to the ARCore anchor/world frame at capture time.
-- [ ] Persist that capture-time page↔ARCore relation.
-- [ ] Maintain short ARCore pose history keyed by frame timestamp.
-- [ ] Pair each KPM observation with the corresponding/interpolated ARCore pose.
-- [ ] Reject KPM observations older than the allowed fusion age.
-- [ ] Define confidence gates:
-  - [ ] minimum inliers;
-  - [ ] maximum reprojection error;
-  - [ ] maximum correction translation;
-  - [ ] maximum correction angle;
-  - [ ] repeated-observation agreement requirement.
-- [ ] Add a formal SphereSLAM correction observation type.
-- [ ] Feed accepted corrections into `PoseFusion`, not directly into renderer matrices.
-- [ ] Define correction strength/smoothing.
-- [ ] Ensure a rejected/failed KPM observation leaves ARCore behavior unchanged.
-- [ ] Add fusion diagnostics: accepted/rejected reason, age, inliers, error, delta angle/translation.
-- [ ] Unit-test known page/ARCore transforms and correction deltas.
+- [x] Seed the hybrid KPM page with physical scale from the ARCore metric wall plane rather than the
+  adapter's legacy/default 72-DPI value.
+  - [x] Intersect raw sensor-camera rays with the ARCore plane.
+  - [x] Build a conservative centered physical wall rectangle.
+  - [x] Perspective-rectify the camera image to the rectangle's physical aspect.
+  - [x] Compute KPM DPI from measured wall width.
+- [x] Reuse the tested KPM→right-handed OpenGL conversion in the hybrid path.
+- [x] Define explicit KPM-page ↔ ARCore frames:
+  - [x] `world_from_page = inverse(sensor_view) * camera_from_page`;
+  - [x] create a dedicated ARCore page anchor from that metric page frame;
+  - [x] freeze `page_from_artwork` only while both the page anchor and artwork consensus anchor
+    are tracking;
+  - [x] unit-test that `page_from_artwork` is invariant under a global ARCore world rebase.
+- [ ] Persist the hybrid rectified page plus page↔artwork relation across process restart/project
+  reopen. PR #1970 keeps them runtime-only; a reopened project still falls back to the durable
+  MobileGS return-visit/fingerprint path until a new hybrid page is captured.
+- [x] Maintain a bounded ARCore pose/backbone history keyed by camera frame timestamp.
+- [x] Pair each asynchronous KPM observation with the nearest sensor-view + unfused consensus sample
+  within a strict 40 ms timestamp window; no render-time pose substitution is allowed.
+- [x] Reject KPM observations older than 500 ms.
+- [x] Define first-pass confidence gates:
+  - [x] minimum 12 inliers;
+  - [x] maximum 4 px reprojection error;
+  - [x] finite metric page/frame requirement;
+  - [x] ARCore itself must currently be tracking.
+- [ ] Add a hard maximum correction translation/angle rejection policy. Existing
+  `PoseFusion.COLD_SNAP_DIST_M` / `COLD_SNAP_ANGLE_DEG` classify a correction as a cold relock;
+  they do **not** reject a large but high-confidence KPM correction.
+- [ ] Require repeated-observation agreement before a large/cold KPM snap. A single observation that
+  passes the current quality gates may cold-snap through PoseFusion.
+- [x] Add a formal correction decision type:
+  `HybridKpmCorrection.Decision/Accepted/Reject`.
+- [x] Feed accepted KPM corrections into `PoseFusion.currentAnchorFromHybridObservation`; never
+  assign KPM output to renderer camera matrices.
+- [x] Store only the resulting anchor-local correction, so it survives ARCore global world rebases.
+- [x] Define source priority per render frame:
+  1. accepted fresh metric KPM correction;
+  2. existing MobileGS correction path;
+  3. hold the standing anchor-local correction;
+  4. raw ARCore consensus if no correction exists.
+- [x] Define smoothing/cold-snap strength from KPM inlier/reprojection quality using PoseFusion's
+  existing blend/cold thresholds.
+- [x] Ensure rejected/missing KPM observations cannot replace ARCore pose; during ARCore tracking
+  loss KPM does not become a surrogate continuous tracker.
+- [ ] Expand fusion diagnostics to expose the full KPM decision payload on-screen/reporting:
+  accepted/rejected reason, observation age, inliers, reprojection error, and correction
+  translation/angle. PR #1970 logs accepted/rejected reason + timestamp/inliers/confidence.
+- [x] Unit-test metric page geometry, page↔ARCore transforms, global-rebase invariance, timestamp
+  pairing/clock discontinuity, age/inlier/error gates, known correction deltas, and PoseFusion
+  anchor-local holding.
 - [ ] On-device test forced ARCore drift/relocalization with KPM visible.
-- [ ] Verify no visible jump when KPM and ARCore already agree.
-- [ ] Verify stale/wrong-wall KPM cannot drag the anchor away.
+- [ ] Verify on device that there is no visible jump when KPM and ARCore already agree.
+- [ ] Verify on device that stale/wrong-wall KPM cannot drag the anchor away.
+- [ ] Verify target recapture + repeated renderer/session lifecycle does not leak the dedicated KPM
+  page anchor/session.
 
-**ACCEPTANCE:** SphereSLAM can improve/recover wall registration in hybrid mode through
-`PoseFusion` while ARCore remains the continuous backbone and KPM failure is harmless.
+**ACCEPTANCE:** the software path can improve/recover wall registration through `PoseFusion` while
+ARCore remains the continuous backbone and KPM failure is harmless. Durable reopen support,
+large-correction hardening, richer diagnostics, and real-device validation remain required before
+calling hybrid correction production-validated.
 
 ---
 
@@ -726,8 +756,8 @@ Still required:
 - [x] tracking-state hysteresis tests for initial lock, bridge, reacquisition, LOST timeout, and
   fatal/reset behavior;
 - [ ] standalone page↔MobileGS frame conversion tests;
-- [ ] hybrid page↔ARCore frame conversion tests;
-- [ ] timestamp pairing/interpolation tests;
+- [x] hybrid page↔ARCore frame conversion tests, including global-rebase invariance;
+- [x] timestamp pairing tests with bounded nearest-sample matching and clock-discontinuity reset;
 - [ ] physical-scale migration tests;
 - [ ] multi-page canonical-frame conversion tests.
 
@@ -862,9 +892,10 @@ first standalone device validation.
 
 ---
 
-## 19. Merge criteria
+## 19. Validation / next-release criteria
 
-Do **not** merge the standalone feature merely because it compiles.
+The standalone feature is already merged. These are the remaining criteria before treating the
+dual-backend SphereSLAM work as production-validated rather than software-complete.
 
 Minimum merge criteria:
 
@@ -885,30 +916,40 @@ Minimum merge criteria:
 - [ ] unresolved parity gaps are documented as explicit backend limitations, not silently broken
   controls.
 
-Full parity milestone, after initial standalone merge:
+Software parity milestone after the initial standalone merge:
 
-- [ ] physical scale;
-- [ ] MobileGS/fingerprint integration;
-- [ ] wide-area/multi-page wall tracking;
-- [ ] hybrid KPM correction through `PoseFusion`;
-- [ ] deliberate equivalents/degradations for all ARCore-only features;
-- [ ] co-op cross-backend calibration;
-- [ ] sustained-session performance/thermal validation.
+- [x] physical-scale model (measured metric or explicitly normalized; real-device measurement
+  validation still open);
+- [x] MobileGS/fingerprint integration in the centered standalone page frame;
+- [x] bounded wide-area/multi-page wall atlas growth and restore;
+- [x] hybrid metric KPM correction through `PoseFusion` (durable hybrid reopen + device validation
+  still open in §10);
+- [x] deliberate equivalents/degradations for ARCore-only features;
+- [x] co-op protocol-v3 cross-backend calibration;
+- [ ] sustained-session performance/thermal/device validation.
 
 ---
 
 ## Recommended implementation order
 
-1. **Build/CI validation** — find compile/API errors before adding more behavior.
-2. **Physical scale** — required before metric integration and trustworthy distance.
-3. **Standalone target workflow parity** — remove the temporary separate capture UX.
-4. **Standalone confidence/loss gates** — make the pose stream defensible.
-5. **MobileGS standalone coordinate bridge + fingerprint generation**.
-6. **MobileGS camera feed / paint-progress / self-grow**.
-7. **Multi-page wall atlas growth**.
-8. **ARCore-only feature/equivalent audit**.
-9. **Co-op cross-backend calibration**.
-10. **Hybrid KPM→PoseFusion correction** — independent enough to proceed in parallel once the page
-    scale and coordinate transform are defined.
-11. **Performance/device matrix**.
-12. **Cleanup/refactor only after the behavior above is proven**.
+Completed software dependencies:
+
+1. [x] Build/CI foundation.
+2. [x] Physical-scale model.
+3. [x] Standalone target workflow.
+4. [x] Standalone confidence/loss gates.
+5. [x] MobileGS standalone coordinate bridge + fingerprint generation.
+6. [x] MobileGS camera feed / paint-progress / self-grow integration.
+7. [x] Multi-page wall atlas growth.
+8. [x] ARCore-only feature/equivalent audit.
+9. [x] Co-op cross-backend calibration.
+10. [x] Hybrid metric KPM→PoseFusion correction software path.
+
+Next dependency:
+
+11. [ ] **Performance/device matrix and remaining real-device acceptance** — includes standalone
+    sustained-session measurements, atlas walk-off/return, hybrid forced-drift/wrong-wall/no-jump,
+    permission/interruption/lifecycle, and non-ARCore hardware.
+12. [ ] **Cleanup/refactor only after those behavior tests are proven** — keep the current explicit
+    frame seams until measurements/device runs show they are safe to consolidate.
+

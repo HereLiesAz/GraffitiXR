@@ -83,6 +83,12 @@ missing from an old file just uses its Kotlin default). Notably:
 - `captureEnvironment: CaptureEnvironment?` carries device attitude, ARCore poses, frame
   orientation, and a location fix at capture time (all independently optional/nullable — see the
   KDoc on `CaptureEnvironment` for why).
+- **Hybrid ARCore+KPM correction currently adds no on-disk field or file.** Its physically rectified
+  KPM page, dedicated ARCore page anchor, timestamp history, and frozen `page_from_artwork`
+  relation are live-renderer/session state only. Do not confuse that page with
+  `sphereSlamReferenceUri`, which is the durable canonical wall object for the standalone backend.
+  After process death/reopen the ARCore path uses the persisted MobileGS fingerprint/capture pose
+  until a new hybrid KPM page is captured.
 
 ## History
 

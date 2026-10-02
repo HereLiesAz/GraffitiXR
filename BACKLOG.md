@@ -570,13 +570,19 @@ bootstrap silently inside a backlog cleanup pass. Recommended next step for whoe
 up: decide which of those four infra investments the project wants (they are not mutually
 exclusive, but do not share setup cost), then this list becomes actionable.
 
-### Active SphereSLAM implementation backlog
+### Active SphereSLAM validation backlog
 
 The complete dependency-ordered SphereSLAM hybrid + standalone checklist lives in
-[`docs/SPHERESLAM_TODO.md`](docs/SPHERESLAM_TODO.md). Treat that file as authoritative for
-SphereSLAM implementation, validation, device coverage, MobileGS coordinate-frame integration,
-physical scale, hybrid fusion, co-op, performance, documentation, cleanup, and merge criteria.
-Do not maintain a second competing SphereSLAM TODO list here.
+[`docs/SPHERESLAM_TODO.md`](docs/SPHERESLAM_TODO.md). Treat that file as authoritative; do not
+maintain a second competing task list here.
+
+As of the 2026-10-01 integration pass, the major **software** dependencies are implemented:
+standalone measured/normalized scale, centered-page MobileGS + persisted feature map, bounded
+multi-page atlas, explicit ARCore-only feature degradations, protocol-v3 cross-backend co-op
+calibration, and metric timestamp-aligned hybrid KPM→PoseFusion correction. Remaining work is
+primarily real-device/performance acceptance plus the explicitly open hybrid hardening items
+(persisted hybrid page relation, hard large-correction/repeated-agreement policy, richer diagnostic
+payload) listed in `SPHERESLAM_TODO.md`.
 
 ### Sequencing notes
 

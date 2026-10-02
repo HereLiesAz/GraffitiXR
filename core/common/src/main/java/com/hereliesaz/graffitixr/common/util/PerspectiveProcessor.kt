@@ -96,6 +96,62 @@ object PerspectiveProcessor {
     }
 
 
+    /**
+     * Metric/reference-page variant of [unwarpImage] with an explicit destination size.
+     *
+     * The ordinary editor helper infers destination dimensions from source-edge pixel lengths, which
+     * is correct for visual straightening but wrong for calibrated planar tracking: an oblique wall
+     * needs the destination aspect ratio to come from PHYSICAL wall dimensions, not perspective-
+     * foreshortened source pixels. Hybrid KPM uses this overload after deriving that physical ratio
+     * from the ARCore wall plane.
+     */
+    fun unwarpImage(
+        bitmap: Bitmap,
+        points: List<Offset>,
+        outputWidth: Int,
+        outputHeight: Int,
+    ): Bitmap? {
+        if (points.size != 4 || outputWidth <= 1 || outputHeight <= 1) return null
+
+        val mats = mutableListOf<Mat>()
+        return try {
+            val src = Mat().also { mats.add(it) }
+            Utils.bitmapToMat(bitmap, src)
+
+            val srcPoints = MatOfPoint2f(
+                Point(points[0].x.toDouble(), points[0].y.toDouble()),
+                Point(points[1].x.toDouble(), points[1].y.toDouble()),
+                Point(points[2].x.toDouble(), points[2].y.toDouble()),
+                Point(points[3].x.toDouble(), points[3].y.toDouble()),
+            ).also { mats.add(it) }
+            val maxX = (outputWidth - 1).toDouble()
+            val maxY = (outputHeight - 1).toDouble()
+            val dstPoints = MatOfPoint2f(
+                Point(0.0, 0.0),
+                Point(maxX, 0.0),
+                Point(maxX, maxY),
+                Point(0.0, maxY),
+            ).also { mats.add(it) }
+            val transform = Geometry.getPerspectiveTransform(srcPoints, dstPoints).also { mats.add(it) }
+            val dest = Mat().also { mats.add(it) }
+            Imgproc.warpPerspective(
+                src,
+                dest,
+                transform,
+                Size(outputWidth.toDouble(), outputHeight.toDouble()),
+            )
+            Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888).also {
+                Utils.matToBitmap(dest, it)
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "PerspectiveProcessor: calibrated processing failed")
+            null
+        } finally {
+            mats.forEach { it.release() }
+        }
+    }
+
+
     fun removeBackground(bitmap: Bitmap): Bitmap? {
         val mats = mutableListOf<Mat>()
         return try {

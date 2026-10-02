@@ -81,10 +81,12 @@ class SphereSlamTracker(
     @Volatile private var cameraModel: CameraModel? = null
     @Volatile private var nativeHandle: Long = 0L
     @Volatile private var referenceReady: Boolean = false
+    @Volatile private var referenceGeometry: SphereSlamPoseMath.PageGeometry? = null
 
     val isNativeAvailable: Boolean get() = native.available
     val isReferenceReady: Boolean get() = referenceReady
     fun latestObservation(): Observation? = latest.get()
+    fun currentReferenceGeometry(): SphereSlamPoseMath.PageGeometry? = referenceGeometry
 
     fun configure(camera: CameraModel) {
         if (closed.get()) return
@@ -95,6 +97,7 @@ class SphereSlamTracker(
             destroyHandle()
             cameraModel = camera
             referenceReady = false
+            referenceGeometry = null
             latest.set(null)
             nativeHandle = if (native.available) native.create(camera) else 0L
         }
@@ -111,6 +114,8 @@ class SphereSlamTracker(
             if (closed.get()) return@execute
             destroyHandle()
             cameraModel = camera
+            referenceReady = false
+            referenceGeometry = null
             latest.set(null)
             nativeHandle = if (native.available) native.create(camera) else 0L
         }
@@ -134,15 +139,37 @@ class SphereSlamTracker(
             if (closed.get()) return@execute
             val handle = nativeHandle
             val model = cameraModel
-            if (handle == 0L || model == null || model.width != width || model.height != height) {
+            // The calibrated session dimensions describe LIVE camera frames. A planar reference is
+            // allowed to be a separately rectified image with its own dimensions; artoolkitX KPM
+            // stores page image geometry independently from camera calibration.
+            if (handle == 0L || model == null) {
                 referenceReady = false
+                referenceGeometry = null
                 return@execute
             }
-            referenceReady = native.setReference(
+            val accepted = native.setReference(
                 handle, packed, width, height, dpi, pageNo, imageNo, maxFeatures
             )
+            referenceReady = accepted
+            referenceGeometry = if (accepted) {
+                SphereSlamPoseMath.pageGeometry(width, height, dpi)
+            } else {
+                null
+            }
             latest.set(null)
         }
+    }
+
+    /**
+     * Synchronously stop publishing/matching the current page before an asynchronous replacement is
+     * prepared. The native handle is intentionally left alive until [reset] supplies the next camera
+     * model, but no old observation can escape after this call.
+     */
+    fun clearReference() {
+        referenceReady = false
+        referenceGeometry = null
+        pendingFrame.set(null)
+        latest.set(null)
     }
 
     /**
@@ -195,6 +222,7 @@ class SphereSlamTracker(
         val handle = nativeHandle
         nativeHandle = 0L
         referenceReady = false
+        referenceGeometry = null
         if (handle != 0L) native.destroy(handle)
     }
 

@@ -700,6 +700,20 @@ class ArRenderer(
     // Parallel wall tracker. It observes camera luma beside ARCore; it never replaces poseSource.
     // Its output is reserved for relocalization/drift fusion once metric page scale is established.
     private val sphereSlamTracker = com.hereliesaz.sphereslam.SphereSlamTracker()
+    // KPM is asynchronous; this ring pairs each observation with the ARCore view + consensus anchor
+    // from the SAME sensor timestamp before any correction enters PoseFusion.
+    private val hybridPoseHistory =
+        com.hereliesaz.graffitixr.feature.ar.anchor.HybridPoseHistory()
+    @Volatile private var hybridReferenceGeometry:
+        com.hereliesaz.sphereslam.SphereSlamPoseMath.PageGeometry? = null
+    @Volatile private var hybridReferencePhysicallyMetric: Boolean = false
+    // ARCore anchor attached to the physical KPM page. Its pose is solved at capture from the same
+    // wall-plane intersections that create the rectified KPM page, so KPM and ARCore share one
+    // explicit page coordinate object from the first frame.
+    private var hybridPageAnchor: com.google.ar.core.Anchor? = null
+    // Fixed page-from-artwork-anchor relation, frozen only when BOTH ARCore anchors track together.
+    private var hybridPageFromArtworkAnchor: FloatArray? = null
+    private var lastHybridObservationTimestampNs: Long = Long.MIN_VALUE
     private val mappingViewMatrixScratch = FloatArray(16)
     private val backboneScratch = FloatArray(16)
     // Scratch for composing the overlay matrix (anchor frame * in-plane transform).
@@ -772,6 +786,54 @@ class ArRenderer(
         }
 
         return contentRotationScratch
+    }
+
+    private fun resetHybridReference(detachPageAnchor: Boolean = true) {
+        // Stop the old page synchronously BEFORE any asynchronous replacement work. Otherwise an
+        // in-flight matcher can publish a perfectly valid observation from the superseded wall.
+        sphereSlamTracker.clearReference()
+        hybridReferenceGeometry = null
+        hybridReferencePhysicallyMetric = false
+        hybridPoseHistory.clear()
+        hybridPageFromArtworkAnchor = null
+        lastHybridObservationTimestampNs = Long.MIN_VALUE
+
+        // Capture-time replacement calls this from onDrawFrame while sessionLock is already held, so
+        // detaching here is serialized with every other ARCore call. Off-GL teardown passes false and
+        // performs the native Anchor.detach only after its bounded sessionLock acquisition below.
+        if (detachPageAnchor) {
+            try {
+                hybridPageAnchor?.detach()
+            } catch (_: Exception) {
+                // Session teardown / an already-detached anchor is harmless here.
+            }
+            hybridPageAnchor = null
+        }
+    }
+
+    /** Must be called only while [sessionLock] is held. */
+    private fun detachHybridPageAnchorLocked() {
+        try {
+            hybridPageAnchor?.detach()
+        } catch (_: Exception) {
+            // Best-effort teardown; the owning Session may already be closing.
+        } finally {
+            hybridPageAnchor = null
+        }
+    }
+
+    private fun createWorldAnchor(
+        session: Session,
+        worldFromLocal: FloatArray,
+    ): com.google.ar.core.Anchor {
+        val q = com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
+            .matrixToQuaternion(worldFromLocal)
+        return session.createAnchor(
+            com.google.ar.core.Pose(
+                floatArrayOf(worldFromLocal[12], worldFromLocal[13], worldFromLocal[14]),
+                q,
+            )
+        )
     }
 
     fun attachSession(session: Session?) {
@@ -1657,6 +1719,75 @@ class ArRenderer(
                 // rather than crash on a null-array arraycopy.
                 slamManager.getAnchorTransform()?.let { System.arraycopy(it, 0, backbone, 0, 16) }
             }
+            // Timestamp bridge for asynchronous KPM. KPM consumes RAW sensor camera frames, so
+            // pair its timestamp with camera.pose.inverse() (mappingViewMatrix), not the display-
+            // rotated render view. The backbone sample is the unfused consensus artwork anchor.
+            if (isTracking) {
+                hybridPoseHistory.add(frame.timestamp, mappingViewMatrix, backbone)
+            }
+
+            // Freeze page-from-artwork exactly once while BOTH ARCore anchors are live. After this
+            // point the relative transform is the coordinate contract; future ARCore global world
+            // rebases multiply both anchors on the left and cancel out of this relation.
+            if (
+                hybridPageFromArtworkAnchor == null &&
+                anchorEstablished &&
+                isTracking &&
+                activeAnchorCount() > 0
+            ) {
+                val pageAnchor = hybridPageAnchor
+                if (pageAnchor?.trackingState == TrackingState.TRACKING) {
+                    val worldFromPage = FloatArray(16)
+                    pageAnchor.pose.toMatrix(worldFromPage, 0)
+                    hybridPageFromArtworkAnchor =
+                        com.hereliesaz.graffitixr.feature.ar.anchor.HybridPageFrame
+                            .pageFromArtwork(worldFromPage, backbone)
+                    Timber.i("ARDIAG hybrid KPM page↔artwork frame frozen")
+                }
+            }
+
+            val hybridObservation = sphereSlamTracker.latestObservation()
+            val hybridDecision =
+                if (
+                    fusionEnabled &&
+                    anchorEstablished &&
+                    isTracking &&
+                    sphereSlamTracker.isReferenceReady &&
+                    hybridReferencePhysicallyMetric &&
+                    hybridPageFromArtworkAnchor != null &&
+                    hybridObservation != null
+                ) {
+                    com.hereliesaz.graffitixr.feature.ar.anchor.HybridKpmCorrection.solve(
+                        observation = hybridObservation,
+                        pageGeometry = sphereSlamTracker.currentReferenceGeometry()
+                            ?: hybridReferenceGeometry,
+                        physicallyMetric = hybridReferencePhysicallyMetric,
+                        pageFromAnchor = hybridPageFromArtworkAnchor,
+                        poseHistory = hybridPoseHistory,
+                        currentFrameTimestampNs = frame.timestamp,
+                    )
+                } else {
+                    null
+                }
+            if (
+                hybridObservation != null &&
+                hybridObservation.timestampNs != lastHybridObservationTimestampNs
+            ) {
+                lastHybridObservationTimestampNs = hybridObservation.timestampNs
+                hybridDecision?.let { decision ->
+                    decision.accepted?.let {
+                        Timber.d(
+                            "ARDIAG hybrid KPM accepted ts=${it.timestampNs} " +
+                                "inliers=${it.inliers} confidence=${it.confidence}"
+                        )
+                    } ?: decision.reject?.let {
+                        Timber.d(
+                            "ARDIAG hybrid KPM rejected ts=${hybridObservation.timestampNs} reason=$it"
+                        )
+                    }
+                }
+            }
+
             // Fuse in the corrected mark-PnP snap (smoothed) when anchored; the flag lets the eval
             // harness A/B fusion vs the old toggle. Off → exact previous behavior.
             // IMPLEMENTATION.md 0.9 — the correction needs `captureAnchorCam`, the anchor's pose in
@@ -1675,16 +1806,17 @@ class ArRenderer(
             // record exists to end. NO_CAPTURE_POSE in particular was introduced by 0.9 and is the
             // one most likely to be mistaken for a bug: a pre-Phase-2 project relocalizes fine and
             // is never corrected.
+            val hybridFrameReady =
+                sphereSlamTracker.isReferenceReady &&
+                    hybridReferencePhysicallyMetric &&
+                    hybridPageFromArtworkAnchor != null
             fusionSkipReason = when {
                 !fusionEnabled -> com.hereliesaz.graffitixr.common.model.FusionState.DISABLED
                 !anchorEstablished -> com.hereliesaz.graffitixr.common.model.FusionState.NO_ANCHOR
-                // Two very different causes, one condition. A pre-Phase-2 fingerprint has points but
-                // no stored capture pose; a session where the target capture failed has no
-                // fingerprint at all. Reported as one state, the overlay told an artist to
-                // "re-create" a target that had never existed, one row under its own "NO TARGET".
-                //
-                // The keypoint count is only read on this branch — i.e. only when fusion is already
-                // skipping — so the healthy path pays nothing for the distinction.
+                // A metric KPM page is a complete alternate relocalization input and does NOT need
+                // MobileGS captureAnchorCam. Only report the legacy missing-fingerprint gates when
+                // neither correction source is capable of carrying the standing correction.
+                hybridFrameReady -> null
                 captureAnchorCam == null ->
                     if (slamManager.getWallKeypointCount() <= 0) {
                         com.hereliesaz.graffitixr.common.model.FusionState.NO_FINGERPRINT
@@ -1693,8 +1825,20 @@ class ArRenderer(
                     }
                 else -> null
             }
-            val anchorMatrix: FloatArray = if (fusionEnabled && anchorEstablished && captureAnchorCam != null) {
-                poseFusion.currentAnchor(
+            val hybridAccepted = hybridDecision?.accepted
+            val anchorMatrix: FloatArray = when {
+                !fusionEnabled || !anchorEstablished -> backbone
+                hybridAccepted != null ->
+                    poseFusion.currentAnchorFromHybridObservation(
+                        currentBackbone = backbone,
+                        backboneAtObservation = hybridAccepted.backboneAtObservation,
+                        correctedAnchorAtObservation = hybridAccepted.correctedAnchorWorld,
+                        observationTimestampNs = hybridAccepted.timestampNs,
+                        confidence = hybridAccepted.confidence,
+                        inliers = hybridAccepted.inliers,
+                    )
+                captureAnchorCam != null ->
+                    poseFusion.currentAnchor(
                     backbone = backbone,
                     vCurrent = viewMatrix,
                     reloc = slamManager.getRelocResult(),
@@ -1728,7 +1872,9 @@ class ArRenderer(
                     // feeding a negative through a parameter documented as [0,1].
                     confGlobal = slamManager.getCorroborationConfidence().coerceAtLeast(0f),
                 )
-            } else backbone
+                hybridFrameReady -> poseFusion.holdCurrentAnchor(backbone)
+                else -> backbone
+            }
 
             // Capture [overlayRotationCorrection] the first frame anchorMatrix exists after
             // establishment — at this point getConsensusMatrix is EXPECTED to have exactly one vote
@@ -2074,29 +2220,9 @@ class ArRenderer(
             lastStep = "capture"
             if (captureRequested) {
                 captureRequested = false
+                resetHybridReference()
                 try {
                     frame.acquireCameraImage().use { image ->
-                        // Seed a fresh SphereSLAM planar atlas from the same target capture ARCore
-                        // continues to use. KPM receives calibrated image intrinsics, but remains a
-                        // sidecar: no matrix from it is allowed to replace ARCore's primary pose.
-                        val sphereY = image.planes[0]
-                        sphereSlamTracker.reset(
-                            com.hereliesaz.sphereslam.SphereSlamTracker.CameraModel(
-                                width = image.width,
-                                height = image.height,
-                                fx = intrinsics.focalLength[0],
-                                fy = intrinsics.focalLength[1],
-                                cx = intrinsics.principalPoint[0],
-                                cy = intrinsics.principalPoint[1],
-                            )
-                        )
-                        sphereSlamTracker.setReference(
-                            luma = sphereY.buffer,
-                            width = image.width,
-                            height = image.height,
-                            rowStride = sphereY.rowStride,
-                        )
-
                         val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
                         // Real native YUV→RGBA (OpenCV NEON on ARM). Replaces the fake "direct"
                         // path that went via YuvImage.compressToJpeg + BitmapFactory.decodeByteArray
@@ -2217,6 +2343,76 @@ class ArRenderer(
                                 Timber.w(e, "Wall-plane hit-test for capture failed")
                             }
                         }
+
+                        // Hybrid KPM reference: only a physically metric ARCore wall plane is
+                        // eligible. The raw camera photo is perspective-warped, so derive a real wall
+                        // rectangle in sensor-camera coordinates, rectify it to the physical aspect,
+                        // and register THAT image at a DPI whose KPM units are metres.
+                        wallPlane?.let { metricPlane ->
+                            val geometry =
+                                com.hereliesaz.graffitixr.feature.ar.HybridMetricKpmReference
+                                    .deriveGeometry(
+                                        imageWidth = image.width,
+                                        imageHeight = image.height,
+                                        fx = fx,
+                                        fy = fy,
+                                        cx = cx,
+                                        cy = cy,
+                                        // Raw YUV/imageIntrinsics are sensor-oriented; camera.pose
+                                        // inverse is the matching sensor-camera GL view.
+                                        glView = mappingViewMatrix,
+                                        wallPlane = metricPlane,
+                                    )
+                            val reference = geometry?.let {
+                                com.hereliesaz.graffitixr.feature.ar.HybridMetricKpmReference
+                                    .rectify(bitmap, it)
+                            }
+                            if (geometry != null && reference != null) {
+                                sphereSlamTracker.reset(
+                                    com.hereliesaz.sphereslam.SphereSlamTracker.CameraModel(
+                                        width = image.width,
+                                        height = image.height,
+                                        fx = fx,
+                                        fy = fy,
+                                        cx = cx,
+                                        cy = cy,
+                                    )
+                                )
+                                sphereSlamTracker.setReference(
+                                    luma = java.nio.ByteBuffer.wrap(reference.luma),
+                                    width = reference.width,
+                                    height = reference.height,
+                                    rowStride = reference.width,
+                                    dpi = reference.referenceDpi,
+                                )
+                                hybridReferenceGeometry = reference.pageGeometry
+                                hybridReferencePhysicallyMetric = true
+
+                                // page pose is known at capture from the SAME metric geometry. Turn
+                                // camera-from-page into world-from-page and let ARCore track that
+                                // page origin beside the artwork anchor. No world origin is shared
+                                // with KPM and no raw KPM pose ever becomes the renderer camera pose.
+                                val worldFromPage =
+                                    com.hereliesaz.graffitixr.feature.ar.anchor.HybridPageFrame
+                                        .worldFromPage(
+                                            sensorView = mappingViewMatrix,
+                                            cameraFromPage = geometry.cameraFromPageGl,
+                                        )
+                                hybridPageAnchor = createWorldAnchor(activeSession, worldFromPage)
+                                Timber.i(
+                                    "ARDIAG hybrid KPM metric reference " +
+                                        "${reference.width}x${reference.height} " +
+                                        "wall=${reference.widthMeters}x${reference.heightMeters}m " +
+                                        "dpi=${reference.referenceDpi}"
+                                )
+                            } else {
+                                Timber.w(
+                                    "ARDIAG hybrid KPM reference skipped: metric wall rectification failed"
+                                )
+                            }
+                        } ?: Timber.w(
+                            "ARDIAG hybrid KPM reference skipped: no metric ARCore wall plane"
+                        )
 
                         // Everything knowable about how and where the device was held, sampled at
                         // the instant the geometry is frozen. backProject runs once per target, so
@@ -3023,11 +3219,16 @@ class ArRenderer(
         watchdog?.interrupt()
         watchdog = null
         backgroundScope.cancel("Renderer detached and destroyed.")
+        // Clear all non-ARCore hybrid state immediately, but do NOT call Anchor.detach() here: destroy
+        // runs off the GL thread and onDrawFrame may currently hold sessionLock inside a native ARCore
+        // call. The page anchor is detached only after the bounded lock succeeds below.
+        resetHybridReference(detachPageAnchor = false)
         sphereSlamTracker.close()
-        // Bounded acquisition only. If the GL thread is wedged mid-frame holding the lock,
-        // fall through and null the @Volatile session anyway: isDestroying (checked at the
-        // top of onDrawFrame) already stops any NEW frame from touching it, and the wedged
-        // frame captured its own local reference — blocking the caller helps nothing.
+        // Bounded acquisition only. If the GL thread is wedged mid-frame holding the lock, null the
+        // @Volatile session and drop Java references without making ANY off-lock ARCore native calls.
+        // isDestroying stops future frames; the ViewModel/session owner performs the eventual session
+        // close after renderer handoff. Unsafe best-effort Anchor.detach is worse than leaving cleanup
+        // to Session.close on this timeout path.
         val locked = try {
             sessionLock.tryLock(500, TimeUnit.MILLISECONDS)
         } catch (_: InterruptedException) {
@@ -3035,13 +3236,15 @@ class ArRenderer(
         }
         try {
             session = null
-            // anchorOrchestrator.clear() calls Anchor.detach() — a real ARCore native call — on this
-            // (main) thread, so it needs the same best-effort serialization against onDrawFrame as
-            // nulling `session` above, not a separate unlocked call afterwards. Kept inside this same
-            // bounded try/finally rather than given its own lock attempt: best-effort and bounded
-            // either way, since blocking here is the exact freeze this method's own doc says an
-            // unconditional lock caused.
-            anchorOrchestrator.clear()
+            if (locked) {
+                detachHybridPageAnchorLocked()
+                // clear() also calls Anchor.detach(), so it belongs under exactly the same lock.
+                anchorOrchestrator.clear()
+            } else {
+                // Do not retain an ARCore Anchor from a renderer that is now dead. Deliberately no
+                // native detach here because serialization could not be proven.
+                hybridPageAnchor = null
+            }
         } finally {
             if (locked) sessionLock.unlock()
         }

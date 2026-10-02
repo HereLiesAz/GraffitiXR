@@ -67,4 +67,46 @@ class SphereSlamTrackerTest {
             assertEquals(31, observation.inliers)
         }
     }
+    @Test
+    fun `rectified reference dimensions are independent from live camera dimensions`() {
+        val referenceAdded = CountDownLatch(1)
+        val fake = object : SphereSlamTracker.Native {
+            override val available = true
+            override fun create(camera: SphereSlamTracker.CameraModel) = 9L
+            override fun destroy(handle: Long) = Unit
+            override fun setReference(
+                handle: Long, luma: ByteArray, width: Int, height: Int, dpi: Float,
+                pageNo: Int, imageNo: Int, maxFeatures: Int,
+            ): Boolean {
+                assertEquals(640, width)
+                assertEquals(320, height)
+                referenceAdded.countDown()
+                return true
+            }
+            override fun match(
+                handle: Long, luma: ByteArray, timestampNs: Long,
+            ): SphereSlamTracker.Observation? = null
+        }
+
+        SphereSlamTracker(fake).use { tracker ->
+            tracker.configure(SphereSlamTracker.CameraModel(1280, 720, 900f, 900f, 640f, 360f))
+            val configureDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+            while (!tracker.isNativeAvailable || System.nanoTime() >= configureDeadline) {
+                Thread.sleep(1)
+            }
+            tracker.setReference(
+                ByteBuffer.wrap(ByteArray(640 * 320)),
+                width = 640,
+                height = 320,
+                rowStride = 640,
+                dpi = 80f,
+            )
+            assertTrue(referenceAdded.await(2, TimeUnit.SECONDS))
+            val readyDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+            while (!tracker.isReferenceReady && System.nanoTime() < readyDeadline) Thread.sleep(5)
+            assertTrue(tracker.isReferenceReady)
+            assertEquals(0.2032f, tracker.currentReferenceGeometry()!!.widthMeters, 0.0001f)
+        }
+    }
+
 }

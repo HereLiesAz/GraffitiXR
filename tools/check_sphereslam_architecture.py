@@ -6,8 +6,8 @@ invariants that are easy to accidentally regress during UI/renderer refactors:
 
 1. AR mode stays reachable even when ARCore is unavailable.
 2. The standalone CameraX + SphereSLAM branch never constructs or imports an ARCore Session.
-3. Hybrid SphereSLAM remains observation-only in ArRenderer until an explicit fusion component is
-   introduced; it must not write directly into the primary ARCore view/projection matrices.
+3. Hybrid SphereSLAM may correct the artwork only through the explicit metric/timestamp/PoseFusion
+   seam; it must never replace the primary ARCore view/projection matrices.
 4. MobileGS tracking validity is backend-neutral, and standalone self-grow/map points remain in the
    centred SphereSLAM fingerprint frame rather than passing through an ARCore-world conversion.
 5. The standalone runtime never reaches ARCore-only hit-test/depth/anchor/perception APIs and exposes
@@ -114,28 +114,59 @@ else:
     if "SphereSlamStandaloneOverlay(" not in standalone_branch:
         fail("MainScreen non-ARCore branch no longer mounts SphereSlamStandaloneOverlay.")
 
-# 3. Hybrid ArRenderer keeps ARCore as primary and KPM observation-only.
+# 3. Hybrid ArRenderer keeps ARCore primary and admits KPM only through the explicit fusion seam.
 if "ArCorePoseSource()" not in ar_renderer:
     fail("ArRenderer no longer declares ArCorePoseSource as the hybrid primary pose source.")
 if "poseSource.sample(viewMatrix, projMatrix" not in ar_renderer:
     fail("ArRenderer primary view/projection matrices no longer flow through poseSource.sample().")
 
-allowed_tracker_calls = {"reset", "setReference", "submitFrame", "close"}
+allowed_tracker_calls = {
+    "reset",
+    "clearReference",
+    "setReference",
+    "submitFrame",
+    "latestObservation",
+    "currentReferenceGeometry",
+    "close",
+}
 tracker_calls = set(re.findall(r"sphereSlamTracker\.(\w+)\s*\(", ar_renderer))
 unexpected = sorted(tracker_calls - allowed_tracker_calls)
 if unexpected:
     fail(
-        "ArRenderer now consumes SphereSLAM beyond the observation-only sidecar contract "
-        f"({', '.join(unexpected)}). Route observations through an explicit fusion component "
-        "before changing primary renderer pose."
+        "ArRenderer added an unreviewed SphereSLAM tracker call "
+        f"({', '.join(unexpected)}); preserve the explicit hybrid fusion seam."
     )
 
-for direct_token in ("latestObservation", "pageToCamera3x4", "SphereSlamPoseMath"):
-    if direct_token in ar_renderer:
-        fail(
-            f"ArRenderer directly references {direct_token}; hybrid KPM correction must enter "
-            "through the explicit fusion seam rather than primary matrices."
-        )
+required_hybrid_literals = (
+    "HybridMetricKpmReference",
+    "hybridPoseHistory.add(frame.timestamp, mappingViewMatrix, backbone)",
+    "HybridKpmCorrection.solve(",
+    "poseFusion.currentAnchorFromHybridObservation(",
+)
+for token in required_hybrid_literals:
+    if token not in ar_renderer:
+        fail(f"Hybrid KPM correction seam is incomplete: missing {token!r} in ArRenderer.")
+
+# Qualified Kotlin calls are routinely wrapped after the class/object name. Match semantic token
+# order while tolerating whitespace/newlines instead of making source formatting a CI invariant.
+if not re.search(r"HybridPageFrame\s*\.\s*worldFromPage\s*\(", ar_renderer):
+    fail("Hybrid KPM correction seam is incomplete: missing HybridPageFrame.worldFromPage call.")
+
+if "pageToCamera3x4" in ar_renderer:
+    fail(
+        "ArRenderer directly consumes raw KPM pageToCamera3x4; raw observations must be converted "
+        "inside HybridKpmCorrection before PoseFusion sees them."
+    )
+
+# The primary renderer view/projection still come only from PoseSource. KPM is permitted to alter
+# anchorMatrix through PoseFusion, never viewMatrix/projMatrix themselves.
+for forbidden in (
+    "System.arraycopy(hybrid",
+    "viewMatrix = sphereSlam",
+    "projMatrix = sphereSlam",
+):
+    if forbidden in ar_renderer:
+        fail(f"Hybrid KPM appears to write primary renderer camera state: found {forbidden!r}.")
 
 # 4. MobileGS frame/tracking state must be backend-neutral and preserve standalone object space.
 for path, text in {
@@ -228,6 +259,6 @@ if FAILURES:
 
 print(
     "SphereSLAM architecture invariant check OK: AR mode remains reachable, standalone is "
-    "ARCore-independent, hybrid KPM is observation-only, ARCore-only perception APIs stay "
+    "ARCore-independent, hybrid KPM corrects only through metric timestamped PoseFusion, ARCore-only perception APIs stay "
     "behind explicit backend boundaries, and co-op geometry is explicitly framed."
 )

@@ -8,6 +8,12 @@
 > default alongside the drift-correction and self-grow switches. **Phases 3–4 — passive
 > accumulation-rate tuning and on-device confidence/pruning validation — have not been verified**;
 > treat the sequencing below as still accurate for what remains open.
+>
+> **Backend frame note (2026-10-01):** ARCore and standalone do not share one persisted
+> `WallFeatureMap` slot. ARCore keeps `wallFeatureMap` in its fingerprint-anchor frame; standalone
+> keeps `sphereSlamWallFeatureMap` in the canonical centered KPM page frame with an identity
+> fingerprint anchor. Hybrid KPM correction does not mutate either map: it contributes only an
+> anchor-local `PoseFusion` correction on the ARCore path.
 
 ## 1. The goal (your concern, restated)
 Relocalization that is **thorough and smooth over a whole mural** — locks back on from

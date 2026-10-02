@@ -58,20 +58,36 @@ real camera and motion sensors. Confirm:
 - A textured target produces a SphereSLAM/KPM lock and the artwork remains registered while
   translating/rotating the phone within the target's useful viewing range.
 - Pan, pinch-scale, in-plane rotation, X/Y perspective rotation, tone, opacity, and invert use the
-  same persisted AR adjustment model as the ARCore path.
+  standalone `sphereSlamModeAdjustment` slot; they do not overwrite ARCore's independent
+  `modeAdjustments[AR]` placement.
 - A brief visual miss can use the short IMU bridge; a longer miss clears the stale overlay and shows
   reacquisition instead of freezing the last pose indefinitely.
 - Leaving and reopening the project restores the URI-referenced `sphereslam_reference_<uuid>.png` and can reacquire the
   target without recapturing it.
-- Exporting/importing the project relocates the stored SphereSLAM reference URI to the imported
-  project directory and can reacquire the target there.
+- Walking far enough to grow/use an additional atlas page does not change the canonical artwork
+  frame; returning to page 0 produces no visible coordinate jump.
+- Exporting/importing the project relocates page 0 and every referenced SphereSLAM atlas-page URI to
+  the imported project directory and can reacquire there.
 - No standalone UI reports physical metres unless
   `sphereSlamReferencePhysicallyMetric == true`.
+- If co-op is exercised, a normalized standalone wall may join another standalone peer but is
+  refused for an ARCore guest; measured metric standalone↔ARCore pairing succeeds only through the
+  protocol-v3 host wall-frame descriptor.
 
 ## Smoke test on an ARCore-supported device
 
 - AR mode is present and entering it initializes an ARCore session.
 - `ArCorePoseSource` remains the primary continuous renderer pose.
 - SphereSLAM runs beside ARCore; loss/failure of KPM does not break normal ARCore tracking.
-- Existing anchor, target capture, scan/fingerprint, depth/plane, relocalization, and teardown flows
-  behave normally.
+- A target captured on a real ARCore wall plane seeds a perspective-rectified **metric** KPM page;
+  the generic 72-DPI default is never treated as a physical hybrid scale.
+- With drift correction OFF (the default), KPM cannot move the artwork.
+- With drift correction ON, an accepted KPM correction adjusts only the artwork anchor through
+  PoseFusion; ARCore remains the renderer camera pose. Covering/removing the KPM target must not
+  make the overlay ride the screen or keep correcting from a stale observation.
+- Target recapture disables the previous KPM reference immediately; repeated AR enter/exit does not
+  race `Anchor.detach()` against the render thread.
+- Reopening a project without a live hybrid page still uses the durable MobileGS return-visit path;
+  hybrid KPM correction resumes only after a new metric hybrid page is captured.
+- Existing anchor, target capture, scan/fingerprint, depth/plane, MobileGS relocalization, and
+  teardown flows behave normally.

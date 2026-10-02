@@ -23,8 +23,11 @@ MobileGS/fingerprint path; ARCore-unavailable devices use CameraX + SphereSLAM/K
 design to a captured wall page. The standalone path uses the same centered KPM wall frame for
 MobileGS, self-grow, the persistent feature map, and a bounded multi-page atlas; ARCore-only
 depth/planes/anchors are replaced or explicitly unavailable rather than emulated.
- ARCore and standalone AR adjustments are persisted separately because their wall coordinate frames
-are deliberately not assumed equivalent before hybrid/cross-backend calibration. Nothing touches the network unless you explicitly start a **co-op** session.
+ARCore and standalone AR adjustments remain separately persisted because they are different durable
+backend placement slots. Hybrid KPM uses an explicit runtime page↔ARCore transform rather than
+conflating those slots, and co-op protocol v3 normalizes only the isolated spectator copy through an
+explicit host wall-frame descriptor. Nothing touches the network unless you explicitly start a
+**co-op** session.
 
 ---
 
@@ -35,7 +38,7 @@ adjustment/anchoring lens is active.
 
 | Mode | Purpose | Anchoring | Primary output |
 |---|---|---|---|
-| **AR** | Anchor the design to a real wall for painting at scale | ARCore: anchor + MobileGS fingerprint; standalone: SphereSLAM/KPM planar wall page + short IMU bridge | On-wall overlay; ARCore supports composited `glReadPixels` export, standalone preview export is currently disabled |
+| **AR** | Anchor the design to a real wall for painting at scale | ARCore: continuous ARCore anchor + MobileGS fingerprint, with optional metric KPM→PoseFusion correction; standalone: SphereSLAM/KPM canonical wall page/atlas + short IMU bridge | On-wall overlay; ARCore supports composited `glReadPixels` export, standalone preview export is currently disabled |
 | **MOCKUP** | Compose the design onto a static wall photo | None (static image) | Flattened preview image |
 | **OVERLAY** | Classic non-AR tracing — reference over live camera | None (screen-space) | Sensor still + composited layers (CameraX) |
 | **TRACE** | Phone-as-lightbox for copying onto paper | Locked screen-space | Transparent-background PNG |
@@ -56,6 +59,7 @@ adjustment/anchoring lens is active.
 | Perception debug | ARCore planes, feature points, accumulated scan cloud | KPM page/inliers/reprojection error/age/match-time/tracking-state diagnostics |
 | Target rail action | ARCore tap-to-target flow | disabled; use the on-screen **Wall Target** capture |
 | Co-op Host/Join | protocol-v3 host wall frame + peer fingerprint | protocol-v3 host wall frame; standalone↔standalone may use normalized page units, cross-backend requires metric scale + peer fingerprint |
+| Drift correction | Off-by-default PoseFusion: accepted metric KPM observation first, MobileGS fallback, otherwise hold standing anchor-local correction | KPM is the primary wall pose while visible; MobileGS corroboration/self-grow use the same centered page frame, not ARCore PoseFusion |
 | AR preview export | composited GL framebuffer | disabled until CameraX + transparent GL can be composited correctly |
 | Pan/scale/rotation/tone/lock | `modeAdjustments[AR]` | `sphereSlamModeAdjustment`; the same controls/undo UI swap to the active backend's persisted adjustment, and standalone spatial placement is generation-bound to its canonical wall |
 
@@ -305,11 +309,13 @@ read as describing a live pipeline in this app.
 
 ## 6. Relocalization & Teleological SLAM (ARCore/MobileGS path)
 
-This section describes the current MobileGS fingerprint path used with ARCore. Standalone
-SphereSLAM AR currently rebuilds a persisted KPM wall page and reacquires that page directly; it
-does not yet mix its page-relative pose with MobileGS because the coordinate-frame conversion is
-not defined or validated. Detailed math in `RELOC_MAP_DESIGN.md`,
-`SELF_GROWING_FINGERPRINT.md`, `TELEOLOGICAL_SLAM.md`, `NATIVE_ENGINE.md`.
+This section describes relocalization/corroboration around the wall target. On ARCore-capable
+devices, MobileGS remains the durable fingerprint/return-visit path and optional PoseFusion fallback,
+while a physically metric rectified KPM page can provide a timestamp-aligned correction through
+`HybridKpmCorrection → PoseFusion`. On standalone devices, KPM supplies the canonical wall pose and
+MobileGS fingerprint/self-grow/feature-map data live directly in that same centered page frame.
+Detailed math in `RELOC_MAP_DESIGN.md`, `SELF_GROWING_FINGERPRINT.md`,
+`TELEOLOGICAL_SLAM.md`, `NATIVE_ENGINE.md`, and `SPHERESLAM_ARCORE_SIDECAR.md`.
 
 - **Fingerprint capture.** When you lock onto a wall, the native engine (`MobileGS`, C++17) captures an
   OpenCV feature **fingerprint** of your marks: ORB/SuperPoint descriptors plus a handful of
@@ -319,11 +325,14 @@ not defined or validated. Detailed math in `RELOC_MAP_DESIGN.md`,
 - **Teleological self-grow.** Because the intended result is known, OpenCV can watch your progress and
   **extend the fingerprint from validated new marks** as you paint — so snap-back survives the original
   reference marks being painted over, tightening the lock instead of degrading it.
-- **These are opt-in, unvalidated A/B switches, not always-on behaviour.** `ArViewModel.evalSetFusionEnabled`
-  (drift correction / corrected snap-back fusion) and `evalSetSelfGrowEnabled` (teleological self-grow)
-  both **default to `false`**, are persisted (`SettingsRepository.driftCorrectionEnabled` /
-  `.selfGrowEnabled`), and are surfaced as "Drift correction: ON/OFF" and "Self-grow: ON/OFF" toggles in
-  the AR diagnostics overlay — see §7.4a. A third switch, **feature map** (`featureMapEnabled`, also
+- **These are opt-in A/B switches, not always-on behaviour.** `ArViewModel.evalSetFusionEnabled`
+  (drift correction) and `evalSetSelfGrowEnabled` (teleological self-grow) both **default to
+  `false`**, are persisted (`SettingsRepository.driftCorrectionEnabled` /
+  `.selfGrowEnabled`), and are surfaced as "Drift correction: ON/OFF" and "Self-grow: ON/OFF"
+  toggles in the AR diagnostics overlay — see §7.4a. With drift correction enabled, a fresh accepted
+  physically-metric KPM observation has first priority; MobileGS PnP is the fallback correction
+  source; otherwise PoseFusion carries the existing anchor-local correction on the live ARCore
+  consensus. KPM never replaces ARCore camera view/projection. A third switch, **feature map** (`featureMapEnabled`, also
   default `false`), gates the persistent wall feature map (build + match); before it existed the
   underlying native flags (`SlamManager.setMapRelocEnabled`/`setMapBuildEnabled`) had no caller at all,
   so the map — and the `.gxr` project field for it — could never do anything. Turn all three on
@@ -463,8 +472,9 @@ Provider-based abstraction (`GlassesSessionState`, `Xreal*Provider`) targeting *
 **Status (deferred):** on ARCore, `glassesWorldHitForTimestamp` currently hit-tests the same
 phone-screen point for source and destination, so Procrustes alignment returns identity. A real fix
 needs a glasses-side world lookup (substantial native/SDK integration). Standalone refuses wearable
-calibration before entering the ARCore hit-test path; cross-backend calibration belongs to the
-co-op/wearable calibration work rather than pretending the page frame is already the glasses frame.
+calibration before entering the ARCore hit-test path. Phone↔phone ARCore/SphereSLAM wall calibration
+now exists in co-op protocol v3, but that does **not** provide a glasses-side world lookup or make a
+KPM page frame equivalent to a glasses coordinate frame.
 
 ---
 
