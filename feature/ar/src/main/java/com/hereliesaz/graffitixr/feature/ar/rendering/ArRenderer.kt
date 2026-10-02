@@ -1702,6 +1702,74 @@ class ArRenderer(
                 // rather than crash on a null-array arraycopy.
                 slamManager.getAnchorTransform()?.let { System.arraycopy(it, 0, backbone, 0, 16) }
             }
+            // Timestamp bridge for asynchronous KPM. KPM consumes RAW sensor camera frames, so
+            // pair its timestamp with camera.pose.inverse() (mappingViewMatrix), not the display-
+            // rotated render view. The backbone sample is the unfused consensus artwork anchor.
+            hybridPoseHistory.add(frame.timestamp, mappingViewMatrix, backbone)
+
+            // Freeze page-from-artwork exactly once while BOTH ARCore anchors are live. After this
+            // point the relative transform is the coordinate contract; future ARCore global world
+            // rebases multiply both anchors on the left and cancel out of this relation.
+            if (
+                hybridPageFromArtworkAnchor == null &&
+                anchorEstablished &&
+                activeAnchorCount() > 0
+            ) {
+                val pageAnchor = hybridPageAnchor
+                if (pageAnchor?.trackingState == TrackingState.TRACKING) {
+                    val worldFromPage = FloatArray(16)
+                    pageAnchor.pose.toMatrix(worldFromPage, 0)
+                    hybridPageFromArtworkAnchor =
+                        com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath.multiply(
+                            com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
+                                .rigidInverse(worldFromPage),
+                            backbone,
+                        )
+                    Timber.i("ARDIAG hybrid KPM page↔artwork frame frozen")
+                }
+            }
+
+            val hybridObservation = sphereSlamTracker.latestObservation()
+            val hybridDecision =
+                if (
+                    fusionEnabled &&
+                    anchorEstablished &&
+                    sphereSlamTracker.isReferenceReady &&
+                    hybridReferencePhysicallyMetric &&
+                    hybridPageFromArtworkAnchor != null &&
+                    hybridObservation != null
+                ) {
+                    com.hereliesaz.graffitixr.feature.ar.anchor.HybridKpmCorrection.solve(
+                        observation = hybridObservation,
+                        pageGeometry = sphereSlamTracker.currentReferenceGeometry()
+                            ?: hybridReferenceGeometry,
+                        physicallyMetric = hybridReferencePhysicallyMetric,
+                        pageFromAnchor = hybridPageFromArtworkAnchor,
+                        poseHistory = hybridPoseHistory,
+                        currentFrameTimestampNs = frame.timestamp,
+                    )
+                } else {
+                    null
+                }
+            if (
+                hybridObservation != null &&
+                hybridObservation.timestampNs != lastHybridObservationTimestampNs
+            ) {
+                lastHybridObservationTimestampNs = hybridObservation.timestampNs
+                hybridDecision?.let { decision ->
+                    decision.accepted?.let {
+                        Timber.d(
+                            "ARDIAG hybrid KPM accepted ts=${it.timestampNs} " +
+                                "inliers=${it.inliers} confidence=${it.confidence}"
+                        )
+                    } ?: decision.reject?.let {
+                        Timber.d(
+                            "ARDIAG hybrid KPM rejected ts=${hybridObservation.timestampNs} reason=$it"
+                        )
+                    }
+                }
+            }
+
             // Fuse in the corrected mark-PnP snap (smoothed) when anchored; the flag lets the eval
             // harness A/B fusion vs the old toggle. Off → exact previous behavior.
             // IMPLEMENTATION.md 0.9 — the correction needs `captureAnchorCam`, the anchor's pose in
@@ -1720,16 +1788,17 @@ class ArRenderer(
             // record exists to end. NO_CAPTURE_POSE in particular was introduced by 0.9 and is the
             // one most likely to be mistaken for a bug: a pre-Phase-2 project relocalizes fine and
             // is never corrected.
+            val hybridFrameReady =
+                sphereSlamTracker.isReferenceReady &&
+                    hybridReferencePhysicallyMetric &&
+                    hybridPageFromArtworkAnchor != null
             fusionSkipReason = when {
                 !fusionEnabled -> com.hereliesaz.graffitixr.common.model.FusionState.DISABLED
                 !anchorEstablished -> com.hereliesaz.graffitixr.common.model.FusionState.NO_ANCHOR
-                // Two very different causes, one condition. A pre-Phase-2 fingerprint has points but
-                // no stored capture pose; a session where the target capture failed has no
-                // fingerprint at all. Reported as one state, the overlay told an artist to
-                // "re-create" a target that had never existed, one row under its own "NO TARGET".
-                //
-                // The keypoint count is only read on this branch — i.e. only when fusion is already
-                // skipping — so the healthy path pays nothing for the distinction.
+                // A metric KPM page is a complete alternate relocalization input and does NOT need
+                // MobileGS captureAnchorCam. Only report the legacy missing-fingerprint gates when
+                // neither correction source is capable of carrying the standing correction.
+                hybridFrameReady -> null
                 captureAnchorCam == null ->
                     if (slamManager.getWallKeypointCount() <= 0) {
                         com.hereliesaz.graffitixr.common.model.FusionState.NO_FINGERPRINT
@@ -1738,8 +1807,20 @@ class ArRenderer(
                     }
                 else -> null
             }
-            val anchorMatrix: FloatArray = if (fusionEnabled && anchorEstablished && captureAnchorCam != null) {
-                poseFusion.currentAnchor(
+            val hybridAccepted = hybridDecision?.accepted
+            val anchorMatrix: FloatArray = when {
+                !fusionEnabled || !anchorEstablished -> backbone
+                hybridAccepted != null ->
+                    poseFusion.currentAnchorFromHybridObservation(
+                        currentBackbone = backbone,
+                        backboneAtObservation = hybridAccepted.backboneAtObservation,
+                        correctedAnchorAtObservation = hybridAccepted.correctedAnchorWorld,
+                        observationTimestampNs = hybridAccepted.timestampNs,
+                        confidence = hybridAccepted.confidence,
+                        inliers = hybridAccepted.inliers,
+                    )
+                captureAnchorCam != null ->
+                    poseFusion.currentAnchor(
                     backbone = backbone,
                     vCurrent = viewMatrix,
                     reloc = slamManager.getRelocResult(),
@@ -1773,7 +1854,9 @@ class ArRenderer(
                     // feeding a negative through a parameter documented as [0,1].
                     confGlobal = slamManager.getCorroborationConfidence().coerceAtLeast(0f),
                 )
-            } else backbone
+                hybridFrameReady -> poseFusion.holdCurrentAnchor(backbone)
+                else -> backbone
+            }
 
             // Capture [overlayRotationCorrection] the first frame anchorMatrix exists after
             // establishment — at this point getConsensusMatrix is EXPECTED to have exactly one vote
