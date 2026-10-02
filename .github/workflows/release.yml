@@ -39,16 +39,23 @@ jobs:
 
       - name: Inject Google services
         env:
+          # Preferred: the full, real google-services.json pasted as one secret.
+          GOOGLE_SERVICES: ${{ secrets.GOOGLE_SERVICES }}
+          # Fallback: placeholder template + individual values (used only if GOOGLE_SERVICES is unset).
           GOOGLE_SERVICES_API_KEY: ${{ secrets.GOOGLE_SERVICES_API_KEY }}
           PROJECT_ID: ${{ secrets.PROJECT_ID }}
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
           ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
         run: |
-          if [ -f "app/google-services.json.template" ]; then
-            echo "Template found. Injecting secrets..."
+          if [ -n "${GOOGLE_SERVICES:-}" ]; then
+            echo "Using full GOOGLE_SERVICES secret."
+            printf '%s' "$GOOGLE_SERVICES" > app/google-services.json
+          elif [ -f "app/google-services.json.template" ]; then
+            echo "GOOGLE_SERVICES unset; injecting from template."
             sed -e 's/{{\([^}]*\)}}/${\1}/g' app/google-services.json.template | envsubst > app/google-services.json
           else
-            echo "::warning::google-services.json.template not found; skipping injection."
+            echo "::error::No GOOGLE_SERVICES secret and no template — cannot produce google-services.json."
+            exit 1
           fi
           echo "ARCORE_API_KEY=$ARCORE_API_KEY" >> local.properties
 
