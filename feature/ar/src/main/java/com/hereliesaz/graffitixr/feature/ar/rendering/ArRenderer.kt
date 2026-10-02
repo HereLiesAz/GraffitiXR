@@ -700,6 +700,20 @@ class ArRenderer(
     // Parallel wall tracker. It observes camera luma beside ARCore; it never replaces poseSource.
     // Its output is reserved for relocalization/drift fusion once metric page scale is established.
     private val sphereSlamTracker = com.hereliesaz.sphereslam.SphereSlamTracker()
+    // KPM is asynchronous; this ring pairs each observation with the ARCore view + consensus anchor
+    // from the SAME sensor timestamp before any correction enters PoseFusion.
+    private val hybridPoseHistory =
+        com.hereliesaz.graffitixr.feature.ar.anchor.HybridPoseHistory()
+    @Volatile private var hybridReferenceGeometry:
+        com.hereliesaz.sphereslam.SphereSlamPoseMath.PageGeometry? = null
+    @Volatile private var hybridReferencePhysicallyMetric: Boolean = false
+    @Volatile private var hybridReferenceEpoch: Long = 0L
+    // ARCore anchor attached to the physical KPM page. Created from the first metric KPM solve so its
+    // axis convention is exactly artoolkitX's, not a hand-derived approximation.
+    private var hybridPageAnchor: com.google.ar.core.Anchor? = null
+    // Fixed page-from-artwork-anchor relation, frozen only when BOTH ARCore anchors track together.
+    private var hybridPageFromArtworkAnchor: FloatArray? = null
+    private var lastHybridObservationTimestampNs: Long = Long.MIN_VALUE
     private val mappingViewMatrixScratch = FloatArray(16)
     private val backboneScratch = FloatArray(16)
     // Scratch for composing the overlay matrix (anchor frame * in-plane transform).
