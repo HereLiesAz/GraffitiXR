@@ -31,6 +31,12 @@ class HybridMetricKpmReferenceTest {
             0.02f,
         )
         assertEquals(geometry.widthMeters, geometry.pageGeometry.widthMeters, 0.01f)
+        // Identity camera at the origin looking -Z, wall at z=-2: the centered KPM page is an
+        // identity-oriented GL frame two metres in front of the camera.
+        assertEquals(1f, geometry.cameraFromPageGl[0], 1e-4f)
+        assertEquals(1f, geometry.cameraFromPageGl[5], 1e-4f)
+        assertEquals(1f, geometry.cameraFromPageGl[10], 1e-4f)
+        assertEquals(-2f, geometry.cameraFromPageGl[14], 1e-3f)
     }
 
     @Test
