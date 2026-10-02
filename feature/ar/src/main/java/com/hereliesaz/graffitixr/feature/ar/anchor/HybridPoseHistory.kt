@@ -1,7 +1,6 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
 import java.util.ArrayDeque
-import kotlin.math.abs
 
 /**
  * Short timestamped history of ARCore solve-time geometry for asynchronous KPM observations.
