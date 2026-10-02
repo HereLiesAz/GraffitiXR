@@ -338,6 +338,15 @@ class PoseFusion {
         return PoseMath.multiply(currentBackbone, correction ?: identity())
     }
 
+    /**
+     * Re-apply the standing anchor-local correction without consuming a new relocalization.
+     * Used while an asynchronous KPM matcher has no fresh accepted observation this render frame.
+     */
+    fun holdCurrentAnchor(backbone: FloatArray): FloatArray {
+        if (correction != null) lastState = FusionState.HOLDING
+        return PoseMath.multiply(backbone, correction ?: identity())
+    }
+
     private var lastState = FusionState.WAITING_FOR_LOCK
     private var lastAlpha = -1f
     private var lastInlierRatio = -1f
