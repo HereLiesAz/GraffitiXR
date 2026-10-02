@@ -118,6 +118,7 @@ fun SphereSlamStandaloneOverlay(
     adjustment: ModeAdjustment? = null,
     onUnitsPerPixel: (Float) -> Unit = {},
     onTrackingTick: (Boolean) -> Unit = {},
+    onReferenceRegistrationChanged: (Boolean) -> Unit = {},
     onDiagnostic: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -142,6 +143,11 @@ fun SphereSlamStandaloneOverlay(
         mutableStateOf(persistedReferencePhysicallyMetric)
     }
     var referenceReady by remember { mutableStateOf(false) }
+    // A freshly captured page is native-registered BEFORE its versioned PNG/project metadata commit
+    // completes. Keep Host disabled across that gap; only the persisted URI transition for this
+    // candidate proves native geometry and durable project bytes now name the same page.
+    var awaitingReferencePersistence by remember { mutableStateOf(false) }
+    var persistenceBaselineUri by remember { mutableStateOf<Uri?>(null) }
     var referenceWidthUnits by remember { mutableStateOf(0f) }
     var referenceHeightUnits by remember { mutableStateOf(0f) }
     var designBaseHalfExtents by remember {
@@ -173,6 +179,9 @@ fun SphereSlamStandaloneOverlay(
     }
 
     fun resetCapture() {
+        onReferenceRegistrationChanged(false)
+        awaitingReferencePersistence = false
+        persistenceBaselineUri = null
         // Only a page that completed native KPM registration is a safe rollback candidate.
         // Keeping an unvalidated bitmap here can create an infinite weak-target restore loop.
         if (referenceReady) {
@@ -195,6 +204,22 @@ fun SphereSlamStandaloneOverlay(
         calibrationDiagnostics = null
         matchDiagnostics = null
         fatalMessage = null
+    }
+
+    LaunchedEffect(persistedReferenceUri, awaitingReferencePersistence) {
+        if (
+            awaitingReferencePersistence &&
+            persistedReferenceUri != null &&
+            persistedReferenceUri != persistenceBaselineUri
+        ) {
+            awaitingReferencePersistence = false
+            persistenceBaselineUri = null
+            onReferenceRegistrationChanged(true)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { onReferenceRegistrationChanged(false) }
     }
 
     LaunchedEffect(persistedReferenceUri) {
@@ -225,6 +250,7 @@ fun SphereSlamStandaloneOverlay(
     }
 
     fun acceptReference(bitmap: Bitmap, widthMeters: Float, physicallyMetric: Boolean) {
+        onReferenceRegistrationChanged(false)
         activeReferenceWidthMeters = widthMeters
         activeReferencePhysicallyMetric = physicallyMetric
         pendingReferenceBitmap = null
@@ -726,6 +752,8 @@ fun SphereSlamStandaloneOverlay(
                         referenceHeightUnits = g.heightMeters
                         referenceReady = true
                         if (referenceNeedsPersistence) {
+                            awaitingReferencePersistence = true
+                            persistenceBaselineUri = persistedReferenceUri
                             referenceBitmap?.let { accepted ->
                                 onReferenceCaptured(
                                     accepted,
@@ -735,6 +763,10 @@ fun SphereSlamStandaloneOverlay(
                             }
                             referenceNeedsPersistence = false
                             previousReferenceBitmap = null
+                        } else {
+                            // Restored page: durable metadata already points at this exact candidate,
+                            // so successful addReference/configureMobileGs is the final readiness gate.
+                            onReferenceRegistrationChanged(true)
                         }
                     }
                 },
