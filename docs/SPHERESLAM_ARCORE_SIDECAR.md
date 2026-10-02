@@ -447,7 +447,9 @@ error no greater than 10.0. Non-finite matrices/errors are also rejected. A seco
 frame-to-frame jumps using reference-page widths (scale-independent for measured and normalized
 targets) and rotation angle. Reacquisition has deliberately looser limits than locked tracking.
 Rejections enter the same short IMU-bridge/loss path as a missing visual match and are logged only
-when the rejection reason changes. Observation-age gating remains a separate TODO item.
+when the rejection reason changes. On Camera2 devices with REALTIME sensor timestamps, observations
+older than 250 ms are rejected against `SystemClock.elapsedRealtimeNanos()`; UNKNOWN timestamp
+sources are reported as age-unavailable rather than forced through a guessed clock conversion.
 
 ## Standalone calibration diagnostics
 
@@ -473,112 +475,32 @@ ARCore teardown remains controlled by the renderer/session locking already prese
 
 ## Current limitations
 
-The current follow-up intentionally stops before pose fusion.
+### Hybrid
 
-Not implemented yet for the hybrid path:
+The correction software path is implemented, but it is not yet production-validated:
 
-- converting `pageToCamera3x4` into GraffitiXR's ARCore/OpenGL/world conventions;
-- metric reference-scale derivation from target capture/depth;
-- confidence gates for accepting a SphereSLAM correction;
-- time alignment between a KPM observation and the corresponding ARCore pose;
-- a formal fusion API between SphereSLAM and `PoseFusion`;
-- persistence/restoration of the KPM page atlas;
-- adding additional pages during adaptive wall-map growth;
-- device validation of KPM reacquisition while walking toward/away from the wall.
+- the rectified hybrid KPM page and frozen `page_from_artwork` relation are runtime-only; project
+  reopen/process death currently falls back to the durable MobileGS fingerprint until a new hybrid
+  page is captured;
+- current KPM gates cover metric frame, age, timestamp pairing, inliers, reprojection error, and
+  finite matrices, but there is not yet a separate hard maximum correction-distance/angle rejection
+  policy or repeated-observation agreement requirement before a large cold snap;
+- accepted/rejected KPM decisions are logged, but the full age/error/delta payload is not yet wired
+  into the artist-facing fusion diagnostics/report;
+- real-device forced-drift, wrong-wall, no-jump, recapture, and lifecycle tests remain required.
 
-Implemented for initial standalone wall tracking:
+### Standalone
 
-- CameraX/raw-camera ownership when there is no ARCore `Session`;
-- calibrated, display-oriented camera input;
-- KPM wall-relative 6-DoF pose;
-- a 400 ms fused-gyro orientation bridge for short visual misses;
-- ARCore-independent centered wall transform and OpenGL overlay rendering;
-- runtime routing that keeps AR mode enabled without ARCore;
-- persisted canonical KPM wall reference with project import relocation.
+The standalone software path now includes CameraX calibration, measured/normalized page scale,
+MobileGS centered-page integration, persisted feature maps, bounded 12-page atlas growth/restore,
+explicit ARCore-only capability degradations, and protocol-v3 cross-backend co-op calibration.
 
-Still required for full standalone parity:
+Remaining work is predominantly device/performance validation and product hardening:
 
-- on-device validation of measured target scale at several distances before relying on it for
-  measurement-sensitive UI;
-- integration with GraffitiXR's normal target-review/fingerprint workflow instead of the current
-  standalone capture/unwarp surface;
-- MobileGS/fingerprint integration in an explicitly defined standalone wall coordinate frame;
-- saved wide-area/self-growing wall-map pages beyond the canonical target;
-- equivalents or deliberate degradations for ARCore plane/depth/cloud-anchor-only features;
-- co-op calibration across standalone/ARCore coordinate frames;
-- device validation on actually ARCore-unsupported hardware, including rotation changes, occlusion,
-  process recreation, export/import, and return-visit reacquisition.
+- physical walk-off/return testing across grown pages;
+- permission revocation, camera interruption, and background/foreground lifecycle tests;
+- sustained KPM FPS/latency/thermal/heap measurements and page-limit validation from measurements;
+- repeated AR enter/exit leak checks;
+- standalone composited preview export;
+- real-device validation on hardware that genuinely lacks ARCore.
 
-Standalone AR design adjustments are already wired on this branch: tone/opacity/invert are baked
-into the texture, while pan/scale/Z rotation/X-Y perspective rotation are applied geometrically by
-the standalone GL renderer. Gesture pan uses the standalone wall-units-per-pixel value when no
-`ArRenderer` exists.
-
-The complete granular implementation/validation checklist is
-[`SPHERESLAM_TODO.md`](SPHERESLAM_TODO.md).
-
-There is also one cleanup item: the asynchronous runtime adapter currently talks to
-`KpmBridge` directly while the merged library already exposes `SphereSlamEngine`. A later cleanup
-can make the adapter delegate through that public engine so JNI ownership has exactly one Kotlin
-abstraction. This does not change the side-by-side architecture.
-
-## Safety invariants for future work
-
-Future changes should preserve all of these:
-
-1. ARCore remains a first-class primary tracker **when it is available**.
-2. ARCore remains an optional dependency at the product level; unsupported phones must be able to
-   enter a fully functional SphereSLAM-backed AR mode once standalone support is complete.
-3. In hybrid mode, SphereSLAM must not silently overwrite ARCore view/projection matrices. Any
-   correction enters through an explicit fusion stage.
-4. In standalone mode, SphereSLAM is explicitly allowed to be the primary `PoseSource`; that is not
-   considered an ARCore replacement bug, it is the required fallback architecture.
-5. KPM matching stays off the render thread.
-6. A KPM page match is a relocalization observation, not by itself a complete continuous SLAM pose
-   source.
-7. KPM translation must not be called metric until reference scale is physically calibrated.
-8. Coordinate conversion must be explicit and tested before any KPM transform reaches
-   `PoseFusion` or a standalone pose source.
-9. Loss or failure of SphereSLAM in hybrid mode must degrade to normal ARCore behavior, not break
-   the AR session.
-10. Loss or failure of the standalone tracker must put tracking into an explicit lost/reacquiring
-    state rather than freezing and presenting a stale pose as valid.
-11. Existing MobileGS relocalization remains available until an explicit architectural decision says
-    otherwise.
-
-## Files changed by this follow-up
-
-- `core/nativebridge/src/main/cpp/CMakeLists.txt`
-  - replace broad AR source glob with upstream-matching explicit source list.
-
-- `feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/rendering/ArRenderer.kt`
-  - instantiate SphereSLAM beside ARCore;
-  - seed the atlas from target capture;
-  - feed luma frames at a throttled rate;
-  - close SphereSLAM during renderer teardown.
-
-- `sphereslam/src/main/java/com/hereliesaz/sphereslam/SphereSlamTracker.kt`
-  - asynchronous runtime sidecar adapter.
-
-- `sphereslam/src/test/java/com/hereliesaz/sphereslam/SphereSlamTrackerTest.kt`
-  - luma row-packing coverage;
-  - asynchronous observation publication coverage.
-
-## Next implementation slice
-
-Do not treat one broad "finish SphereSLAM" task as reviewable work. The authoritative dependency-
-ordered checklist is [`SPHERESLAM_TODO.md`](SPHERESLAM_TODO.md).
-
-The immediate order is:
-
-1. get branch build/unit/native CI green;
-2. establish physical standalone page scale;
-3. finish standalone target-workflow and tracking-confidence/loss gates;
-4. define/test the standalone KPM-page ↔ MobileGS fingerprint frame before feeding standalone
-   camera frames into MobileGS;
-5. then add standalone MobileGS paint-progress/self-grow and wide-area page growth;
-6. in parallel, once physical page scale is known, implement hybrid KPM → `PoseFusion` correction
-   through explicit timestamp/frame conversion and confidence gates.
-
-SphereSLAM must never be allowed to correct the hybrid rendered anchor before those conversion and
-confidence tests pass.
