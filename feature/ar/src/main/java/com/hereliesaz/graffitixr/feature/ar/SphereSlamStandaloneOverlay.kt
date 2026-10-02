@@ -431,13 +431,13 @@ fun SphereSlamStandaloneOverlay(
     // Snapshot persisted native state once per canonical page. Autosaves/grown-page commits publish
     // new project objects while THIS analyzer already owns the fresher live state; keying ordinary
     // autosaves into the effect would tear down tracking every few seconds.
-    val initialMobileGsWallFeatureMap = remember(reference, awaitingReferencePersistence) {
-        if (awaitingReferencePersistence) null else mobileGsWallFeatureMap
+    val initialMobileGsWallFeatureMap = remember(reference, candidateUncommitted) {
+        if (candidateUncommitted) null else mobileGsWallFeatureMap
     }
     val initialMobileGsWallFeatureMapFrameVersion =
-        remember(reference, awaitingReferencePersistence) { mobileGsWallFeatureMapFrameVersion }
-    val initialPersistedAtlasPages = remember(reference, awaitingReferencePersistence) {
-        if (awaitingReferencePersistence) emptyList() else persistedAtlasPages
+        remember(reference, candidateUncommitted) { mobileGsWallFeatureMapFrameVersion }
+    val initialPersistedAtlasPages = remember(reference, candidateUncommitted) {
+        if (candidateUncommitted) emptyList() else persistedAtlasPages
     }
     val atlasReferenceImages by produceState<List<SphereSlamStandaloneAtlasReferenceImage>?>(
         initialValue = null,
