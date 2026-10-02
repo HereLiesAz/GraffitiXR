@@ -97,9 +97,25 @@ jobs:
           PKG=$(grep -E 'applicationId\s*=' app/build.gradle.kts | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
           echo "package_name=$PKG" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve CI versionCode
+        id: vcode
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          # app/build.gradle.kts reads CI_VERSION_CODE as the Android versionCode and, when it is set,
+          # never rewrites the tracked version.properties — so the same commit builds the same code and
+          # the persist step below has nothing to commit (which is what previously raced into a conflict).
+          #
+          # Play requires a strictly increasing code. Pre-centralization builds reached ~14731; nothing
+          # has published since. The 1,000,000 floor clears that history with room to spare and stays far
+          # below the 2,100,000,000 ceiling, and github.run_number keeps it monotonic across runs.
+          echo "ci_version_code=$((1000000 + RUN_NUMBER))" >> "$GITHUB_OUTPUT"
+
       - name: Build signed AAB + APK
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CI_VERSION_CODE: ${{ steps.vcode.outputs.ci_version_code }}
           KEYSTORE_FILE: ${{ github.workspace }}/app/keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
