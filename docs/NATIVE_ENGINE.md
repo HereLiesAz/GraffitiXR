@@ -11,6 +11,27 @@ A fingerprint is ORB (`cv::ORB::create(1500)`) or SuperPoint descriptors paired 
 ### 2. Relocalization ("snap-back")
 A background thread (`relocThreadFunc`) continuously matches the live camera frame's descriptors against the stored fingerprint (Lowe ratio test, `kRelocLoweRatio = 0.75`) and solves the resulting 2D↔3D correspondences with `cv::solvePnPRansac` (100 iterations, 8px reprojection threshold, 0.99 confidence). A big lock (`kBigLockInliers = 20` inliers) is accepted outright; smaller locks go through additional consistency checks before the global anchor transform is corrected. This — not a mapping/rendering layer — is the actual mechanism behind the "Pocket-Ready" pitch: it needs no persistent map, just the one fingerprint.
 
+### 2a. Relationship to hybrid SphereSLAM/KPM
+
+On ARCore-capable devices, MobileGS is no longer the only optional drift-correction observation.
+A target capture with a real ARCore wall plane can also seed a **physically metric, rectified KPM
+page** in the separate `:sphereslam` module.
+
+The ownership boundary is strict:
+
+- ARCore remains the continuous camera pose;
+- KPM matching runs asynchronously outside this native engine;
+- `HybridKpmCorrection` pairs a KPM observation with the ARCore sensor-view/backbone from the same
+  timestamp and applies metric/quality gates;
+- an accepted KPM correction enters `PoseFusion` first;
+- if there is no accepted KPM correction that render frame, the existing MobileGS PnP correction is
+  the fallback;
+- if neither source is fresh, PoseFusion only re-applies its standing anchor-local correction.
+
+MobileGS does not consume the hybrid KPM page frame and KPM does not mutate MobileGS fingerprint
+coordinates. The only shared downstream object is PoseFusion's **anchor-local correction**, which is
+frame-invariant under ARCore global world rebases. The correction switch remains off by default.
+
 ### 3. Teleological corroboration and self-grow (both off by default)
 Two optional, separately-gated mechanisms sit on top of relocalization:
 - **Corroboration**: compares descriptors from the design composite against the live wall to produce a confidence signal (Lowe ratio `kCorrobLoweRatio = 0.85`) — see `docs/TELEOLOGICAL_SLAM.md` for what it does and does not measure.
