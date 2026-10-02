@@ -1705,7 +1705,9 @@ class ArRenderer(
             // Timestamp bridge for asynchronous KPM. KPM consumes RAW sensor camera frames, so
             // pair its timestamp with camera.pose.inverse() (mappingViewMatrix), not the display-
             // rotated render view. The backbone sample is the unfused consensus artwork anchor.
-            hybridPoseHistory.add(frame.timestamp, mappingViewMatrix, backbone)
+            if (isTracking) {
+                hybridPoseHistory.add(frame.timestamp, mappingViewMatrix, backbone)
+            }
 
             // Freeze page-from-artwork exactly once while BOTH ARCore anchors are live. After this
             // point the relative transform is the coordinate contract; future ARCore global world
@@ -1713,6 +1715,7 @@ class ArRenderer(
             if (
                 hybridPageFromArtworkAnchor == null &&
                 anchorEstablished &&
+                isTracking &&
                 activeAnchorCount() > 0
             ) {
                 val pageAnchor = hybridPageAnchor
@@ -1734,6 +1737,7 @@ class ArRenderer(
                 if (
                     fusionEnabled &&
                     anchorEstablished &&
+                    isTracking &&
                     sphereSlamTracker.isReferenceReady &&
                     hybridReferencePhysicallyMetric &&
                     hybridPageFromArtworkAnchor != null &&
