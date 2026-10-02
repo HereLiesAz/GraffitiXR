@@ -1282,8 +1282,12 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch {
             projectRepository.currentProject.collect { project ->
                 _uiState.update {
+                    val nextReferenceUri = project?.sphereSlamReferenceUri
+                    val referenceChanged = it.sphereSlamReferenceUri != nextReferenceUri
                     it.copy(
-                        sphereSlamReferenceUri = project?.sphereSlamReferenceUri,
+                        sphereSlamReferenceUri = nextReferenceUri,
+                        isSphereSlamReferenceRegistered =
+                            if (referenceChanged) false else it.isSphereSlamReferenceRegistered,
                         sphereSlamReferenceWidthMeters =
                             project?.sphereSlamReferenceWidthMeters ?: 1f,
                         sphereSlamReferencePhysicallyMetric =
@@ -3759,6 +3763,10 @@ class ArViewModel @Inject constructor(
      * Called at camera cadence, but native painting progress changes at reloc cadence (~1–2 Hz), so
      * cap UI/native polling at 10 Hz to avoid pointless JNI traffic.
      */
+    fun onStandaloneReferenceRegistrationChanged(registered: Boolean) {
+        _uiState.update { it.copy(isSphereSlamReferenceRegistered = registered) }
+    }
+
     fun onStandaloneTrackingTick(isTracking: Boolean) {
         val now = android.os.SystemClock.elapsedRealtime()
         if (now - lastStandaloneNativeUiUpdateMs < 100L) return
