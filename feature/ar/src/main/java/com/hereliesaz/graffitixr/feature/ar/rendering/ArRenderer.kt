@@ -2119,29 +2119,9 @@ class ArRenderer(
             lastStep = "capture"
             if (captureRequested) {
                 captureRequested = false
+                resetHybridReference()
                 try {
                     frame.acquireCameraImage().use { image ->
-                        // Seed a fresh SphereSLAM planar atlas from the same target capture ARCore
-                        // continues to use. KPM receives calibrated image intrinsics, but remains a
-                        // sidecar: no matrix from it is allowed to replace ARCore's primary pose.
-                        val sphereY = image.planes[0]
-                        sphereSlamTracker.reset(
-                            com.hereliesaz.sphereslam.SphereSlamTracker.CameraModel(
-                                width = image.width,
-                                height = image.height,
-                                fx = intrinsics.focalLength[0],
-                                fy = intrinsics.focalLength[1],
-                                cx = intrinsics.principalPoint[0],
-                                cy = intrinsics.principalPoint[1],
-                            )
-                        )
-                        sphereSlamTracker.setReference(
-                            luma = sphereY.buffer,
-                            width = image.width,
-                            height = image.height,
-                            rowStride = sphereY.rowStride,
-                        )
-
                         val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
                         // Real native YUV→RGBA (OpenCV NEON on ARM). Replaces the fake "direct"
                         // path that went via YuvImage.compressToJpeg + BitmapFactory.decodeByteArray
@@ -2262,6 +2242,76 @@ class ArRenderer(
                                 Timber.w(e, "Wall-plane hit-test for capture failed")
                             }
                         }
+
+                        // Hybrid KPM reference: only a physically metric ARCore wall plane is
+                        // eligible. The raw camera photo is perspective-warped, so derive a real wall
+                        // rectangle in sensor-camera coordinates, rectify it to the physical aspect,
+                        // and register THAT image at a DPI whose KPM units are metres.
+                        wallPlane?.let { metricPlane ->
+                            val geometry =
+                                com.hereliesaz.graffitixr.feature.ar.HybridMetricKpmReference
+                                    .deriveGeometry(
+                                        imageWidth = image.width,
+                                        imageHeight = image.height,
+                                        fx = fx,
+                                        fy = fy,
+                                        cx = cx,
+                                        cy = cy,
+                                        // Raw YUV/imageIntrinsics are sensor-oriented; camera.pose
+                                        // inverse is the matching sensor-camera GL view.
+                                        glView = mappingViewMatrix,
+                                        wallPlane = metricPlane,
+                                    )
+                            val reference = geometry?.let {
+                                com.hereliesaz.graffitixr.feature.ar.HybridMetricKpmReference
+                                    .rectify(bitmap, it)
+                            }
+                            if (geometry != null && reference != null) {
+                                sphereSlamTracker.reset(
+                                    com.hereliesaz.sphereslam.SphereSlamTracker.CameraModel(
+                                        width = image.width,
+                                        height = image.height,
+                                        fx = fx,
+                                        fy = fy,
+                                        cx = cx,
+                                        cy = cy,
+                                    )
+                                )
+                                sphereSlamTracker.setReference(
+                                    luma = java.nio.ByteBuffer.wrap(reference.luma),
+                                    width = reference.width,
+                                    height = reference.height,
+                                    rowStride = reference.width,
+                                    dpi = reference.referenceDpi,
+                                )
+                                hybridReferenceGeometry = reference.pageGeometry
+                                hybridReferencePhysicallyMetric = true
+
+                                // page pose is known at capture from the SAME metric geometry. Turn
+                                // camera-from-page into world-from-page and let ARCore track that
+                                // page origin beside the artwork anchor. No world origin is shared
+                                // with KPM and no raw KPM pose ever becomes the renderer camera pose.
+                                val worldFromPage =
+                                    com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath.multiply(
+                                        com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
+                                            .rigidInverse(mappingViewMatrix),
+                                        geometry.cameraFromPageGl,
+                                    )
+                                hybridPageAnchor = createWorldAnchor(activeSession, worldFromPage)
+                                Timber.i(
+                                    "ARDIAG hybrid KPM metric reference " +
+                                        "${reference.width}x${reference.height} " +
+                                        "wall=${reference.widthMeters}x${reference.heightMeters}m " +
+                                        "dpi=${reference.referenceDpi}"
+                                )
+                            } else {
+                                Timber.w(
+                                    "ARDIAG hybrid KPM reference skipped: metric wall rectification failed"
+                                )
+                            }
+                        } ?: Timber.w(
+                            "ARDIAG hybrid KPM reference skipped: no metric ARCore wall plane"
+                        )
 
                         // Everything knowable about how and where the device was held, sampled at
                         // the instant the geometry is frozen. backProject runs once per target, so
