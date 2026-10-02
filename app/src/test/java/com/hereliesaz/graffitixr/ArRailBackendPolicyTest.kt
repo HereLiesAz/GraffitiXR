@@ -99,7 +99,7 @@ class ArRailBackendPolicyTest {
                 policy = p,
                 arCoreAnchorEstablished = false,
                 arCorePointCount = 0,
-                standaloneReferencePresent = true,
+                standaloneReferenceRegistered = true,
             )
         )
         assertFalse(
@@ -107,7 +107,7 @@ class ArRailBackendPolicyTest {
                 policy = p,
                 arCoreAnchorEstablished = true,
                 arCorePointCount = 500,
-                standaloneReferencePresent = false,
+                standaloneReferenceRegistered = false,
             )
         )
     }
