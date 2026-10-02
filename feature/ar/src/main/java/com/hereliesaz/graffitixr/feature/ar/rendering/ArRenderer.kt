@@ -3202,6 +3202,7 @@ class ArRenderer(
         watchdog?.interrupt()
         watchdog = null
         backgroundScope.cancel("Renderer detached and destroyed.")
+        resetHybridReference()
         sphereSlamTracker.close()
         // Bounded acquisition only. If the GL thread is wedged mid-frame holding the lock,
         // fall through and null the @Volatile session anyway: isDestroying (checked at the
