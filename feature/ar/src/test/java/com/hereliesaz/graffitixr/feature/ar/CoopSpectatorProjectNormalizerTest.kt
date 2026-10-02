@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.net.Uri
+import io.mockk.mockk
 import com.hereliesaz.graffitixr.common.model.CoopSpatialFrame
 import com.hereliesaz.graffitixr.common.model.CoopSpatialScale
 import com.hereliesaz.graffitixr.common.model.CoopTrackingBackend
@@ -14,8 +15,8 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class CoopSpectatorProjectNormalizerTest {
-    private val pageUri = Uri.parse("file:///spectator/page.png")
-    private val designUri = Uri.parse("file:///spectator/design.png")
+    private val pageUri = mockk<Uri>(relaxed = true)
+    private val designUri = mockk<Uri>(relaxed = true)
 
     @Test
     fun `standalone host placement becomes ARCore placement with matching metric base width`() {
