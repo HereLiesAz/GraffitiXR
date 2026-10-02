@@ -161,6 +161,18 @@ class SphereSlamTracker(
     }
 
     /**
+     * Synchronously stop publishing/matching the current page before an asynchronous replacement is
+     * prepared. The native handle is intentionally left alive until [reset] supplies the next camera
+     * model, but no old observation can escape after this call.
+     */
+    fun clearReference() {
+        referenceReady = false
+        referenceGeometry = null
+        pendingFrame.set(null)
+        latest.set(null)
+    }
+
+    /**
      * Copies and submits one live frame without blocking on KPM. Only the newest unprocessed frame
      * is retained, so a slow matcher cannot build latency behind ARCore.
      */
