@@ -707,9 +707,9 @@ class ArRenderer(
     @Volatile private var hybridReferenceGeometry:
         com.hereliesaz.sphereslam.SphereSlamPoseMath.PageGeometry? = null
     @Volatile private var hybridReferencePhysicallyMetric: Boolean = false
-    @Volatile private var hybridReferenceEpoch: Long = 0L
-    // ARCore anchor attached to the physical KPM page. Created from the first metric KPM solve so its
-    // axis convention is exactly artoolkitX's, not a hand-derived approximation.
+    // ARCore anchor attached to the physical KPM page. Its pose is solved at capture from the same
+    // wall-plane intersections that create the rectified KPM page, so KPM and ARCore share one
+    // explicit page coordinate object from the first frame.
     private var hybridPageAnchor: com.google.ar.core.Anchor? = null
     // Fixed page-from-artwork-anchor relation, frozen only when BOTH ARCore anchors track together.
     private var hybridPageFromArtworkAnchor: FloatArray? = null
@@ -786,6 +786,37 @@ class ArRenderer(
         }
 
         return contentRotationScratch
+    }
+
+    private fun resetHybridReference() {
+        // Stop the old page synchronously BEFORE any asynchronous replacement work. Otherwise an
+        // in-flight matcher can publish a perfectly valid observation from the superseded wall.
+        sphereSlamTracker.clearReference()
+        hybridReferenceGeometry = null
+        hybridReferencePhysicallyMetric = false
+        hybridPoseHistory.clear()
+        hybridPageFromArtworkAnchor = null
+        lastHybridObservationTimestampNs = Long.MIN_VALUE
+        try {
+            hybridPageAnchor?.detach()
+        } catch (_: Exception) {
+            // Session teardown / an already-detached anchor is harmless here.
+        }
+        hybridPageAnchor = null
+    }
+
+    private fun createWorldAnchor(
+        session: Session,
+        worldFromLocal: FloatArray,
+    ): com.google.ar.core.Anchor {
+        val q = com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
+            .matrixToQuaternion(worldFromLocal)
+        return session.createAnchor(
+            com.google.ar.core.Pose(
+                floatArrayOf(worldFromLocal[12], worldFromLocal[13], worldFromLocal[14]),
+                q,
+            )
+        )
     }
 
     fun attachSession(session: Session?) {
