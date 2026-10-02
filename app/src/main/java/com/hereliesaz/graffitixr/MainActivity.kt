@@ -2045,8 +2045,9 @@ class MainActivity : ComponentActivity() {
                         policy = arRailPolicy,
                         arCoreAnchorEstablished = arUiState.isAnchorEstablished,
                         arCorePointCount = arUiState.splatCount,
-                        // Standalone never creates an ARCore Anchor/cloud; page 0 IS its wall frame.
-                        standaloneReferencePresent = arUiState.sphereSlamReferenceUri != null,
+                        // A URI is only durable intent; native KPM registration proves the
+                        // current page can actually be shared without freezing stale geometry.
+                        standaloneReferenceRegistered = arUiState.isSphereSlamReferenceRegistered,
                     )
                     val coopContainerBlocked =
                         coopBackendBlocked && arUiState.coopRole == CoopRole.NONE
