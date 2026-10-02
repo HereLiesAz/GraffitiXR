@@ -6,7 +6,6 @@ import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricMarks
 import com.hereliesaz.graffitixr.feature.ar.anchor.PlaneMarks
 import com.hereliesaz.sphereslam.SphereSlamPoseMath
-import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
