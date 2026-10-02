@@ -137,16 +137,20 @@ if unexpected:
         f"({', '.join(unexpected)}); preserve the explicit hybrid fusion seam."
     )
 
-required_hybrid_seam = (
+required_hybrid_literals = (
     "HybridMetricKpmReference",
-    "HybridPageFrame.worldFromPage",
     "hybridPoseHistory.add(frame.timestamp, mappingViewMatrix, backbone)",
     "HybridKpmCorrection.solve(",
     "poseFusion.currentAnchorFromHybridObservation(",
 )
-for token in required_hybrid_seam:
+for token in required_hybrid_literals:
     if token not in ar_renderer:
         fail(f"Hybrid KPM correction seam is incomplete: missing {token!r} in ArRenderer.")
+
+# Qualified Kotlin calls are routinely wrapped after the class/object name. Match semantic token
+# order while tolerating whitespace/newlines instead of making source formatting a CI invariant.
+if not re.search(r"HybridPageFrame\s*\.\s*worldFromPage\s*\(", ar_renderer):
+    fail("Hybrid KPM correction seam is incomplete: missing HybridPageFrame.worldFromPage call.")
 
 if "pageToCamera3x4" in ar_renderer:
     fail(
