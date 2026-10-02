@@ -29,6 +29,7 @@ import com.hereliesaz.graffitixr.common.model.FusionState
  */
 class PoseFusion {
     private var lastSeq = 0f
+    private var lastHybridTimestampNs = Long.MIN_VALUE
     // Persistent ANCHOR-LOCAL correction L such that fused = backbone ∘ L. Unlike a world-frame
     // left correction, L survives ARCore rebasing because the same current backbone carries it into
     // whatever world basis ARCore publishes this frame. Null until the first trusted relocalization.
@@ -54,6 +55,7 @@ class PoseFusion {
         correction = null
         coldStart = true
         lastSeq = 0f
+        lastHybridTimestampNs = Long.MIN_VALUE
         lastState = FusionState.WAITING_FOR_LOCK
         lastAlpha = -1f
         lastInlierRatio = -1f
@@ -272,6 +274,68 @@ class PoseFusion {
         lastSeq = seq
         // fused = backbone ∘ L, re-applied every frame (identity until the first trusted snap).
         return PoseMath.multiply(backbone, correction ?: identity())
+    }
+
+    /**
+     * Apply one timestamp-aligned KPM wall observation without replacing ARCore as the primary pose.
+     *
+     * [correctedAnchorAtObservation] and [backboneAtObservation] are expressed in the SAME ARCore
+     * world frame at the KPM image timestamp. Their relative transform is therefore invariant under
+     * any later ARCore global world rebase. Only that local transform survives this method; the old
+     * world-frame matrices do not.
+     */
+    fun currentAnchorFromHybridObservation(
+        currentBackbone: FloatArray,
+        backboneAtObservation: FloatArray,
+        correctedAnchorAtObservation: FloatArray,
+        observationTimestampNs: Long,
+        confidence: Float,
+        inliers: Int,
+    ): FloatArray {
+        val isNew =
+            observationTimestampNs > 0L &&
+                observationTimestampNs != lastHybridTimestampNs
+        if (isNew) {
+            val quality = confidence.coerceIn(0f, 1f)
+            lastInlierRatio = quality
+            if (quality < MIN_INLIER_RATIO) snapsRejected++
+
+            if (quality >= MIN_INLIER_RATIO) {
+                val newLocal = PoseMath.multiply(
+                    PoseMath.rigidInverse(backboneAtObservation),
+                    correctedAnchorAtObservation,
+                )
+                // Compare divergence in the CURRENT world frame. Both the standing and candidate
+                // corrections ride through currentBackbone, so an ARCore world rebase cancels out.
+                val correctedCurrent = PoseMath.multiply(currentBackbone, newLocal)
+                val applied = correction?.let { PoseMath.multiply(currentBackbone, it) }
+                val cold = coldStart || applied == null || diverged(applied, correctedCurrent)
+                val highConf =
+                    quality >= COLD_SNAP_INLIER_RATIO &&
+                        inliers >= COLD_SNAP_MIN_INLIERS
+
+                correction = if (cold && highConf) {
+                    coldStart = false
+                    lastState = FusionState.COLD_SNAP
+                    lastAlpha = -1f
+                    newLocal
+                } else {
+                    val effConf =
+                        CONF_FLOOR + (1f - CONF_FLOOR) * quality
+                    val alpha = (BASE_ALPHA * quality * effConf).coerceIn(0f, 1f)
+                    lastState = FusionState.BLENDING
+                    lastAlpha = alpha
+                    blend(correction ?: identity(), newLocal, alpha)
+                }
+                snapsAccepted++
+            } else if (correction != null) {
+                lastState = FusionState.RELOCK_REFUSED
+            }
+            lastHybridTimestampNs = observationTimestampNs
+        } else if (correction != null) {
+            lastState = FusionState.HOLDING
+        }
+        return PoseMath.multiply(currentBackbone, correction ?: identity())
     }
 
     private var lastState = FusionState.WAITING_FOR_LOCK
