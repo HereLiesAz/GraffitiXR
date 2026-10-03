@@ -212,7 +212,7 @@ fun ProjectLibraryScreen(
                                     // regenerated thumbnail invalidates the cached one.
                                     val thumbUri = project.thumbnailUri!!
                                     val thumbCtx = androidx.compose.ui.platform.LocalContext.current
-                                    val thumbStamp = android.net.Uri.parse(thumbUri).path
+                                    val thumbStamp = thumbUri.path
                                         ?.let { java.io.File(it).lastModified() } ?: 0L
                                     val thumbKey = "$thumbUri:$thumbStamp"
                                     coil.compose.AsyncImage(
