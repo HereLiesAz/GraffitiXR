@@ -1236,8 +1236,16 @@ class ArViewModel @Inject constructor(
             // support. The result drives mode-chooser visibility and the
             // first-launch "AR unavailable" onboarding step.
             val result = ArAvailabilityChecker.check(appContext)
-            val supported = result == ArAvailabilityChecker.Result.Supported ||
-                result == ArAvailabilityChecker.Result.NeedsInstallOrUpdate
+            // Only a fully INSTALLED ARCore routes into the ARCore Session path. A device that is
+            // ARCore-capable but has no Google Play Services for AR installed (or too old an APK) reports
+            // NeedsInstallOrUpdate — and nothing in this app ever calls ArCoreApk.requestInstall, so
+            // treating that as "available" opened an ARCore Session on a device with no ARCore runtime.
+            // That session never received a camera frame and surfaced "Camera isn't delivering frames".
+            // Those devices take the CameraX + SphereSLAM standalone path instead, which needs no ARCore
+            // APK — the app's documented fallback ("unsupported devices remain in AR mode and take the
+            // CameraX + SphereSLAM standalone path"). A later install isn't auto-detected mid-process,
+            // which is acceptable: standalone AR is fully functional without ARCore.
+            val supported = result == ArAvailabilityChecker.Result.Supported
             if (!supported) {
                 // The native MobileGS instance is process-global. Project loading may have installed
                 // an ARCore/capture-camera fingerprint while ARCore capability was still UNKNOWN.
