@@ -227,8 +227,8 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override val cameraTargetFps: Flow<Int> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        // DEVICE_DEFAULT: run ARCore on its own validated camera config. A 60 fps swap halves the
-        // exposure and degrades VIO (drifting point cloud); 60 is opt-in in Settings, not the default.
+        // DEVICE_DEFAULT: let ARCore select its own camera config instead of the app pinning a rate.
+        // 30/60 are opt-in power-saving caps in Settings, not the default.
         .map { preferences -> preferences[CAMERA_TARGET_FPS] ?: CameraTargetFps.DEVICE_DEFAULT }
 
     override suspend fun setCameraTargetFps(fps: Int) {

@@ -150,10 +150,12 @@ data class ArUiState(
      * four values: `DEVICE_DEFAULT` (0, no filtering — the default), 30, 60, or `DEVICE_MAX` (-1, the
      * device's highest-fps config). Applies on next AR entry.
      *
-     * Defaults to DEVICE_DEFAULT so ARCore runs on the camera config it validated its motion tracking
-     * against — swapping to a 60 fps config halves the per-frame exposure, which in normal/indoor light
-     * produces noisier, motion-blurred frames and visibly worse VIO (a drifting point cloud). 60 fps is
-     * a smoothness-vs-tracking trade the artist can opt into in Settings, not a sane default.
+     * Defaults to DEVICE_DEFAULT: no filter, so ARCore selects the camera config itself. Per ARCore's
+     * docs it "prioritize[s] camera configs that support [60 fps]" on capable devices and lowers the
+     * actual capture rate under low light to keep exposure — so the right default is to let ARCore
+     * choose, not to have the app pin a rate. The fixed 30 and 60 options exist as deliberate opt-ins to
+     * cap the rate and save power (ARCore: TARGET_FPS_60 "increases power consumption and may increase
+     * app memory usage"); they are an artist choice, never an app-imposed default.
      */
     val cameraTargetFps: Int = CameraTargetFps.DEVICE_DEFAULT,
     /**
