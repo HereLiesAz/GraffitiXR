@@ -25,6 +25,14 @@ on:
 permissions:
   contents: read
 
+# Serialize publishing so run N commits its versionCode and persists version.properties before run
+# N+1 starts. github.run_number is monotonic by run CREATION, not publication order; without this,
+# two overlapping runs could reach Play out of order and the later-but-lower code would be rejected.
+# cancel-in-progress: false — queue, never cancel a publish mid-flight.
+concurrency:
+  group: release-publish
+  cancel-in-progress: false
+
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
@@ -36,6 +44,11 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          # third_party/artoolkitx backs core/nativebridge's SphereSLAM/KPM tracker — the non-ARCore
+          # standalone path. Without it the gitlink is empty, CMake builds inert stubs, and we would
+          # publish a release with non-ARCore tracking silently disabled. android-ci.yml checks it out
+          # the same way.
+          submodules: recursive
 
       - name: Inject Google services
         env:
@@ -62,9 +75,23 @@ jobs:
       - name: Decode signing keystore
         env:
           KEYSTORE_RAW: ${{ secrets.KEYSTORE_RAW }}
+          # app/build.gradle.kts omits the release signingConfig (and silently produces an UNSIGNED
+          # build) when any of these is blank. Validate all three here so we never publish an
+          # uninstallable unsigned APK to the GitHub release or hand Play an unsigned AAB.
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           if [ -z "$KEYSTORE_RAW" ]; then
             echo "::error::KEYSTORE_RAW secret is empty — cannot produce a signed build."
+            exit 1
+          fi
+          missing=""
+          [ -z "$KEYSTORE_PASSWORD" ] && missing="$missing KEYSTORE_PASSWORD"
+          [ -z "$KEY_ALIAS" ] && missing="$missing KEY_ALIAS"
+          [ -z "$KEY_PASSWORD" ] && missing="$missing KEY_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing signing secret(s):$missing — the build would be unsigned and unpublishable."
             exit 1
           fi
           echo "$KEYSTORE_RAW" | base64 -d > app/keystore.jks
@@ -101,6 +128,7 @@ jobs:
         id: vcode
         env:
           RUN_NUMBER: ${{ github.run_number }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
           set -euo pipefail
           # app/build.gradle.kts reads CI_VERSION_CODE as the Android versionCode and, when it is set,
@@ -108,9 +136,14 @@ jobs:
           # the persist step below has nothing to commit (which is what previously raced into a conflict).
           #
           # Play requires a strictly increasing code. Pre-centralization builds reached ~14731; nothing
-          # has published since. The 1,000,000 floor clears that history with room to spare and stays far
-          # below the 2,100,000,000 ceiling, and github.run_number keeps it monotonic across runs.
-          echo "ci_version_code=$((1000000 + RUN_NUMBER))" >> "$GITHUB_OUTPUT"
+          # has published since. The 1,000,000 floor clears that history with room to spare.
+          #
+          # run_number is monotonic but does NOT change on a re-run, so a re-run after Play already
+          # accepted the bundle would rebuild the same code and be rejected. run_attempt advances on each
+          # re-run, so include it: run_number*10 + (run_attempt-1) gives each attempt a distinct code
+          # while staying monotonic across runs and far below the 2,100,000,000 ceiling (allows 9
+          # attempts per run; run_number can reach ~209M before overflow).
+          echo "ci_version_code=$((1000000 + RUN_NUMBER * 10 + (RUN_ATTEMPT - 1)))" >> "$GITHUB_OUTPUT"
 
       - name: Build signed AAB + APK
         env:
@@ -134,24 +167,35 @@ jobs:
       - name: Resolve release version
         id: version
         run: |
-          VB=$(grep -E '^versionBuild=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          # The GitHub release is a moving per-minor pointer (latest-release-vMAJOR.MINOR). versionBuild
+          # is no longer read here: with CI_VERSION_CODE set it stays at the tracked placeholder, so the
+          # release notes use the actual built versionCode (steps.vcode) instead.
           echo "tag=latest-release-v$(grep -E '^versionMajor=' version.properties | cut -d'=' -f2 | tr -d '\r ').$(grep -E '^versionMinor=' version.properties | cut -d'=' -f2 | tr -d '\r ')" >> "$GITHUB_OUTPUT"
-          echo "build=$VB" >> "$GITHUB_OUTPUT"
 
       - name: Publish APK to GitHub release
-        if: ${{ github.event_name == 'push' || inputs.publish }}
+        # Only main publishes. A workflow_dispatch run on a feature branch builds and uploads the
+        # artifact above but must not mint a public release or a Play upload against this repo's codes.
+        if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.publish) }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.version.outputs.tag }}
+          VERSION_CODE: ${{ steps.vcode.outputs.ci_version_code }}
         run: |
           set -euo pipefail
           apk=$(ls app/build/outputs/apk/release/*.apk | head -n1)
-          gh release create "$TAG" "$apk" --title "$TAG" --notes "Automated release build ${{ steps.version.outputs.build }}" --latest \
-            || gh release upload "$TAG" "$apk" --clobber
+          notes="Automated release build — versionCode ${VERSION_CODE} (${GITHUB_SHA})"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # Moving release already exists: refresh its notes to this build and replace the APK, so the
+            # tag's metadata and asset track the latest build instead of staying frozen at the first run.
+            gh release edit "$TAG" --notes "$notes"
+            gh release upload "$TAG" "$apk" --clobber
+          else
+            gh release create "$TAG" "$apk" --title "$TAG" --notes "$notes" --latest
+          fi
 
       - name: Publish AAB to Google Play
         id: play-upload
-        if: ${{ github.event_name == 'push' || inputs.publish }}
+        if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.publish) }}
         env:
           PACKAGE_NAME: ${{ steps.meta.outputs.package_name }}
           AAB_GLOB: app/build/outputs/bundle/release/*.aab
@@ -160,38 +204,10 @@ jobs:
           pip install --quiet google-api-python-client google-auth google-auth-httplib2 httplib2==0.15.0
           python .github/scripts/play_multitrack_publish.py
 
-      - name: Persist auto-incremented versionCode without clobbering newer versions
-        if: ${{ always() && (github.event_name == 'push' || inputs.publish) }}
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- version.properties; then
-            echo "version.properties unchanged — nothing to persist"
-            exit 0
-          fi
-          NEW_BUILD=$(grep -E '^versionBuild=' version.properties | cut -d'=' -f2 | tr -d '\r ')
-          BRANCH="${{ github.ref_name }}"
-          for attempt in 1 2 3 4 5; do
-            git fetch origin "${BRANCH}"
-            REMOTE_BUILD=$(git show "origin/${BRANCH}:version.properties" 2>/dev/null | grep -E '^versionBuild=' | cut -d'=' -f2 | tr -d '\r ' || echo 0)
-            if [ "$REMOTE_BUILD" -ge "$NEW_BUILD" ]; then
-              echo "Remote versionBuild=${REMOTE_BUILD} already >= ${NEW_BUILD}; not overwriting."
-              exit 0
-            fi
-            git stash --include-untracked || true
-            git reset --hard "origin/${BRANCH}"
-            git stash pop || true
-            git add version.properties
-            git commit -m "ci: versionBuild=${NEW_BUILD} [skip ci]"
-            if git push origin "HEAD:${BRANCH}"; then
-              echo "Pushed versionBuild=${NEW_BUILD} on attempt ${attempt}"
-              exit 0
-            fi
-            echo "::warning::Push raced with a newer main commit; retrying"
-          done
-          echo "::error::Could not persist versionBuild=${NEW_BUILD} after 5 attempts"
-          exit 1
+      # No versionCode persistence step: CI_VERSION_CODE is derived from the run number, so the build
+      # never rewrites version.properties and there is nothing to commit back. (The previous step's
+      # stash/reset/pop retry was also unsound — once the increment was committed locally the stash
+      # saved nothing and reset discarded it — but it is simply gone now rather than fixed in place.)
 
       - name: Fail loudly if Play upload didn't succeed
         if: ${{ always() && steps.play-upload.outcome != 'success' && steps.play-upload.outcome != 'skipped' }}

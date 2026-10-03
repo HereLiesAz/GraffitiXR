@@ -1170,8 +1170,15 @@ class MainActivity : ComponentActivity() {
                             // Depth-unsupported devices auto-fall-back to Canvas (handled in
                             // ArViewModel), so the old "switch to Canvas in Settings" banner is gone.
 
+                            // "Install ARCore" is only correct when AR truly cannot run. A device without
+                            // ARCore installed now runs the CameraX + SphereSLAM standalone path, so gate
+                            // this on BOTH backends being unavailable — otherwise the card covers a working
+                            // standalone session and tells the artist to install ARCore they don't need.
                             if (editorUiState.editorMode == EditorMode.AR
+                                && arUiState.isArCoreAvailabilityResolved
                                 && !arUiState.isArCoreAvailable
+                                && arUiState.isSphereSlamAvailabilityResolved
+                                && !arUiState.isSphereSlamAvailable
                                 && !showLibrary && !showSettings
                             ) {
                                 ArCoreUnavailableOverlay(
