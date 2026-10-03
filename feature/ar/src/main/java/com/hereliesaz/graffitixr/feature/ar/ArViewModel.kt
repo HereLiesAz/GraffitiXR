@@ -1236,8 +1236,16 @@ class ArViewModel @Inject constructor(
             // support. The result drives mode-chooser visibility and the
             // first-launch "AR unavailable" onboarding step.
             val result = ArAvailabilityChecker.check(appContext)
-            val supported = result == ArAvailabilityChecker.Result.Supported ||
-                result == ArAvailabilityChecker.Result.NeedsInstallOrUpdate
+            // Only a fully INSTALLED ARCore routes into the ARCore Session path. A device that is
+            // ARCore-capable but has no Google Play Services for AR installed (or too old an APK) reports
+            // NeedsInstallOrUpdate — and nothing in this app ever calls ArCoreApk.requestInstall, so
+            // treating that as "available" opened an ARCore Session on a device with no ARCore runtime.
+            // That session never received a camera frame and surfaced "Camera isn't delivering frames".
+            // Those devices take the CameraX + SphereSLAM standalone path instead, which needs no ARCore
+            // APK — the app's documented fallback ("unsupported devices remain in AR mode and take the
+            // CameraX + SphereSLAM standalone path"). A later install isn't auto-detected mid-process,
+            // which is acceptable: standalone AR is fully functional without ARCore.
+            val supported = result == ArAvailabilityChecker.Result.Supported
             if (!supported) {
                 // The native MobileGS instance is process-global. Project loading may have installed
                 // an ARCore/capture-camera fingerprint while ARCore capability was still UNKNOWN.
@@ -3587,7 +3595,15 @@ class ArViewModel @Inject constructor(
             // stereo fault). Auto-recreating the session here is NOT safe — recreating ARCore on a wedged
             // camera crashed natively — so surface it and let the user re-enter AR. Root cause is under
             // investigation (the 'camera handoff' / 'AR session' diag lines localize it).
-            appendDiag("camera not feeding on mono — exit and re-enter AR to retry")
+            //
+            // Arm the safest-camera-config recovery NOW, not only via the 10s MainScreen dead-camera
+            // watchdog. This 8s path fires ~2s earlier and its toast tells the user to exit and re-enter;
+            // without this, that manual re-entry reopens the identical config and fails the same way. On a
+            // budget HAL that opens a config but never streams it, ARCore's default config (no fps-variant
+            // swap, no stereo) is the documented recovery. Idempotent, process-scoped, flag-only — no
+            // in-place session recreate (the restriction above still holds).
+            onCameraStreamStalled()
+            appendDiag("camera not feeding on mono — armed safe-config recovery; exit and re-enter AR to retry")
             _feedback.tryEmit(
                 com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
                     "Camera isn't delivering frames — exit AR and try again"
