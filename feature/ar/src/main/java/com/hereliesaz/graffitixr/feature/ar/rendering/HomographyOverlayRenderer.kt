@@ -68,13 +68,15 @@ class HomographyOverlayRenderer(context: Context) : android.opengl.GLSurfaceView
     @Volatile private var surfaceWidth = 0
     @Volatile private var surfaceHeight = 0
 
-    // Whole-design transform. Defaults preserve the existing homography-fallback behavior.
-    @Volatile private var panX = 0f
-    @Volatile private var panY = 0f
-    @Volatile private var designScale = 1f
-    @Volatile private var rotationZDeg = 0f
-    @Volatile private var rotationXDeg = 0f
-    @Volatile private var rotationYDeg = 0f
+    // Whole-design transform. All six components move together, so they are bundled into one immutable
+    // snapshot behind an AtomicReference: writing six loose @Volatile fields let the GL thread read a
+    // torn set (a new pan with the old scale/rotation) for one frame during a drag. Defaults preserve
+    // the existing homography-fallback behavior.
+    private val transform = java.util.concurrent.atomic.AtomicReference(
+        StandaloneRenderTransform(
+            panX = 0f, panY = 0f, scale = 1f, rotationZDeg = 0f, rotationXDeg = 0f, rotationYDeg = 0f,
+        )
+    )
 
     private val model4 = FloatArray(16).also { Matrix.setIdentityM(it, 0) }
     private val contentRotation4 = FloatArray(16)
@@ -128,12 +130,7 @@ class HomographyOverlayRenderer(context: Context) : android.opengl.GLSurfaceView
             rotationXDeg = rotationXDeg,
             rotationYDeg = rotationYDeg,
         )
-        this.panX = sanitized.panX
-        this.panY = sanitized.panY
-        this.designScale = sanitized.scale
-        this.rotationZDeg = sanitized.rotationZDeg
-        this.rotationXDeg = sanitized.rotationXDeg
-        this.rotationYDeg = sanitized.rotationYDeg
+        transform.set(sanitized)
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -167,15 +164,17 @@ class HomographyOverlayRenderer(context: Context) : android.opengl.GLSurfaceView
         val viewport = letterboxViewport(surfaceWidth, surfaceHeight, frame.frameAspect)
         if (viewport != null) GLES30.glViewport(viewport[0], viewport[1], viewport[2], viewport[3])
 
+        // One consistent snapshot of all six components for this frame.
+        val t = transform.get()
         Matrix.setIdentityM(model4, 0)
-        Matrix.translateM(model4, 0, panX, panY, 0f)
-        Matrix.rotateM(model4, 0, rotationZDeg, 0f, 0f, 1f)
-        Matrix.scaleM(model4, 0, designScale, designScale, 1f)
+        Matrix.translateM(model4, 0, t.panX, t.panY, 0f)
+        Matrix.rotateM(model4, 0, t.rotationZDeg, 0f, 0f, 1f)
+        Matrix.scaleM(model4, 0, t.scale, t.scale, 1f)
         overlayRenderer.draw(
             frame.viewMatrix,
             frame.projMatrix,
             model4,
-            contentRotation = buildContentRotation(rotationXDeg, rotationYDeg),
+            contentRotation = buildContentRotation(t.rotationXDeg, t.rotationYDeg),
         )
     }
 

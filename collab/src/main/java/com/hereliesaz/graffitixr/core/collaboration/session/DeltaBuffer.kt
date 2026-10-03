@@ -146,6 +146,15 @@ internal class DeltaBuffer(
         return ring.filter { it.seq > lastSeq }.map { it.seq to it.op }
     }
 
+    /**
+     * The op buffered at [seq], or null if it is no longer held (acked/trimmed, superseded by a newer
+     * op, or evicted under budget). The outbound path uses this to re-encode a delta at send time
+     * instead of retaining a second copy of its bytes in the send queue — a null here means the op is
+     * either already represented by a newer superseding op (also queued) or covered by a gap resync.
+     */
+    @Synchronized
+    fun opBySeq(seq: Long): Op? = ring.firstOrNull { it.seq == seq }?.op
+
     /** True when eviction has left a hole that makes [opsAfter] unable to answer a replay. */
     @Synchronized
     fun hasGap(): Boolean = gapped

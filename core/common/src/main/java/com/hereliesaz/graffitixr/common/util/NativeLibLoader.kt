@@ -6,17 +6,22 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 object NativeLibLoader {
     private val isLoaded = AtomicBoolean(false)
+    // OpenCV loads before libgraffitixr. Tracked separately so that if the graffitixr load fails and a
+    // caller retries, we skip re-running the OpenCV load sequence (it already succeeded) and only retry
+    // the step that failed, rather than re-invoking System.loadLibrary for an already-loaded OpenCV.
+    private val opencvLoaded = AtomicBoolean(false)
 
     @Synchronized
     fun loadAll() {
         if (isLoaded.get()) return
-        
+
         try {
+            if (!opencvLoaded.get()) {
             // Step 1: Ensure OpenCV is loaded. GraffitiXR depends on its native symbols.
             // Priority 1: Try exact versioned name (v5)
             // Priority 2: Try generic name
             // Priority 3: Try OpenCVLoader.initLocal()
-            val opencvLoaded = try {
+            val opencvOk = try {
                 System.loadLibrary("opencv_java5")
                 Log.i("NativeLibLoader", "libopencv_java5.so loaded directly.")
                 true
@@ -31,16 +36,18 @@ object NativeLibLoader {
                 }
             }
 
-            if (!opencvLoaded) {
+            if (!opencvOk) {
                 val errorMsg = "CRITICAL: OpenCV native symbols could not be registered."
                 Log.e("NativeLibLoader", errorMsg)
                 throw RuntimeException(errorMsg)
+            }
+            opencvLoaded.set(true)
             }
 
             // Step 2: Load our primary C++ engine (depends on symbols from Step 1)
             System.loadLibrary("graffitixr")
             Log.i("NativeLibLoader", "libgraffitixr.so loaded successfully.")
-            
+
             // Only set to true if BOTH loaded successfully
             isLoaded.set(true)
         } catch (e: UnsatisfiedLinkError) {

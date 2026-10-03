@@ -128,6 +128,15 @@ fun SphereSlamStandaloneOverlay(
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
     val surfaceSize = remember { AtomicReference(IntSize.Zero) }
 
+    // True once the analyzer DisposableEffect has disposed. An analyze() already running when the
+    // analyzer is cleared can still post to mainHandler AFTER onDispose's removeCallbacksAndMessages
+    // purge; those late posts would run on a torn-down composition. Every worker→UI post goes through
+    // postUi, which drops the work when disposed. Reset to false when the effect re-arms (re-entry).
+    val disposed = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+    fun postUi(block: () -> Unit) {
+        mainHandler.post { if (!disposed.get()) block() }
+    }
+
     var rawCaptureBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var pendingReferenceBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var pendingReferenceWarning by remember { mutableStateOf<String?>(null) }
@@ -660,7 +669,7 @@ fun SphereSlamStandaloneOverlay(
                 surfaceHeightPixels = size.height,
             )
         } ?: 0f
-        mainHandler.post {
+        postUi {
             if (peerOnlyTracking) {
                 trackingState =
                     if (frame != null) StandaloneTrackingState.LOCKED
@@ -721,6 +730,9 @@ fun SphereSlamStandaloneOverlay(
         coopPeerSpatialFrame,
         coopPeerFingerprint,
     ) {
+        // Re-arm the UI-post gate: a prior disposal set this true, and this fresh analyzer's posts
+        // must be delivered again.
+        disposed.set(false)
         val id = cameraId
         val restoredAtlas = atlasReferenceImages
         if (id == null || restoredAtlas == null) {
@@ -739,10 +751,11 @@ fun SphereSlamStandaloneOverlay(
                     peerFingerprint = peerFingerprint,
                     spatialFrame = peerSpatial,
                     onFrameTracked = ::consumeTrackedFrame,
-                    onDiagnostic = { text -> mainHandler.post { onDiagnostic(text) } },
+                    onDiagnostic = { text -> postUi { onDiagnostic(text) } },
                 )
                 cameraController.setImageAnalysisAnalyzer(executor, analyzer)
                 onDispose {
+                    disposed.set(true)
                     cameraController.clearImageAnalysisAnalyzer()
                     mainHandler.removeCallbacksAndMessages(null)
                     executor.execute { analyzer.close() }
@@ -762,7 +775,7 @@ fun SphereSlamStandaloneOverlay(
                 mobileGsWallFeatureMapFrameVersion = initialMobileGsWallFeatureMapFrameVersion,
                 onReferenceReady = { registered: SphereSlamStandaloneSession.Reference ->
                     val g = registered.geometry
-                    mainHandler.post {
+                    postUi {
                         referenceWidthUnits = g.widthMeters
                         referenceHeightUnits = g.heightMeters
                         referenceReady = true
@@ -786,7 +799,7 @@ fun SphereSlamStandaloneOverlay(
                     }
                 },
                 onAtlasPageAdded = { candidate ->
-                    mainHandler.post {
+                    postUi {
                         onAtlasPageCaptured(
                             candidate.bitmap,
                             candidate.pageNo,
@@ -797,16 +810,16 @@ fun SphereSlamStandaloneOverlay(
                     }
                 },
                 onDiagnostic = { text ->
-                    mainHandler.post { onDiagnostic(text) }
+                    postUi { onDiagnostic(text) }
                 },
                 onCalibrationChanged = { calibration ->
-                    mainHandler.post { calibrationDiagnostics = calibration }
+                    postUi { calibrationDiagnostics = calibration }
                 },
                 onFailure = { event ->
-                    mainHandler.post { applyFailure(event, emitDiagnostic = false) }
+                    postUi { applyFailure(event, emitDiagnostic = false) }
                 },
                 onTrackingStateChanged = { state ->
-                    mainHandler.post {
+                    postUi {
                         trackingState = state
                         if (
                             state == StandaloneTrackingState.LOCKED &&
@@ -818,7 +831,7 @@ fun SphereSlamStandaloneOverlay(
                 },
                 onFrameTracked = ::consumeTrackedFrame,
                 onFatalError = { error ->
-                    mainHandler.post {
+                    postUi {
                         if (error is StandaloneReferenceTooWeakException) {
                             val old = previousReferenceBitmap
                             if (old != null) {
@@ -856,10 +869,11 @@ fun SphereSlamStandaloneOverlay(
             cameraController.setImageAnalysisAnalyzer(executor, analyzer)
 
             onDispose {
-                cameraController.clearImageAnalysisAnalyzer()
                 // Drop worker-posted UI callbacks before the remembered Handler can outlive this
-                // standalone overlay composition. Native teardown is serialized behind any in-flight
-                // analyze() call on the same executor.
+                // standalone overlay composition. removeCallbacksAndMessages only clears ALREADY-queued
+                // posts; disposed guards against a still-running analyze() posting AFTER this purge.
+                disposed.set(true)
+                cameraController.clearImageAnalysisAnalyzer()
                 mainHandler.removeCallbacksAndMessages(null)
                 executor.execute { analyzer.close() }
                 executor.shutdown()

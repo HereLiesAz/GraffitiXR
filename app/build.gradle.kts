@@ -69,6 +69,10 @@ var currentPatch = if (isMinorBumped) 0 else versionProps.getProperty("versionPa
 val ciVersionCode = System.getenv("CI_VERSION_CODE")?.toIntOrNull()?.takeIf { it > 0 }
 if (ciVersionCode != null) {
     currentVersionCode = ciVersionCode
+    // Keep versionName distinct per CI build too: without this the patch stays frozen at the tracked
+    // value and every Play release reports the same human-readable version across many versionCodes.
+    // The CI code is monotonic (1_000_000 + run_number*10 + attempt), so it makes a unique patch.
+    currentPatch = ciVersionCode
 } else if (isBuilding) {
     currentVersionCode++ // build never resets
     // A minor bump makes this build the new minor's .0; otherwise advance the patch.

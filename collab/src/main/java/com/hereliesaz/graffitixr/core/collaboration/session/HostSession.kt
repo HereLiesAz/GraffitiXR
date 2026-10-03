@@ -74,9 +74,13 @@ internal class HostSession(
     }
 
     /** An op with its sequence number and wire encoding, fixed at enqueue time. */
+    // Holds only the seq, not the encoded bytes: the op itself lives in deltaBuffer (the single, 48 MB-
+    // capped source of truth), and outboundLoop re-encodes from there at send time. Retaining the bytes
+    // here too meant a second, UNBOUNDED copy of every op — including multi-MB bitmap ops — grew without
+    // limit while the host sat in WaitingForGuest (nothing drains the queue until a guest connects),
+    // OOMing a long solo pre-guest session. deltaBuffer's eviction does not bound this queue; seq-only does.
     private class EncodedDelta(
         val seq: Long,
-        val bytes: ByteArray,
         /** Monotonic enqueue time; see [BULK_PERSIST_GRACE_MS]. */
         val enqueuedAtMs: Long = System.nanoTime() / 1_000_000L,
     )
@@ -227,23 +231,25 @@ internal class HostSession(
             // session).
             if (phase == Phase.Ended) return
             val seq = seqCounter.incrementAndGet()
-            val bytes = OpCodec.encode(DeltaPayload(seq, op))
+            // Encode once here only to validate the size and to size the deltaBuffer entry; the bytes are
+            // not retained (outboundLoop re-encodes from deltaBuffer at send time — see EncodedDelta).
+            val encodedSize = OpCodec.encode(DeltaPayload(seq, op)).size
             // The guard must measure against the PLAINTEXT budget: writeSecure seals this payload, and
             // seal() adds SEAL_OVERHEAD_BYTES (counter + inner type + GCM tag). Measuring against the raw
             // MAX_PAYLOAD_BYTES let a near-max op pass here, then throw inside Frame.write at send time —
             // bouncing the live guest and permanently dropping the op (it is skipped on replay too).
             val maxPlaintext = Frame.MAX_PAYLOAD_BYTES - SessionCrypto.SEAL_OVERHEAD_BYTES
-            if (bytes.size > maxPlaintext) {
+            if (encodedSize > maxPlaintext) {
                 Log.w(
                     TAG,
-                    "dropping op (seq=$seq, ${op.javaClass.simpleName}): encoded size ${bytes.size}B " +
+                    "dropping op (seq=$seq, ${op.javaClass.simpleName}): encoded size ${encodedSize}B " +
                         "exceeds the sealed-frame plaintext budget (${maxPlaintext}B); it can never " +
                         "be sent as a single DELTA frame",
                 )
                 return
             }
-            deltaBuffer.append(seq, op, bytes.size)
-            outQueue.trySend(EncodedDelta(seq, bytes))
+            deltaBuffer.append(seq, op, encodedSize)
+            outQueue.trySend(EncodedDelta(seq))
         }
     }
 
@@ -284,10 +290,12 @@ internal class HostSession(
     }
 
     private suspend fun handleConnection(socket: Socket) {
-        // Bound every read on this connection (handshake and live). Guests ack every 1s and
-        // answer PINGs sent every 5s, so 15s of silence means a dead/half-open peer — without
-        // this, Frame.read blocks forever and a vanished guest is never detected.
-        socket.soTimeout = READ_TIMEOUT_MS
+        // acceptLoop handles connections serially, so the pre-auth HELLO read must be bound tightly:
+        // an unauthenticated peer that opens a socket and sends nothing would otherwise hold the accept
+        // loop for the full live READ_TIMEOUT_MS (15s), a trivial pre-auth DoS. Use the shorter handshake
+        // timeout for the HELLO read, then widen to READ_TIMEOUT_MS for the live phase (guests ack every
+        // 1s and answer 5s PINGs, so 15s of live silence means a dead/half-open peer).
+        socket.soTimeout = HANDSHAKE_READ_TIMEOUT_MS
         val input = socket.getInputStream()
         val output = socket.getOutputStream()
 
@@ -404,6 +412,8 @@ internal class HostSession(
             sendBulk(output, crypto)
         }
 
+        // Handshake done — widen the read timeout for the live phase.
+        socket.soTimeout = READ_TIMEOUT_MS
         _state.value = CoopSessionState.Connected(peerName = hello.deviceName)
         phase = Phase.Live
 
@@ -523,11 +533,13 @@ internal class HostSession(
     }
 
     private suspend fun outboundLoop(output: OutputStream, crypto: SessionCrypto) {
-        // Seq/encoding/DeltaBuffer accounting all happened in enqueueOp; this loop only ships
-        // the pre-encoded delta payloads, sealed here.
+        // The queue carries only seqs; re-encode each from deltaBuffer at send time. A null means the op
+        // is no longer buffered — superseded by a newer op (whose seq is also queued and carries the
+        // absolute state) or covered by a gap resync — so skipping it is correct, not a lost update.
         for (delta in outQueue) {
+            val op = deltaBuffer.opBySeq(delta.seq) ?: continue
             try {
-                writeSecure(output, crypto, FrameType.DELTA, delta.bytes)
+                writeSecure(output, crypto, FrameType.DELTA, OpCodec.encode(DeltaPayload(delta.seq, op)))
             } catch (e: Exception) {
                 // A reconnect handoff cancels liveJob (see enterReconnecting/handleConnection),
                 // which surfaces here as a CancellationException from inside writeSecure/delay.
@@ -663,9 +675,13 @@ internal class HostSession(
         private const val TAG = "HostSession"
 
         // Guests ack every 1s and answer 5s PINGs, so 15s of read silence means a dead or
-        // half-open peer. Also bounds handshake reads in handleConnection, so a stalled
-        // client can block the accept loop for at most this long.
+        // half-open peer.
         const val READ_TIMEOUT_MS = 15_000
+
+        // Pre-auth HELLO read bound. acceptLoop is serial, so a peer that connects and sends nothing
+        // blocks hosting for this long — kept short (5s) to limit that pre-auth stall, while the live
+        // phase widens back to READ_TIMEOUT_MS.
+        const val HANDSHAKE_READ_TIMEOUT_MS = 5_000
 
         // Plain java.net.Socket exposes no write-side timeout, so writeFrameTimed enforces one
         // itself. Mirrors READ_TIMEOUT_MS: a guest that stops reading for this long (backgrounded,
