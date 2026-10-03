@@ -3366,7 +3366,7 @@ class ArViewModel @Inject constructor(
         // TOCTOU) instead created a worse race: it could run AFTER performFullCleanupLocked nulled
         // `renderer`, resurrecting a reference to an already-destroyed renderer.
         renderer = r
-        renderer?.onCameraNotFeeding = { onCameraNotFeeding() }
+        renderer?.onCameraNotFeeding = { cameraEverStreamed -> onCameraNotFeeding(cameraEverStreamed) }
         // The renderer assembles the capture record on the GL thread; these hand it the two pieces
         // whose lifecycles live here. Lambdas rather than direct references so the renderer never
         // touches a SensorManager or a location client it does not own.
@@ -3585,23 +3585,24 @@ class ArViewModel @Inject constructor(
      * self-heal: reconfigure the LIVE session to mono. No-op when we're already on mono (then the black
      * camera is some other fault and must not be mis-blamed on stereo) or when recovery already ran.
      */
-    private fun onCameraNotFeeding() {
-        if (forcedStereoUnstable) {
-            appendDiag("camera not feeding (mono/unstable) — exit and re-enter AR to retry")
+    private fun onCameraNotFeeding(cameraEverStreamed: Boolean) {
+        if (cameraEverStreamed) {
+            // The render watchdog also fires for a GL-thread stall (slamCamera / slamFeed / mesh) that
+            // happens AFTER frames were already flowing. That is a native/render stall, not a camera-feed
+            // failure: it must not switch the next entry to the safe camera config or blame the camera.
+            appendDiag("render stalled after camera had streamed — native/GL stall, not a camera-feed fault")
             return
         }
-        if (!_uiState.value.isHardwareStereoActive) {
-            // Mono config and STILL no frames: the camera itself isn't feeding ARCore (confirmed not a
-            // stereo fault). Auto-recreating the session here is NOT safe — recreating ARCore on a wedged
-            // camera crashed natively — so surface it and let the user re-enter AR. Root cause is under
-            // investigation (the 'camera handoff' / 'AR session' diag lines localize it).
-            //
-            // Arm the safest-camera-config recovery NOW, not only via the 10s MainScreen dead-camera
-            // watchdog. This 8s path fires ~2s earlier and its toast tells the user to exit and re-enter;
-            // without this, that manual re-entry reopens the identical config and fails the same way. On a
-            // budget HAL that opens a config but never streams it, ARCore's default config (no fps-variant
-            // swap, no stereo) is the documented recovery. Idempotent, process-scoped, flag-only — no
-            // in-place session recreate (the restriction above still holds).
+        if (forcedStereoUnstable || !_uiState.value.isHardwareStereoActive) {
+            // Mono (either configured mono, or mono after a stereo downgrade) and no first frame ever: the
+            // camera itself isn't feeding ARCore. Auto-recreating the session here is NOT safe — recreating
+            // ARCore on a wedged camera crashed natively — so arm the safest-camera-config recovery and let
+            // the user re-enter AR. Arming here (not only via the 10s MainScreen dead-camera watchdog) makes
+            // the "exit and re-enter" the toast instructs actually recover: the next entry uses ARCore's
+            // default config (no fps-variant swap, no stereo) instead of reopening the identical one.
+            // Reaching this in the forcedStereoUnstable (post-downgrade) case matters because MainScreen's
+            // startup watchdog has already stopped by then, so this is the only recovery left. Idempotent,
+            // process-scoped, flag-only — no in-place session recreate (the restriction above still holds).
             onCameraStreamStalled()
             appendDiag("camera not feeding on mono — armed safe-config recovery; exit and re-enter AR to retry")
             _feedback.tryEmit(
