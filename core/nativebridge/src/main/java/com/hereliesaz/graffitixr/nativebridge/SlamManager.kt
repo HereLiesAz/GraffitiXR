@@ -425,12 +425,16 @@ class SlamManager @Inject constructor(
         if (blob.size < 12) return null
         val bb = ByteBuffer.wrap(blob).order(ByteOrder.nativeOrder())
         val rows = bb.int; val cols = bb.int; val type = bb.int
-        if (rows <= 0 || cols <= 0 || blob.size < 12 + rows * 12) return null
+        // 64-bit size math: rows*12 in Int can overflow negative for a corrupt/huge count, bypassing
+        // the guard and letting FloatArray(rows*3) attempt a multi-GB allocation.
+        if (rows <= 0 || cols <= 0 || blob.size.toLong() < 12L + rows.toLong() * 12L) return null
         return try {
             val points = FloatArray(rows * 3) { bb.float }
             val desc = ByteArray(blob.size - bb.position()).also { bb.get(it) }
             WallFeatureMap(points3d = points, descriptorsData = desc, descriptorsRows = rows,
                 descriptorsCols = cols, descriptorsType = type)
+        } catch (_: OutOfMemoryError) {
+            null
         } catch (_: Exception) {
             null
         }
@@ -492,7 +496,9 @@ class SlamManager @Inject constructor(
         if (n < 0 || rows < 0 || cols < 0) return null
         // Bail before reading if the blob can't even hold the fixed-size fields (header + points/conf/obs
         // + anchor + intrinsics = 96 + n*20 bytes), rather than catching a BufferUnderflowException.
-        if (blob.size < 96 + n * 20) return null
+        // 64-bit math: n*20 in Int can overflow negative for a corrupt/huge count, bypassing the guard
+        // and letting FloatArray(n*3) attempt a multi-GB allocation.
+        if (blob.size.toLong() < 96L + n.toLong() * 20L) return null
         return try {
             val points = FloatArray(n * 3) { bb.float }
             val conf = FloatArray(n) { bb.float }
@@ -501,6 +507,8 @@ class SlamManager @Inject constructor(
             val intrinsics = FloatArray(4) { bb.float }
             val desc = ByteArray(blob.size - bb.position()).also { bb.get(it) }
             WallFeatureMap(points, desc, rows, cols, type, conf, obs, anchor, intrinsics)
+        } catch (_: OutOfMemoryError) {
+            null
         } catch (_: Exception) {
             null
         }

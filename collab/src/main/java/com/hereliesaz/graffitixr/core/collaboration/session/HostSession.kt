@@ -228,11 +228,16 @@ internal class HostSession(
             if (phase == Phase.Ended) return
             val seq = seqCounter.incrementAndGet()
             val bytes = OpCodec.encode(DeltaPayload(seq, op))
-            if (bytes.size > Frame.MAX_PAYLOAD_BYTES) {
+            // The guard must measure against the PLAINTEXT budget: writeSecure seals this payload, and
+            // seal() adds SEAL_OVERHEAD_BYTES (counter + inner type + GCM tag). Measuring against the raw
+            // MAX_PAYLOAD_BYTES let a near-max op pass here, then throw inside Frame.write at send time —
+            // bouncing the live guest and permanently dropping the op (it is skipped on replay too).
+            val maxPlaintext = Frame.MAX_PAYLOAD_BYTES - SessionCrypto.SEAL_OVERHEAD_BYTES
+            if (bytes.size > maxPlaintext) {
                 Log.w(
                     TAG,
                     "dropping op (seq=$seq, ${op.javaClass.simpleName}): encoded size ${bytes.size}B " +
-                        "exceeds Frame.MAX_PAYLOAD_BYTES (${Frame.MAX_PAYLOAD_BYTES}B); it can never " +
+                        "exceeds the sealed-frame plaintext budget (${maxPlaintext}B); it can never " +
                         "be sent as a single DELTA frame",
                 )
                 return
@@ -550,32 +555,42 @@ internal class HostSession(
                 if (e is CancellationException) throw e
                 enterReconnecting(); return
             }
-            when (frame.type) {
-                FrameType.DELTA_ACK -> {
-                    val ack = OpCodec.decode<DeltaAckPayload>(frame.payload)
-                    deltaBuffer.trimUpTo(ack.lastSeq)
-                }
-                FrameType.PING -> {
-                    val ping = OpCodec.decode<PingPayload>(frame.payload)
-                    try {
-                        writeSecure(output, crypto, FrameType.PONG, OpCodec.encode(ping))
-                    } catch (e: Exception) {
-                        if (e is CancellationException) throw e
-                        enterReconnecting(); return
+            try {
+                when (frame.type) {
+                    FrameType.DELTA_ACK -> {
+                        val ack = OpCodec.decode<DeltaAckPayload>(frame.payload)
+                        deltaBuffer.trimUpTo(ack.lastSeq)
+                    }
+                    FrameType.PING -> {
+                        val ping = OpCodec.decode<PingPayload>(frame.payload)
+                        try {
+                            writeSecure(output, crypto, FrameType.PONG, OpCodec.encode(ping))
+                        } catch (e: Exception) {
+                            if (e is CancellationException) throw e
+                            enterReconnecting(); return
+                        }
+                    }
+                    FrameType.BULK_ACK -> { /* bulk done; ignore */ }
+                    FrameType.BYE -> {
+                        // The guest is closing voluntarily; report the reason it actually sent
+                        // (typically UserLeft) rather than the host's own HostClosed, which this
+                        // guest-initiated BYE never is.
+                        val bye = OpCodec.decode<ByePayload>(frame.payload)
+                        close(bye.reason)
+                        return
+                    }
+                    else -> {
+                        // Unexpected frame in this direction; ignore but log.
                     }
                 }
-                FrameType.BULK_ACK -> { /* bulk done; ignore */ }
-                FrameType.BYE -> {
-                    // The guest is closing voluntarily; report the reason it actually sent
-                    // (typically UserLeft) rather than the host's own HostClosed, which this
-                    // guest-initiated BYE never is.
-                    val bye = OpCodec.decode<ByePayload>(frame.payload)
-                    close(bye.reason)
-                    return
-                }
-                else -> {
-                    // Unexpected frame in this direction; ignore but log.
-                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Authenticated != trusted: a token-holding guest can still send a frame whose inner
+                // payload is not valid CBOR for its declared type. Decoding threw — drop the connection
+                // instead of letting it escape this loop and crash the process.
+                Log.w(TAG, "undecodable ${frame.type} frame from guest; reconnecting", e)
+                enterReconnecting(); return
             }
         }
     }

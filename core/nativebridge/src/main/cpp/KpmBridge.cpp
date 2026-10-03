@@ -12,6 +12,7 @@
 #include <android/log.h>
 #include <cstdint>
 #include <mutex>
+#include <set>
 
 #define LOG_TAG "POSEPROBE"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -29,12 +30,21 @@ struct KpmSession {
     ARParamLT *cameraParams = nullptr;
     int frameWidth = 0;
     int frameHeight = 0;
-    std::mutex mutex;
+    // Lifetime + mutual exclusion is handled by gKpmRegistryMutex below, not a per-session lock.
 };
 
 KpmSession *asSession(jlong value) {
     return reinterpret_cast<KpmSession *>(static_cast<intptr_t>(value));
 }
+
+// Lifetime guard. nativeDestroySession can run on a different thread than nativeMatchPlanar /
+// nativeAddPlanarPage; the per-session std::mutex cannot protect against the session (and that mutex)
+// being deleted out from under an in-flight call. This registry serializes create/destroy against the
+// work functions and lets them confirm the session is still alive before dereferencing it, closing the
+// use-after-free. (Mirrors gEngineMutex's role for the MobileGS engine.) Holding it across kpmMatching
+// serializes KPM globally, which is acceptable: a session is driven by a single frame pipeline.
+std::mutex gKpmRegistryMutex;
+std::set<KpmSession *> gKpmSessions;
 
 bool directBuffer(JNIEnv *env, jobject buffer, jlong requiredBytes, ARUint8 **out) {
     if (!buffer || !out || requiredBytes <= 0) return false;
@@ -158,6 +168,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_KpmBridge_nativeCreateCalibratedSess
 
     session->frameWidth = static_cast<int>(width);
     session->frameHeight = static_cast<int>(height);
+    {
+        std::lock_guard<std::mutex> registryLock(gKpmRegistryMutex);
+        gKpmSessions.insert(session);
+    }
     return static_cast<jlong>(reinterpret_cast<intptr_t>(session));
 #else
     (void) width;
@@ -184,7 +198,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_KpmBridge_nativeAddPlanarPage(
         jint maxFeatures) {
 #ifdef HAVE_ARX_KPM
     KpmSession *session = asSession(sessionValue);
-    if (!session || !session->handle) return -1;
+    // Hold the registry lock across the whole call and confirm the session is still alive before any
+    // dereference, so a concurrent nativeDestroySession cannot free it mid-use.
+    std::lock_guard<std::mutex> registryLock(gKpmRegistryMutex);
+    if (!session || gKpmSessions.find(session) == gKpmSessions.end() || !session->handle) return -1;
     if (width <= 0 || height <= 0 || referenceDpi <= 0.0f ||
         pageNo < 0 || imageNo < 0 || maxFeatures <= 0) {
         return -2;
@@ -194,7 +211,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_KpmBridge_nativeAddPlanarPage(
     ARUint8 *luma = nullptr;
     if (!directBuffer(env, lumaBuffer, requiredBytes, &luma)) return -3;
 
-    std::lock_guard<std::mutex> lock(session->mutex);
     const int before = session->atlas ? session->atlas->num : 0;
     const int addResult = kpmAddRefDataSet(
         luma,
@@ -256,7 +272,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_KpmBridge_nativeMatchPlanar(
         jfloatArray outArray) {
 #ifdef HAVE_ARX_KPM
     KpmSession *session = asSession(sessionValue);
-    if (!session || !session->handle || !session->atlas || !outArray) return -1;
+    // Hold the registry lock across the whole call and confirm the session is still alive before any
+    // dereference, so a concurrent nativeDestroySession cannot free it mid-match.
+    std::lock_guard<std::mutex> registryLock(gKpmRegistryMutex);
+    if (!session || gKpmSessions.find(session) == gKpmSessions.end() ||
+        !session->handle || !session->atlas || !outArray) {
+        return -1;
+    }
     if (env->GetArrayLength(outArray) < 14) return -1;
 
     const jlong requiredBytes =
@@ -264,7 +286,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_KpmBridge_nativeMatchPlanar(
     ARUint8 *luma = nullptr;
     if (!directBuffer(env, lumaBuffer, requiredBytes, &luma)) return -1;
 
-    std::lock_guard<std::mutex> lock(session->mutex);
     if (kpmMatching(session->handle, luma) < 0) return -1;
 
     float pose[3][4] = {};
@@ -308,7 +329,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_KpmBridge_nativeDestroySession(
         JNIEnv *, jobject, jlong sessionValue) {
 #ifdef HAVE_ARX_KPM
     KpmSession *session = asSession(sessionValue);
-    if (!session) return;
+    // Take the registry lock and remove the session atomically. erase() returning 0 means it was never
+    // registered or already destroyed (double-free guard). Any in-flight add/match holds this same lock,
+    // so by the time we proceed no other thread can be inside the session.
+    std::lock_guard<std::mutex> registryLock(gKpmRegistryMutex);
+    if (!session || gKpmSessions.erase(session) == 0) return;
 
     if (session->atlas) kpmDeleteRefDataSet(&session->atlas);
     if (session->handle) kpmDeleteHandle(&session->handle);
