@@ -30,11 +30,10 @@ class ProjectRepositoryImpl @Inject constructor(
     // Serializes project writes, switches and deletion; state is published after persistence.
     private val saveMutex = Mutex()
 
-    // Backing state for the project list so observers see creates/deletes/imports,
-    // as the ProjectRepository contract promises. A hot MutableStateFlow: nothing in the app
-    // currently collects [projects] (the dashboard calls [getProjects] directly instead), so the
-    // write paths below deliberately do NOT refresh it on every save — only its first collector
-    // triggers a rescan, via this onStart.
+    // Backing state for the project list so observers see creates/deletes/imports, as the
+    // ProjectRepository contract promises ("Updated whenever a project is created or deleted"). A hot
+    // MutableStateFlow: its first collector rescans via onStart, and every write path below refreshes
+    // it after persisting so a collector is not frozen at the snapshot it took on first collection.
     private val _projects = MutableStateFlow<List<GraffitiProject>>(emptyList())
     override val projects: Flow<List<GraffitiProject>> = _projects.onStart { refreshProjects() }
 
@@ -51,6 +50,7 @@ class ProjectRepositoryImpl @Inject constructor(
     override suspend fun createProject(project: GraffitiProject) = saveMutex.withLock {
         projectManager.saveProject(context, project)
         _currentProject.value = project
+        refreshProjects()
     }
 
     override suspend fun getProject(id: String): GraffitiProject? = withContext(Dispatchers.IO) {
@@ -76,6 +76,7 @@ class ProjectRepositoryImpl @Inject constructor(
     override suspend fun updateProject(project: GraffitiProject) = saveMutex.withLock {
         projectManager.saveProject(context, project)
         if (_currentProject.value?.id == project.id) _currentProject.value = project
+        refreshProjects()
     }
 
     override suspend fun updateProject(transform: (GraffitiProject) -> GraffitiProject) = saveMutex.withLock {
@@ -93,11 +94,14 @@ class ProjectRepositoryImpl @Inject constructor(
         // whole-object writers; using it here resurrects fields a transform intentionally cleared.
         projectManager.saveProjectExact(context, updated)
         _currentProject.value = updated
+        // A metadata-affecting transform (e.g. a rename) changes the list projection, so republish.
+        refreshProjects()
     }
 
     override suspend fun deleteProject(id: String) = saveMutex.withLock {
         withContext(Dispatchers.IO) { projectManager.deleteProject(context, id) }
         if (_currentProject.value?.id == id) _currentProject.value = null
+        refreshProjects()
     }
 
     override suspend fun saveArtifact(projectId: String, filename: String, data: ByteArray): String = withContext(Dispatchers.IO) {

@@ -794,7 +794,8 @@ fun MainScreen(
                             )
                         }
                     }
-                    .pointerInput(uiState.design?.id, isImageLocked, isWaitingForTap, isTouchLocked, uiState.editorMode) {
+                    .pointerInput(uiState.design?.id, isImageLocked, isWaitingForTap, isTouchLocked, isGuest, uiState.editorMode) {
+                        if (isGuest) return@pointerInput // A co-op guest may not move/scale/rotate the shared design.
                         // Outside Design the whole design is the single layer, so transform gestures
                         // always drive the mode adjustment instead of a per-layer transform.
                         val editingMode = uiState.editorMode != EditorMode.DESIGN

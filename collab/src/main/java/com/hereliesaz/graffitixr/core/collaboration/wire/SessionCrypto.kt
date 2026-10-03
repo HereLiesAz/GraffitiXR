@@ -93,6 +93,13 @@ internal class SessionCrypto private constructor(
         private const val COUNTER_BYTES = 8
         private const val KEY_BYTES = 32
 
+        /**
+         * Bytes [seal] adds to the plaintext payload: the 8-byte send counter prefix, the 1-byte inner
+         * FrameType, and the 16-byte GCM tag. A pre-seal payload must therefore be at most
+         * `Frame.MAX_PAYLOAD_BYTES - SEAL_OVERHEAD_BYTES` or the sealed frame overflows the wire cap.
+         */
+        const val SEAL_OVERHEAD_BYTES = COUNTER_BYTES + 1 + TAG_BITS / 8
+
         private val EXTRACT_SALT = "GraffitiXR-coop-v2".toByteArray(StandardCharsets.UTF_8)
 
         /** Pseudo-random key derived from the shared token; input to the proofs and key schedule. */

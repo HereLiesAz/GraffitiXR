@@ -70,6 +70,10 @@ jobs:
             echo "::error::No GOOGLE_SERVICES secret and no template — cannot produce google-services.json."
             exit 1
           fi
+          if [ -z "${ARCORE_API_KEY:-}" ]; then
+            echo "::error::ARCORE_API_KEY secret is empty — a release with a blank ARCore key would ship non-functional AR."
+            exit 1
+          fi
           echo "ARCORE_API_KEY=$ARCORE_API_KEY" >> local.properties
 
       - name: Decode signing keystore
@@ -164,6 +168,15 @@ jobs:
             app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
+      - name: Verify SphereSLAM native tracking is present
+        # CMake silently stubs the KPM/SphereSLAM tracker (STATUS, not error) when third_party/artoolkitx
+        # is absent, so a submodule hiccup could ship a release with non-ARCore tracking disabled. These
+        # are the same checks android-ci.yml runs; fail the publish rather than ship a crippled build.
+        run: |
+          python3 tools/check_sphereslam_build_contract.py
+          python3 tools/check_sphereslam_apk.py --variant release
+          python3 tools/check_sphereslam_manifest.py --variant release
+
       - name: Resolve release version
         id: version
         run: |
@@ -172,9 +185,32 @@ jobs:
           # release notes use the actual built versionCode (steps.vcode) instead.
           echo "tag=latest-release-v$(grep -E '^versionMajor=' version.properties | cut -d'=' -f2 | tr -d '\r ').$(grep -E '^versionMinor=' version.properties | cut -d'=' -f2 | tr -d '\r ')" >> "$GITHUB_OUTPUT"
 
-      - name: Publish APK to GitHub release
+      # Play first, GitHub release second. Publishing the public GitHub release before Play meant a Play
+      # failure left the moving release advertising a build that never shipped to users; ordering Play
+      # ahead makes a Play failure abort the job before the GitHub release is touched.
+      - name: Publish AAB to Google Play
+        id: play-upload
         # Only main publishes. A workflow_dispatch run on a feature branch builds and uploads the
-        # artifact above but must not mint a public release or a Play upload against this repo's codes.
+        # artifact above but must not mint a Play upload or a public release against this repo's codes.
+        if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.publish) }}
+        env:
+          PACKAGE_NAME: ${{ steps.meta.outputs.package_name }}
+          AAB_GLOB: app/build/outputs/bundle/release/*.aab
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          pip install --quiet google-api-python-client google-auth google-auth-httplib2 httplib2==0.15.0
+          python .github/scripts/play_multitrack_publish.py
+
+      - name: Fail loudly if Play upload didn't succeed
+        if: ${{ always() && steps.play-upload.outcome != 'success' && steps.play-upload.outcome != 'skipped' }}
+        run: |
+          echo "::error title=Play upload failed::AAB did not land on all target tracks." >&2
+          exit 1
+
+      # Runs only after the Play upload step succeeded (a failed Play step fails the job and skips this),
+      # so the public GitHub release never advertises a build Play rejected. No versionCode persistence
+      # step: CI_VERSION_CODE comes from the run number, so the build never rewrites version.properties.
+      - name: Publish APK to GitHub release
         if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.publish) }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -192,25 +228,3 @@ jobs:
           else
             gh release create "$TAG" "$apk" --title "$TAG" --notes "$notes" --latest
           fi
-
-      - name: Publish AAB to Google Play
-        id: play-upload
-        if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.publish) }}
-        env:
-          PACKAGE_NAME: ${{ steps.meta.outputs.package_name }}
-          AAB_GLOB: app/build/outputs/bundle/release/*.aab
-          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-        run: |
-          pip install --quiet google-api-python-client google-auth google-auth-httplib2 httplib2==0.15.0
-          python .github/scripts/play_multitrack_publish.py
-
-      # No versionCode persistence step: CI_VERSION_CODE is derived from the run number, so the build
-      # never rewrites version.properties and there is nothing to commit back. (The previous step's
-      # stash/reset/pop retry was also unsound — once the increment was committed locally the stash
-      # saved nothing and reset discarded it — but it is simply gone now rather than fixed in place.)
-
-      - name: Fail loudly if Play upload didn't succeed
-        if: ${{ always() && steps.play-upload.outcome != 'success' && steps.play-upload.outcome != 'skipped' }}
-        run: |
-          echo "::error title=Play upload failed::AAB did not land on all target tracks." >&2
-          exit 1

@@ -826,6 +826,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
     jbyte* descData = env->GetByteArrayElements(descArray, nullptr);
     cv::Mat descriptors(rows, cols, type, descData);
     jsize ptsLen = env->GetArrayLength(ptsArray);
+    // Point count must match the descriptor row count (mirrors nativeRestorePaintMarks /
+    // nativeRestoreWallFeatureMap): a disagreement means a malformed/old blob, so refuse it rather than
+    // store a fingerprint whose keypoints and descriptors have different sizes.
+    if ((jlong)ptsLen != (jlong)rows * 3) {
+        env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
+        return;
+    }
     jfloat* ptsData = env->GetFloatArrayElements(ptsArray, nullptr);
     std::vector<cv::Point3f> points3d;
     for (int i = 0; i + 2 < ptsLen; i += 3) {
@@ -861,6 +868,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
     jbyte* descData = env->GetByteArrayElements(descArray, nullptr);
     cv::Mat descriptors(rows, cols, type, descData);
     jsize ptsLen = env->GetArrayLength(ptsArray);
+    // Point count must match the descriptor row count (mirrors the sibling restores): refuse a
+    // malformed/old blob rather than store mismatched keypoints and descriptors.
+    if ((jlong)ptsLen != (jlong)rows * 3) {
+        env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
+        return;
+    }
     jfloat* ptsData = env->GetFloatArrayElements(ptsArray, nullptr);
     std::vector<cv::Point3f> points3d;
     points3d.reserve(ptsLen / 3);

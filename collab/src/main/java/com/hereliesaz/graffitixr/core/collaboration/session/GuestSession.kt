@@ -268,27 +268,37 @@ internal class GuestSession(
                     attemptReconnect(); return@launch
                 }
                 pending = null
-                when (frame.type) {
-                    FrameType.DELTA -> {
-                        val delta = OpCodec.decode<DeltaPayload>(frame.payload)
-                        if (delta.seq > lastAppliedSeq) {
-                            onOp(delta.op)
-                            lastAppliedSeq = delta.seq
+                try {
+                    when (frame.type) {
+                        FrameType.DELTA -> {
+                            val delta = OpCodec.decode<DeltaPayload>(frame.payload)
+                            if (delta.seq > lastAppliedSeq) {
+                                onOp(delta.op)
+                                lastAppliedSeq = delta.seq
+                            }
                         }
-                    }
-                    FrameType.PING -> {
-                        val ping = OpCodec.decode<PingPayload>(frame.payload)
-                        try {
-                            writeSecure(output, crypto, FrameType.PONG, OpCodec.encode(ping))
-                        } catch (_: Exception) {
-                            attemptReconnect(); return@launch
+                        FrameType.PING -> {
+                            val ping = OpCodec.decode<PingPayload>(frame.payload)
+                            try {
+                                writeSecure(output, crypto, FrameType.PONG, OpCodec.encode(ping))
+                            } catch (_: Exception) {
+                                attemptReconnect(); return@launch
+                            }
                         }
+                        FrameType.BYE -> {
+                            val bye = OpCodec.decode<ByePayload>(frame.payload)
+                            close(bye.reason); return@launch
+                        }
+                        else -> { /* ignore */ }
                     }
-                    FrameType.BYE -> {
-                        val bye = OpCodec.decode<ByePayload>(frame.payload)
-                        close(bye.reason); return@launch
-                    }
-                    else -> { /* ignore */ }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    // Authenticated != trusted: a token-holding peer can still send a frame whose inner
+                    // payload is not valid CBOR for its declared type. Decoding threw — drop the
+                    // connection and reconnect instead of letting it escape this coroutine (no
+                    // CoroutineExceptionHandler on the SupervisorJob) and crash the process.
+                    attemptReconnect(); return@launch
                 }
             }
         }

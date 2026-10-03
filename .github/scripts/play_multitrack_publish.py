@@ -74,6 +74,7 @@ def main() -> None:
     # the open edit sits on the quota until Play garbage-collects it. Delete it on any
     # exception so repeated failures don't lock us out.
     edit_id = None
+    committed = False
     try:
         edit = svc.edits().insert(packageName=pkg, body={}).execute()
         edit_id = edit["id"]
@@ -109,8 +110,15 @@ def main() -> None:
             print(f"::notice::Assigned versionCode={version_code} to '{track}' as {status}")
 
         svc.edits().commit(packageName=pkg, editId=edit_id).execute()
+        committed = True
         print(f"::notice::Committed edit {edit_id} — versionCode={version_code} live on internal, draft on the rest")
     except Exception:
+        # Once commit().execute() has returned, the release is live. An exception after that point (e.g.
+        # a later line, or a transient error raised while handling the already-successful commit response)
+        # must NOT delete the committed edit or report the run as failed — the artifact already shipped.
+        if committed:
+            print("::warning::Post-commit error after a successful Play commit; the release is live, treating as success", file=sys.stderr)
+            return
         if edit_id is not None:
             try:
                 svc.edits().delete(packageName=pkg, editId=edit_id).execute()
