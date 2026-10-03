@@ -60,8 +60,29 @@ internal class GuestSession(
     // send counter across the inbound-PONG and DELTA_ACK loops).
     private suspend fun writeSecure(output: OutputStream, crypto: SessionCrypto, type: FrameType, payload: ByteArray) {
         writeMutex.withLock {
-            Frame.write(output, FrameType.ENC, crypto.seal(type, payload))
-            output.flush()
+            val sealed = crypto.seal(type, payload)
+            // java.net.Socket has no write-side timeout; without this, a host that stops reading parks
+            // this blocking write (and the write lock) until the read loop's own timeout fires. Mirror
+            // the host's writeFrameTimed: a watchdog force-closes the stream after WRITE_TIMEOUT_MS,
+            // unblocking the write as an IOException the caller treats as a dropped connection.
+            val timedOut = java.util.concurrent.atomic.AtomicBoolean(false)
+            val watchdog = scope.launch {
+                delay(WRITE_TIMEOUT_MS)
+                timedOut.set(true)
+                try { output.close() } catch (_: Exception) {}
+            }
+            try {
+                withContext(Dispatchers.IO) {
+                    Frame.write(output, FrameType.ENC, sealed)
+                    output.flush()
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                if (timedOut.get()) throw java.io.IOException("write timed out after ${WRITE_TIMEOUT_MS}ms", e)
+                throw e
+            } finally {
+                watchdog.cancel()
+            }
         }
     }
 
@@ -226,10 +247,14 @@ internal class GuestSession(
     }
 
     private fun receiveChunked(input: InputStream, crypto: SessionCrypto, expectedType: FrameType, totalBytes: Int): ByteArray {
-        // totalBytes is peer-declared: reject negative/absurd sizes before allocating
+        // totalBytes is peer-declared: reject negative/absurd sizes before doing anything
         // (NegativeArraySize / OOM).
         require(totalBytes in 0..Limits.MAX_BULK_BYTES) { "invalid bulk size $totalBytes" }
-        val buffer = ByteArray(totalBytes)
+        // Do NOT allocate the full declared size up front: a hostile host could declare MAX_BULK_BYTES
+        // (256 MB) and send nothing, forcing a 256 MB allocation before a single byte is validated as
+        // present. Grow the buffer toward totalBytes only as real chunks arrive (doubling, capped at
+        // totalBytes), so declared-but-unsent size costs nothing.
+        var buffer = ByteArray(minOf(totalBytes, INITIAL_BULK_ALLOC_BYTES))
         var offset = 0
         while (offset < totalBytes) {
             val frame = readSecure(input, crypto) ?: error("EOF mid-bulk")
@@ -242,10 +267,18 @@ internal class GuestSession(
                     "bulk chunk overruns declared size: ${frame.payload.size} > ${totalBytes - offset} remaining",
                 )
             }
+            val needed = offset + frame.payload.size
+            if (needed > buffer.size) {
+                var newCap = buffer.size
+                while (newCap < needed) newCap = minOf(totalBytes, maxOf(newCap * 2, needed))
+                buffer = buffer.copyOf(newCap)
+            }
             System.arraycopy(frame.payload, 0, buffer, offset, frame.payload.size)
-            offset += frame.payload.size
+            offset = needed
         }
-        return buffer
+        // The grown buffer is exactly totalBytes once complete (the loop fills every byte), so no final
+        // copy is needed in the common case; guard anyway for a zero-byte transfer.
+        return if (buffer.size == totalBytes) buffer else buffer.copyOf(totalBytes)
     }
 
     private suspend fun livePhase(
@@ -393,5 +426,14 @@ internal class GuestSession(
         // this is teardown, not live traffic, and nothing should wait long on it before the
         // socket closes regardless.
         const val BYE_TIMEOUT_MS = 1_000L
+
+        // Initial bulk-receive allocation. The buffer grows toward the declared size as chunks arrive,
+        // so a declared-but-unsent size never forces a large up-front allocation. 64 KiB matches the
+        // host's bulk chunk size.
+        const val INITIAL_BULK_ALLOC_BYTES = 64 * 1024
+
+        // Write-side bound (java.net.Socket has none). Mirrors HostSession.WRITE_TIMEOUT_MS: a host that
+        // stops reading for this long is treated as gone rather than left to park a blocked write.
+        const val WRITE_TIMEOUT_MS = 15_000L
     }
 }

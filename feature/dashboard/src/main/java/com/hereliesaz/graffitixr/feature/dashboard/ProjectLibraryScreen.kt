@@ -206,8 +206,21 @@ fun ProjectLibraryScreen(
                             // stay legible over any artwork.
                             Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
                                 if (project.thumbnailUri != null) {
+                                    // Thumbnails are rewritten to a fixed filename, so Coil's default
+                                    // cache key (the unchanging URI) serves a stale image after an edit.
+                                    // Fold the file's last-modified time into the cache keys so a
+                                    // regenerated thumbnail invalidates the cached one.
+                                    val thumbUri = project.thumbnailUri!!
+                                    val thumbCtx = androidx.compose.ui.platform.LocalContext.current
+                                    val thumbStamp = thumbUri.path
+                                        ?.let { java.io.File(it).lastModified() } ?: 0L
+                                    val thumbKey = "$thumbUri:$thumbStamp"
                                     coil.compose.AsyncImage(
-                                        model = project.thumbnailUri,
+                                        model = coil.request.ImageRequest.Builder(thumbCtx)
+                                            .data(thumbUri)
+                                            .memoryCacheKey(thumbKey)
+                                            .diskCacheKey(thumbKey)
+                                            .build(),
                                         contentDescription = strings.lib.projectThumbnail,
                                         modifier = Modifier.fillMaxSize(),
                                         contentScale = androidx.compose.ui.layout.ContentScale.Crop

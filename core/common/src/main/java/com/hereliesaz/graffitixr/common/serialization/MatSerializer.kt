@@ -14,16 +14,10 @@ import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 
 object MatSerializer : KSerializer<Mat> {
 
-    // NOTE: same latent issue as SketchProcessor had (see its util/SketchProcessor.kt comment) —
-    // a load failure here throws from a static initializer, so the JVM wraps it in
-    // ExceptionInInitializerError (an Error, not an Exception), which callers' `catch (e:
-    // Exception)` cannot catch. Left as `init {}` for now rather than moved to lazy-on-first-use
-    // in [serialize]/[deserialize], since that would need an integration test covering
-    // native-load failure to verify against; flagging here instead of guessing.
-    init {
-        NativeLibLoader.loadAll()
-    }
-
+    // Native load happens lazily on first (de)serialize, NOT in an `init {}` block. From a static
+    // initializer a load failure is wrapped as ExceptionInInitializerError (an Error), which callers'
+    // `catch (e: Exception)` cannot catch — turning a recoverable "OpenCV .so missing" into a process
+    // crash. loadAll() is idempotent and cheap after the first success, so calling it per op is free.
     override val descriptor: SerialDescriptor = buildClassSerialDescriptor("Mat") {
         element<Int>("rows")
         element<Int>("cols")
@@ -32,6 +26,7 @@ object MatSerializer : KSerializer<Mat> {
     }
 
     override fun serialize(encoder: Encoder, value: Mat) {
+        NativeLibLoader.loadAll()
         val expectedSize = value.total().toInt() * value.elemSize().toInt()
         if (expectedSize <= 0) {
             throw IllegalArgumentException("Invalid Mat dimensions or type: rows=${value.rows()}, cols=${value.cols()}, type=${value.type()}")
@@ -47,6 +42,7 @@ object MatSerializer : KSerializer<Mat> {
     }
 
     override fun deserialize(decoder: Decoder): Mat {
+        NativeLibLoader.loadAll()
         return decoder.decodeStructure(descriptor) {
             var rows = 0
             var cols = 0

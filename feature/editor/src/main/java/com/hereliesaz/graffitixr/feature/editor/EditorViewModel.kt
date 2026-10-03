@@ -845,6 +845,12 @@ class EditorViewModel @Inject constructor(
             thumbnailJob = viewModelScope.launch(dispatchers.default) {
                 try {
                     kotlinx.coroutines.delay(2000)
+                    // NOTE: this uses the full display size, which includes system bars/insets and so
+                    // can differ from the editor Box's actual content region — the composite's Fit math
+                    // then frames the design slightly differently from what the artist saw on screen.
+                    // For this downscaled thumbnail the difference is cosmetic; pixel-accurate framing
+                    // (here and in the default export path) needs the real editor-box size plumbed in,
+                    // which must be verified on-device before changing.
                     val metrics = context.resources.displayMetrics
                     val w = metrics.widthPixels.takeIf { it > 0 } ?: 1080
                     val h = metrics.heightPixels.takeIf { it > 0 } ?: 1920

@@ -22,6 +22,14 @@
 #include <ARX/AR/ar.h>
 #include <ARX/KPM/kpm.h>
 
+// makeCameraParams() writes the OpenCV "version-5" dist_factor layout (fx,fy,cx,cy at indices [12..15],
+// scale at [16]) but builds the ARParam with AR_DIST_FUNCTION_VERSION_DEFAULT. If that default is not
+// version 5 the intrinsics land in the wrong slots and every KPM pose is solved with garbage
+// calibration — silently. Fail the build loudly instead of shipping miscalibrated tracking.
+static_assert(AR_DIST_FUNCTION_VERSION_DEFAULT == 5,
+              "KpmBridge assumes the OpenCV v5 dist_factor layout; update makeCameraParams if the "
+              "default artoolkitX distortion-function version changes.");
+
 namespace {
 
 struct KpmSession {

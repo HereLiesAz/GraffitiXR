@@ -213,10 +213,21 @@ jobs:
             const fs = require('fs');
             let logTail = 'Log file not found.';
             try { logTail = fs.readFileSync('build.log', 'utf8').slice(-4000); } catch (e) {}
+            const title = `Build Failure on ${context.eventName === 'pull_request' ? 'PR #' + context.issue.number : context.ref}`;
+            // Dedupe: android-ci.yml and merged-build.yml both run on every push and both report
+            // failures, so skip creating a second issue when an open one with this title already exists.
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: 'open', labels: 'jules,bug', per_page: 100,
+            });
+            if (existing.data.some(i => i.title === title)) {
+              core.info(`An open "${title}" issue already exists; not creating a duplicate.`);
+              return;
+            }
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `Build Failure on ${context.eventName === 'pull_request' ? 'PR #' + context.issue.number : context.ref}`,
+              title,
               body: `**Log:**\n\`\`\`\n${logTail}\n\`\`\``,
               labels: ['jules', 'bug']
             });
