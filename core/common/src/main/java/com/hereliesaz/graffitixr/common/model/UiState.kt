@@ -147,10 +147,17 @@ data class ArUiState(
     val showAnchorBoundary: Boolean = false,
     /**
      * ARCore camera target frame rate. One of [com.hereliesaz.graffitixr.common.model.CameraTargetFps]'s
-     * four values: 60 (default), 30, `DEVICE_DEFAULT` (0, no filtering), or `DEVICE_MAX` (-1, the
+     * four values: `DEVICE_DEFAULT` (0, no filtering — the default), 30, 60, or `DEVICE_MAX` (-1, the
      * device's highest-fps config). Applies on next AR entry.
+     *
+     * Defaults to DEVICE_DEFAULT: no filter, so ARCore selects the camera config itself. Per ARCore's
+     * docs it "prioritize[s] camera configs that support [60 fps]" on capable devices and lowers the
+     * actual capture rate under low light to keep exposure — so the right default is to let ARCore
+     * choose, not to have the app pin a rate. The fixed 30 and 60 options exist as deliberate opt-ins to
+     * cap the rate and save power (ARCore: TARGET_FPS_60 "increases power consumption and may increase
+     * app memory usage"); they are an artist choice, never an app-imposed default.
      */
-    val cameraTargetFps: Int = 60,
+    val cameraTargetFps: Int = CameraTargetFps.DEVICE_DEFAULT,
     /**
      * Perception-throttle triggers. When enabled and active, each drops the world-locked perception
      * redraw rate from 60 to 30 fps to save power; camera + overlay + gestures stay full-rate.

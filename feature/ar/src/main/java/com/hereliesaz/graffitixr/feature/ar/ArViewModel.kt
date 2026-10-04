@@ -882,6 +882,26 @@ class ArViewModel @Inject constructor(
     /** ARCore autofocus: ON is `FocusMode.AUTO`, OFF is `FocusMode.FIXED`. */
     val evalAutoFocusEnabled: StateFlow<Boolean> = _evalAutoFocusEnabled.asStateFlow()
 
+    // Once the artist toggles focus by hand, the automatic acquire-then-lock below steps aside for the
+    // rest of the session. Reset on AR exit so each session starts with the automatic behavior again.
+    @Volatile private var focusManuallyOverridden = false
+
+    /**
+     * Acquire-then-lock autofocus. AUTO while the artist frames the wall — a sharp image is what gives
+     * ARCore/KPM the features to acquire — then FIXED once the anchor is placed, so the focal length
+     * stops sweeping during tracking. ARCore documents fixed focus as better for tracking and uses it as
+     * its own default; AUTO's focal sweeps are a known tracking-instability source. This gets both: a
+     * sharp acquisition and stable optics after. A manual focus toggle disables it for the session.
+     */
+    private fun applyAnchorFocusLock(anchorEstablished: Boolean) {
+        if (focusManuallyOverridden) return
+        val auto = !anchorEstablished
+        if (_evalAutoFocusEnabled.value == auto) return
+        _evalAutoFocusEnabled.value = auto
+        renderer?.updateAutoFocus(auto)
+        appendDiag("focus: ${if (auto) "AUTO (acquiring)" else "FIXED (locked on anchor)"}")
+    }
+
     /**
      * A/B switch for the camera focus mode, applied to the LIVE session so the two can be compared
      * on the same wall without re-entering AR.
@@ -892,6 +912,7 @@ class ArViewModel @Inject constructor(
      * is correct in general, which is why it is a switch and not a fix.
      */
     fun evalSetAutoFocusEnabled(on: Boolean) {
+        focusManuallyOverridden = true
         renderer?.updateAutoFocus(on)
         _evalAutoFocusEnabled.value = on
         viewModelScope.launch { settingsRepository.setAutoFocusEnabled(on) }
@@ -1735,6 +1756,10 @@ class ArViewModel @Inject constructor(
         // tracking frame (updateAutoMapping gates on it) and report scanPhase COMPLETE on a session
         // that never scanned. Sixth field to be cleared in one place and not its sibling.
         _uiState.update { it.copy(isAnchorEstablished = false, backboneTooSmall = false) }
+        // Anchor gone — re-arm acquire-then-lock so the next session frames in AUTO, and clear any
+        // manual focus override so the automatic behavior applies again.
+        focusManuallyOverridden = false
+        applyAnchorFocusLock(anchorEstablished = false)
         // Cancel any in-flight session update (including a running stereo probe) so it stops pumping
         // the camera and releases the session mutex before cleanup tries to acquire it.
         sessionUpdateJob?.cancel()
@@ -4188,6 +4213,8 @@ class ArViewModel @Inject constructor(
      */
     fun onPrimaryAnchorEstablished() {
         _uiState.update { it.copy(isAnchorEstablished = true) }
+        // Anchor placed — lock focus to FIXED so the focal length stops sweeping during tracking.
+        applyAnchorFocusLock(anchorEstablished = true)
     }
 
     /**
