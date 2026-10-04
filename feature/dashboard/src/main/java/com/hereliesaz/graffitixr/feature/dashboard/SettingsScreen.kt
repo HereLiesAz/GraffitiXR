@@ -93,6 +93,8 @@ fun SettingsScreen(
     onArCoreEnabledChanged: (Boolean) -> Unit,
     arCoreDepthEnabled: Boolean,
     onArCoreDepthEnabledChanged: (Boolean) -> Unit,
+    monocularDepthEnabled: Boolean,
+    onMonocularDepthEnabledChanged: (Boolean) -> Unit,
     throttleOnThermal: Boolean,
     onThrottleOnThermalChanged: (Boolean) -> Unit,
     throttleOnPowerSave: Boolean,
@@ -365,6 +367,13 @@ fun SettingsScreen(
                                 label = "ARCore depth",
                                 value = if (arCoreDepthEnabled) strings.settings.on else strings.settings.off,
                                 modifier = Modifier.clickable { onArCoreDepthEnabledChanged(!arCoreDepthEnabled) }
+                            )
+                            // Monocular depth (Depth Anything V2) for the non-ARCore path. Beta, default
+                            // off; adds a self-test on next AR entry whose result shows in the diag overlay.
+                            SettingsItem(
+                                label = "Monocular depth (beta)",
+                                value = if (monocularDepthEnabled) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable { onMonocularDepthEnabledChanged(!monocularDepthEnabled) }
                             )
                             // Perception throttle triggers: each drops perception 60→30 fps to save
                             // power while active. Default on. Lower = laggier perception but less drain.

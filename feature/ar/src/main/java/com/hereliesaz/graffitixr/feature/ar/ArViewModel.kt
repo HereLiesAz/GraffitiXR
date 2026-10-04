@@ -902,6 +902,48 @@ class ArViewModel @Inject constructor(
         appendDiag("focus: ${if (auto) "AUTO (acquiring)" else "FIXED (locked on anchor)"}")
     }
 
+    // Monocular depth (Depth Anything V2, ONNX Runtime). Created lazily; only touched when the beta
+    // toggle is on. Step 1 just proves it loads+runs on-device (selfTestDepth); Step 2 will feed live
+    // frames into the standalone plane/scale path.
+    private val depthEstimatorLazy = lazy {
+        com.hereliesaz.graffitixr.feature.ar.depth.DepthEstimator(appContext)
+    }
+    private val depthEstimator get() = depthEstimatorLazy.value
+
+    /** One synthetic-image inference to confirm the depth model loads AND executes on this device. */
+    private fun selfTestDepth() {
+        if (!depthEstimator.load()) {
+            appendDiag("depth: model unavailable (load failed)")
+            return
+        }
+        val n = 64
+        val probe = android.graphics.Bitmap.createBitmap(n, n, android.graphics.Bitmap.Config.ARGB_8888)
+        for (y in 0 until n) for (x in 0 until n) {
+            val v = ((x + y) * 2).coerceAtMost(255)
+            probe.setPixel(x, y, android.graphics.Color.rgb(v, v, v))
+        }
+        val t0 = android.os.SystemClock.elapsedRealtime()
+        val map = depthEstimator.estimate(probe)
+        probe.recycle()
+        if (map == null) {
+            appendDiag("depth: inference failed")
+            return
+        }
+        var mn = Float.MAX_VALUE
+        var mx = -Float.MAX_VALUE
+        var sum = 0.0
+        for (v in map.data) {
+            if (v < mn) mn = v
+            if (v > mx) mx = v
+            sum += v
+        }
+        val ms = android.os.SystemClock.elapsedRealtime() - t0
+        appendDiag(
+            "depth self-test: ${map.width}x${map.height} min=%.3f max=%.3f mean=%.3f %dms"
+                .format(mn, mx, sum / map.data.size, ms),
+        )
+    }
+
     /**
      * A/B switch for the camera focus mode, applied to the LIVE session so the two can be compared
      * on the same wall without re-entering AR.
@@ -1249,6 +1291,14 @@ class ArViewModel @Inject constructor(
             slamManager.loadSuperPoint(appContext.assets)
             slamManager.loadDistortionHead(appContext.assets) // optional; inert if asset absent
             slamManager.loadLowLightEnhancer(appContext.assets)
+            // Monocular depth (beta, non-ARCore path): load + self-test only when the artist has
+            // opted in, so it costs nothing otherwise. The self-test runs one inference on a synthetic
+            // image to confirm the ONNX Runtime int8 model both LOADS and EXECUTES on this hardware
+            // before any camera/fusion wiring (Step 2); results go to the diag overlay.
+            if (settingsRepository.monocularDepthEnabled.firstOrNull() == true) {
+                runCatching { selfTestDepth() }
+                    .onFailure { Timber.w(it, "depth self-test threw") }
+            }
         }
         viewModelScope.launch {
             // Resolve ARCore availability up front. With com.google.ar.core
@@ -1409,6 +1459,11 @@ class ArViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            settingsRepository.monocularDepthEnabled.collect { on ->
+                _uiState.update { it.copy(monocularDepthEnabled = on) }
+            }
+        }
+        viewModelScope.launch {
             settingsRepository.throttleOnThermal.collect { on ->
                 _uiState.update { it.copy(throttleOnThermal = on) }
                 recomputeSystemThrottle()
@@ -1532,6 +1587,10 @@ class ArViewModel @Inject constructor(
 
     fun setArCoreDepthEnabled(on: Boolean) {
         viewModelScope.launch { settingsRepository.setArCoreDepthEnabled(on) }
+    }
+
+    fun setMonocularDepthEnabled(on: Boolean) {
+        viewModelScope.launch { settingsRepository.setMonocularDepthEnabled(on) }
     }
 
     fun setThrottleOnThermal(on: Boolean) {
@@ -4641,6 +4700,7 @@ class ArViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         stopSystemThrottleMonitoring()
+        if (depthEstimatorLazy.isInitialized()) depthEstimatorLazy.value.close()
         // viewModelScope is already cancelled by the time onCleared runs, so leaveSession()'s
         // viewModelScope.launch would never execute and the collaboration session would leak.
         // Cancel the local collector synchronously and tear the session down on the manager's

@@ -56,6 +56,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val CAMERA_TARGET_FPS = intPreferencesKey("camera_target_fps")
     private val AR_CORE_ENABLED = booleanPreferencesKey("ar_core_enabled")
     private val AR_CORE_DEPTH_ENABLED = booleanPreferencesKey("ar_core_depth_enabled")
+    private val MONOCULAR_DEPTH_ENABLED = booleanPreferencesKey("monocular_depth_enabled")
     private val THROTTLE_ON_THERMAL = booleanPreferencesKey("throttle_on_thermal")
     private val THROTTLE_ON_POWER_SAVE = booleanPreferencesKey("throttle_on_power_save")
     private val THROTTLE_ON_LOW_BATTERY = booleanPreferencesKey("throttle_on_low_battery")
@@ -262,6 +263,18 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setArCoreDepthEnabled(on: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[AR_CORE_DEPTH_ENABLED] = on
+        }
+    }
+
+    // Defaults FALSE: monocular depth (Depth Anything V2, ONNX Runtime) is beta and unproven on-device,
+    // so it has zero impact until the artist opts in on the non-ARCore path.
+    override val monocularDepthEnabled: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[MONOCULAR_DEPTH_ENABLED] ?: false }
+
+    override suspend fun setMonocularDepthEnabled(on: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[MONOCULAR_DEPTH_ENABLED] = on
         }
     }
 

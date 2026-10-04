@@ -1714,6 +1714,8 @@ class MainActivity : ComponentActivity() {
                                     onArCoreEnabledChanged = { arViewModel.setArCoreEnabled(it) },
                                     arCoreDepthEnabled = arUiState.arCoreDepthEnabled,
                                     onArCoreDepthEnabledChanged = { arViewModel.setArCoreDepthEnabled(it) },
+                                    monocularDepthEnabled = arUiState.monocularDepthEnabled,
+                                    onMonocularDepthEnabledChanged = { arViewModel.setMonocularDepthEnabled(it) },
                                     throttleOnThermal = arUiState.throttleOnThermal,
                                     onThrottleOnThermalChanged = { arViewModel.setThrottleOnThermal(it) },
                                     throttleOnPowerSave = arUiState.throttleOnPowerSave,

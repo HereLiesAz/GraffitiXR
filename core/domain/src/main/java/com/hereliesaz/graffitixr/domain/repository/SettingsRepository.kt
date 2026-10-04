@@ -174,6 +174,10 @@ interface SettingsRepository {
     val arCoreDepthEnabled: Flow<Boolean>
     suspend fun setArCoreDepthEnabled(on: Boolean)
 
+    /** Monocular depth (Depth Anything V2) for the non-ARCore path. Beta; default off. */
+    val monocularDepthEnabled: Flow<Boolean>
+    suspend fun setMonocularDepthEnabled(on: Boolean)
+
     /** Perception-throttle triggers: each, when on, drops perception to 30fps while active. Default on. */
     val throttleOnThermal: Flow<Boolean>
     suspend fun setThrottleOnThermal(on: Boolean)
