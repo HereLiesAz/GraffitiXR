@@ -58,6 +58,11 @@ class ArSessionTest {
         every { settingsRepository.ambientScanEnabled } returns flowOf(true)
         every { settingsRepository.isRightHanded } returns flowOf(true)
         every { settingsRepository.showAnchorBoundary } returns flowOf(false)
+        // Keep the monocular-depth self-test inert (see ArViewModelTest): off here too, so init never
+        // constructs the DepthEstimator and no ONNX Runtime load runs in the test JVM.
+        every { settingsRepository.monocularDepthEnabled } returns flowOf(false)
+        every { settingsRepository.arCoreEnabled } returns flowOf(true)
+        every { settingsRepository.arCoreDepthEnabled } returns flowOf(true)
         every { projectRepository.currentProject } returns MutableStateFlow(null)
         every { context.filesDir } returns File("/tmp")
         viewModel = ArViewModel(slamManager, projectRepository, settingsRepository, projectManager, collaborationManager, wearableManager, context, testDispatchers)

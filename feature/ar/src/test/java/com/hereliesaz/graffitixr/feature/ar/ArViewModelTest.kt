@@ -94,6 +94,12 @@ class ArViewModelTest {
         every { settingsRepository.isRightHanded } returns flowOf(true)
         every { settingsRepository.showAnchorBoundary } returns flowOf(false)
         every { settingsRepository.isImperialUnits } returns flowOf(false)
+        // Keep the monocular-depth self-test inert: with it off, ArViewModel.init never constructs the
+        // DepthEstimator, so no ONNX Runtime load runs against the relaxed-mock AssetManager (which would
+        // otherwise spin/stall and exhaust the shared test JVM). The ARCore flags default on.
+        every { settingsRepository.monocularDepthEnabled } returns flowOf(false)
+        every { settingsRepository.arCoreEnabled } returns flowOf(true)
+        every { settingsRepository.arCoreDepthEnabled } returns flowOf(true)
         every { projectRepository.currentProject } returns MutableStateFlow(null)
         every { context.filesDir } returns File("/tmp")
         viewModel = ArViewModel(slamManager, projectRepository, settingsRepository, projectManager, collaborationManager, wearableManager, context, testDispatchers)
