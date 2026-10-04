@@ -7,6 +7,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.SystemClock
+import androidx.annotation.VisibleForTesting
 import com.hereliesaz.graffitixr.feature.ar.util.RotationDeltaMath
 import timber.log.Timber
 
@@ -110,7 +111,19 @@ class GyroOrientationBridge(context: Context) : SensorEventListener {
             val t = 1f - v[0] * v[0] - v[1] * v[1] - v[2] * v[2]
             if (t > 0f) kotlin.math.sqrt(t) else 0f
         }
-        latestQuaternion = RotationDeltaMath.normalize(floatArrayOf(v[0], v[1], v[2], w))
+        ingestRotationQuaternion(v[0], v[1], v[2], w)
+    }
+
+    /**
+     * The quaternion-ingestion tail of [onSensorChanged], factored out as the one seam a test can
+     * drive — [SensorEvent] cannot be constructed in a plain JVM unit test, so without this the
+     * `A`-extrinsic conjugation in [cameraRotationDelta] would stay untestable (and its sign, per
+     * this class's doc, is the one piece asserted but never hardware- or test-verified). Stores a
+     * freshly normalized copy, identical to the live path.
+     */
+    @VisibleForTesting
+    internal fun ingestRotationQuaternion(x: Float, y: Float, z: Float, w: Float) {
+        latestQuaternion = RotationDeltaMath.normalize(floatArrayOf(x, y, z, w))
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit

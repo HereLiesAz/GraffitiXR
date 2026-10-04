@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.hereliesaz.graffitixr.common.model.AppLanguage
+import com.hereliesaz.graffitixr.common.model.CameraTargetFps
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -226,7 +227,9 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override val cameraTargetFps: Flow<Int> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { preferences -> preferences[CAMERA_TARGET_FPS] ?: 60 }
+        // DEVICE_DEFAULT: let ARCore select its own camera config instead of the app pinning a rate.
+        // 30/60 are opt-in power-saving caps in Settings, not the default.
+        .map { preferences -> preferences[CAMERA_TARGET_FPS] ?: CameraTargetFps.DEVICE_DEFAULT }
 
     override suspend fun setCameraTargetFps(fps: Int) {
         context.dataStore.edit { preferences ->

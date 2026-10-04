@@ -10,6 +10,8 @@ import androidx.camera.core.ImageProxy
 import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsics
 import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsicsEstimator
 import com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation
+import com.hereliesaz.graffitixr.feature.ar.anchor.MetricMarks
+import com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion
 import com.hereliesaz.graffitixr.feature.ar.rendering.ProjectionMatrix
 import com.hereliesaz.graffitixr.feature.ar.util.RotationDeltaMath
 import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintFrame
@@ -168,6 +170,15 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private var lastGood: SphereSlamStandaloneFrame? = null
     private var lastMetricsDiagnosticMs = Long.MIN_VALUE
     private var staleObservationReported = false
+
+    // Temporal low-pass for the emitted render pose (damps per-frame KPM jitter; see
+    // StandalonePoseStabilizer). Reset wherever lastGood is cleared so it never blends across a
+    // session rebuild or a tracking-loss discontinuity.
+    private val poseStabilizer = StandalonePoseStabilizer()
+
+    // Sequence of the last MobileGS reloc result consumed by fuseWithReloc, so a given relocalization
+    // is evaluated once. 0 = none seen (the native no-result sentinel).
+    private var lastRelocSeq = 0f
     private var frameBuffer: ByteBuffer? = null
     private val runtimeAtlasPages = linkedMapOf<Int, SphereSlamStandaloneAtlasReferenceImage>().apply {
         atlasReferenceImages.sortedBy { it.pageNo }.forEach { page ->
@@ -354,8 +365,13 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                     pose = pose,
                     intrinsics = intrinsics,
                 )
+                // Render pose = raw KPM pulled toward the MobileGS reloc estimate when that estimate
+                // corroborates it (drift correction), then temporally smoothed (jitter). The RAW KPM
+                // pose still drives gating (lastAcceptedVisualView, above), the atlas (maybeGrowAtlas)
+                // and what is fed to MobileGS (feedMobileGsFrame) — only the displayed pose is fused.
+                val renderView = poseStabilizer.stabilize(fuseWithReloc(pose.viewMatrix))
                 val tracked = SphereSlamStandaloneFrame(
-                    viewMatrix = pose.viewMatrix,
+                    viewMatrix = renderView,
                     projMatrix = projection,
                     frameAspect = rotated.width.toFloat() / rotated.height.toFloat(),
                     frameHeightPixels = rotated.height,
@@ -364,7 +380,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                     reprojectionError = pose.reprojectionError,
                     inlierCount = pose.inlierCount,
                     unitsPerPixel = unitsPerPixel(
-                        pose.viewMatrix,
+                        renderView,
                         projection,
                         rotated.height,
                     ),
@@ -531,6 +547,8 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         existing?.close()
         bridge.clearReference()
         lastGood = null
+        poseStabilizer.reset()
+        lastRelocSeq = 0f
 
         val created = SphereSlamStandaloneSession(
             frameWidth = intrinsics.width,
@@ -840,6 +858,38 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         slam.feedLumaFrame(copy, frame.width, frame.height, timestampNs)
     }
 
+    /**
+     * Pull the raw KPM view toward the MobileGS relocalizer's independent estimate, but ONLY when
+     * that estimate corroborates KPM — i.e. already agrees within [PoseFusion.diverged]'s thresholds.
+     * This is the standalone drift corrector: a wide-baseline reloc that concurs with the drifting
+     * planar KPM pose gently tightens it; a reloc that disagrees (stale during motion, a bad solve,
+     * or — were the fingerprint/canonical-frame assumption ever to break — systematically off) is
+     * ignored. So the loop can reduce accumulated drift but can never yank the overlay to a bad pose,
+     * and it only ever blends, never snaps.
+     *
+     * `reloc[0..15]` is `camera_from_fingerprint` in the CV convention; the standalone fingerprint is
+     * the centered-page (canonical wall) reference, so [MetricMarks.glViewToCv] (its own inverse)
+     * maps it into the GL `camera_from_canonical` frame the KPM view already uses.
+     */
+    private fun fuseWithReloc(kpmView: FloatArray): FloatArray {
+        val slam = slamManager ?: return kpmView
+        val reloc = slam.getRelocResult()
+        if (reloc.size < 19) return kpmView
+        val seq = reloc[18]
+        // Evaluate each relocalization once — accepted or not — mirroring PoseFusion's seq handling.
+        if (seq <= 0f || seq == lastRelocSeq) return kpmView
+        lastRelocSeq = seq
+        val matches = reloc[17]
+        val inliers = reloc[16]
+        val inlierRatio = if (matches > 0f) inliers / matches else 0f
+        if (inlierRatio < PoseFusion.MIN_INLIER_RATIO || inliers < RELOC_MIN_INLIERS) return kpmView
+        val relocViewGl = MetricMarks.glViewToCv(reloc.copyOfRange(0, 16))
+        if (!relocViewGl.all { it.isFinite() } || relocViewGl[15] != 1f) return kpmView
+        // Trust the reloc only when it already corroborates the current KPM pose.
+        if (PoseFusion.diverged(kpmView, relocViewGl)) return kpmView
+        return PoseFusion.blend(kpmView, relocViewGl, RELOC_ALPHA)
+    }
+
     private fun bridgeLastGood(
         projection: FloatArray,
         frame: RotatedLuma,
@@ -849,6 +899,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         val elapsed = bridge.msSinceReference()
         if (elapsed < 0L || elapsed > maxBridgeMs) {
             lastGood = null
+            poseStabilizer.reset()
             return null
         }
         val delta = bridge.cameraRotationDelta() ?: return null
@@ -909,6 +960,8 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         bridge.stop()
         bridge.clearReference()
         lastGood = null
+        poseStabilizer.reset()
+        lastRelocSeq = 0f
         session?.close()
         session = null
         sessionKey = null
@@ -922,6 +975,23 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         staleObservationReported = false
         frameBuffer = null
         runtimeAtlasPages.clear()
+    }
+
+    private companion object {
+        /**
+         * Minimum PnP inliers before a reloc is allowed to correct the pose, on top of the
+         * [PoseFusion.MIN_INLIER_RATIO] ratio gate. A handful of inliers can satisfy a ratio by luck;
+         * this floors the absolute evidence so only a well-supported solve nudges the overlay.
+         */
+        const val RELOC_MIN_INLIERS = 12f
+
+        /**
+         * Blend weight toward a corroborating reloc. Deliberately small: the reloc only ever fires
+         * when it already agrees with KPM, so a gentle pull tightens accumulated drift without a
+         * visible jump, and a slightly-off (but non-diverged) reloc can move the pose by at most this
+         * fraction of an already-small gap.
+         */
+        const val RELOC_ALPHA = 0.15f
     }
 }
 
