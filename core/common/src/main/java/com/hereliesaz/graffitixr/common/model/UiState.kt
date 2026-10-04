@@ -172,10 +172,10 @@ data class ArUiState(
      */
     val arCoreDepthEnabled: Boolean = true,
     /**
-     * Monocular depth (Depth Anything V2 via ONNX Runtime) for the non-ARCore path (default true).
-     * It is the SphereSLAM path's depth source — ARCore supplies its own — so it loads and runs only
-     * when the standalone path is active, forming planes / recovering scale there. Applies on next
-     * AR entry.
+     * Monocular depth (Depth Anything V2 via ONNX Runtime), default true. It is the depth source for
+     * any device that can't get ARCore's Depth API — no ARCore, ARCore turned off, or an ARCore device
+     * whose depth is unsupported/off — forming planes / recovering scale there. It stays dormant when
+     * ARCore depth is actually active, so those devices pay nothing. Applies on next AR entry.
      */
     val monocularDepthEnabled: Boolean = true,
     /**

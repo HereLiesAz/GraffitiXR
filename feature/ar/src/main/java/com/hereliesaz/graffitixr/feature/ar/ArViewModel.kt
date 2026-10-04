@@ -1291,16 +1291,20 @@ class ArViewModel @Inject constructor(
             slamManager.loadSuperPoint(appContext.assets)
             slamManager.loadDistortionHead(appContext.assets) // optional; inert if asset absent
             slamManager.loadLowLightEnhancer(appContext.assets)
-            // Monocular depth is the SphereSLAM path's depth source (on by default), so it loads and
-            // self-tests only when the standalone path will actually be used — ARCore supplies its own
-            // depth, so an ARCore device pays nothing here. The self-test runs one inference on a
-            // synthetic image to confirm the ONNX Runtime int8 model both LOADS and EXECUTES on this
-            // hardware before any camera/fusion wiring (Step 2); results go to the diag overlay.
+            // Monocular depth fills in wherever ARCore's Depth API won't: a device with no ARCore, with
+            // ARCore turned off, or an ARCore device whose depth is off/unsupported (the drift case).
+            // So it loads + self-tests unless ARCore depth will actually be the source, and an ARCore
+            // device that does provide depth pays nothing here. (This setting-level check can't see the
+            // device's isDepthModeSupported, which needs a live session; Step 2's fusion, running in the
+            // AR session, makes the "ARCore depth active" test exact.) The self-test runs one inference
+            // on a synthetic image to confirm the ONNX Runtime int8 model LOADS and EXECUTES on this
+            // hardware before any camera/fusion wiring; results go to the diag overlay.
             if (settingsRepository.monocularDepthEnabled.firstOrNull() != false) {
                 val arCoreOptIn = settingsRepository.arCoreEnabled.firstOrNull() ?: true
-                val arCoreUsable = arCoreOptIn &&
+                val arCoreDepthOptIn = settingsRepository.arCoreDepthEnabled.firstOrNull() ?: true
+                val arCoreDepthActive = arCoreOptIn && arCoreDepthOptIn &&
                     ArAvailabilityChecker.check(appContext) == ArAvailabilityChecker.Result.Supported
-                if (!arCoreUsable) {
+                if (!arCoreDepthActive) {
                     runCatching { selfTestDepth() }
                         .onFailure { Timber.w(it, "depth self-test threw") }
                 }
