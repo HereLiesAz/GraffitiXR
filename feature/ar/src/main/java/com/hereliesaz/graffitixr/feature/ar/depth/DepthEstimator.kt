@@ -162,13 +162,21 @@ class DepthEstimator(private val appContext: Context) : AutoCloseable {
 
     private fun copyAssetIfNeeded(assetName: String, dest: File): Boolean {
         return try {
-            // Re-copy only when size differs (first run, or a model swap on app update).
-            val expected = appContext.assets.openFd(assetName).use { it.length }
-            if (dest.exists() && dest.length() == expected) return true
+            // Copy once; MODEL_DIR carries a version so a model swap lands in a fresh dir. Do NOT use
+            // AssetManager.openFd() to size-check — it throws on a COMPRESSED asset (.onnx is gz-packed
+            // in the APK unless noCompress'd), which previously aborted the whole load. assets.open()
+            // streams through the decompressor regardless. Copy via a temp file + rename so a crash
+            // mid-copy can't leave a truncated model that then fails to parse forever.
+            if (dest.exists() && dest.length() > 0L) return true
+            val tmp = File(dest.parentFile, "${dest.name}.tmp")
             appContext.assets.open(assetName).use { input ->
-                dest.outputStream().use { output -> input.copyTo(output) }
+                tmp.outputStream().use { output -> input.copyTo(output) }
             }
-            true
+            if (!tmp.renameTo(dest)) {
+                tmp.delete()
+                return false
+            }
+            dest.exists() && dest.length() > 0L
         } catch (t: Throwable) {
             Timber.w(t, "DepthEstimator: asset %s unavailable", assetName)
             false
@@ -190,7 +198,7 @@ class DepthEstimator(private val appContext: Context) : AutoCloseable {
     companion object {
         const val INPUT = 518
         const val DEFAULT_OUT_MAX_DIM = 128
-        private const val MODEL_DIR = "depth"
+        private const val MODEL_DIR = "depth-v1"
         private const val GRAPH_ASSET = "model_quantized.onnx"
         private const val DATA_ASSET = "model_quantized.onnx_data"
         private val MEAN = floatArrayOf(0.485f, 0.456f, 0.406f)
