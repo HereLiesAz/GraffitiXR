@@ -54,6 +54,8 @@ class SettingsRepositoryImpl @Inject constructor(
     private val IS_IMPERIAL_UNITS = booleanPreferencesKey("is_imperial_units")
     private val BACKGROUND_COLOR = intPreferencesKey("background_color")
     private val CAMERA_TARGET_FPS = intPreferencesKey("camera_target_fps")
+    private val AR_CORE_ENABLED = booleanPreferencesKey("ar_core_enabled")
+    private val AR_CORE_DEPTH_ENABLED = booleanPreferencesKey("ar_core_depth_enabled")
     private val THROTTLE_ON_THERMAL = booleanPreferencesKey("throttle_on_thermal")
     private val THROTTLE_ON_POWER_SAVE = booleanPreferencesKey("throttle_on_power_save")
     private val THROTTLE_ON_LOW_BATTERY = booleanPreferencesKey("throttle_on_low_battery")
@@ -234,6 +236,32 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setCameraTargetFps(fps: Int) {
         context.dataStore.edit { preferences ->
             preferences[CAMERA_TARGET_FPS] = fps
+        }
+    }
+
+    // Defaults TRUE: use ARCore when the device supports it. Turning it off forces the standalone
+    // (SphereSLAM/KPM) path even on an ARCore-capable device — the same path ARCore-less phones take.
+    override val arCoreEnabled: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[AR_CORE_ENABLED] ?: true }
+
+    override suspend fun setArCoreEnabled(on: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[AR_CORE_ENABLED] = on
+        }
+    }
+
+    // Defaults TRUE: enable ARCore's Depth API (DepthMode.AUTOMATIC) where the device supports it.
+    // AUTOMATIC is ARCore's monocular/ML depth, built for single-camera phones with no depth sensor,
+    // and it is what feeds plane finding and stabilizes the feature cloud. The toggle exists because
+    // on some hardware the ML depth graph can destabilize VIO; disabling it there is the escape hatch.
+    override val arCoreDepthEnabled: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[AR_CORE_DEPTH_ENABLED] ?: true }
+
+    override suspend fun setArCoreDepthEnabled(on: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[AR_CORE_DEPTH_ENABLED] = on
         }
     }
 

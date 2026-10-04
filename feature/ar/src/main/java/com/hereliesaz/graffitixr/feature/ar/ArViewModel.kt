@@ -1266,7 +1266,11 @@ class ArViewModel @Inject constructor(
             // APK — the app's documented fallback ("unsupported devices remain in AR mode and take the
             // CameraX + SphereSLAM standalone path"). A later install isn't auto-detected mid-process,
             // which is acceptable: standalone AR is fully functional without ARCore.
-            val supported = result == ArAvailabilityChecker.Result.Supported
+            // The user can force the standalone path even on an ARCore-capable device (Settings →
+            // "Use ARCore"). Treat an opt-out exactly like unsupported hardware: same fingerprint
+            // cleanup, same standalone routing. Read once here; it applies on the next AR entry.
+            val arCoreOptIn = settingsRepository.arCoreEnabled.firstOrNull() ?: true
+            val supported = result == ArAvailabilityChecker.Result.Supported && arCoreOptIn
             if (!supported) {
                 // The native MobileGS instance is process-global. Project loading may have installed
                 // an ARCore/capture-camera fingerprint while ARCore capability was still UNKNOWN.
@@ -1392,6 +1396,19 @@ class ArViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            // Use-ARCore and ARCore-depth toggles. Mirrored into state for the settings UI and the
+            // session-config selection; both apply on the next AR entry (availability is resolved and
+            // the depth mode is fixed at session creation).
+            settingsRepository.arCoreEnabled.collect { on ->
+                _uiState.update { it.copy(arCoreEnabled = on) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.arCoreDepthEnabled.collect { on ->
+                _uiState.update { it.copy(arCoreDepthEnabled = on) }
+            }
+        }
+        viewModelScope.launch {
             settingsRepository.throttleOnThermal.collect { on ->
                 _uiState.update { it.copy(throttleOnThermal = on) }
                 recomputeSystemThrottle()
@@ -1507,6 +1524,14 @@ class ArViewModel @Inject constructor(
     /** Persist the camera target fps (30/60). Takes effect on the next AR entry. */
     fun setCameraTargetFps(fps: Int) {
         viewModelScope.launch { settingsRepository.setCameraTargetFps(fps) }
+    }
+
+    fun setArCoreEnabled(on: Boolean) {
+        viewModelScope.launch { settingsRepository.setArCoreEnabled(on) }
+    }
+
+    fun setArCoreDepthEnabled(on: Boolean) {
+        viewModelScope.launch { settingsRepository.setArCoreDepthEnabled(on) }
     }
 
     fun setThrottleOnThermal(on: Boolean) {
@@ -1947,13 +1972,15 @@ class ArViewModel @Inject constructor(
             // this, hit-tests only return sparse feature points and the overlay lands short of the wall.
             config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
             
-            // ARCore's ML Depth API (DepthMode.AUTOMATIC) ran a perception graph that errored
-            // continuously and starved VIO into permanent kNotTracking on this hardware (confirmed via
-            // logcat: feature_track_ml_depth_provider + mediapipe normal_detector RET_CHECK). It stays
-            // OFF. Metric depth comes from VIO-baseline triangulation (and hardware stereo where the
-            // device offers it); the wall anchor uses plane detection. Re-enabling requires first
-            // solving the VIO starvation.
-            val useArCoreDepthApi = false
+            // ARCore's Depth API (DepthMode.AUTOMATIC) is monocular/ML depth — built for single-camera
+            // phones with no depth sensor — and it is what feeds plane finding and stabilizes the sparse
+            // feature cloud. On without it, a textured wall at near-zero parallax yields zero planes and
+            // an unconstrained, drifting cloud. It is user-controlled (Settings → "ARCore depth",
+            // default on), still gated by isDepthModeSupported. The off switch remains because on some
+            // hardware the ML depth graph errored continuously and starved VIO into kNotTracking
+            // (logcat: feature_track_ml_depth_provider + mediapipe normal_detector RET_CHECK); disabling
+            // it there keeps tracking alive at the cost of plane/depth.
+            val useArCoreDepthApi = _uiState.value.arCoreDepthEnabled
             if (useArCoreDepthApi && s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                 config.depthMode = Config.DepthMode.AUTOMATIC
                 _uiState.update { it.copy(isDepthApiSupported = true) }

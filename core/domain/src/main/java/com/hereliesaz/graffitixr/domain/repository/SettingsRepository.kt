@@ -166,6 +166,14 @@ interface SettingsRepository {
     val cameraTargetFps: Flow<Int>
     suspend fun setCameraTargetFps(fps: Int)
 
+    /** Use ARCore when available. Default on; off forces the standalone SphereSLAM/KPM path. */
+    val arCoreEnabled: Flow<Boolean>
+    suspend fun setArCoreEnabled(on: Boolean)
+
+    /** Enable ARCore's Depth API (DepthMode.AUTOMATIC) where supported. Default on. */
+    val arCoreDepthEnabled: Flow<Boolean>
+    suspend fun setArCoreDepthEnabled(on: Boolean)
+
     /** Perception-throttle triggers: each, when on, drops perception to 30fps while active. Default on. */
     val throttleOnThermal: Flow<Boolean>
     suspend fun setThrottleOnThermal(on: Boolean)

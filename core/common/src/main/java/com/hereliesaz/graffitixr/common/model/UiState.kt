@@ -159,6 +159,19 @@ data class ArUiState(
      */
     val cameraTargetFps: Int = CameraTargetFps.DEVICE_DEFAULT,
     /**
+     * Use ARCore when the device supports it (default true). When false, the AR session runs the
+     * standalone SphereSLAM/KPM path even on an ARCore-capable device — the same path ARCore-less
+     * phones use. Gates [isArCoreAvailable] at session build; applies on next AR entry.
+     */
+    val arCoreEnabled: Boolean = true,
+    /**
+     * Enable ARCore's Depth API (DepthMode.AUTOMATIC) where the device supports it (default true).
+     * AUTOMATIC is ARCore's monocular/ML depth — built for single-camera phones with no depth
+     * sensor — and it feeds plane finding and stabilizes the sparse feature cloud. Applies on next
+     * AR entry; off is the escape hatch for hardware whose ML depth graph destabilizes VIO.
+     */
+    val arCoreDepthEnabled: Boolean = true,
+    /**
      * Perception-throttle triggers. When enabled and active, each drops the world-locked perception
      * redraw rate from 60 to 30 fps to save power; camera + overlay + gestures stay full-rate.
      */

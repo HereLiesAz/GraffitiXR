@@ -89,6 +89,10 @@ fun SettingsScreen(
     onPointsChanged: () -> Unit,
     cameraTargetFps: Int,
     onCameraTargetFpsChanged: (Int) -> Unit,
+    arCoreEnabled: Boolean,
+    onArCoreEnabledChanged: (Boolean) -> Unit,
+    arCoreDepthEnabled: Boolean,
+    onArCoreDepthEnabledChanged: (Boolean) -> Unit,
     throttleOnThermal: Boolean,
     onThrottleOnThermalChanged: (Boolean) -> Unit,
     throttleOnPowerSave: Boolean,
@@ -346,6 +350,21 @@ fun SettingsScreen(
                                             .next(cameraTargetFps),
                                     )
                                 }
+                            )
+                            // Use ARCore when the device supports it (default on). Off forces the
+                            // standalone SphereSLAM/KPM path even on an ARCore-capable device. ARCore
+                            // depth is AUTOMATIC (monocular/ML) depth, which feeds plane finding and
+                            // stabilizes the feature cloud; off is the escape hatch for hardware whose
+                            // ML depth graph destabilizes VIO. Both apply on the next AR entry.
+                            SettingsItem(
+                                label = "Use ARCore",
+                                value = if (arCoreEnabled) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable { onArCoreEnabledChanged(!arCoreEnabled) }
+                            )
+                            SettingsItem(
+                                label = "ARCore depth",
+                                value = if (arCoreDepthEnabled) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable { onArCoreDepthEnabledChanged(!arCoreDepthEnabled) }
                             )
                             // Perception throttle triggers: each drops perception 60→30 fps to save
                             // power while active. Default on. Lower = laggier perception but less drain.
