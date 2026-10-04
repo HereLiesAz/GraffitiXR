@@ -902,6 +902,48 @@ class ArViewModel @Inject constructor(
         appendDiag("focus: ${if (auto) "AUTO (acquiring)" else "FIXED (locked on anchor)"}")
     }
 
+    // Monocular depth (Depth Anything V2, ONNX Runtime). Created lazily; only touched when the beta
+    // toggle is on. Step 1 just proves it loads+runs on-device (selfTestDepth); Step 2 will feed live
+    // frames into the standalone plane/scale path.
+    private val depthEstimatorLazy = lazy {
+        com.hereliesaz.graffitixr.feature.ar.depth.DepthEstimator(appContext)
+    }
+    private val depthEstimator get() = depthEstimatorLazy.value
+
+    /** One synthetic-image inference to confirm the depth model loads AND executes on this device. */
+    private fun selfTestDepth() {
+        if (!depthEstimator.load()) {
+            appendDiag("depth: model unavailable (load failed)")
+            return
+        }
+        val n = 64
+        val probe = android.graphics.Bitmap.createBitmap(n, n, android.graphics.Bitmap.Config.ARGB_8888)
+        for (y in 0 until n) for (x in 0 until n) {
+            val v = ((x + y) * 2).coerceAtMost(255)
+            probe.setPixel(x, y, android.graphics.Color.rgb(v, v, v))
+        }
+        val t0 = android.os.SystemClock.elapsedRealtime()
+        val map = depthEstimator.estimate(probe)
+        probe.recycle()
+        if (map == null) {
+            appendDiag("depth: inference failed")
+            return
+        }
+        var mn = Float.MAX_VALUE
+        var mx = -Float.MAX_VALUE
+        var sum = 0.0
+        for (v in map.data) {
+            if (v < mn) mn = v
+            if (v > mx) mx = v
+            sum += v
+        }
+        val ms = android.os.SystemClock.elapsedRealtime() - t0
+        appendDiag(
+            "depth self-test: ${map.width}x${map.height} min=%.3f max=%.3f mean=%.3f %dms"
+                .format(mn, mx, sum / map.data.size, ms),
+        )
+    }
+
     /**
      * A/B switch for the camera focus mode, applied to the LIVE session so the two can be compared
      * on the same wall without re-entering AR.
@@ -1249,6 +1291,24 @@ class ArViewModel @Inject constructor(
             slamManager.loadSuperPoint(appContext.assets)
             slamManager.loadDistortionHead(appContext.assets) // optional; inert if asset absent
             slamManager.loadLowLightEnhancer(appContext.assets)
+            // Monocular depth fills in wherever ARCore's Depth API won't: a device with no ARCore, with
+            // ARCore turned off, or an ARCore device whose depth is off/unsupported (the drift case).
+            // So it loads + self-tests unless ARCore depth will actually be the source, and an ARCore
+            // device that does provide depth pays nothing here. (This setting-level check can't see the
+            // device's isDepthModeSupported, which needs a live session; Step 2's fusion, running in the
+            // AR session, makes the "ARCore depth active" test exact.) The self-test runs one inference
+            // on a synthetic image to confirm the ONNX Runtime int8 model LOADS and EXECUTES on this
+            // hardware before any camera/fusion wiring; results go to the diag overlay.
+            if (settingsRepository.monocularDepthEnabled.firstOrNull() != false) {
+                val arCoreOptIn = settingsRepository.arCoreEnabled.firstOrNull() ?: true
+                val arCoreDepthOptIn = settingsRepository.arCoreDepthEnabled.firstOrNull() ?: true
+                val arCoreDepthActive = arCoreOptIn && arCoreDepthOptIn &&
+                    ArAvailabilityChecker.check(appContext) == ArAvailabilityChecker.Result.Supported
+                if (!arCoreDepthActive) {
+                    runCatching { selfTestDepth() }
+                        .onFailure { Timber.w(it, "depth self-test threw") }
+                }
+            }
         }
         viewModelScope.launch {
             // Resolve ARCore availability up front. With com.google.ar.core
@@ -1266,7 +1326,11 @@ class ArViewModel @Inject constructor(
             // APK — the app's documented fallback ("unsupported devices remain in AR mode and take the
             // CameraX + SphereSLAM standalone path"). A later install isn't auto-detected mid-process,
             // which is acceptable: standalone AR is fully functional without ARCore.
-            val supported = result == ArAvailabilityChecker.Result.Supported
+            // The user can force the standalone path even on an ARCore-capable device (Settings →
+            // "Use ARCore"). Treat an opt-out exactly like unsupported hardware: same fingerprint
+            // cleanup, same standalone routing. Read once here; it applies on the next AR entry.
+            val arCoreOptIn = settingsRepository.arCoreEnabled.firstOrNull() ?: true
+            val supported = result == ArAvailabilityChecker.Result.Supported && arCoreOptIn
             if (!supported) {
                 // The native MobileGS instance is process-global. Project loading may have installed
                 // an ARCore/capture-camera fingerprint while ARCore capability was still UNKNOWN.
@@ -1392,6 +1456,24 @@ class ArViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            // Use-ARCore and ARCore-depth toggles. Mirrored into state for the settings UI and the
+            // session-config selection; both apply on the next AR entry (availability is resolved and
+            // the depth mode is fixed at session creation).
+            settingsRepository.arCoreEnabled.collect { on ->
+                _uiState.update { it.copy(arCoreEnabled = on) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.arCoreDepthEnabled.collect { on ->
+                _uiState.update { it.copy(arCoreDepthEnabled = on) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.monocularDepthEnabled.collect { on ->
+                _uiState.update { it.copy(monocularDepthEnabled = on) }
+            }
+        }
+        viewModelScope.launch {
             settingsRepository.throttleOnThermal.collect { on ->
                 _uiState.update { it.copy(throttleOnThermal = on) }
                 recomputeSystemThrottle()
@@ -1507,6 +1589,18 @@ class ArViewModel @Inject constructor(
     /** Persist the camera target fps (30/60). Takes effect on the next AR entry. */
     fun setCameraTargetFps(fps: Int) {
         viewModelScope.launch { settingsRepository.setCameraTargetFps(fps) }
+    }
+
+    fun setArCoreEnabled(on: Boolean) {
+        viewModelScope.launch { settingsRepository.setArCoreEnabled(on) }
+    }
+
+    fun setArCoreDepthEnabled(on: Boolean) {
+        viewModelScope.launch { settingsRepository.setArCoreDepthEnabled(on) }
+    }
+
+    fun setMonocularDepthEnabled(on: Boolean) {
+        viewModelScope.launch { settingsRepository.setMonocularDepthEnabled(on) }
     }
 
     fun setThrottleOnThermal(on: Boolean) {
@@ -1947,13 +2041,15 @@ class ArViewModel @Inject constructor(
             // this, hit-tests only return sparse feature points and the overlay lands short of the wall.
             config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
             
-            // ARCore's ML Depth API (DepthMode.AUTOMATIC) ran a perception graph that errored
-            // continuously and starved VIO into permanent kNotTracking on this hardware (confirmed via
-            // logcat: feature_track_ml_depth_provider + mediapipe normal_detector RET_CHECK). It stays
-            // OFF. Metric depth comes from VIO-baseline triangulation (and hardware stereo where the
-            // device offers it); the wall anchor uses plane detection. Re-enabling requires first
-            // solving the VIO starvation.
-            val useArCoreDepthApi = false
+            // ARCore's Depth API (DepthMode.AUTOMATIC) is monocular/ML depth — built for single-camera
+            // phones with no depth sensor — and it is what feeds plane finding and stabilizes the sparse
+            // feature cloud. On without it, a textured wall at near-zero parallax yields zero planes and
+            // an unconstrained, drifting cloud. It is user-controlled (Settings → "ARCore depth",
+            // default on), still gated by isDepthModeSupported. The off switch remains because on some
+            // hardware the ML depth graph errored continuously and starved VIO into kNotTracking
+            // (logcat: feature_track_ml_depth_provider + mediapipe normal_detector RET_CHECK); disabling
+            // it there keeps tracking alive at the cost of plane/depth.
+            val useArCoreDepthApi = _uiState.value.arCoreDepthEnabled
             if (useArCoreDepthApi && s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                 config.depthMode = Config.DepthMode.AUTOMATIC
                 _uiState.update { it.copy(isDepthApiSupported = true) }
@@ -4614,6 +4710,7 @@ class ArViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         stopSystemThrottleMonitoring()
+        if (depthEstimatorLazy.isInitialized()) depthEstimatorLazy.value.close()
         // viewModelScope is already cancelled by the time onCleared runs, so leaveSession()'s
         // viewModelScope.launch would never execute and the collaboration session would leak.
         // Cancel the local collector synchronously and tear the session down on the manager's

@@ -25,6 +25,7 @@ lifecycle = "2.11.0"
 litert = "2.2.0"
 mlkitSubjectSegmentation = "16.0.0-beta1" # ACCEPTED RISK: no stable release as of 2026-04-02
 navigation = "2.10.2"
+onnxruntime = "1.20.0"
 opencv = "5.0.0.1"
 playServicesBase = "18.10.1"
 playServicesLocation = "21.4.0"
@@ -101,6 +102,7 @@ litert = { module = "com.google.ai.edge.litert:litert", version.ref = "litert" }
 mlkit-subject-segmentation = { group = "com.google.android.gms", name = "play-services-mlkit-subject-segmentation", version.ref = "mlkitSubjectSegmentation" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
+onnxruntime-android = { group = "com.microsoft.onnxruntime", name = "onnxruntime-android", version.ref = "onnxruntime" }
 opencv = { group = "org.opencv", name = "opencv", version.ref = "opencv" }
 play-services-base = { group = "com.google.android.gms", name = "play-services-base", version.ref = "playServicesBase" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }

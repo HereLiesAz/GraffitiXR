@@ -89,6 +89,12 @@ fun SettingsScreen(
     onPointsChanged: () -> Unit,
     cameraTargetFps: Int,
     onCameraTargetFpsChanged: (Int) -> Unit,
+    arCoreEnabled: Boolean,
+    onArCoreEnabledChanged: (Boolean) -> Unit,
+    arCoreDepthEnabled: Boolean,
+    onArCoreDepthEnabledChanged: (Boolean) -> Unit,
+    monocularDepthEnabled: Boolean,
+    onMonocularDepthEnabledChanged: (Boolean) -> Unit,
     throttleOnThermal: Boolean,
     onThrottleOnThermalChanged: (Boolean) -> Unit,
     throttleOnPowerSave: Boolean,
@@ -346,6 +352,30 @@ fun SettingsScreen(
                                             .next(cameraTargetFps),
                                     )
                                 }
+                            )
+                            // Use ARCore when the device supports it (default on). Off forces the
+                            // standalone SphereSLAM/KPM path even on an ARCore-capable device. ARCore
+                            // depth is AUTOMATIC (monocular/ML) depth, which feeds plane finding and
+                            // stabilizes the feature cloud; off is the escape hatch for hardware whose
+                            // ML depth graph destabilizes VIO. Both apply on the next AR entry.
+                            SettingsItem(
+                                label = "Use ARCore",
+                                value = if (arCoreEnabled) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable { onArCoreEnabledChanged(!arCoreEnabled) }
+                            )
+                            SettingsItem(
+                                label = "ARCore depth",
+                                value = if (arCoreDepthEnabled) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable { onArCoreDepthEnabledChanged(!arCoreDepthEnabled) }
+                            )
+                            // Monocular depth (Depth Anything V2) — depth source for any device that
+                            // can't get ARCore's Depth API (no ARCore, ARCore off, or ARCore depth off);
+                            // default on, dormant when ARCore depth is active. Beta: Step 1 runs a
+                            // self-test on next AR entry whose result shows in the diag overlay.
+                            SettingsItem(
+                                label = "Monocular depth (beta)",
+                                value = if (monocularDepthEnabled) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable { onMonocularDepthEnabledChanged(!monocularDepthEnabled) }
                             )
                             // Perception throttle triggers: each drops perception 60→30 fps to save
                             // power while active. Default on. Lower = laggier perception but less drain.
