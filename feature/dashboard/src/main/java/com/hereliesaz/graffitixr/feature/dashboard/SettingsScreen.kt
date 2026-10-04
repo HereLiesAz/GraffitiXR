@@ -368,8 +368,9 @@ fun SettingsScreen(
                                 value = if (arCoreDepthEnabled) strings.settings.on else strings.settings.off,
                                 modifier = Modifier.clickable { onArCoreDepthEnabledChanged(!arCoreDepthEnabled) }
                             )
-                            // Monocular depth (Depth Anything V2) for the non-ARCore path. Beta, default
-                            // off; adds a self-test on next AR entry whose result shows in the diag overlay.
+                            // Monocular depth (Depth Anything V2) — the SphereSLAM path's depth source,
+                            // default on; loads/runs only on the non-ARCore path. Beta: Step 1 runs a
+                            // self-test on next AR entry whose result shows in the diag overlay.
                             SettingsItem(
                                 label = "Monocular depth (beta)",
                                 value = if (monocularDepthEnabled) strings.settings.on else strings.settings.off,

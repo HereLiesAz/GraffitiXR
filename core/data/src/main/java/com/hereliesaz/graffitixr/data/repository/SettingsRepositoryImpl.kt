@@ -266,11 +266,12 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
-    // Defaults FALSE: monocular depth (Depth Anything V2, ONNX Runtime) is beta and unproven on-device,
-    // so it has zero impact until the artist opts in on the non-ARCore path.
+    // Defaults TRUE: monocular depth (Depth Anything V2, ONNX Runtime) is the SphereSLAM path's depth
+    // source, so it is on by default — but it only loads and runs when the standalone path is active
+    // (ARCore supplies its own depth), so ARCore devices pay nothing for it.
     override val monocularDepthEnabled: Flow<Boolean> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { preferences -> preferences[MONOCULAR_DEPTH_ENABLED] ?: false }
+        .map { preferences -> preferences[MONOCULAR_DEPTH_ENABLED] ?: true }
 
     override suspend fun setMonocularDepthEnabled(on: Boolean) {
         context.dataStore.edit { preferences ->

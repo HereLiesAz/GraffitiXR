@@ -172,11 +172,12 @@ data class ArUiState(
      */
     val arCoreDepthEnabled: Boolean = true,
     /**
-     * Monocular depth (Depth Anything V2 via ONNX Runtime) for the non-ARCore path (default false,
-     * beta). When on, the AR session loads the depth model and will use it to form planes / recover
-     * scale where ARCore isn't providing depth. Applies on next AR entry.
+     * Monocular depth (Depth Anything V2 via ONNX Runtime) for the non-ARCore path (default true).
+     * It is the SphereSLAM path's depth source — ARCore supplies its own — so it loads and runs only
+     * when the standalone path is active, forming planes / recovering scale there. Applies on next
+     * AR entry.
      */
-    val monocularDepthEnabled: Boolean = false,
+    val monocularDepthEnabled: Boolean = true,
     /**
      * Perception-throttle triggers. When enabled and active, each drops the world-locked perception
      * redraw rate from 60 to 30 fps to save power; camera + overlay + gestures stay full-rate.

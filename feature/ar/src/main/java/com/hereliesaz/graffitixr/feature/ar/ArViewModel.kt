@@ -1291,13 +1291,19 @@ class ArViewModel @Inject constructor(
             slamManager.loadSuperPoint(appContext.assets)
             slamManager.loadDistortionHead(appContext.assets) // optional; inert if asset absent
             slamManager.loadLowLightEnhancer(appContext.assets)
-            // Monocular depth (beta, non-ARCore path): load + self-test only when the artist has
-            // opted in, so it costs nothing otherwise. The self-test runs one inference on a synthetic
-            // image to confirm the ONNX Runtime int8 model both LOADS and EXECUTES on this hardware
-            // before any camera/fusion wiring (Step 2); results go to the diag overlay.
-            if (settingsRepository.monocularDepthEnabled.firstOrNull() == true) {
-                runCatching { selfTestDepth() }
-                    .onFailure { Timber.w(it, "depth self-test threw") }
+            // Monocular depth is the SphereSLAM path's depth source (on by default), so it loads and
+            // self-tests only when the standalone path will actually be used — ARCore supplies its own
+            // depth, so an ARCore device pays nothing here. The self-test runs one inference on a
+            // synthetic image to confirm the ONNX Runtime int8 model both LOADS and EXECUTES on this
+            // hardware before any camera/fusion wiring (Step 2); results go to the diag overlay.
+            if (settingsRepository.monocularDepthEnabled.firstOrNull() != false) {
+                val arCoreOptIn = settingsRepository.arCoreEnabled.firstOrNull() ?: true
+                val arCoreUsable = arCoreOptIn &&
+                    ArAvailabilityChecker.check(appContext) == ArAvailabilityChecker.Result.Supported
+                if (!arCoreUsable) {
+                    runCatching { selfTestDepth() }
+                        .onFailure { Timber.w(it, "depth self-test threw") }
+                }
             }
         }
         viewModelScope.launch {
