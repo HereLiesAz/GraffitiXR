@@ -82,6 +82,17 @@ public:
     // Phase 3: passively grow the feature map from reloc-locked frames. Default OFF, and independent of
     // the match flag (accumulate without matching, or match a persisted map without growing).
     void setMapBuildEnabled(bool e) { mMapBuildEnabled.store(e, std::memory_order_relaxed); }
+
+    // Sphere map Phase 2 (docs/SPHERESLAM_SPHERE_MAP.md): MiDaS depth → radial map-point placement.
+    //
+    // Stash the latest per-keyframe monocular depth map (MiDaS inverse depth, larger = nearer),
+    // downscaled to w*h and corresponding to a frameW*frameH camera frame. Thread-safe; a copy is
+    // taken. Passing data==nullptr (or an empty map) clears it, restoring pure wall-plane placement.
+    void setLatestDepthMap(const float* data, int w, int h, int frameW, int frameH);
+    // Gate depth-calibrated radial placement in growMapFromReloc. Default OFF — with it off, or with no
+    // stashed depth, the map builds exactly as before (wall-plane back-projection only), so the classic
+    // planar path is byte-for-byte unchanged. Standalone + feature-map flag opts in.
+    void setDepthPlacementEnabled(bool e) { mDepthPlacementEnabled.store(e, std::memory_order_relaxed); }
     /**
      * Why the last relocalization attempt failed to publish a pose. Ordered by how early the gate
      * sits in the pipeline, so the largest value reached is the furthest the attempt got.
@@ -729,6 +740,13 @@ private:
     // correspondences into PnP. Default OFF so the map has zero effect on reloc until device-validated.
     std::atomic<bool> mMapRelocEnabled{false};
     std::atomic<bool> mMapBuildEnabled{false};
+
+    // Sphere map Phase 2: latest MiDaS depth (inverse depth, larger = nearer), guarded by mMutex.
+    // mDepthFrame{W,H} are the camera-frame dims the map was downscaled from, so growMapFromReloc can
+    // map a keypoint pixel into mDepth. Empty = no depth stashed (pure wall-plane placement).
+    std::vector<float> mDepth;
+    int mDepthW = 0, mDepthH = 0, mDepthFrameW = 0, mDepthFrameH = 0;
+    std::atomic<bool> mDepthPlacementEnabled{false};
 
     float mAnchorMatrix[16];
 
