@@ -172,12 +172,13 @@ data class ArUiState(
      */
     val arCoreDepthEnabled: Boolean = true,
     /**
-     * Monocular depth (MiDaS Small via ONNX Runtime), default true. It is the depth source for
-     * any device that can't get ARCore's Depth API — no ARCore, ARCore turned off, or an ARCore device
-     * whose depth is unsupported/off — forming planes / recovering scale there. It stays dormant when
-     * ARCore depth is actually active, so those devices pay nothing. Applies on next AR entry.
+     * Monocular depth (MiDaS Small via ONNX Runtime), default FALSE (opt-in). It is the depth source
+     * for a device that can't get ARCore's Depth API — no ARCore, ARCore off, or ARCore depth
+     * unsupported/off — forming planes / recovering scale there. Default-off until an ONNX Runtime
+     * native abort in OrtSession.createSession (which crashed some devices on launch) is root-caused;
+     * enable it in Settings. Applies on next AR entry.
      */
-    val monocularDepthEnabled: Boolean = true,
+    val monocularDepthEnabled: Boolean = false,
     /**
      * Perception-throttle triggers. When enabled and active, each drops the world-locked perception
      * redraw rate from 60 to 30 fps to save power; camera + overlay + gestures stay full-rate.
