@@ -66,7 +66,7 @@ dependencies {
     // Native Engine (MobileGS)
     implementation(project(":core:nativebridge"))
     // Side-by-side non-ARCore tracker. ARCore remains a separate first-class pose source.
-    implementation("com.github.HereLiesAz.SphereSLAM:sphereslam:v0.1.0") // decoupled: published KPM API
+    implementation("com.github.HereLiesAz.SphereSLAM:sphereslam:v0.1.1") // decoupled: published KPM API
     implementation(project(":android_collaboration_module"))
 
     // Compose
