@@ -189,6 +189,13 @@ data class GraffitiProject(
     val sphereSlamWallFeatureMapFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
 
     /**
+     * Per-keyframe device orientation samples recorded during standalone tracking — the angular glue
+     * for the planned spherical-coverage map (`docs/SPHERESLAM_SPHERE_MAP.md`, Phase 1). Storage only:
+     * nothing consumes it for relocalization yet. Null for every project that predates the feature.
+     */
+    val sphereSlamKeyframeOrientations: KeyframeOrientations? = null,
+
+    /**
      * Additional KPM pages beyond canonical page 0. Every transform targets page 0's exact centered
      * wall frame; changing page 0 invalidates this entire list.
      */
