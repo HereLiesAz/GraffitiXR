@@ -266,7 +266,7 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
-    // Defaults TRUE: monocular depth (Depth Anything V2, ONNX Runtime) is the depth source for any
+    // Defaults TRUE: monocular depth (MiDaS Small, ONNX Runtime) is the depth source for any
     // device that can't get ARCore's Depth API (no ARCore, ARCore off, or ARCore depth unsupported/off),
     // so it is on by default — but it loads/runs only when ARCore depth isn't active, so a device whose
     // ARCore depth works pays nothing for it.
