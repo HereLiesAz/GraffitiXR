@@ -1081,12 +1081,12 @@ JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetMapRelocCounts(JNIEnv* env, jobject, jintArray out) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (out == nullptr || env->GetArrayLength(out) < 2) return;
-    jint vals[2] = {-1, -1};
+    jint counts[2] = {-1, -1};
     if (gSlamEngine) {
-        vals[0] = gSlamEngine->lastRelocMapVisible();
-        vals[1] = gSlamEngine->lastRelocMapCorr();
+        counts[0] = gSlamEngine->lastRelocMapVisible();
+        counts[1] = gSlamEngine->lastRelocMapCorr();
     }
-    env->SetIntArrayRegion(out, 0, 2, vals);
+    env->SetIntArrayRegion(out, 0, 2, counts);
 }
 
 JNIEXPORT void JNICALL

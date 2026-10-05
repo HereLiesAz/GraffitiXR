@@ -1,5 +1,19 @@
 #!/usr/bin/env python3
-"""Verify that a built APK actually contains the embedded SphereSLAM/KPM runtime."""
+"""Verify that a built APK actually contains the real (non-stub) SphereSLAM/KPM runtime.
+
+Post-decouple the KPM tracker ships in the published SphereSLAM artifact as `libsphereslam.so`
+(from its :core:nativebridge module), merged into the APK alongside the Kotlin API classes. This
+guard fails the release if:
+
+ - `libsphereslam.so` is missing for either supported ABI, or
+ - it is present but the KPM JNI entry points are absent, or
+ - it is the artoolkitX-less *stub* (built when the submodule is not checked out), which exports the
+   same symbols but whose `nativeKpmAvailable` always returns false — i.e. non-functional AR.
+
+The stub is caught two ways: its self-identifying marker string must be absent, and a real
+artoolkitX KPM internal symbol must be present. The dex check confirms R8 preserved the public API
+and native bridge classes the app calls into (kept by the artifact's own consumer ProGuard rules).
+"""
 
 from __future__ import annotations
 
@@ -10,16 +24,21 @@ import zipfile
 from pathlib import Path
 
 EXPECTED_ABIS = ("arm64-v8a", "armeabi-v7a")
+NATIVE_LIB = "libsphereslam.so"
 JNI_SYMBOLS = (
-    b"Java_com_hereliesaz_graffitixr_nativebridge_KpmBridge_nativeKpmAvailable",
-    b"Java_com_hereliesaz_graffitixr_nativebridge_KpmBridge_nativeCreateCalibratedSession",
-    b"Java_com_hereliesaz_graffitixr_nativebridge_KpmBridge_nativeAddPlanarPage",
-    b"Java_com_hereliesaz_graffitixr_nativebridge_KpmBridge_nativeMatchPlanar",
-    b"Java_com_hereliesaz_graffitixr_nativebridge_KpmBridge_nativeDestroySession",
+    b"Java_com_hereliesaz_sphereslam_nativebridge_KpmBridge_nativeKpmAvailable",
+    b"Java_com_hereliesaz_sphereslam_nativebridge_KpmBridge_nativeCreateCalibratedSession",
+    b"Java_com_hereliesaz_sphereslam_nativebridge_KpmBridge_nativeAddPlanarPage",
+    b"Java_com_hereliesaz_sphereslam_nativebridge_KpmBridge_nativeMatchPlanar",
+    b"Java_com_hereliesaz_sphereslam_nativebridge_KpmBridge_nativeDestroySession",
 )
+# The stub libsphereslam.so self-identifies with this message (see SphereSLAM KpmBridge.cpp's
+# !HAVE_ARX_KPM branch). A real build links artoolkitX and exports its KPM C API instead.
+STUB_MARKER = b"built without HAVE_ARX_KPM"
+REAL_KPM_SYMBOL = b"kpmCreateHandle"
 DEX_MARKERS = (
-    b"Lcom/hereliesaz/graffitixr/nativebridge/KpmBridge;",
-    b"Lcom/hereliesaz/sphereslam/SphereSlamStandaloneSession;",
+    b"Lcom/hereliesaz/sphereslam/nativebridge/KpmBridge;",
+    b"Lcom/hereliesaz/sphereslam/SphereSlamTracker;",
 )
 
 
@@ -43,9 +62,9 @@ def main() -> None:
     with zipfile.ZipFile(apk) as archive:
         names = set(archive.namelist())
         for abi in EXPECTED_ABIS:
-            lib_name = f"lib/{abi}/libgraffitixr.so"
+            lib_name = f"lib/{abi}/{NATIVE_LIB}"
             if lib_name not in names:
-                errors.append(f"{apk}: missing {lib_name}")
+                errors.append(f"{apk}: missing {lib_name} (SphereSLAM KPM artifact not packaged)")
                 continue
             payload = archive.read(lib_name)
             for symbol in JNI_SYMBOLS:
@@ -54,6 +73,16 @@ def main() -> None:
                         f"{apk}: {lib_name} missing exported KPM JNI symbol "
                         f"{symbol.decode('ascii')}"
                     )
+            if STUB_MARKER in payload:
+                errors.append(
+                    f"{apk}: {lib_name} is the artoolkitX-less KPM stub "
+                    "(tracking disabled); the published SphereSLAM build did not compile KPM."
+                )
+            if REAL_KPM_SYMBOL not in payload:
+                errors.append(
+                    f"{apk}: {lib_name} lacks artoolkitX KPM internals "
+                    f"({REAL_KPM_SYMBOL.decode('ascii')}); not a real tracker build."
+                )
 
         dex_names = sorted(
             name for name in names if name.startswith("classes") and name.endswith(".dex")
@@ -77,7 +106,8 @@ def main() -> None:
 
     print(
         f"SphereSLAM APK packaging OK ({args.variant}): {apk}; "
-        f"ABIs={','.join(EXPECTED_ABIS)}, KPM JNI symbols and preserved classes present."
+        f"ABIs={','.join(EXPECTED_ABIS)}, real (non-stub) KPM native, JNI symbols and "
+        "preserved API classes present."
     )
 
 

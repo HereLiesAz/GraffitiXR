@@ -81,11 +81,12 @@ else:
         )
 
 # 2. Standalone classes and the non-ARCore MainScreen branch may not touch ARCore Session.
+# SphereSlamStandaloneSession now lives in the published SphereSLAM artifact, so its
+# ARCore-independence is enforced in that library's own CI rather than from a source path here.
 standalone_paths = [
     "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/SphereSlamStandaloneOverlay.kt",
     "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/SphereSlamStandaloneTrackingAnalyzer.kt",
     "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/CoopPeerFingerprintAnalyzer.kt",
-    "sphereslam/src/main/java/com/hereliesaz/sphereslam/SphereSlamStandaloneSession.kt",
 ]
 for path in standalone_paths:
     text = read(path)
