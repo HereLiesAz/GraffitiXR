@@ -812,6 +812,17 @@ std::vector<uint8_t> MobileGS::exportWallFeatureMap() const {
     return out;
 }
 
+void MobileGS::setLatestDepthMap(const float* data, int w, int h, int frameW, int frameH) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (!data || w <= 0 || h <= 0 || frameW <= 0 || frameH <= 0) {
+        mDepth.clear();
+        mDepthW = mDepthH = mDepthFrameW = mDepthFrameH = 0;
+        return;
+    }
+    mDepth.assign(data, data + (size_t)w * h);
+    mDepthW = w; mDepthH = h; mDepthFrameW = frameW; mDepthFrameH = frameH;
+}
+
 void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv::KeyPoint>& kps,
                                 const cv::Mat& descs, double fx, double fy, double cx, double cy) {
     if (descs.empty() || kps.empty() || (int)kps.size() != descs.rows) return;
@@ -897,6 +908,54 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
     glm::mat4 fpFromCam = glm::inverse(camFromFp);
     glm::vec3 camCenter(fpFromCam[3][0], fpFromCam[3][1], fpFromCam[3][2]);
     glm::mat3 R = glm::mat3(fpFromCam);
+
+    // Camera-axis depth of a feature whose plane intersection is at parameter t is exactly t: the
+    // camera-frame ray is (u',v',1), so P_cam = t*(u',v',1) and its z (axial depth) is t. The wall
+    // distance of this keyframe anchors the depth-sanity window below.
+    const float wallZ = glm::length(cc - camCenter);
+
+    // Sphere map Phase 2: calibrate MiDaS to this keyframe using the wall itself, then rescue the
+    // off-wall features the plane path throws away. MiDaS is affine on INVERSE depth: invd = a*(1/Z)+b.
+    // The wall features (plane intersection in front, t>0) give known (1/Z, invd) pairs; a least-
+    // squares line recovers (a,b). Nothing here touches the wall-plane points placed below — it only
+    // adds points that today are discarded (t<=0), so the classic planar map is unchanged. Entirely
+    // gated: no stashed depth or the flag off ⇒ depthReady stays false ⇒ original behavior.
+    bool depthReady = false;
+    float depthA = 0.f, depthB = 0.f;
+    if (mDepthPlacementEnabled.load(std::memory_order_relaxed) &&
+        !mDepth.empty() && mDepthFrameW > 0 && mDepthFrameH > 0) {
+        auto sampleInvDepth = [&](float px, float py) -> float {
+            int dxi = (int)(px * mDepthW / mDepthFrameW);
+            int dyi = (int)(py * mDepthH / mDepthFrameH);
+            if (dxi < 0 || dyi < 0 || dxi >= mDepthW || dyi >= mDepthH) return NAN;
+            return mDepth[(size_t)dyi * mDepthW + dxi];
+        };
+        // Accumulate the normal equations for y = a*x + b over wall (t>0) features.
+        double sx = 0, sy = 0, sxx = 0, sxy = 0; int nfit = 0;
+        for (size_t i = 0; i < kps.size(); ++i) {
+            glm::vec3 dir = R * glm::vec3((float)((kps[i].pt.x - cx) / fx),
+                                          (float)((kps[i].pt.y - cy) / fy), 1.0f);
+            float denom = glm::dot(n, dir);
+            if (std::fabs(denom) < 1e-6f) continue;
+            float t = glm::dot(n, cc - camCenter) / denom;
+            if (t <= 1e-3f) continue;
+            float invd = sampleInvDepth(kps[i].pt.x, kps[i].pt.y);
+            if (!std::isfinite(invd)) continue;
+            double x = 1.0 / (double)t, yv = (double)invd;
+            sx += x; sy += yv; sxx += x * x; sxy += x * yv; ++nfit;
+        }
+        if (nfit >= 6) {
+            double denomFit = (double)nfit * sxx - sx * sx;
+            if (std::fabs(denomFit) > 1e-9) {
+                depthA = (float)(((double)nfit * sxy - sx * sy) / denomFit);
+                depthB = (float)((sy * sxx - sx * sxy) / denomFit);
+                // a>0 is the physical sign (nearer ⇒ larger invd ⇒ larger 1/Z). Reject a degenerate
+                // or inverted fit rather than place points from it.
+                if (depthA > 1e-6f) depthReady = true;
+            }
+        }
+    }
+
     int added = 0;
     for (size_t i = 0; i < kps.size(); ++i) {
         if (matched[i]) continue;
@@ -904,9 +963,24 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
         glm::vec3 dir = R * glm::vec3((float)((kps[i].pt.x - cx) / fx),
                                       (float)((kps[i].pt.y - cy) / fy), 1.0f);
         float denom = glm::dot(n, dir);
-        if (std::fabs(denom) < 1e-6f) continue;
-        float t = glm::dot(n, cc - camCenter) / denom;
-        if (t <= 0.f) continue;            // plane intersection behind the camera
+        float t = (std::fabs(denom) < 1e-6f) ? -1.f : glm::dot(n, cc - camCenter) / denom;
+        if (t <= 0.f) {
+            // Off-wall feature: the plane path discards it. With a valid depth calibration, place it
+            // radially at its MiDaS-derived camera-axis depth instead — the omnidirectional coverage
+            // that makes the surrounding "sphere". Skip (as before) when depth is unavailable.
+            if (!depthReady) continue;
+            int dxi = (int)(kps[i].pt.x * mDepthW / mDepthFrameW);
+            int dyi = (int)(kps[i].pt.y * mDepthH / mDepthFrameH);
+            if (dxi < 0 || dyi < 0 || dxi >= mDepthW || dyi >= mDepthH) continue;
+            float invd = mDepth[(size_t)dyi * mDepthW + dxi];
+            if (!std::isfinite(invd)) continue;
+            float invZ = (invd - depthB) / depthA;    // 1/Z from the affine fit
+            if (invZ <= 1e-4f) continue;               // behind the camera / at infinity
+            t = 1.0f / invZ;
+            // Reject MiDaS outliers: keep radii within a sane band around the wall distance so a
+            // single bad depth pixel can't scatter a point to infinity.
+            if (t < 0.1f * wallZ || t > 10.f * wallZ) continue;
+        }
         glm::vec3 P = camCenter + t * dir;
         // P is already in the fingerprint object frame. For standalone that is the centred
         // SphereSLAM page frame; storing it verbatim is the frame-preservation contract.

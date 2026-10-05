@@ -309,6 +309,10 @@ fun MainScreen(
                                 arViewModel.onStandaloneReferenceRegistrationChanged(it)
                             },
                             onDiagnostic = { text -> arViewModel.appendDiag(text) },
+                            onKeyframeOrientation = { timestampNs, quaternion ->
+                                arViewModel.recordStandaloneKeyframeOrientation(timestampNs, quaternion)
+                            },
+                            depthEstimator = arViewModel.standaloneDepthEstimatorOrNull(),
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {

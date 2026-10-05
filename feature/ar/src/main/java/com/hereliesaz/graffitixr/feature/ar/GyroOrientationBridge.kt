@@ -66,6 +66,16 @@ class GyroOrientationBridge(context: Context) : SensorEventListener {
     /** True when this device has a usable sensor at all — callers should skip bridging otherwise. */
     val isAvailable: Boolean get() = gameRotationSensor != null
 
+    /**
+     * The latest normalized `[x, y, z, w]` orientation quaternion, or null when no sample has
+     * arrived (or after [stop]). Returns a fresh copy so the caller can keep it without racing the
+     * sampling thread's next whole-array swap — the spherical-coverage keyframe recorder
+     * (`docs/SPHERESLAM_SPHERE_MAP.md`, Phase 1) reads this to log per-keyframe bearing. Read-only:
+     * it samples the same `latestQuaternion` the bridge already maintains and changes no tracking
+     * behavior.
+     */
+    fun latestOrientationSample(): FloatArray? = latestQuaternion?.copyOf()
+
     // Published as a whole new array per sample (never mutated in place) so a concurrent reader on
     // another thread always sees either the old or the new sample, never a half-written one —
     // same pattern DeviceAttitudeProvider already uses for exactly this reason.

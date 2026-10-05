@@ -832,6 +832,12 @@ class MainActivity : ComponentActivity() {
                         // not the phone — the phone sits in the off-hand, so the rail must dock on
                         // the side opposite the dominant hand for that hand's thumb to reach it.
                         dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT,
+                        // Trace ▸ Freeze folds the rail up and must keep it folded. AzNavRail only
+                        // honors isFoldedUp (set in the effect below) when noMenu is on — otherwise the
+                        // flag is inert and the rail never collapses. So switch to fold-mode while the
+                        // screen is frozen; the full-screen touch absorber (below the host call) then
+                        // disallows unfolding. Normal menu behavior returns the moment Freeze is lifted.
+                        noMenu = mainUiState.isTouchLocked,
                     )
                     azAdvanced(
                         helpEnabled = true,
@@ -1832,6 +1838,25 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 guidanceControllerRef = guidanceController
+
+                // Trace ▸ Freeze: absorb EVERY pointer event above the (now folded) rail so nothing
+                // responds — including the rail's app-icon unfold tap, which would otherwise bring the
+                // rail back. Drawn as the last sibling in the theme Surface, so it sits on top of the
+                // host layout and the rail it renders. Unlock stays volume-key only (key events don't
+                // go through this), matching the existing touch lock.
+                if (mainUiState.isTouchLocked) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        awaitPointerEvent().changes.forEach { it.consume() }
+                                    }
+                                }
+                            }
+                    )
+                }
             }
         }
     }
@@ -2031,16 +2056,16 @@ class MainActivity : ComponentActivity() {
                     // Target button is a toggle: selected (cyan) means screen taps create the target;
                     // tapping it again cancels. After a target is accepted it deselects, so making
                     // another target requires re-selecting this button.
-                    azRailSubItem(
+                    // Omit the Target button entirely when the backend can't support it (don't show a
+                    // disabled, reason-labelled button): if it can't act, it isn't on the rail.
+                    if (arRailPolicy.targetRailEnabled) azRailSubItem(
                         id = "target.create",
                         hostId = "mode.ar",
-                        text = arRailPolicy.targetDisabledReason?.let {
-                            "${navStrings.grid} — $it"
-                        } ?: navStrings.grid,
+                        text = navStrings.grid,
                         color = navItemColor,
                         classifiers = setOf("toggle"),
                         shape = AzButtonShape.NONE,
-                        disabled = showLibrary || !arRailPolicy.targetRailEnabled,
+                        disabled = showLibrary,
                         onClick = {
                             if (isWaitingForTap) {
                                 mainViewModel.cancelTapMode()
@@ -2081,37 +2106,37 @@ class MainActivity : ComponentActivity() {
                     )
                     val coopContainerBlocked =
                         coopBackendBlocked && arUiState.coopRole == CoopRole.NONE
-                    azRailSubHostItem(
-                        id = "coop",
-                        hostId = "mode.ar",
-                        text = if (coopContainerBlocked) {
-                            "${navStrings.coop} — ${arRailPolicy.coopDisabledReason}"
-                        } else {
-                            navStrings.coop
-                        },
-                        color = navItemColor,
-                        shape = AzButtonShape.NONE,
-                        disabled = showLibrary || coopContainerBlocked,
-                    )
-                    azRailSubItem(
-                        id = "coop.host", hostId = "coop", text = navStrings.hostCoop,
-                        color = navItemColor,
-                        classifiers = setOf("toggle"),
-                        shape = AzButtonShape.NONE,
-                        disabled = showLibrary || coopBackendBlocked ||
-                            (!coopHostReady && arUiState.coopRole != CoopRole.HOST),
-                        onClick = { if (arUiState.coopRole != CoopRole.HOST) arViewModel.startHosting() },
-                    )
-                    azRailSubItem(
-                        id = "coop.join", hostId = "coop", text = navStrings.joinCoop,
-                        color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE,
-                        disabled = showLibrary || coopBackendBlocked,
-                        onClick = {
-                            if (arUiState.coopRole != CoopRole.GUEST) {
-                                if (hasCameraPermission) onShowJoinScanner() else requestPermissions()
-                            }
-                        },
-                    )
+                    // Omit the whole Coop group when the backend can't support it (don't show a disabled,
+                    // reason-labelled host): if it can't act, it isn't on the rail.
+                    if (!coopContainerBlocked) {
+                        azRailSubHostItem(
+                            id = "coop",
+                            hostId = "mode.ar",
+                            text = navStrings.coop,
+                            color = navItemColor,
+                            shape = AzButtonShape.NONE,
+                            disabled = showLibrary,
+                        )
+                        azRailSubItem(
+                            id = "coop.host", hostId = "coop", text = navStrings.hostCoop,
+                            color = navItemColor,
+                            classifiers = setOf("toggle"),
+                            shape = AzButtonShape.NONE,
+                            disabled = showLibrary || coopBackendBlocked ||
+                                (!coopHostReady && arUiState.coopRole != CoopRole.HOST),
+                            onClick = { if (arUiState.coopRole != CoopRole.HOST) arViewModel.startHosting() },
+                        )
+                        azRailSubItem(
+                            id = "coop.join", hostId = "coop", text = navStrings.joinCoop,
+                            color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE,
+                            disabled = showLibrary || coopBackendBlocked,
+                            onClick = {
+                                if (arUiState.coopRole != CoopRole.GUEST) {
+                                    if (hasCameraPermission) onShowJoinScanner() else requestPermissions()
+                                }
+                            },
+                        )
+                    }
                     if (arUiState.coopRole != CoopRole.NONE) {
                         azRailSubItem(id = "coop.leave", hostId = "coop", text = navStrings.leaveCoop, color = HotPink, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { arViewModel.leaveSession() })
                     }
@@ -2198,17 +2223,15 @@ class MainActivity : ComponentActivity() {
             val standaloneArExportBlocked =
                 editorUiState.editorMode == EditorMode.AR &&
                     !arRailPolicy.modePreviewExportAvailable
-            azRailSubItem(
+            // Omit Export when it can't act (standalone AR, no mode-preview export): no disabled,
+            // reason-labelled button. It stays present in every other mode.
+            if (!standaloneArExportBlocked) azRailSubItem(
                 id = "proj.export",
                 hostId = "host.project",
-                text = if (standaloneArExportBlocked) {
-                    "${navStrings.export} — ${arRailPolicy.exportDisabledReason}"
-                } else {
-                    navStrings.export
-                },
+                text = navStrings.export,
                 color = navItemColor,
                 shape = AzButtonShape.NONE,
-                disabled = showLibrary || standaloneArExportBlocked,
+                disabled = showLibrary,
                 onClick = {
                     // Export is mode-dispatched by the caller so it has access to the CameraX
                     // controller (Overlay stills) and a coroutine scope (AR/Overlay both suspend on

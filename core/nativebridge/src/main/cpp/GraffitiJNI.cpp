@@ -1077,6 +1077,33 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMapBuildEnabled
     if (gSlamEngine) gSlamEngine->setMapBuildEnabled(enabled == JNI_TRUE);
 }
 
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetDepthPlacementEnabled(JNIEnv*, jobject, jboolean enabled) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (gSlamEngine) gSlamEngine->setDepthPlacementEnabled(enabled == JNI_TRUE);
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetLatestDepthMap(
+        JNIEnv* env, jobject, jfloatArray data, jint w, jint h, jint frameW, jint frameH) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return;
+    if (data == nullptr) {
+        gSlamEngine->setLatestDepthMap(nullptr, 0, 0, 0, 0);
+        return;
+    }
+    const jsize n = env->GetArrayLength(data);
+    if (n < (jsize)w * h || w <= 0 || h <= 0) {
+        gSlamEngine->setLatestDepthMap(nullptr, 0, 0, 0, 0);
+        return;
+    }
+    jfloat* buf = env->GetFloatArrayElements(data, nullptr);
+    if (buf) {
+        gSlamEngine->setLatestDepthMap(buf, w, h, frameW, frameH);
+        env->ReleaseFloatArrayElements(data, buf, JNI_ABORT);
+    }
+}
+
 JNIEXPORT jbyteArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportWallFeatureMap(JNIEnv* env, jobject) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
