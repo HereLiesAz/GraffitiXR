@@ -7,6 +7,8 @@ import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.WindowManager
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -564,6 +566,9 @@ class MainActivity : ComponentActivity() {
                     // Other modes keep system brightness (AR touch-lock at max brightness was pure
                     // waste). Even in TRACE, cap brightness once battery is low.
                     params.screenBrightness = when {
+                        // Freeze is the tracing moment: brightness all the way up regardless of
+                        // battery, since the screen is the lightbox the artist is tracing through.
+                        mainUiState.isTouchLocked && isTrace -> 1.0f
                         !isTrace -> WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
                         arUiState.batteryTier >= 2 -> 0.85f
                         else -> 1.0f
@@ -573,6 +578,18 @@ class MainActivity : ComponentActivity() {
                         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     } else {
                         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    }
+                    // Freeze hides the system bars so the whole screen is tracing surface and a
+                    // resting hand can't pull down the notification shade or hit a nav gesture. The
+                    // bars still swipe in transiently (then re-hide) so the user is never trapped.
+                    // Any other state shows them normally.
+                    val insets = WindowInsetsControllerCompat(window, window.decorView)
+                    if (mainUiState.isTouchLocked) {
+                        insets.systemBarsBehavior =
+                            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                        insets.hide(WindowInsetsCompat.Type.systemBars())
+                    } else {
+                        insets.show(WindowInsetsCompat.Type.systemBars())
                     }
                 }
 
@@ -2144,7 +2161,10 @@ class MainActivity : ComponentActivity() {
                 azRailSubItem(id = "mode.mockup.lock", hostId = "mode.mockup", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { editorViewModel.onToggleModeTransformLocked(EditorMode.MOCKUP) })
             }
 
-            // Trace ▸ { Freeze, Lock } — same mode gating as the others.
+            // Trace ▸ Freeze — the only Trace control. (Lock was removed: a frozen lightbox is
+            // already immovable, so a separate transform-lock was redundant here.) Entering Freeze
+            // also closes any open adjustment panel; the rail folds itself away via the
+            // isTouchLocked effect below, and brightness/keep-awake/immersive bars follow suit.
             azRailHostItem(
                 id = "mode.trace",
                 text = navStrings.trace,
@@ -2156,8 +2176,11 @@ class MainActivity : ComponentActivity() {
                 onExpandedChange = { editorViewModel.onRailHostExpansionChanged("mode.trace", it) },
             )
             if (editorUiState.editorMode == EditorMode.TRACE) {
-                azRailSubItem(id = "mode.trace.freeze", hostId = "mode.trace", text = "Freeze", color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { mainViewModel.setTouchLocked(!isTouchLocked) })
-                azRailSubItem(id = "mode.trace.lock", hostId = "mode.trace", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { editorViewModel.onToggleModeTransformLocked(EditorMode.TRACE) })
+                azRailSubItem(id = "mode.trace.freeze", hostId = "mode.trace", text = "Freeze", color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE, disabled = showLibrary, onClick = {
+                    val freezing = !isTouchLocked
+                    mainViewModel.setTouchLocked(freezing)
+                    if (freezing) editorViewModel.onDismissPanel()
+                })
             }
 
             azDivider()
@@ -2236,8 +2259,6 @@ class MainActivity : ComponentActivity() {
             }
             if (editorUiState.editorMode == EditorMode.TRACE) {
                 if (isTouchLocked) azHighlight("mode.trace.freeze", active = Cyan)
-                if (editorUiState.modeAdjustments[EditorMode.TRACE]?.isTransformLocked == true)
-                    azHighlight("mode.trace.lock", active = Cyan)
             }
             if (editorUiState.activePanel == EditorPanel.ADJUST) azHighlight("design.adjust", active = Cyan)
             if (editorUiState.activePanel == EditorPanel.COLOR) azHighlight("design.balance", active = Cyan)

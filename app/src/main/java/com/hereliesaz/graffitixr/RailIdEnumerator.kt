@@ -56,7 +56,7 @@ internal fun enumerateRailItemIdRegistrations(mode: EditorMode): List<String> {
         ids += listOf("mockup.wall", "wall.photo", "wall.file", "wall.clear", "mode.mockup.lock")
     }
     if (mode == EditorMode.TRACE) {
-        ids += listOf("mode.trace.freeze", "mode.trace.lock")
+        ids += listOf("mode.trace.freeze")
     }
 
     // Design menu (the top-level workspace entry, plus its per-design controls: the adjust/colour
@@ -114,7 +114,6 @@ internal val RAIL_ITEM_HOST_ID: Map<String, String> = mapOf(
     "wall.clear" to "mockup.wall",
     "mode.mockup.lock" to "mode.mockup",
     "mode.trace.freeze" to "mode.trace",
-    "mode.trace.lock" to "mode.trace",
     "proj.new" to "host.project",
     "proj.save" to "host.project",
     "proj.export" to "host.project",
