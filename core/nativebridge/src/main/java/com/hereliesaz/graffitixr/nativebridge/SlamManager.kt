@@ -484,6 +484,22 @@ class SlamManager @Inject constructor(
     fun setMapBuildEnabled(enabled: Boolean) = nativeSetMapBuildEnabled(enabled)
 
     /**
+     * Sphere map Phase 2 (docs/SPHERESLAM_SPHERE_MAP.md): enable MiDaS-depth-calibrated radial
+     * placement of off-wall map points during build. Default OFF — with it off, the map builds from
+     * wall-plane back-projection exactly as before. Standalone opts in behind the feature-map flag.
+     */
+    fun setDepthPlacementEnabled(enabled: Boolean) = nativeSetDepthPlacementEnabled(enabled)
+
+    /**
+     * Stash the latest per-keyframe MiDaS depth (inverse depth, larger = nearer), of size [w]×[h],
+     * computed from a [frameW]×[frameH] camera frame. The next map-build uses it to place off-wall
+     * features radially. Pass `data = null` (or an inconsistent size) to clear and fall back to pure
+     * wall-plane placement. A copy is taken natively; the caller may reuse the array.
+     */
+    fun setLatestDepthMap(data: FloatArray?, w: Int, h: Int, frameW: Int, frameH: Int) =
+        nativeSetLatestDepthMap(data, w, h, frameW, frameH)
+
+    /**
      * Phase 3b: read the in-native feature map back as a [WallFeatureMap] for .gxr persistence, or null
      * when empty. Unpacks the native little-endian blob: [n, rows, cols, type][points][conf][obs][anchor16]
      * [intrinsics4][descriptors]. Returns null (skip this save) if a concurrent grow left it inconsistent.
@@ -910,6 +926,8 @@ class SlamManager @Inject constructor(
     private external fun nativeGetWallFeatureMapRevision(): Long
     private external fun nativeSetMapRelocEnabled(enabled: Boolean)
     private external fun nativeSetMapBuildEnabled(enabled: Boolean)
+    private external fun nativeSetDepthPlacementEnabled(enabled: Boolean)
+    private external fun nativeSetLatestDepthMap(data: FloatArray?, w: Int, h: Int, frameW: Int, frameH: Int)
     private external fun nativeExportWallFeatureMap(): ByteArray?
     private external fun nativeSetArtworkFingerprint(
         bitmap: Bitmap, depthBuffer: ByteBuffer?,
