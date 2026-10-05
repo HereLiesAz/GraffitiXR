@@ -45,6 +45,14 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+        // The forked unit-test JVM defaults to ~512 MB (org.gradle.jvmargs sizes the daemon, not this
+        // JVM). A 1 GB cushion keeps the run deterministic now that ONNX Runtime is on the classpath.
+        // (The suite's earlier OOM was ArViewModel.init firing the monocular-depth self-test against a
+        // relaxed-mock AssetManager at every VM construction; the AR tests now stub monocularDepthEnabled
+        // off so the DepthEstimator/ORT path never runs. This heap is belt-and-suspenders.)
+        unitTests.all {
+            it.maxHeapSize = "1g"
+        }
     }
 }
 

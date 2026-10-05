@@ -2049,7 +2049,13 @@ class ArViewModel @Inject constructor(
             // hardware the ML depth graph errored continuously and starved VIO into kNotTracking
             // (logcat: feature_track_ml_depth_provider + mediapipe normal_detector RET_CHECK); disabling
             // it there keeps tracking alive at the cost of plane/depth.
-            val useArCoreDepthApi = _uiState.value.arCoreDepthEnabled
+            //
+            // Safe mode (forceSafeCameraConfig, armed after a camera stall) ALSO drops depth, not just
+            // the fps swap: a session whose camera never streamed a frame is exactly the ML-depth-starves-
+            // VIO hardware above, and depth is the one config knob that otherwise survives the safe-config
+            // retry — so leaving it on made the retry stall again (ts stuck at 0, PAUSED) with no way out.
+            // Dropping it on retry is the automatic form of the per-device "ARCore depth" opt-out.
+            val useArCoreDepthApi = _uiState.value.arCoreDepthEnabled && !forceSafeCameraConfig
             if (useArCoreDepthApi && s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                 config.depthMode = Config.DepthMode.AUTOMATIC
                 _uiState.update { it.copy(isDepthApiSupported = true) }
