@@ -8,7 +8,7 @@ buildscript {
         "io.netty:netty-handler:4.2.18.Final",
         "io.netty:netty-handler-proxy:4.2.18.Final",
         "org.bitbucket.b_c:jose4j:0.9.7",
-        "org.apache.commons:commons-lang3:3.20.0",
+        "org.apache.commons:commons-lang3:3.21.0",
         "org.apache.httpcomponents:httpclient:4.5.14",
         "com.google.guava:guava:33.7.2-jre",
         // play-services-base 18.10.1 (see libs.versions.toml) itself depends on
