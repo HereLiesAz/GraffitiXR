@@ -17,8 +17,12 @@ import androidx.camera.view.LifecycleCameraController
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
@@ -133,6 +137,13 @@ fun SphereSlamStandaloneOverlay(
      * view model — the analyzer uses it but never closes it.
      */
     depthEstimator: com.hereliesaz.graffitixr.feature.ar.depth.DepthEstimator? = null,
+    /**
+     * Phase 3 guided-sweep coverage over the wall's viewable arc, in `[0, 1]`, or null to hide the
+     * hint (classic path / flag off). Shown while locked and still incomplete, to nudge the artist to
+     * keep pivoting until the surrounding map is dense enough for fast re-lock. Guides, never gates
+     * (§9.1).
+     */
+    sweepCoverage: Float? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -651,6 +662,8 @@ fun SphereSlamStandaloneOverlay(
     }
 
     fun copyDiagnostics() {
+        val sphereMapEnabled = depthEstimator != null || sweepCoverage != null
+        val relocCounts = slamManager.getMapRelocCounts()
         val dump = standaloneDiagnosticDump(
             calibration = calibrationDiagnostics,
             trackingState = trackingState,
@@ -658,6 +671,14 @@ fun SphereSlamStandaloneOverlay(
             physicallyMetric = activeReferencePhysicallyMetric,
             referenceWidthUnits = activeReferenceWidthMeters,
             failure = currentFailure,
+            sphereMap = SphereMapDiagnostics(
+                enabled = sphereMapEnabled,
+                pointCount = slamManager.getMapPointCount(),
+                revision = slamManager.getWallFeatureMapRevision(),
+                relocVisible = relocCounts.getOrElse(0) { -1 },
+                relocCorr = relocCounts.getOrElse(1) { -1 },
+                sweepCoverage = sweepCoverage ?: 0f,
+            ),
         )
         context.getSystemService(ClipboardManager::class.java)
             ?.setPrimaryClip(ClipData.newPlainText("GraffitiXR SphereSLAM diagnostics", dump))
@@ -967,6 +988,46 @@ fun SphereSlamStandaloneOverlay(
                 }
                 TextButton(onClick = { copyDiagnostics() }) {
                     Text("Copy Diagnostics")
+                }
+            }
+        }
+    }
+
+    // Phase 3: guided-sweep coverage hint. Only while actively tracking and still incomplete — it
+    // disappears once the viewable arc is covered, and never blocks interaction.
+    val coverage = sweepCoverage
+    if (
+        coverage != null &&
+        coverage < 1f &&
+        referenceReady &&
+        trackingState == StandaloneTrackingState.LOCKED &&
+        fatalMessage == null
+    ) {
+        Box(modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .padding(bottom = 40.dp)
+                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
+                    .padding(horizontal = 20.dp, vertical = 10.dp),
+            ) {
+                Text(
+                    text = "Turn slowly to map the space — ${(coverage * 100f).toInt()}%",
+                    color = Color.White,
+                )
+                Box(
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .width(180.dp)
+                        .height(3.dp)
+                        .background(Color.White.copy(alpha = 0.25f)),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(coverage.coerceIn(0f, 1f))
+                            .background(Color.White),
+                    )
                 }
             }
         }

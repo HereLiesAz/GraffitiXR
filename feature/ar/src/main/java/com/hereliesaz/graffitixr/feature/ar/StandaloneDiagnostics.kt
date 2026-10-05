@@ -27,6 +27,20 @@ internal data class StandaloneMatchDiagnostics(
     val source: SphereSlamStandalonePoseSource,
 )
 
+/**
+ * Sphere map Phase 4 (docs/SPHERESLAM_SPHERE_MAP.md): the live state of the spherical-coverage map,
+ * for the on-device tuning instrument. All fields are present only when the feature-map flag is on;
+ * [relocVisible]/[relocCorr] are -1 when the last attempt's map path did not run.
+ */
+internal data class SphereMapDiagnostics(
+    val enabled: Boolean,
+    val pointCount: Int,
+    val revision: Long,
+    val relocVisible: Int,
+    val relocCorr: Int,
+    val sweepCoverage: Float,
+)
+
 internal fun standaloneDiagnosticDump(
     calibration: StandaloneCalibrationDiagnostics?,
     trackingState: StandaloneTrackingState,
@@ -34,6 +48,7 @@ internal fun standaloneDiagnosticDump(
     physicallyMetric: Boolean,
     referenceWidthUnits: Float,
     failure: StandaloneFailureEvent?,
+    sphereMap: SphereMapDiagnostics? = null,
 ): String {
     fun f(value: Float?): String =
         value?.takeIf { it.isFinite() }
@@ -74,6 +89,16 @@ internal fun standaloneDiagnosticDump(
         appendLine("failure=${failure?.reason?.name ?: "none"}")
         if (failure != null && failure.diagnostic.isNotBlank()) {
             appendLine("failureDetail=${failure.diagnostic}")
+        }
+        if (sphereMap != null) {
+            appendLine("sphereMap=${if (sphereMap.enabled) "on" else "off"}")
+            appendLine("sphereMapPoints=${sphereMap.pointCount}")
+            appendLine("sphereMapRevision=${sphereMap.revision}")
+            // Map-carried reloc: visible=frustum-gated candidates, corr=correspondences fed to PnP.
+            // corr>0 with the marks off-frame is the surrounding sphere holding the lock.
+            appendLine("sphereMapRelocVisible=${sphereMap.relocVisible}")
+            appendLine("sphereMapRelocCorr=${sphereMap.relocCorr}")
+            appendLine("sphereSweepCoverage=${f(sphereMap.sweepCoverage)}")
         }
     }.trimEnd()
 }

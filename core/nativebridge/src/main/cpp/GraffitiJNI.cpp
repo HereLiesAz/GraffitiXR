@@ -1078,6 +1078,18 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMapBuildEnabled
 }
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetMapRelocCounts(JNIEnv* env, jobject, jintArray out) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (out == nullptr || env->GetArrayLength(out) < 2) return;
+    jint vals[2] = {-1, -1};
+    if (gSlamEngine) {
+        vals[0] = gSlamEngine->lastRelocMapVisible();
+        vals[1] = gSlamEngine->lastRelocMapCorr();
+    }
+    env->SetIntArrayRegion(out, 0, 2, vals);
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetDepthPlacementEnabled(JNIEnv*, jobject, jboolean enabled) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setDepthPlacementEnabled(enabled == JNI_TRUE);

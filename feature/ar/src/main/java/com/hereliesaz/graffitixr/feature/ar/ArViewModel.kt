@@ -890,13 +890,57 @@ class ArViewModel @Inject constructor(
     private val keyframeOrientationRecorder = KeyframeOrientationRecorder()
 
     /**
+     * Absolute camera heading source for the Phase 3 sweep coverage. Lazily created; sampling runs
+     * only while standalone tracking with the feature-map flag on, and stops on reset/exit. Separate
+     * from [GyroOrientationBridge] on purpose — see [CompassHeadingProvider].
+     */
+    private val compassHeadingProvider by lazy { CompassHeadingProvider(appContext) }
+
+    /**
+     * Compass-anchored sweep coverage (Phase 3). Accumulates the camera heading at each keyframe over
+     * the wall's viewable front arc; [sphereCoverageFraction] drives the sweep hint. Guarded by its
+     * own lock because [recordStandaloneKeyframeOrientation] runs on the camera worker.
+     */
+    private val sphereCoverage = com.hereliesaz.graffitixr.common.geometry.SphereCoverage()
+    private val sphereCoverageLock = Any()
+    private val _sphereCoverageFraction = MutableStateFlow(0f)
+
+    /** Sweep coverage in `[0, 1]` over the viewable arc — 0 off the standalone path. */
+    val sphereCoverageFraction: StateFlow<Float> = _sphereCoverageFraction.asStateFlow()
+
+    /**
      * Record one standalone keyframe orientation `(timestampNs, quaternion[x,y,z,w])`. Gated on the
      * feature-map flag so the classic planar path records nothing; off by default. Called on the
-     * camera worker thread — [KeyframeOrientationRecorder] is thread-safe.
+     * camera worker thread — [KeyframeOrientationRecorder] and the coverage accumulator are both
+     * synchronized. The gyro quaternion feeds the persisted log and (natively) off-wall placement;
+     * the compass heading, read here, feeds the viewable-arc coverage.
      */
     fun recordStandaloneKeyframeOrientation(timestampNs: Long, quaternion: FloatArray) {
         if (!_evalFeatureMapEnabled.value) return
         keyframeOrientationRecorder.record(timestampNs, quaternion)
+        compassHeadingProvider.start() // idempotent; ensures sampling once standalone recording begins
+        val heading = compassHeadingProvider.latestHeadingDegrees() ?: return
+        val grew = synchronized(sphereCoverageLock) { sphereCoverage.observe(heading) }
+        if (grew) {
+            _sphereCoverageFraction.value =
+                synchronized(sphereCoverageLock) { sphereCoverage.coverageFraction() }
+        }
+    }
+
+    /**
+     * Anchor the sweep's viewable arc to the heading the camera faces now — called when the wall
+     * reference is captured head-on, so coverage is measured over the arc actually in front of the
+     * wall. No-op when the compass is unavailable (the arc then auto-anchors to the first keyframe).
+     */
+    private fun anchorSphereCoverageToWall() {
+        compassHeadingProvider.start()
+        val heading = compassHeadingProvider.latestHeadingDegrees() ?: return
+        synchronized(sphereCoverageLock) { sphereCoverage.setWallHeading(heading) }
+    }
+
+    private fun resetSphereCoverage() {
+        synchronized(sphereCoverageLock) { sphereCoverage.reset() }
+        _sphereCoverageFraction.value = 0f
     }
 
     private val _evalAutoFocusEnabled = MutableStateFlow(true)
@@ -1850,6 +1894,8 @@ class ArViewModel @Inject constructor(
     fun exitArMode() {
         isInArMode = false
         isDestroying = true
+        // Release the compass sensor (Phase 3 sweep coverage); re-armed on the next standalone record.
+        compassHeadingProvider.stop()
         // Stop the GL thread FIRST, before any of the state below is cleared.
         //
         // `onDrawFrame` returns immediately on this flag, and until it is set the renderer keeps
@@ -2374,6 +2420,7 @@ class ArViewModel @Inject constructor(
                         // New canonical frame: the orientation log is co-registered to the old one,
                         // so drop it with the map (Phase 1b, docs/SPHERESLAM_SPHERE_MAP.md).
                         keyframeOrientationRecorder.clear()
+                        resetSphereCoverage()
                         current.copy(
                             sphereSlamReferenceUri = candidateUri,
                             sphereSlamReferenceWidthMeters = referenceWidthMeters,
@@ -2397,6 +2444,9 @@ class ArViewModel @Inject constructor(
                 }
 
                 if (transformApplied) {
+                    // The reference was just captured head-on, so this is the moment to anchor the
+                    // sweep's viewable arc to the wall-facing heading (Phase 3).
+                    if (_evalFeatureMapEnabled.value) anchorSphereCoverageToWall()
                     projectManager.deleteSphereSlamReference(
                         appContext,
                         projectId,
@@ -2500,6 +2550,7 @@ class ArViewModel @Inject constructor(
                     } else {
                         cleared = true
                         keyframeOrientationRecorder.clear()
+                        resetSphereCoverage()
                         current.copy(
                             sphereSlamReferenceUri = null,
                             sphereSlamReferenceWidthMeters = 1f,
@@ -4759,6 +4810,7 @@ class ArViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         stopSystemThrottleMonitoring()
+        compassHeadingProvider.stop()
         if (depthEstimatorLazy.isInitialized()) depthEstimatorLazy.value.close()
         // viewModelScope is already cancelled by the time onCleared runs, so leaveSession()'s
         // viewModelScope.launch would never execute and the collaboration session would leak.

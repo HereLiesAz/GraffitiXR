@@ -354,6 +354,13 @@ public:
     /** RANSAC inliers that came from F_out points; -1 when PnP never produced an inlier set. */
     int lastRelocBackboneInliers() const { return mLastRelocBackboneInliers.load(std::memory_order_relaxed); }
 
+    // Sphere map Phase 4 (docs/SPHERESLAM_SPHERE_MAP.md): the persistent-map reloc contribution of
+    // the last attempt, for the on-device tuning instrument. -1 = not measured (the map path did not
+    // run this attempt: flag off, no map, or no prior pose). Lets the artist see the surrounding
+    // sphere carrying the lock — above all when the fingerprint marks are off-frame.
+    int lastRelocMapVisible() const { return mLastRelocMapVisible.load(std::memory_order_relaxed); }
+    int lastRelocMapCorr() const { return mLastRelocMapCorr.load(std::memory_order_relaxed); }
+
     /**
      * IMPLEMENTATION.md 4.6 — the corroboration match's own counts, so the effect Phase 4 claims can
      * be seen rather than argued about.
@@ -868,6 +875,10 @@ private:
     std::atomic<int>        mLastRelocBackboneFeatures{-1};
     std::atomic<int>        mLastRelocBackboneMatches{-1};
     std::atomic<int>        mLastRelocBackboneInliers{-1};
+    // Sphere map Phase 4: last attempt's persistent-map reloc contribution (frustum-visible points,
+    // correspondences appended to PnP). -1 = the map path did not run this attempt.
+    std::atomic<int>        mLastRelocMapVisible{-1};
+    std::atomic<int>        mLastRelocMapCorr{-1};
     // IMPLEMENTATION.md 4.6 — the corroboration match's counts and the radius it used. All -1 for
     // "no gated attempt has run", following the same rule as the trio above: zero predicted is a
     // real reading (the artist is not looking at the design) and cannot double as the default.

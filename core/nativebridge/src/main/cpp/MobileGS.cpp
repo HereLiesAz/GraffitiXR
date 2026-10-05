@@ -206,6 +206,10 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
     mLastRelocBackboneFeatures.store(-1, std::memory_order_relaxed);
     mLastRelocBackboneMatches.store(-1, std::memory_order_relaxed);
     mLastRelocBackboneInliers.store(-1, std::memory_order_relaxed);
+    // Sphere map Phase 4: reset the map-contribution counters so an attempt whose map path does not
+    // run publishes "not measured" (-1) rather than the previous attempt's numbers.
+    mLastRelocMapVisible.store(-1, std::memory_order_relaxed);
+    mLastRelocMapCorr.store(-1, std::memory_order_relaxed);
     // Same rule for the reprojection residual (IMPLEMENTATION.md 4.3): it is only meaningful
     // for the attempt that produced it, and the search radius reads it as a drift measurement.
     // Leaving a previous lock's value in place would widen or narrow the corroboration search
@@ -433,6 +437,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
             float v = (float)(gfy * pc.y / pc.z + gcy);
             if (u >= 0.f && u < gray.cols && v >= 0.f && v < gray.rows) visible.push_back(i);
         }
+        mLastRelocMapVisible.store((int)visible.size(), std::memory_order_relaxed);
         if (visible.size() >= 8) {
             // Preallocate the gated descriptor block with the right size+type and copy rows
             // (cv::Mat has no usable reserve() on an empty/typeless matrix). Reuse the base detection.
@@ -456,6 +461,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
                         corrFromBackbone.push_back(0);
                     }
                 }
+                mLastRelocMapCorr.store((int)(imgPts.size() - before), std::memory_order_relaxed);
                 if (imgPts.size() > before)
                     LOGI("Reloc map: gated %zu/%zu pts, added %zu corr (total %zu)",
                          visible.size(), mapKps3d.size(), imgPts.size() - before, imgPts.size());

@@ -491,6 +491,18 @@ class SlamManager @Inject constructor(
     fun setDepthPlacementEnabled(enabled: Boolean) = nativeSetDepthPlacementEnabled(enabled)
 
     /**
+     * Sphere map Phase 4: the last reloc attempt's persistent-map contribution as
+     * `[frustumVisiblePoints, correspondencesAddedToPnP]`; each is -1 when the map path did not run
+     * (flag off, no map, or no prior pose). The on-device tuning instrument reads this to show the
+     * surrounding sphere carrying a lock — especially while the fingerprint marks are off-frame.
+     */
+    fun getMapRelocCounts(): IntArray {
+        val o = IntArray(2)
+        nativeGetMapRelocCounts(o)
+        return o
+    }
+
+    /**
      * Stash the latest per-keyframe MiDaS depth (inverse depth, larger = nearer), of size [w]×[h],
      * computed from a [frameW]×[frameH] camera frame. The next map-build uses it to place off-wall
      * features radially. Pass `data = null` (or an inconsistent size) to clear and fall back to pure
@@ -928,6 +940,7 @@ class SlamManager @Inject constructor(
     private external fun nativeSetMapBuildEnabled(enabled: Boolean)
     private external fun nativeSetDepthPlacementEnabled(enabled: Boolean)
     private external fun nativeSetLatestDepthMap(data: FloatArray?, w: Int, h: Int, frameW: Int, frameH: Int)
+    private external fun nativeGetMapRelocCounts(out: IntArray)
     private external fun nativeExportWallFeatureMap(): ByteArray?
     private external fun nativeSetArtworkFingerprint(
         bitmap: Bitmap, depthBuffer: ByteBuffer?,
