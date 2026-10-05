@@ -19,7 +19,6 @@ add_library(graffitixr SHARED
     DistortionHead.cpp
     LowLightEnhancer.cpp
     MlasStub.cpp
-    KpmBridge.cpp
 )
 
 # 16 KB page-size support. Android's newer devices (and Play's requirement) use a 16 KB memory page
