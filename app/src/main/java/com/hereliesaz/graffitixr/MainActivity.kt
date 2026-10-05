@@ -832,6 +832,12 @@ class MainActivity : ComponentActivity() {
                         // not the phone — the phone sits in the off-hand, so the rail must dock on
                         // the side opposite the dominant hand for that hand's thumb to reach it.
                         dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT,
+                        // Trace ▸ Freeze folds the rail up and must keep it folded. AzNavRail only
+                        // honors isFoldedUp (set in the effect below) when noMenu is on — otherwise the
+                        // flag is inert and the rail never collapses. So switch to fold-mode while the
+                        // screen is frozen; the full-screen touch absorber (below the host call) then
+                        // disallows unfolding. Normal menu behavior returns the moment Freeze is lifted.
+                        noMenu = mainUiState.isTouchLocked,
                     )
                     azAdvanced(
                         helpEnabled = true,
@@ -1832,6 +1838,25 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 guidanceControllerRef = guidanceController
+
+                // Trace ▸ Freeze: absorb EVERY pointer event above the (now folded) rail so nothing
+                // responds — including the rail's app-icon unfold tap, which would otherwise bring the
+                // rail back. Drawn as the last sibling in the theme Surface, so it sits on top of the
+                // host layout and the rail it renders. Unlock stays volume-key only (key events don't
+                // go through this), matching the existing touch lock.
+                if (mainUiState.isTouchLocked) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                awaitPointerEventScope {
+                                    while (true) {
+                                        awaitPointerEvent().changes.forEach { it.consume() }
+                                    }
+                                }
+                            }
+                    )
+                }
             }
         }
     }
