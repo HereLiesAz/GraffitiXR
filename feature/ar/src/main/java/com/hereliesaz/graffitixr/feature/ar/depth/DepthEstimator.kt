@@ -48,6 +48,11 @@ class DepthEstimator(private val appContext: Context) : AutoCloseable {
     var isLoaded: Boolean = false
         private set
 
+    /** Reason the last [load] failed, for the on-device diagnostic overlay. Null once loaded. */
+    @Volatile
+    var lastError: String? = null
+        private set
+
     /**
      * Extract the model (+ external weights) from assets to filesDir and open the ORT session. Safe
      * to call repeatedly; only the first successful call does work. Returns [isLoaded].
@@ -62,25 +67,25 @@ class DepthEstimator(private val appContext: Context) : AutoCloseable {
             if (!copyAssetIfNeeded(GRAPH_ASSET, graph) ||
                 !copyAssetIfNeeded(DATA_ASSET, File(dir, DATA_ASSET))
             ) {
+                lastError = "assets absent (copy failed)"
                 Timber.w("DepthEstimator: model assets absent; depth disabled")
                 return false
             }
             val environment = OrtEnvironment.getEnvironment()
-            val options = OrtSession.SessionOptions().apply {
-                // NNAPI accelerates where available but silently rejects some int8 graphs; fall back to
-                // the default CPU/XNNPACK execution provider rather than failing the whole load.
-                try {
-                    addNnapi()
-                } catch (t: Throwable) {
-                    Timber.i("DepthEstimator: NNAPI unavailable, using CPU EP (%s)", t.message)
-                }
-            }
+            // CPU execution provider only. NNAPI was tried here, but on some SoCs it does not reject
+            // the int8 ViT graph gracefully: it registers, then aborts the whole process from inside
+            // OrtSession.createSession (native SIGABRT in checkOrtStatus) — an abort Kotlin can't catch,
+            // so the try/catch below never sees it and the app dies. The default CPU EP (MLAS) runs the
+            // quantized model fine; depth is downscaled and off the hot path, so CPU latency is fine.
+            val options = OrtSession.SessionOptions()
             session = environment.createSession(graph.absolutePath, options)
             env = environment
             isLoaded = true
+            lastError = null
             Timber.i("DepthEstimator: loaded (inputs=%s outputs=%s)", session?.inputNames, session?.outputNames)
             true
         } catch (t: Throwable) {
+            lastError = "${t.javaClass.simpleName}: ${t.message?.take(160) ?: "no message"}"
             Timber.w(t, "DepthEstimator: load failed; depth disabled")
             close()
             false
