@@ -51,7 +51,6 @@ internal fun buildHelpItems(strings: AppStrings): Map<String, Any> = mapOf(
 
     // Trace tools
     "mode.trace.freeze" to strings.help.lockTrace,
-    "mode.trace.lock" to strings.nav.lockInfo,
 
     // Design menu
     "mode.design" to strings.nav.designInfo,
