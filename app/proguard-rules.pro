@@ -33,6 +33,19 @@
     <init>(java.lang.String, int);
 }
 
+# --- ONNX Runtime (monocular depth) ---
+# ORT's JNI resolves ai.onnxruntime.OrtException via FindClass to surface a failed
+# OrtSession.createSession. The generic "native <methods>" rule below keeps OrtSession/
+# OrtEnvironment (they declare natives) but NOT OrtException (it declares none), so R8 stripped it:
+# on a createSession failure the JNI throw hit ClassNotFoundException and ART turned a catchable
+# OrtException into a fatal JniAbort (SIGABRT), bypassing DepthEstimator's try/catch and crashing the
+# app. Keep the whole package so every ORT error stays catchable and depth fails soft instead.
+-keep class ai.onnxruntime.** { *; }
+-keepclassmembers class ai.onnxruntime.** {
+    native <methods>;
+}
+-dontwarn ai.onnxruntime.**
+
 # --- Native Engine (MobileGS & SlamManager) ---
 # Keep the JNI wrapper class and its native methods
 -keep class com.hereliesaz.graffitixr.nativebridge.SlamManager { *; }
