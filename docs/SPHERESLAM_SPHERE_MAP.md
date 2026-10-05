@@ -5,6 +5,28 @@
 > (non-ARCore) path** and records why the two premises that decision rested on have changed.
 > It does not change the ARCore path, which keeps VIO-driven passive accumulation.
 
+## 0. Reversibility — the classic path stays the fallback (hard requirement)
+
+Spherical coverage is experimental: it may not work well enough in practice. So it is built to
+be **removable by a flag flip, never a rewrite**, and the classic planar-KPM path must remain
+intact and shippable at every step:
+
+1. **Additive, flag-gated.** All sphere-map behavior rides the existing (off-by-default)
+   Feature-map toggle (`setMapBuildEnabled` / `setMapRelocEnabled`). The classic
+   `SphereSlamStandaloneSession` planar tracker is **not modified or replaced** — it stays the
+   always-present path. With the flag off, standalone behavior is identical to today's classic
+   approach. "Slip the current version back in" = turn the flag off; no code revert needed.
+2. **No classic code deleted.** The guided sweep, recorded orientation, and depth→geometry are
+   *new* code paths that the classic tracker does not depend on. Removing the feature is removing
+   additions, never restoring deletions.
+3. **Per-phase, independently revertable.** Each phase in §8 is its own PR; any single phase can
+   be backed out without disturbing the others or the classic path.
+4. **External backstop.** `HereLiesAz/SphereSLAM` holds the classic approach as a verbatim source
+   snapshot, independent of whatever happens here.
+
+Any phase that cannot satisfy (1)–(2) — i.e. that would require changing or removing classic
+behavior rather than layering over it — is out of scope for this design and must be re-proposed.
+
 ## 1. The problem this solves
 
 On the standalone (SphereSLAM / no-ARCore) path, relocalization is **slow — "always too
