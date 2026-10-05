@@ -18,7 +18,7 @@ dependencyResolutionManagement {
 rootProject.name = "GraffitiXR"
 include(":app")
 include(":core:common", ":core:domain", ":core:data", ":core:nativebridge", ":core:design")
-include(":sphereslam")
+
 include(":feature:ar", ":feature:editor", ":feature:dashboard")
 
 include(":android_collaboration_module")
