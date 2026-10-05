@@ -368,7 +368,7 @@ fun SettingsScreen(
                                 value = if (arCoreDepthEnabled) strings.settings.on else strings.settings.off,
                                 modifier = Modifier.clickable { onArCoreDepthEnabledChanged(!arCoreDepthEnabled) }
                             )
-                            // Monocular depth (Depth Anything V2) — depth source for any device that
+                            // Monocular depth (MiDaS Small) — depth source for any device that
                             // can't get ARCore's Depth API (no ARCore, ARCore off, or ARCore depth off);
                             // default on, dormant when ARCore depth is active. Beta: Step 1 runs a
                             // self-test on next AR entry whose result shows in the diag overlay.

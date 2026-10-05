@@ -902,7 +902,7 @@ class ArViewModel @Inject constructor(
         appendDiag("focus: ${if (auto) "AUTO (acquiring)" else "FIXED (locked on anchor)"}")
     }
 
-    // Monocular depth (Depth Anything V2, ONNX Runtime). Created lazily; only touched when the beta
+    // Monocular depth (MiDaS Small, ONNX Runtime). Created lazily; only touched when the beta
     // toggle is on. Step 1 just proves it loads+runs on-device (selfTestDepth); Step 2 will feed live
     // frames into the standalone plane/scale path.
     private val depthEstimatorLazy = lazy {

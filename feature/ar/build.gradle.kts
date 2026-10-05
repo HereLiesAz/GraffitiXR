@@ -82,7 +82,7 @@ dependencies {
     implementation(libs.arcore.client)
     implementation(libs.opencv)
 
-    // ONNX Runtime (Kotlin) for monocular depth (Depth Anything V2) on the non-ARCore path.
+    // ONNX Runtime (Kotlin) for monocular depth (MiDaS Small) on the non-ARCore path.
     // OpenCV DNN (the native engine's ONNX runtime) can't reliably import the ViT depth model,
     // so depth runs here, where its consumer (SphereSlamStandaloneTrackingAnalyzer) lives.
     implementation(libs.onnxruntime.android)

@@ -14,7 +14,7 @@ import java.nio.FloatBuffer
 data class DepthMap(
     val width: Int,
     val height: Int,
-    /** Row-major `height * width` values. Depth Anything outputs INVERSE depth: larger = nearer. */
+    /** Row-major `height * width` values. MiDaS outputs INVERSE depth: larger = nearer. */
     val data: FloatArray,
 ) {
     init {
@@ -23,17 +23,17 @@ data class DepthMap(
 }
 
 /**
- * Monocular depth (Depth Anything V2-Small, int8) via ONNX Runtime, for the non-ARCore path.
+ * Monocular depth (MiDaS v2.1 Small, 256×256, int8) via ONNX Runtime, for the non-ARCore path.
  *
- * Why ONNX Runtime and not the native engine's OpenCV DNN: `cv::dnn` reliably imports the existing
- * CNNs (SuperPoint, ZeroDCE) but not a DINOv2-backbone ViT, and it can't run the int8 (QDQ) weights
- * that keep this model phone-sized; ORT runs them directly. It lives in Kotlin because its consumer,
- * [com.hereliesaz.graffitixr.feature.ar.SphereSlamStandaloneTrackingAnalyzer], is Kotlin.
+ * MiDaS Small replaced Depth Anything V2-Small here: it is ~17 MB int8 vs ~38 MB and a single
+ * self-contained graph (no external-data sidecar), and its coarse relative depth is all this path
+ * needs — the output feeds plane-fit + relative scale and is downscaled to [DEFAULT_OUT_MAX_DIM]
+ * anyway, so the ViT's extra fidelity was overkill for the bytes. MIT-licensed.
  *
- * The model ships as ONNX external-data (`model_quantized.onnx` + `model_quantized.onnx_data`); ORT
- * resolves the sibling data file by name from the graph's directory, so both are extracted to
- * [Context.getFilesDir] and the session is opened from that path — asset bytes alone can't satisfy
- * the external reference.
+ * Why ONNX Runtime and not the native engine's OpenCV DNN: ORT runs the int8 (QDQ) weights directly,
+ * which keep the model phone-sized. It lives in Kotlin because its consumer,
+ * [com.hereliesaz.graffitixr.feature.ar.SphereSlamStandaloneTrackingAnalyzer], is Kotlin. The model
+ * is extracted from assets to [Context.getFilesDir] and the session opened from that path.
  *
  * Fails soft: a missing asset or a load error leaves [isLoaded] false and [estimate] returning null,
  * exactly like the native engine's optional distortion head. All public methods are synchronized; ORT
@@ -63,10 +63,8 @@ class DepthEstimator(private val appContext: Context) : AutoCloseable {
         return try {
             val dir = File(appContext.filesDir, MODEL_DIR).apply { mkdirs() }
             val graph = File(dir, GRAPH_ASSET)
-            // Both files are needed on disk together; the graph references the data file by name.
-            if (!copyAssetIfNeeded(GRAPH_ASSET, graph) ||
-                !copyAssetIfNeeded(DATA_ASSET, File(dir, DATA_ASSET))
-            ) {
+            // Single self-contained file (no ONNX external-data sidecar for this model).
+            if (!copyAssetIfNeeded(GRAPH_ASSET, graph)) {
                 lastError = "assets absent (copy failed)"
                 Timber.w("DepthEstimator: model assets absent; depth disabled")
                 return false
@@ -116,7 +114,7 @@ class DepthEstimator(private val appContext: Context) : AutoCloseable {
         }
     }
 
-    /** Build the `[1,3,518,518]` ImageNet-normalized NCHW tensor Depth Anything expects. */
+    /** Build the `[1,3,256,256]` ImageNet-normalized NCHW tensor MiDaS Small expects. */
     private fun preprocess(bitmap: Bitmap, environment: OrtEnvironment): OnnxTensor {
         val scaled = Bitmap.createScaledBitmap(bitmap, INPUT, INPUT, true)
         val pixels = IntArray(INPUT * INPUT)
@@ -201,11 +199,10 @@ class DepthEstimator(private val appContext: Context) : AutoCloseable {
     }
 
     companion object {
-        const val INPUT = 518
+        const val INPUT = 256
         const val DEFAULT_OUT_MAX_DIM = 128
-        private const val MODEL_DIR = "depth-v1"
-        private const val GRAPH_ASSET = "model_quantized.onnx"
-        private const val DATA_ASSET = "model_quantized.onnx_data"
+        private const val MODEL_DIR = "depth-v2"
+        private const val GRAPH_ASSET = "midas_v21_small_256_int8.onnx"
         private val MEAN = floatArrayOf(0.485f, 0.456f, 0.406f)
         private val STD = floatArrayOf(0.229f, 0.224f, 0.225f)
     }

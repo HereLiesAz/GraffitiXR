@@ -92,11 +92,11 @@ android {
     namespace = "com.hereliesaz.graffitixr"
     compileSdk = 37
 
-    // Store ONNX models uncompressed in the APK. The depth model is ONNX external-data (a small graph
-    // + a ~38 MB .onnx_data); leaving them gz-packed both slows load and breaks AssetManager.openFd(),
-    // and ONNX Runtime memory-maps the weights, which needs them uncompressed on disk anyway.
+    // Store ONNX models uncompressed in the APK. Leaving them gz-packed slows load and breaks
+    // AssetManager.openFd(), and ONNX Runtime memory-maps the weights, which needs them uncompressed
+    // on disk anyway. (The depth model is now MiDaS Small int8 — a single ~17 MB self-contained graph.)
     androidResources {
-        noCompress += listOf("onnx", "onnx_data")
+        noCompress += listOf("onnx")
     }
 
     defaultConfig {

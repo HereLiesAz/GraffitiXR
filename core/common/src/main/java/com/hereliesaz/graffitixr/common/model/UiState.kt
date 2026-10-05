@@ -172,7 +172,7 @@ data class ArUiState(
      */
     val arCoreDepthEnabled: Boolean = true,
     /**
-     * Monocular depth (Depth Anything V2 via ONNX Runtime), default true. It is the depth source for
+     * Monocular depth (MiDaS Small via ONNX Runtime), default true. It is the depth source for
      * any device that can't get ARCore's Depth API — no ARCore, ARCore turned off, or an ARCore device
      * whose depth is unsupported/off — forming planes / recovering scale there. It stays dormant when
      * ARCore depth is actually active, so those devices pay nothing. Applies on next AR entry.

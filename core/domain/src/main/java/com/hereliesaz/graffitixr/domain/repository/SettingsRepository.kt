@@ -174,7 +174,7 @@ interface SettingsRepository {
     val arCoreDepthEnabled: Flow<Boolean>
     suspend fun setArCoreDepthEnabled(on: Boolean)
 
-    /** Monocular depth (Depth Anything V2) for the non-ARCore path. Beta; default off. */
+    /** Monocular depth (MiDaS Small) for the non-ARCore path. Beta; default off. */
     val monocularDepthEnabled: Flow<Boolean>
     suspend fun setMonocularDepthEnabled(on: Boolean)
 
