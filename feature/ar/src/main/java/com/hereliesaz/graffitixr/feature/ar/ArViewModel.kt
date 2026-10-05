@@ -913,7 +913,7 @@ class ArViewModel @Inject constructor(
     /** One synthetic-image inference to confirm the depth model loads AND executes on this device. */
     private fun selfTestDepth() {
         if (!depthEstimator.load()) {
-            appendDiag("depth: model unavailable (load failed)")
+            appendDiag("depth: model unavailable — ${depthEstimator.lastError ?: "load failed"}")
             return
         }
         val n = 64
