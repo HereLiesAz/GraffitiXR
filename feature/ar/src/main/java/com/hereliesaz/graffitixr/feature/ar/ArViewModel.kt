@@ -877,6 +877,24 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.setFeatureMapEnabled(on) }
     }
 
+    /**
+     * Per-keyframe device-orientation log for the spherical-coverage map (Phase 1b,
+     * docs/SPHERESLAM_SPHERE_MAP.md). Accumulated during standalone tracking, snapshotted onto the
+     * project in [saveProjectWallMap], co-registered with the wall feature map and reset on the same
+     * canonical-frame boundaries. Storage only — nothing consumes it for relocalization yet.
+     */
+    private val keyframeOrientationRecorder = KeyframeOrientationRecorder()
+
+    /**
+     * Record one standalone keyframe orientation `(timestampNs, quaternion[x,y,z,w])`. Gated on the
+     * feature-map flag so the classic planar path records nothing; off by default. Called on the
+     * camera worker thread — [KeyframeOrientationRecorder] is thread-safe.
+     */
+    fun recordStandaloneKeyframeOrientation(timestampNs: Long, quaternion: FloatArray) {
+        if (!_evalFeatureMapEnabled.value) return
+        keyframeOrientationRecorder.record(timestampNs, quaternion)
+    }
+
     private val _evalAutoFocusEnabled = MutableStateFlow(true)
 
     /** ARCore autofocus: ON is `FocusMode.AUTO`, OFF is `FocusMode.FIXED`. */
@@ -2340,6 +2358,9 @@ class ArViewModel @Inject constructor(
                     } else {
                         transformApplied = true
                         lastStandaloneGuideKey = null
+                        // New canonical frame: the orientation log is co-registered to the old one,
+                        // so drop it with the map (Phase 1b, docs/SPHERESLAM_SPHERE_MAP.md).
+                        keyframeOrientationRecorder.clear()
                         current.copy(
                             sphereSlamReferenceUri = candidateUri,
                             sphereSlamReferenceWidthMeters = referenceWidthMeters,
@@ -2356,6 +2377,7 @@ class ArViewModel @Inject constructor(
                             sphereSlamWallFeatureMap = null,
                             sphereSlamWallFeatureMapFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                            sphereSlamKeyframeOrientations = null,
                             sphereSlamAtlasPages = emptyList(),
                         )
                     }
@@ -2464,6 +2486,7 @@ class ArViewModel @Inject constructor(
                         current
                     } else {
                         cleared = true
+                        keyframeOrientationRecorder.clear()
                         current.copy(
                             sphereSlamReferenceUri = null,
                             sphereSlamReferenceWidthMeters = 1f,
@@ -2479,6 +2502,7 @@ class ArViewModel @Inject constructor(
                             sphereSlamWallFeatureMap = null,
                             sphereSlamWallFeatureMapFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                            sphereSlamKeyframeOrientations = null,
                             sphereSlamAtlasPages = emptyList(),
                         )
                     }
@@ -2864,6 +2888,12 @@ class ArViewModel @Inject constructor(
                         sphereSlamWallFeatureMap = map,
                         sphereSlamWallFeatureMapFrameVersion =
                             com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                        // Phase 1b: persist the per-keyframe orientation log alongside the map it is
+                        // co-registered with. Null snapshot (flag off / nothing recorded) keeps the
+                        // project's existing value (docs/SPHERESLAM_SPHERE_MAP.md).
+                        sphereSlamKeyframeOrientations =
+                            keyframeOrientationRecorder.snapshot()
+                                ?: project.sphereSlamKeyframeOrientations,
                     )
                 } else {
                     project

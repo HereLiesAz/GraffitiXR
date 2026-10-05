@@ -115,6 +115,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private val onFrameTracked: (SphereSlamStandaloneFrame?) -> Unit,
     private val onReferenceReady: (SphereSlamStandaloneSession.Reference) -> Unit = {},
     private val onAtlasPageAdded: (StandaloneAtlasGrowthCandidate) -> Unit = {},
+    // Phase 1b of the spherical-coverage map (docs/SPHERESLAM_SPHERE_MAP.md): the device bearing at
+    // each atlas-growth keyframe. Defaults to a no-op, so this records nothing until the view model
+    // opts in by wiring it — storage only, no tracking/reloc behavior change.
+    private val onKeyframeOrientation: (Long, FloatArray) -> Unit = { _, _ -> },
     private val onDiagnostic: (String) -> Unit = {},
     private val onCalibrationChanged: (StandaloneCalibrationDiagnostics) -> Unit = {},
     private val onFailure: (StandaloneFailureEvent) -> Unit = {},
@@ -747,6 +751,11 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 canonicalFromPage = page.canonicalFromPage.copyOf(),
             ),
         )
+        // Record the device bearing at this keyframe (the angular glue for the surrounding sphere).
+        // Best-effort: skip silently when the sensor hasn't produced a sample.
+        bridge.latestOrientationSample()?.let {
+            onKeyframeOrientation(android.os.SystemClock.elapsedRealtimeNanos(), it)
+        }
     }
 
     private fun configureMobileGs(intrinsics: CameraIntrinsics) {

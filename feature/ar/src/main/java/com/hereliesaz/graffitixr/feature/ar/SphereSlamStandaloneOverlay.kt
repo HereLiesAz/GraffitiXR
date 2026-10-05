@@ -120,6 +120,13 @@ fun SphereSlamStandaloneOverlay(
     onTrackingTick: (Boolean) -> Unit = {},
     onReferenceRegistrationChanged: (Boolean) -> Unit = {},
     onDiagnostic: (String) -> Unit = {},
+    /**
+     * Per-keyframe device orientation `(timestampNs, quaternion[x,y,z,w])` sampled at each atlas-growth
+     * keyframe — Phase 1b of the spherical-coverage map (`docs/SPHERESLAM_SPHERE_MAP.md`). Storage only;
+     * the view model gates recording on the feature-map flag and persists the log. Fired on the camera
+     * worker thread, so the handler must be thread-safe.
+     */
+    onKeyframeOrientation: (Long, FloatArray) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -830,6 +837,7 @@ fun SphereSlamStandaloneOverlay(
                     }
                 },
                 onFrameTracked = ::consumeTrackedFrame,
+                onKeyframeOrientation = onKeyframeOrientation,
                 onFatalError = { error ->
                     postUi {
                         if (error is StandaloneReferenceTooWeakException) {
