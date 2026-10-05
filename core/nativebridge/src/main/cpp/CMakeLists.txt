@@ -22,6 +22,15 @@ add_library(graffitixr SHARED
     KpmBridge.cpp
 )
 
+# 16 KB page-size support. Android's newer devices (and Play's requirement) use a 16 KB memory page
+# size; a shared library laid out for 4 KB pages fails to load there. Force 16 KB ELF segment
+# alignment explicitly so libgraffitixr.so is correct regardless of the NDK's default (older NDKs
+# default to 4 KB). Prebuilt deps (ONNX Runtime, OpenCV) ship their own 16 KB-aligned .so.
+target_link_options(graffitixr PRIVATE
+    "-Wl,-z,max-page-size=16384"
+    "-Wl,-z,common-page-size=16384"
+)
+
 # ---------------------------------------------------------------------------
 # SphereSLAM / artoolkitX KPM.
 #
