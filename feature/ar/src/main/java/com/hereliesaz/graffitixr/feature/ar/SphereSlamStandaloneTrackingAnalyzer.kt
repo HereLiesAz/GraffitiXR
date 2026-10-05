@@ -119,6 +119,12 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     // each atlas-growth keyframe. Defaults to a no-op, so this records nothing until the view model
     // opts in by wiring it — storage only, no tracking/reloc behavior change.
     private val onKeyframeOrientation: (Long, FloatArray) -> Unit = { _, _ -> },
+    // Phase 2 of the spherical-coverage map: optional monocular depth source. When non-null AND loaded,
+    // the analyzer estimates per-keyframe depth on the live frame and stashes it in the native engine
+    // for depth-calibrated radial map-point placement. Null (the default, and the classic path) means
+    // no depth is ever stashed, so the native map builds from wall-plane back-projection exactly as
+    // before. The view model supplies this only on the standalone path with the feature-map flag on.
+    private val depthEstimator: com.hereliesaz.graffitixr.feature.ar.depth.DepthEstimator? = null,
     private val onDiagnostic: (String) -> Unit = {},
     private val onCalibrationChanged: (StandaloneCalibrationDiagnostics) -> Unit = {},
     private val onFailure: (StandaloneFailureEvent) -> Unit = {},
@@ -196,6 +202,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         }
     }
     private var lastAtlasGrowthMs = Long.MIN_VALUE
+    // Phase 2: throttle MiDaS inference to a keyframe cadence (not per-frame — ORT CPU inference is
+    // too expensive for 30fps and the map builds per-keyframe anyway).
+    private var lastDepthMs = Long.MIN_VALUE
     @Volatile private var closed = false
     @Volatile private var fatal = false
 
@@ -369,6 +378,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                     pose = pose,
                     intrinsics = intrinsics,
                 )
+                maybePushDepth(rotated)
                 // Render pose = raw KPM pulled toward the MobileGS reloc estimate when that estimate
                 // corroborates it (drift correction), then temporally smoothed (jitter). The RAW KPM
                 // pose still drives gating (lastAcceptedVisualView, above), the atlas (maybeGrowAtlas)
@@ -620,6 +630,44 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             created.close()
             throw t
         }
+    }
+
+    /**
+     * Phase 2 of the spherical-coverage map: estimate monocular depth on the live keyframe and stash
+     * it in the native engine for depth-calibrated radial map-point placement. Throttled to a keyframe
+     * cadence. Entirely optional and fail-soft: with no [depthEstimator] (the classic path), or when
+     * the model is unavailable, nothing is stashed and the native map builds from the wall plane alone.
+     */
+    private fun maybePushDepth(frame: RotatedLuma) {
+        val estimator = depthEstimator ?: return
+        val slam = slamManager ?: return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (lastDepthMs != Long.MIN_VALUE && now - lastDepthMs < DEPTH_MIN_INTERVAL_MS) return
+        lastDepthMs = now
+        if (!estimator.isLoaded && !estimator.load()) return
+
+        // MiDaS wants RGB; the live frame is luma. A gray bitmap is coarse but all this path needs —
+        // depth here is downscaled and only calibrates a radius, not a texture.
+        val w = frame.width
+        val h = frame.height
+        if (w <= 0 || h <= 0 || frame.bytes.size < w * h) return
+        val pixels = IntArray(w * h)
+        for (i in 0 until w * h) {
+            val v = frame.bytes[i].toInt() and 0xFF
+            pixels[i] = (0xFF shl 24) or (v shl 16) or (v shl 8) or v
+        }
+        val gray = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+        gray.setPixels(pixels, 0, w, 0, 0, w, h)
+        val depth = try {
+            estimator.estimate(gray)
+        } finally {
+            gray.recycle()
+        } ?: run {
+            // Inference failed: clear any stale stashed depth so placement falls back to the wall plane.
+            slam.setLatestDepthMap(null, 0, 0, 0, 0)
+            return
+        }
+        slam.setLatestDepthMap(depth.data, depth.width, depth.height, w, h)
     }
 
     private fun maybeGrowAtlas(
@@ -987,6 +1035,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     }
 
     private companion object {
+        /** Phase 2: minimum interval between MiDaS depth inferences (keyframe cadence, not per-frame). */
+        const val DEPTH_MIN_INTERVAL_MS = 500L
+
         /**
          * Minimum PnP inliers before a reloc is allowed to correct the pose, on top of the
          * [PoseFusion.MIN_INLIER_RATIO] ratio gate. A handful of inliers can satisfy a ratio by luck;

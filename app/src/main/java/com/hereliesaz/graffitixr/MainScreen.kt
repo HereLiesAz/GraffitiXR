@@ -312,6 +312,7 @@ fun MainScreen(
                             onKeyframeOrientation = { timestampNs, quaternion ->
                                 arViewModel.recordStandaloneKeyframeOrientation(timestampNs, quaternion)
                             },
+                            depthEstimator = arViewModel.standaloneDepthEstimatorOrNull(),
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {

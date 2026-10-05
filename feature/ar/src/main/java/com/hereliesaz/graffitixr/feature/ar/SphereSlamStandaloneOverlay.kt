@@ -127,6 +127,12 @@ fun SphereSlamStandaloneOverlay(
      * worker thread, so the handler must be thread-safe.
      */
     onKeyframeOrientation: (Long, FloatArray) -> Unit = { _, _ -> },
+    /**
+     * Phase 2: optional monocular depth source. Non-null (feature-map flag on) opts this session into
+     * depth-calibrated radial map-point placement; null is the classic wall-plane path. Owned by the
+     * view model — the analyzer uses it but never closes it.
+     */
+    depthEstimator: com.hereliesaz.graffitixr.feature.ar.depth.DepthEstimator? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -838,6 +844,7 @@ fun SphereSlamStandaloneOverlay(
                 },
                 onFrameTracked = ::consumeTrackedFrame,
                 onKeyframeOrientation = onKeyframeOrientation,
+                depthEstimator = depthEstimator,
                 onFatalError = { error ->
                     postUi {
                         if (error is StandaloneReferenceTooWeakException) {

@@ -831,6 +831,10 @@ class ArViewModel @Inject constructor(
     private fun applyFeatureMapSwitch(on: Boolean) {
         slamManager.setMapBuildEnabled(on)
         slamManager.setMapRelocEnabled(on)
+        // Sphere map Phase 2: allow depth-calibrated radial placement while the map is building. Inert
+        // unless the standalone analyzer also stashes per-keyframe depth, so this is a no-op on the
+        // ARCore path and when depth is unavailable.
+        slamManager.setDepthPlacementEnabled(on)
     }
 
     private val _evalFusionEnabled = MutableStateFlow(false)
@@ -927,6 +931,15 @@ class ArViewModel @Inject constructor(
         com.hereliesaz.graffitixr.feature.ar.depth.DepthEstimator(appContext)
     }
     private val depthEstimator get() = depthEstimatorLazy.value
+
+    /**
+     * The shared depth estimator for the standalone analyzer, or null when the feature-map flag is
+     * off (Phase 2). Returning null keeps the analyzer on the pure wall-plane path; a non-null
+     * estimator opts that session into depth-calibrated radial map-point placement. Single instance,
+     * closed in [onCleared], so the analyzer must not close it.
+     */
+    fun standaloneDepthEstimatorOrNull(): com.hereliesaz.graffitixr.feature.ar.depth.DepthEstimator? =
+        if (_evalFeatureMapEnabled.value) depthEstimator else null
 
     /** One synthetic-image inference to confirm the depth model loads AND executes on this device. */
     private fun selfTestDepth() {
