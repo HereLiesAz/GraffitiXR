@@ -266,13 +266,14 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
-    // Defaults TRUE: monocular depth (MiDaS Small, ONNX Runtime) is the depth source for any
-    // device that can't get ARCore's Depth API (no ARCore, ARCore off, or ARCore depth unsupported/off),
-    // so it is on by default — but it loads/runs only when ARCore depth isn't active, so a device whose
-    // ARCore depth works pays nothing for it.
+    // Defaults FALSE (opt-in): monocular depth (MiDaS Small, ONNX Runtime) is the depth source for a
+    // device that can't get ARCore's Depth API, but on some SoCs ONNX Runtime aborts the process from
+    // inside OrtSession.createSession (native SIGABRT in checkOrtStatus) — uncatchable, so a default-on
+    // self-test crashed the app on launch. Until that native abort is root-caused, depth is opt-in via
+    // Settings so it never runs without the user asking for it.
     override val monocularDepthEnabled: Flow<Boolean> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { preferences -> preferences[MONOCULAR_DEPTH_ENABLED] ?: true }
+        .map { preferences -> preferences[MONOCULAR_DEPTH_ENABLED] ?: false }
 
     override suspend fun setMonocularDepthEnabled(on: Boolean) {
         context.dataStore.edit { preferences ->
