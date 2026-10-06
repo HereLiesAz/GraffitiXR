@@ -894,7 +894,7 @@ class ArViewModel @Inject constructor(
      * Lazily created; sampling runs only while standalone tracking with the feature-map flag on, and
      * stops on reset/exit. Magnetometer-fused (`TYPE_ROTATION_VECTOR`), so both axes are drift-free.
      */
-    private val attitudeProvider by lazy {
+    private val cameraAttitudeProvider by lazy {
         com.hereliesaz.sphereslam.CameraAttitudeProvider(appContext)
     }
 
@@ -920,8 +920,8 @@ class ArViewModel @Inject constructor(
     /** Latest camera attitude (headingDeg, elevationDeg) for projecting the glow, or null. */
     val latestCameraAttitude: Pair<Float, Float>?
         get() {
-            val h = attitudeProvider.latestHeadingDegrees() ?: return null
-            return h to (attitudeProvider.latestElevationDegrees() ?: 0f)
+            val h = cameraAttitudeProvider.latestHeadingDegrees() ?: return null
+            return h to (cameraAttitudeProvider.latestElevationDegrees() ?: 0f)
         }
 
     /**
@@ -934,9 +934,9 @@ class ArViewModel @Inject constructor(
     fun recordStandaloneKeyframeOrientation(timestampNs: Long, quaternion: FloatArray) {
         if (!_evalFeatureMapEnabled.value) return
         keyframeOrientationRecorder.record(timestampNs, quaternion)
-        attitudeProvider.start() // idempotent; ensures sampling once standalone recording begins
-        val heading = attitudeProvider.latestHeadingDegrees() ?: return
-        val elevation = attitudeProvider.latestElevationDegrees() ?: 0f
+        cameraAttitudeProvider.start() // idempotent; ensures sampling once standalone recording begins
+        val heading = cameraAttitudeProvider.latestHeadingDegrees() ?: return
+        val elevation = cameraAttitudeProvider.latestElevationDegrees() ?: 0f
         val grew = synchronized(sphereCoverageLock) { sphereCoverage.observe(heading, elevation) }
         if (grew) {
             synchronized(sphereCoverageLock) {
@@ -952,8 +952,8 @@ class ArViewModel @Inject constructor(
      * wall. No-op when the sensor is unavailable (the arc then auto-anchors to the first keyframe).
      */
     private fun anchorSphereCoverageToWall() {
-        attitudeProvider.start()
-        val heading = attitudeProvider.latestHeadingDegrees() ?: return
+        cameraAttitudeProvider.start()
+        val heading = cameraAttitudeProvider.latestHeadingDegrees() ?: return
         synchronized(sphereCoverageLock) { sphereCoverage.setWallHeading(heading) }
     }
 
@@ -1915,7 +1915,7 @@ class ArViewModel @Inject constructor(
         isInArMode = false
         isDestroying = true
         // Release the compass sensor (Phase 3 sweep coverage); re-armed on the next standalone record.
-        attitudeProvider.stop()
+        cameraAttitudeProvider.stop()
         // Stop the GL thread FIRST, before any of the state below is cleared.
         //
         // `onDrawFrame` returns immediately on this flag, and until it is set the renderer keeps
@@ -4830,7 +4830,7 @@ class ArViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         stopSystemThrottleMonitoring()
-        attitudeProvider.stop()
+        cameraAttitudeProvider.stop()
         if (depthEstimatorLazy.isInitialized()) depthEstimatorLazy.value.close()
         // viewModelScope is already cancelled by the time onCleared runs, so leaveSession()'s
         // viewModelScope.launch would never execute and the collaboration session would leak.
