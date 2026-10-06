@@ -64,16 +64,15 @@ This document lists key files in the repository and their purposes.
 *   `src/main/cpp/LowLightEnhancer.cpp`: Low-light frame enhancement for feature detection.
 *   `src/main/cpp/MlasStub.cpp`: Build-time stub patching a missing ONNX Runtime symbol.
 
-### `:sphereslam`
+### SphereSLAM (published dependency)
 
-*   `SphereSlamStandaloneSession.kt`: synchronous calibrated KPM page session used by CameraX
-    standalone AR; returns the pose for the exact submitted frame.
-*   `SphereSlamTracker.kt`: asynchronous lower-rate KPM sidecar used beside ARCore. Live-camera
-    calibration and reference-image dimensions are independent, so a perspective-rectified metric
-    page can be smaller than the camera frame; only the newest pending live frame is retained.
-*   `KpmSphereSlamEngine.kt` / `KpmBridge.kt`: shared KPM engine/JNI ownership for both roles.
-*   `SphereSlamPoseMath.kt`: page DPI/physical scale and KPM camera-from-page → centered
-    right-handed OpenGL view conversion.
+The KPM planar tracker is no longer built in this repo. It is consumed as the published
+`com.github.HereLiesAz.SphereSLAM:sphereslam` artifact, which carries the Kotlin API
+(`SphereSlamStandaloneSession`, `SphereSlamTracker`, `SphereSlamPoseMath`, …) and the native
+`libsphereslam.so` (artoolkitX KPM + JNI bridge). GraffitiXR's own `:core:nativebridge` no longer
+compiles artoolkitX; `feature/ar` depends on the artifact and the release guards in `tools/` verify
+the real (non-stub) tracker is packaged.
+
 *   The native KPM atlas/session is rebuildable state and is never persisted; projects store the
     rectified reference PNG plus scale metadata.
 

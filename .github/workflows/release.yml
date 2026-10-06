@@ -44,11 +44,6 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          # third_party/artoolkitx backs core/nativebridge's SphereSLAM/KPM tracker — the non-ARCore
-          # standalone path. Without it the gitlink is empty, CMake builds inert stubs, and we would
-          # publish a release with non-ARCore tracking silently disabled. android-ci.yml checks it out
-          # the same way.
-          submodules: recursive
 
       - name: Inject Google services
         env:
@@ -169,9 +164,10 @@ jobs:
           if-no-files-found: error
 
       - name: Verify SphereSLAM native tracking is present
-        # CMake silently stubs the KPM/SphereSLAM tracker (STATUS, not error) when third_party/artoolkitx
-        # is absent, so a submodule hiccup could ship a release with non-ARCore tracking disabled. These
-        # are the same checks android-ci.yml runs; fail the publish rather than ship a crippled build.
+        # The KPM/SphereSLAM tracker now ships in the published SphereSLAM artifact. These checks fail
+        # the publish if the dependency's libsphereslam.so is missing, is the artoolkitX-less stub, or
+        # its API/JNI classes were stripped — rather than ship a release with non-ARCore tracking dead.
+        # android-ci.yml runs the same checks.
         run: |
           python3 tools/check_sphereslam_build_contract.py
           python3 tools/check_sphereslam_apk.py --variant release
