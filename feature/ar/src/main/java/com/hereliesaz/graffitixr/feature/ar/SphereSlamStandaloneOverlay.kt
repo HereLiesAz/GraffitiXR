@@ -144,6 +144,14 @@ fun SphereSlamStandaloneOverlay(
      * (§9.1).
      */
     sweepCoverage: Float? = null,
+    /**
+     * Still-unscanned coverage directions for the "map more here" glow, read per tracked frame.
+     * Empty (the default, or once coverage is complete) draws nothing. Fed from the view model's
+     * [com.hereliesaz.sphereslam.SphereCoverage.thinDirections].
+     */
+    coverageGlowDirections: () -> List<com.hereliesaz.sphereslam.SphereCoverage.Direction> = { emptyList() },
+    /** Latest camera attitude `(headingDeg, elevationDeg)` for projecting the glow, or null. */
+    cameraAttitude: () -> Pair<Float, Float>? = { null },
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -516,6 +524,8 @@ fun SphereSlamStandaloneOverlay(
         value = loaded.first
     }
     val glRenderer = remember(context) { HomographyOverlayRenderer(context) }
+    // SphereSLAM's drop-in coverage glow, layered above the design overlay. Fed per tracked frame.
+    val coverageGlowView = remember(context) { com.hereliesaz.sphereslam.overlay.CoverageGlowView(context) }
 
     LaunchedEffect(glRenderer, designBitmap) {
         if (designBitmap == null) {
@@ -692,6 +702,21 @@ fun SphereSlamStandaloneOverlay(
             glRenderer.clearPose()
         } else {
             glRenderer.updatePose(frame.viewMatrix, frame.projMatrix, frame.frameAspect)
+            // Feed the coverage glow: project the unscanned directions for the current view. FOV is
+            // recovered from the perspective projection (proj[0] = 1/tan(hFov/2), proj[5] = 1/tan(vFov/2)).
+            val attitude = cameraAttitude()
+            val directions = coverageGlowDirections()
+            if (attitude != null && directions.isNotEmpty()) {
+                val px = frame.projMatrix[0]
+                val py = frame.projMatrix[5]
+                if (px > 1e-4f && py > 1e-4f) {
+                    val hFovDeg = Math.toDegrees(2.0 * kotlin.math.atan(1.0 / px)).toFloat()
+                    val vFovDeg = Math.toDegrees(2.0 * kotlin.math.atan(1.0 / py)).toFloat()
+                    coverageGlowView.update(directions, attitude.first, attitude.second, hFovDeg, vFovDeg)
+                }
+            } else {
+                coverageGlowView.update(emptyList(), 0f, 0f, 60f, 45f)
+            }
         }
         val screenUnitsPerPixel = frame?.let {
             val size = surfaceSize.get()
@@ -933,6 +958,12 @@ fun SphereSlamStandaloneOverlay(
         modifier = modifier
             .fillMaxSize()
             .onSizeChanged { surfaceSize.set(it) },
+    )
+
+    // Coverage glow surface, above the design overlay and the camera preview.
+    AndroidView(
+        factory = { coverageGlowView },
+        modifier = Modifier.fillMaxSize(),
     )
 
     if (!referenceReady || trackingState == StandaloneTrackingState.INITIALIZING) {
