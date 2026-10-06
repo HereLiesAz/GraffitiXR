@@ -389,7 +389,8 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             }
 
             // Not accepted: classify why for the failure taxonomy, then emit the bridge frame or null
-            // per the loop's state decision.
+            // per the loop's state decision. (Capture into a local val so the null check smart-casts.)
+            val rejection = outcome.rejection
             when {
                 outcome.stale -> {
                     staleObservationReported = true
@@ -400,8 +401,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                         ),
                     )
                 }
-                outcome.rejection != null -> {
-                    val rejection = outcome.rejection
+                rejection != null -> {
                     lastPoseRejection = rejection
                     reportFailure(
                         StandaloneFailureClassifier.fromPoseRejection(
