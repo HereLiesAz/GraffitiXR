@@ -11,8 +11,6 @@
 }
 
 -keep class com.hereliesaz.graffitixr.nativebridge.SlamManager { *; }
-# Static-name JNI entry points in KpmBridge.cpp depend on this exact class/method naming contract.
--keep class com.hereliesaz.graffitixr.nativebridge.KpmBridge { *; }
 
 # GraffitiJNI.cpp resolves org.opencv.core.KeyPoint's constructor by name via JNI reflection
 # (FindClass + GetMethodID for the 7-arg ctor) to build List<KeyPoint> results. R8 has no
