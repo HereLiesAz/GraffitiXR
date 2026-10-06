@@ -18,6 +18,7 @@ import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintFrame
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.sphereslam.SphereSlamCalibration
 import com.hereliesaz.sphereslam.SphereSlamStandaloneSession
+import com.hereliesaz.sphereslam.reloc.RobustTrackingLoop
 import java.nio.ByteBuffer
 import timber.log.Timber
 
@@ -176,8 +177,14 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private var lastPoseRejection: StandalonePoseRejection? = null
     private var lastFailureReason: StandaloneFailureReason? = null
     private var lastReportedTrackingState: StandaloneTrackingState? = null
-    private var lastAcceptedVisualView: FloatArray? = null
     private var lastGood: SphereSlamStandaloneFrame? = null
+
+    // The library's fused per-frame loop (age -> acceptance -> correction -> smoothing -> state),
+    // rebuilt per session in [ensureSession] with the wall reference's metric width. It owns the
+    // acceptance policy, age policy, stabilizer and state machine; the proprietary reloc corroboration
+    // rides its correctAcceptedPose hook, gating on the raw KPM pose and displaying the corrected one.
+    // Bridging stays here (richer per-frame bridge frame), so no bridgeRotatedPose callback is wired.
+    private var robustLoop: RobustTrackingLoop? = null
     private var lastMetricsDiagnosticMs = Long.MIN_VALUE
     private var staleObservationReported = false
 
@@ -305,68 +312,42 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             val pose = active.match(direct, timestampNs)
             val matchEndNs = android.os.SystemClock.elapsedRealtimeNanos()
             val matchDurationMs = (matchEndNs - matchStartNs).toFloat() / 1_000_000f
+            // Read here for the frame metric/diagnostic; the loop re-checks age internally to gate
+            // staleness, using this same policy instance, so the two verdicts agree.
             val observationAge = observationAgePolicy.evaluate(
                 frameTimestampNs = timestampNs,
                 nowElapsedRealtimeNs = matchEndNs,
                 source = cameraTimestampSource,
             )
 
-            if (pose != null) {
-                if (observationAge.stale) {
-                    staleObservationReported = true
-                    reportFailure(
-                        StandaloneFailureClassifier.event(
-                            StandaloneFailureReason.STALE_OBSERVATION,
-                            "ageMs=${observationAge.ageMs} matchMs=$matchDurationMs",
-                        ),
-                    )
-                    feedMobileGsFrame(direct, rotated, timestampNs, projection, null)
-                    publishVisualMiss(projection, rotated, timestampNs)
-                    return
-                }
-                staleObservationReported = false
-                val acceptance = poseAcceptancePolicy.evaluate(
-                    viewMatrix = pose.viewMatrix,
-                    inlierCount = pose.inlierCount,
-                    reprojectionError = pose.reprojectionError,
-                    previousViewMatrix = lastAcceptedVisualView,
-                    referenceWidthUnits = pose.reference.geometry.widthMeters,
-                    // Once the short visual bridge has expired, the next legitimate wall return may
-                    // be far from the previous camera pose. Keep continuity gates deliberately
-                    // looser for that explicit reacquisition case.
-                    reacquiring = trackingStateMachine.state == StandaloneTrackingState.REACQUIRING ||
-                        trackingStateMachine.state == StandaloneTrackingState.LOST,
-                )
-                if (!acceptance.accepted) {
-                    val rejection = acceptance.rejection
-                    if (rejection != null) {
-                        lastPoseRejection = rejection
-                        reportFailure(
-                            StandaloneFailureClassifier.fromPoseRejection(
-                                rejection,
-                                "page=${pose.pageNo} inliers=${pose.inlierCount} " +
-                                    "error=${pose.reprojectionError}",
-                            ),
-                        )
-                    }
-                    feedMobileGsFrame(direct, rotated, timestampNs, projection, null)
-                    publishVisualMiss(projection, rotated, timestampNs)
-                    return
-                }
+            // Single per-frame decision: age -> acceptance (on the raw KPM pose) -> correction
+            // (fuseWithReloc, display only) -> smoothing -> state hysteresis. Bridging is handled
+            // below, caller-side, so the loop is told whether a bridge is available but renders none.
+            val loop = requireNotNull(robustLoop) { "robust tracking loop not initialised" }
+            val outcome = loop.onFrame(
+                viewMatrix = pose?.viewMatrix,
+                inlierCount = pose?.inlierCount ?: 0,
+                reprojectionError = pose?.reprojectionError ?: Float.MAX_VALUE,
+                frameTimestampNs = timestampNs,
+                nowElapsedRealtimeNs = matchEndNs,
+                timestampSource = cameraTimestampSource,
+                nowMs = android.os.SystemClock.elapsedRealtime(),
+                bridgeAvailable = canBridge(),
+            )
 
+            // MobileGS always gets the frame; it sees the RAW accepted KPM pose when one locked this
+            // frame, else null — unchanged by the correction, which only affects the displayed pose.
+            val acceptedRawView = if (outcome.accepted) pose!!.viewMatrix else null
+            feedMobileGsFrame(direct, rotated, timestampNs, projection, acceptedRawView)
+
+            if (outcome.accepted) {
+                // The loop accepts only a non-null candidate, so a pose is present here.
+                val lockedPose = requireNotNull(pose)
+                staleObservationReported = false
                 lastPoseRejection = null
                 lastFailureReason = null
-                lastAcceptedVisualView = pose.viewMatrix.copyOf()
-                val state = trackingStateMachine.onAcceptedVisual(android.os.SystemClock.elapsedRealtime())
-                reportTrackingState(state)
-                feedMobileGsFrame(
-                    direct,
-                    rotated,
-                    timestampNs,
-                    projection,
-                    pose.viewMatrix,
-                )
-                if (state != StandaloneTrackingState.LOCKED) {
+                reportTrackingState(outcome.state)
+                if (outcome.state != StandaloneTrackingState.LOCKED) {
                     onFrameTracked(null)
                     return
                 }
@@ -375,24 +356,23 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 maybeGrowAtlas(
                     active = active,
                     frame = rotated,
-                    pose = pose,
+                    pose = lockedPose,
                     intrinsics = intrinsics,
                 )
                 maybePushDepth(rotated)
-                // Render pose = raw KPM pulled toward the MobileGS reloc estimate when that estimate
-                // corroborates it (drift correction), then temporally smoothed (jitter). The RAW KPM
-                // pose still drives gating (lastAcceptedVisualView, above), the atlas (maybeGrowAtlas)
-                // and what is fed to MobileGS (feedMobileGsFrame) — only the displayed pose is fused.
-                val renderView = poseStabilizer.stabilize(fuseWithReloc(pose.viewMatrix))
+                // outcome.renderPose = stabilize(fuseWithReloc(rawKpm)): the raw pose nudged toward a
+                // corroborating MobileGS reloc (drift trim), then smoothed. Gating, the atlas and the
+                // MobileGS feed all used the RAW pose — only the displayed pose is fused.
+                val renderView = outcome.renderPose!!
                 val tracked = SphereSlamStandaloneFrame(
                     viewMatrix = renderView,
                     projMatrix = projection,
                     frameAspect = rotated.width.toFloat() / rotated.height.toFloat(),
                     frameHeightPixels = rotated.height,
                     timestampNs = timestampNs,
-                    pageNo = pose.pageNo,
-                    reprojectionError = pose.reprojectionError,
-                    inlierCount = pose.inlierCount,
+                    pageNo = lockedPose.pageNo,
+                    reprojectionError = lockedPose.reprojectionError,
+                    inlierCount = lockedPose.inlierCount,
                     unitsPerPixel = unitsPerPixel(
                         renderView,
                         projection,
@@ -408,14 +388,39 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 return
             }
 
-            feedMobileGsFrame(direct, rotated, timestampNs, projection, null)
-            reportFailure(
-                StandaloneFailureClassifier.event(
-                    StandaloneFailureReason.NO_CURRENT_PAGE_MATCH,
-                    "matchMs=$matchDurationMs frameTimestampNs=$timestampNs",
-                ),
-            )
-            publishVisualMiss(projection, rotated, timestampNs)
+            // Not accepted: classify why for the failure taxonomy, then emit the bridge frame or null
+            // per the loop's state decision.
+            when {
+                outcome.stale -> {
+                    staleObservationReported = true
+                    reportFailure(
+                        StandaloneFailureClassifier.event(
+                            StandaloneFailureReason.STALE_OBSERVATION,
+                            "ageMs=${observationAge.ageMs} matchMs=$matchDurationMs",
+                        ),
+                    )
+                }
+                outcome.rejection != null -> {
+                    val rejection = outcome.rejection
+                    lastPoseRejection = rejection
+                    reportFailure(
+                        StandaloneFailureClassifier.fromPoseRejection(
+                            rejection,
+                            "page=${pose?.pageNo} inliers=${pose?.inlierCount} " +
+                                "error=${pose?.reprojectionError}",
+                        ),
+                    )
+                }
+                else -> {
+                    reportFailure(
+                        StandaloneFailureClassifier.event(
+                            StandaloneFailureReason.NO_CURRENT_PAGE_MATCH,
+                            "matchMs=$matchDurationMs frameTimestampNs=$timestampNs",
+                        ),
+                    )
+                }
+            }
+            publishVisualMiss(outcome.state, projection, rotated, timestampNs)
         } catch (t: Throwable) {
             if (!closed) {
                 fatal = true
@@ -430,18 +435,35 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         }
     }
 
+    // The state is already decided by RobustTrackingLoop (which ran onVisualMiss internally with the
+    // [canBridge] availability we gave it). Here we only surface it and emit the matching frame: a
+    // gyro-bridged pose while IMU_BRIDGE holds, otherwise null and the held frame is forgotten so a
+    // re-lock snaps rather than drifting from a stale anchor.
     private fun publishVisualMiss(
+        state: StandaloneTrackingState,
         projection: FloatArray,
         frame: RotatedLuma,
         timestampNs: Long,
     ) {
-        val bridged = bridgeLastGood(projection, frame, timestampNs)
-        val state = trackingStateMachine.onVisualMiss(
-            bridgeAvailable = bridged != null,
-            nowMs = android.os.SystemClock.elapsedRealtime(),
-        )
         reportTrackingState(state)
-        onFrameTracked(if (state == StandaloneTrackingState.IMU_BRIDGE) bridged else null)
+        if (state == StandaloneTrackingState.IMU_BRIDGE) {
+            onFrameTracked(bridgeLastGood(projection, frame, timestampNs))
+        } else {
+            lastGood = null
+            onFrameTracked(null)
+        }
+    }
+
+    /**
+     * Whether a gyro bridge can still hold a brief visual miss: a prior good frame exists, the IMU
+     * reference is within [maxBridgeMs], and a rotation delta is available. Pure — no state change
+     * (the loop owns the stabilizer reset; [publishVisualMiss] owns clearing [lastGood]).
+     */
+    private fun canBridge(): Boolean {
+        if (lastGood == null) return false
+        val elapsed = bridge.msSinceReference()
+        if (elapsed < 0L || elapsed > maxBridgeMs) return false
+        return bridge.cameraRotationDelta() != null
     }
 
     private fun reportFailure(event: StandaloneFailureEvent) {
@@ -622,6 +644,18 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 )
             }
             configureMobileGs(intrinsics)
+            // Rebuild the fused loop for this session. referenceWidthUnits scales the acceptance
+            // translation-jump limit; the primary wall reference's metric width is the right scale
+            // (grown atlas pages share the wall's scale). The loop owns the (freshly reset above)
+            // stabilizer and the state machine; the proprietary corroboration rides correctAcceptedPose.
+            robustLoop = RobustTrackingLoop(
+                referenceWidthUnits = reference.geometry.widthMeters,
+                acceptancePolicy = poseAcceptancePolicy,
+                agePolicy = observationAgePolicy,
+                stabilizer = poseStabilizer,
+                stateMachine = trackingStateMachine,
+                correctAcceptedPose = ::fuseWithReloc,
+            )
             session = created
             sessionKey = key
             onReferenceReady(reference)
@@ -952,13 +986,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         frame: RotatedLuma,
         timestampNs: Long,
     ): SphereSlamStandaloneFrame? {
+        // Availability (held frame present, within maxBridgeMs, rotation delta exists) was already
+        // confirmed by [canBridge] and reflected in the loop's IMU_BRIDGE decision; here we just build
+        // the bridged frame. A null return (delta briefly unavailable) renders nothing this frame.
         val held = lastGood ?: return null
-        val elapsed = bridge.msSinceReference()
-        if (elapsed < 0L || elapsed > maxBridgeMs) {
-            lastGood = null
-            poseStabilizer.reset()
-            return null
-        }
         val delta = bridge.cameraRotationDelta() ?: return null
         return held.copy(
             viewMatrix = rotateViewPoseKeepingCameraCenter(held.viewMatrix, delta),
@@ -1027,7 +1058,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         lastFailureReason = null
         lastReportedTrackingState = null
         trackingStateMachine.reset()
-        lastAcceptedVisualView = null
+        robustLoop = null
         lastMetricsDiagnosticMs = Long.MIN_VALUE
         staleObservationReported = false
         frameBuffer = null

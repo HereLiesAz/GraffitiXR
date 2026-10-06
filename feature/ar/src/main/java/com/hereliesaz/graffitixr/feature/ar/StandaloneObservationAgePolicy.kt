@@ -1,48 +1,15 @@
 package com.hereliesaz.graffitixr.feature.ar
 
-internal enum class StandaloneCameraTimestampSource {
-    REALTIME,
-    UNKNOWN,
-}
-
-data class StandaloneObservationAgeConfig(
-    val maxRealtimeAgeMs: Float = 250f,
-) {
-    init {
-        require(maxRealtimeAgeMs.isFinite() && maxRealtimeAgeMs > 0f)
-    }
-}
-
-data class StandaloneObservationAge(
-    val ageMs: Float?,
-    val stale: Boolean,
-)
-
 /**
- * CameraX forwards the underlying camera timestamp. Absolute age is safe to compare with
- * SystemClock.elapsedRealtimeNanos() only when Camera2 declares SENSOR_INFO_TIMESTAMP_SOURCE_REALTIME.
- * UNKNOWN is intentionally not guessed or offset-calibrated from callback arrival time.
+ * Stale-frame gate for standalone tracking — now owned by SphereSLAM.
+ *
+ * The age check (trustworthy only for a REALTIME camera timestamp source, never guessed for UNKNOWN)
+ * moved into the published library (`:reloc`); these aliases keep GraffitiXR's names while the
+ * implementation is the library's. Default `maxRealtimeAgeMs` is unchanged (250 ms).
+ *
+ * @see com.hereliesaz.sphereslam.reloc.ObservationAgePolicy
  */
-internal class StandaloneObservationAgePolicy(
-    private val config: StandaloneObservationAgeConfig = StandaloneObservationAgeConfig(),
-) {
-    fun evaluate(
-        frameTimestampNs: Long,
-        nowElapsedRealtimeNs: Long,
-        source: StandaloneCameraTimestampSource,
-    ): StandaloneObservationAge {
-        if (
-            source != StandaloneCameraTimestampSource.REALTIME ||
-            frameTimestampNs <= 0L ||
-            nowElapsedRealtimeNs < frameTimestampNs
-        ) {
-            return StandaloneObservationAge(ageMs = null, stale = false)
-        }
-
-        val ageMs = (nowElapsedRealtimeNs - frameTimestampNs).toFloat() / 1_000_000f
-        return StandaloneObservationAge(
-            ageMs = ageMs,
-            stale = ageMs > config.maxRealtimeAgeMs,
-        )
-    }
-}
+typealias StandaloneCameraTimestampSource = com.hereliesaz.sphereslam.reloc.CameraTimestampSource
+typealias StandaloneObservationAgeConfig = com.hereliesaz.sphereslam.reloc.ObservationAgeConfig
+typealias StandaloneObservationAge = com.hereliesaz.sphereslam.reloc.ObservationAge
+typealias StandaloneObservationAgePolicy = com.hereliesaz.sphereslam.reloc.ObservationAgePolicy
