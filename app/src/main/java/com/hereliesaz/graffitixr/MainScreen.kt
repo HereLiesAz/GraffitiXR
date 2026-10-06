@@ -316,6 +316,10 @@ fun MainScreen(
                             },
                             depthEstimator = arViewModel.standaloneDepthEstimatorOrNull(),
                             sweepCoverage = if (featureMapOn) sweepCoverageValue else null,
+                            coverageGlowDirections = {
+                                if (featureMapOn) arViewModel.sphereThinDirections.value else emptyList()
+                            },
+                            cameraAttitude = { arViewModel.latestCameraAttitude },
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {

@@ -890,57 +890,77 @@ class ArViewModel @Inject constructor(
     private val keyframeOrientationRecorder = KeyframeOrientationRecorder()
 
     /**
-     * Absolute camera heading source for the Phase 3 sweep coverage. Lazily created; sampling runs
-     * only while standalone tracking with the feature-map flag on, and stops on reset/exit. Separate
-     * from [GyroOrientationBridge] on purpose — see [CompassHeadingProvider].
+     * Absolute camera attitude source (heading + elevation) for the sweep coverage, from SphereSLAM.
+     * Lazily created; sampling runs only while standalone tracking with the feature-map flag on, and
+     * stops on reset/exit. Magnetometer-fused (`TYPE_ROTATION_VECTOR`), so both axes are drift-free.
      */
-    private val compassHeadingProvider by lazy { CompassHeadingProvider(appContext) }
+    private val cameraAttitudeProvider by lazy {
+        com.hereliesaz.sphereslam.CameraAttitudeProvider(appContext)
+    }
 
     /**
-     * Compass-anchored sweep coverage (Phase 3). Accumulates the camera heading at each keyframe over
-     * the wall's viewable front arc; [sphereCoverageFraction] drives the sweep hint. Guarded by its
-     * own lock because [recordStandaloneKeyframeOrientation] runs on the camera worker.
+     * SphereSLAM's 2-D sweep coverage (azimuth × elevation) over the wall's viewable front region;
+     * [sphereCoverageFraction] drives the sweep hint and [sphereThinDirections] the coverage glow.
+     * Guarded by its own lock because [recordStandaloneKeyframeOrientation] runs on the camera worker.
      */
-    private val sphereCoverage = com.hereliesaz.graffitixr.common.geometry.SphereCoverage()
+    private val sphereCoverage = com.hereliesaz.sphereslam.SphereCoverage(elevationBandCount = 3)
     private val sphereCoverageLock = Any()
     private val _sphereCoverageFraction = MutableStateFlow(0f)
 
-    /** Sweep coverage in `[0, 1]` over the viewable arc — 0 off the standalone path. */
+    /** Sweep coverage in `[0, 1]` over the viewable region — 0 off the standalone path. */
     val sphereCoverageFraction: StateFlow<Float> = _sphereCoverageFraction.asStateFlow()
+
+    private val _sphereThinDirections =
+        MutableStateFlow<List<com.hereliesaz.sphereslam.SphereCoverage.Direction>>(emptyList())
+
+    /** Still-unscanned directions for the coverage glow — empty off the standalone path / once full. */
+    val sphereThinDirections: StateFlow<List<com.hereliesaz.sphereslam.SphereCoverage.Direction>> =
+        _sphereThinDirections.asStateFlow()
+
+    /** Latest camera attitude (headingDeg, elevationDeg) for projecting the glow, or null. */
+    val latestCameraAttitude: Pair<Float, Float>?
+        get() {
+            val h = cameraAttitudeProvider.latestHeadingDegrees() ?: return null
+            return h to (cameraAttitudeProvider.latestElevationDegrees() ?: 0f)
+        }
 
     /**
      * Record one standalone keyframe orientation `(timestampNs, quaternion[x,y,z,w])`. Gated on the
      * feature-map flag so the classic planar path records nothing; off by default. Called on the
      * camera worker thread — [KeyframeOrientationRecorder] and the coverage accumulator are both
      * synchronized. The gyro quaternion feeds the persisted log and (natively) off-wall placement;
-     * the compass heading, read here, feeds the viewable-arc coverage.
+     * the magnetometer-fused camera attitude, read here, feeds the 2-D viewable-region coverage.
      */
     fun recordStandaloneKeyframeOrientation(timestampNs: Long, quaternion: FloatArray) {
         if (!_evalFeatureMapEnabled.value) return
         keyframeOrientationRecorder.record(timestampNs, quaternion)
-        compassHeadingProvider.start() // idempotent; ensures sampling once standalone recording begins
-        val heading = compassHeadingProvider.latestHeadingDegrees() ?: return
-        val grew = synchronized(sphereCoverageLock) { sphereCoverage.observe(heading) }
+        cameraAttitudeProvider.start() // idempotent; ensures sampling once standalone recording begins
+        val heading = cameraAttitudeProvider.latestHeadingDegrees() ?: return
+        val elevation = cameraAttitudeProvider.latestElevationDegrees() ?: 0f
+        val grew = synchronized(sphereCoverageLock) { sphereCoverage.observe(heading, elevation) }
         if (grew) {
-            _sphereCoverageFraction.value =
-                synchronized(sphereCoverageLock) { sphereCoverage.coverageFraction() }
+            synchronized(sphereCoverageLock) {
+                _sphereCoverageFraction.value = sphereCoverage.coverageFraction()
+                _sphereThinDirections.value = sphereCoverage.thinDirections()
+            }
         }
     }
 
     /**
      * Anchor the sweep's viewable arc to the heading the camera faces now — called when the wall
      * reference is captured head-on, so coverage is measured over the arc actually in front of the
-     * wall. No-op when the compass is unavailable (the arc then auto-anchors to the first keyframe).
+     * wall. No-op when the sensor is unavailable (the arc then auto-anchors to the first keyframe).
      */
     private fun anchorSphereCoverageToWall() {
-        compassHeadingProvider.start()
-        val heading = compassHeadingProvider.latestHeadingDegrees() ?: return
+        cameraAttitudeProvider.start()
+        val heading = cameraAttitudeProvider.latestHeadingDegrees() ?: return
         synchronized(sphereCoverageLock) { sphereCoverage.setWallHeading(heading) }
     }
 
     private fun resetSphereCoverage() {
         synchronized(sphereCoverageLock) { sphereCoverage.reset() }
         _sphereCoverageFraction.value = 0f
+        _sphereThinDirections.value = emptyList()
     }
 
     private val _evalAutoFocusEnabled = MutableStateFlow(true)
@@ -1895,7 +1915,7 @@ class ArViewModel @Inject constructor(
         isInArMode = false
         isDestroying = true
         // Release the compass sensor (Phase 3 sweep coverage); re-armed on the next standalone record.
-        compassHeadingProvider.stop()
+        cameraAttitudeProvider.stop()
         // Stop the GL thread FIRST, before any of the state below is cleared.
         //
         // `onDrawFrame` returns immediately on this flag, and until it is set the renderer keeps
@@ -4810,7 +4830,7 @@ class ArViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         stopSystemThrottleMonitoring()
-        compassHeadingProvider.stop()
+        cameraAttitudeProvider.stop()
         if (depthEstimatorLazy.isInitialized()) depthEstimatorLazy.value.close()
         // viewModelScope is already cancelled by the time onCleared runs, so leaveSession()'s
         // viewModelScope.launch would never execute and the collaboration session would leak.
