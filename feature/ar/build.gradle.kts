@@ -69,8 +69,8 @@ dependencies {
     // SphereSLAM provides the base KPM tracking, world-size retention (AnchoredStandaloneSession /
     // OverlayPlacement), 2-D sweep coverage (SphereCoverage / CameraAttitudeProvider), and the glow
     // overlay; GraffitiXR's fingerprint (MobileGS) reloc and pose fusion layer on top.
-    implementation("com.github.HereLiesAz.SphereSLAM:sphereslam:0.8.0")
-    implementation("com.github.HereLiesAz.SphereSLAM:overlay:0.8.0") // drop-in coverage glow (GL)
+    implementation("com.github.HereLiesAz.SphereSLAM:sphereslam:0.9.0")
+    implementation("com.github.HereLiesAz.SphereSLAM:overlay:0.9.0") // drop-in coverage glow (GL)
     implementation(project(":android_collaboration_module"))
 
     // Compose
