@@ -1,5 +1,7 @@
 # SphereSLAM Hybrid + Standalone Integration
 
+Library API baseline: **SphereSLAM 0.23.5**. The migration preserves both hybrid and standalone behavior; only the published API-facing names/visibility seams change.
+
 Status: dual-backend foundation is on `main`; co-op protocol-v3 calibration is merged through
 PR #1968; metric hybrid KPM→PoseFusion correction is implemented on
 `feat/sphereslam-hybrid-posefusion` / PR #1970.
@@ -156,7 +158,7 @@ The adapter's `Observation` contains:
 - matched `pageNo`;
 - KPM reprojection `error`;
 - KPM `inliers`;
-- `pageToCamera3x4`.
+- `cameraFromPage3x4`.
 
 The adapter publishes observations only. `ArRenderer` converts an accepted metric observation into
 an artwork-anchor correction through `HybridKpmCorrection` and `PoseFusion`; the observation is
