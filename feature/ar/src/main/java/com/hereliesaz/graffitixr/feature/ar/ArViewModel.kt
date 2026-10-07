@@ -3731,7 +3731,9 @@ class ArViewModel @Inject constructor(
         // is never invoked and so has nothing to report.
         val fusionDiag = renderer?.fusionDiagnostics()
             ?: com.hereliesaz.graffitixr.common.model.FusionDiagnostics()
-        renderer?.sphereSlamRuntimeStatus()?.let(::publishSphereSlamRuntimeStatus)
+        if (isInArMode) {
+            renderer?.sphereSlamRuntimeStatus()?.let(::publishSphereSlamRuntimeStatus)
+        }
         // Read alongside the diagnostics, not on a success path: the state this exists to expose is
         // "the capture produced nothing", which by definition never reaches one.
         val wallPoints = slamManager.getWallKeypointCount()
@@ -4081,6 +4083,7 @@ class ArViewModel @Inject constructor(
     fun onStandaloneReferenceRegistrationChanged(registered: Boolean) {
         _uiState.update { it.copy(isSphereSlamReferenceRegistered = registered) }
         val state = _uiState.value
+        if (!state.isArCoreAvailabilityResolved || state.isArCoreAvailable) return
         val available = state.isSphereSlamAvailable
         publishSphereSlamRuntimeStatus(
             com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeStatus(
@@ -4099,6 +4102,7 @@ class ArViewModel @Inject constructor(
 
     fun onStandaloneTrackingTick(isTracking: Boolean) {
         val state = _uiState.value
+        if (!state.isArCoreAvailabilityResolved || state.isArCoreAvailable) return
         val available = state.isSphereSlamAvailable
         val referenceReady = state.isSphereSlamReferenceRegistered
         publishSphereSlamRuntimeStatus(
