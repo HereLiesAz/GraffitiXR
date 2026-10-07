@@ -66,6 +66,8 @@ This document lists key files in the repository and their purposes.
 
 ### SphereSLAM (published dependency)
 
+SphereSLAM 0.23.5 public API baseline: GraffitiXR consumes the supported planar/coverage surface and explicitly opts into the experimental `:reloc` surface while preserving its existing `Standalone*` aliases.
+
 The KPM planar tracker is no longer built in this repo. It is consumed as the published
 `com.github.HereLiesAz.SphereSLAM:sphereslam` artifact, which carries the Kotlin API
 (`SphereSlamStandaloneSession`, `SphereSlamTracker`, `SphereSlamPoseMath`, …) and the native
