@@ -327,7 +327,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             // below, caller-side, so the loop is told whether a bridge is available but renders none.
             val loop = requireNotNull(robustLoop) { "robust tracking loop not initialised" }
             val outcome = loop.onFrame(
-                viewMatrix = pose?.viewMatrix,
+                viewMatrix = pose?.cameraFromCanonical,
                 inlierCount = pose?.inlierCount ?: 0,
                 reprojectionError = pose?.reprojectionError ?: Float.MAX_VALUE,
                 frameTimestampNs = timestampNs,
@@ -339,7 +339,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
 
             // MobileGS always gets the frame; it sees the RAW accepted KPM pose when one locked this
             // frame, else null — unchanged by the correction, which only affects the displayed pose.
-            val acceptedRawView = if (outcome.accepted) pose!!.viewMatrix else null
+            val acceptedRawView = if (outcome.accepted) pose!!.cameraFromCanonical else null
             feedMobileGsFrame(direct, rotated, timestampNs, projection, acceptedRawView)
 
             if (outcome.accepted) {
@@ -750,7 +750,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             }
         }
         val geometry = StandaloneAtlasGrowth.propose(
-            cameraFromCanonicalOpenGl = pose.viewMatrix,
+            cameraFromCanonicalOpenGl = pose.cameraFromCanonical,
             intrinsics = intrinsics,
             frameWidth = frame.width,
             frameHeight = frame.height,
