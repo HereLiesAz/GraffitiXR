@@ -10,6 +10,8 @@ protects the two invariants that keep that consumption sound at the build level:
 2. The app and the local native module still package both supported ARM ABIs, so the dependency's
    per-ABI `libsphereslam.so` has a matching slot in every APK split (a missing ABI would ship an AR
    build that cannot load the tracker on that hardware).
+3. GraffitiXR uses only the supported SphereSLAM 0.23.5 surface: no direct nativebridge/internal
+   imports, no hidden Observation construction, and no deprecated pose-property names.
 
 The deeper native contract — artoolkitX source lists, JNI symbol wiring, R8 keep rules for the
 public API — now lives in the SphereSLAM repository's own CI and in that artifact's consumer
@@ -62,7 +64,48 @@ for module, version in sorted(deps.items()):
 if len(set(deps.values())) > 1:
     fail(f"SphereSLAM artifacts must use one version; found {deps}.")
 
-# 2. Both supported ARM ABIs stay built/packaged so every APK split has a libsphereslam.so slot.
+# 2. SphereSLAM 0.23.5 API migration stays on supported/public seams.
+feature_ar_gradle = read("feature/ar/build.gradle.kts")
+required_opt_in = "-opt-in=com.hereliesaz.sphereslam.reloc.ExperimentalSphereSlamRelocApi"
+if required_opt_in not in feature_ar_gradle:
+    fail("feature/ar must explicitly opt into SphereSLAM's experimental :reloc API.")
+
+reloc_dep = 'api("com.github.HereLiesAz.SphereSLAM:reloc:0.23.5")'
+if reloc_dep not in feature_ar_gradle:
+    fail(
+        "SphereSLAM :reloc must remain an api dependency at 0.23.5 because GraffitiXR's public "
+        "Standalone* typealiases expand to reloc types."
+    )
+
+feature_ar_source_root = ROOT / "feature/ar/src"
+kotlin_sources = "\n".join(
+    p.read_text(encoding="utf-8")
+    for p in feature_ar_source_root.rglob("*.kt")
+)
+
+for token, explanation in {
+    "com.hereliesaz.sphereslam.nativebridge": "internal nativebridge package",
+    "com.hereliesaz.sphereslam.common.InternalSphereSlamApi": "internal API opt-in marker",
+    "SphereSlamTracker.Observation(": "hidden SphereSlamTracker.Observation constructor",
+    "pageToCamera3x4": "deprecated raw KPM pose name",
+}.items():
+    if token in kotlin_sources:
+        fail(f"feature/ar reaches {explanation}: found {token!r}.")
+
+standalone_analyzer = read(
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/"
+    "SphereSlamStandaloneTrackingAnalyzer.kt"
+)
+if "cameraFromCanonical" not in standalone_analyzer:
+    fail("Standalone analyzer is not consuming SphereSLAM Pose.cameraFromCanonical.")
+
+hybrid_correction = read(
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/anchor/HybridKpmCorrection.kt"
+)
+if "observation.cameraFromPage3x4" not in hybrid_correction:
+    fail("Hybrid correction is not consuming SphereSLAM Observation.cameraFromPage3x4.")
+
+# 3. Both supported ARM ABIs stay built/packaged so every APK split has a libsphereslam.so slot.
 expected_abi_expr = 'abiFilters += listOf("arm64-v8a", "armeabi-v7a")'
 for path in ("app/build.gradle.kts", "core/nativebridge/build.gradle.kts"):
     if expected_abi_expr not in read(path):
@@ -75,6 +118,6 @@ if errors:
     raise SystemExit(1)
 
 print(
-    "SphereSLAM build contract OK: feature/ar consumes the published KPM artifact at a pinned "
-    "version and both ARM ABIs remain packaged for its per-ABI native library."
+    "SphereSLAM build contract OK: all 0.23.5 artifacts are aligned, GraffitiXR stays on the "
+    "supported public API seams, and both ARM ABIs remain packaged for the native library."
 )
