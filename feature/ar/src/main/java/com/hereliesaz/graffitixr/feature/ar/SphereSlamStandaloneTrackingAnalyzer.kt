@@ -1,3 +1,5 @@
+@file:OptIn(com.hereliesaz.sphereslam.reloc.ExperimentalSphereSlamRelocApi::class)
+
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
