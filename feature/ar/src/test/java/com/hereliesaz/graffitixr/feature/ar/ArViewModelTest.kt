@@ -11,13 +11,13 @@ import com.hereliesaz.graffitixr.common.wearable.WearableManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
-import com.hereliesaz.sphereslam.SphereSlam
 import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Paint
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
+import com.hereliesaz.graffitixr.feature.ar.pose.SphereSlamRuntimeProbe
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -72,9 +72,8 @@ class ArViewModelTest {
         Dispatchers.setMain(testDispatcher)
         mockkObject(NativeLibLoader)
         every { NativeLibLoader.loadAll() } returns Unit
-        mockkObject(SphereSlam)
-        every { SphereSlam.isAvailable() } returns true
-        every { SphereSlam.smokeTest(any(), any()) } returns true
+        mockkObject(SphereSlamRuntimeProbe)
+        every { SphereSlamRuntimeProbe.isOperational() } returns true
         mockkStatic(Bitmap::class)
         mockkStatic(Canvas::class)
         mockkConstructor(Canvas::class)
@@ -120,7 +119,7 @@ class ArViewModelTest {
         unmockkStatic(Matrix::class)
         unmockkStatic(Paint::class)
         unmockkConstructor(Paint::class)
-        unmockkObject(SphereSlam)
+        unmockkObject(SphereSlamRuntimeProbe)
         unmockkObject(NativeLibLoader)
     }
 
@@ -144,8 +143,7 @@ class ArViewModelTest {
 
         assertTrue(viewModel.uiState.value.isSphereSlamAvailabilityResolved)
         assertTrue(viewModel.uiState.value.isSphereSlamAvailable)
-        verify { SphereSlam.isAvailable() }
-        verify { SphereSlam.smokeTest(640, 480) }
+        verify { SphereSlamRuntimeProbe.isOperational() }
     }
 
     @Test
