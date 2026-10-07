@@ -35,6 +35,9 @@ android {
     kotlin {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+            freeCompilerArgs.add(
+                "-opt-in=com.hereliesaz.sphereslam.reloc.ExperimentalSphereSlamRelocApi"
+            )
         }
     }
 
@@ -77,7 +80,9 @@ dependencies {
     // RobustTrackingLoop GraffitiXR used to carry locally, now owned by the library. The
     // proprietary fingerprint build + corroboration fusion layer on top via the loop's
     // correctAcceptedPose hook (gate on raw KPM, display the corroborated pose).
-    implementation("com.github.HereLiesAz.SphereSLAM:reloc:0.23.5")
+    // Public Standalone* typealiases expand to :reloc types, so this must remain on the consumer
+    // compile classpath. Keeping those aliases preserves GraffitiXR's existing public vocabulary.
+    api("com.github.HereLiesAz.SphereSLAM:reloc:0.23.5")
     implementation(project(":android_collaboration_module"))
 
     // Compose
