@@ -30,6 +30,7 @@ opencv = "5.0.0.1"
 playServicesBase = "18.11.0"
 playServicesLocation = "21.4.0"
 segmentationSelfie = "16.0.0-beta6" # ACCEPTED RISK: no stable release as of 2026-04-02
+sphereSlam = "0.23.5" # Current tested release; update this single value when SphereSLAM advances.
 timber = "5.0.1"
 robolectric = "4.17"
 uiGeometry = "1.11.4"
@@ -107,6 +108,9 @@ opencv = { group = "org.opencv", name = "opencv", version.ref = "opencv" }
 play-services-base = { group = "com.google.android.gms", name = "play-services-base", version.ref = "playServicesBase" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 segmentation-selfie = { module = "com.google.mlkit:segmentation-selfie", version.ref = "segmentationSelfie" }
+sphereslam-core = { group = "com.github.HereLiesAz.SphereSLAM", name = "sphereslam", version.ref = "sphereSlam" }
+sphereslam-overlay = { group = "com.github.HereLiesAz.SphereSLAM", name = "overlay", version.ref = "sphereSlam" }
+sphereslam-reloc = { group = "com.github.HereLiesAz.SphereSLAM", name = "reloc", version.ref = "sphereSlam" }
 retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
 retrofit-converter-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
