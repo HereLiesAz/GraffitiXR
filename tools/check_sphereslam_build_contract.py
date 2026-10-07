@@ -87,6 +87,7 @@ for token, explanation in {
     "com.hereliesaz.sphereslam.nativebridge": "internal nativebridge package",
     "com.hereliesaz.sphereslam.common.InternalSphereSlamApi": "internal API opt-in marker",
     "SphereSlamTracker.Observation(": "hidden SphereSlamTracker.Observation constructor",
+    "SphereSlam.smokeTest(": "internal SphereSlam smoke-test hook",
     "pageToCamera3x4": "deprecated raw KPM pose name",
 }.items():
     if token in kotlin_sources:
@@ -104,6 +105,14 @@ hybrid_correction = read(
 )
 if "observation.cameraFromPage3x4" not in hybrid_correction:
     fail("Hybrid correction is not consuming SphereSLAM Observation.cameraFromPage3x4.")
+
+runtime_probe = read(
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/pose/"
+    "SphereSlamRuntimeProbe.kt"
+)
+for required in ("SphereSlam.isAvailable", "SphereSlam.create", "engine.isReady", "engine.close()"):
+    if required not in runtime_probe:
+        fail(f"Supported SphereSLAM runtime probe lost required public-API step {required!r}.")
 
 # 3. Both supported ARM ABIs stay built/packaged so every APK split has a libsphereslam.so slot.
 expected_abi_expr = 'abiFilters += listOf("arm64-v8a", "armeabi-v7a")'
