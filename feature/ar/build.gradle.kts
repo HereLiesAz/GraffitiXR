@@ -74,15 +74,15 @@ dependencies {
     // overlay; GraffitiXR's fingerprint (MobileGS) reloc and pose fusion layer on top.
     // `api`, not `implementation`: feature/ar's public surface exposes SphereSLAM types
     // (e.g. ArViewModel.sphereThinDirections -> SphereCoverage.Direction), so :app must see them.
-    api("com.github.HereLiesAz.SphereSLAM:sphereslam:0.23.5")
-    implementation("com.github.HereLiesAz.SphereSLAM:overlay:0.23.5") // drop-in coverage glow (GL)
+    api(libs.sphereslam.core)
+    implementation(libs.sphereslam.overlay) // drop-in coverage glow (GL)
     // Reloc robustness: the acceptance/stabilizer/state-machine/age policies and the fused
     // RobustTrackingLoop GraffitiXR used to carry locally, now owned by the library. The
     // proprietary fingerprint build + corroboration fusion layer on top via the loop's
     // correctAcceptedPose hook (gate on raw KPM, display the corroborated pose).
     // Public Standalone* typealiases expand to :reloc types, so this must remain on the consumer
     // compile classpath. Keeping those aliases preserves GraffitiXR's existing public vocabulary.
-    api("com.github.HereLiesAz.SphereSLAM:reloc:0.23.5")
+    api(libs.sphereslam.reloc)
     implementation(project(":android_collaboration_module"))
 
     // Compose
