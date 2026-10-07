@@ -1,7 +1,6 @@
 package com.hereliesaz.graffitixr.feature.ar.pose
 
 import android.util.Log
-import com.hereliesaz.sphereslam.SphereSlam
 
 /**
  * Registry/bring-up entry point for pose producers.
@@ -22,28 +21,17 @@ object PoseSourceRegistry {
     private const val TAG = "POSEPROBE"
 
     /**
-     * Opt-in native link probe invoked by -PposeProbe=true. This checks only the currently
-     * implemented SphereSLAM/KPM relocalization capability. A passing probe does not mean the
-     * standalone SphereSLAM pose backend is complete or safe to select.
+     * Opt-in native runtime probe invoked by -PposeProbe=true. This verifies the published
+     * SphereSLAM API can create and destroy a calibrated KPM session. A passing probe does not mean
+     * the standalone SphereSLAM pose backend is complete or safe to select.
      */
     fun probe() {
         Thread({
-            val available = runCatching { SphereSlam.isAvailable() }.getOrDefault(false)
-            if (!available) {
-                Log.w(
-                    TAG,
-                    "probe: SphereSLAM/KPM not built in (is third_party/artoolkitx checked out?)",
-                )
-                return@Thread
-            }
-            val ok = runCatching { SphereSlam.smokeTest(640, 480) }.getOrElse { e ->
-                Log.e(TAG, "probe: SphereSLAM/KPM smoke test threw", e)
-                false
-            }
+            val ok = SphereSlamRuntimeProbe.isOperational()
             Log.i(
                 TAG,
-                "probe: SphereSLAM/KPM link smoke test " +
-                    if (ok) "PASSED (KPM available; standalone pose readiness not implied)" else "FAILED",
+                "probe: SphereSLAM/KPM calibrated-session probe " +
+                    if (ok) "PASSED (KPM operational; standalone pose readiness not implied)" else "FAILED",
             )
         }, "pose-probe").start()
     }
