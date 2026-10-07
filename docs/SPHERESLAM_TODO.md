@@ -1,3 +1,45 @@
+## SphereSLAM 0.23.5 library API migration — no-regression contract
+
+The app now consumes SphereSLAM **0.23.5** across `:sphereslam`, `:overlay`, and `:reloc`.
+This is an API-surface migration, **not** a feature consolidation. The following behavior must remain
+true throughout and after the migration:
+
+- [x] ARCore-capable devices keep ARCore as the primary continuous pose source.
+- [x] Hybrid SphereSLAM remains a sidecar wall/relocalization correction input through
+  `HybridKpmCorrection -> PoseFusion`; it never replaces ARCore view/projection matrices.
+- [x] ARCore-unavailable devices keep the CameraX + synchronous `SphereSlamStandaloneSession`
+  backend.
+- [x] Standalone KPM still feeds the same-frame accepted raw pose to MobileGS and keeps proprietary
+  corroboration/fusion layered on top.
+- [x] Rotation-only IMU bridging remains bounded and does not invent translation.
+- [x] Multi-page canonical-wall atlas growth, persistence, restore, and anchor-generation semantics
+  remain unchanged.
+- [x] Physical-vs-normalized scale semantics remain unchanged.
+- [x] Coverage/glow and camera-attitude behavior remain available.
+- [x] Co-op protocol-v3 backend/scale/wall-frame contracts remain unchanged.
+- [x] Existing fail-closed ARCore-only feature boundaries remain enforced.
+- [x] GraffitiXR's public `Standalone*` vocabulary remains available through public aliases to the
+  library reloc types.
+- [x] Existing hybrid correction tests remain; hidden SphereSLAM test constructors are replaced by a
+  GraffitiXR-owned raw-value test seam rather than deleting coverage.
+- [x] `check_sphereslam_architecture.py` continues to enforce the dual-backend behavior.
+- [x] `check_sphereslam_build_contract.py` now enforces all three artifacts at 0.23.5, public-only
+  API usage, reloc opt-in/transitivity, and supported ABI packaging.
+
+The 0.23.5 naming changes used by GraffitiXR are:
+
+- `SphereSlamStandaloneSession.Pose.cameraFromCanonical` instead of the deprecated `viewMatrix`
+  property when reading a library pose.
+- `SphereSlamTracker.Observation.cameraFromPage3x4` instead of deprecated
+  `pageToCamera3x4`.
+- production code consumes library-owned `SphereSlamTracker.Observation` values; GraffitiXR no
+  longer constructs that now-internal observation constructor in tests.
+
+No existing tracking, persistence, fusion, atlas, co-op, or UI capability is intentionally removed
+by this migration.
+
+---
+
 # SphereSLAM Implementation TODO
 
 Status: active implementation + validation plan. Standalone, MobileGS frame integration,
