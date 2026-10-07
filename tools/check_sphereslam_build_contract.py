@@ -35,22 +35,32 @@ def fail(message: str) -> None:
     errors.append(message)
 
 
-# 1. The AR feature consumes the published SphereSLAM artifact at a pinned version.
+# 1. The AR feature consumes the complete published SphereSLAM surface at one pinned version.
 ar_gradle = read("feature/ar/build.gradle.kts")
-dep = re.search(
-    r'com\.github\.HereLiesAz\.SphereSLAM:sphereslam:([^"\']+)',
-    ar_gradle,
-)
-if not dep:
-    fail(
-        "feature/ar must consume the published SphereSLAM KPM artifact "
-        "(com.github.HereLiesAz.SphereSLAM:sphereslam:<version>)."
+expected_sphereslam_version = "0.23.5"
+expected_modules = {"sphereslam", "overlay", "reloc"}
+deps = dict(
+    re.findall(
+        r'com\.github\.HereLiesAz\.SphereSLAM:(sphereslam|overlay|reloc):([^"\']+)',
+        ar_gradle,
     )
-else:
-    version = dep.group(1).strip()
-    # JitPack resolves a branch's moving head as <branch>-SNAPSHOT; a release must pin a tag/commit.
+)
+missing = sorted(expected_modules - deps.keys())
+if missing:
+    fail("feature/ar is missing SphereSLAM artifacts: " + ", ".join(missing))
+
+for module, version in sorted(deps.items()):
+    version = version.strip()
     if version.endswith("-SNAPSHOT") or version.lower() in {"main-snapshot", "master-snapshot"}:
-        fail(f"SphereSLAM dependency must pin a released version, not a moving snapshot: {version!r}.")
+        fail(f"SphereSLAM {module} dependency must pin a released version, not {version!r}.")
+    if version != expected_sphereslam_version:
+        fail(
+            f"SphereSLAM {module} must remain aligned at {expected_sphereslam_version}; "
+            f"found {version!r}."
+        )
+
+if len(set(deps.values())) > 1:
+    fail(f"SphereSLAM artifacts must use one version; found {deps}.")
 
 # 2. Both supported ARM ABIs stay built/packaged so every APK split has a libsphereslam.so slot.
 expected_abi_expr = 'abiFilters += listOf("arm64-v8a", "armeabi-v7a")'
