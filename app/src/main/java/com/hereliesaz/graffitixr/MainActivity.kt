@@ -1427,6 +1427,7 @@ class MainActivity : ComponentActivity() {
                                     fingerprintPoints = arUiState.wallFingerprintPoints,
                                     paintingProgress = arUiState.paintingProgress,
                                     featureProgress = arUiState.featureProgress,
+                                    sphereSlamStatus = arUiState.sphereSlamRuntimeStatus,
                                     captureCount = diagnosticCaptures,
                                     onShareReport = { shareDiagnosticBundle() },
                                     fusionEnabled = evalFusionOn,
@@ -2634,6 +2635,7 @@ private fun RelocDiagnosticsOverlay(
     fingerprintPoints: Int,
     paintingProgress: Float,
     featureProgress: Float = -1f,
+    sphereSlamStatus: com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeStatus,
     onShareReport: () -> Unit,
     captureCount: Int,
     // The two experiment switches, moved here from the debug-only eval panel.
@@ -2682,6 +2684,28 @@ private fun RelocDiagnosticsOverlay(
             .background(androidx.compose.ui.graphics.Color(0xAA000000))
             .padding(8.dp)
     ) {
+        val sphereSignal = when (sphereSlamStatus.mode) {
+            com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.ARCORE_SIDECAR ->
+                "active=${sphereSlamStatus.active} ref=${sphereSlamStatus.referenceReady} " +
+                    "observations=${sphereSlamStatus.trackingData}"
+            com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.STANDALONE ->
+                "active=${sphereSlamStatus.active} ref=${sphereSlamStatus.referenceReady} " +
+                    "tracking=${sphereSlamStatus.trackingData}"
+            com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.UNRESOLVED ->
+                "waiting for backend/capability resolution"
+            com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.UNAVAILABLE ->
+                "native runtime unavailable"
+        }
+        DiagnosticRow(
+            "SphereSLAM",
+            sphereSlamStatus.mode.name,
+            if (sphereSlamStatus.active) {
+                androidx.compose.ui.graphics.Color.Green
+            } else {
+                androidx.compose.ui.graphics.Color.Yellow
+            },
+        )
+        DiagnosticRow("", sphereSignal, androidx.compose.ui.graphics.Color.LightGray)
         DiagnosticRow(
             "Reloc", label,
             if (locked) androidx.compose.ui.graphics.Color.Green else androidx.compose.ui.graphics.Color.Yellow,
