@@ -31,6 +31,8 @@ import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.concurrent.withLock
 
+private const val SPHERESLAM_STATUS_FRESH_NS = 1_000_000_000L
+
 /** Result of [ArRenderer.requestResume]/[ArRenderer.requestPause]. */
 sealed class SessionLifecycleOutcome {
     /** Session.resume()/pause() ran to completion. */
@@ -334,6 +336,36 @@ class ArRenderer(
         } else {
             poseFusion.diagnostics()
         }
+    }
+
+    /**
+     * Live status of SphereSLAM's ARCore-sidecar mode.
+     *
+     * A retained old observation is not evidence of current tracking, so [trackingData] is true only
+     * when the latest KPM observation is within one second of the newest ARCore frame timestamp.
+     */
+    fun sphereSlamRuntimeStatus(): com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeStatus {
+        val available = sphereSlamTracker.isNativeAvailable
+        val referenceReady = sphereSlamTracker.isReferenceReady
+        val observation = sphereSlamTracker.latestObservation()
+        val frameTimestampNs = latestFrameTimestampNs
+        val observationFresh =
+            observation != null &&
+                frameTimestampNs > 0L &&
+                observation.timestampNs > 0L &&
+                observation.timestampNs <= frameTimestampNs &&
+                frameTimestampNs - observation.timestampNs <= SPHERESLAM_STATUS_FRESH_NS
+        return com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeStatus(
+            available = available,
+            mode = if (available) {
+                com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.ARCORE_SIDECAR
+            } else {
+                com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.UNAVAILABLE
+            },
+            active = available && referenceReady,
+            referenceReady = referenceReady,
+            trackingData = observationFresh,
+        )
     }
 
     /**
