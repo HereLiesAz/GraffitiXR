@@ -3,7 +3,7 @@
 
 GraffitiXR no longer compiles the KPM tracker itself: the planar KPM engine (artoolkitX) is built
 and published by the separate SphereSLAM library, and consumed here as a Maven artifact. This guard
-protects the two invariants that keep that consumption sound at the build level:
+protects the three invariants that keep that consumption sound at the build level:
 
 1. The AR feature declares the published SphereSLAM artifact at a pinned, reproducible version (never
    a mutable -SNAPSHOT), so a release always resolves the same native tracker.
