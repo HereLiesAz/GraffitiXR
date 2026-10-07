@@ -31,7 +31,7 @@ permissions:
 # cancel-in-progress: false — queue, never cancel a publish mid-flight.
 concurrency:
   group: release-publish
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-and-publish:
