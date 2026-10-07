@@ -13,6 +13,11 @@ import com.hereliesaz.sphereslam.SphereSlamTracker
  *
  * The result is a corrected artwork anchor in the observation's ARCore world frame plus the
  * solve-time backbone needed to convert it to PoseFusion's rebase-invariant local correction.
+ *
+ * SphereSLAM 0.23.5 intentionally owns construction of [SphereSlamTracker.Observation]. Production
+ * consumes that public result type directly; the raw-parameter seam below exists only so GraffitiXR
+ * can keep deterministic unit coverage of its own fusion policy without depending on a hidden
+ * SphereSLAM test constructor.
  */
 object HybridKpmCorrection {
     const val MIN_INLIERS = 12
@@ -42,8 +47,35 @@ object HybridKpmCorrection {
         val reject: Reject? = null,
     )
 
+    /** Production entry point: consume the immutable observation published by SphereSLAM. */
     fun solve(
         observation: SphereSlamTracker.Observation,
+        pageGeometry: SphereSlamPoseMath.PageGeometry?,
+        physicallyMetric: Boolean,
+        pageFromAnchor: FloatArray?,
+        poseHistory: HybridPoseHistory,
+        currentFrameTimestampNs: Long,
+    ): Decision = solveRaw(
+        timestampNs = observation.timestampNs,
+        inliers = observation.inliers,
+        reprojectionError = observation.error,
+        cameraFromPage3x4 = observation.cameraFromPage3x4,
+        pageGeometry = pageGeometry,
+        physicallyMetric = physicallyMetric,
+        pageFromAnchor = pageFromAnchor,
+        poseHistory = poseHistory,
+        currentFrameTimestampNs = currentFrameTimestampNs,
+    )
+
+    /**
+     * GraffitiXR-owned test seam for the fusion policy. This deliberately mirrors only the public
+     * values read from SphereSLAM's observation; it is not a replacement tracker abstraction.
+     */
+    internal fun solveRaw(
+        timestampNs: Long,
+        inliers: Int,
+        reprojectionError: Float,
+        cameraFromPage3x4: FloatArray,
         pageGeometry: SphereSlamPoseMath.PageGeometry?,
         physicallyMetric: Boolean,
         pageFromAnchor: FloatArray?,
@@ -55,36 +87,37 @@ object HybridKpmCorrection {
         }
         if (
             currentFrameTimestampNs <= 0L ||
-            observation.timestampNs <= 0L ||
-            observation.timestampNs > currentFrameTimestampNs ||
-            currentFrameTimestampNs - observation.timestampNs > MAX_OBSERVATION_AGE_NS
+            timestampNs <= 0L ||
+            timestampNs > currentFrameTimestampNs ||
+            currentFrameTimestampNs - timestampNs > MAX_OBSERVATION_AGE_NS
         ) {
             return Decision(reject = Reject.STALE)
         }
-        if (observation.inliers < MIN_INLIERS) {
+        if (inliers < MIN_INLIERS) {
             return Decision(reject = Reject.TOO_FEW_INLIERS)
         }
         if (
-            !observation.error.isFinite() ||
-            observation.error < 0f ||
-            observation.error > MAX_REPROJECTION_ERROR_PX
+            !reprojectionError.isFinite() ||
+            reprojectionError < 0f ||
+            reprojectionError > MAX_REPROJECTION_ERROR_PX
         ) {
             return Decision(reject = Reject.BAD_REPROJECTION)
         }
         if (
-            observation.pageToCamera3x4.any { !it.isFinite() } ||
+            cameraFromPage3x4.size != 12 ||
+            cameraFromPage3x4.any { !it.isFinite() } ||
             pageFromAnchor.any { !it.isFinite() }
         ) {
             return Decision(reject = Reject.NON_FINITE)
         }
 
         val sample = poseHistory.nearest(
-            observation.timestampNs,
+            timestampNs,
             MAX_POSE_PAIR_DELTA_NS,
         ) ?: return Decision(reject = Reject.NO_POSE_PAIR)
 
         val cameraFromPage = SphereSlamPoseMath.pageToOpenGlViewMeters(
-            observation.pageToCamera3x4,
+            cameraFromPage3x4,
             pageCenterXmm = pageGeometry.centerXmm,
             pageCenterYmm = pageGeometry.centerYmm,
         )
@@ -99,18 +132,18 @@ object HybridKpmCorrection {
 
         // Independent confidence terms. Inliers saturate at the same 20-point bar PoseFusion uses
         // for hard relocks; reprojection confidence falls linearly to zero at the acceptance edge.
-        val inlierConfidence = (observation.inliers / 20f).coerceIn(0f, 1f)
+        val inlierConfidence = (inliers / 20f).coerceIn(0f, 1f)
         val reprojectionConfidence =
-            (1f - observation.error / MAX_REPROJECTION_ERROR_PX).coerceIn(0f, 1f)
+            (1f - reprojectionError / MAX_REPROJECTION_ERROR_PX).coerceIn(0f, 1f)
         val confidence = (inlierConfidence * reprojectionConfidence).coerceIn(0f, 1f)
 
         return Decision(
             accepted = Accepted(
-                timestampNs = observation.timestampNs,
+                timestampNs = timestampNs,
                 correctedAnchorWorld = correctedWorld,
                 backboneAtObservation = sample.backboneMatrix.copyOf(),
                 confidence = confidence,
-                inliers = observation.inliers,
+                inliers = inliers,
             )
         )
     }
