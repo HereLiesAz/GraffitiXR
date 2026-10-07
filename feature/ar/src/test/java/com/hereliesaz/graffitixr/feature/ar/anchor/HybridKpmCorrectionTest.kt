@@ -1,7 +1,6 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
 import com.hereliesaz.sphereslam.SphereSlamPoseMath
-import com.hereliesaz.sphereslam.SphereSlamTracker
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -16,7 +15,7 @@ class HybridKpmCorrectionTest {
         val history = HybridPoseHistory()
         val backbone = translated(0f, 0f, -2f)
         history.add(1_000L, identity(), backbone)
-        val decision = HybridKpmCorrection.solve(
+        val decision = solve(
             observation = frontObservation(timestampNs = 1_000L, zMm = 2_000f),
             pageGeometry = geometry,
             physicallyMetric = true,
@@ -34,7 +33,7 @@ class HybridKpmCorrectionTest {
         val history = HybridPoseHistory()
         val driftedBackbone = translated(0f, 0f, -2.3f)
         history.add(2_000L, identity(), driftedBackbone)
-        val accepted = HybridKpmCorrection.solve(
+        val accepted = solve(
             frontObservation(2_000L, 2_000f),
             geometry,
             true,
@@ -53,19 +52,19 @@ class HybridKpmCorrectionTest {
         val good = frontObservation(1_000_000_000L, 2_000f)
         assertEquals(
             HybridKpmCorrection.Reject.NON_METRIC,
-            HybridKpmCorrection.solve(good, geometry, false, identity(), history, 1_000_000_010L).reject,
+            solve(good, geometry, false, identity(), history, 1_000_000_010L).reject,
         )
         assertEquals(
             HybridKpmCorrection.Reject.STALE,
-            HybridKpmCorrection.solve(good, geometry, true, identity(), history, 1_600_000_001L).reject,
+            solve(good, geometry, true, identity(), history, 1_600_000_001L).reject,
         )
         assertEquals(
             HybridKpmCorrection.Reject.TOO_FEW_INLIERS,
-            HybridKpmCorrection.solve(good.copy(inliers = 3), geometry, true, identity(), history, 1_000_000_010L).reject,
+            solve(good.copy(inliers = 3), geometry, true, identity(), history, 1_000_000_010L).reject,
         )
         assertEquals(
             HybridKpmCorrection.Reject.BAD_REPROJECTION,
-            HybridKpmCorrection.solve(good.copy(error = 4.1f), geometry, true, identity(), history, 1_000_000_010L).reject,
+            solve(good.copy(error = 4.1f), geometry, true, identity(), history, 1_000_000_010L).reject,
         )
     }
 
@@ -73,7 +72,7 @@ class HybridKpmCorrectionTest {
     fun `missing timestamp pair is refused rather than using render-time camera pose`() {
         val history = HybridPoseHistory()
         history.add(1_000L, identity(), translated(0f,0f,-2f))
-        val decision = HybridKpmCorrection.solve(
+        val decision = solve(
             frontObservation(100_000_000L, 2_000f),
             geometry,
             true,
@@ -84,16 +83,41 @@ class HybridKpmCorrectionTest {
         assertEquals(HybridKpmCorrection.Reject.NO_POSE_PAIR, decision.reject)
     }
 
-    private fun frontObservation(timestampNs: Long, zMm: Float) = SphereSlamTracker.Observation(
+    private data class TestObservation(
+        val timestampNs: Long,
+        val error: Float,
+        val inliers: Int,
+        val cameraFromPage3x4: FloatArray,
+    )
+
+    private fun frontObservation(timestampNs: Long, zMm: Float) = TestObservation(
         timestampNs = timestampNs,
-        pageNo = 0,
         error = 1f,
         inliers = 24,
-        pageToCamera3x4 = floatArrayOf(
+        cameraFromPage3x4 = floatArrayOf(
             1f, 0f, 0f, -500f,
             0f, -1f, 0f, 500f,
             0f, 0f, -1f, zMm,
         ),
+    )
+
+    private fun solve(
+        observation: TestObservation,
+        pageGeometry: SphereSlamPoseMath.PageGeometry?,
+        physicallyMetric: Boolean,
+        pageFromAnchor: FloatArray?,
+        poseHistory: HybridPoseHistory,
+        currentFrameTimestampNs: Long,
+    ) = HybridKpmCorrection.solveRaw(
+        timestampNs = observation.timestampNs,
+        inliers = observation.inliers,
+        reprojectionError = observation.error,
+        cameraFromPage3x4 = observation.cameraFromPage3x4,
+        pageGeometry = pageGeometry,
+        physicallyMetric = physicallyMetric,
+        pageFromAnchor = pageFromAnchor,
+        poseHistory = poseHistory,
+        currentFrameTimestampNs = currentFrameTimestampNs,
     )
 
     private fun identity() = floatArrayOf(
