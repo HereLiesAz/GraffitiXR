@@ -251,6 +251,8 @@ data class ArUiState(
     // treating "ARCore unsupported" as proof that the fallback binary exists.
     val isSphereSlamAvailable: Boolean = false,
     val isSphereSlamAvailabilityResolved: Boolean = false,
+    /** Live mode/activity snapshot surfaced by the diagnostics setting and exported report. */
+    val sphereSlamRuntimeStatus: SphereSlamRuntimeStatus = SphereSlamRuntimeStatus(),
 
     // Persisted canonical wall page for the ARCore-independent SphereSLAM path. Null means this
     // project has not captured a standalone target yet. Width is only a physical measurement when
