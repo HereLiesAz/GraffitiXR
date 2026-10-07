@@ -25,10 +25,6 @@ on:
 permissions:
   contents: read
 
-# Serialize publishing so run N commits its versionCode and persists version.properties before run
-# N+1 starts. github.run_number is monotonic by run CREATION, not publication order; without this,
-# two overlapping runs could reach Play out of order and the later-but-lower code would be rejected.
-# cancel-in-progress: false — queue, never cancel a publish mid-flight.
 concurrency:
   group: release-publish
   cancel-in-progress: false
