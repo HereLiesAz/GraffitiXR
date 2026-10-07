@@ -153,11 +153,14 @@ for token in required_hybrid_literals:
 if not re.search(r"HybridPageFrame\s*\.\s*worldFromPage\s*\(", ar_renderer):
     fail("Hybrid KPM correction seam is incomplete: missing HybridPageFrame.worldFromPage call.")
 
-if "pageToCamera3x4" in ar_renderer:
-    fail(
-        "ArRenderer directly consumes raw KPM pageToCamera3x4; raw observations must be converted "
-        "inside HybridKpmCorrection before PoseFusion sees them."
-    )
+for raw_kpm_pose_name in ("cameraFromPage3x4", "pageToCamera3x4"):
+    if raw_kpm_pose_name in ar_renderer:
+        fail(
+            "ArRenderer directly consumes raw KPM "
+            + raw_kpm_pose_name
+            + "; raw observations must be converted inside HybridKpmCorrection before "
+            + "PoseFusion sees them."
+        )
 
 # The primary renderer view/projection still come only from PoseSource. KPM is permitted to alter
 # anchorMatrix through PoseFusion, never viewMatrix/projMatrix themselves.
