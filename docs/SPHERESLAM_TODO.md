@@ -36,6 +36,9 @@ The 0.23.5 naming changes used by GraffitiXR are:
   `pageToCamera3x4`.
 - production code consumes library-owned `SphereSlamTracker.Observation` values; GraffitiXR no
   longer constructs that now-internal observation constructor in tests.
+- the old internal `SphereSlam.smokeTest` diagnostic is replaced by
+  `SphereSlamRuntimeProbe`, which uses only public API while preserving the stronger fail-closed
+  check: native availability plus calibrated engine creation, nonzero/ready session, and teardown.
 
 No existing tracking, persistence, fusion, atlas, co-op, or UI capability is intentionally removed
 by this migration.
