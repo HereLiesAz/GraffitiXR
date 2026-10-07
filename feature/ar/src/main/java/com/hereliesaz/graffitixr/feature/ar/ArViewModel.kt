@@ -1,6 +1,8 @@
 // FILE: feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/ArViewModel.kt
 package com.hereliesaz.graffitixr.feature.ar
 
+import com.hereliesaz.graffitixr.feature.ar.pose.SphereSlamRuntimeProbe
+
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -49,7 +51,6 @@ import com.hereliesaz.graffitixr.feature.ar.coop.calibration.Procrustes
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
-import com.hereliesaz.sphereslam.SphereSlam
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.data.ProjectManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -1451,13 +1452,10 @@ class ArViewModel @Inject constructor(
             // reporting ARCore unsupported must not be routed into standalone AR merely because the
             // Kotlin classes are present: stripped/dev packaging can omit the native KPM objects.
             //
-            // isAvailable() proves the JNI entry points are linked; smokeTest() exercises native
-            // handle creation/destruction so a partially packaged binary also fails closed.
-            val available = runCatching {
-                SphereSlam.isAvailable() && SphereSlam.smokeTest(640, 480)
-            }.onFailure { error ->
-                Timber.w(error, "SphereSLAM/KPM runtime capability probe failed")
-            }.getOrDefault(false)
+            // The public runtime probe verifies both native availability and calibrated KPM session
+            // creation/destruction. A partially packaged binary therefore still fails closed without
+            // reaching SphereSLAM's internal diagnostic/test hooks.
+            val available = SphereSlamRuntimeProbe.isOperational()
 
             _uiState.update {
                 it.copy(
