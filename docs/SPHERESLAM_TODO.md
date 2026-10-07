@@ -1,3 +1,5 @@
+# SphereSLAM Implementation TODO
+
 ## SphereSLAM 0.23.5 library API migration — no-regression contract
 
 The app now consumes SphereSLAM **0.23.5** across `:sphereslam`, `:overlay`, and `:reloc`.
@@ -39,8 +41,6 @@ No existing tracking, persistence, fusion, atlas, co-op, or UI capability is int
 by this migration.
 
 ---
-
-# SphereSLAM Implementation TODO
 
 Status: active implementation + validation plan. Standalone, MobileGS frame integration,
 multi-page atlas, ARCore-equivalent audit, and co-op protocol-v3 calibration are on `main`;
