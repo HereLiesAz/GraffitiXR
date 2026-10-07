@@ -615,7 +615,48 @@ class ArViewModel @Inject constructor(
     private val capturesPurged = AtomicBoolean(false)
 
     fun setDiagnosticCaptureEnabled(enabled: Boolean) {
+        val wasEnabled = diagnosticCaptureEnabled
         diagnosticCaptureEnabled = enabled
+        if (enabled && !wasEnabled) {
+            // The backend may have settled before diagnostics were enabled. Snapshot it now so the
+            // log always answers which SphereSLAM mode is selected even if no transition happens
+            // after the user flips the setting.
+            appendDiag(_uiState.value.sphereSlamRuntimeStatus.diagnosticLine())
+        }
+    }
+
+    private fun publishSphereSlamRuntimeStatus(
+        status: com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeStatus,
+    ) {
+        val previous = _uiState.value.sphereSlamRuntimeStatus
+        if (previous == status) return
+        _uiState.update { state -> state.copy(sphereSlamRuntimeStatus = status) }
+        if (diagnosticCaptureEnabled) appendDiag(status.diagnosticLine())
+    }
+
+    private fun refreshSphereSlamRuntimeSelection() {
+        val state = _uiState.value
+        val mode = when {
+            !state.isSphereSlamAvailabilityResolved || !state.isArCoreAvailabilityResolved ->
+                com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.UNRESOLVED
+            !state.isSphereSlamAvailable ->
+                com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.UNAVAILABLE
+            state.isArCoreAvailable ->
+                com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.ARCORE_SIDECAR
+            else ->
+                com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.STANDALONE
+        }
+        val current = state.sphereSlamRuntimeStatus
+        val sameMode = current.mode == mode
+        publishSphereSlamRuntimeStatus(
+            current.copy(
+                available = state.isSphereSlamAvailable,
+                mode = mode,
+                active = if (sameMode) current.active else false,
+                referenceReady = if (sameMode) current.referenceReady else false,
+                trackingData = if (sameMode) current.trackingData else false,
+            )
+        )
     }
 
     /**
@@ -1070,6 +1111,11 @@ class ArViewModel @Inject constructor(
             "device" to "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
             "android" to (android.os.Build.VERSION.RELEASE ?: "unknown"),
             "session" to "${(System.currentTimeMillis() - diagnosticSessionStartMs) / 1000}s since AR view-model start",
+            "sphereSlamAvailable" to _uiState.value.sphereSlamRuntimeStatus.available.toString(),
+            "sphereSlamMode" to _uiState.value.sphereSlamRuntimeStatus.mode.name,
+            "sphereSlamActive" to _uiState.value.sphereSlamRuntimeStatus.active.toString(),
+            "sphereSlamReferenceReady" to _uiState.value.sphereSlamRuntimeStatus.referenceReady.toString(),
+            "sphereSlamTrackingData" to _uiState.value.sphereSlamRuntimeStatus.trackingData.toString(),
             // Two flags that change what every number below MEANS, so they belong beside the numbers
             // and not in a settings screen the reader cannot see. Read back from the objects that
             // hold them rather than from whatever the eval buttons last asked for.
@@ -1446,6 +1492,7 @@ class ArViewModel @Inject constructor(
                 )
             }
             Timber.i("ArCore availability resolved: $result (supported=$supported)")
+            refreshSphereSlamRuntimeSelection()
         }
         viewModelScope.launch(dispatchers.io) {
             // ARCore and SphereSLAM are independent optional capabilities. In particular, a phone
@@ -1464,6 +1511,7 @@ class ArViewModel @Inject constructor(
                 )
             }
             Timber.i("SphereSLAM/KPM availability resolved: available=$available")
+            refreshSphereSlamRuntimeSelection()
         }
         viewModelScope.launch {
             projectRepository.currentProject.collect { project ->
@@ -1912,6 +1960,16 @@ class ArViewModel @Inject constructor(
     fun exitArMode() {
         isInArMode = false
         isDestroying = true
+        _uiState.value.sphereSlamRuntimeStatus
+            .takeIf {
+                it.mode ==
+                    com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.ARCORE_SIDECAR
+            }
+            ?.let {
+                publishSphereSlamRuntimeStatus(
+                    it.copy(active = false, referenceReady = false, trackingData = false)
+                )
+            }
         // Release the compass sensor (Phase 3 sweep coverage); re-armed on the next standalone record.
         cameraAttitudeProvider.stop()
         // Stop the GL thread FIRST, before any of the state below is cleared.
@@ -3673,6 +3731,7 @@ class ArViewModel @Inject constructor(
         // is never invoked and so has nothing to report.
         val fusionDiag = renderer?.fusionDiagnostics()
             ?: com.hereliesaz.graffitixr.common.model.FusionDiagnostics()
+        renderer?.sphereSlamRuntimeStatus()?.let(::publishSphereSlamRuntimeStatus)
         // Read alongside the diagnostics, not on a success path: the state this exists to expose is
         // "the capture produced nothing", which by definition never reaches one.
         val wallPoints = slamManager.getWallKeypointCount()
@@ -4021,9 +4080,41 @@ class ArViewModel @Inject constructor(
      */
     fun onStandaloneReferenceRegistrationChanged(registered: Boolean) {
         _uiState.update { it.copy(isSphereSlamReferenceRegistered = registered) }
+        val state = _uiState.value
+        val available = state.isSphereSlamAvailable
+        publishSphereSlamRuntimeStatus(
+            com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeStatus(
+                available = available,
+                mode = if (available) {
+                    com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.STANDALONE
+                } else {
+                    com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.UNAVAILABLE
+                },
+                active = available && (registered || state.sphereSlamRuntimeStatus.trackingData),
+                referenceReady = registered,
+                trackingData = if (registered) state.sphereSlamRuntimeStatus.trackingData else false,
+            )
+        )
     }
 
     fun onStandaloneTrackingTick(isTracking: Boolean) {
+        val state = _uiState.value
+        val available = state.isSphereSlamAvailable
+        val referenceReady = state.isSphereSlamReferenceRegistered
+        publishSphereSlamRuntimeStatus(
+            com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeStatus(
+                available = available,
+                mode = if (available) {
+                    com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.STANDALONE
+                } else {
+                    com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.UNAVAILABLE
+                },
+                active = available && (referenceReady || isTracking),
+                referenceReady = referenceReady,
+                trackingData = isTracking,
+            )
+        )
+
         val now = android.os.SystemClock.elapsedRealtime()
         if (now - lastStandaloneNativeUiUpdateMs < 100L) return
         lastStandaloneNativeUiUpdateMs = now
