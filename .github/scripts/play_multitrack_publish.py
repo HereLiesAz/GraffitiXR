@@ -45,9 +45,13 @@ SCOPES = ["https://www.googleapis.com/auth/androidpublisher"]
 # is plenty for any single chunk read.
 HTTP_TIMEOUT_S = 600
 
-# Chunk-level retry count on transient upload failures (5xx, connection errors, timeouts).
-# googleapiclient's `.execute(num_retries=N)` retries with exponential backoff.
-UPLOAD_RETRIES = 5
+# Retry count for transient Play API failures. googleapiclient's
+# `.execute(num_retries=N)` retries 429/5xx responses and transient transport errors with
+# exponential backoff. This applies to edit creation, track updates, commit, and upload.
+#
+# The 2026-10-07 release failure was a 503 from edits.insert before upload started; previously only
+# the resumable bundle upload had retries, so one transient Play outage failed the whole release.
+PLAY_API_RETRIES = 5
 
 # Smaller chunks = shorter individual reads = smaller per-chunk timeout risk. Default is 100MB
 # which is too big when Play's edge is slow. 4MB is standard for resumable uploads.
@@ -76,7 +80,10 @@ def main() -> None:
     edit_id = None
     committed = False
     try:
-        edit = svc.edits().insert(packageName=pkg, body={}).execute()
+        edit = svc.edits().insert(
+            packageName=pkg,
+            body={},
+        ).execute(num_retries=PLAY_API_RETRIES)
         edit_id = edit["id"]
         print(f"::notice::Opened Play edit {edit_id}")
 
@@ -90,7 +97,7 @@ def main() -> None:
         # transport errors — including the socket-read TimeoutError we hit on release 14148.
         bundle = svc.edits().bundles().upload(
             packageName=pkg, editId=edit_id, media_body=media,
-        ).execute(num_retries=UPLOAD_RETRIES)
+        ).execute(num_retries=PLAY_API_RETRIES)
         version_code = bundle["versionCode"]
         print(f"::notice::Uploaded AAB versionCode={version_code} ({aab})")
 
@@ -106,10 +113,13 @@ def main() -> None:
                         "versionCodes": [str(version_code)],
                     }],
                 },
-            ).execute()
+            ).execute(num_retries=PLAY_API_RETRIES)
             print(f"::notice::Assigned versionCode={version_code} to '{track}' as {status}")
 
-        svc.edits().commit(packageName=pkg, editId=edit_id).execute()
+        svc.edits().commit(
+            packageName=pkg,
+            editId=edit_id,
+        ).execute(num_retries=PLAY_API_RETRIES)
         committed = True
         print(f"::notice::Committed edit {edit_id} — versionCode={version_code} live on internal, draft on the rest")
     except Exception:
@@ -121,7 +131,10 @@ def main() -> None:
             return
         if edit_id is not None:
             try:
-                svc.edits().delete(packageName=pkg, editId=edit_id).execute()
+                svc.edits().delete(
+                    packageName=pkg,
+                    editId=edit_id,
+                ).execute(num_retries=PLAY_API_RETRIES)
                 print(f"::warning::Deleted uncommitted Play edit {edit_id} after failure", file=sys.stderr)
             except Exception as cleanup_err:
                 # Best-effort — don't mask the original failure by raising from the cleanup path.
