@@ -211,12 +211,8 @@ private class SphereTileGlowMaskView(
 internal fun shouldStartStandaloneAnalyzer(
     cameraIdPresent: Boolean,
     atlasLoaded: Boolean,
-    peerOnlyTracking: Boolean,
-    localReferencePresent: Boolean,
 ): Boolean =
-    cameraIdPresent &&
-        atlasLoaded &&
-        (peerOnlyTracking || localReferencePresent)
+    cameraIdPresent && atlasLoaded
 
 internal fun shouldUseCoopPeerFingerprint(
     spatialFrame: com.hereliesaz.graffitixr.common.model.CoopSpatialFrame?,
@@ -280,6 +276,11 @@ fun SphereSlamStandaloneOverlay(
      * worker thread, so the handler must be thread-safe.
      */
     onKeyframeOrientation: (Long, FloatArray) -> Unit = { _, _ -> },
+    /**
+     * Base SphereSLAM photosphere keyframes. These begin before any fingerprint exists and continue
+     * independently of the fingerprint/teleological layer.
+     */
+    onPhotosphereKeyframe: (SphereSlamPhotosphereKeyframe) -> Unit = {},
     /**
      * Phase 2: optional monocular depth source. Non-null (feature-map flag on) opts this session into
      * depth-calibrated radial map-point placement; null is the classic wall-plane path. Owned by the
@@ -953,15 +954,12 @@ fun SphereSlamStandaloneOverlay(
         val id = cameraId
         val restoredAtlas = atlasReferenceImages
         val standaloneReference = referenceImage
-        // Pre-reference startup is a valid steady state: CameraX and the full-screen glow must stay
-        // mounted while the shared Target/fingerprint flow is waiting for capture. Do NOT construct
-        // the native standalone analyzer until it has an actual page to register.
+        // SphereSLAM is the base runtime. Start its analyzer as soon as CameraX + atlas state exist,
+        // even before any fingerprint/reference page has been created.
         if (
             !shouldStartStandaloneAnalyzer(
                 cameraIdPresent = id != null,
                 atlasLoaded = restoredAtlas != null,
-                peerOnlyTracking = peerOnlyTracking,
-                localReferencePresent = standaloneReference != null,
             )
         ) {
             onDispose {}
@@ -1063,6 +1061,8 @@ fun SphereSlamStandaloneOverlay(
                     }
                 },
                 onFrameTracked = ::consumeTrackedFrame,
+                cameraAttitude = cameraAttitude,
+                onPhotosphereKeyframe = onPhotosphereKeyframe,
                 onKeyframeOrientation = onKeyframeOrientation,
                 depthEstimator = depthEstimator,
                 onFatalError = { error ->
