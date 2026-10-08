@@ -145,13 +145,13 @@ fun MainScreen(
             uiState.editorMode,
             selectedBackendHasTarget,
             mainUiState.isCapturingTarget,
-            mainUiState.targetCapturedThisSession,
+            mainUiState.isConfirmingTarget,
         ) {
             if (
                 uiState.editorMode == EditorMode.AR &&
                 selectedBackendHasTarget == false &&
                 !mainUiState.isCapturingTarget &&
-                !mainUiState.targetCapturedThisSession
+                !mainUiState.isConfirmingTarget
             ) {
                 mainViewModel.startTargetCapture()
             }
