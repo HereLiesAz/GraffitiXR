@@ -11,11 +11,11 @@ Spherical coverage is experimental: it may not work well enough in practice. So 
 be **removable by a flag flip, never a rewrite**, and the classic planar-KPM path must remain
 intact and shippable at every step:
 
-1. **Additive, flag-gated.** All sphere-map behavior rides the existing (off-by-default)
-   Feature-map toggle (`setMapBuildEnabled` / `setMapRelocEnabled`). The classic
-   `SphereSlamStandaloneSession` planar tracker is **not modified or replaced** — it stays the
-   always-present path. With the flag off, standalone behavior is identical to today's classic
-   approach. "Slip the current version back in" = turn the flag off; no code revert needed.
+1. **SphereSLAM is the base runtime.** On the standalone path, CameraX and the photosphere start
+   together, before any fingerprint exists. The Feature-map toggle may still gate experimental
+   depth/reloc enrichment, but it does **not** gate creation or maintenance of the base photosphere.
+   The planar fingerprint/KPM and teleological layers are additive precision/corroboration layers on
+   top; they never create, reset, or own the photosphere.
 2. **No classic code deleted.** The guided sweep, recorded orientation, and depth→geometry are
    *new* code paths that the classic tracker does not depend on. Removing the feature is removing
    additions, never restoring deletions.
@@ -110,23 +110,25 @@ scan" rule remains correct there and is retained.
 
 ## 5. The flow
 
-1. **Fingerprint the wall (precision anchor).** The standalone capture-and-curate flow:
-   point at the wall, tap the marks, freeze the frame, prune candidate features with the same
-   editable selection mask the ARCore path uses, build the `sphereSlamFingerprint`. (This
-   capture/curate parity is a prerequisite, specified separately; the sphere map builds on the
-   anchor it produces.)
-2. **Sweep the surroundings (coverage).** A guided pivot: the artist turns roughly in place
-   while the app captures keyframes across the angular field. Per keyframe, record the gyro
-   orientation (bearing) and run MiDaS (radius); detect ORB/SuperPoint features; place them as
-   3D points in the fingerprint-anchored frame; associate to existing map points or add new,
-   bumping confidence/obsCount exactly as the passive path would. Coverage is shown as a
-   simple angular progress hint (which directions are still thin), not a forced full 360°.
-3. **Reloc fuses sphere + fingerprint.** The whole map is frustum-gated to the current
-   bearing and matched for wide-area coverage; the fingerprint provides the precision snap when
-   the marks are visible; the map lets the app **anticipate the fingerprint** — project the
-   anchor into the current frustum and prime the matcher as it is about to enter view
-   (`RELOC_MAP_DESIGN.md` §4a.3). The lock is held while facing away, so it is instant on
-   return instead of late.
+1. **Camera + SphereSLAM start together.** Entering standalone AR immediately starts CameraX,
+   camera attitude sampling, the SphereSLAM photosphere, and its visual-keyframe capture loop.
+   Every tile begins `needsUpdate=true`, so the whole view has the hazy guidance glow. As usable
+   tiles are captured and kept current, only those tile regions become clear; missing/stale tiles
+   remain glowing.
+2. **The photosphere continuously grows/refreshes.** This is the base spatial layer and exists
+   whether or not the artist ever creates a fingerprint. Visual keyframes are indexed into the
+   photosphere from normal camera motion/pivoting; depth/reloc enrichment may improve those tiles,
+   but no fingerprint is required for the map to exist.
+3. **Fingerprint the chosen wall target on top of the running map.** The artist taps the wall where
+   the precision target is, freezes that frame, singles out the marks with the shared ARCore/
+   SphereSLAM curation flow, and confirms it. That fingerprint is attached to the already-existing
+   photosphere tile/frame; it does not start or reset SphereSLAM.
+4. **Place the artwork on the fingerprint.** The selected wall marks provide the precision content
+   anchor. The artwork is placed relative to that anchor while SphereSLAM continues maintaining the
+   surrounding photosphere underneath it.
+5. **Teleological SLAM enriches the same base tracking.** Fingerprint relocalization, painting
+   progress/corroboration, self-grow, and artwork-aware correction add precision and resilience.
+   They never replace SphereSLAM and never become a prerequisite for base mapping/tracking.
 
 ## 6. What is reused vs net-new
 
@@ -154,7 +156,10 @@ per-frame cost), no GPU footprint, ≤ ~1 MB RAM and `.gxr` at the ORB default. 
 sweep must not reintroduce per-frame work: keyframes are sampled, not every camera frame
 integrated.
 
-## 8. Phased sequencing (each phase device-gated, behind the existing Feature-map flag)
+## 8. Phased sequencing
+
+The base CameraX + photosphere lifecycle is always-on in standalone mode. Experimental depth,
+wide-area reloc matching, and tuning may remain independently gated while they are validated.
 
 1. **Record orientation.** Persist per-keyframe gyro bearing alongside the existing map build;
    no behavior change to reloc yet. Round-trip test.
