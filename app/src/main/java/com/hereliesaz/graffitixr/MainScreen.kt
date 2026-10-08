@@ -45,6 +45,7 @@ import com.hereliesaz.graffitixr.common.model.FeedbackEvent
 import android.widget.Toast
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.CameraPreview
+import com.hereliesaz.graffitixr.feature.ar.takePictureAsBitmap
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
@@ -133,7 +134,30 @@ fun MainScreen(
         }
 
         if (hasCameraPermission && isCameraActive && uiState.editorMode != EditorMode.TRACE) {
-            when (uiState.editorMode) {
+            val selectedBackendHasTarget: Boolean? = when {
+            !arUiState.isArCoreAvailabilityResolved -> null
+            arUiState.isArCoreAvailable -> mainUiState.hasArCoreTarget
+            !arUiState.isSphereSlamAvailabilityResolved -> null
+            arUiState.isSphereSlamAvailable -> mainUiState.hasSphereSlamTarget
+            else -> null
+        }
+        LaunchedEffect(
+            uiState.editorMode,
+            selectedBackendHasTarget,
+            mainUiState.isCapturingTarget,
+            mainUiState.targetCapturedThisSession,
+        ) {
+            if (
+                uiState.editorMode == EditorMode.AR &&
+                selectedBackendHasTarget == false &&
+                !mainUiState.isCapturingTarget &&
+                !mainUiState.targetCapturedThisSession
+            ) {
+                mainViewModel.startTargetCapture()
+            }
+        }
+
+        when (uiState.editorMode) {
                 EditorMode.AR -> {
                     if (!arUiState.isArCoreAvailabilityResolved) {
                         // Do not start an ARCore Session until capability resolution completes.
@@ -206,6 +230,34 @@ fun MainScreen(
                             modifier = Modifier.fillMaxSize(),
                         )
 
+                        LaunchedEffect(
+                            arUiState.isCaptureRequested,
+                            arUiState.sphereSlamRuntimeStatus.mode,
+                        ) {
+                            if (
+                                arUiState.isCaptureRequested &&
+                                arUiState.sphereSlamRuntimeStatus.mode ==
+                                    com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.STANDALONE
+                            ) {
+                                runCatching {
+                                    cameraController.takePictureAsBitmap(context)
+                                }.onSuccess { bitmap ->
+                                    arViewModel.onStandaloneTargetCaptured(bitmap)
+                                }.onFailure { error ->
+                                    arViewModel.onCaptureRequestHandled()
+                                    arViewModel.appendDiag(
+                                        "SphereSLAM shared target capture failed: " +
+                                            (error.message ?: error.javaClass.simpleName)
+                                    )
+                                    Toast.makeText(
+                                        context,
+                                        "Couldn't capture the target — try again.",
+                                        Toast.LENGTH_LONG,
+                                    ).show()
+                                }
+                            }
+                        }
+
                         val standaloneDesign = uiState.design?.takeIf {
                             it.isVisible && it.bitmap != null
                         }
@@ -276,6 +328,7 @@ fun MainScreen(
                             persistedAtlasPages = arUiState.sphereSlamAtlasPages,
                             coopPeerSpatialFrame = arUiState.coopPeerSpatialFrame,
                             coopPeerFingerprint = arUiState.coopPeerFingerprint,
+                            sharedTargetCapture = true,
                             onReferenceCaptured = { bitmap, widthMeters, physicallyMetric ->
                                 arViewModel.saveSphereSlamReference(
                                     bitmap,
@@ -344,20 +397,6 @@ fun MainScreen(
                                 // Reset in-flight capture state so stale isWaitingForTap doesn't
                                 // block gestures on AR re-entry.
                                 mainViewModel.cancelTapMode()
-                            }
-                        }
-    
-                        // Enter AR with the Target button pre-selected when no target exists yet, so the
-                        // first screen tap (once tracking allows) creates the target without a detour to
-                        // the rail. If a target was already created, stay in normal layer-editing mode.
-                        LaunchedEffect(mainUiState.hasExistingTarget) {
-                            // Only act once the project state is resolved (non-null). `== false` means a
-                            // loaded project with no saved target, so pre-select the Target button.
-                            // Skip if a target was already created this session (survives AR exit/re-entry).
-                            if (mainUiState.hasExistingTarget == false
-                                && !mainUiState.isCapturingTarget
-                                && !mainUiState.targetCapturedThisSession) {
-                                mainViewModel.startTargetCapture()
                             }
                         }
     
