@@ -7,37 +7,27 @@ import org.junit.Test
 class StandaloneAnalyzerStartupTest {
 
     @Test
-    fun localStandaloneDoesNotStartBeforeReferenceExists() {
+    fun localStandaloneStartsBeforeFingerprintExists() {
+        assertTrue(
+            shouldStartStandaloneAnalyzer(
+                cameraIdPresent = true,
+                atlasLoaded = true,
+            )
+        )
+    }
+
+    @Test
+    fun standaloneWaitsOnlyForCameraAndAtlasState() {
+        assertFalse(
+            shouldStartStandaloneAnalyzer(
+                cameraIdPresent = false,
+                atlasLoaded = true,
+            )
+        )
         assertFalse(
             shouldStartStandaloneAnalyzer(
                 cameraIdPresent = true,
-                atlasLoaded = true,
-                peerOnlyTracking = false,
-                localReferencePresent = false,
-            )
-        )
-    }
-
-    @Test
-    fun localStandaloneStartsOnceReferenceExists() {
-        assertTrue(
-            shouldStartStandaloneAnalyzer(
-                cameraIdPresent = true,
-                atlasLoaded = true,
-                peerOnlyTracking = false,
-                localReferencePresent = true,
-            )
-        )
-    }
-
-    @Test
-    fun peerTrackingDoesNotRequireLocalReference() {
-        assertTrue(
-            shouldStartStandaloneAnalyzer(
-                cameraIdPresent = true,
-                atlasLoaded = true,
-                peerOnlyTracking = true,
-                localReferencePresent = false,
+                atlasLoaded = false,
             )
         )
     }
