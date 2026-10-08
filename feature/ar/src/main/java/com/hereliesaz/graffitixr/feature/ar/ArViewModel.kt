@@ -942,11 +942,11 @@ class ArViewModel @Inject constructor(
     }
 
     /**
-     * Freshness-aware SphereSLAM photosphere used by the guided glow.
+     * Base SphereSLAM photosphere. It exists independently of fingerprints/teleological SLAM.
      *
-     * Every tile begins `needsUpdate=true`. A direction stops glowing only after the native
-     * standalone wall map actually advances while tracking that direction; merely looking there is
-     * not enough. This matches SphereSLAM's tile contract: missing or stale => glow, current => clear.
+     * CameraX visual keyframes populate this map from standalone startup. Every tile begins
+     * `needsUpdate=true`; a tile becomes current only when a usable visual keyframe is actually
+     * captured for that direction. The later fingerprint is anchored into this already-running map.
      */
     private val spherePhotosphere =
         com.hereliesaz.sphereslam.PhotosphereMap(elevationBandCount = 3)
@@ -970,7 +970,10 @@ class ArViewModel @Inject constructor(
     val sphereCurrentDirections: StateFlow<List<com.hereliesaz.sphereslam.SphereCoverage.Direction>> =
         _sphereCurrentDirections.asStateFlow()
 
-    @Volatile private var lastStandaloneGlowMapRevision: Long = Long.MIN_VALUE
+    private val spherePhotosphereFrames =
+        LinkedHashMap<com.hereliesaz.sphereslam.TileId, SphereSlamPhotosphereKeyframe>()
+    @Volatile private var standalonePhotosphereActive: Boolean = false
+    @Volatile private var sphereFingerprintAnchorTile: com.hereliesaz.sphereslam.TileId? = null
 
     /** Latest camera attitude (headingDeg, elevationDeg) for projecting the glow, or null. */
     val latestCameraAttitude: Pair<Float, Float>?
@@ -979,10 +982,7 @@ class ArViewModel @Inject constructor(
             return h to (cameraAttitudeProvider.latestElevationDegrees() ?: 0f)
         }
 
-    /**
-     * Persist one atlas-growth orientation sample when the feature-map experiment is enabled.
-     * Glow freshness itself is driven by actual native map revisions in [onStandaloneTrackingTick].
-     */
+    /** Persist optional atlas-growth orientation diagnostics; base photosphere mapping is separate. */
     fun recordStandaloneKeyframeOrientation(timestampNs: Long, quaternion: FloatArray) {
         if (_evalFeatureMapEnabled.value) {
             keyframeOrientationRecorder.record(timestampNs, quaternion)
@@ -1006,55 +1006,71 @@ class ArViewModel @Inject constructor(
         _sphereCurrentDirections.value = current
     }
 
-    private fun markCurrentSphereTileFromNativeMapRevision(mapRevision: Long) {
-        if (mapRevision == lastStandaloneGlowMapRevision) return
-        val previous = lastStandaloneGlowMapRevision
-        lastStandaloneGlowMapRevision = mapRevision
-        // Establishing/restoring the native map sets the baseline; only a later revision proves that
-        // this live direction actually received new/updated map content.
-        if (previous == Long.MIN_VALUE) return
-
-        cameraAttitudeProvider.start()
-        val heading = cameraAttitudeProvider.latestHeadingDegrees() ?: return
-        val elevation = cameraAttitudeProvider.latestElevationDegrees() ?: 0f
-        val updated = synchronized(spherePhotosphereLock) {
-            val id = spherePhotosphere.markUpdated(
-                headingDeg = heading,
-                elevationDeg = elevation,
+    fun onStandalonePhotosphereKeyframe(keyframe: SphereSlamPhotosphereKeyframe) {
+        var tile: com.hereliesaz.sphereslam.TileId? = null
+        var firstCaptureForTile = false
+        synchronized(spherePhotosphereLock) {
+            if (!spherePhotosphere.hasWallHeading()) {
+                // The photosphere owns its coordinate frame from startup. This is NOT a fingerprint
+                // anchor; it is simply the initial camera-facing bearing for the base map.
+                spherePhotosphere.setWallHeading(keyframe.headingDeg)
+            }
+            val candidate = spherePhotosphere.tileAt(keyframe.headingDeg, keyframe.elevationDeg)
+            firstCaptureForTile =
+                candidate != null && !spherePhotosphere.hasBeenScanned(candidate)
+            tile = spherePhotosphere.markUpdated(
+                headingDeg = keyframe.headingDeg,
+                elevationDeg = keyframe.elevationDeg,
                 nowMs = android.os.SystemClock.elapsedRealtime(),
+                representativeOrientation = keyframe.orientationQuaternion,
             )
+            tile?.let { spherePhotosphereFrames[it] = keyframe }
             refreshSphereTileGlowLocked()
-            id
         }
-        if (updated != null) {
+
+        standalonePhotosphereActive = true
+        val state = _uiState.value
+        if (state.isArCoreAvailabilityResolved && !state.isArCoreAvailable) {
+            val available = state.isSphereSlamAvailable
+            publishSphereSlamRuntimeStatus(
+                com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeStatus(
+                    available = available,
+                    mode = if (available) {
+                        com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.STANDALONE
+                    } else {
+                        com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.UNAVAILABLE
+                    },
+                    active = available,
+                    referenceReady = state.isSphereSlamReferenceRegistered,
+                    trackingData = state.sphereSlamRuntimeStatus.trackingData,
+                )
+            )
+        }
+        _uiState.update { it.copy(isScanning = true, isArReady = true) }
+
+        if (firstCaptureForTile && tile != null) {
             appendDiag(
-                "SphereSLAM tile current sector=${updated.sector} band=${updated.band} " +
+                "SphereSLAM photosphere tile captured sector=${tile!!.sector} band=${tile!!.band} " +
                     "coverage=${"%.3f".format(_sphereCoverageFraction.value)}"
             )
         }
     }
 
-    private fun anchorSphereCoverageToWall() {
-        cameraAttitudeProvider.start()
-        val heading = cameraAttitudeProvider.latestHeadingDegrees() ?: run {
-            appendDiag("SphereSLAM coverage glow: camera attitude unavailable")
-            return
+    private fun currentPhotosphereTile(): com.hereliesaz.sphereslam.TileId? {
+        val attitude = latestCameraAttitude ?: return null
+        return synchronized(spherePhotosphereLock) {
+            spherePhotosphere.tileAt(attitude.first, attitude.second)
         }
-        synchronized(spherePhotosphereLock) {
-            spherePhotosphere.setWallHeading(heading)
-            refreshSphereTileGlowLocked()
-        }
-        appendDiag(
-            "SphereSLAM coverage glow armed updateTiles=" + _sphereThinDirections.value.size
-        )
     }
 
     private fun resetSphereCoverage() {
         synchronized(spherePhotosphereLock) {
             spherePhotosphere.reset()
+            spherePhotosphereFrames.clear()
             refreshSphereTileGlowLocked()
         }
-        lastStandaloneGlowMapRevision = Long.MIN_VALUE
+        standalonePhotosphereActive = false
+        sphereFingerprintAnchorTile = null
     }
 
     private val _evalAutoFocusEnabled = MutableStateFlow(true)
@@ -4133,11 +4149,14 @@ class ArViewModel @Inject constructor(
         val wasRegistered = _uiState.value.isSphereSlamReferenceRegistered
         _uiState.update { it.copy(isSphereSlamReferenceRegistered = registered) }
         if (registered && !wasRegistered) {
-            resetSphereCoverage()
-            anchorSphereCoverageToWall()
-            lastStandaloneGlowMapRevision = slamManager.getWallFeatureMapRevision()
+            sphereFingerprintAnchorTile = currentPhotosphereTile()
+            appendDiag(
+                "SphereSLAM fingerprint attached to base photosphere tile=" +
+                    (sphereFingerprintAnchorTile?.let { "${it.sector}:${it.band}" } ?: "unknown")
+            )
         } else if (!registered && wasRegistered) {
-            resetSphereCoverage()
+            // Removing/replacing the precision fingerprint does not destroy the base SphereSLAM map.
+            sphereFingerprintAnchorTile = null
         }
         val state = _uiState.value
         if (!state.isArCoreAvailabilityResolved || state.isArCoreAvailable) return
@@ -4150,9 +4169,10 @@ class ArViewModel @Inject constructor(
                 } else {
                     com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.UNAVAILABLE
                 },
-                active = available && (registered || state.sphereSlamRuntimeStatus.trackingData),
+                active = available &&
+                    (standalonePhotosphereActive || registered || state.sphereSlamRuntimeStatus.trackingData),
                 referenceReady = registered,
-                trackingData = if (registered) state.sphereSlamRuntimeStatus.trackingData else false,
+                trackingData = state.sphereSlamRuntimeStatus.trackingData,
             )
         )
     }
@@ -4170,7 +4190,7 @@ class ArViewModel @Inject constructor(
                 } else {
                     com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.UNAVAILABLE
                 },
-                active = available && (referenceReady || isTracking),
+                active = available && (standalonePhotosphereActive || referenceReady || isTracking),
                 referenceReady = referenceReady,
                 trackingData = isTracking,
             )
@@ -4191,7 +4211,6 @@ class ArViewModel @Inject constructor(
         val wallPoints = slamManager.getWallKeypointCount()
         val mapPoints = slamManager.getMapPointCount()
         val mapRevision = slamManager.getWallFeatureMapRevision()
-        if (isTracking) markCurrentSphereTileFromNativeMapRevision(mapRevision)
         maybePersistStandaloneWallFeatureMap(now, mapPoints, mapRevision)
 
         _uiState.update { state ->
