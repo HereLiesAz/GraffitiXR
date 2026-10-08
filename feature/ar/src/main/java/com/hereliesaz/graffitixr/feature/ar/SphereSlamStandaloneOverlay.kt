@@ -449,8 +449,7 @@ fun SphereSlamStandaloneOverlay(
     // protocol-v3 session contract; local/persisted page state is irrelevant while it is active.
     val peerOnlyTracking =
         shouldUseCoopPeerFingerprint(coopPeerSpatialFrame, coopPeerFingerprint)
-    if (reference == null && !peerOnlyTracking) {
-        if (sharedTargetCapture) return
+    if (reference == null && !peerOnlyTracking && !sharedTargetCapture) {
         val pending = pendingReferenceBitmap
         if (pending != null) {
             val measuredWidth = StandaloneReferenceScale.parseMeters(referenceWidthInput)
