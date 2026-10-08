@@ -2469,18 +2469,15 @@ class ArViewModel @Inject constructor(
             var newUri: android.net.Uri? = null
             var transformApplied = false
             try {
-                // Build the MobileGS seed from the KPM-validated rectified page before committing
-                // metadata. A failure here does NOT invalidate KPM wall tracking; it merely leaves
-                // the optional MobileGS seed absent for this reference.
-                val standaloneFingerprint = runCatching {
+                // Fingerprinting is part of target creation, not an optional enhancement.
+                // Teleological SLAM consumes this seed for relocalization/progress, so never persist a
+                // standalone reference that cannot also produce its canonical-page fingerprint.
+                val standaloneFingerprint =
                     StandaloneFingerprintBuilder.build(
                         slam = slamManager,
                         bitmap = bitmap,
                         referenceWidthMeters = referenceWidthMeters,
-                    )
-                }.onFailure { error ->
-                    Timber.w(error, "Standalone MobileGS fingerprint seed build failed")
-                }.getOrNull()
+                    ) ?: error("Standalone target produced no teleological SLAM fingerprint")
 
                 newUri = projectManager.saveSphereSlamReference(appContext, projectId, bitmap)
                 val candidateUri = newUri
