@@ -366,6 +366,9 @@ fun MainScreen(
                             onKeyframeOrientation = { timestampNs, quaternion ->
                                 arViewModel.recordStandaloneKeyframeOrientation(timestampNs, quaternion)
                             },
+                            onPhotosphereKeyframe = { keyframe ->
+                                arViewModel.onStandalonePhotosphereKeyframe(keyframe)
+                            },
                             depthEstimator = arViewModel.standaloneDepthEstimatorOrNull(),
                             sweepCoverage = sweepCoverageValue,
                             coverageGlowDirections = {
