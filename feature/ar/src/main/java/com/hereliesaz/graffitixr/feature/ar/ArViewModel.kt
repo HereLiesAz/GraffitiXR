@@ -4206,8 +4206,8 @@ class ArViewModel @Inject constructor(
 
         _uiState.update { state ->
             state.copy(
-                isScanning = isTracking,
-                isArReady = state.isArReady || isTracking,
+                isScanning = standalonePhotosphereActive || isTracking,
+                isArReady = state.isArReady || standalonePhotosphereActive || isTracking,
                 // Never leak stale ARCore depth/perception state into standalone. KPM normalized
                 // scale is not depth, and the standalone CameraX path currently has no depth source.
                 isDepthApiSupported = false,
