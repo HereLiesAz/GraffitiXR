@@ -967,16 +967,21 @@ class ArViewModel @Inject constructor(
         }
 
     /**
-     * Record one standalone keyframe orientation `(timestampNs, quaternion[x,y,z,w])`. Gated on the
-     * feature-map flag so the classic planar path records nothing; off by default. Called on the
-     * camera worker thread — [KeyframeOrientationRecorder] and the coverage accumulator are both
-     * synchronized. The gyro quaternion feeds the persisted log and (natively) off-wall placement;
-     * the magnetometer-fused camera attitude, read here, feeds the 2-D viewable-region coverage.
+     * Record one standalone atlas-growth orientation sample.
+     *
+     * Persisting the quaternion remains part of the optional feature-map experiment, but the visible
+     * SphereSLAM coverage/glow is a normal tracking aid and is therefore updated independently from
+     * that switch.
      */
     fun recordStandaloneKeyframeOrientation(timestampNs: Long, quaternion: FloatArray) {
-        if (!_evalFeatureMapEnabled.value) return
-        keyframeOrientationRecorder.record(timestampNs, quaternion)
-        cameraAttitudeProvider.start() // idempotent; ensures sampling once standalone recording begins
+        if (_evalFeatureMapEnabled.value) {
+            keyframeOrientationRecorder.record(timestampNs, quaternion)
+        }
+        observeStandaloneCoverage()
+    }
+
+    private fun observeStandaloneCoverage() {
+        cameraAttitudeProvider.start()
         val heading = cameraAttitudeProvider.latestHeadingDegrees() ?: return
         val elevation = cameraAttitudeProvider.latestElevationDegrees() ?: 0f
         val grew = synchronized(sphereCoverageLock) { sphereCoverage.observe(heading, elevation) }
@@ -995,8 +1000,18 @@ class ArViewModel @Inject constructor(
      */
     private fun anchorSphereCoverageToWall() {
         cameraAttitudeProvider.start()
-        val heading = cameraAttitudeProvider.latestHeadingDegrees() ?: return
-        synchronized(sphereCoverageLock) { sphereCoverage.setWallHeading(heading) }
+        val heading = cameraAttitudeProvider.latestHeadingDegrees() ?: run {
+            appendDiag("SphereSLAM coverage glow: camera attitude unavailable")
+            return
+        }
+        synchronized(sphereCoverageLock) {
+            sphereCoverage.setWallHeading(heading)
+            _sphereCoverageFraction.value = sphereCoverage.coverageFraction()
+            _sphereThinDirections.value = sphereCoverage.thinDirections()
+        }
+        appendDiag(
+            "SphereSLAM coverage glow armed directions=" + _sphereThinDirections.value.size
+        )
     }
 
     private fun resetSphereCoverage() {
@@ -2519,7 +2534,7 @@ class ArViewModel @Inject constructor(
                 if (transformApplied) {
                     // The reference was just captured head-on, so this is the moment to anchor the
                     // sweep's viewable arc to the wall-facing heading (Phase 3).
-                    if (_evalFeatureMapEnabled.value) anchorSphereCoverageToWall()
+                    anchorSphereCoverageToWall()
                     projectManager.deleteSphereSlamReference(
                         appContext,
                         projectId,
@@ -4078,7 +4093,14 @@ class ArViewModel @Inject constructor(
      * cap UI/native polling at 10 Hz to avoid pointless JNI traffic.
      */
     fun onStandaloneReferenceRegistrationChanged(registered: Boolean) {
+        val wasRegistered = _uiState.value.isSphereSlamReferenceRegistered
         _uiState.update { it.copy(isSphereSlamReferenceRegistered = registered) }
+        if (registered && !wasRegistered) {
+            resetSphereCoverage()
+            anchorSphereCoverageToWall()
+        } else if (!registered && wasRegistered) {
+            resetSphereCoverage()
+        }
         val state = _uiState.value
         if (!state.isArCoreAvailabilityResolved || state.isArCoreAvailable) return
         val available = state.isSphereSlamAvailable
@@ -4098,6 +4120,7 @@ class ArViewModel @Inject constructor(
     }
 
     fun onStandaloneTrackingTick(isTracking: Boolean) {
+        if (isTracking) observeStandaloneCoverage()
         val state = _uiState.value
         if (!state.isArCoreAvailabilityResolved || state.isArCoreAvailable) return
         val available = state.isSphereSlamAvailable
