@@ -4,11 +4,17 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.PixelFormat
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.RectF
 import android.net.Uri
 import android.opengl.GLSurfaceView
 import android.os.Handler
 import android.os.Looper
+import android.view.View
 import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
@@ -56,6 +62,8 @@ import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import com.hereliesaz.graffitixr.design.theme.rememberAppStrings
 import com.hereliesaz.graffitixr.feature.ar.rendering.HomographyOverlayRenderer
+import com.hereliesaz.sphereslam.CoverageGlowProjection
+import com.hereliesaz.sphereslam.SphereCoverage
 import com.hereliesaz.sphereslam.SphereSlamStandaloneSession
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
@@ -70,6 +78,109 @@ private val SPHERESLAM_DEFAULT_UNWARP_POINTS = listOf(
     Offset(0.75f, 0.75f),
     Offset(0.25f, 0.75f),
 )
+
+
+/**
+ * Draws the inverse of the usual point-glow: a translucent wash covers the whole preview and only
+ * photosphere tiles that are current are cut transparent. Missing and stale tiles therefore glow by
+ * default, exactly matching PhotosphereMap.needsUpdate semantics.
+ */
+private class SphereTileGlowMaskView(context: android.content.Context) : View(context) {
+    private data class MaskState(
+        val currentDirections: List<SphereCoverage.Direction> = emptyList(),
+        val cameraHeadingDeg: Float = 0f,
+        val cameraElevationDeg: Float = 0f,
+        val horizontalFovDeg: Float = 60f,
+        val verticalFovDeg: Float = 45f,
+    )
+
+    private val state = AtomicReference(MaskState())
+    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.argb(36, 255, 255, 255)
+        style = Paint.Style.FILL
+    }
+    private val clearPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+    }
+    private val clearRect = RectF()
+
+    init {
+        // CLEAR compositing is deterministic on the supported API range with a software layer.
+        setLayerType(LAYER_TYPE_SOFTWARE, null)
+        setWillNotDraw(false)
+    }
+
+    fun update(
+        currentDirections: List<SphereCoverage.Direction>,
+        cameraHeadingDeg: Float? = null,
+        cameraElevationDeg: Float? = null,
+        horizontalFovDeg: Float? = null,
+        verticalFovDeg: Float? = null,
+    ) {
+        val previous = state.get()
+        state.set(
+            previous.copy(
+                currentDirections = currentDirections.toList(),
+                cameraHeadingDeg = cameraHeadingDeg ?: previous.cameraHeadingDeg,
+                cameraElevationDeg = cameraElevationDeg ?: previous.cameraElevationDeg,
+                horizontalFovDeg = horizontalFovDeg ?: previous.horizontalFovDeg,
+                verticalFovDeg = verticalFovDeg ?: previous.verticalFovDeg,
+            )
+        )
+        postInvalidateOnAnimation()
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        if (width <= 0 || height <= 0) return
+
+        val snapshot = state.get()
+        val layer = canvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), null)
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), glowPaint)
+
+        if (snapshot.currentDirections.isNotEmpty()) {
+            val marks = CoverageGlowProjection.project(
+                directions = snapshot.currentDirections,
+                cameraHeadingDeg = snapshot.cameraHeadingDeg,
+                cameraElevationDeg = snapshot.cameraElevationDeg,
+                horizontalFovDeg = snapshot.horizontalFovDeg,
+                verticalFovDeg = snapshot.verticalFovDeg,
+            )
+
+            // PhotosphereMap is configured with SphereCoverage's 12-sector default and three
+            // elevation bands. Convert that angular tile footprint to the current camera frustum.
+            val tileWidthDeg =
+                (SphereCoverage.DEFAULT_VIEWABLE_HALF_ANGLE_DEG * 2f) /
+                    SphereCoverage.DEFAULT_SECTORS.toFloat()
+            val tileHeightDeg =
+                (SphereCoverage.DEFAULT_VIEWABLE_ELEVATION_HALF_ANGLE_DEG * 2f) / 3f
+            val halfWidthPx =
+                width * 0.5f *
+                    (kotlin.math.tan(Math.toRadians(tileWidthDeg / 2.0)).toFloat() /
+                        kotlin.math.tan(Math.toRadians(snapshot.horizontalFovDeg / 2.0)).toFloat())
+            val halfHeightPx =
+                height * 0.5f *
+                    (kotlin.math.tan(Math.toRadians(tileHeightDeg / 2.0)).toFloat() /
+                        kotlin.math.tan(Math.toRadians(snapshot.verticalFovDeg / 2.0)).toFloat())
+
+            for (mark in marks) {
+                if (!mark.onScreen) continue
+                val cx = (mark.ndcX + 1f) * 0.5f * width
+                val cy = (1f - mark.ndcY) * 0.5f * height
+                clearRect.set(
+                    cx - halfWidthPx,
+                    cy - halfHeightPx,
+                    cx + halfWidthPx,
+                    cy + halfHeightPx,
+                )
+                canvas.drawRect(clearRect, clearPaint)
+            }
+        }
+
+        canvas.restoreToCount(layer)
+    }
+}
 
 internal fun shouldUseCoopPeerFingerprint(
     spatialFrame: com.hereliesaz.graffitixr.common.model.CoopSpatialFrame?,
@@ -152,6 +263,8 @@ fun SphereSlamStandaloneOverlay(
      * [com.hereliesaz.sphereslam.SphereCoverage.thinDirections].
      */
     coverageGlowDirections: () -> List<com.hereliesaz.sphereslam.SphereCoverage.Direction> = { emptyList() },
+    /** Current tiles are the ONLY regions cut out of the otherwise full-screen glow. */
+    coverageCurrentDirections: () -> List<com.hereliesaz.sphereslam.SphereCoverage.Direction> = { emptyList() },
     /** Latest camera attitude `(headingDeg, elevationDeg)` for projecting the glow, or null. */
     cameraAttitude: () -> Pair<Float, Float>? = { null },
     modifier: Modifier = Modifier,
@@ -527,8 +640,8 @@ fun SphereSlamStandaloneOverlay(
         value = loaded.first
     }
     val glRenderer = remember(context) { HomographyOverlayRenderer(context) }
-    // SphereSLAM's drop-in coverage glow, layered above the design overlay. Fed per tracked frame.
-    val coverageGlowView = remember(context) { com.hereliesaz.sphereslam.overlay.CoverageGlowView(context) }
+    // Full-view freshness mask: glow everywhere, then punch out only current photosphere tiles.
+    val coverageGlowMaskView = remember(context) { SphereTileGlowMaskView(context) }
 
     LaunchedEffect(glRenderer, designBitmap) {
         if (designBitmap == null) {
@@ -705,20 +818,27 @@ fun SphereSlamStandaloneOverlay(
             glRenderer.clearPose()
         } else {
             glRenderer.updatePose(frame.viewMatrix, frame.projMatrix, frame.frameAspect)
-            // Feed the coverage glow: project the unscanned directions for the current view. FOV is
-            // recovered from the perspective projection (proj[0] = 1/tan(hFov/2), proj[5] = 1/tan(vFov/2)).
+            // The glow is the complement of tile freshness: the entire view glows, and only
+            // photosphere tiles whose needsUpdate=false state is current are punched clear.
             val attitude = cameraAttitude()
-            val directions = coverageGlowDirections()
-            if (attitude != null && directions.isNotEmpty()) {
+            val currentDirections = coverageCurrentDirections()
+            coverageGlowDirections() // keep the update-side signal hot/read alongside its complement
+            if (attitude != null) {
                 val px = frame.projMatrix[0]
                 val py = frame.projMatrix[5]
                 if (px > 1e-4f && py > 1e-4f) {
                     val hFovDeg = Math.toDegrees(2.0 * kotlin.math.atan(1.0 / px)).toFloat()
                     val vFovDeg = Math.toDegrees(2.0 * kotlin.math.atan(1.0 / py)).toFloat()
-                    coverageGlowView.update(directions, attitude.first, attitude.second, hFovDeg, vFovDeg)
+                    coverageGlowMaskView.update(
+                        currentDirections = currentDirections,
+                        cameraHeadingDeg = attitude.first,
+                        cameraElevationDeg = attitude.second,
+                        horizontalFovDeg = hFovDeg,
+                        verticalFovDeg = vFovDeg,
+                    )
                 }
             } else {
-                coverageGlowView.update(emptyList(), 0f, 0f, 60f, 45f)
+                coverageGlowMaskView.update(currentDirections = emptyList())
             }
         }
         val screenUnitsPerPixel = frame?.let {
@@ -963,23 +1083,12 @@ fun SphereSlamStandaloneOverlay(
             .onSizeChanged { surfaceSize.set(it) },
     )
 
-    // Coverage glow surface, above the design overlay and the camera preview.
+    // Full-screen freshness mask, above the design overlay and camera preview. It starts fully
+    // glowing and clears only the screen regions occupied by current (needsUpdate=false) tiles.
     AndroidView(
-        factory = { coverageGlowView },
+        factory = { coverageGlowMaskView },
         modifier = Modifier.fillMaxSize(),
     )
-
-    // Before SphereSLAM has observed its first coverage tile/bin, there is no directional gap
-    // geometry to project yet. The correct guidance in that state is "everything still needs
-    // mapping", so wash the entire camera view with the same translucent white glow. As soon as
-    // coverage becomes non-zero, the projected directional glow above takes over.
-    if ((sweepCoverage ?: 0f) <= 0f) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.White.copy(alpha = 0.14f)),
-        )
-    }
 
     if (!referenceReady || trackingState == StandaloneTrackingState.INITIALIZING) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
