@@ -941,23 +941,28 @@ class ArViewModel @Inject constructor(
     }
 
     /**
-     * SphereSLAM's 2-D sweep coverage (azimuth × elevation) over the wall's viewable front region;
-     * [sphereCoverageFraction] drives the sweep hint and [sphereThinDirections] the coverage glow.
-     * Guarded by its own lock because [recordStandaloneKeyframeOrientation] runs on the camera worker.
+     * Freshness-aware SphereSLAM photosphere used by the guided glow.
+     *
+     * Every tile begins `needsUpdate=true`. A direction stops glowing only after the native
+     * standalone wall map actually advances while tracking that direction; merely looking there is
+     * not enough. This matches SphereSLAM's tile contract: missing or stale => glow, current => clear.
      */
-    private val sphereCoverage = com.hereliesaz.sphereslam.SphereCoverage(elevationBandCount = 3)
-    private val sphereCoverageLock = Any()
+    private val spherePhotosphere =
+        com.hereliesaz.sphereslam.PhotosphereMap(elevationBandCount = 3)
+    private val spherePhotosphereLock = Any()
     private val _sphereCoverageFraction = MutableStateFlow(0f)
 
-    /** Sweep coverage in `[0, 1]` over the viewable region — 0 off the standalone path. */
+    /** Fraction of photosphere tiles that are current, in `[0, 1]`. */
     val sphereCoverageFraction: StateFlow<Float> = _sphereCoverageFraction.asStateFlow()
 
     private val _sphereThinDirections =
         MutableStateFlow<List<com.hereliesaz.sphereslam.SphereCoverage.Direction>>(emptyList())
 
-    /** Still-unscanned directions for the coverage glow — empty off the standalone path / once full. */
+    /** Directions whose photosphere tiles are missing or currently need an update. */
     val sphereThinDirections: StateFlow<List<com.hereliesaz.sphereslam.SphereCoverage.Direction>> =
         _sphereThinDirections.asStateFlow()
+
+    @Volatile private var lastStandaloneGlowMapRevision: Long = Long.MIN_VALUE
 
     /** Latest camera attitude (headingDeg, elevationDeg) for projecting the glow, or null. */
     val latestCameraAttitude: Pair<Float, Float>?
@@ -967,57 +972,69 @@ class ArViewModel @Inject constructor(
         }
 
     /**
-     * Record one standalone atlas-growth orientation sample.
-     *
-     * Persisting the quaternion remains part of the optional feature-map experiment, but the visible
-     * SphereSLAM coverage/glow is a normal tracking aid and is therefore updated independently from
-     * that switch.
+     * Persist one atlas-growth orientation sample when the feature-map experiment is enabled.
+     * Glow freshness itself is driven by actual native map revisions in [onStandaloneTrackingTick].
      */
     fun recordStandaloneKeyframeOrientation(timestampNs: Long, quaternion: FloatArray) {
         if (_evalFeatureMapEnabled.value) {
             keyframeOrientationRecorder.record(timestampNs, quaternion)
         }
-        observeStandaloneCoverage()
     }
 
-    private fun observeStandaloneCoverage() {
+    private fun refreshSphereTileGlowLocked() {
+        _sphereCoverageFraction.value = spherePhotosphere.coverageFraction()
+        _sphereThinDirections.value = spherePhotosphere.directionsNeedingUpdate()
+    }
+
+    private fun markCurrentSphereTileFromNativeMapRevision(mapRevision: Long) {
+        if (mapRevision == lastStandaloneGlowMapRevision) return
+        val previous = lastStandaloneGlowMapRevision
+        lastStandaloneGlowMapRevision = mapRevision
+        // Establishing/restoring the native map sets the baseline; only a later revision proves that
+        // this live direction actually received new/updated map content.
+        if (previous == Long.MIN_VALUE) return
+
         cameraAttitudeProvider.start()
         val heading = cameraAttitudeProvider.latestHeadingDegrees() ?: return
         val elevation = cameraAttitudeProvider.latestElevationDegrees() ?: 0f
-        val grew = synchronized(sphereCoverageLock) { sphereCoverage.observe(heading, elevation) }
-        if (grew) {
-            synchronized(sphereCoverageLock) {
-                _sphereCoverageFraction.value = sphereCoverage.coverageFraction()
-                _sphereThinDirections.value = sphereCoverage.thinDirections()
-            }
+        val updated = synchronized(spherePhotosphereLock) {
+            val id = spherePhotosphere.markUpdated(
+                headingDeg = heading,
+                elevationDeg = elevation,
+                nowMs = android.os.SystemClock.elapsedRealtime(),
+            )
+            refreshSphereTileGlowLocked()
+            id
+        }
+        if (updated != null) {
+            appendDiag(
+                "SphereSLAM tile current sector=${updated.sector} band=${updated.band} " +
+                    "coverage=${"%.3f".format(_sphereCoverageFraction.value)}"
+            )
         }
     }
 
-    /**
-     * Anchor the sweep's viewable arc to the heading the camera faces now — called when the wall
-     * reference is captured head-on, so coverage is measured over the arc actually in front of the
-     * wall. No-op when the sensor is unavailable (the arc then auto-anchors to the first keyframe).
-     */
     private fun anchorSphereCoverageToWall() {
         cameraAttitudeProvider.start()
         val heading = cameraAttitudeProvider.latestHeadingDegrees() ?: run {
             appendDiag("SphereSLAM coverage glow: camera attitude unavailable")
             return
         }
-        synchronized(sphereCoverageLock) {
-            sphereCoverage.setWallHeading(heading)
-            _sphereCoverageFraction.value = sphereCoverage.coverageFraction()
-            _sphereThinDirections.value = sphereCoverage.thinDirections()
+        synchronized(spherePhotosphereLock) {
+            spherePhotosphere.setWallHeading(heading)
+            refreshSphereTileGlowLocked()
         }
         appendDiag(
-            "SphereSLAM coverage glow armed directions=" + _sphereThinDirections.value.size
+            "SphereSLAM coverage glow armed updateTiles=" + _sphereThinDirections.value.size
         )
     }
 
     private fun resetSphereCoverage() {
-        synchronized(sphereCoverageLock) { sphereCoverage.reset() }
-        _sphereCoverageFraction.value = 0f
-        _sphereThinDirections.value = emptyList()
+        synchronized(spherePhotosphereLock) {
+            spherePhotosphere.reset()
+            refreshSphereTileGlowLocked()
+        }
+        lastStandaloneGlowMapRevision = Long.MIN_VALUE
     }
 
     private val _evalAutoFocusEnabled = MutableStateFlow(true)
@@ -4098,6 +4115,7 @@ class ArViewModel @Inject constructor(
         if (registered && !wasRegistered) {
             resetSphereCoverage()
             anchorSphereCoverageToWall()
+            lastStandaloneGlowMapRevision = slamManager.getWallFeatureMapRevision()
         } else if (!registered && wasRegistered) {
             resetSphereCoverage()
         }
@@ -4120,7 +4138,6 @@ class ArViewModel @Inject constructor(
     }
 
     fun onStandaloneTrackingTick(isTracking: Boolean) {
-        if (isTracking) observeStandaloneCoverage()
         val state = _uiState.value
         if (!state.isArCoreAvailabilityResolved || state.isArCoreAvailable) return
         val available = state.isSphereSlamAvailable
@@ -4154,6 +4171,7 @@ class ArViewModel @Inject constructor(
         val wallPoints = slamManager.getWallKeypointCount()
         val mapPoints = slamManager.getMapPointCount()
         val mapRevision = slamManager.getWallFeatureMapRevision()
+        if (isTracking) markCurrentSphereTileFromNativeMapRevision(mapRevision)
         maybePersistStandaloneWallFeatureMap(now, mapPoints, mapRevision)
 
         _uiState.update { state ->
