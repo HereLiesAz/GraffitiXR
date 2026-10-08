@@ -317,6 +317,8 @@ fun SphereSlamStandaloneOverlay(
     // purge; those late posts would run on a torn-down composition. Every worker→UI post goes through
     // postUi, which drops the work when disposed. Reset to false when the effect re-arms (re-entry).
     val disposed = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+    val standaloneAnalyzerRef =
+        remember { AtomicReference<SphereSlamStandaloneTrackingAnalyzer?>(null) }
     fun postUi(block: () -> Unit) {
         mainHandler.post { if (!disposed.get()) block() }
     }
@@ -940,10 +942,6 @@ fun SphereSlamStandaloneOverlay(
     DisposableEffect(
         cameraController,
         cameraId,
-        referenceImage,
-        runtimeMobileGsFingerprint,
-        mobileGsFingerprintFrameVersion,
-        atlasReferenceImages,
         peerOnlyTracking,
         coopPeerSpatialFrame,
         coopPeerFingerprint,
@@ -1122,6 +1120,7 @@ fun SphereSlamStandaloneOverlay(
                 },
             )
             analyzer.start()
+            standaloneAnalyzerRef.set(analyzer)
             cameraController.setImageAnalysisAnalyzer(executor, analyzer)
 
             onDispose {
@@ -1129,6 +1128,7 @@ fun SphereSlamStandaloneOverlay(
                 // standalone overlay composition. removeCallbacksAndMessages only clears ALREADY-queued
                 // posts; disposed guards against a still-running analyze() posting AFTER this purge.
                 disposed.set(true)
+                standaloneAnalyzerRef.compareAndSet(analyzer, null)
                 cameraController.clearImageAnalysisAnalyzer()
                 mainHandler.removeCallbacksAndMessages(null)
                 executor.execute { analyzer.close() }
@@ -1139,6 +1139,26 @@ fun SphereSlamStandaloneOverlay(
         }
     }
 
+    LaunchedEffect(
+        referenceImage,
+        runtimeMobileGsFingerprint,
+        mobileGsFingerprintFrameVersion,
+        atlasReferenceImages,
+        initialMobileGsWallFeatureMap,
+        initialMobileGsWallFeatureMapFrameVersion,
+        peerOnlyTracking,
+    ) {
+        if (!peerOnlyTracking) {
+            standaloneAnalyzerRef.get()?.updatePrecisionLayer(
+                reference = referenceImage,
+                atlasPages = atlasReferenceImages,
+                fingerprint = runtimeMobileGsFingerprint,
+                fingerprintFrameVersion = mobileGsFingerprintFrameVersion,
+                wallFeatureMap = initialMobileGsWallFeatureMap,
+                wallFeatureMapFrameVersion = initialMobileGsWallFeatureMapFrameVersion,
+            )
+        }
+    }
     AndroidView(
         factory = { ctx ->
             GLSurfaceView(ctx).apply {
