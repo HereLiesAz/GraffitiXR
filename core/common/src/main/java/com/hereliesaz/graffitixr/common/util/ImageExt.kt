@@ -31,6 +31,43 @@ private const val ERASE_TOUCH_RADIUS_MIN_PX = 16
 private const val MAX_ISOLATE_MARKINGS_PIXELS = 8_000_000L
 
 /**
+ * Target-review work is intentionally capped near the ARCore capture size. CameraX still capture can
+ * return 12+ MP JPEGs (for example 3024x4032 on Pixel 5); running mark isolation and descriptor
+ * extraction at that resolution wastes memory/CPU and breaches the Int integral-image budget above.
+ */
+const val TARGET_REVIEW_MAX_PIXELS = 2_000_000L
+
+internal fun fitWithinPixelBudget(
+    width: Int,
+    height: Int,
+    maxPixels: Long = TARGET_REVIEW_MAX_PIXELS,
+): Pair<Int, Int> {
+    require(width > 0 && height > 0)
+    require(maxPixels > 0)
+    val pixels = width.toLong() * height.toLong()
+    if (pixels <= maxPixels) return width to height
+
+    val scale = kotlin.math.sqrt(maxPixels.toDouble() / pixels.toDouble())
+    val scaledWidth = kotlin.math.floor(width * scale).toInt().coerceAtLeast(1)
+    val scaledHeight = kotlin.math.floor(height * scale).toInt().coerceAtLeast(1)
+    return scaledWidth to scaledHeight
+}
+
+/**
+ * Returns an aspect-identical target-review bitmap that is safe for [isolateMarkings].
+ *
+ * The returned bitmap is the receiver itself when no resize is needed; callers must therefore only
+ * recycle the original when the returned instance is different.
+ */
+fun Bitmap.forTargetReview(
+    maxPixels: Long = TARGET_REVIEW_MAX_PIXELS,
+): Bitmap {
+    val (targetWidth, targetHeight) = fitWithinPixelBudget(width, height, maxPixels)
+    if (targetWidth == width && targetHeight == height) return this
+    return Bitmap.createScaledBitmap(this, targetWidth, targetHeight, true)
+}
+
+/**
  * Deconstructs the visual reality of a poorly lit wall, stripping away the
  * chaotic noise of the background to isolate only the high-contrast markings.
  * Uses a Bradley-Roth adaptive threshold to outsmart uneven lighting, then keeps only
