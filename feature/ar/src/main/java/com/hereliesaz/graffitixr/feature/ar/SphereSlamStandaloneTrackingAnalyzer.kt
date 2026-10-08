@@ -91,6 +91,24 @@ data class SphereSlamStandaloneFrame(
     }
 }
 
+data class SphereSlamPhotosphereKeyframe(
+    val timestampNs: Long,
+    val luma: ByteArray,
+    val width: Int,
+    val height: Int,
+    val intrinsics: FloatArray,
+    val headingDeg: Float,
+    val elevationDeg: Float,
+    val orientationQuaternion: FloatArray?,
+) {
+    init {
+        require(width > 0 && height > 0 && luma.size == width * height)
+        require(intrinsics.size == 4 && intrinsics.all { it.isFinite() })
+        require(headingDeg.isFinite() && elevationDeg.isFinite())
+        require(orientationQuaternion == null || orientationQuaternion.size == 4)
+    }
+}
+
 /**
  * CameraX ImageAnalysis -> calibrated KPM wall pose for phones that cannot run ARCore.
  *
@@ -106,7 +124,7 @@ data class SphereSlamStandaloneFrame(
 internal class SphereSlamStandaloneTrackingAnalyzer(
     private val context: Context,
     private val cameraId: String,
-    private val referenceImage: SphereSlamStandaloneReferenceImage,
+    private val referenceImage: SphereSlamStandaloneReferenceImage?,
     private val atlasReferenceImages: List<SphereSlamStandaloneAtlasReferenceImage> = emptyList(),
     private val slamManager: SlamManager? = null,
     private val mobileGsFingerprint: Fingerprint? = null,
@@ -116,6 +134,8 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private val mobileGsWallFeatureMapFrameVersion: Int =
         com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     private val onFrameTracked: (SphereSlamStandaloneFrame?) -> Unit,
+    private val cameraAttitude: () -> Pair<Float, Float>? = { null },
+    private val onPhotosphereKeyframe: (SphereSlamPhotosphereKeyframe) -> Unit = {},
     private val onReferenceReady: (SphereSlamStandaloneSession.Reference) -> Unit = {},
     private val onAtlasPageAdded: (StandaloneAtlasGrowthCandidate) -> Unit = {},
     // Phase 1b of the spherical-coverage map (docs/SPHERESLAM_SPHERE_MAP.md): the device bearing at
@@ -211,6 +231,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         }
     }
     private var lastAtlasGrowthMs = Long.MIN_VALUE
+    private var lastPreAnchorKeyframeMs = Long.MIN_VALUE
     // Phase 2: throttle MiDaS inference to a keyframe cadence (not per-frame — ORT CPU inference is
     // too expensive for 30fps and the map builds per-keyframe anyway).
     private var lastDepthMs = Long.MIN_VALUE
@@ -304,12 +325,23 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 intrinsics.cy,
             )
 
-            val active = ensureSession(intrinsics)
             val pendingImuReference = bridge.captureReferenceCandidate(rotationDeg)
             val timestampNs = image.imageInfo.timestamp
             val projection = ProjectionMatrix.buildFrom(intrinsics)
             val direct = directFrame(rotated.bytes)
 
+            // SphereSLAM is the base runtime. Before the user creates a precision fingerprint there
+            // is intentionally no planar page to match, but the photosphere still starts immediately
+            // and continuously captures visual keyframes. Fingerprinting/teleological SLAM are
+            // enrichment layers added later; they never gate base-map startup.
+            if (referenceImage == null) {
+                capturePreAnchorPhotosphereKeyframe(rotated, intrinsics, timestampNs)
+                slamManager?.setTrackingPoseValid(false)
+                onFrameTracked(null)
+                return
+            }
+
+            val active = ensureSession(intrinsics)
             val matchStartNs = android.os.SystemClock.elapsedRealtimeNanos()
             val pose = active.match(direct, timestampNs)
             val matchEndNs = android.os.SystemClock.elapsedRealtimeNanos()
@@ -570,6 +602,38 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         )
     }
 
+    private fun capturePreAnchorPhotosphereKeyframe(
+        frame: RotatedLuma,
+        intrinsics: CameraIntrinsics,
+        timestampNs: Long,
+    ) {
+        val attitude = cameraAttitude() ?: return
+        val nowMs = android.os.SystemClock.elapsedRealtime()
+        if (
+            lastPreAnchorKeyframeMs != Long.MIN_VALUE &&
+            nowMs - lastPreAnchorKeyframeMs < PRE_ANCHOR_KEYFRAME_INTERVAL_MS
+        ) return
+        lastPreAnchorKeyframeMs = nowMs
+
+        onPhotosphereKeyframe(
+            SphereSlamPhotosphereKeyframe(
+                timestampNs = timestampNs,
+                luma = frame.bytes.copyOf(),
+                width = frame.width,
+                height = frame.height,
+                intrinsics = floatArrayOf(
+                    intrinsics.fx,
+                    intrinsics.fy,
+                    intrinsics.cx,
+                    intrinsics.cy,
+                ),
+                headingDeg = attitude.first,
+                elevationDeg = attitude.second,
+                orientationQuaternion = bridge.latestOrientationSample(),
+            )
+        )
+    }
+
     private fun ensureSession(intrinsics: CameraIntrinsics): SphereSlamStandaloneSession {
         val key = SessionKey(
             intrinsics.width,
@@ -588,6 +652,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         poseStabilizer.reset()
         lastRelocSeq = 0f
 
+        val reference = requireNotNull(referenceImage) {
+            "planar SphereSLAM session requested before fingerprint/reference exists"
+        }
         val created = SphereSlamStandaloneSession(
             frameWidth = intrinsics.width,
             frameHeight = intrinsics.height,
@@ -599,16 +666,16 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             ),
         )
         try {
-            val refBuffer = ByteBuffer.allocateDirect(referenceImage.luma.size).apply {
-                put(referenceImage.luma)
+            val refBuffer = ByteBuffer.allocateDirect(reference.luma.size).apply {
+                put(reference.luma)
                 flip()
             }
             val reference = created.addReference(
                 luma = refBuffer,
-                width = referenceImage.width,
-                height = referenceImage.height,
-                referenceWidthMeters = referenceImage.referenceWidthMeters,
-                physicallyMetric = referenceImage.physicallyMetric,
+                width = reference.width,
+                height = reference.height,
+                referenceWidthMeters = reference.referenceWidthMeters,
+                physicallyMetric = reference.physicallyMetric,
             )
             if (reference.featureCount < targetQualityConfig.minKpmFeatures) {
                 throw StandaloneReferenceTooWeakException(
@@ -723,9 +790,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             now - lastAtlasGrowthMs < StandaloneAtlasGrowth.MIN_GROW_INTERVAL_MS
         ) return
 
-        val rootWidth = referenceImage.referenceWidthMeters
+        val rootWidth = reference.referenceWidthMeters
         val rootHeight =
-            rootWidth * referenceImage.height.toFloat() / referenceImage.width.toFloat()
+            rootWidth * reference.height.toFloat() / reference.width.toFloat()
         val existing = buildList {
             add(
                 StandaloneAtlasPageWindow(
@@ -788,7 +855,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             width = bitmap.width,
             height = bitmap.height,
             referenceWidthMeters = geometry.width,
-            physicallyMetric = referenceImage.physicallyMetric,
+            physicallyMetric = reference.physicallyMetric,
             canonicalFromPage = canonicalFromPage,
         )
         val buffer = ByteBuffer.allocateDirect(luma.size).apply {
