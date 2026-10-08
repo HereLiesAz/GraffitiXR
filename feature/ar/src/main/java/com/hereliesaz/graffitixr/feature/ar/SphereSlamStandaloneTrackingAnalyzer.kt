@@ -652,7 +652,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         poseStabilizer.reset()
         lastRelocSeq = 0f
 
-        val reference = requireNotNull(referenceImage) {
+        val rootReference = requireNotNull(referenceImage) {
             "planar SphereSLAM session requested before fingerprint/reference exists"
         }
         val created = SphereSlamStandaloneSession(
@@ -666,25 +666,25 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             ),
         )
         try {
-            val refBuffer = ByteBuffer.allocateDirect(reference.luma.size).apply {
-                put(reference.luma)
+            val refBuffer = ByteBuffer.allocateDirect(rootReference.luma.size).apply {
+                put(rootReference.luma)
                 flip()
             }
-            val reference = created.addReference(
+            val registeredReference = created.addReference(
                 luma = refBuffer,
-                width = reference.width,
-                height = reference.height,
-                referenceWidthMeters = reference.referenceWidthMeters,
-                physicallyMetric = reference.physicallyMetric,
+                width = rootReference.width,
+                height = rootReference.height,
+                referenceWidthMeters = rootReference.referenceWidthMeters,
+                physicallyMetric = rootReference.physicallyMetric,
             )
-            if (reference.featureCount < targetQualityConfig.minKpmFeatures) {
+            if (registeredReference.featureCount < targetQualityConfig.minKpmFeatures) {
                 throw StandaloneReferenceTooWeakException(
-                    featureCount = reference.featureCount,
+                    featureCount = registeredReference.featureCount,
                     minimumFeatureCount = targetQualityConfig.minKpmFeatures,
                 )
             }
             onDiagnostic(
-                "SphereSLAM standalone reference features=" + reference.featureCount +
+                "SphereSLAM standalone reference features=" + registeredReference.featureCount +
                     " minimum=" + targetQualityConfig.minKpmFeatures,
             )
 
@@ -718,7 +718,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             // (grown atlas pages share the wall's scale). The loop owns the (freshly reset above)
             // stabilizer and the state machine; the proprietary corroboration rides correctAcceptedPose.
             robustLoop = RobustTrackingLoop(
-                referenceWidthUnits = reference.geometry.widthMeters,
+                referenceWidthUnits = registeredReference.geometry.widthMeters,
                 acceptancePolicy = poseAcceptancePolicy,
                 agePolicy = observationAgePolicy,
                 stabilizer = poseStabilizer,
@@ -727,7 +727,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             )
             session = created
             sessionKey = key
-            onReferenceReady(reference)
+            onReferenceReady(registeredReference)
             return created
         } catch (t: Throwable) {
             created.close()
@@ -790,9 +790,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             now - lastAtlasGrowthMs < StandaloneAtlasGrowth.MIN_GROW_INTERVAL_MS
         ) return
 
-        val rootWidth = reference.referenceWidthMeters
+        val rootReference = referenceImage ?: return
+        val rootWidth = rootReference.referenceWidthMeters
         val rootHeight =
-            rootWidth * reference.height.toFloat() / reference.width.toFloat()
+            rootWidth * rootReference.height.toFloat() / rootReference.width.toFloat()
         val existing = buildList {
             add(
                 StandaloneAtlasPageWindow(
@@ -855,7 +856,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             width = bitmap.width,
             height = bitmap.height,
             referenceWidthMeters = geometry.width,
-            physicallyMetric = reference.physicallyMetric,
+            physicallyMetric = rootReference.physicallyMetric,
             canonicalFromPage = canonicalFromPage,
         )
         val buffer = ByteBuffer.allocateDirect(luma.size).apply {
@@ -1135,6 +1136,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     }
 
     private companion object {
+        /** Pre-anchor photosphere keyframe cadence; visual mapping begins with the camera, not the fingerprint. */
+        const val PRE_ANCHOR_KEYFRAME_INTERVAL_MS = 250L
+
         /** Phase 2: minimum interval between MiDaS depth inferences (keyframe cadence, not per-frame). */
         const val DEPTH_MIN_INTERVAL_MS = 500L
 
