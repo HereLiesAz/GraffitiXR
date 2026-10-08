@@ -44,6 +44,7 @@ import com.hereliesaz.graffitixr.common.sensor.Vec3
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.common.util.eraseColorBlob
+import com.hereliesaz.graffitixr.common.util.forTargetReview
 import com.hereliesaz.graffitixr.common.wearable.ConnectionState
 import com.hereliesaz.graffitixr.common.wearable.WearableManager
 import com.hereliesaz.graffitixr.feature.ar.coop.calibration.Mat4
@@ -4283,30 +4284,65 @@ class ArViewModel @Inject constructor(
      */
     fun onStandaloneTargetCaptured(bitmap: Bitmap) {
         pendingTapPosition = null
+        // Stop the capture request immediately so CameraX cannot hand us a second full-resolution
+        // still while the first one is being prepared for review.
+        _uiState.update { it.copy(isCaptureRequested = false) }
+
         val initialPoints = listOf(
             Offset(0.15f, 0.15f),
             Offset(0.85f, 0.15f),
             Offset(0.85f, 0.85f),
             Offset(0.15f, 0.85f),
         )
-        _uiState.update {
-            it.copy(
-                targetRawBitmap = bitmap,
-                targetDepthBuffer = null,
-                targetDepthWidth = bitmap.width,
-                targetDepthHeight = bitmap.height,
-                targetDepthBufferWidth = 0,
-                targetDepthBufferHeight = 0,
-                targetDepthStride = 0,
-                targetIntrinsics = null,
-                targetCaptureViewMatrix = null,
-                targetWallPlane = null,
-                targetPhysicalExtent = null,
-                isCaptureRequested = false,
-                tempCaptureBitmap = bitmap,
-                annotatedCaptureBitmap = bitmap.isolateMarkings(),
-                unwarpPoints = initialPoints,
-            )
+
+        viewModelScope.launch(dispatchers.default) {
+            val sourceWidth = bitmap.width
+            val sourceHeight = bitmap.height
+            val reviewBitmap = bitmap.forTargetReview()
+            try {
+                val markings = reviewBitmap.isolateMarkings()
+                if (reviewBitmap !== bitmap) {
+                    // The CameraX JPEG can be 12+ MP. Once the bounded review/reference copy exists,
+                    // keeping that original allocation only burns tens of MB and serves no runtime
+                    // purpose; the standalone fingerprint/page geometry is resolution-independent.
+                    bitmap.recycle()
+                }
+                _uiState.update {
+                    it.copy(
+                        targetRawBitmap = reviewBitmap,
+                        targetDepthBuffer = null,
+                        targetDepthWidth = reviewBitmap.width,
+                        targetDepthHeight = reviewBitmap.height,
+                        targetDepthBufferWidth = 0,
+                        targetDepthBufferHeight = 0,
+                        targetDepthStride = 0,
+                        targetIntrinsics = null,
+                        targetCaptureViewMatrix = null,
+                        targetWallPlane = null,
+                        targetPhysicalExtent = null,
+                        tempCaptureBitmap = reviewBitmap,
+                        annotatedCaptureBitmap = markings,
+                        unwarpPoints = initialPoints,
+                    )
+                }
+                appendDiag(
+                    "SphereSLAM target review source=${sourceWidth}x${sourceHeight} " +
+                        "working=${reviewBitmap.width}x${reviewBitmap.height}"
+                )
+            } catch (e: Exception) {
+                if (reviewBitmap !== bitmap && !reviewBitmap.isRecycled) reviewBitmap.recycle()
+                if (!bitmap.isRecycled) bitmap.recycle()
+                appendDiag(
+                    "SphereSLAM target review failed: " +
+                        (e.message ?: e.javaClass.simpleName)
+                )
+                _feedback.tryEmit(
+                    com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                        "Couldn't prepare the captured target. Try again.",
+                        e,
+                    )
+                )
+            }
         }
     }
 
