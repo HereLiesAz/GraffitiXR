@@ -301,6 +301,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         }
     }
 
+    @Synchronized
     override fun analyze(image: ImageProxy) {
         try {
             if (closed || fatal) return
