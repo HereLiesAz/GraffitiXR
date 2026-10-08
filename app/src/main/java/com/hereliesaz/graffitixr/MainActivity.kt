@@ -1567,23 +1567,33 @@ class MainActivity : ComponentActivity() {
                                     isWaitingForTap = mainUiState.isWaitingForTap,
                                     strings = strings,
                                     onConfirmTarget = { bitmap, mask ->
-                                        arViewModel.setInitialAnchorFromCapture()
-                                        mainViewModel.onConfirmTargetCreation(
-                                            bitmap,
-                                            mask,
-                                            arUiState.targetDepthBuffer,
-                                            arUiState.targetDepthBufferWidth,
-                                            arUiState.targetDepthBufferHeight,
-                                            arUiState.targetDepthStride,
-                                            arUiState.targetIntrinsics,
-                                            arUiState.targetCaptureViewMatrix,
-                                            arUiState.targetWallPlane,
-                                            // rotationNeeded, as recorded at capture. The bitmap
-                                            // and intrinsics above were already rotated by it; the
-                                            // view matrix now follows (Phase 0, convention B).
-                                            arUiState.targetDisplayRotation,
-                                            arUiState.targetCaptureEnvironment,
-                                        )
+                                        if (
+                                            arUiState.sphereSlamRuntimeStatus.mode ==
+                                                com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.STANDALONE
+                                        ) {
+                                            mainViewModel.onConfirmStandaloneTargetCreation(
+                                                bitmap,
+                                                mask,
+                                            )
+                                        } else {
+                                            arViewModel.setInitialAnchorFromCapture()
+                                            mainViewModel.onConfirmTargetCreation(
+                                                bitmap,
+                                                mask,
+                                                arUiState.targetDepthBuffer,
+                                                arUiState.targetDepthBufferWidth,
+                                                arUiState.targetDepthBufferHeight,
+                                                arUiState.targetDepthStride,
+                                                arUiState.targetIntrinsics,
+                                                arUiState.targetCaptureViewMatrix,
+                                                arUiState.targetWallPlane,
+                                                // rotationNeeded, as recorded at capture. The bitmap
+                                                // and intrinsics above were already rotated by it; the
+                                                // view matrix now follows (Phase 0, convention B).
+                                                arUiState.targetDisplayRotation,
+                                                arUiState.targetCaptureEnvironment,
+                                            )
+                                        }
                                     },
                                     onRetake = {
                                         mainViewModel.onRetakeCapture()
