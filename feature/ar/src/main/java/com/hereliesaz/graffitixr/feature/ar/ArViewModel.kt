@@ -962,6 +962,13 @@ class ArViewModel @Inject constructor(
     val sphereThinDirections: StateFlow<List<com.hereliesaz.sphereslam.SphereCoverage.Direction>> =
         _sphereThinDirections.asStateFlow()
 
+    private val _sphereCurrentDirections =
+        MutableStateFlow<List<com.hereliesaz.sphereslam.SphereCoverage.Direction>>(emptyList())
+
+    /** Directions whose photosphere tiles are current and therefore must be cut out of the glow. */
+    val sphereCurrentDirections: StateFlow<List<com.hereliesaz.sphereslam.SphereCoverage.Direction>> =
+        _sphereCurrentDirections.asStateFlow()
+
     @Volatile private var lastStandaloneGlowMapRevision: Long = Long.MIN_VALUE
 
     /** Latest camera attitude (headingDeg, elevationDeg) for projecting the glow, or null. */
@@ -984,6 +991,18 @@ class ArViewModel @Inject constructor(
     private fun refreshSphereTileGlowLocked() {
         _sphereCoverageFraction.value = spherePhotosphere.coverageFraction()
         _sphereThinDirections.value = spherePhotosphere.directionsNeedingUpdate()
+
+        val snapshot = spherePhotosphere.snapshot()
+        val current = ArrayList<com.hereliesaz.sphereslam.SphereCoverage.Direction>()
+        for (sector in 0 until snapshot.sectorCount) {
+            for (band in 0 until snapshot.elevationBandCount) {
+                val id = com.hereliesaz.sphereslam.TileId(sector, band)
+                if (spherePhotosphere.hasBeenScanned(id) && !spherePhotosphere.needsUpdate(id)) {
+                    spherePhotosphere.tile(id)?.center?.let(current::add)
+                }
+            }
+        }
+        _sphereCurrentDirections.value = current
     }
 
     private fun markCurrentSphereTileFromNativeMapRevision(mapRevision: Long) {
