@@ -17,6 +17,7 @@ import android.graphics.Paint
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
+import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder
 import com.hereliesaz.graffitixr.feature.ar.pose.SphereSlamRuntimeProbe
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -74,6 +75,13 @@ class ArViewModelTest {
         every { NativeLibLoader.loadAll() } returns Unit
         mockkObject(SphereSlamRuntimeProbe)
         every { SphereSlamRuntimeProbe.isOperational() } returns true
+        // Reference-persistence tests exercise the atomic URI/metadata transaction, not feature
+        // extraction. Supply a valid fingerprint so the mandatory teleological-SLAM precondition is
+        // satisfied without making those tests depend on OpenCV/native descriptor extraction.
+        mockkObject(StandaloneFingerprintBuilder)
+        every {
+            StandaloneFingerprintBuilder.build(any(), any(), any())
+        } returns mockk(relaxed = true)
         mockkStatic(Bitmap::class)
         mockkStatic(Canvas::class)
         mockkConstructor(Canvas::class)
@@ -119,6 +127,7 @@ class ArViewModelTest {
         unmockkStatic(Matrix::class)
         unmockkStatic(Paint::class)
         unmockkConstructor(Paint::class)
+        unmockkObject(StandaloneFingerprintBuilder)
         unmockkObject(SphereSlamRuntimeProbe)
         unmockkObject(NativeLibLoader)
     }
