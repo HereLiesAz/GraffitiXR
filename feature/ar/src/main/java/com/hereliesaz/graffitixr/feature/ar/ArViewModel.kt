@@ -2558,10 +2558,8 @@ class ArViewModel @Inject constructor(
                     } else {
                         transformApplied = true
                         lastStandaloneGuideKey = null
-                        // New canonical frame: the orientation log is co-registered to the old one,
-                        // so drop it with the map (Phase 1b, docs/SPHERESLAM_SPHERE_MAP.md).
-                        keyframeOrientationRecorder.clear()
-                        resetSphereCoverage()
+                        // Fingerprint replacement changes only the precision/teleological layer.
+                        // The base SphereSLAM photosphere and its orientation history stay alive.
                         current.copy(
                             sphereSlamReferenceUri = candidateUri,
                             sphereSlamReferenceWidthMeters = referenceWidthMeters,
@@ -2578,16 +2576,12 @@ class ArViewModel @Inject constructor(
                             sphereSlamWallFeatureMap = null,
                             sphereSlamWallFeatureMapFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
-                            sphereSlamKeyframeOrientations = null,
                             sphereSlamAtlasPages = emptyList(),
                         )
                     }
                 }
 
                 if (transformApplied) {
-                    // The reference was just captured head-on, so this is the moment to anchor the
-                    // sweep's viewable arc to the wall-facing heading (Phase 3).
-                    anchorSphereCoverageToWall()
                     projectManager.deleteSphereSlamReference(
                         appContext,
                         projectId,
@@ -2690,8 +2684,6 @@ class ArViewModel @Inject constructor(
                         current
                     } else {
                         cleared = true
-                        keyframeOrientationRecorder.clear()
-                        resetSphereCoverage()
                         current.copy(
                             sphereSlamReferenceUri = null,
                             sphereSlamReferenceWidthMeters = 1f,
@@ -2707,7 +2699,6 @@ class ArViewModel @Inject constructor(
                             sphereSlamWallFeatureMap = null,
                             sphereSlamWallFeatureMapFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
-                            sphereSlamKeyframeOrientations = null,
                             sphereSlamAtlasPages = emptyList(),
                         )
                     }
