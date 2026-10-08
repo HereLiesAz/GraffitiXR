@@ -2700,7 +2700,7 @@ private fun RelocDiagnosticsOverlay(
                     "observations=${sphereSlamStatus.trackingData}"
             com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.STANDALONE ->
                 "active=${sphereSlamStatus.active} ref=${sphereSlamStatus.referenceReady} " +
-                    "tracking=${sphereSlamStatus.trackingData}"
+                    "mapping=${sphereSlamStatus.mappingData} tracking=${sphereSlamStatus.trackingData}"
             com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.UNRESOLVED ->
                 "waiting for backend/capability resolution"
             com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.UNAVAILABLE ->
