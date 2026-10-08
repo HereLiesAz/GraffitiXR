@@ -1042,6 +1042,7 @@ class ArViewModel @Inject constructor(
                     },
                     active = available,
                     referenceReady = state.isSphereSlamReferenceRegistered,
+                    mappingData = true,
                     trackingData = state.sphereSlamRuntimeStatus.trackingData,
                 )
             )
@@ -1183,6 +1184,7 @@ class ArViewModel @Inject constructor(
             "sphereSlamMode" to _uiState.value.sphereSlamRuntimeStatus.mode.name,
             "sphereSlamActive" to _uiState.value.sphereSlamRuntimeStatus.active.toString(),
             "sphereSlamReferenceReady" to _uiState.value.sphereSlamRuntimeStatus.referenceReady.toString(),
+            "sphereSlamMappingData" to _uiState.value.sphereSlamRuntimeStatus.mappingData.toString(),
             "sphereSlamTrackingData" to _uiState.value.sphereSlamRuntimeStatus.trackingData.toString(),
             // Two flags that change what every number below MEANS, so they belong beside the numbers
             // and not in a settings screen the reader cannot see. Read back from the objects that
@@ -4163,6 +4165,7 @@ class ArViewModel @Inject constructor(
                 active = available &&
                     (standalonePhotosphereActive || registered || state.sphereSlamRuntimeStatus.trackingData),
                 referenceReady = registered,
+                mappingData = standalonePhotosphereActive,
                 trackingData = state.sphereSlamRuntimeStatus.trackingData,
             )
         )
@@ -4183,6 +4186,7 @@ class ArViewModel @Inject constructor(
                 },
                 active = available && (standalonePhotosphereActive || referenceReady || isTracking),
                 referenceReady = referenceReady,
+                mappingData = standalonePhotosphereActive,
                 trackingData = isTracking,
             )
         )
