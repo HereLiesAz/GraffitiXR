@@ -942,38 +942,51 @@ fun SphereSlamStandaloneOverlay(
         disposed.set(false)
         val id = cameraId
         val restoredAtlas = atlasReferenceImages
-        if (id == null || restoredAtlas == null) {
+        val standaloneReference = referenceImage
+        // Pre-reference startup is a valid steady state: CameraX and the full-screen glow must stay
+        // mounted while the shared Target/fingerprint flow is waiting for capture. Do NOT construct
+        // the native standalone analyzer until it has an actual page to register.
+        if (
+            id == null ||
+            restoredAtlas == null ||
+            (!peerOnlyTracking && standaloneReference == null)
+        ) {
             onDispose {}
         } else {
             val executor = Executors.newSingleThreadExecutor { runnable ->
                 Thread(runnable, "sphereslam-standalone-camera").apply { isDaemon = true }
             }
             if (peerOnlyTracking) {
-                val peerSpatial = requireNotNull(coopPeerSpatialFrame)
-                val peerFingerprint = requireNotNull(coopPeerFingerprint)
-                val analyzer = CoopPeerFingerprintAnalyzer(
-                    context = context,
-                    cameraId = id,
-                    slam = slamManager,
-                    peerFingerprint = peerFingerprint,
-                    spatialFrame = peerSpatial,
-                    onFrameTracked = ::consumeTrackedFrame,
-                    onDiagnostic = { text -> postUi { onDiagnostic(text) } },
-                )
-                cameraController.setImageAnalysisAnalyzer(executor, analyzer)
-                onDispose {
-                    disposed.set(true)
-                    cameraController.clearImageAnalysisAnalyzer()
-                    mainHandler.removeCallbacksAndMessages(null)
-                    executor.execute { analyzer.close() }
+                val peerSpatial = coopPeerSpatialFrame
+                val peerFingerprint = coopPeerFingerprint
+                if (peerSpatial == null || peerFingerprint.isNullOrEmpty()) {
                     executor.shutdown()
-                    glRenderer.clearPose()
+                    onDispose {}
+                } else {
+                    val analyzer = CoopPeerFingerprintAnalyzer(
+                        context = context,
+                        cameraId = id,
+                        slam = slamManager,
+                        peerFingerprint = peerFingerprint,
+                        spatialFrame = peerSpatial,
+                        onFrameTracked = ::consumeTrackedFrame,
+                        onDiagnostic = { text -> postUi { onDiagnostic(text) } },
+                    )
+                    cameraController.setImageAnalysisAnalyzer(executor, analyzer)
+                    onDispose {
+                        disposed.set(true)
+                        cameraController.clearImageAnalysisAnalyzer()
+                        mainHandler.removeCallbacksAndMessages(null)
+                        executor.execute { analyzer.close() }
+                        executor.shutdown()
+                        glRenderer.clearPose()
+                    }
                 }
             } else {
                 val analyzer = SphereSlamStandaloneTrackingAnalyzer(
                 context = context,
                 cameraId = id,
-                referenceImage = requireNotNull(referenceImage),
+                referenceImage = standaloneReference,
                 atlasReferenceImages = restoredAtlas,
                 slamManager = slamManager,
                 mobileGsFingerprint = runtimeMobileGsFingerprint,
