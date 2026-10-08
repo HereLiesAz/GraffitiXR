@@ -231,7 +231,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         }
     }
     private var lastAtlasGrowthMs = Long.MIN_VALUE
-    private var lastPreAnchorKeyframeMs = Long.MIN_VALUE
+    private var lastPhotosphereKeyframeMs = Long.MIN_VALUE
     // Phase 2: throttle MiDaS inference to a keyframe cadence (not per-frame — ORT CPU inference is
     // too expensive for 30fps and the map builds per-keyframe anyway).
     private var lastDepthMs = Long.MIN_VALUE
@@ -330,12 +330,11 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             val projection = ProjectionMatrix.buildFrom(intrinsics)
             val direct = directFrame(rotated.bytes)
 
-            // SphereSLAM is the base runtime. Before the user creates a precision fingerprint there
-            // is intentionally no planar page to match, but the photosphere still starts immediately
-            // and continuously captures visual keyframes. Fingerprinting/teleological SLAM are
-            // enrichment layers added later; they never gate base-map startup.
+            // SphereSLAM is the base runtime. Its photosphere updates for the whole standalone
+            // session, before and after fingerprint creation. The fingerprint/teleological layer can
+            // enrich this map, but never owns its lifetime.
+            capturePhotosphereKeyframe(rotated, intrinsics, timestampNs)
             if (referenceImage == null) {
-                capturePreAnchorPhotosphereKeyframe(rotated, intrinsics, timestampNs)
                 slamManager?.setTrackingPoseValid(false)
                 onFrameTracked(null)
                 return
@@ -602,7 +601,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         )
     }
 
-    private fun capturePreAnchorPhotosphereKeyframe(
+    private fun capturePhotosphereKeyframe(
         frame: RotatedLuma,
         intrinsics: CameraIntrinsics,
         timestampNs: Long,
@@ -610,10 +609,15 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         val attitude = cameraAttitude() ?: return
         val nowMs = android.os.SystemClock.elapsedRealtime()
         if (
-            lastPreAnchorKeyframeMs != Long.MIN_VALUE &&
-            nowMs - lastPreAnchorKeyframeMs < PRE_ANCHOR_KEYFRAME_INTERVAL_MS
+            lastPhotosphereKeyframeMs != Long.MIN_VALUE &&
+            nowMs - lastPhotosphereKeyframeMs < PHOTOSPHERE_KEYFRAME_INTERVAL_MS
         ) return
-        lastPreAnchorKeyframeMs = nowMs
+        lastPhotosphereKeyframeMs = nowMs
+
+        val quality = StandaloneTargetQuality.analyze(frame.bytes, frame.width, frame.height)
+        if (StandaloneTargetQuality.blockingMessage(quality) != null) {
+            return
+        }
 
         onPhotosphereKeyframe(
             SphereSlamPhotosphereKeyframe(
@@ -1136,8 +1140,8 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     }
 
     private companion object {
-        /** Pre-anchor photosphere keyframe cadence; visual mapping begins with the camera, not the fingerprint. */
-        const val PRE_ANCHOR_KEYFRAME_INTERVAL_MS = 250L
+        /** Photosphere keyframe cadence; visual mapping runs for the entire standalone session. */
+        const val PHOTOSPHERE_KEYFRAME_INTERVAL_MS = 250L
 
         /** Phase 2: minimum interval between MiDaS depth inferences (keyframe cadence, not per-frame). */
         const val DEPTH_MIN_INTERVAL_MS = 500L
