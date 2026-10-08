@@ -11,6 +11,7 @@ import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricMarks
+import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
@@ -34,6 +35,8 @@ data class MainUiState(
     // (project still loading) so AR entry can wait instead of racing; true/false drives whether AR
     // entry auto-selects the Target button (no target yet) or drops straight into layer editing.
     val hasExistingTarget: Boolean? = null,
+    val hasArCoreTarget: Boolean? = null,
+    val hasSphereSlamTarget: Boolean? = null,
     // True once the user has successfully created a target in this app session.
     // Prevents auto-starting target capture on AR re-entry within the same process.
     val targetCapturedThisSession: Boolean = false,
@@ -78,7 +81,16 @@ class MainViewModel @Inject constructor(
                 // Only resolve once a real project arrives; leave it null while loading so the UI
                 // doesn't briefly see "no target" and auto-start target capture by mistake.
                 if (project != null) {
-                    _uiState.update { it.copy(hasExistingTarget = project.fingerprint != null) }
+                    val hasArCoreTarget = project.fingerprint != null
+                    val hasSphereSlamTarget =
+                        project.sphereSlamReferenceUri != null && project.sphereSlamFingerprint != null
+                    _uiState.update {
+                        it.copy(
+                            hasExistingTarget = hasArCoreTarget || hasSphereSlamTarget,
+                            hasArCoreTarget = hasArCoreTarget,
+                            hasSphereSlamTarget = hasSphereSlamTarget,
+                        )
+                    }
                     // targetCapturedThisSession is meant to read "has THIS project (in this session)
                     // had a target captured", not "has any project, ever, this process" — otherwise
                     // capturing a target in one project silently suppressed the pre-selection prompt
@@ -153,6 +165,176 @@ class MainViewModel @Inject constructor(
 
     fun endPlaneRealignment() {
         _uiState.update { it.copy(isInPlaneRealignment = false) }
+    }
+
+    /**
+     * Confirm the shared TargetCreationUi capture while SphereSLAM standalone owns pose tracking.
+     *
+     * The artist-facing workflow is intentionally identical to ARCore: tap target, review detected
+     * marks, erase any that should not anchor the mural, confirm. Only the geometry stage differs:
+     * standalone maps the reviewed features into SphereSLAM's canonical centered page frame.
+     */
+    fun onConfirmStandaloneTargetCreation(
+        bitmap: Bitmap?,
+        selectionMask: Bitmap?,
+    ) {
+        if (bitmap == null) {
+            resetCaptureUi()
+            Toast.makeText(
+                context,
+                "Capture incomplete. Try creating the target again.",
+                Toast.LENGTH_LONG,
+            ).show()
+            return
+        }
+
+        resetCaptureUi()
+        _uiState.update { it.copy(isConfirmingTarget = true) }
+        viewModelScope.launch(Dispatchers.IO) {
+            var candidateUri: android.net.Uri? = null
+            try {
+                val currentProject = projectRepository.currentProject.value
+                if (currentProject == null) {
+                    MetricFingerprintBuilder.recordPreconditionFailure(
+                        "no project open to save the standalone target into",
+                    )
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            context,
+                            "No project open — a target is saved into a project. Open or create one first.",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                    return@launch
+                }
+
+                // No external metric measurement belongs in the shared capture UX. Standalone uses a
+                // normalized 1-unit canonical page; the page/fingerprint stay self-consistent and the
+                // project records that this scale is not physically metric.
+                val fp = StandaloneFingerprintBuilder.build(
+                    slam = slamManager,
+                    bitmap = bitmap,
+                    referenceWidthMeters = 1f,
+                    mask = selectionMask,
+                )
+                if (fp == null) {
+                    MetricFingerprintBuilder.recordPreconditionFailure(
+                        "standalone target produced too few selected SphereSLAM fingerprint features",
+                    )
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            context,
+                            "Target lacks enough selected visual detail. Keep more distinctive wall marks.",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                    return@launch
+                }
+
+                val patch = grayPatchBytes(bitmap)
+                val fingerprint = fp.copy(patchData = patch)
+                slamManager.setWallPatchBytes(patch, PATCH_SIZE)
+
+                val oldReference = currentProject.sphereSlamReferenceUri
+                val oldAtlas = currentProject.sphereSlamAtlasPages
+                candidateUri =
+                    projectManager.saveSphereSlamReference(context, currentProject.id, bitmap)
+                val baseTargetUris =
+                    projectRepository.currentProject.value?.targetImageUris
+                        ?: currentProject.targetImageUris
+                val targetUris =
+                    projectManager.appendTargetImage(
+                        context,
+                        currentProject.id,
+                        baseTargetUris,
+                        bitmap,
+                    )
+
+                var committed = false
+                projectRepository.updateProject { current ->
+                    if (
+                        current.id != currentProject.id ||
+                        current.sphereSlamReferenceUri != oldReference
+                    ) {
+                        current
+                    } else {
+                        committed = true
+                        current.copy(
+                            sphereSlamReferenceUri = candidateUri,
+                            sphereSlamReferenceWidthMeters = 1f,
+                            sphereSlamReferencePhysicallyMetric = false,
+                            sphereSlamAnchorGeneration = current.sphereSlamAnchorGeneration + 1L,
+                            sphereSlamAnchorFrameVersion =
+                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                            sphereSlamPlacementAnchorGeneration = 0L,
+                            sphereSlamFingerprint = fingerprint,
+                            sphereSlamFingerprintFrameVersion =
+                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                            sphereSlamWallFeatureMap = null,
+                            sphereSlamWallFeatureMapFrameVersion =
+                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                            sphereSlamKeyframeOrientations = null,
+                            sphereSlamAtlasPages = emptyList(),
+                            paintMarks = null,
+                            paintGrid = null,
+                            targetImageUris = targetUris,
+                        )
+                    }
+                }
+
+                if (!committed) {
+                    projectManager.deleteSphereSlamReference(
+                        context,
+                        currentProject.id,
+                        candidateUri,
+                    )
+                    return@launch
+                }
+
+                projectManager.deleteSphereSlamReference(
+                    context,
+                    currentProject.id,
+                    oldReference,
+                )
+                oldAtlas.forEach { page ->
+                    projectManager.deleteSphereSlamAtlasPage(
+                        context,
+                        currentProject.id,
+                        page.referenceUri,
+                    )
+                }
+
+                projectRepository.loadProject(currentProject.id)
+                _uiState.update { it.copy(targetCapturedThisSession = true) }
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Target Saved & Locked", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                candidateUri?.let {
+                    runCatching {
+                        projectManager.deleteSphereSlamReference(
+                            context,
+                            projectRepository.currentProject.value?.id ?: return@runCatching,
+                            it,
+                        )
+                    }
+                }
+                MetricFingerprintBuilder.recordPreconditionFailure(
+                    "standalone target save failed: ${e.message ?: e.javaClass.simpleName}",
+                )
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        context,
+                        "Couldn't save the SphereSLAM target. Try again.",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            } finally {
+                _uiState.update { it.copy(isConfirmingTarget = false) }
+            }
+        }
     }
 
     fun onConfirmTargetCreation(
