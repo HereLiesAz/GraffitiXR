@@ -124,14 +124,14 @@ data class SphereSlamPhotosphereKeyframe(
 internal class SphereSlamStandaloneTrackingAnalyzer(
     private val context: Context,
     private val cameraId: String,
-    private val referenceImage: SphereSlamStandaloneReferenceImage?,
-    private val atlasReferenceImages: List<SphereSlamStandaloneAtlasReferenceImage> = emptyList(),
+    @Volatile private var referenceImage: SphereSlamStandaloneReferenceImage?,
+    atlasReferenceImages: List<SphereSlamStandaloneAtlasReferenceImage> = emptyList(),
     private val slamManager: SlamManager? = null,
-    private val mobileGsFingerprint: Fingerprint? = null,
-    private val mobileGsFingerprintFrameVersion: Int =
+    @Volatile private var mobileGsFingerprint: Fingerprint? = null,
+    @Volatile private var mobileGsFingerprintFrameVersion: Int =
         com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
-    private val mobileGsWallFeatureMap: WallFeatureMap? = null,
-    private val mobileGsWallFeatureMapFrameVersion: Int =
+    @Volatile private var mobileGsWallFeatureMap: WallFeatureMap? = null,
+    @Volatile private var mobileGsWallFeatureMapFrameVersion: Int =
         com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     private val onFrameTracked: (SphereSlamStandaloneFrame?) -> Unit,
     private val cameraAttitude: () -> Pair<Float, Float>? = { null },
@@ -242,6 +242,62 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         if (!closed) {
             bridge.start()
             reportTrackingState(trackingStateMachine.state)
+        }
+    }
+
+    /**
+     * Hot-swap only the fingerprint/teleological enrichment layer.
+     *
+     * The CameraX analyzer, gyro sampling, and base photosphere remain alive. Rebuilding the planar
+     * KPM sub-session here is allowed because it is an enrichment consumer of the base map, not the
+     * owner of SphereSLAM's runtime lifecycle.
+     */
+    @Synchronized
+    fun updatePrecisionLayer(
+        reference: SphereSlamStandaloneReferenceImage?,
+        atlasPages: List<SphereSlamStandaloneAtlasReferenceImage>,
+        fingerprint: Fingerprint?,
+        fingerprintFrameVersion: Int,
+        wallFeatureMap: WallFeatureMap?,
+        wallFeatureMapFrameVersion: Int,
+    ) {
+        if (closed) return
+
+        val referenceChanged = referenceImage !== reference
+        val fingerprintChanged = mobileGsFingerprint !== fingerprint ||
+            mobileGsFingerprintFrameVersion != fingerprintFrameVersion
+        val mapChanged = mobileGsWallFeatureMap !== wallFeatureMap ||
+            mobileGsWallFeatureMapFrameVersion != wallFeatureMapFrameVersion
+
+        referenceImage = reference
+        mobileGsFingerprint = fingerprint
+        mobileGsFingerprintFrameVersion = fingerprintFrameVersion
+        mobileGsWallFeatureMap = wallFeatureMap
+        mobileGsWallFeatureMapFrameVersion = wallFeatureMapFrameVersion
+
+        runtimeAtlasPages.clear()
+        atlasPages.sortedBy { it.pageNo }.forEach { page ->
+            runtimeAtlasPages[page.pageNo] = page.copy(
+                luma = page.luma.copyOf(),
+                canonicalFromPage = page.canonicalFromPage.copyOf(),
+            )
+        }
+
+        if (referenceChanged || fingerprintChanged || mapChanged) {
+            session?.close()
+            session = null
+            sessionKey = null
+            robustLoop = null
+            lastGood = null
+            poseStabilizer.reset()
+            bridge.clearReference()
+            lastRelocSeq = 0f
+            // Deliberately DO NOT touch lastPhotosphereKeyframeMs or any photosphere state here.
+            onDiagnostic(
+                "SphereSLAM precision layer updated reference=" + (reference != null) +
+                    " fingerprint=" + (fingerprint != null) +
+                    "; base photosphere preserved"
+            )
         }
     }
 
