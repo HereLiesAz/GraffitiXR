@@ -371,6 +371,9 @@ fun MainScreen(
                             coverageGlowDirections = {
                                 arViewModel.sphereThinDirections.value
                             },
+                            coverageCurrentDirections = {
+                                arViewModel.sphereCurrentDirections.value
+                            },
                             cameraAttitude = { arViewModel.latestCameraAttitude },
                             modifier = Modifier.fillMaxSize(),
                         )
