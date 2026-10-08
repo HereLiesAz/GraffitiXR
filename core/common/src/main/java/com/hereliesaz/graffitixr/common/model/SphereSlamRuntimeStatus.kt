@@ -21,6 +21,8 @@ data class SphereSlamRuntimeStatus(
     val mode: SphereSlamRuntimeMode = SphereSlamRuntimeMode.UNRESOLVED,
     val active: Boolean = false,
     val referenceReady: Boolean = false,
+    /** Standalone base photosphere is receiving usable visual keyframes. */
+    val mappingData: Boolean = false,
     val trackingData: Boolean = false,
 ) {
     fun diagnosticLine(): String = buildString {
@@ -38,6 +40,8 @@ data class SphereSlamRuntimeStatus(
                 append(trackingData)
             }
             SphereSlamRuntimeMode.STANDALONE -> {
+                append(" mapping=")
+                append(mappingData)
                 append(" tracking=")
                 append(trackingData)
             }
