@@ -1062,7 +1062,28 @@ fun SphereSlamStandaloneOverlay(
                 },
                 onFrameTracked = ::consumeTrackedFrame,
                 cameraAttitude = cameraAttitude,
-                onPhotosphereKeyframe = onPhotosphereKeyframe,
+                onPhotosphereKeyframe = { keyframe ->
+                    // Base-map update first so the current-tile read below observes the newly captured
+                    // tile. This path works before a fingerprint/KPM pose exists.
+                    onPhotosphereKeyframe(keyframe)
+                    val fx = keyframe.intrinsics[0]
+                    val fy = keyframe.intrinsics[1]
+                    if (fx > 1e-4f && fy > 1e-4f) {
+                        val hFovDeg = Math.toDegrees(
+                            2.0 * kotlin.math.atan(keyframe.width.toDouble() / (2.0 * fx))
+                        ).toFloat()
+                        val vFovDeg = Math.toDegrees(
+                            2.0 * kotlin.math.atan(keyframe.height.toDouble() / (2.0 * fy))
+                        ).toFloat()
+                        coverageGlowMaskView.update(
+                            currentDirections = coverageCurrentDirections(),
+                            cameraHeadingDeg = keyframe.headingDeg,
+                            cameraElevationDeg = keyframe.elevationDeg,
+                            horizontalFovDeg = hFovDeg,
+                            verticalFovDeg = vFovDeg,
+                        )
+                    }
+                },
                 onKeyframeOrientation = onKeyframeOrientation,
                 depthEstimator = depthEstimator,
                 onFatalError = { error ->
