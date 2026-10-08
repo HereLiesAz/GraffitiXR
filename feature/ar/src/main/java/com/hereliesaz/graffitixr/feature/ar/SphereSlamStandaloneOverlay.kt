@@ -208,6 +208,16 @@ private class SphereTileGlowMaskView(
     }
 }
 
+internal fun shouldStartStandaloneAnalyzer(
+    cameraIdPresent: Boolean,
+    atlasLoaded: Boolean,
+    peerOnlyTracking: Boolean,
+    localReferencePresent: Boolean,
+): Boolean =
+    cameraIdPresent &&
+        atlasLoaded &&
+        (peerOnlyTracking || localReferencePresent)
+
 internal fun shouldUseCoopPeerFingerprint(
     spatialFrame: com.hereliesaz.graffitixr.common.model.CoopSpatialFrame?,
     peerFingerprint: ByteArray?,
@@ -947,9 +957,12 @@ fun SphereSlamStandaloneOverlay(
         // mounted while the shared Target/fingerprint flow is waiting for capture. Do NOT construct
         // the native standalone analyzer until it has an actual page to register.
         if (
-            id == null ||
-            restoredAtlas == null ||
-            (!peerOnlyTracking && standaloneReference == null)
+            !shouldStartStandaloneAnalyzer(
+                cameraIdPresent = id != null,
+                atlasLoaded = restoredAtlas != null,
+                peerOnlyTracking = peerOnlyTracking,
+                localReferencePresent = standaloneReference != null,
+            )
         ) {
             onDispose {}
         } else {
