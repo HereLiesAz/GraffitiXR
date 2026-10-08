@@ -969,6 +969,18 @@ fun SphereSlamStandaloneOverlay(
         modifier = Modifier.fillMaxSize(),
     )
 
+    // Before SphereSLAM has observed its first coverage tile/bin, there is no directional gap
+    // geometry to project yet. The correct guidance in that state is "everything still needs
+    // mapping", so wash the entire camera view with the same translucent white glow. As soon as
+    // coverage becomes non-zero, the projected directional glow above takes over.
+    if ((sweepCoverage ?: 0f) <= 0f) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White.copy(alpha = 0.14f)),
+        )
+    }
+
     if (!referenceReady || trackingState == StandaloneTrackingState.INITIALIZING) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
