@@ -114,6 +114,10 @@ private class SphereTileGlowMaskView(
                 surfaceWidth = width
                 surfaceHeight = height
                 GLES20.glViewport(0, 0, width, height)
+                // The initial state is deliberately "everything needs mapping". Request a draw as
+                // soon as the translucent surface has real dimensions; no tracking/reference/camera
+                // attitude callback is required for the startup glow to become visible.
+                requestRender()
             }
 
             override fun onDrawFrame(gl: GL10?) {
