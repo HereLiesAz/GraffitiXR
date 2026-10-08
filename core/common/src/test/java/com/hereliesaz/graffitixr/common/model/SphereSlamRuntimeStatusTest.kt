@@ -29,12 +29,13 @@ class SphereSlamRuntimeStatusTest {
             mode = SphereSlamRuntimeMode.STANDALONE,
             active = true,
             referenceReady = true,
+            mappingData = true,
             trackingData = false,
         )
 
         assertEquals(
             "SphereSLAM available=true mode=STANDALONE active=true " +
-                "referenceReady=true tracking=false",
+                "referenceReady=true mapping=true tracking=false",
             status.diagnosticLine(),
         )
     }
