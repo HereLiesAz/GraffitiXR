@@ -115,6 +115,8 @@ fun SphereSlamStandaloneOverlay(
     /** Host MobileGS fingerprint; required for ARCore-host -> standalone-guest alignment. */
     coopPeerFingerprint: ByteArray? = null,
     onReferenceCaptured: (Bitmap, Float, Boolean) -> Unit = { _, _, _ -> },
+    /** Normal app path: TargetCreationUi above both AR backends owns capture/review/fingerprint UX. */
+    sharedTargetCapture: Boolean = false,
     onPersistedReferenceInvalid: (Uri) -> Unit = {},
     onPersistedAtlasPageInvalid: (Int, Uri) -> Unit = { _, _ -> },
     onAtlasPageCaptured: (Bitmap, Int, Float, Boolean, FloatArray) -> Unit =
@@ -313,6 +315,7 @@ fun SphereSlamStandaloneOverlay(
     val peerOnlyTracking =
         shouldUseCoopPeerFingerprint(coopPeerSpatialFrame, coopPeerFingerprint)
     if (reference == null && !peerOnlyTracking) {
+        if (sharedTargetCapture) return
         val pending = pendingReferenceBitmap
         if (pending != null) {
             val measuredWidth = StandaloneReferenceScale.parseMeters(referenceWidthInput)
