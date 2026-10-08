@@ -310,7 +310,6 @@ fun MainScreen(
                         }
 
                         val sweepCoverageValue by arViewModel.sphereCoverageFraction.collectAsState()
-                        val featureMapOn by arViewModel.evalFeatureMapEnabled.collectAsState()
                         com.hereliesaz.graffitixr.feature.ar.SphereSlamStandaloneOverlay(
                             cameraController = cameraController,
                             designBitmap = standaloneTexture,
@@ -368,9 +367,9 @@ fun MainScreen(
                                 arViewModel.recordStandaloneKeyframeOrientation(timestampNs, quaternion)
                             },
                             depthEstimator = arViewModel.standaloneDepthEstimatorOrNull(),
-                            sweepCoverage = if (featureMapOn) sweepCoverageValue else null,
+                            sweepCoverage = sweepCoverageValue,
                             coverageGlowDirections = {
-                                if (featureMapOn) arViewModel.sphereThinDirections.value else emptyList()
+                                arViewModel.sphereThinDirections.value
                             },
                             cameraAttitude = { arViewModel.latestCameraAttitude },
                             modifier = Modifier.fillMaxSize(),
