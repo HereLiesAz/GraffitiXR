@@ -49,6 +49,7 @@ object StandaloneFingerprintBuilder {
         slam: SlamManager,
         bitmap: Bitmap,
         referenceWidthMeters: Float,
+        mask: Bitmap? = null,
         minPoints: Int = DEFAULT_MIN_POINTS,
     ): Fingerprint? {
         require(bitmap.width > 0 && bitmap.height > 0)
@@ -59,8 +60,9 @@ object StandaloneFingerprintBuilder {
         val geometry = SphereSlamPoseMath.pageGeometry(bitmap.width, bitmap.height, dpi)
 
         val detected = detectSuperPoint(slam, bitmap)
+            ?.let { filterByMask(it, mask, bitmap.width, bitmap.height) }
             ?.takeIf { it.rows >= minPoints }
-            ?: detectOrb(bitmap)?.takeIf { it.rows >= minPoints }
+            ?: detectOrb(bitmap, mask)?.takeIf { it.rows >= minPoints }
             ?: return null
 
         return assemble(
@@ -149,6 +151,50 @@ object StandaloneFingerprintBuilder {
         )
     }
 
+    private fun filterByMask(
+        detected: DetectedFeatures,
+        mask: Bitmap?,
+        width: Int,
+        height: Int,
+    ): DetectedFeatures {
+        if (mask == null || detected.rows == 0) return detected
+        val effectiveMask =
+            if (mask.width == width && mask.height == height) mask
+            else Bitmap.createScaledBitmap(mask, width, height, false)
+        return try {
+            val rowBytes =
+                if (detected.rows > 0) detected.descriptorsData.size / detected.rows else 0
+            if (rowBytes <= 0) return detected
+            val keep = ArrayList<Int>(detected.rows)
+            for (row in 0 until detected.rows) {
+                val u = detected.positions[row * 2].toInt().coerceIn(0, width - 1)
+                val v = detected.positions[row * 2 + 1].toInt().coerceIn(0, height - 1)
+                if ((effectiveMask.getPixel(u, v) ushr 24) != 0) keep += row
+            }
+            if (keep.size == detected.rows) return detected
+            val positions = FloatArray(keep.size * 2)
+            val descriptors = ByteArray(keep.size * rowBytes)
+            keep.forEachIndexed { dst, src ->
+                positions[dst * 2] = detected.positions[src * 2]
+                positions[dst * 2 + 1] = detected.positions[src * 2 + 1]
+                System.arraycopy(
+                    detected.descriptorsData,
+                    src * rowBytes,
+                    descriptors,
+                    dst * rowBytes,
+                    rowBytes,
+                )
+            }
+            detected.copy(
+                positions = positions,
+                descriptorsData = descriptors,
+                rows = keep.size,
+            )
+        } finally {
+            if (effectiveMask !== mask) effectiveMask.recycle()
+        }
+    }
+
     private fun detectSuperPoint(slam: SlamManager, bitmap: Bitmap): DetectedFeatures? {
         val raw = slam.detectSuperPoint(bitmap) ?: return null
         if (raw.size < 2) return null
@@ -175,7 +221,7 @@ object StandaloneFingerprintBuilder {
         )
     }
 
-    private fun detectOrb(bitmap: Bitmap): DetectedFeatures? {
+    private fun detectOrb(bitmap: Bitmap, selectionMask: Bitmap?): DetectedFeatures? {
         val rgba = Mat()
         val gray = Mat()
         val normalized = Mat()
@@ -193,6 +239,25 @@ object StandaloneFingerprintBuilder {
                 else -> return null
             }
             clahe.apply(gray, normalized)
+            if (selectionMask != null) {
+                val resized =
+                    if (selectionMask.width == bitmap.width && selectionMask.height == bitmap.height) {
+                        selectionMask
+                    } else {
+                        Bitmap.createScaledBitmap(selectionMask, bitmap.width, bitmap.height, false)
+                    }
+                try {
+                    val alphaPixels = IntArray(bitmap.width * bitmap.height)
+                    resized.getPixels(alphaPixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+                    val maskBytes = ByteArray(alphaPixels.size) { i ->
+                        if ((alphaPixels[i] ushr 24) != 0) 0xFF.toByte() else 0
+                    }
+                    mask.create(bitmap.height, bitmap.width, CvType.CV_8UC1)
+                    mask.put(0, 0, maskBytes)
+                } finally {
+                    if (resized !== selectionMask) resized.recycle()
+                }
+            }
             orb.detectAndCompute(normalized, mask, keypoints, descriptors)
             if (descriptors.empty()) return null
 
