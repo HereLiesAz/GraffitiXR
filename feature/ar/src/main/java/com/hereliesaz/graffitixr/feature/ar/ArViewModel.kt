@@ -4217,6 +4217,42 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    /**
+     * CameraX/SphereSLAM counterpart to [onTargetCaptured].
+     *
+     * Fingerprint capture sits above the pose backend, so standalone feeds the exact same review
+     * state (raw image + removable-mark mask) instead of mounting a second capture workflow.
+     * Geometry is supplied later by the standalone fingerprint builder in its canonical page frame.
+     */
+    fun onStandaloneTargetCaptured(bitmap: Bitmap) {
+        pendingTapPosition = null
+        val initialPoints = listOf(
+            Offset(0.15f, 0.15f),
+            Offset(0.85f, 0.15f),
+            Offset(0.85f, 0.85f),
+            Offset(0.15f, 0.85f),
+        )
+        _uiState.update {
+            it.copy(
+                targetRawBitmap = bitmap,
+                targetDepthBuffer = null,
+                targetDepthWidth = bitmap.width,
+                targetDepthHeight = bitmap.height,
+                targetDepthBufferWidth = 0,
+                targetDepthBufferHeight = 0,
+                targetDepthStride = 0,
+                targetIntrinsics = null,
+                targetCaptureViewMatrix = null,
+                targetWallPlane = null,
+                targetPhysicalExtent = null,
+                isCaptureRequested = false,
+                tempCaptureBitmap = bitmap,
+                annotatedCaptureBitmap = bitmap.isolateMarkings(),
+                unwarpPoints = initialPoints,
+            )
+        }
+    }
+
     fun onTargetCaptured(
         bitmap: Bitmap,
         depthBuffer: ByteBuffer?,
