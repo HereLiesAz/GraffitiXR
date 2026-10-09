@@ -195,6 +195,43 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    // ── Host side of co-op v4: edits a connected guest made ─────────────────────────────────
+    // Collected HERE, for the ViewModel's lifetime, rather than in an Activity-scoped effect: the
+    // host session acknowledges a guest edit on arrival, so one that reached a collector that was
+    // being torn down (Activity recreation) would be acked and never applied. Unbounded on purpose
+    // for the same reason; HostSession rate-limits the only large op (DesignBitmapReplace).
+    private val pendingGuestOps = ArrayDeque<com.hereliesaz.graffitixr.common.model.Op>()
+    @Volatile private var guestOpHandler: ((com.hereliesaz.graffitixr.common.model.Op) -> Unit)? = null
+
+    init {
+        viewModelScope.launch {
+            collaborationManager.guestOps.collect { op ->
+                val handler = synchronized(pendingGuestOps) {
+                    guestOpHandler ?: run { pendingGuestOps.addLast(op); null }
+                }
+                handler?.invoke(op)
+            }
+        }
+    }
+
+    /**
+     * Wire the editor that applies guest edits on the host (EditorViewModel.applyGuestOp). Drains
+     * any backlog first, in order, before publishing — the same FIFO discipline as
+     * [setSpectatorOpHandler].
+     */
+    fun setGuestOpHandler(handler: (com.hereliesaz.graffitixr.common.model.Op) -> Unit) {
+        while (true) {
+            val op = synchronized(pendingGuestOps) {
+                if (pendingGuestOps.isEmpty()) {
+                    guestOpHandler = handler
+                    return
+                }
+                pendingGuestOps.removeFirst()
+            }
+            handler(op)
+        }
+    }
+
     /** Invokes the handler, or buffers the op (drop-oldest past the cap) until one is wired. */
     private fun dispatchSpectatorOp(op: com.hereliesaz.graffitixr.common.model.Op) {
         val handler = synchronized(pendingSpectatorOps) {
@@ -251,10 +288,11 @@ class ArViewModel @Inject constructor(
     /**
      * Tell a guest, once per session, that an edit they just made is theirs alone.
      *
-     * The co-op protocol is host-broadcast: a guest receives the host's ops and has no channel to
-     * send its own. That is a real limitation, but the failure mode before this was silence — the
-     * edit applied locally, reached nobody, and the two canvases diverged with neither side told.
-     * Once per session, because the point is to explain the mode, not to nag every gesture.
+     * Since co-op protocol v4 a guest's edits ARE sent to the host. This now fires only for the
+     * ones that cannot be: an AR placement between devices on different tracking backends (each
+     * expresses it in its own wall frame) or an edit too large for one frame. Silence there would
+     * leave the two canvases diverging with neither side told. Once per session, because the point
+     * is to explain the limit, not to nag every gesture.
      */
     private fun observeDroppedGuestEdits() {
         guestEditDropJob?.cancel()
@@ -265,7 +303,7 @@ class ArViewModel @Inject constructor(
                 reportedGuestEditDrop = true
                 _feedback.tryEmit(
                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                        "You're viewing the host's project — your changes stay on this device"
+                        "That change can't be shared with the host — it stays on this device"
                     )
                 )
             }
@@ -4681,6 +4719,9 @@ class ArViewModel @Inject constructor(
     }
 
     fun onScreenTap(nx: Float, ny: Float) {
+        // A co-op guest keeps the session's spatial frame: re-targeting re-anchors only this device
+        // and no Op carries it, so it would split the peers' frames.
+        if (_uiState.value.coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) return
         pendingTapPosition = nx to ny
         // Hand the tap to the renderer so it can measure the camera→point distance at that pixel
         // (and add a fusion support anchor) on the GL thread during capture.

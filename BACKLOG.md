@@ -143,8 +143,9 @@ Verified by `testDebugUnitTest` (413 tests), `externalNativeBuildDebug`, `detekt
 
 - _No open security alerts._ (CodeQL #3/#4/#5 SRI and the Bouncy Castle advisories #23/#24/#25 are resolved — see the Done section above.)
 
-Remaining open items (all in `docs/AUDIT.md` under "Still open"): Glasses AR session,
-bidirectional co-op, and a short list of unreferenced diagnostic/eval knobs.
+Remaining open items (all in `docs/AUDIT.md` under "Still open"): Glasses AR session (kept as WIP
+by decision) and a short list of unreferenced diagnostic/eval knobs. Bidirectional co-op shipped as
+protocol v4 (2026-10-08).
 
 #### Glee audit pass (2026-09-04) — not yet acted on
 
