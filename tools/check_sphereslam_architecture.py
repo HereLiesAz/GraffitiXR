@@ -235,7 +235,8 @@ if "(!capability.isArCoreAvailabilityResolved || !capability.isArCoreAvailable)"
     fail("setArMode no longer fails closed while ARCore availability is unresolved/unavailable.")
 
 # 6. Co-op peer geometry must be framed explicitly before either backend consumes it.
-if "const val CURRENT: Int = 3" not in coop_protocol:
+_coop_version = re.search(r"const val CURRENT: Int = (\d+)", coop_protocol)
+if _coop_version is None or int(_coop_version.group(1)) < 3:
     fail("Co-op protocol must remain v3+ while spatial-frame metadata is required.")
 for token in ("localBackend: CoopTrackingBackend", "spatialFrame: CoopSpatialFrame"):
     if token not in coop_handshake:

@@ -6,7 +6,6 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.PixelFormat
 import android.net.Uri
-import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.os.Handler
 import android.os.Looper
@@ -66,8 +65,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import javax.microedition.khronos.egl.EGLConfig
-import javax.microedition.khronos.opengles.GL10
 
 private val SPHERESLAM_DEFAULT_UNWARP_POINTS = listOf(
     Offset(0.25f, 0.25f),
@@ -81,10 +78,14 @@ private val SPHERESLAM_DEFAULT_UNWARP_POINTS = listOf(
  * Draws the inverse of the usual point-glow: a translucent wash covers the whole preview and only
  * photosphere tiles that are current are cut transparent. Missing and stale tiles therefore glow by
  * default, exactly matching PhotosphereMap.needsUpdate semantics.
+ *
+ * Deliberately an ordinary View, not a GL surface: a top-ordered SurfaceView sat above the whole
+ * window (hiding all app UI), and its non-premultiplied clear composited as near-solid white.
+ * As a window-level View it draws above the camera preview and beneath the media-overlay artwork.
  */
 private class SphereTileGlowMaskView(
     context: android.content.Context,
-) : GLSurfaceView(context) {
+) : android.view.View(context) {
     private data class MaskState(
         val currentDirections: List<SphereCoverage.Direction> = emptyList(),
         val cameraHeadingDeg: Float = 0f,
@@ -95,91 +96,58 @@ private class SphereTileGlowMaskView(
 
     private val state = AtomicReference(MaskState())
 
-    init {
-        setEGLContextClientVersion(2)
-        setEGLConfigChooser(8, 8, 8, 8, 0, 0)
-        holder.setFormat(PixelFormat.TRANSLUCENT)
-        // The artwork renderer is itself a SurfaceView/media overlay. This mask must be a separate
-        // top surface or Android may composite an ordinary View behind the GL artwork surface.
-        setZOrderOnTop(true)
-        setRenderer(object : GLSurfaceView.Renderer {
-            private var surfaceWidth = 0
-            private var surfaceHeight = 0
+    override fun onDraw(canvas: android.graphics.Canvas) {
+        super.onDraw(canvas)
+        val surfaceWidth = width
+        val surfaceHeight = height
+        if (surfaceWidth <= 0 || surfaceHeight <= 0) return
+        val snapshot = state.get()
 
-            override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-                GLES20.glDisable(GLES20.GL_DEPTH_TEST)
-            }
+        canvas.save()
+        if (snapshot.currentDirections.isNotEmpty()) {
+            val marks = CoverageGlowProjection.project(
+                directions = snapshot.currentDirections,
+                cameraHeadingDeg = snapshot.cameraHeadingDeg,
+                cameraElevationDeg = snapshot.cameraElevationDeg,
+                horizontalFovDeg = snapshot.horizontalFovDeg,
+                verticalFovDeg = snapshot.verticalFovDeg,
+            )
 
-            override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-                surfaceWidth = width
-                surfaceHeight = height
-                GLES20.glViewport(0, 0, width, height)
-                // The initial state is deliberately "everything needs mapping". Request a draw as
-                // soon as the translucent surface has real dimensions; no tracking/reference/camera
-                // attitude callback is required for the startup glow to become visible.
-                requestRender()
-            }
+            val tileWidthDeg =
+                (SphereCoverage.DEFAULT_VIEWABLE_HALF_ANGLE_DEG * 2f) /
+                    SphereCoverage.DEFAULT_SECTORS.toFloat()
+            val tileHeightDeg =
+                (SphereCoverage.DEFAULT_VIEWABLE_ELEVATION_HALF_ANGLE_DEG * 2f) /
+                    TILE_ELEVATION_BANDS.toFloat()
+            val halfWidthPx =
+                surfaceWidth * 0.5f *
+                    (kotlin.math.tan(Math.toRadians(tileWidthDeg / 2.0)).toFloat() /
+                        kotlin.math.tan(
+                            Math.toRadians(snapshot.horizontalFovDeg / 2.0)
+                        ).toFloat())
+            val halfHeightPx =
+                surfaceHeight * 0.5f *
+                    (kotlin.math.tan(Math.toRadians(tileHeightDeg / 2.0)).toFloat() /
+                        kotlin.math.tan(
+                            Math.toRadians(snapshot.verticalFovDeg / 2.0)
+                        ).toFloat())
 
-            override fun onDrawFrame(gl: GL10?) {
-                if (surfaceWidth <= 0 || surfaceHeight <= 0) return
-                val snapshot = state.get()
-
-                // Default is glow everywhere. Missing and stale tiles need no explicit geometry.
-                GLES20.glDisable(GLES20.GL_SCISSOR_TEST)
-                GLES20.glClearColor(1f, 1f, 1f, FULL_GLOW_ALPHA)
-                GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
-
-                if (snapshot.currentDirections.isEmpty()) return
-
-                val marks = CoverageGlowProjection.project(
-                    directions = snapshot.currentDirections,
-                    cameraHeadingDeg = snapshot.cameraHeadingDeg,
-                    cameraElevationDeg = snapshot.cameraElevationDeg,
-                    horizontalFovDeg = snapshot.horizontalFovDeg,
-                    verticalFovDeg = snapshot.verticalFovDeg,
+            // Current tiles are clipped out of the wash, leaving literal transparent holes.
+            for (mark in marks) {
+                if (!mark.onScreen) continue
+                val cx = (mark.ndcX + 1f) * 0.5f * surfaceWidth
+                val cyTop = (1f - mark.ndcY) * 0.5f * surfaceHeight
+                canvas.clipOutRect(
+                    cx - halfWidthPx,
+                    cyTop - halfHeightPx,
+                    cx + halfWidthPx,
+                    cyTop + halfHeightPx,
                 )
-
-                val tileWidthDeg =
-                    (SphereCoverage.DEFAULT_VIEWABLE_HALF_ANGLE_DEG * 2f) /
-                        SphereCoverage.DEFAULT_SECTORS.toFloat()
-                val tileHeightDeg =
-                    (SphereCoverage.DEFAULT_VIEWABLE_ELEVATION_HALF_ANGLE_DEG * 2f) /
-                        TILE_ELEVATION_BANDS.toFloat()
-                val halfWidthPx =
-                    surfaceWidth * 0.5f *
-                        (kotlin.math.tan(Math.toRadians(tileWidthDeg / 2.0)).toFloat() /
-                            kotlin.math.tan(
-                                Math.toRadians(snapshot.horizontalFovDeg / 2.0)
-                            ).toFloat())
-                val halfHeightPx =
-                    surfaceHeight * 0.5f *
-                        (kotlin.math.tan(Math.toRadians(tileHeightDeg / 2.0)).toFloat() /
-                            kotlin.math.tan(
-                                Math.toRadians(snapshot.verticalFovDeg / 2.0)
-                            ).toFloat())
-
-                // Current tiles are literal transparent holes in the glow surface.
-                GLES20.glEnable(GLES20.GL_SCISSOR_TEST)
-                GLES20.glClearColor(0f, 0f, 0f, 0f)
-                for (mark in marks) {
-                    if (!mark.onScreen) continue
-                    val cx = (mark.ndcX + 1f) * 0.5f * surfaceWidth
-                    val cyTop = (1f - mark.ndcY) * 0.5f * surfaceHeight
-                    val left = kotlin.math.floor(cx - halfWidthPx).toInt().coerceAtLeast(0)
-                    val right = kotlin.math.ceil(cx + halfWidthPx).toInt().coerceAtMost(surfaceWidth)
-                    val top = kotlin.math.floor(cyTop - halfHeightPx).toInt().coerceAtLeast(0)
-                    val bottom = kotlin.math.ceil(cyTop + halfHeightPx).toInt().coerceAtMost(surfaceHeight)
-                    val w = right - left
-                    val h = bottom - top
-                    if (w <= 0 || h <= 0) continue
-                    // OpenGL scissor origin is bottom-left; screen-space projection above is top-left.
-                    GLES20.glScissor(left, surfaceHeight - bottom, w, h)
-                    GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
-                }
-                GLES20.glDisable(GLES20.GL_SCISSOR_TEST)
             }
-        })
-        renderMode = RENDERMODE_WHEN_DIRTY
+        }
+        // Default is glow everywhere. Missing and stale tiles need no explicit geometry.
+        canvas.drawColor(FULL_GLOW_COLOR)
+        canvas.restore()
     }
 
     fun update(
@@ -199,11 +167,13 @@ private class SphereTileGlowMaskView(
                 verticalFovDeg = verticalFovDeg ?: previous.verticalFovDeg,
             )
         )
-        requestRender()
+        // May be called off the main thread (analyzer callbacks).
+        postInvalidateOnAnimation()
     }
 
     private companion object {
         const val FULL_GLOW_ALPHA = 0.14f
+        val FULL_GLOW_COLOR = android.graphics.Color.argb(FULL_GLOW_ALPHA, 1f, 1f, 1f)
         const val TILE_ELEVATION_BANDS = 3
     }
 }
@@ -682,6 +652,28 @@ fun SphereSlamStandaloneOverlay(
         value = loaded.first
     }
     val glRenderer = remember(context) { HomographyOverlayRenderer(context) }
+    LaunchedEffect(
+        glRenderer,
+        peerOnlyTracking,
+        coopPeerSpatialFrame,
+        mobileGsMapFromFingerprint,
+    ) {
+        val mapAnchor =
+            if (peerOnlyTracking && coopPeerSpatialFrame != null) {
+                // Peer analyzer already emits camera_from_hostWall, so its wall model is identity.
+                floatArrayOf(
+                    1f, 0f, 0f, 0f,
+                    0f, 1f, 0f, 0f,
+                    0f, 0f, 1f, 0f,
+                    0f, 0f, 0f, 1f,
+                )
+            } else {
+                mobileGsMapFromFingerprint
+                    .takeIf { it.size == 16 && it.all(Float::isFinite) }
+                    ?.toFloatArray()
+            }
+        glRenderer.setMapFromFingerprint(mapAnchor)
+    }
     // Full-view freshness mask: glow everywhere, then punch out only current photosphere tiles.
     val coverageGlowMaskView = remember(context) { SphereTileGlowMaskView(context) }
 
@@ -1191,8 +1183,9 @@ fun SphereSlamStandaloneOverlay(
             .onSizeChanged { surfaceSize.set(it) },
     )
 
-    // Full-screen freshness mask, above the design overlay and camera preview. It starts fully
-    // glowing and clears only the screen regions occupied by current (needsUpdate=false) tiles.
+    // Full-screen freshness mask, above the camera preview and beneath the media-overlay artwork.
+    // It starts fully glowing and clears only the screen regions occupied by current
+    // (needsUpdate=false) tiles.
     AndroidView(
         factory = { coverageGlowMaskView },
         modifier = Modifier.fillMaxSize(),

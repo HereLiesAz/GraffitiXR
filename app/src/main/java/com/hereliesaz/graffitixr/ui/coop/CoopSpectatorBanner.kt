@@ -25,7 +25,8 @@ fun CoopSpectatorBanner(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = if (isReconnecting) "Reconnecting to $peerName…" else "Spectating $peerName",
+            // "Painting with", not "Spectating": since co-op v4 the guest's edits reach the host.
+            text = if (isReconnecting) "Reconnecting to $peerName…" else "Painting with $peerName",
             color = Color.White,
             modifier = Modifier.weight(1f),
         )

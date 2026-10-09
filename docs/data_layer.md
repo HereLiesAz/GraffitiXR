@@ -32,18 +32,25 @@ it without depending on `app/`).
     `modeAdjustments`, `railExpansion` — contextual/UI state that rides along with the project so it
     restores exactly as the user left it.
 
-### Hybrid KPM runtime state (not project-persisted yet)
+### Hybrid KPM page (`hybridKpmPage*`)
 
-The ARCore hybrid KPM correction added in PR #1970 deliberately does **not** add project fields yet.
-Its perspective-rectified metric page, dedicated ARCore page anchor, timestamp history, and frozen
-`page_from_artwork` relation exist only for the live renderer/session. On process death or project
-reopen, ARCore returns through the already-durable MobileGS fingerprint/`captureAnchorCam` path;
-hybrid KPM becomes available again after a new target capture builds a fresh metric page.
+The ARCore hybrid KPM sidecar's page is persisted in its own fields, never in the standalone
+`sphereSlamReferenceUri` slot (that slot is the canonical non-ARCore wall coordinate object; mixing
+the two would recreate the backend-frame ambiguity the separate fields prevent):
 
-This separation is intentional until the project format gets an explicit versioned hybrid-page
-artifact + frame relation. Do not serialize the hybrid page into the standalone
-`sphereSlamReferenceUri` slot: that slot is the canonical non-ARCore wall coordinate object and
-mixing the two would recreate the backend-frame ambiguity the separate fields prevent.
+- `hybridKpmPageUri` — gzip'd raw 8-bit luma, `hybrid_kpm_page_<uuid>.y8.gz` (bit-exact; versioned
+  name, temp file + fsync + rename, like the standalone reference);
+- `hybridKpmPageWidthPx` / `HeightPx`, `hybridKpmPageWidthMeters` — DPI and page geometry are
+  recomputed from these on restore, never stored;
+- `hybridKpmPageFromArtwork` — the frozen rigid `page_from_artwork` relation;
+- `hybridKpmFingerprintKey` — `fingerprint.captureAnchorCam` of the target the relation belongs to.
+
+Written once, by an exact transform, after the relation freezes AND that capture's fingerprint has
+landed. Restored only while the project's fingerprint matches the key — an older page is inert, not
+wrong. Preserved against stale whole-object saves (with or without a fingerprint in hand); rebased
+on import (dropped, not fatal, if the archive lacks the file). The dedicated ARCore page anchor and
+timestamp history remain runtime-only: a restore needs neither. Observations from before the
+artwork anchor is (re-)established are ignored.
 
 ### `OverlayLayer` (Serializable)
 - **Location:** `OverlayLayer.kt`

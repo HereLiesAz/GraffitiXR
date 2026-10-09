@@ -830,7 +830,8 @@ fun MainScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .pointerInput(uiState.design?.id, isImageLocked, isWaitingForTap, isTouchLocked, isGuest, uiState.editorMode) {
-                        if (isGuest) return@pointerInput // Block ALL guest interaction with layers
+                        // Guests edit too since co-op v4: their edits are sent to the host. Target
+                        // capture stays host-only (below).
 
                         // Outside Design there is only ONE layer (the whole design), so transform
                         // gestures always edit the mode adjustment — no "Layer" toggle. This isn't gated
@@ -838,10 +839,14 @@ fun MainScreen(
                         // even while the artwork is locked for painting.
                         val editingMode = uiState.editorMode != EditorMode.DESIGN
                         if (isWaitingForTap) {
-                            detectTapGestures { offset ->
-                                val nx = offset.x / size.width
-                                val ny = offset.y / size.height
-                                arViewModel.onScreenTap(nx, ny)
+                            // Not for a guest: a new target would re-anchor only this device, and no
+                            // Op carries that, so the peers' spatial frames would split.
+                            if (!isGuest) {
+                                detectTapGestures { offset ->
+                                    val nx = offset.x / size.width
+                                    val ny = offset.y / size.height
+                                    arViewModel.onScreenTap(nx, ny)
+                                }
                             }
                         } else if (!isTouchLocked && (editingMode || !isImageLocked)) {
                             detectTapGestures(
@@ -855,7 +860,6 @@ fun MainScreen(
                         }
                     }
                     .pointerInput(uiState.design?.id, isImageLocked, isWaitingForTap, isTouchLocked, isGuest, uiState.editorMode) {
-                        if (isGuest) return@pointerInput // A co-op guest may not move/scale/rotate the shared design.
                         // Outside Design the whole design is the single layer, so transform gestures
                         // always drive the mode adjustment instead of a per-layer transform.
                         val editingMode = uiState.editorMode != EditorMode.DESIGN
