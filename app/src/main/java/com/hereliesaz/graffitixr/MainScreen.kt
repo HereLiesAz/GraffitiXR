@@ -369,6 +369,9 @@ fun MainScreen(
                             onPhotosphereKeyframe = { keyframe ->
                                 arViewModel.onStandalonePhotosphereKeyframe(keyframe)
                             },
+                            onMapFromFingerprintSolved = { mapFromFingerprint ->
+                                arViewModel.onStandaloneMapFromFingerprintSolved(mapFromFingerprint)
+                            },
                             depthEstimator = arViewModel.standaloneDepthEstimatorOrNull(),
                             sweepCoverage = sweepCoverageValue,
                             coverageGlowDirections = {
