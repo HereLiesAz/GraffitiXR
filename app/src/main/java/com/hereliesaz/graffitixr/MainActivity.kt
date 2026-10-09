@@ -435,6 +435,11 @@ class MainActivity : ComponentActivity() {
                 // deterministically and, just as importantly, unfreezing cannot resurrect whatever
                 // expanded state the uncontrolled rail happened to hold beforehand.
                 var railMenuExpanded by rememberSaveable { mutableStateOf(false) }
+                // AzNavRail COMPLETE_GUIDE: isFoldedUp only controls the stationary rail when
+                // noMenu=true. Keep this policy specific to Trace -> Freeze rather than coupling
+                // unrelated touch-lock states to navigation behavior.
+                val traceFrozen =
+                    editorUiState.editorMode == EditorMode.TRACE && mainUiState.isTouchLocked
                 val arUiState by arViewModel.uiState.collectAsState()
                 val crashReportingConsent by settingsViewModel.crashReportingConsent.collectAsState()
                 val crashReportToken by settingsViewModel.crashReportToken.collectAsState()
@@ -828,11 +833,11 @@ class MainActivity : ComponentActivity() {
                     // AzNavRail 11.54 supports a controlled drawer state. Freeze is a true hands-off
                     // tracing mode, so force the expanded drawer closed while locked instead of
                     // trusting an uncontrolled menu to collapse itself after the click.
-                    expanded = if (mainUiState.isTouchLocked) false else railMenuExpanded,
+                    expanded = if (traceFrozen) false else railMenuExpanded,
                     onExpandedChange = { requested ->
-                        if (!mainUiState.isTouchLocked) railMenuExpanded = requested
+                        if (!traceFrozen) railMenuExpanded = requested
                     },
-                    disableSwipeToOpen = mainUiState.isTouchLocked,
+                    disableSwipeToOpen = traceFrozen,
                 ) {
                     azTheme(
                         activeColor = Cyan,
@@ -853,7 +858,7 @@ class MainActivity : ComponentActivity() {
                         // flag is inert and the rail never collapses. So switch to fold-mode while the
                         // screen is frozen; the full-screen touch absorber (below the host call) then
                         // disallows unfolding. Normal menu behavior returns the moment Freeze is lifted.
-                        noMenu = mainUiState.isTouchLocked,
+                        noMenu = traceFrozen,
                     )
                     azAdvanced(
                         helpEnabled = true,
@@ -983,13 +988,13 @@ class MainActivity : ComponentActivity() {
                         // Fold it away for them. This is the one deliberate exception to the "fold
                         // state is the user's call, not app state's" rule below: unfreezing does NOT
                         // re-expand it, so a manual re-fold elsewhere in the session is respected.
-                        LaunchedEffect(mainUiState.isTouchLocked) {
-                            if (mainUiState.isTouchLocked) {
-                                // Complete Guide contract: isFoldedUp is the stationary noMenu
-                                // rail's programmatic fold state. Freeze also owns the controlled
-                                // drawer state, so no pre-Freeze expansion can reappear on unlock.
-                                railMenuExpanded = false
-                                hostScope.isFoldedUp = true
+                        SideEffect {
+                            if (traceFrozen) {
+                                // COMPLETE_GUIDE contract: noMenu makes isFoldedUp authoritative.
+                                // Drive both pieces in the same successful composition as Freeze so
+                                // there is no coroutine/frame where the drawer can remain expanded.
+                                if (railMenuExpanded) railMenuExpanded = false
+                                if (!hostScope.isFoldedUp) hostScope.isFoldedUp = true
                             }
                         }
 
