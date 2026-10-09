@@ -584,4 +584,12 @@
     <string-array name="onboarding_design_layers">
         <item>Abrir — importa uma foto da sua galeria; ela cai aqui como uma nova camada.</item>
     </string-array>
+    <string name="nav_measure">Medir</string>
+    <string name="nav_measure_info">Meça a parede real: toque numa borda e depois na outra, na parede onde está o design. A largura fica salva no projeto: medida, não estimada.</string>
+    <string name="measure_tap_first">Toque na primeira borda da parede</string>
+    <string name="measure_tap_second">Toque na outra borda</string>
+    <string name="measure_save">Salvar</string>
+    <string name="measure_redo">Refazer</string>
+    <string name="measure_failed">Não foi possível colocar esse ponto na parede. Aponte mais de frente e toque novamente.</string>
+    <string name="measure_wall_width">Largura da parede</string>
 </resources>

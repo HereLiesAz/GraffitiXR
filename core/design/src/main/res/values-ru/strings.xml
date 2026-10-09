@@ -586,4 +586,12 @@
     <string-array name="onboarding_design_layers">
         <item>Открыть — импортирует фото из галереи; оно появляется как новый слой.</item>
     </string-array>
+    <string name="nav_measure">Измерить</string>
+    <string name="nav_measure_info">Измерьте реальную стену: коснитесь одного края, затем другого на стене, где размещён дизайн. Ширина сохраняется в проекте — измеренная, а не угаданная.</string>
+    <string name="measure_tap_first">Коснитесь первого края стены</string>
+    <string name="measure_tap_second">Коснитесь другого края</string>
+    <string name="measure_save">Сохранить</string>
+    <string name="measure_redo">Заново</string>
+    <string name="measure_failed">Не удалось поставить точку на стену. Направьте камеру прямее и коснитесь снова.</string>
+    <string name="measure_wall_width">Ширина стены</string>
 </resources>

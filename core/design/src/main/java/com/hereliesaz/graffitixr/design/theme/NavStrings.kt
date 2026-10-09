@@ -84,7 +84,15 @@ fun rememberNavStrings(): NavStrings {
         leaveCoop = stringResource(R.string.nav_leave_coop),
         leaveCoopInfo = stringResource(R.string.nav_leave_coop_info),
         wearable = stringResource(R.string.nav_wearable),
-        wearableInfo = stringResource(R.string.nav_wearable_info)
+        wearableInfo = stringResource(R.string.nav_wearable_info),
+        measure = stringResource(R.string.nav_measure),
+        measureInfo = stringResource(R.string.nav_measure_info),
+        measureTapFirst = stringResource(R.string.measure_tap_first),
+        measureTapSecond = stringResource(R.string.measure_tap_second),
+        measureSave = stringResource(R.string.measure_save),
+        measureRedo = stringResource(R.string.measure_redo),
+        measureFailed = stringResource(R.string.measure_failed),
+        measureWallWidth = stringResource(R.string.measure_wall_width),
     )
 }
 
@@ -166,5 +174,14 @@ data class NavStrings(
     val leaveCoop: String,
     val leaveCoopInfo: String,
     val wearable: String,
-    val wearableInfo: String
+    val wearableInfo: String,
+    // AR Measure (two-tap wall width).
+    val measure: String,
+    val measureInfo: String,
+    val measureTapFirst: String,
+    val measureTapSecond: String,
+    val measureSave: String,
+    val measureRedo: String,
+    val measureFailed: String,
+    val measureWallWidth: String,
 )

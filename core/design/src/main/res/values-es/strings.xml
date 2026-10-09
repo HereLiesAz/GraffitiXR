@@ -584,4 +584,12 @@
     <string-array name="onboarding_design_layers">
         <item>Abrir — importa una foto de tu galería; se añade como una nueva capa.</item>
     </string-array>
+    <string name="nav_measure">Medir</string>
+    <string name="nav_measure_info">Mide la pared real: toca un borde y luego el otro, sobre la pared donde está el diseño. El ancho se guarda en el proyecto: medido, no adivinado.</string>
+    <string name="measure_tap_first">Toca el primer borde de la pared</string>
+    <string name="measure_tap_second">Toca el otro borde</string>
+    <string name="measure_save">Guardar</string>
+    <string name="measure_redo">Repetir</string>
+    <string name="measure_failed">No se pudo situar ese punto en la pared. Apunta más de frente y vuelve a tocar.</string>
+    <string name="measure_wall_width">Ancho de la pared</string>
 </resources>
