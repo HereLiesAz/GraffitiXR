@@ -17,6 +17,7 @@
 #include <exception>
 #include "include/MobileGS.h"
 #include "include/HomographyTracker.h"
+#include "include/FrameBufferGuard.h"
 
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "GraffitiJNI", __VA_ARGS__)
 
@@ -489,9 +490,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     // read past its end. Same guard style as uCap/vCap: skip the check only when the capacity query
     // itself is unavailable (<=0), matching those call sites.
     jlong yCap = env->GetDirectBufferCapacity(yBuffer);
-    size_t yNeeded = (size_t)(height - 1) * (size_t)yStride + (size_t)width;
-    if (yCap > 0 && (size_t)yCap < yNeeded) {
-        LOGE("nativeFeedYuvFrame: Y buffer too small (cap=%lld, need=%zu)", (long long)yCap, yNeeded);
+    if (!graffitixr::planeFits(yCap, width, height, yStride)) {
+        LOGE("nativeFeedYuvFrame: Y plane rejected (cap=%lld, %dx%d stride=%d)",
+             (long long)yCap, width, height, yStride);
         return;
     }
 
@@ -610,10 +611,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_YuvConverter_nativeYuvToRgbaBitmap(
     // Same Y-plane guard as nativeFeedYuvFrame above: the U/V planes below are bounded by
     // GetDirectBufferCapacity, and the Y plane needs the same check before yMat.copyTo reads
     // (height-1)*yStride+width bytes out of yData.
+    // planeFits also refuses non-positive dimensions and a stride narrower than the row: either
+    // makes the cv::Mat below throw, and this entry point has no try/catch around it.
     jlong yCap = env->GetDirectBufferCapacity(yBuffer);
-    size_t yNeeded = (size_t)(height - 1) * (size_t)yStride + (size_t)width;
-    if (yCap > 0 && (size_t)yCap < yNeeded) {
-        LOGE("nativeYuvToRgbaBitmap: Y buffer too small (cap=%lld, need=%zu)", (long long)yCap, yNeeded);
+    if (!graffitixr::planeFits(yCap, width, height, yStride)) {
+        LOGE("nativeYuvToRgbaBitmap: Y plane rejected (cap=%lld, %dx%d stride=%d)",
+             (long long)yCap, width, height, yStride);
         return;
     }
 
@@ -725,9 +728,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
     // caller's side, e.g. a glasses-forwarded frame) read past its end. Skip the check only when
     // the capacity query itself is unavailable, matching that call site's style.
     jlong colorCap = env->GetDirectBufferCapacity(colorBuffer);
-    size_t colorNeeded = (size_t)height * (size_t)width * 4;
-    if (colorCap > 0 && (size_t)colorCap < colorNeeded) {
-        LOGE("nativeFeedColorFrame: buffer too small (cap=%lld, need=%zu)", (long long)colorCap, colorNeeded);
+    if (!graffitixr::packedFrameFits(colorCap, width, height, 4)) {
+        LOGE("nativeFeedColorFrame: buffer too small (cap=%lld, %dx%d RGBA)",
+             (long long)colorCap, width, height);
         return;
     }
 

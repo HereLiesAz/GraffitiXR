@@ -568,6 +568,10 @@ public:
     void destroy();
     std::mutex& getMutex() { return mMutex; }
 
+    // Host-side test access (core/nativebridge/src/test/cpp) to state no public getter exposes.
+    // Declaration only: no production code defines it, so it has no effect on the shipped library.
+    friend struct MobileGSTestPeer;
+
 private:
     void relocThreadFunc();
     /**

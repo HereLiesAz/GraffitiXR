@@ -68,6 +68,15 @@ jobs:
         # MobileGS-owned lock (gEngineMutex is a shared_mutex and no longer serialises them).
         run: python3 tools/check_native_locking.py
 
+      - name: Native host unit tests
+        # core/nativebridge's production C++ (HomographyTracker, MobileGS, the JNI frame-buffer
+        # guards) compiled for the runner against OpenCV 4 + GoogleTest: the known-answer pose and
+        # fingerprint-state tests BACKLOG Phase 7 had no way to run. NDK-side, not Kotlin.
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake g++ libopencv-dev libgtest-dev
+          tools/run_native_host_tests.sh
+
       - name: SphereSLAM architecture invariants
         run: python3 tools/check_sphereslam_architecture.py
 
