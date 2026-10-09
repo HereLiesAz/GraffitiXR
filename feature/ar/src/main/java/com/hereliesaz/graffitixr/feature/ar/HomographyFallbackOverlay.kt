@@ -29,13 +29,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.hereliesaz.graffitixr.common.model.Layer
-import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import com.hereliesaz.graffitixr.design.theme.rememberAppStrings
 import com.hereliesaz.graffitixr.feature.ar.rendering.HomographyOverlayRenderer
@@ -74,14 +70,8 @@ private val DEFAULT_UNWARP_POINTS = listOf(
  * each edge's longest visible length, not a true metric aspect — that needs the camera intrinsics
  * and a plane-normal decomposition, which nothing here computes).
  *
- * @param designBitmap the current design composite to texture the tracked quad with — the same
- *   tone-adjusted (`modeAdjustments[OVERLAY]` brightness/contrast/saturation/opacity/invert baked in)
- *   texture AR mode uses; null draws nothing (tracking still runs, so a design supplied later
- *   appears without re-tracking).
- * @param design the raw design layer [designBitmap] was composited from — its size, scale, Z
- *   rotation and offset place the quad (see [overlayTrackedPlacement]).
- * @param adjustment Overlay's whole-design ModeAdjustment; its offset/scale/rotation (and X/Y tilt)
- *   are applied on the tracked quad, so the design keeps the placement it had in the 2D draw.
+ * @param designBitmap the current design composite to texture the tracked quad with; null draws
+ *   nothing (tracking still runs, so a design supplied later appears without re-tracking).
  * @param onPoseTracked observes each frame's tracking result — null means lost, which also
  *   drives this composable's own "Reacquiring target…" banner (ARCore's `TrackingState`
  *   equivalent). Optional — for a caller that additionally wants the raw pose stream.
@@ -96,8 +86,6 @@ private val DEFAULT_UNWARP_POINTS = listOf(
 fun HomographyFallbackOverlay(
     cameraController: LifecycleCameraController,
     designBitmap: Bitmap?,
-    design: Layer? = null,
-    adjustment: ModeAdjustment? = null,
     onPoseTracked: (HomographyArTracker.HomographyPose?) -> Unit = {},
     onDesignTrackedChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -217,7 +205,9 @@ fun HomographyFallbackOverlay(
         val accepted = withContext(Dispatchers.Default) {
             bridgedTracker.setReference(reference, objectHalfW, objectHalfH)
         }
-        if (!accepted) {
+        if (accepted) {
+            glRenderer.setExtent(objectHalfW, objectHalfH)
+        } else {
             referenceRejected = true
             hasPose = false
             referenceBitmap = null
@@ -226,61 +216,7 @@ fun HomographyFallbackOverlay(
     }
 
     LaunchedEffect(glRenderer, designBitmap) {
-        if (designBitmap == null) glRenderer.clearDesignBitmap() else glRenderer.updateDesignBitmap(designBitmap)
-    }
-
-    // The homography pose is already camera_from_target, so the target plane IS the model frame.
-    // Without this the renderer fails closed (no map anchor) and the tracked design never drew.
-    LaunchedEffect(glRenderer) {
-        glRenderer.setMapFromFingerprint(
-            floatArrayOf(1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f)
-        )
-    }
-
-    // Same screen this overlay fills as Overlay's 2D draw; its size converts that draw's pixel
-    // offsets into target units.
-    var viewSize by remember { mutableStateOf(IntSize.Zero) }
-    val rawDesign = design?.bitmap
-    val placement = remember(
-        rawDesign, design?.scale, design?.rotationZ, design?.offset, adjustment, viewSize,
-        objectHalfW, objectHalfH,
-    ) {
-        val d = design
-        if (d == null || rawDesign == null) null else {
-            overlayTrackedPlacement(
-                targetHalfWidth = objectHalfW,
-                targetHalfHeight = objectHalfH,
-                designWidthPx = rawDesign.width,
-                designHeightPx = rawDesign.height,
-                viewWidthPx = viewSize.width,
-                viewHeightPx = viewSize.height,
-                layerScale = d.scale,
-                layerRotationZDeg = d.rotationZ,
-                layerOffsetXPx = d.offset.x,
-                layerOffsetYPx = d.offset.y,
-                modeOffsetXPx = adjustment?.offsetX ?: 0f,
-                modeOffsetYPx = adjustment?.offsetY ?: 0f,
-                modeScale = adjustment?.scale ?: 1f,
-                modeRotationDeg = adjustment?.rotation ?: 0f,
-            )
-        }
-    }
-    LaunchedEffect(glRenderer, placement, adjustment?.rotationX, adjustment?.rotationY) {
-        // Until there is a design and a measured view, keep the reference rectangle as the quad.
-        if (placement == null) {
-            glRenderer.setExtent(objectHalfW, objectHalfH)
-            glRenderer.setTransform(0f, 0f, 1f, 0f)
-            return@LaunchedEffect
-        }
-        glRenderer.setExtent(placement.halfWidth, placement.halfHeight)
-        glRenderer.setTransform(
-            panX = placement.panX,
-            panY = placement.panY,
-            scale = placement.scale,
-            rotationZDeg = placement.rotationZDeg,
-            rotationXDeg = adjustment?.rotationX ?: 0f,
-            rotationYDeg = adjustment?.rotationY ?: 0f,
-        )
+        designBitmap?.let { glRenderer.updateDesignBitmap(it) }
     }
 
     // cameraController.cameraInfo is null until CameraPreview has actually bound the controller to
@@ -332,7 +268,7 @@ fun HomographyFallbackOverlay(
             }
         },
         onRelease = { view -> view.queueEvent { glRenderer.release() } },
-        modifier = modifier.fillMaxSize().onSizeChanged { viewSize = it },
+        modifier = modifier.fillMaxSize(),
     )
 
     // TrackingState.TRACKING == false, ARCore mode's own equivalent (see ArViewModel's
