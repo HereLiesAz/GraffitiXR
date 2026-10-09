@@ -18,7 +18,7 @@ This document lists key files in the repository and their purposes.
     resolves: supported devices keep the existing ARCore `ArRenderer`; unsupported devices keep AR
     mode and layer `SphereSlamStandaloneOverlay` over CameraX. Overlay mode remains CameraX and can
     use its separate legacy homography tracker on non-ARCore devices; Mockup/Trace are static.
-*   `MainViewModel.kt`: Cross-cutting state — touch lock, `CaptureStep` wizard for target creation, and the persisted first-run flag for the AR-unavailable explainer.
+*   `MainViewModel.kt`: Cross-cutting state — touch lock, Overlay ▸ Gyro toggle (`isOverlayGyroActive`), `CaptureStep` wizard for target creation, and the persisted first-run flag for the AR-unavailable explainer.
 *   `GuidanceDefinitions.kt`: The reactive status-driven guidance graph (AzNavRail 10.18) that replaced the old scripted-tutorial API and the hand-built onboarding coach. Declares `azStatus`/`azEdge`/`azGoal`/`azSuppressGuide` reusing the existing `onboarding_*` strings; per-mode goals self-activate on mode entry and persist completion.
 *   `HelpItemsBuilder.kt`: Builds the `helpList` map for the rail's help overlay (rail-item id → help text).
 *   `RailIntegrityCheck.kt`: Debug-only invariants — validates helpList keys and guidance highlight ids against the registered rail items.
@@ -123,6 +123,13 @@ the real (non-stub) tracker is packaged.
 *   `rendering/BackgroundRenderer.kt`: OpenGL ES shader that renders ARCore's `EXTERNAL_OES`
     camera texture full-screen.
 *   `CameraPreview.kt`: shared CameraX preview for Overlay and standalone SphereSLAM AR.
+*   `OverlayGyroStabilizer.kt`: Overlay ▸ Gyro (tripod stabilisation). `rememberOverlayGyroCompensation`
+    captures a rotation-vector reference (`GyroOrientationBridge`), publishes the per-frame
+    pure-rotation screen homography MainScreen draws the Overlay design through, auto-releases past
+    3°, and runs a slow (15 s) background MiDaS sample of the surface under the design.
+*   `util/OverlayGyroCompensationMath.kt`: pure math for Gyro — body→display axis remap, rotation
+    angle, FIT_CENTER screen intrinsics, `K·(R + t·nᵀ)·K⁻¹` homography, MiDaS patch sampling;
+    pinned by `OverlayGyroCompensationMathTest`.
 *   `HomographyFallbackOverlay.kt` / `HomographyArTracker.kt`: legacy planar live tracking, currently
     unmounted (Overlay draws the edited design over the camera untracked); not the standalone AR backend.
 *   `computervision/DualAnalyzer.kt`: ARCore-side `ImageAnalysis.Analyzer` for relocalization

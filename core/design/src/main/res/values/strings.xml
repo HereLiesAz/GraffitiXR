@@ -615,4 +615,9 @@
     <string name="measure_redo">Redo</string>
     <string name="measure_failed">Couldn\'t place that point on the wall. Aim more squarely and tap again.</string>
     <string name="measure_wall_width">Wall width</string>
+    <!-- Overlay > Gyro (tripod stabilisation) -->
+    <string name="nav_gyro">Gyro</string>
+    <string name="nav_gyro_info">On a tripod, holds the design still on the wall against small vibrations using the motion sensor. Turn on once the phone is set; it lets go if the phone is moved.</string>
+    <string name="gyro_released_moved">Gyro released: the phone moved too far.</string>
+    <string name="gyro_unavailable">Gyro needs a rotation sensor this device doesn\'t report.</string>
 </resources>

@@ -594,4 +594,9 @@
     <string name="measure_redo">Opnieuw</string>
     <string name="measure_failed">Dat punt kon niet op de muur worden geplaatst. Richt rechter op de muur en tik opnieuw.</string>
     <string name="measure_wall_width">Muurbreedte</string>
+    <!-- Overlay > Gyro (tripod stabilisation) -->
+    <string name="nav_gyro">Gyro</string>
+    <string name="nav_gyro_info">Houdt het ontwerp op een statief stil op de muur tegen kleine trillingen met de bewegingssensor. Zet aan zodra de telefoon staat; laat los als de telefoon wordt bewogen.</string>
+    <string name="gyro_released_moved">Gyro losgelaten: de telefoon bewoog te veel.</string>
+    <string name="gyro_unavailable">Gyro heeft een rotatiesensor nodig die dit apparaat niet biedt.</string>
 </resources>

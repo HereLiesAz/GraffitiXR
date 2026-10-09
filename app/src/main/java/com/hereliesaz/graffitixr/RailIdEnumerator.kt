@@ -52,7 +52,7 @@ internal fun enumerateRailItemIdRegistrations(mode: EditorMode): List<String> {
         ids += listOf("coop", "coop.host", "coop.join", "coop.leave")
     }
     if (mode == EditorMode.OVERLAY) {
-        ids += listOf("mode.overlay.light", "mode.overlay.lock")
+        ids += listOf("mode.overlay.light", "mode.overlay.lock", "mode.overlay.gyro")
     }
     if (mode == EditorMode.MOCKUP) {
         ids += listOf("mockup.wall", "wall.photo", "wall.file", "wall.clear", "mode.mockup.lock")
@@ -111,6 +111,7 @@ internal val RAIL_ITEM_HOST_ID: Map<String, String> = mapOf(
     "coop.leave" to "coop",
     "mode.overlay.light" to "mode.overlay",
     "mode.overlay.lock" to "mode.overlay",
+    "mode.overlay.gyro" to "mode.overlay",
     "mockup.wall" to "mode.mockup",
     "wall.photo" to "mockup.wall",
     "wall.file" to "mockup.wall",

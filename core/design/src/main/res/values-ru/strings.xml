@@ -594,4 +594,9 @@
     <string name="measure_redo">Заново</string>
     <string name="measure_failed">Не удалось поставить точку на стену. Направьте камеру прямее и коснитесь снова.</string>
     <string name="measure_wall_width">Ширина стены</string>
+    <!-- Overlay > Gyro (tripod stabilisation) -->
+    <string name="nav_gyro">Гиро</string>
+    <string name="nav_gyro_info">На штативе удерживает дизайн на стене, гася мелкие вибрации с помощью датчика движения. Включайте, когда телефон закреплён; при смещении телефона отключается.</string>
+    <string name="gyro_released_moved">Гиро отключено: телефон сдвинулся слишком сильно.</string>
+    <string name="gyro_unavailable">Для Гиро нужен датчик вращения, которого нет на этом устройстве.</string>
 </resources>

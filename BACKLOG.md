@@ -148,6 +148,14 @@ by decision) and a short list of unreferenced diagnostic/eval knobs. Bidirection
 protocol v4 (2026-10-08); protocol v5 (2026-10-09) adds `Op.WallWidth` so co-op guests (and
 hosts) share Measure results.
 
+- [ ] Overlay ▸ Gyro (tripod stabilisation, 2026-10-09) needs on-device verification: the design
+  should move WITH the wall when the tripod head is nudged (sign/axes pinned only by
+  `OverlayGyroCompensationMathTest`, not hardware), in portrait and both landscapes; the
+  perspective `Matrix` concat around the graphicsLayer must render on hardware canvases; the 3°
+  release threshold and 15 s MiDaS cadence are first guesses; slow `GAME_ROTATION_VECTOR` yaw drift
+  on long sessions is uncorrected (it eventually trips the release). MiDaS depth is sampled but
+  unused while translation is unmeasured.
+
 #### Glee audit pass (2026-09-04) — not yet acted on
 
 Correctness bugs, worst first:

@@ -304,4 +304,9 @@
     <string name="measure_redo">Ulitin</string>
     <string name="measure_failed">Hindi mailagay ang puntong iyon sa pader. Itutok nang mas diretso at mag-tap ulit.</string>
     <string name="measure_wall_width">Lapad ng pader</string>
+    <!-- Overlay > Gyro (tripod stabilisation) -->
+    <string name="nav_gyro">Gyro</string>
+    <string name="nav_gyro_info">Sa tripod, pinapanatiling nakapirmi ang disenyo sa pader laban sa maliliit na pag-uga gamit ang motion sensor. I-on kapag nakapuwesto na ang phone; bibitaw ito kapag ginalaw ang phone.</string>
+    <string name="gyro_released_moved">Bumitaw ang Gyro: masyadong gumalaw ang phone.</string>
+    <string name="gyro_unavailable">Kailangan ng Gyro ng rotation sensor na wala sa device na ito.</string>
 </resources>

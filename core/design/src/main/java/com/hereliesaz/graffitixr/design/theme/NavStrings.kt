@@ -93,6 +93,8 @@ fun rememberNavStrings(): NavStrings {
         measureRedo = stringResource(R.string.measure_redo),
         measureFailed = stringResource(R.string.measure_failed),
         measureWallWidth = stringResource(R.string.measure_wall_width),
+        gyro = stringResource(R.string.nav_gyro),
+        gyroInfo = stringResource(R.string.nav_gyro_info),
     )
 }
 
@@ -184,4 +186,7 @@ data class NavStrings(
     val measureRedo: String,
     val measureFailed: String,
     val measureWallWidth: String,
+    // Overlay ▸ Gyro (tripod stabilisation).
+    val gyro: String,
+    val gyroInfo: String,
 )

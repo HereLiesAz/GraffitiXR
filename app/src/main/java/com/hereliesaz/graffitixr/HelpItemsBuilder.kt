@@ -42,6 +42,7 @@ internal fun buildHelpItems(strings: AppStrings): Map<String, Any> = mapOf(
     // Overlay tools
     "mode.overlay.light" to strings.help.flashlight,
     "mode.overlay.lock" to strings.nav.lockInfo,
+    "mode.overlay.gyro" to strings.nav.gyroInfo,
 
     // Mockup tools
     "mockup.wall" to strings.help.wall,

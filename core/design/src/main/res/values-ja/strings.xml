@@ -612,4 +612,9 @@
     <string name="measure_redo">やり直す</string>
     <string name="measure_failed">その点を壁上に置けませんでした。壁に正対してもう一度タップしてください。</string>
     <string name="measure_wall_width">壁の幅</string>
+    <!-- Overlay > Gyro (tripod stabilisation) -->
+    <string name="nav_gyro">ジャイロ</string>
+    <string name="nav_gyro_info">三脚使用時、モーションセンサーで小さな振動を打ち消し、デザインを壁上に固定します。スマホを設置してからオンにしてください。動かすと解除されます。</string>
+    <string name="gyro_released_moved">ジャイロを解除しました:スマホが大きく動きました。</string>
+    <string name="gyro_unavailable">ジャイロには、この端末が提供していない回転センサーが必要です。</string>
 </resources>

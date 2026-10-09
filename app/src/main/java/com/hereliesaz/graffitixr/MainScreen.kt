@@ -26,6 +26,11 @@ import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
@@ -721,6 +726,38 @@ fun MainScreen(
             }
 
 
+        // Overlay ▸ Gyro: tripod stabilisation. Off (and released: sensor listener unregistered,
+        // MiDaS stopped) whenever we are not in Overlay with the camera showing, so returning to
+        // Overlay never silently re-arms it against a different reference.
+        val overlayCameraShowing = uiState.editorMode == EditorMode.OVERLAY && isCameraActive && hasCameraPermission
+        LaunchedEffect(overlayCameraShowing) {
+            if (!overlayCameraShowing) mainViewModel.setOverlayGyroActive(false)
+        }
+        var overlayViewSize by remember { mutableStateOf(IntSize.Zero) }
+        val gyroHomography = com.hereliesaz.graffitixr.feature.ar.rememberOverlayGyroCompensation(
+            active = overlayCameraShowing && mainUiState.isOverlayGyroActive,
+            cameraController = cameraController,
+            viewWidth = overlayViewSize.width,
+            viewHeight = overlayViewSize.height,
+            designCenter = {
+                val adj = uiState.modeAdjustments[EditorMode.OVERLAY] ?: ModeAdjustment()
+                val w = overlayViewSize.width.coerceAtLeast(1)
+                val h = overlayViewSize.height.coerceAtLeast(1)
+                Pair(0.5f + adj.offsetX / w, 0.5f + adj.offsetY / h)
+            },
+            onRelease = { reason ->
+                mainViewModel.setOverlayGyroActive(false)
+                val message = when (reason) {
+                    com.hereliesaz.graffitixr.feature.ar.OverlayGyroRelease.MOVED ->
+                        context.getString(DesignR.string.gyro_released_moved)
+                    com.hereliesaz.graffitixr.feature.ar.OverlayGyroRelease.SENSOR_UNAVAILABLE ->
+                        context.getString(DesignR.string.gyro_unavailable)
+                }
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            },
+        )
+        val gyroMatrix = remember { Matrix() }
+
         // Overlay draws the edited design over the camera on every device; only AR renders it GL-side.
         if (uiState.editorMode != EditorMode.AR) {
             // Per-mode whole-design adjustment: position/scale/rotate/fade and tone the entire
@@ -733,6 +770,22 @@ fun MainScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .onSizeChanged { overlayViewSize = it }
+                    // Overlay ▸ Gyro's compensation, applied in SCREEN space around everything below
+                    // (outside the mode adjustment's graphicsLayer), so the user's edits and Overlay
+                    // adjustments are untouched and it simply falls away (null) when Gyro is off.
+                    // Read in the draw phase only: per-frame updates redraw, never recompose.
+                    .drawWithContent {
+                        val h = if (uiState.editorMode == EditorMode.OVERLAY) gyroHomography.value else null
+                        if (h == null) {
+                            drawContent()
+                        } else {
+                            gyroMatrix.setValues(h)
+                            drawIntoCanvas { it.nativeCanvas.save(); it.nativeCanvas.concat(gyroMatrix) }
+                            drawContent()
+                            drawIntoCanvas { it.nativeCanvas.restore() }
+                        }
+                    }
                     .graphicsLayer {
                         translationX = modeAdj.offsetX
                         translationY = modeAdj.offsetY

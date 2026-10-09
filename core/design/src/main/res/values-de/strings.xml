@@ -592,4 +592,9 @@
     <string name="measure_redo">Neu messen</string>
     <string name="measure_failed">Dieser Punkt liegt nicht auf der Wand. Richte das Gerät gerader aus und tippe erneut.</string>
     <string name="measure_wall_width">Wandbreite</string>
+    <!-- Overlay > Gyro (tripod stabilisation) -->
+    <string name="nav_gyro">Gyro</string>
+    <string name="nav_gyro_info">Hält das Design auf dem Stativ trotz kleiner Vibrationen mit dem Bewegungssensor ruhig auf der Wand. Einschalten, sobald das Gerät steht; bei Bewegung wird es gelöst.</string>
+    <string name="gyro_released_moved">Gyro gelöst: Das Gerät wurde zu stark bewegt.</string>
+    <string name="gyro_unavailable">Gyro benötigt einen Drehsensor, den dieses Gerät nicht meldet.</string>
 </resources>

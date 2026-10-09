@@ -908,6 +908,7 @@ class MainActivity : ComponentActivity() {
                         isTouchLocked = mainUiState.isTouchLocked,
                         isWaitingForTap = mainUiState.isWaitingForTap,
                         isCapturingTarget = mainUiState.isCapturingTarget,
+                        isOverlayGyroActive = mainUiState.isOverlayGyroActive,
                         onShowJoinScanner = { showJoinScanner = true },
                         onWallPhoto = {
                             if (hasCameraPermission) {
@@ -1971,6 +1972,7 @@ class MainActivity : ComponentActivity() {
         isTouchLocked: Boolean,
         isWaitingForTap: Boolean = false,
         isCapturingTarget: Boolean = false,
+        isOverlayGyroActive: Boolean = false,
         onShowJoinScanner: () -> Unit = {},
         onWallPhoto: () -> Unit = {},
         onExportRequested: () -> Unit,
@@ -2247,6 +2249,10 @@ class MainActivity : ComponentActivity() {
             if (editorUiState.editorMode == EditorMode.OVERLAY) {
                 azRailSubItem(id = "mode.overlay.light", hostId = "mode.overlay", text = navStrings.light, color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { arViewModel.toggleFlashlight() })
                 azRailSubItem(id = "mode.overlay.lock", hostId = "mode.overlay", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { editorViewModel.onToggleModeTransformLocked(EditorMode.OVERLAY) })
+                // Gyro — tripod stabilisation: pins the drawn design to the wall against tiny
+                // vibrations using the rotation sensor (OverlayGyroStabilizer, mounted in MainScreen).
+                // Toggling on captures the current orientation as the reference; off releases it.
+                azRailSubItem(id = "mode.overlay.gyro", hostId = "mode.overlay", text = navStrings.gyro, color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { mainViewModel.setOverlayGyroActive(!isOverlayGyroActive) })
             }
 
             // Mockup ▸ Wall ▸ { Photo (take a photo), File (pick an image) }
@@ -2366,6 +2372,7 @@ class MainActivity : ComponentActivity() {
                 if (arUiState.isFlashlightOn) azHighlight("mode.overlay.light", active = Cyan)
                 if (editorUiState.modeAdjustments[EditorMode.OVERLAY]?.isTransformLocked == true)
                     azHighlight("mode.overlay.lock", active = Cyan)
+                if (isOverlayGyroActive) azHighlight("mode.overlay.gyro", active = Cyan)
             }
             if (editorUiState.editorMode == EditorMode.MOCKUP) {
                 if (editorUiState.modeAdjustments[EditorMode.MOCKUP]?.isTransformLocked == true)
