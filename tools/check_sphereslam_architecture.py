@@ -13,6 +13,8 @@ invariants that are easy to accidentally regress during UI/renderer refactors:
 5. The standalone runtime never reaches ARCore-only hit-test/depth/anchor/perception APIs and exposes
    an explicit canonical-wall hit-test seam instead.
 6. Co-op never installs peer geometry without a protocol-v3 backend/scale/wall-frame contract.
+7. Standalone analysis drops stale frames rather than queueing them: the shared CameraX controller
+   pins STRATEGY_KEEP_ONLY_LATEST and the standalone analyzer does no asynchronous per-frame work.
 
 If a future, legitimate architecture change trips this check, update the check together with the
 new explicit seam. Do not simply weaken/remove it.
@@ -255,6 +257,26 @@ for required in (
 ):
     if required not in ar_view_model:
         fail(f"Standalone tracking no longer clears stale ARCore depth state: missing {required!r}.")
+
+# 7. Latency over throughput for standalone analysis.
+camera_preview = read("feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/CameraPreview.kt")
+# Match the ASSIGNMENT, not a file-wide token: the constant surviving in a comment or import while
+# the property is removed or set to something else must fail.
+_code = "\n".join(line.split("//", 1)[0] for line in camera_preview.splitlines())
+if not re.search(
+    r"imageAnalysisBackpressureStrategy\s*=\s*(?:androidx\.camera\.core\.)?ImageAnalysis\.STRATEGY_KEEP_ONLY_LATEST\b",
+    _code,
+):
+    fail("Shared CameraX controller must assign imageAnalysisBackpressureStrategy = ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST.")
+standalone_analyzer = read(
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/SphereSlamStandaloneTrackingAnalyzer.kt"
+)
+for token in ("launch(", "launch {", ".execute(", ".submit(", "Thread("):
+    if token in standalone_analyzer:
+        fail(
+            f"Standalone analyzer starts asynchronous work ({token!r}); per-frame work must stay synchronous "
+            "so backpressure bounds the queue."
+        )
 
 if FAILURES:
     print("SphereSLAM architecture invariant check FAILED:", file=sys.stderr)

@@ -35,6 +35,15 @@ fun rememberCameraController(): LifecycleCameraController {
             // setImageAnalysisAnalyzer. Standalone SphereSLAM AR and the legacy non-ARCore
             // homography Overlay path both attach one when active.
             setEnabledUseCases(LifecycleCameraController.IMAGE_CAPTURE or LifecycleCameraController.IMAGE_ANALYSIS)
+            // Latency over throughput, stated rather than inherited from CameraX's default. Both
+            // analyzers (standalone SphereSLAM, homography Overlay) are synchronous, so with
+            // KEEP_ONLY_LATEST at most one frame waits while one is analysed: a slow KPM match
+            // drops stale frames instead of queueing them, and the effective analysis rate adapts
+            // to the match cost by itself. STRATEGY_BLOCK_PRODUCER here would queue up to the
+            // image-queue depth and add that many frames of lag. Enforced by
+            // tools/check_sphereslam_architecture.py.
+            imageAnalysisBackpressureStrategy =
+                androidx.camera.core.ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
             initializationFuture.addListener({
                 cameraControl?.let { control ->
                     val c2Control = androidx.camera.camera2.interop.Camera2CameraControl.from(control)
