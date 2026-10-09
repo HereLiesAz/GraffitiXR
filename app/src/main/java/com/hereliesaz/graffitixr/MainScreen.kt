@@ -317,6 +317,8 @@ fun MainScreen(
                             mobileGsFingerprint = arUiState.sphereSlamFingerprint,
                             mobileGsFingerprintFrameVersion =
                                 arUiState.sphereSlamFingerprintFrameVersion,
+                            mobileGsMapFromFingerprint =
+                                arUiState.sphereSlamMapFromFingerprint,
                             mobileGsWallFeatureMap = arUiState.sphereSlamWallFeatureMap,
                             mobileGsWallFeatureMapFrameVersion =
                                 arUiState.sphereSlamWallFeatureMapFrameVersion,
