@@ -272,6 +272,8 @@ data class ArUiState(
     // Separate from the ARCore/capture-camera fingerprint; see GraffitiProject.sphereSlamFingerprint.
     val sphereSlamFingerprint: Fingerprint? = null,
     val sphereSlamFingerprintFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+    /** Column-major GL map_from_fingerprint; empty until the precision target is localized in-map. */
+    val sphereSlamMapFromFingerprint: List<Float> = emptyList(),
     val sphereSlamWallFeatureMap: WallFeatureMap? = null,
     val sphereSlamWallFeatureMapFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     val sphereSlamAtlasPages: List<SphereSlamAtlasPage> = emptyList(),
