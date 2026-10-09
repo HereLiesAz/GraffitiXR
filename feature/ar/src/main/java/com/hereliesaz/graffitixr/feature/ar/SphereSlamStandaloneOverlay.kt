@@ -1205,7 +1205,11 @@ fun SphereSlamStandaloneOverlay(
                     text = currentFailure
                         ?.takeIf { it.severity != StandaloneFailureSeverity.FATAL }
                         ?.userMessage
-                        ?: if (!referenceReady) "Preparing wall tracker…" else "Finding wall target…",
+                        ?: if (!referenceReady) {
+                            "SphereSLAM mapping • tap Target to add fingerprint"
+                        } else {
+                            "Finding fingerprint target…"
+                        },
                     color = Color.White,
                     modifier = Modifier
                         .padding(top = 32.dp)
