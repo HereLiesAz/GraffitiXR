@@ -4355,9 +4355,14 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.io) {
             try {
                 val map = slamManager.getWallFeatureMap() ?: return@launch
-                if (!StandaloneFingerprintFrame.isCenteredPageAnchor(map.anchor)) {
+                val mapFromFingerprint = startingProject.sphereSlamMapFromFingerprint
+                if (
+                    mapFromFingerprint.size != 16 ||
+                    !sameStandaloneTransform(map.anchor, mapFromFingerprint)
+                ) {
                     appendDiag(
-                        "SphereSLAM standalone map save refused: native map anchor is not centered-page identity",
+                        "SphereSLAM precision-map autosave refused: " +
+                            "native anchor does not match map_from_fingerprint",
                     )
                     return@launch
                 }
@@ -4384,7 +4389,7 @@ class ArViewModel @Inject constructor(
                     lastStandaloneSavedMapRevision = mapRevision
                     lastStandaloneMapSaveMs = android.os.SystemClock.elapsedRealtime()
                     appendDiag(
-                        "SphereSLAM MobileGS map saved frame=centered-page " +
+                        "SphereSLAM MobileGS map saved frame=photosphere-map " +
                             "version=" +
                             com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION +
                             " points=" + map.pointCount,
@@ -4400,10 +4405,10 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    fun standaloneFingerprintPlacementForConfirm(): StandaloneFingerprintPlacement? =
-        pendingStandaloneFingerprintPlacement?.copy(
-            mapFromFingerprint = pendingStandaloneFingerprintPlacement!!.mapFromFingerprint.copyOf(),
-        )
+    fun standaloneFingerprintPlacementForConfirm(): StandaloneFingerprintPlacement? {
+        val placement = pendingStandaloneFingerprintPlacement ?: return null
+        return placement.copy(mapFromFingerprint = placement.mapFromFingerprint.copyOf())
+    }
 
     private fun buildStandaloneFingerprintPlacement(
         tap: Pair<Float, Float>?,
