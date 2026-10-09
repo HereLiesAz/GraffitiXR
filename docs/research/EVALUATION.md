@@ -717,8 +717,11 @@ rather than assumed.
 battery and heat?
 
 **Method.** Full configuration on the real-mural recording and a 20-minute live
-session. Readouts: `pnpRelocMs`, `drawMs`, `batteryMa`, `tempC`,
-`nativeHeapKb`, and the frame-time distribution's 95th percentile.
+session. Readouts: `pnpRelocMs`, `batteryMa`, `tempC`,
+`nativeHeapKb`, and the frame-time distribution's 95th percentile. (`drawMs` is
+not a readout: it and the other three voxel-era stage columns are always `-1`,
+"not measured" — the native engine never timed them. Filter `-1` out of
+`pnpRelocMs` too; it marks an interval with no reloc pass, not a zero cost.)
 
 **Reasoning.** The 95th percentile, not the mean. The original complaint that
 started this work was "it constantly feels like there is drift because there's
