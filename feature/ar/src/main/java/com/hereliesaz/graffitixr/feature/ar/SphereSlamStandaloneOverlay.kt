@@ -1009,6 +1009,8 @@ fun SphereSlamStandaloneOverlay(
                 slamManager = slamManager,
                 mobileGsFingerprint = runtimeMobileGsFingerprint,
                 mobileGsFingerprintFrameVersion = mobileGsFingerprintFrameVersion,
+                mobileGsMapFromFingerprint =
+                    mobileGsMapFromFingerprint.takeIf { it.size == 16 }?.toFloatArray(),
                 mobileGsWallFeatureMap = initialMobileGsWallFeatureMap,
                 mobileGsWallFeatureMapFrameVersion = initialMobileGsWallFeatureMapFrameVersion,
                 onReferenceReady = { registered: SphereSlamStandaloneSession.Reference ->
