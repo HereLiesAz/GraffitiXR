@@ -604,4 +604,12 @@
     <string-array name="onboarding_design_layers">
         <item>打开 — 从相册导入一张照片；它会作为新图层放置。</item>
     </string-array>
+    <string name="nav_measure">测量</string>
+    <string name="nav_measure_info">测量真实的墙面:在放置设计的墙上先点一侧边缘,再点另一侧。宽度会随项目保存——是测量值,而非估计值。</string>
+    <string name="measure_tap_first">点按墙的第一个边缘</string>
+    <string name="measure_tap_second">点按另一侧边缘</string>
+    <string name="measure_save">保存</string>
+    <string name="measure_redo">重测</string>
+    <string name="measure_failed">无法将该点放到墙上。请更正对墙面后再点按。</string>
+    <string name="measure_wall_width">墙宽</string>
 </resources>

@@ -207,6 +207,78 @@ class ArRenderer(
             val req = hitTestQueue.poll() ?: break
             req.result.complete(null)
         }
+        failPendingWallPoints()
+    }
+
+    // Measure (BACKLOG Phase 6 step 1): taps resolved against the plane the design is drawn on.
+    private class PendingWallPoint(
+        val x: Float,
+        val y: Float,
+        val planeLocal: FloatArray?,
+        val result: kotlinx.coroutines.CompletableDeferred<WallPoint?>,
+    )
+    private val wallPointQueue = java.util.concurrent.ConcurrentLinkedQueue<PendingWallPoint>()
+
+    /**
+     * A measured wall point and the wall plane it was taken on, both relative to the UNFUSED ARCore
+     * consensus anchor (so fusion corrections cannot move either).
+     *
+     * @property local the hit (x, y, z), metres, anchor-local.
+     * @property planeLocal the wall frame (local z = 0 is the plane), anchor-local, 4x4 column-major.
+     */
+    class WallPoint(val local: FloatArray, val planeLocal: FloatArray)
+
+    /**
+     * Resolve normalised screen point ([nx], [ny]) — [0,1], y down, relative to the AR view — to a
+     * point on the wall. With [planeLocal] null the plane is the one the design is drawn on right
+     * now; pass the FIRST point's [WallPoint.planeLocal] for the second tap so both points lie on one
+     * plane even if fusion re-orients the drawn frame between taps. Served on the next frame after
+     * the overlay base frame is computed; completes null with no trustworthy wall frame, a
+     * grazing/out-of-range ray, or a destroyed renderer. Await with a timeout.
+     */
+    fun requestWallPoint(nx: Float, ny: Float, planeLocal: FloatArray? = null): kotlinx.coroutines.Deferred<WallPoint?> {
+        val d = kotlinx.coroutines.CompletableDeferred<WallPoint?>()
+        if (isDestroying || session == null) {
+            d.complete(null)
+            return d
+        }
+        wallPointQueue.add(PendingWallPoint(nx, ny, planeLocal?.copyOf(), d))
+        return d
+    }
+
+    private fun failPendingWallPoints() {
+        while (true) {
+            val req = wallPointQueue.poll() ?: break
+            req.result.complete(null)
+        }
+    }
+
+    /** GL thread, after [overlayBaseScratch] is final for this frame. */
+    private fun drainWallPointQueue(view: FloatArray, proj: FloatArray, wallReady: Boolean) {
+        while (true) {
+            val req = wallPointQueue.poll() ?: break
+            val point = if (!wallReady) {
+                null
+            } else {
+                try {
+                    val wm = com.hereliesaz.graffitixr.feature.ar.anchor.WallMeasure
+                    val pm = com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
+                    // The plane: the first tap's, carried through the unfused backbone, or the drawn
+                    // wall frame expressed anchor-locally.
+                    val planeLocal = req.planeLocal
+                        ?: pm.multiply(pm.rigidInverse(backboneScratch), overlayBaseScratch)
+                    val planeWorld = pm.multiply(backboneScratch, planeLocal)
+                    wm.screenRay(req.x, req.y, view, proj)
+                        ?.let { wm.intersectWallWorld(it, planeWorld) }
+                        ?.let { wm.toFrameLocal(it, backboneScratch) }
+                        ?.let { WallPoint(it, planeLocal) }
+                } catch (e: Exception) {
+                    Timber.w(e, "wall-point request failed")
+                    null
+                }
+            }
+            req.result.complete(point)
+        }
     }
 
     private val backgroundRenderer = BackgroundRenderer()
@@ -643,6 +715,25 @@ class ArRenderer(
     // AnchorOrchestrator's no-tracking-anchor fallback (a PREVIOUS anchor's lastGoodMatrix, or
     // identity) rather than this anchor's own pose — see the validation where this flag is consumed.
     private var overlayRotationCorrectionPending: Boolean = false
+    // Measure gates (set at anchor establishment / correction outcome). The overlay base frame's
+    // local z is the real wall normal only when the anchor's normal came from a wall surface (a
+    // plane hit, or a reloc pose whose up axis faces the camera) AND the one-time rotation
+    // correction was applied. Depth/feature-point and fallback anchors use the anchor→camera
+    // direction, a camera-facing plane that foreshortens an oblique wall.
+    private var anchorNormalIsWall = false
+    private var overlayRotationCorrectionApplied = false
+    // A reloc-restored anchor's wall-ness is only inferred from viewing angle (a floor or table
+    // seen obliquely passes too), so Measure stays off until a live VERTICAL plane hit at the
+    // anchor confirms it (see [confirmRelocWallFromPlaneHit]).
+    private var relocWallUnconfirmed = false
+
+    /**
+     * True while the established anchor's drawn frame is a trustworthy wall plane for Measure (see
+     * [anchorNormalIsWall]). Tracking is NOT part of this — a momentary loss should not make the
+     * rail item flicker; taps during a loss are refused individually.
+     */
+    @Volatile var wallMeasureAvailable: Boolean = false
+        private set
     // How many consecutive frames [overlayRotationCorrectionPending] has been retried because the
     // candidate correction failed validation. Reset whenever a NEW establishment arms the pending
     // flag, and again once the candidate is either applied or discarded. Capped by
@@ -1625,11 +1716,17 @@ class ArRenderer(
                         val cos = if (tcl > 1e-4f && yl > 1e-4f) (yx * tcx + yy * tcy + yz * tcz) / (tcl * yl) else 0f
                         if (kotlin.math.abs(cos) > 0.5f) {
                             nrmX = yx; nrmY = yy; nrmZ = yz
+                            // Not yet trusted for Measure: confirmed per frame by a live VERTICAL hit.
+                            anchorNormalIsWall = false
+                            relocWallUnconfirmed = true
                         } else {
                             nrmX = tcx; nrmY = tcy; nrmZ = tcz
+                            anchorNormalIsWall = false
+                            relocWallUnconfirmed = false
                         }
                         haveNormal = true
                     } else if (chosen != null) {
+                        relocWallUnconfirmed = false
                         val pose = chosen.hitPose
                         val dx = pose.tx() - camPosX
                         val dy = pose.ty() - camPosY
@@ -1670,8 +1767,13 @@ class ArRenderer(
                                 val axis = FloatArray(3)
                                 pose.getTransformedAxis(1, 1f, axis, 0) // local +Y = plane normal
                                 nrmX = axis[0]; nrmY = axis[1]; nrmZ = axis[2]
+                                // Any plane gives a real surface normal, but only a VERTICAL one is a
+                                // wall: a floor or tabletop hit must not offer "wall width".
+                                anchorNormalIsWall = (chosen.trackable as com.google.ar.core.Plane).type ==
+                                    com.google.ar.core.Plane.Type.VERTICAL
                             } else {
                                 nrmX = -dx; nrmY = -dy; nrmZ = -dz // toward the camera
+                                anchorNormalIsWall = false
                             }
                             haveNormal = true
                         }
@@ -1685,6 +1787,8 @@ class ArRenderer(
                             )
                         )
                         // Free/fallback anchor: face the user directly (anchor→camera).
+                        anchorNormalIsWall = false
+                        relocWallUnconfirmed = false
                         nrmX = camPosX - anchorModelMatrix[12]
                         nrmY = camPosY - anchorModelMatrix[13]
                         nrmZ = camPosZ - anchorModelMatrix[14]
@@ -1715,6 +1819,7 @@ class ArRenderer(
                     // [overlayRotationCorrection] can't be computed here — it needs anchorMatrix (the
                     // consensus/fused pose), which isn't built until later this same frame. Defer.
                     overlayRotationCorrectionPending = true
+                    overlayRotationCorrectionApplied = false
                     overlayRotationCorrectionRetryFrames = 0
                     slamManager.updateAnchorTransform(anchorModelMatrix)
                     // Doodle demo: publish the wall plane (anchor point + surface normal) so the
@@ -2160,6 +2265,7 @@ class ArRenderer(
                     OverlayRotationCorrectionDecision.APPLY -> {
                         System.arraycopy(overlayRotationCorrectionCandidate, 0, overlayRotationCorrection, 0, 16)
                         overlayRotationCorrectionPending = false
+                        overlayRotationCorrectionApplied = true
                         overlayRotationCorrectionRetryFrames = 0
                     }
                     OverlayRotationCorrectionDecision.RETRY -> {
@@ -2905,6 +3011,18 @@ class ArRenderer(
                 // Translation stays the live anchor position (cols 12-14 already copied above).
             }
 
+            // Measure taps: the overlay base frame's local z = 0 is the wall the design is drawn on —
+            // but only when its normal came from the wall itself and the rotation correction has
+            // been applied (see [anchorNormalIsWall]). With tracking paused, the view is the frozen
+            // last pose while the camera image is live, so refuse rather than return a wrong point.
+            if (relocWallUnconfirmed && anchorEstablished && isTracking && frameCount % 15 == 0) {
+                confirmRelocWallFromPlaneHit(frame, anchorMatrix)
+            }
+            val wallReady = anchorEstablished && isTracking && anchorNormalIsWall &&
+                overlayRotationCorrectionApplied && !overlayRotationCorrectionPending
+            wallMeasureAvailable = anchorEstablished && anchorNormalIsWall && overlayRotationCorrectionApplied
+            drainWallPointQueue(viewMatrix, projMatrix, wallReady = wallReady)
+
             // Center the overlay on the matched-marks centroid instead of the screen-center anchor.
             // overlayMarkCenterLocal is the centroid in the fingerprint anchor's frame; reconstruct
             // its world position from the live (drift-tracked, reloc-fused) anchor, then project the
@@ -3147,6 +3265,37 @@ class ArRenderer(
 
     fun setPrimaryAnchor(anchor: com.google.ar.core.Anchor) {
         anchorOrchestrator.setInitialAnchor(anchor)
+    }
+
+    /**
+     * Confirms a reloc-restored anchor as a wall: a screen-centre hit on a tracked VERTICAL plane
+     * whose normal matches [anchorSurfaceNormal] and which passes within a few cm of the anchor.
+     * Only then is [anchorNormalIsWall] set, so Measure never offers wall width on a floor/table.
+     */
+    private fun confirmRelocWallFromPlaneHit(frame: Frame, anchorMatrix: FloatArray) {
+        val n = anchorSurfaceNormal
+        if (n[0] == 0f && n[1] == 0f && n[2] == 0f) return
+        val hits = try {
+            frame.hitTest(0.5f * surfaceWidth.toFloat(), 0.5f * surfaceHeight.toFloat())
+        } catch (_: Exception) { return }
+        for (h in hits) {
+            val plane = h.trackable as? com.google.ar.core.Plane ?: continue
+            if (plane.type != com.google.ar.core.Plane.Type.VERTICAL) continue
+            if (plane.trackingState != TrackingState.TRACKING || plane.subsumedBy != null) continue
+            if (!plane.isPoseInPolygon(h.hitPose)) continue
+            val axis = FloatArray(3)
+            h.hitPose.getTransformedAxis(1, 1f, axis, 0)
+            val dot = axis[0] * n[0] + axis[1] * n[1] + axis[2] * n[2]
+            if (kotlin.math.abs(dot) < 0.9f) continue
+            // Anchor's offset from the hit plane, along the plane normal.
+            val off = (anchorMatrix[12] - h.hitPose.tx()) * axis[0] +
+                (anchorMatrix[13] - h.hitPose.ty()) * axis[1] +
+                (anchorMatrix[14] - h.hitPose.tz()) * axis[2]
+            if (kotlin.math.abs(off) > 0.1f) continue
+            anchorNormalIsWall = true
+            relocWallUnconfirmed = false
+            return
+        }
     }
 
     /**

@@ -368,6 +368,27 @@ class ProjectManagerTest {
     }
 
     @Test
+    fun `stale whole-object save keeps the measured wall width`() = runTest {
+        manager.saveProject(mockContext, GraffitiProject(id = "ww", name = "Wall", wallWidthMeters = 6.4f))
+        manager.saveProject(mockContext, GraffitiProject(id = "ww", name = "Renamed"))
+        assertEquals(6.4f, manager.loadProjectMetadata(mockContext, "ww")?.wallWidthMeters ?: 0f, 0f)
+    }
+
+    @Test
+    fun `exact save can clear the wall width`() = runTest {
+        manager.saveProject(mockContext, GraffitiProject(id = "ww_clear", name = "Wall", wallWidthMeters = 3f))
+        manager.saveProjectExact(mockContext, GraffitiProject(id = "ww_clear", name = "Wall"))
+        assertNull(manager.loadProjectMetadata(mockContext, "ww_clear")?.wallWidthMeters)
+    }
+
+    @Test
+    fun `legacy project has no wall width`() = runTest {
+        val projectDir = File(tempFilesDir, "projects/pre_ww").also { it.mkdirs() }
+        File(projectDir, "project.json").writeText("""{"id":"pre_ww","name":"Old"}""")
+        assertNull(manager.loadProjectMetadata(mockContext, "pre_ww")?.wallWidthMeters)
+    }
+
+    @Test
     fun `hybrid KPM page round-trips bit-exact`() = runTest {
         val luma = ByteArray(6 * 4) { (it * 37).toByte() }
         val uri = manager.saveHybridKpmPage(mockContext, "hyb_rt", luma)

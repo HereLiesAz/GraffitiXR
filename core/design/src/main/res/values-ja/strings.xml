@@ -604,4 +604,12 @@
     <string-array name="onboarding_design_layers">
         <item>開く — ギャラリーから写真をインポートします。新しいレイヤーとして配置されます。</item>
     </string-array>
+    <string name="nav_measure">計測</string>
+    <string name="nav_measure_info">実際の壁を計測します。デザインを配置した壁の一方の端をタップし、次にもう一方の端をタップします。幅はプロジェクトに保存されます(推測ではなく計測値)。</string>
+    <string name="measure_tap_first">壁の最初の端をタップ</string>
+    <string name="measure_tap_second">もう一方の端をタップ</string>
+    <string name="measure_save">保存</string>
+    <string name="measure_redo">やり直す</string>
+    <string name="measure_failed">その点を壁上に置けませんでした。壁に正対してもう一度タップしてください。</string>
+    <string name="measure_wall_width">壁の幅</string>
 </resources>

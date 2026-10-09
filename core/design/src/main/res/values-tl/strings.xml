@@ -296,4 +296,12 @@
     <string-array name="onboarding_design_layers">
         <item>Bukas — nag-i-import ng larawan mula sa iyong gallery; ito ay lalapag bilang bagong layer.</item>
     </string-array>
+    <string name="nav_measure">Sukatin</string>
+    <string name="nav_measure_info">Sukatin ang totoong pader: i-tap ang isang gilid, pagkatapos ang kabila, sa pader kung nasaan ang disenyo. Ise-save ang lapad sa proyekto — sinukat, hindi hinulaan.</string>
+    <string name="measure_tap_first">I-tap ang unang gilid ng pader</string>
+    <string name="measure_tap_second">I-tap ang kabilang gilid</string>
+    <string name="measure_save">I-save</string>
+    <string name="measure_redo">Ulitin</string>
+    <string name="measure_failed">Hindi mailagay ang puntong iyon sa pader. Itutok nang mas diretso at mag-tap ulit.</string>
+    <string name="measure_wall_width">Lapad ng pader</string>
 </resources>
