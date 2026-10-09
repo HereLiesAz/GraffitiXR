@@ -988,13 +988,13 @@ class MainActivity : ComponentActivity() {
                         // Fold it away for them. This is the one deliberate exception to the "fold
                         // state is the user's call, not app state's" rule below: unfreezing does NOT
                         // re-expand it, so a manual re-fold elsewhere in the session is respected.
-                        SideEffect {
+                        LaunchedEffect(traceFrozen) {
                             if (traceFrozen) {
                                 // COMPLETE_GUIDE contract: noMenu makes isFoldedUp authoritative.
-                                // Drive both pieces in the same successful composition as Freeze so
-                                // there is no coroutine/frame where the drawer can remain expanded.
-                                if (railMenuExpanded) railMenuExpanded = false
-                                if (!hostScope.isFoldedUp) hostScope.isFoldedUp = true
+                                // Freeze owns the controlled drawer state and stationary fold state.
+                                // Unfreezing deliberately does not re-expand either one.
+                                railMenuExpanded = false
+                                hostScope.isFoldedUp = true
                             }
                         }
 
