@@ -682,6 +682,28 @@ fun SphereSlamStandaloneOverlay(
         value = loaded.first
     }
     val glRenderer = remember(context) { HomographyOverlayRenderer(context) }
+    LaunchedEffect(
+        glRenderer,
+        peerOnlyTracking,
+        coopPeerSpatialFrame,
+        mobileGsMapFromFingerprint,
+    ) {
+        val mapAnchor =
+            if (peerOnlyTracking && coopPeerSpatialFrame != null) {
+                // Peer analyzer already emits camera_from_hostWall, so its wall model is identity.
+                floatArrayOf(
+                    1f, 0f, 0f, 0f,
+                    0f, 1f, 0f, 0f,
+                    0f, 0f, 1f, 0f,
+                    0f, 0f, 0f, 1f,
+                )
+            } else {
+                mobileGsMapFromFingerprint
+                    .takeIf { it.size == 16 && it.all(Float::isFinite) }
+                    ?.toFloatArray()
+            }
+        glRenderer.setMapFromFingerprint(mapAnchor)
+    }
     // Full-view freshness mask: glow everywhere, then punch out only current photosphere tiles.
     val coverageGlowMaskView = remember(context) { SphereTileGlowMaskView(context) }
 
