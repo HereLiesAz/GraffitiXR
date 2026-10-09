@@ -82,6 +82,9 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
+    // Robolectric: CameraManager/CameraCharacteristics are real framework classes the JVM stub
+    // android.jar cannot run (BACKLOG Phase 7). Same version core:data already uses.
+    testImplementation(libs.robolectric)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

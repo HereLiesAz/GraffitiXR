@@ -455,6 +455,9 @@ class EditorViewModel @Inject constructor(
         // from once the pre-Reset stash was cleared by RestoreDesign just above.
         if (command.oldMode != null && command.oldModeAdjustment != null) {
             dispatch(EditorIntent.SetModeAdjustment(command.oldMode, command.oldModeAdjustment))
+            // Co-op: the restored placement must reach the peer too. emitDesignResync below covers
+            // only the design's own props/transform.
+            opEmitter.emit(Op.ModeTransform(command.oldMode.name, command.oldModeAdjustment))
         }
         saveProject()
         emitDesignResync(restored)
@@ -1325,8 +1328,85 @@ class EditorViewModel @Inject constructor(
         blendMode = blendMode
     )
 
-    /** Applies a remote Op received from the host, without echoing it back through opEmitter. */
-    fun applySpectatorOp(op: Op) {
+    /**
+     * Host side of co-op v4: apply an edit a guest made, as if it were a local edit — undoable,
+     * persisted, and emitted HERE, on the main thread, in the same stream as the host's own edits.
+     * Emitting at apply time (not when the frame arrived on the session thread) is what makes the
+     * host's send order equal its apply order, so host and guest converge when both edit at once.
+     *
+     * Undo snapshots the mode the op touches, not the host's active mode. A DesignBitmapReplace is
+     * applied but not made undoable: history snapshots strip the bitmap and compare URIs, so an undo
+     * entry for it would restore nothing.
+     *
+     * [hostedArStandalone]: whether the session was hosted on standalone SphereSLAM. A guest's AR
+     * placement is in that backend's frame, so it belongs in that backend's persisted slot. When the
+     * slot the editor currently exposes is the OTHER one (the host is in another mode, so the
+     * standalone slot is not swapped in), the placement is written straight to the hosted slot
+     * instead — not undoable from here, since undo only covers the exposed slot.
+     */
+    fun applyGuestOp(op: Op, hostedArStandalone: Boolean = standaloneArBackendActive) {
+        if (op is Op.ModeTransform && op.mode == EditorMode.AR.name && hostedArStandalone != standaloneArBackendActive) {
+            persistHiddenArSlot(op.adjustment, standalone = hostedArStandalone)
+            opEmitter.emit(op)
+            return
+        }
+        when (op) {
+            is Op.ModeTransform -> runCatching { EditorMode.valueOf(op.mode) }.getOrNull()?.let { mode ->
+                history.pushProperty(
+                    currentDesignSnapshot(), mode, _uiState.value.modeAdjustments[mode] ?: ModeAdjustment(),
+                )
+                updateHistoryCounts()
+            }
+            is Op.DesignBitmapReplace -> Unit
+            else -> pushHistory()
+        }
+        applySpectatorOp(op) {
+            saveProject()
+            opEmitter.emit(op)
+        }
+    }
+
+    /** Write [adjustment] into the AR slot the editor is not exposing; see [applyGuestOp]. */
+    private fun persistHiddenArSlot(adjustment: ModeAdjustment, standalone: Boolean) {
+        val projectId = _uiState.value.projectId ?: return
+        viewModelScope.launch(dispatchers.main) {
+            editorSaveMutex.withLock {
+                withContext(dispatchers.io) {
+                    try {
+                        projectRepository.updateProject { current ->
+                            when {
+                                current.id != projectId -> current
+                                standalone -> current.copy(
+                                    sphereSlamModeAdjustment = adjustment,
+                                    // Authored in the live session's frame: the current wall generation.
+                                    sphereSlamPlacementAnchorGeneration =
+                                        if (current.sphereSlamReferenceUri != null) {
+                                            current.sphereSlamAnchorGeneration
+                                        } else {
+                                            current.sphereSlamPlacementAnchorGeneration
+                                        },
+                                    lastModified = System.currentTimeMillis(),
+                                )
+                                else -> current.copy(
+                                    modeAdjustments = current.modeAdjustments + (EditorMode.AR.name to adjustment),
+                                    lastModified = System.currentTimeMillis(),
+                                )
+                            }
+                        }
+                    } catch (e: Exception) {
+                        if (e is kotlinx.coroutines.CancellationException) throw e
+                        android.util.Log.e("EditorViewModel", "guest AR placement save failed", e)
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Applies a remote Op received from the host, without echoing it back through opEmitter.
+     * [onApplied] runs once the op's state is in place (after the async decode, for a bitmap op).
+     */
+    fun applySpectatorOp(op: Op, onApplied: () -> Unit = {}) {
         when (op) {
             is Op.DesignReplace -> dispatch(EditorIntent.RestoreDesign(op.design))
             is Op.DesignTransform -> {
@@ -1362,15 +1442,18 @@ class EditorViewModel @Inject constructor(
                     }
                     withContext(dispatchers.main) {
                         _uiState.update { s -> s.copy(design = s.design?.copy(bitmap = decoded)) }
+                        onApplied()
                     }
                 }
+                return // onApplied runs after the decode, above
             }
             // Authoring ops a peer running the design-side build may still send. This app no longer
             // edits pixels or text, so there is nothing to apply — accepted and ignored rather than
             // breaking the session over a frame it merely doesn't use.
-            is Op.StrokeComplete -> Unit
-            is Op.TextContentChange -> Unit
+            is Op.StrokeComplete -> return
+            is Op.TextContentChange -> return
         }
+        onApplied()
     }
 
     // ── Internals ─────────────────────────────────────────────────────────────

@@ -90,6 +90,8 @@ the real (non-stub) tracker is packaged.
 *   `HybridMetricKpmReference.kt`: derives a physical rectangle from the ARCore wall plane,
     perspective-rectifies the captured sensor image to that physical aspect, and computes explicit
     KPM DPI/centered page geometry; a raw perspective photo is never treated as metric.
+*   `HybridKpmPage.kt`: the persisted form of a hybrid KPM page (raw luma, pixel size, metric width,
+    `page_from_artwork`) with validation; DPI/geometry are recomputed on restore, never stored.
 *   `anchor/HybridPageFrame.kt`: pure ARCore/KPM frame conversion
     (`world_from_page`, `page_from_artwork`) with world-rebase-invariant math.
 *   `anchor/HybridPoseHistory.kt`: bounded timestamp history pairing asynchronous KPM observations

@@ -99,6 +99,19 @@ internal data class DeltaPayload(val seq: Long, val op: Op)
 @Serializable
 internal data class DeltaAckPayload(val lastSeq: Long)
 
+/**
+ * A guest's edit (v4). [guestSeq] is the guest's own monotonic counter within [guestInstance] (one
+ * random id per GuestSession), so the host can drop a resend it already applied after a reconnect.
+ * The host applies the op, then emits it in its own DELTA sequence at apply time: that single host
+ * order is what both peers converge on when host and guest edit the same thing concurrently.
+ */
+@Serializable
+internal data class GuestOpPayload(val guestInstance: String, val guestSeq: Long, val op: Op)
+
+/** Host → guest: every guest op with guestSeq <= [lastGuestSeq] has been handled (applied or refused). */
+@Serializable
+internal data class GuestOpAckPayload(val lastGuestSeq: Long)
+
 @Serializable
 internal data class BulkAckPayload(val lastSeq: Long)
 

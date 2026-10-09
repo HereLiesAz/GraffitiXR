@@ -57,6 +57,11 @@ class ProjectManager @Inject constructor(
 
     companion object {
         private const val SPECTATOR_PREFIX = "coop_"
+        /** Filename shape of [saveHybridKpmPage] output; [deleteHybridKpmPage] refuses anything else. */
+        private const val HYBRID_KPM_PAGE_PREFIX = "hybrid_kpm_page_"
+        private const val HYBRID_KPM_PAGE_SUFFIX = ".y8.gz"
+        /** Generous ceiling (4096²) over the 1024-px capture cap, so a bad manifest cannot OOM. */
+        private const val MAX_HYBRID_KPM_PAGE_BYTES = 4096 * 4096
         /**
          * Cap on total decompressed bytes accepted from an imported/peer-received `.gxr` archive.
          * Both sources are untrusted (a shared file, or the co-op wire), so a zip bomb must not
@@ -145,7 +150,7 @@ class ProjectManager @Inject constructor(
         // map and cloud anchor id can each legitimately be set on a routine (non-fingerprint) save
         // (e.g. the passive wall-map save), so those instead only fall back to the on-disk value when
         // the incoming project doesn't set one, same as the legacy target-fingerprint references.
-        val incoming = if (preserveExistingCaptureState && projectData.fingerprint == null) {
+        val mergedCapture = if (preserveExistingCaptureState && projectData.fingerprint == null) {
             val existing = try {
                 val f = File(root, "project.json")
                 if (f.exists()) json.decodeFromString<GraffitiProject>(f.readText()) else null
@@ -281,6 +286,7 @@ class ProjectManager @Inject constructor(
                 )
             } else projectData
         } else projectData
+        val incoming = preserveHybridKpmPage(root, mergedCapture, preserveExistingCaptureState)
 
         val thumbnailUri = if (thumbnail != null) {
             val file = File(root, "thumbnail.png")
@@ -418,6 +424,107 @@ class ProjectManager @Inject constructor(
         if (file.parentFile == root && validName) {
             runCatching { file.delete() }
         }
+    }
+
+    /**
+     * The hybrid KPM page's six fields are one unit keyed on its URI, written only by the hybrid
+     * persist transform (saveProjectExact, which bypasses this). A stale whole-object writer that
+     * carries no page must not erase it — with OR without a fingerprint in hand: a snapshot taken
+     * after a target's fingerprint saved but before its page committed carries the fingerprint and
+     * would skip the fingerprint-null merge above. Keeping an older page is safe: it restores only
+     * while the project's fingerprint matches its key.
+     */
+    private fun preserveHybridKpmPage(
+        root: File,
+        project: GraffitiProject,
+        preserve: Boolean,
+    ): GraffitiProject {
+        if (!preserve || project.hybridKpmPageUri != null) return project
+        val existing = try {
+            val f = File(root, "project.json")
+            if (f.exists()) json.decodeFromString<GraffitiProject>(f.readText()) else null
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        } ?: return project
+        if (existing.hybridKpmPageUri == null) return project
+        return project.copy(
+            hybridKpmPageUri = existing.hybridKpmPageUri,
+            hybridKpmPageWidthPx = existing.hybridKpmPageWidthPx,
+            hybridKpmPageHeightPx = existing.hybridKpmPageHeightPx,
+            hybridKpmPageWidthMeters = existing.hybridKpmPageWidthMeters,
+            hybridKpmPageFromArtwork = existing.hybridKpmPageFromArtwork,
+            hybridKpmFingerprintKey = existing.hybridKpmFingerprintKey,
+        )
+    }
+
+    /**
+     * Writes the hybrid (ARCore-sidecar) KPM page as gzip'd raw 8-bit luma and returns its URI.
+     *
+     * Raw luma rather than PNG: the matcher consumes luma, and a grey ARGB bitmap round trip through
+     * PNG and back through a luma formula is not guaranteed bit-exact. Versioned filename, temp file,
+     * fsync, rename — the same commit discipline as [saveSphereSlamReference].
+     */
+    suspend fun saveHybridKpmPage(
+        context: Context,
+        projectId: String,
+        luma: ByteArray,
+    ): Uri = withContext(Dispatchers.IO) {
+        require(luma.isNotEmpty())
+        val root = File(context.filesDir, "projects/$projectId").also { if (!it.exists()) it.mkdirs() }
+        val target = File(root, "${HYBRID_KPM_PAGE_PREFIX}${UUID.randomUUID()}$HYBRID_KPM_PAGE_SUFFIX")
+        val tmp = File.createTempFile(HYBRID_KPM_PAGE_PREFIX, ".tmp", root)
+        try {
+            FileOutputStream(tmp).use { out ->
+                java.util.zip.GZIPOutputStream(out).let { gz ->
+                    gz.write(luma)
+                    gz.finish()
+                }
+                out.flush()
+                out.fd.sync()
+            }
+            check(tmp.renameTo(target)) { "Could not install hybrid KPM page" }
+        } finally {
+            if (tmp.exists()) tmp.delete()
+        }
+        uriProvider.getUriForFile(target)
+    }
+
+    /**
+     * Reads a page written by [saveHybridKpmPage]. Returns null — never a partial or padded buffer —
+     * when the file is missing, unreadable, or does not hold exactly [expectedBytes] bytes.
+     */
+    suspend fun readHybridKpmPage(uri: Uri, expectedBytes: Int): ByteArray? = withContext(Dispatchers.IO) {
+        // The size comes from project.json, which may be an imported or peer-sent manifest; refuse
+        // anything a real page (≤ 1024 px per side at capture) could not be, before allocating.
+        if (expectedBytes <= 0 || expectedBytes > MAX_HYBRID_KPM_PAGE_BYTES) return@withContext null
+        val path = uri.path ?: return@withContext null
+        runCatching {
+            java.util.zip.GZIPInputStream(File(path).inputStream().buffered()).use { gz ->
+                val out = ByteArray(expectedBytes)
+                var read = 0
+                while (read < expectedBytes) {
+                    val n = gz.read(out, read, expectedBytes - read)
+                    if (n < 0) return@use null
+                    read += n
+                }
+                if (gz.read() != -1) null else out
+            }
+        }.getOrNull()
+    }
+
+    /** Best-effort deletion of a hybrid KPM page owned by [projectId]; never outside its directory. */
+    suspend fun deleteHybridKpmPage(
+        context: Context,
+        projectId: String,
+        uri: Uri?,
+    ) = withContext(Dispatchers.IO) {
+        val path = uri?.path ?: return@withContext
+        val root = File(context.filesDir, "projects/$projectId").canonicalFile
+        val file = File(path).canonicalFile
+        val validName = file.name.startsWith(HYBRID_KPM_PAGE_PREFIX) && file.name.endsWith(HYBRID_KPM_PAGE_SUFFIX)
+        if (file.parentFile == root && validName) runCatching { file.delete() }
     }
 
     /** Write one additional rectified KPM page without changing canonical page 0. */
@@ -751,7 +858,25 @@ class ProjectManager @Inject constructor(
                 },
                 evolutionImageUris = migrated.evolutionImageUris.map { localUri(it)!! },
                 targetFingerprintPath = migrated.targetFingerprintPath?.let { localPath(it).absolutePath },
-            )
+            ).let { relocated ->
+                // The hybrid page is an optional accelerator, not project content: a sender's
+                // archive that lacks the file drops the page rather than failing the whole import.
+                val hybridUri = migrated.hybridKpmPageUri?.let { uri ->
+                    runCatching { localUri(uri) }.getOrNull()
+                }
+                if (hybridUri != null) {
+                    relocated.copy(hybridKpmPageUri = hybridUri)
+                } else {
+                    relocated.copy(
+                        hybridKpmPageUri = null,
+                        hybridKpmPageWidthPx = 0,
+                        hybridKpmPageHeightPx = 0,
+                        hybridKpmPageWidthMeters = 0f,
+                        hybridKpmPageFromArtwork = emptyList(),
+                        hybridKpmFingerprintKey = emptyList(),
+                    )
+                }
+            }
         }
     }
 
