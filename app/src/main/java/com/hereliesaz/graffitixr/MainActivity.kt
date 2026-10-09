@@ -431,6 +431,10 @@ class MainActivity : ComponentActivity() {
                 val editorUiState by editorViewModel.uiState.collectAsState()
                 val railExpansion by editorViewModel.railExpansion.collectAsState()
                 val mainUiState by mainViewModel.uiState.collectAsState()
+                // Own the whole AzNavRail drawer state so Trace -> Freeze can collapse it
+                // deterministically and, just as importantly, unfreezing cannot resurrect whatever
+                // expanded state the uncontrolled rail happened to hold beforehand.
+                var railMenuExpanded by rememberSaveable { mutableStateOf(false) }
                 val arUiState by arViewModel.uiState.collectAsState()
                 val crashReportingConsent by settingsViewModel.crashReportingConsent.collectAsState()
                 val crashReportToken by settingsViewModel.crashReportToken.collectAsState()
@@ -824,7 +828,10 @@ class MainActivity : ComponentActivity() {
                     // AzNavRail 11.54 supports a controlled drawer state. Freeze is a true hands-off
                     // tracing mode, so force the expanded drawer closed while locked instead of
                     // trusting an uncontrolled menu to collapse itself after the click.
-                    expanded = if (mainUiState.isTouchLocked) false else null,
+                    expanded = if (mainUiState.isTouchLocked) false else railMenuExpanded,
+                    onExpandedChange = { requested ->
+                        if (!mainUiState.isTouchLocked) railMenuExpanded = requested
+                    },
                     disableSwipeToOpen = mainUiState.isTouchLocked,
                 ) {
                     azTheme(
@@ -979,8 +986,9 @@ class MainActivity : ComponentActivity() {
                         LaunchedEffect(mainUiState.isTouchLocked) {
                             if (mainUiState.isTouchLocked) {
                                 // Complete Guide contract: isFoldedUp is the stationary noMenu
-                                // rail's programmatic fold state. noMenu is also true while frozen,
-                                // and the host drawer is controlled closed above.
+                                // rail's programmatic fold state. Freeze also owns the controlled
+                                // drawer state, so no pre-Freeze expansion can reappear on unlock.
+                                railMenuExpanded = false
                                 hostScope.isFoldedUp = true
                             }
                         }
