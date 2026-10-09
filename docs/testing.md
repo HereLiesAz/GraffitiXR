@@ -36,10 +36,9 @@ rather than ordinary feature behavior:
 
 *Note: The relocalization and confidence/progress logic itself — `MobileGS::runRelocPass`
 (background PnP snap-back), the distortion-head crop, `MobileGS::tryUpdateFingerprint`'s fallback —
-runs entirely in the C++ layer and has **no automated coverage of any kind**, JVM or native. The
-tests above guard the JNI *boundary* (signatures, contracts, sequencing) — they do not verify the
-relocalization algorithm itself. See §2 below for the only verification that currently exists for
-that code.*
+runs entirely in the C++ layer and has no automated coverage of its *algorithmic* correctness. The
+tests above guard the JNI *boundary* (signatures, contracts, sequencing); §2's host-native tests
+cover the fallback tracker's pose math and fingerprint-replacement state, not reloc accuracy.*
 
 ### Mock patterns
 
@@ -74,12 +73,30 @@ every { context.getSystemService(Context.CAMERA_SERVICE) } returns cameraManager
 ~~~
 
 ## 2. Native Tests (C++)
-No automated C++ test runner is integrated, and there is no on-device visual debug pipeline for it
-either — there is no 3D map or surface-normal visualization to inspect (see `NATIVE_ENGINE.md`). The
-only coverage of native code is the JVM-side JNI-boundary tests in the table above, plus the "Wall
-Test" in §4 below. This is a real gap: the relocalization algorithm's actual correctness (match
-quality, PnP accuracy, drift-correction behaviour) is currently unverified by any repeatable test —
-see `docs/research/EVALUATION.md` for the state of that effort.
+**Host-native GoogleTest suite** — `core/nativebridge/src/test/cpp/`, run with
+`tools/run_native_host_tests.sh` (CI: Android CI ▸ unit-tests ▸ "Native host unit tests"). It
+compiles the SAME production sources (`HomographyTracker.cpp`, `MobileGS.cpp`, the ONNX wrappers)
+for x86-64 against host OpenCV 4 + GoogleTest, with one-file shims in `shim/` for Android/GL/JNI
+headers the tested paths never call. Local setup (Ubuntu): `apt-get install cmake g++ libopencv-dev
+libgtest-dev`.
+
+| Test | Pins |
+|---|---|
+| `HomographyTrackerTest` | Known-answer pose: frames synthesised from a chosen GL pose via the GL pinhole model written out longhand; the tracker must recover it. Mutation-checked: re-introducing the old `C·R·C` flip fails both pose tests. |
+| `MobileGSFingerprintStateTest` | `restoreWallFingerprint` / `alignToFingerprint` clear the previous fingerprint's capture view, anchor, intrinsics (and, for the restore, the canonical patch); malformed peer bytes change nothing. Private state via the `MobileGSTestPeer` friend. Mutation-checked. |
+| `FrameBufferGuardTest` | `include/FrameBufferGuard.h`, the bounds arithmetic of `nativeFeedYuvFrame`, `nativeFeedColorFrame`, `nativeYuvToRgbaBitmap`, incl. 32-bit wrap. |
+
+**OpenCV 4 vs 5:** the device links OpenCV 5; the host suite builds against 4. Only APIs present in
+both compile — if production code adopts a 5-only API the host build fails loudly rather than
+testing something else (`shim/opencv2/geometry.hpp` covers the one header 5 split out).
+
+Still uncovered: reloc match quality, PnP accuracy and drift-correction behaviour — see
+`docs/research/EVALUATION.md`. There is no on-device visual debug pipeline either (see
+`NATIVE_ENGINE.md`).
+
+**Robolectric** — `:core:data` (persistence) and `:core:common` (`CameraIntrinsicsEstimatorCameraIdTest`:
+the Camera2 id → `CameraManager` → intrinsics seam every CameraX tracking path uses) run framework
+classes the stub `android.jar` cannot.
 
 ## 3. UI / Instrumented Tests
 There are currently **no `src/androidTest/` directories anywhere in this repository** — no

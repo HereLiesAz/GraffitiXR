@@ -46,6 +46,66 @@ internal class GuestSession(
     // with keys bound to an already-dead connection.
     @Volatile private var activeCrypto: SessionCrypto? = null
 
+    // ── Protocol v4: this guest's own edits ──────────────────────────────────────────────────
+    private val outbox = GuestOutbox()
+    // Identifies this GuestSession to the host's dedupe; a new instance restarts guestSeq at 1.
+    private val guestInstance: String = java.util.UUID.randomUUID().toString()
+    // The live connection's stream/crypto for flushing the outbox; null outside the live phase.
+    @Volatile private var liveOutput: OutputStream? = null
+    @Volatile private var liveCrypto: SessionCrypto? = null
+    // From BULK_BEGIN; GuestOpPolicy needs it. Kept across a replay-only reconnect (same host).
+    @Volatile private var hostBackend: CoopTrackingBackend? = null
+    // Highest guestSeq written on the CURRENT connection, and highest the host has acknowledged.
+    // A new connection rewinds the first to the second, so unacknowledged edits are resent.
+    @Volatile private var lastSentGuestSeq: Long = 0L
+    @Volatile private var lastAckedGuestSeq: Long = 0L
+    private val flushMutex = Mutex()
+    // True once a host snapshot is installed locally (Live reached). Until then the local project is
+    // whatever the guest had open before joining — or, after a host restart, a baseline about to be
+    // replaced — so an edit made against it must not be queued for the host.
+    @Volatile private var snapshotInstalled = false
+    // Set when this guest replaced its design locally (a refused DesignReplace). Its later design
+    // ops — the paired DesignBitmapReplace, transforms, props, placements — describe THAT local
+    // design, not the host's, so they are refused too until the host's design is back (a bulk
+    // snapshot or the host's own DesignReplace).
+    @Volatile private var designDiverged = false
+
+    /**
+     * Send one of this guest's own edits to the host. Returns false — and sends nothing — when the
+     * host would refuse it ([GuestOpPolicy]) or it cannot fit a single sealed frame; the caller
+     * reports that the edit stays local. Otherwise the edit is queued until acknowledged, surviving
+     * a reconnect, and the host's re-broadcast of it arrives back as an ordinary DELTA.
+     */
+    fun sendOp(op: Op): Boolean {
+        if (phase == Phase.Ended || !snapshotInstalled) return false
+        if (op is Op.DesignReplace) designDiverged = true
+        if (designDiverged) return false
+        if (!GuestOpPolicy.allows(op, hostBackend, localBackend)) return false
+        val maxPlaintext = Frame.MAX_PAYLOAD_BYTES - SessionCrypto.SEAL_OVERHEAD_BYTES
+        if (OpCodec.encode(GuestOpPayload(guestInstance, Long.MAX_VALUE, op)).size > maxPlaintext) return false
+        outbox.add(op)
+        scope.launch { flushOutbox() }
+        return true
+    }
+
+    /** Write every queued edit not yet sent on this connection. A write failure leaves them queued. */
+    private suspend fun flushOutbox() {
+        flushMutex.withLock {
+            val output = liveOutput ?: return
+            val crypto = liveCrypto ?: return
+            if (phase != Phase.Live) return
+            for ((seq, op) in outbox.pendingAfter(lastSentGuestSeq)) {
+                try {
+                    writeSecure(output, crypto, FrameType.GUEST_OP, OpCodec.encode(GuestOpPayload(guestInstance, seq, op)))
+                    lastSentGuestSeq = seq
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    return // the read loop notices the dead socket and reconnects; the op stays queued
+                }
+            }
+        }
+    }
+
     private fun randomNonce(): ByteArray = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
     // Guards the check-then-set phase transition in attemptReconnect(): the inbound loop and a
     // failed PONG write can race into it, and without the lock each would run its own full
@@ -165,6 +225,13 @@ internal class GuestSession(
                         // fresh join (lastAppliedSeq == 0), which triggers a full bulk re-sync.
                         sessionId = null
                         lastAppliedSeq = 0L
+                        // Edits queued for the old host session may or may not have been applied
+                        // there; replaying them onto a new host session's freshly bulk-synced project
+                        // could overwrite newer host edits. The fresh bulk is the new baseline.
+                        outbox.clear()
+                        snapshotInstalled = false
+                        lastAckedGuestSeq = 0L
+                        lastSentGuestSeq = 0L
                         try { s.close() } catch (_: Exception) {}
                         socket = null
                         return false
@@ -188,6 +255,7 @@ internal class GuestSession(
                         // start with one.
                         require(isReconnect) { "expected BULK_BEGIN for a fresh join, got ${first.type}" }
                     }
+                    snapshotInstalled = true
                     // The host's own name, now that HELLO_OK carries it. Falls back to "host" for
                     // a peer that predates the field — the same string this used to hard-code.
                     _state.value = CoopSessionState.Connected(
@@ -230,10 +298,13 @@ internal class GuestSession(
         crypto: SessionCrypto,
     ) {
         require(begin.type == FrameType.BULK_BEGIN)
+        // A snapshot replaces whatever design this guest had diverged to.
+        designDiverged = false
         val beginPayload = OpCodec.decode<BulkBeginPayload>(begin.payload)
         require(beginPayload.spatialFrame.supportsGuest(localBackend)) {
             "host spatial frame is incompatible with $localBackend"
         }
+        hostBackend = beginPayload.spatialFrame.hostBackend
 
         val fingerprint = receiveChunked(input, crypto, FrameType.BULK_FINGERPRINT, beginPayload.fingerprintBytes)
         val project = receiveChunked(input, crypto, FrameType.BULK_PROJECT, beginPayload.projectBytes)
@@ -290,6 +361,17 @@ internal class GuestSession(
         // this loop's first iteration instead of being re-read (and lost) from the socket.
         firstFrame: Frame.FrameRead? = null,
     ) {
+        // A new connection: resend every edit the host has not acknowledged. The rewind happens
+        // under flushMutex so a flush still finishing on the previous connection can't advance
+        // lastSentGuestSeq past it afterwards.
+        scope.launch {
+            flushMutex.withLock {
+                liveOutput = output
+                liveCrypto = crypto
+                lastSentGuestSeq = lastAckedGuestSeq
+            }
+            flushOutbox()
+        }
         scope.launch {
             var pending = firstFrame
             while (scope.isActive) {
@@ -306,6 +388,8 @@ internal class GuestSession(
                         FrameType.DELTA -> {
                             val delta = OpCodec.decode<DeltaPayload>(frame.payload)
                             if (delta.seq > lastAppliedSeq) {
+                                // The host's design replaces this guest's local one: shared again.
+                                if (delta.op is Op.DesignReplace) designDiverged = false
                                 onOp(delta.op)
                                 lastAppliedSeq = delta.seq
                             }
@@ -321,6 +405,13 @@ internal class GuestSession(
                         FrameType.BYE -> {
                             val bye = OpCodec.decode<ByePayload>(frame.payload)
                             close(bye.reason); return@launch
+                        }
+                        FrameType.GUEST_OP_ACK -> {
+                            val ack = OpCodec.decode<GuestOpAckPayload>(frame.payload)
+                            if (ack.lastGuestSeq > lastAckedGuestSeq) {
+                                lastAckedGuestSeq = ack.lastGuestSeq
+                                outbox.ackUpTo(ack.lastGuestSeq)
+                            }
                         }
                         else -> { /* ignore */ }
                     }
@@ -357,6 +448,8 @@ internal class GuestSession(
             phase = Phase.Reconnecting
         }
         _state.value = CoopSessionState.Reconnecting
+        liveOutput = null
+        liveCrypto = null
         try { socket?.close() } catch (_: Exception) {}
         socket = null
         activeCrypto = null

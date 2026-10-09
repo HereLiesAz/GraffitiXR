@@ -195,6 +195,43 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    // ── Host side of co-op v4: edits a connected guest made ─────────────────────────────────
+    // Collected HERE, for the ViewModel's lifetime, rather than in an Activity-scoped effect: the
+    // host session acknowledges a guest edit on arrival, so one that reached a collector that was
+    // being torn down (Activity recreation) would be acked and never applied. Unbounded on purpose
+    // for the same reason; HostSession rate-limits the only large op (DesignBitmapReplace).
+    private val pendingGuestOps = ArrayDeque<com.hereliesaz.graffitixr.common.model.Op>()
+    @Volatile private var guestOpHandler: ((com.hereliesaz.graffitixr.common.model.Op) -> Unit)? = null
+
+    init {
+        viewModelScope.launch {
+            collaborationManager.guestOps.collect { op ->
+                val handler = synchronized(pendingGuestOps) {
+                    guestOpHandler ?: run { pendingGuestOps.addLast(op); null }
+                }
+                handler?.invoke(op)
+            }
+        }
+    }
+
+    /**
+     * Wire the editor that applies guest edits on the host (EditorViewModel.applyGuestOp). Drains
+     * any backlog first, in order, before publishing — the same FIFO discipline as
+     * [setSpectatorOpHandler].
+     */
+    fun setGuestOpHandler(handler: (com.hereliesaz.graffitixr.common.model.Op) -> Unit) {
+        while (true) {
+            val op = synchronized(pendingGuestOps) {
+                if (pendingGuestOps.isEmpty()) {
+                    guestOpHandler = handler
+                    return
+                }
+                pendingGuestOps.removeFirst()
+            }
+            handler(op)
+        }
+    }
+
     /** Invokes the handler, or buffers the op (drop-oldest past the cap) until one is wired. */
     private fun dispatchSpectatorOp(op: com.hereliesaz.graffitixr.common.model.Op) {
         val handler = synchronized(pendingSpectatorOps) {
@@ -251,10 +288,11 @@ class ArViewModel @Inject constructor(
     /**
      * Tell a guest, once per session, that an edit they just made is theirs alone.
      *
-     * The co-op protocol is host-broadcast: a guest receives the host's ops and has no channel to
-     * send its own. That is a real limitation, but the failure mode before this was silence — the
-     * edit applied locally, reached nobody, and the two canvases diverged with neither side told.
-     * Once per session, because the point is to explain the mode, not to nag every gesture.
+     * Since co-op protocol v4 a guest's edits ARE sent to the host. This now fires only for the
+     * ones that cannot be: an AR placement between devices on different tracking backends (each
+     * expresses it in its own wall frame) or an edit too large for one frame. Silence there would
+     * leave the two canvases diverging with neither side told. Once per session, because the point
+     * is to explain the limit, not to nag every gesture.
      */
     private fun observeDroppedGuestEdits() {
         guestEditDropJob?.cancel()
@@ -265,7 +303,7 @@ class ArViewModel @Inject constructor(
                 reportedGuestEditDrop = true
                 _feedback.tryEmit(
                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                        "You're viewing the host's project — your changes stay on this device"
+                        "That change can't be shared with the host — it stays on this device"
                     )
                 )
             }
@@ -1746,6 +1784,13 @@ class ArViewModel @Inject constructor(
                     ) {
                         loadMapIfExists()
                         loadFingerprintIfExists()
+                        // A page frozen this session commits once its own fingerprint lands.
+                        tryCommitPendingHybridPage(project)
+                        // Once per project, not per emission: re-arming KPM resets the sidecar.
+                        if (project.id != hybridRestoreProjectId) {
+                            hybridRestoreProjectId = project.id
+                            pushPersistedHybridPage(project)
+                        }
                     }
                 }
             }
@@ -3825,6 +3870,149 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    // Project whose persisted hybrid page was last offered to the renderer.
+    private var hybridRestoreProjectId: String? = null
+
+    // A page frozen this session, waiting for ITS fingerprint to commit. Guarded by [hybridLock]:
+    // written from the GL thread (renderer callbacks) and read from the project collector.
+    private val hybridLock = Any()
+    private var pendingHybridPage: HybridKpmPage? = null
+    // `fingerprint.captureAnchorCam` as it stood when the current capture started. The pending page
+    // commits only once the project's fingerprint has moved off this value — i.e. the capture that
+    // produced the page actually produced a fingerprint. A capture whose fingerprint build fails
+    // never commits its page, so a page can never be paired with a different capture's fingerprint.
+    private var hybridKeyAtCapture: List<Float>? = null
+    // Project the capture belongs to; a page never commits into a different project.
+    private var hybridCaptureProjectId: String? = null
+
+    /** Renderer: a new target capture started. Drop any uncommitted page from an earlier capture. */
+    private fun onHybridCaptureStarted() {
+        synchronized(hybridLock) {
+            pendingHybridPage = null
+            val project = projectRepository.currentProject.value
+            hybridCaptureProjectId = project?.id
+            hybridKeyAtCapture = project?.fingerprint?.captureAnchorCam ?: emptyList()
+        }
+    }
+
+    /** Renderer: page↔artwork relation frozen for this session's capture. */
+    private fun onHybridPageFrozen(page: HybridKpmPage) {
+        synchronized(hybridLock) {
+            if (hybridKeyAtCapture == null) return // no capture this session; nothing to bind to
+            pendingHybridPage = page
+        }
+        projectRepository.currentProject.value?.let(::tryCommitPendingHybridPage)
+    }
+
+    /** Commit the pending page iff [project] now carries the fingerprint of the capture behind it. */
+    private fun tryCommitPendingHybridPage(project: com.hereliesaz.graffitixr.common.model.GraffitiProject) {
+        val page: HybridKpmPage
+        val key: List<Float>
+        synchronized(hybridLock) {
+            val pending = pendingHybridPage ?: return
+            key = HybridKpmPage.commitKeyOrNull(
+                projectId = project.id,
+                captureProjectId = hybridCaptureProjectId,
+                fingerprintKey = project.fingerprint?.captureAnchorCam,
+                keyAtCapture = hybridKeyAtCapture,
+            ) ?: return // this capture's fingerprint has not landed (or never will)
+            pendingHybridPage = null
+            page = pending
+        }
+        persistHybridKpmPage(project.id, page, key)
+    }
+
+    /** Load [project]'s persisted hybrid KPM page off the main thread and hand it to the renderer. */
+    private fun pushPersistedHybridPage(project: com.hereliesaz.graffitixr.common.model.GraffitiProject) {
+        val uri = project.hybridKpmPageUri ?: return
+        val r = renderer ?: return
+        if (!HybridKpmPage.isBoundTo(project.fingerprint?.captureAnchorCam, project.hybridKpmFingerprintKey)) {
+            // Bound to a different (older) target, or the target was never committed: inert.
+            Timber.i("ARDIAG hybrid KPM page not restored: bound to a different target")
+            return
+        }
+        viewModelScope.launch(dispatchers.io) {
+            val luma = projectManager.readHybridKpmPage(
+                uri,
+                project.hybridKpmPageWidthPx * project.hybridKpmPageHeightPx,
+            )
+            val page = HybridKpmPage.fromPersisted(
+                luma = luma,
+                width = project.hybridKpmPageWidthPx,
+                height = project.hybridKpmPageHeightPx,
+                widthMeters = project.hybridKpmPageWidthMeters,
+                pageFromArtwork = project.hybridKpmPageFromArtwork,
+            )
+            // Only if the project and renderer are still the ones this was loaded for; the renderer
+            // itself refuses it if a capture has started since.
+            if (page != null && renderer === r && projectRepository.currentProject.value?.id == project.id) {
+                r.restoreHybridPage(page)
+            } else if (page == null) {
+                Timber.w("Persisted hybrid KPM page unreadable or inconsistent; sidecar stays off")
+            }
+        }
+    }
+
+    /**
+     * Persist a page bound to fingerprint [key]. Same commit discipline as the standalone reference:
+     * write a new versioned file, commit metadata through an exact transform that re-checks the
+     * project id AND that the fingerprint is still [key], then delete the superseded file — or the
+     * new one if it never became authoritative.
+     */
+    private fun persistHybridKpmPage(projectId: String, page: HybridKpmPage, key: List<Float>) {
+        viewModelScope.launch(dispatchers.io) {
+            var newUri: android.net.Uri? = null
+            var previousUri: android.net.Uri? = null
+            try {
+                newUri = projectManager.saveHybridKpmPage(appContext, projectId, page.luma)
+                val candidate = newUri
+                projectRepository.updateProject { current ->
+                    if (current.id != projectId || current.fingerprint?.captureAnchorCam != key) {
+                        current
+                    } else {
+                        previousUri = current.hybridKpmPageUri
+                        current.copy(
+                            hybridKpmPageUri = candidate,
+                            hybridKpmPageWidthPx = page.width,
+                            hybridKpmPageHeightPx = page.height,
+                            hybridKpmPageWidthMeters = page.widthMeters,
+                            hybridKpmPageFromArtwork = page.pageFromArtwork.toList(),
+                            hybridKpmFingerprintKey = key,
+                        )
+                    }
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Not fatal and never rethrown (an uncaught throw here would crash the app): the
+                // sidecar works for this session; only a reopen falls back to MobileGS.
+                Timber.e(e, "Hybrid KPM page save failed")
+            } finally {
+                // Decide from authoritative state, not a local flag: updateProject persists before it
+                // publishes, and can throw or be cancelled on either side of that.
+                withContext(NonCancellable) {
+                    val inMemory = newUri != null && projectRepository.currentProject.value
+                        ?.takeIf { it.id == projectId }?.hybridKpmPageUri == newUri
+                    val onDisk = newUri != null && runCatching {
+                        projectManager.loadProjectMetadata(appContext, projectId)?.hybridKpmPageUri == newUri
+                    }.getOrDefault(false)
+                    when {
+                        // Fully committed: the superseded file is unreferenced everywhere.
+                        inMemory && previousUri != newUri ->
+                            projectManager.deleteHybridKpmPage(appContext, projectId, previousUri)
+                        // Neither side references the new file: it never became authoritative.
+                        !inMemory && !onDisk ->
+                            projectManager.deleteHybridKpmPage(appContext, projectId, newUri)
+                        // Half-committed (on disk, not yet published): keep BOTH files. An orphan
+                        // is harmless; deleting the previous one could leave the in-memory project —
+                        // and the next save — pointing at a missing file.
+                        else -> Unit
+                    }
+                }
+            }
+        }
+    }
+
     fun attachSessionToRenderer(r: ArRenderer?) {
         // Synchronous on purpose. ArRenderer.attachSession() already guards the session read with
         // its own ReentrantLock and null-checks, and onDrawFrame swallows a torn-down session, so
@@ -3852,6 +4040,21 @@ class ArViewModel @Inject constructor(
                     if (e is kotlinx.coroutines.CancellationException) throw e
                     Timber.e(e, "Design size save failed")
                 }
+            }
+        }
+        renderer?.onHybridPageFrozen = ::onHybridPageFrozen
+        renderer?.onHybridPageInvalidated = ::onHybridCaptureStarted
+        // A fresh renderer has no hybrid page; offer it the persisted one.
+        projectRepository.currentProject.value?.let { project ->
+            if (
+                shouldRestoreLocalArCoreFingerprint(
+                    isArCoreAvailable = _uiState.value.isArCoreAvailable,
+                    coopRole = _uiState.value.coopRole,
+                    peerSpatialFramePresent = _uiState.value.coopPeerSpatialFrame != null,
+                )
+            ) {
+                hybridRestoreProjectId = project.id
+                pushPersistedHybridPage(project)
             }
         }
         // Re-apply the experiment switches to the FRESH renderer.
@@ -4684,6 +4887,9 @@ class ArViewModel @Inject constructor(
     }
 
     fun onScreenTap(nx: Float, ny: Float) {
+        // A co-op guest keeps the session's spatial frame: re-targeting re-anchors only this device
+        // and no Op carries it, so it would split the peers' frames.
+        if (_uiState.value.coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) return
         pendingTapPosition = nx to ny
         // Hand the tap to the renderer so it can measure the camera→point distance at that pixel
         // (and add a fusion support anchor) on the GL thread during capture.

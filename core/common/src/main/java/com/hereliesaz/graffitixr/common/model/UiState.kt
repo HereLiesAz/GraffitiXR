@@ -14,7 +14,9 @@ data class EvalLiveMetrics(
     val jitterMm: Float = 0f,
     val availability: Float = 0f,
     val recoveryMs: Long? = null,
-    val stageMs: FloatArray = FloatArray(5),
+    // -1 = "not measured" (the native sentinel), not 0: before the first sample a zero-filled
+    // array rendered as a measured 0.0 ms reloc cost.
+    val stageMs: FloatArray = FloatArray(5) { -1f },
     val batteryMa: Float = 0f,
     val wallCount: Int = 0, // live wall-fingerprint point count (reloc health / self-grow watch)
 )

@@ -204,9 +204,11 @@ an asynchronous matcher cannot publish a late observation from the superseded wa
 metric ARCore plane or rectification fails, hybrid KPM correction is simply unavailable; ARCore and
 MobileGS continue normally.
 
-The rectified hybrid page + page↔artwork relation are currently **runtime-only**. They are not yet
-restored after process death/project reopen; the durable MobileGS fingerprint remains the return-
-visit path until a new hybrid page is captured.
+The rectified hybrid page + page↔artwork relation are persisted with the project (`hybridKpmPage*`,
+see `docs/data_layer.md`) and bound to the target fingerprint they were frozen against. On reopen,
+the MobileGS fingerprint re-establishes the artwork anchor as before; the persisted page re-arms KPM
+on the first tracking frame (no ARCore page anchor needed), and observations from before the anchor
+lands are ignored.
 
 
 #### Live matching
@@ -482,9 +484,7 @@ ARCore teardown remains controlled by the renderer/session locking already prese
 
 The correction software path is implemented, but it is not yet production-validated:
 
-- the rectified hybrid KPM page and frozen `page_from_artwork` relation are runtime-only; project
-  reopen/process death currently falls back to the durable MobileGS fingerprint until a new hybrid
-  page is captured;
+- reopen persistence of the hybrid page is implemented but not device-validated;
 - current KPM gates cover metric frame, age, timestamp pairing, inliers, reprojection error, and
   finite matrices, but there is not yet a separate hard maximum correction-distance/angle rejection
   policy or repeated-observation agreement requirement before a large cold snap;

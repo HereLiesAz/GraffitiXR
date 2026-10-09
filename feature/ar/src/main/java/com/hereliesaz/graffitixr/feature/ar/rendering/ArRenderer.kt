@@ -760,6 +760,53 @@ class ArRenderer(
     // [hybridKpmDiagnostics]. Immutable data class, so a volatile reference swap is a safe publish.
     @Volatile private var lastHybridKpmDiagnostics =
         com.hereliesaz.graffitixr.common.model.HybridKpmDiagnostics()
+    // This session's freshly captured metric page, held until the page↔artwork relation freezes and
+    // the two can be persisted as one unit. Null for a restored page (already persisted) and after
+    // emit. GL-thread only.
+    private var hybridCapturedLuma: ByteArray? = null
+    private var hybridCapturedWidth = 0
+    private var hybridCapturedHeight = 0
+    private var hybridCapturedWidthMeters = 0f
+    // A persisted page waiting for the GL thread (needs live camera intrinsics to re-arm KPM).
+    @Volatile private var pendingHybridRestore: com.hereliesaz.graffitixr.feature.ar.HybridKpmPage? = null
+    // Set once this renderer has started a target capture. A persisted page belongs to a target
+    // from an earlier session; after a capture it can only be older than what this session holds,
+    // so restores are refused for the rest of the renderer's life (also closes the window where a
+    // slow IO read lands after the capture already discarded the queued restore).
+    @Volatile private var targetCaptureStarted = false
+    // Bumped every time an artwork anchor is established (capture confirm OR return-visit reloc).
+    // The page↔artwork relation may only freeze against an anchor established AFTER the hybrid
+    // page was captured: on a re-capture the old anchor is still live for a few frames and freezing
+    // against it pins the page to the placement being replaced.
+    private var anchorGeneration = 0L
+    // KPM observations at or before this frame timestamp predate the current anchor (GL thread).
+    private var hybridEligibleAfterNs = Long.MIN_VALUE
+    private var hybridCaptureAnchorGeneration = Long.MAX_VALUE
+
+    /**
+     * Emitted on the GL thread once a freshly captured metric page AND its page↔artwork relation
+     * exist, so the owner can persist them together. Handlers must hand off to another thread.
+     */
+    @Volatile var onHybridPageFrozen: ((com.hereliesaz.graffitixr.feature.ar.HybridKpmPage) -> Unit)? = null
+
+    /**
+     * Emitted on the GL thread when a new ARCore target capture begins. The owner must drop any
+     * frozen-but-uncommitted page from an earlier capture; it must NOT eagerly delete the persisted
+     * page, because a capture can still be cancelled or fail to produce a fingerprint, and the
+     * persisted page is bound to its fingerprint (see ArViewModel) and simply stops restoring once a
+     * newer fingerprint replaces it.
+     */
+    @Volatile var onHybridPageInvalidated: (() -> Unit)? = null
+
+    /**
+     * Queue a persisted hybrid page for re-arming on the next tracking frame. Dropped, not applied,
+     * if this session already has its own hybrid page or a capture is pending — a live capture is
+     * always newer than anything on disk.
+     */
+    fun restoreHybridPage(page: com.hereliesaz.graffitixr.feature.ar.HybridKpmPage?) {
+        if (targetCaptureStarted) return
+        pendingHybridRestore = page?.takeIf { it.isValid() }
+    }
     private val mappingViewMatrixScratch = FloatArray(16)
     private val backboneScratch = FloatArray(16)
     // Scratch for composing the overlay matrix (anchor frame * in-plane transform).
@@ -844,6 +891,8 @@ class ArRenderer(
         hybridPageFromArtworkAnchor = null
         lastHybridObservationTimestampNs = Long.MIN_VALUE
         lastHybridKpmDiagnostics = com.hereliesaz.graffitixr.common.model.HybridKpmDiagnostics()
+        hybridCapturedLuma = null
+        hybridCaptureAnchorGeneration = Long.MAX_VALUE
 
         // Capture-time replacement calls this from onDrawFrame while sessionLock is already held, so
         // detaching here is serialized with every other ARCore call. Off-GL teardown passes false and
@@ -855,6 +904,51 @@ class ArRenderer(
                 // Session teardown / an already-detached anchor is harmless here.
             }
             hybridPageAnchor = null
+        }
+    }
+
+    /**
+     * Re-arm KPM from a persisted page. GL thread only. No ARCore page anchor is created: the
+     * correction solve reads only `page_from_artwork` and the live artwork backbone.
+     */
+    private fun applyHybridRestore(
+        page: com.hereliesaz.graffitixr.feature.ar.HybridKpmPage,
+        intrinsics: com.google.ar.core.CameraIntrinsics,
+    ) {
+        try {
+            val dims = intrinsics.imageDimensions
+            val dpi = com.hereliesaz.sphereslam.SphereSlamPoseMath
+                .dpiForReferenceWidth(page.width, page.widthMeters)
+            sphereSlamTracker.reset(
+                com.hereliesaz.sphereslam.SphereSlamTracker.CameraModel(
+                    width = dims[0],
+                    height = dims[1],
+                    fx = intrinsics.focalLength[0],
+                    fy = intrinsics.focalLength[1],
+                    cx = intrinsics.principalPoint[0],
+                    cy = intrinsics.principalPoint[1],
+                )
+            )
+            sphereSlamTracker.setReference(
+                luma = java.nio.ByteBuffer.wrap(page.luma),
+                width = page.width,
+                height = page.height,
+                rowStride = page.width,
+                dpi = dpi,
+            )
+            hybridReferenceGeometry = com.hereliesaz.sphereslam.SphereSlamPoseMath
+                .pageGeometry(page.width, page.height, dpi)
+            hybridReferencePhysicallyMetric = true
+            hybridPageFromArtworkAnchor = page.pageFromArtwork.copyOf()
+            Timber.i(
+                "ARDIAG hybrid KPM page restored ${page.width}x${page.height} " +
+                    "wall=${page.widthMeters}m dpi=$dpi"
+            )
+        } catch (e: Exception) {
+            // A restore that cannot arm leaves the sidecar off, exactly as before persistence
+            // existed; the MobileGS return-visit path is unaffected.
+            resetHybridReference()
+            Timber.w(e, "ARDIAG hybrid KPM restore failed")
         }
     }
 
@@ -1674,6 +1768,12 @@ class ArRenderer(
                     // different event from the anchor itself changing. Reset unconditionally; a no-op
                     // on the session's first anchor, since correction starts null anyway.
                     poseFusion.reset()
+                    anchorGeneration++
+                    // KPM observations and pose-history samples from before this anchor existed
+                    // pair against a backbone that was not this anchor (e.g. a restored page that
+                    // armed during the return-visit scan). Drop them; only later frames may correct.
+                    hybridPoseHistory.clear()
+                    hybridEligibleAfterNs = frame.timestamp
                     anchorEstablished = true
                     // Announce it beyond the GL thread. This is the ONLY anchor write that counts as
                     // establishment — the plane refiner and the depth fallback both write poses
@@ -1778,12 +1878,29 @@ class ArRenderer(
                 hybridPoseHistory.add(frame.timestamp, mappingViewMatrix, backbone)
             }
 
+            // Re-arm a persisted hybrid page (SPHERESLAM_TODO §10 durable reopen). Taken exactly
+            // once; dropped if this session already owns a hybrid page or a capture is pending.
+            if (isTracking) {
+                pendingHybridRestore?.let { page ->
+                    pendingHybridRestore = null
+                    if (
+                        !captureRequested &&
+                        !targetCaptureStarted &&
+                        hybridReferenceGeometry == null &&
+                        hybridPageFromArtworkAnchor == null
+                    ) {
+                        applyHybridRestore(page, intrinsics)
+                    }
+                }
+            }
+
             // Freeze page-from-artwork exactly once while BOTH ARCore anchors are live. After this
             // point the relative transform is the coordinate contract; future ARCore global world
             // rebases multiply both anchors on the left and cancel out of this relation.
             if (
                 hybridPageFromArtworkAnchor == null &&
                 anchorEstablished &&
+                anchorGeneration > hybridCaptureAnchorGeneration &&
                 isTracking &&
                 activeAnchorCount() > 0
             ) {
@@ -1791,10 +1908,22 @@ class ArRenderer(
                 if (pageAnchor?.trackingState == TrackingState.TRACKING) {
                     val worldFromPage = FloatArray(16)
                     pageAnchor.pose.toMatrix(worldFromPage, 0)
-                    hybridPageFromArtworkAnchor =
+                    val relation =
                         com.hereliesaz.graffitixr.feature.ar.anchor.HybridPageFrame
                             .pageFromArtwork(worldFromPage, backbone)
+                    hybridPageFromArtworkAnchor = relation
                     Timber.i("ARDIAG hybrid KPM page↔artwork frame frozen")
+                    hybridCapturedLuma?.let { luma ->
+                        val page = com.hereliesaz.graffitixr.feature.ar.HybridKpmPage(
+                            luma = luma,
+                            width = hybridCapturedWidth,
+                            height = hybridCapturedHeight,
+                            widthMeters = hybridCapturedWidthMeters,
+                            pageFromArtwork = relation.copyOf(),
+                        )
+                        hybridCapturedLuma = null
+                        if (page.isValid()) onHybridPageFrozen?.invoke(page)
+                    }
                 }
             }
 
@@ -1807,7 +1936,8 @@ class ArRenderer(
                     sphereSlamTracker.isReferenceReady &&
                     hybridReferencePhysicallyMetric &&
                     hybridPageFromArtworkAnchor != null &&
-                    hybridObservation != null
+                    hybridObservation != null &&
+                    hybridObservation.timestampNs > hybridEligibleAfterNs
                 ) {
                     com.hereliesaz.graffitixr.feature.ar.anchor.HybridKpmCorrection.solve(
                         observation = hybridObservation,
@@ -2289,6 +2419,12 @@ class ArRenderer(
             if (captureRequested) {
                 captureRequested = false
                 resetHybridReference()
+                // A new target may replace the artwork anchor any hybrid relation is expressed
+                // against. Drop the queued restore and tell the owner; persistence is bound to the
+                // fingerprint, so nothing on disk needs touching here.
+                pendingHybridRestore = null
+                targetCaptureStarted = true
+                onHybridPageInvalidated?.invoke()
                 try {
                     frame.acquireCameraImage().use { image ->
                         val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
@@ -2455,6 +2591,13 @@ class ArRenderer(
                                 )
                                 hybridReferenceGeometry = reference.pageGeometry
                                 hybridReferencePhysicallyMetric = true
+                                // Held for persistence until the page↔artwork relation freezes
+                                // against an anchor established after this capture.
+                                hybridCaptureAnchorGeneration = anchorGeneration
+                                hybridCapturedLuma = reference.luma
+                                hybridCapturedWidth = reference.width
+                                hybridCapturedHeight = reference.height
+                                hybridCapturedWidthMeters = reference.widthMeters
 
                                 // page pose is known at capture from the SAME metric geometry. Turn
                                 // camera-from-page into world-from-page and let ARCore track that

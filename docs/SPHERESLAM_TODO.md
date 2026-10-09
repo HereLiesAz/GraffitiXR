@@ -111,7 +111,9 @@ This must happen before treating the branch as merge-ready.
 - [x] Compile the native `:core:nativebridge` target for every release ABI. Android CI release
   packaging verified `libgraffitixr.so` plus the KPM JNI symbols in both `arm64-v8a` and
   `armeabi-v7a`.
-- [ ] Build at least one debug APK containing artoolkitX KPM.
+- [x] Build at least one debug APK containing artoolkitX KPM. `assembleDebug` (2026-10-08) produced
+  a debug APK that `check_sphereslam_apk.py --variant debug` confirms carries the real (non-stub)
+  KPM native library, JNI symbols and preserved API classes for arm64-v8a and armeabi-v7a.
 - [x] Build the normal release artifact(s): Android CI `release-build` completed
   `assembleRelease` successfully with the real artoolkitX submodule initialized.
 - [x] Inspect the merged manifest and confirm (enforced by `check_sphereslam_manifest.py` in the
@@ -122,8 +124,11 @@ This must happen before treating the branch as merge-ready.
 - [x] Confirm ProGuard/R8 does not strip the KPM JNI entry points or standalone classes:
   `check_sphereslam_apk.py --variant release` passed against the shrunk release APK and found all
   required JNI symbols plus the preserved KPM/SphereSLAM DEX descriptors.
-- [ ] Confirm no duplicate native symbol/source issue was introduced by the explicit artoolkitX AR
-  source list.
+- [x] Confirm no duplicate native symbol/source issue was introduced by the explicit artoolkitX AR
+  source list. Moot in its original form: artoolkitX/KPM now arrives prebuilt in the SphereSLAM
+  0.23.5 artifacts and `core/nativebridge/src/main/cpp/CMakeLists.txt` compiles no artoolkitX
+  sources. Both the debug link (2026-10-08, local) and release link (CI) succeed, which a duplicate
+  strong symbol would fail.
 - [x] Add/enable CI for branch/PR validation; PR #1961 ran Android CI with the artoolkitX
   submodule enabled in the release-build job.
 - [x] Re-run release CI after the ARUtil/minizip/SHA-1 support-source fix; the release build
@@ -566,9 +571,21 @@ Implemented:
   - [x] freeze `page_from_artwork` only while both the page anchor and artwork consensus anchor
     are tracking;
   - [x] unit-test that `page_from_artwork` is invariant under a global ARCore world rebase.
-- [ ] Persist the hybrid rectified page plus page↔artwork relation across process restart/project
+- [x] Persist the hybrid rectified page plus page↔artwork relation across process restart/project
   reopen. PR #1970 keeps them runtime-only; a reopened project still falls back to the durable
-  MobileGS return-visit/fingerprint path until a new hybrid page is captured.
+  MobileGS return-visit/fingerprint path until a new hybrid page is captured. Now persisted as
+  `GraffitiProject.hybridKpmPage*` (gzip'd raw luma `hybrid_kpm_page_<uuid>.y8.gz`, pixel size,
+  metric width, `page_from_artwork`) plus `hybridKpmFingerprintKey` — the
+  `fingerprint.captureAnchorCam` of the target the relation was frozen against. The relation freezes
+  only against an anchor established AFTER the page's capture (re-captures no longer freeze against
+  the outgoing anchor); the page commits only once that capture's own fingerprint lands on the
+  project (a failed fingerprint build never commits its page), and restores only while the project's
+  fingerprint still matches the key, so an older page goes inert rather than wrong. Rebased on
+  import (dropped, not fatal, when the archive lacks the file), re-armed on the first tracking frame
+  of a later session with no ARCore page anchor (the solve needs only the relation + live backbone),
+  and refused for the rest of a session once a new capture starts. Corrections still require the artwork
+  anchor to be re-established first, which the MobileGS return-visit path does. Device validation
+  of a reopen-then-correct cycle is still open with the other §10 device items.
 - [x] Maintain a bounded ARCore pose/backbone history keyed by camera frame timestamp.
 - [x] Pair each asynchronous KPM observation with the nearest sensor-view + unfused consensus sample
   within a strict 40 ms timestamp window; no render-time pose substitution is allowed.
@@ -732,10 +749,21 @@ they were the same frame.
 - [ ] Measure standalone KPM matching time at representative CameraX resolutions.
 - [ ] Measure UI/preview FPS with KPM active.
 - [ ] Measure native heap and Java heap while tracking.
-- [ ] Confirm direct frame buffers are reused rather than allocated each frame.
-- [ ] Confirm pending work cannot queue unboundedly.
-- [ ] Add adaptive standalone analysis cadence if KPM exceeds the frame budget.
-- [ ] Preserve low latency over maximum throughput: drop stale frames instead of queueing them.
+- [x] Confirm direct frame buffers are reused rather than allocated each frame:
+  `SphereSlamStandaloneTrackingAnalyzer.directFrame` grows one direct buffer only when a frame is
+  larger and reuses it otherwise. (The heap `ByteArray` from `LumaFrameTransform.packCropAndRotate`
+  is still allocated per frame — a GC-pressure measurement item, not a direct-buffer leak.)
+- [ ] Confirm pending work cannot queue unboundedly. **Camera side done:** the analyzer does its
+  matching synchronously and the shared controller pins `STRATEGY_KEEP_ONLY_LATEST`, so at most one
+  camera frame waits (enforced by `tools/check_sphereslam_architecture.py` invariant 7). **Still
+  open:** each tracked frame's `onFrameTracked` → `SphereSlamStandaloneOverlay.consumeTrackedFrame`
+  posts a main-thread runnable without waiting, so a slow UI thread can accumulate per-frame updates
+  and replay stale ticks in a burst; coalesce to a latest-value update.
+- [ ] Add adaptive standalone analysis cadence if KPM exceeds the frame budget. KEEP_ONLY_LATEST
+  drops stale frames but does NOT throttle: when matching exceeds the budget the analyzer stays
+  continuously saturated. A match-duration-driven sampling interval is still required.
+- [x] Preserve low latency over maximum throughput: drop stale frames instead of queueing them
+  (`CameraPreview.rememberCameraController` now pins it rather than inheriting CameraX's default).
 - [ ] Measure battery/thermal behavior over a realistic mural session.
 - [ ] Verify background/pause stops CameraX analysis and IMU sampling.
 - [ ] Verify resume recreates/calibrates the standalone session cleanly.
