@@ -281,6 +281,8 @@ fun SphereSlamStandaloneOverlay(
      * independently of the fingerprint/teleological layer.
      */
     onPhotosphereKeyframe: (SphereSlamPhotosphereKeyframe) -> Unit = {},
+    /** Same-frame base-map to precision-target transform, solved only after a real KPM lock. */
+    onMapFromFingerprintSolved: (FloatArray) -> Unit = {},
     /**
      * Phase 2: optional monocular depth source. Non-null (feature-map flag on) opts this session into
      * depth-calibrated radial map-point placement; null is the classic wall-plane path. Owned by the
@@ -1065,6 +1067,7 @@ fun SphereSlamStandaloneOverlay(
                 },
                 onFrameTracked = ::consumeTrackedFrame,
                 cameraAttitude = cameraAttitude,
+                onMapFromFingerprintSolved = onMapFromFingerprintSolved,
                 onPhotosphereKeyframe = { keyframe ->
                     // Base-map update first so the current-tile read below observes the newly captured
                     // tile. This path works before a fingerprint/KPM pose exists.
