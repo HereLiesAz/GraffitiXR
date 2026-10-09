@@ -80,6 +80,18 @@ object PoseMath {
 
     fun translationOf(m: FloatArray) = floatArrayOf(m[12], m[13], m[14])
 
+    /** Euclidean length of the translation column of a rigid transform, in the matrix's own units. */
+    fun translationNorm(m: FloatArray): Float = sqrt(m[12] * m[12] + m[13] * m[13] + m[14] * m[14])
+
+    /**
+     * Rotation magnitude of a rigid transform in degrees, in [0, 180]. Uses |w| because q and -q
+     * are the same rotation; without it a rotation just past 180° would read as a tiny one.
+     */
+    fun rotationAngleDeg(m: FloatArray): Float {
+        val w = kotlin.math.abs(matrixToQuaternion(m)[3]).coerceIn(0f, 1f)
+        return Math.toDegrees(2.0 * kotlin.math.acos(w.toDouble())).toFloat()
+    }
+
     /** Extract a unit quaternion (x,y,z,w) from the rotation part of a column-major matrix. */
     fun matrixToQuaternion(m: FloatArray): FloatArray {
         val m00 = m[0]; val m10 = m[1]; val m20 = m[2]

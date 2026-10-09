@@ -5,6 +5,8 @@ import com.hereliesaz.graffitixr.common.model.CorroborationDiagnostics
 import com.hereliesaz.graffitixr.common.model.FusionDiagnostics
 import com.hereliesaz.graffitixr.common.model.FusionState
 import com.hereliesaz.graffitixr.common.model.GrowOutcome
+import com.hereliesaz.graffitixr.common.model.HybridKpmDiagnostics
+import com.hereliesaz.graffitixr.common.model.HybridKpmOutcome
 import com.hereliesaz.graffitixr.common.model.RelocDiagnostics
 import com.hereliesaz.graffitixr.common.model.RelocReject
 import org.junit.Assert.assertEquals
@@ -374,5 +376,30 @@ class DiagnosticRecorderTest {
         val out = r.report(emptyMap(), emptyMap(), emptyList())
         val row = out.lines().first { it.startsWith("| searchRadiusPx") }
         assertEquals("| searchRadiusPx | 12 | 12.500 | 12.500 | 2 |", row.trim())
+    }
+
+    @Test
+    fun `hybrid KPM section appears only when the sidecar evaluated something`() {
+        val quiet = recorder()
+        quiet.tick()
+        assertFalse(quiet.report(emptyMap(), emptyMap(), emptyList()).contains("HybridKPM"))
+
+        val r = recorder()
+        clock += 66L
+        r.record(
+            RelocDiagnostics(reject = RelocReject.OK, matches = 100, inliers = 80),
+            CorroborationDiagnostics(),
+            FusionDiagnostics(state = FusionState.HOLDING),
+            wallPoints = 500,
+            progress = 0.25f,
+            hybrid = HybridKpmDiagnostics(
+                outcome = HybridKpmOutcome.CORRECTION_TOO_LARGE,
+                inliers = 24, correctionMm = 1500f, correctionDeg = 2f,
+            ),
+        )
+        val report = r.report(emptyMap(), emptyMap(), emptyList())
+        assertTrue(report.contains("HybridKPM"))
+        assertTrue(report.contains("CORRECTION_TOO_LARGE"))
+        assertTrue(report.contains("hybridCorrectionMm"))
     }
 }
