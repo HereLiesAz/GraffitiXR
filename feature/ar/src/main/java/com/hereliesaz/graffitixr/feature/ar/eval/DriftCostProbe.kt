@@ -61,6 +61,8 @@ class DriftCostProbe(
         // the last frame of run one.
         lastFrameMs = -1L
         recentTranslations.clear()
+        // A new run must not display the previous run's last reading as if it were current.
+        lastMetrics = EvalLiveMetrics()
         return f
     }
 

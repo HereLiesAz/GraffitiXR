@@ -45,4 +45,9 @@ class StageTimingsTest {
         assertEquals("pnpRelocMs", EvalSampleLog.COLUMNS[EvalSampleLog.COLUMNS.indexOf("voxelUpdateMs") + 4])
         assertEquals(4, StageTimings.PNP_RELOC)
     }
+
+    @Test
+    fun `default live metrics render as unmeasured, not zero`() {
+        assertEquals("—", StageTimings.formatHud(com.hereliesaz.graffitixr.common.model.EvalLiveMetrics().stageMs))
+    }
 }
