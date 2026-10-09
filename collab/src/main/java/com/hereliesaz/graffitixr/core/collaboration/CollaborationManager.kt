@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -83,6 +84,8 @@ class CollaborationManager @Inject constructor() {
         snapshotProvider: () -> ProjectSnapshot,
     ): String {
         check(hostSession == null && guestSession == null) { "already in a session" }
+        // A previous session's undelivered guest edits belong to that session, not this one.
+        while (_guestOps.tryReceive().isSuccess) Unit
         val token = QrPayload.newToken()
         val session = HostSession(
             token = token,
@@ -90,6 +93,7 @@ class CollaborationManager @Inject constructor() {
             localDeviceName = localDeviceName,
             projectId = projectId,
             snapshotProvider = snapshotProvider,
+            onGuestOp = { op -> _guestOps.trySend(op) },
         )
         hostSession = session
         observe(session.state)
@@ -175,13 +179,14 @@ class CollaborationManager @Inject constructor() {
     }
 
     /**
-     * Signalled when an editor mutation is made in a session that cannot transmit it — i.e. as a
-     * guest, because the protocol is host-broadcast and there is no guest→host channel.
+     * Signalled when a guest makes an edit that cannot be shared: the host would refuse it (an AR
+     * placement between peers on different tracking backends — see
+     * [com.hereliesaz.graffitixr.core.collaboration.session.GuestOpPolicy]) or it is too large for
+     * one frame. Since protocol v4 every other guest edit IS sent; before v4 this fired for all of
+     * them, because there was no guest→host channel at all.
      *
-     * This exists because the alternative is worse than the limitation itself. `enqueueHostOp` used
-     * to no-op whenever `hostSession` was null, so a guest could change a layer, see it change on
-     * their own screen, and have it reach nobody — with the two canvases now silently diverging and
-     * no signal on either end. Reporting the drop turns an invisible desync into a stated one.
+     * It exists because silence is worse than the limitation: an edit that applies locally and
+     * reaches nobody leaves the two canvases diverging with no signal on either end.
      *
      * Conflated (`extraBufferCapacity = 1`, DROP_OLDEST) on purpose: a single gesture emits a burst
      * of ops, and the user needs to be told once, not once per op.
@@ -193,6 +198,15 @@ class CollaborationManager @Inject constructor() {
     )
     val guestEditDropped: SharedFlow<Unit> get() = _guestEditDropped
 
+    /**
+     * Guest edits the host accepted (protocol v4), for the host's editor to apply to the
+     * authoritative project and then emit like a local edit (that emit is the re-broadcast).
+     * Unbounded: dropping one would silently desync host from guest. Single consumer
+     * (ArViewModel, for its whole lifetime).
+     */
+    private val _guestOps = kotlinx.coroutines.channels.Channel<Op>(kotlinx.coroutines.channels.Channel.UNLIMITED)
+    val guestOps: kotlinx.coroutines.flow.Flow<Op> = _guestOps.receiveAsFlow()
+
     /** Called by OpEmitterImpl on every editor mutation. */
     internal fun enqueueHostOp(op: Op) {
         val host = hostSession
@@ -200,9 +214,10 @@ class CollaborationManager @Inject constructor() {
             host.enqueueOp(op)
             return
         }
-        // Not hosting. As a guest that is a dropped edit worth reporting; with no session at all
-        // (solo editing) there is nothing to report — the op simply has nowhere to go by design.
-        if (guestSession != null) _guestEditDropped.tryEmit(Unit)
+        // As a guest (v4): send it; report only an edit the host would refuse or that can't be
+        // framed. With no session at all (solo editing) the op simply has nowhere to go.
+        val guest = guestSession ?: return
+        if (!guest.sendOp(op)) _guestEditDropped.tryEmit(Unit)
     }
 
     private fun observe(stateFlow: StateFlow<CoopSessionState>) {

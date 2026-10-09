@@ -11,6 +11,9 @@ internal enum class FrameType(val code: Byte) {
     BULK_ACK(0x24),
     DELTA(0x30),
     DELTA_ACK(0x31),
+    // v4: a guest's own edit, and the host's acknowledgement of it (see GuestOpPayload).
+    GUEST_OP(0x32),
+    GUEST_OP_ACK(0x33),
     PING(0x40),
     PONG(0x41),
     BYE(0x50),

@@ -78,6 +78,10 @@ class HomographyOverlayRenderer(context: Context) : android.opengl.GLSurfaceView
         )
     )
 
+    /** Explicit base-map placement of the fingerprint/artwork plane. Null = no truthful anchor yet. */
+    private val mapFromFingerprint =
+        java.util.concurrent.atomic.AtomicReference<FloatArray?>(null)
+    private val localModel4 = FloatArray(16).also { Matrix.setIdentityM(it, 0) }
     private val model4 = FloatArray(16).also { Matrix.setIdentityM(it, 0) }
     private val contentRotation4 = FloatArray(16)
     private val contentRotationTemp4 = FloatArray(16)
@@ -108,6 +112,18 @@ class HomographyOverlayRenderer(context: Context) : android.opengl.GLSurfaceView
         extentHalfW = halfW
         extentHalfH = halfH
         extentDirty = true
+    }
+
+    /**
+     * Place the fingerprint-local artwork plane into SphereSLAM's persistent map frame.
+     *
+     * The renderer fails closed when this is null/invalid; drawing at map origin would silently make
+     * the fingerprint the world frame again.
+     */
+    fun setMapFromFingerprint(value: FloatArray?) {
+        mapFromFingerprint.set(
+            value?.takeIf { it.size == 16 && it.all(Float::isFinite) }?.copyOf()
+        )
     }
 
     /**
@@ -164,12 +180,15 @@ class HomographyOverlayRenderer(context: Context) : android.opengl.GLSurfaceView
         val viewport = letterboxViewport(surfaceWidth, surfaceHeight, frame.frameAspect)
         if (viewport != null) GLES30.glViewport(viewport[0], viewport[1], viewport[2], viewport[3])
 
-        // One consistent snapshot of all six components for this frame.
+        // The camera pose is camera_from_map. The design therefore needs the explicit
+        // map_from_fingerprint model anchor before its artist-controlled local adjustment.
+        val anchor = mapFromFingerprint.get() ?: return
         val t = transform.get()
-        Matrix.setIdentityM(model4, 0)
-        Matrix.translateM(model4, 0, t.panX, t.panY, 0f)
-        Matrix.rotateM(model4, 0, t.rotationZDeg, 0f, 0f, 1f)
-        Matrix.scaleM(model4, 0, t.scale, t.scale, 1f)
+        Matrix.setIdentityM(localModel4, 0)
+        Matrix.translateM(localModel4, 0, t.panX, t.panY, 0f)
+        Matrix.rotateM(localModel4, 0, t.rotationZDeg, 0f, 0f, 1f)
+        Matrix.scaleM(localModel4, 0, t.scale, t.scale, 1f)
+        Matrix.multiplyMM(model4, 0, anchor, 0, localModel4, 0)
         overlayRenderer.draw(
             frame.viewMatrix,
             frame.projMatrix,

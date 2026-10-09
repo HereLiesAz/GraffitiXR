@@ -371,6 +371,61 @@ class EditorViewModelTest {
     }
 
     @Test
+    fun `a guest edit applies, persists, is emitted once at apply time, and undoes`() = runTest {
+        viewModel.setEditorMode(EditorMode.TRACE)
+        addDesign()
+        testDispatcher.scheduler.advanceUntilIdle()
+        fun traceScale() = viewModel.uiState.value.modeAdjustments[EditorMode.TRACE]?.scale ?: 1f
+        val before = traceScale()
+        io.mockk.clearMocks(opEmitter, projectRepository, answers = false)
+
+        val op = com.hereliesaz.graffitixr.common.model.Op.ModeTransform("TRACE", ModeAdjustment(scale = 3f))
+        viewModel.setEditorMode(EditorMode.DESIGN) // the host is elsewhere; undo must still target TRACE
+        viewModel.applyGuestOp(op)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(3f, traceScale(), 0.001f)
+        // Emitted exactly once, from the host's apply — that emit IS the re-broadcast.
+        io.mockk.verify(exactly = 1) { opEmitter.emit(op) }
+        coVerify { projectRepository.updateProject(any<(GraffitiProject) -> GraffitiProject>()) }
+
+        viewModel.onUndoClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(before, traceScale(), 0.001f)
+        // The undo reaches the guest too.
+        io.mockk.verify {
+            opEmitter.emit(
+                com.hereliesaz.graffitixr.common.model.Op.ModeTransform("TRACE", ModeAdjustment(scale = before)),
+            )
+        }
+    }
+
+    @Test
+    fun `a guest AR placement on a standalone session lands in the standalone slot while the host is elsewhere`() = runTest {
+        viewModel.setEditorMode(EditorMode.TRACE)
+        addDesign()
+        testDispatcher.scheduler.advanceUntilIdle()
+        val arCoreSlot = ModeAdjustment(scale = 1.5f)
+        var stored = GraffitiProject(id = "test-project", modeAdjustments = mapOf("AR" to arCoreSlot))
+        io.mockk.clearMocks(opEmitter, projectRepository, answers = false)
+        coEvery { projectRepository.updateProject(any<(GraffitiProject) -> GraffitiProject>()) } coAnswers {
+            stored = firstArg<(GraffitiProject) -> GraffitiProject>()(stored)
+        }
+        val inMemoryAr = viewModel.uiState.value.modeAdjustments[EditorMode.AR]
+
+        val placed = ModeAdjustment(scale = 2.5f, offsetX = 0.3f)
+        val op = com.hereliesaz.graffitixr.common.model.Op.ModeTransform("AR", placed)
+        viewModel.applyGuestOp(op, hostedArStandalone = true)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(placed, stored.sphereSlamModeAdjustment)
+        assertEquals(arCoreSlot, stored.modeAdjustments["AR"])
+        // The exposed (ARCore) slot is untouched; the op is still re-broadcast once.
+        assertEquals(inMemoryAr, viewModel.uiState.value.modeAdjustments[EditorMode.AR])
+        io.mockk.verify(exactly = 1) { opEmitter.emit(op) }
+    }
+
+    @Test
     fun `redo after a mode switch restores the undone mode's adjustment`() = runTest {
         viewModel.setEditorMode(EditorMode.TRACE)
         addDesign()
