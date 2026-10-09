@@ -7,12 +7,14 @@ import kotlin.math.sqrt
  * Two-tap wall measurement (BACKLOG Phase 6, step 1 "Measure"). Pure geometry, no Android/ARCore.
  *
  * A screen tap becomes a camera ray; the ray is intersected with the plane the design is drawn on
- * (the overlay base frame's local z = 0) and the hit is returned in that frame's local (x, y).
- * Measuring in the drawn wall frame rather than ARCore plane hit-tests means:
- *  - both points lie on the plane the artwork lives on, which is what a later grid needs;
- *  - wall ends outside ARCore's detected plane polygon (the usual case) still measure;
- *  - two taps seconds apart stay consistent while fusion nudges the anchor, because each is
- *    expressed relative to the frame as drawn at its own instant.
+ * (the overlay base frame's local z = 0, [intersectWallWorld]). Using that plane rather than ARCore
+ * plane hit-tests means both points lie on the plane the artwork lives on (what a later grid needs)
+ * and wall ends outside ARCore's detected plane polygon — the usual case — still measure.
+ *
+ * The caller then stores each hit relative to a frame that does NOT move with fusion corrections
+ * ([toFrameLocal] against the unfused ARCore consensus anchor). The drawn frame does move: a
+ * correction of δ between the two taps would otherwise add up to |δ| (or L·δθ for a rotation at
+ * distance L) to the width. Only the plane's orientation is taken from the drawn frame.
  *
  * Matrices are column-major OpenGL. `view` is the render camera's view matrix (rigid); `proj` is a
  * standard perspective projection (`proj[11] == -1`, `proj[15] == 0`), which is what ARCore's
@@ -66,10 +68,26 @@ object WallMeasure {
 
     /**
      * Intersect [ray] with the local z = 0 plane of [wallModel] and return the hit as wall-local
-     * (x, y), or null when the frame is not rigid, the ray is parallel/grazing, the hit is behind
-     * the camera, or it lies outside [MIN_RANGE_M]..[MAX_RANGE_M].
+     * (x, y). Convenience over [intersectWallWorld] + [toFrameLocal].
      */
-    fun intersectWallLocal(ray: Ray, wallModel: FloatArray): FloatArray? {
+    fun intersectWallLocal(ray: Ray, wallModel: FloatArray): FloatArray? =
+        intersectWallWorld(ray, wallModel)?.let { toFrameLocal(it, wallModel) }?.let { floatArrayOf(it[0], it[1]) }
+
+    /** World point [p] expressed in rigid [frame]'s local coordinates (x, y, z), or null. */
+    fun toFrameLocal(p: FloatArray, frame: FloatArray): FloatArray? {
+        if (p.size < 3 || frame.size != 16 || frame.any { !it.isFinite() }) return null
+        if (abs(PoseMath.scaleOf(frame) - 1f) > RIGID_SCALE_TOLERANCE) return null
+        val inv = PoseMath.rigidInverse(frame)
+        val out = FloatArray(3) { r -> inv[r] * p[0] + inv[4 + r] * p[1] + inv[8 + r] * p[2] + inv[12 + r] }
+        return out.takeIf { o -> o.all { it.isFinite() } }
+    }
+
+    /**
+     * Intersect [ray] with the local z = 0 plane of [wallModel] and return the WORLD hit (x, y, z),
+     * or null when the frame is not rigid, the ray is parallel/grazing, the hit is behind the
+     * camera, or it lies outside [MIN_RANGE_M]..[MAX_RANGE_M].
+     */
+    fun intersectWallWorld(ray: Ray, wallModel: FloatArray): FloatArray? {
         if (wallModel.size != 16 || wallModel.any { !it.isFinite() }) return null
         if (abs(PoseMath.scaleOf(wallModel) - 1f) > RIGID_SCALE_TOLERANCE) return null
         val nx = wallModel[8]; val ny = wallModel[9]; val nz = wallModel[10]
@@ -80,17 +98,18 @@ object WallMeasure {
         val t = (nx * (wallModel[12] - o[0]) + ny * (wallModel[13] - o[1]) + nz * (wallModel[14] - o[2])) / denom
         if (!t.isFinite() || t < MIN_RANGE_M || t > MAX_RANGE_M) return null
         val hit = floatArrayOf(o[0] + t * d[0], o[1] + t * d[1], o[2] + t * d[2])
-        val inv = PoseMath.rigidInverse(wallModel)
-        val lx = inv[0] * hit[0] + inv[4] * hit[1] + inv[8] * hit[2] + inv[12]
-        val ly = inv[1] * hit[0] + inv[5] * hit[1] + inv[9] * hit[2] + inv[13]
-        return if (lx.isFinite() && ly.isFinite()) floatArrayOf(lx, ly) else null
+        return hit.takeIf { h -> h.all { it.isFinite() } }
     }
 
-    /** Straight-line wall distance between two wall-local points, or null outside the valid range. */
+    /**
+     * Straight-line distance between two points in the same frame (2 or 3 components; a missing z
+     * counts as 0), or null outside [MIN_WIDTH_M]..[MAX_WIDTH_M].
+     */
     fun widthMeters(a: FloatArray, b: FloatArray): Float? {
         if (a.size < 2 || b.size < 2) return null
         val dx = b[0] - a[0]; val dy = b[1] - a[1]
-        val w = sqrt(dx * dx + dy * dy)
+        val dz = (if (b.size > 2) b[2] else 0f) - (if (a.size > 2) a[2] else 0f)
+        val w = sqrt(dx * dx + dy * dy + dz * dz)
         return w.takeIf { it.isFinite() && it >= MIN_WIDTH_M && it <= MAX_WIDTH_M }
     }
 }

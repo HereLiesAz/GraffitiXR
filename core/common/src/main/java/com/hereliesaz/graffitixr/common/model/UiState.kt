@@ -44,6 +44,11 @@ data class ArUiState(
     val isAnchorEstablished: Boolean = false,
     /** AR Measure tool state; see [MeasureUi]. */
     val measure: MeasureUi = MeasureUi(),
+    /**
+     * The anchor's drawn frame is a real wall plane (plane-sourced normal, rotation correction
+     * applied), so Measure can be offered. False on depth/feature-point/fallback anchors.
+     */
+    val measureAvailable: Boolean = false,
     /** The project's saved wall width (m), mirrored for display; null = never measured. */
     val wallWidthMeters: Float? = null,
     // First-run onboarding signals. isArReady flips true the first frame ARCore reports TRACKING

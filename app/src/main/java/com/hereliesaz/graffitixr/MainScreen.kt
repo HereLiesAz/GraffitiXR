@@ -831,8 +831,9 @@ fun MainScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .pointerInput(uiState.design?.id, isImageLocked, isWaitingForTap, isTouchLocked, isGuest, uiState.editorMode, isMeasuring) {
-                        // Measure taps are wall readings, not edits, so a guest may measure too.
-                        if (isMeasuring) {
+                        // Measure taps are wall readings, not edits, so a guest may measure too —
+                        // but not through a touch lock.
+                        if (isMeasuring && !isTouchLocked) {
                             detectTapGestures { offset ->
                                 arViewModel.onMeasureTap(offset.x / size.width, offset.y / size.height)
                             }

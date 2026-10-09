@@ -215,7 +215,8 @@ class ArRenderer(
 
     /**
      * Resolve normalised screen point ([nx], [ny]) — [0,1], y down, relative to the AR view — to a
-     * point on the wall the design is drawn on, in that wall frame's local (x, y) metres. Served on
+     * point on the wall the design is drawn on, as (x, y, z) metres in the unfused ARCore anchor's
+     * local frame (so fusion corrections between taps do not move it). Served on
      * the next frame after the overlay base frame is computed; completes null with no established
      * anchor, a grazing/out-of-range ray, or a destroyed renderer. Await with a timeout.
      */
@@ -244,10 +245,17 @@ class ArRenderer(
                 null
             } else {
                 try {
+                    // Plane from the drawn wall frame; point kept relative to the UNFUSED ARCore
+                    // consensus anchor (backbone), so a fusion correction landing between the two
+                    // taps cannot change the measured distance.
                     com.hereliesaz.graffitixr.feature.ar.anchor.WallMeasure.screenRay(req.x, req.y, view, proj)
                         ?.let {
                             com.hereliesaz.graffitixr.feature.ar.anchor.WallMeasure
-                                .intersectWallLocal(it, overlayBaseScratch)
+                                .intersectWallWorld(it, overlayBaseScratch)
+                        }
+                        ?.let {
+                            com.hereliesaz.graffitixr.feature.ar.anchor.WallMeasure
+                                .toFrameLocal(it, backboneScratch)
                         }
                 } catch (e: Exception) {
                     Timber.w(e, "wall-point request failed")
@@ -692,6 +700,21 @@ class ArRenderer(
     // AnchorOrchestrator's no-tracking-anchor fallback (a PREVIOUS anchor's lastGoodMatrix, or
     // identity) rather than this anchor's own pose — see the validation where this flag is consumed.
     private var overlayRotationCorrectionPending: Boolean = false
+    // Measure gates (set at anchor establishment / correction outcome). The overlay base frame's
+    // local z is the real wall normal only when the anchor's normal came from a wall surface (a
+    // plane hit, or a reloc pose whose up axis faces the camera) AND the one-time rotation
+    // correction was applied. Depth/feature-point and fallback anchors use the anchor→camera
+    // direction, a camera-facing plane that foreshortens an oblique wall.
+    private var anchorNormalIsWall = false
+    private var overlayRotationCorrectionApplied = false
+
+    /**
+     * True while the established anchor's drawn frame is a trustworthy wall plane for Measure (see
+     * [anchorNormalIsWall]). Tracking is NOT part of this — a momentary loss should not make the
+     * rail item flicker; taps during a loss are refused individually.
+     */
+    @Volatile var wallMeasureAvailable: Boolean = false
+        private set
     // How many consecutive frames [overlayRotationCorrectionPending] has been retried because the
     // candidate correction failed validation. Reset whenever a NEW establishment arms the pending
     // flag, and again once the candidate is either applied or discarded. Capped by
@@ -1580,8 +1603,10 @@ class ArRenderer(
                         val cos = if (tcl > 1e-4f && yl > 1e-4f) (yx * tcx + yy * tcy + yz * tcz) / (tcl * yl) else 0f
                         if (kotlin.math.abs(cos) > 0.5f) {
                             nrmX = yx; nrmY = yy; nrmZ = yz
+                            anchorNormalIsWall = true
                         } else {
                             nrmX = tcx; nrmY = tcy; nrmZ = tcz
+                            anchorNormalIsWall = false
                         }
                         haveNormal = true
                     } else if (chosen != null) {
@@ -1625,8 +1650,10 @@ class ArRenderer(
                                 val axis = FloatArray(3)
                                 pose.getTransformedAxis(1, 1f, axis, 0) // local +Y = plane normal
                                 nrmX = axis[0]; nrmY = axis[1]; nrmZ = axis[2]
+                                anchorNormalIsWall = true
                             } else {
                                 nrmX = -dx; nrmY = -dy; nrmZ = -dz // toward the camera
+                                anchorNormalIsWall = false
                             }
                             haveNormal = true
                         }
@@ -1640,6 +1667,7 @@ class ArRenderer(
                             )
                         )
                         // Free/fallback anchor: face the user directly (anchor→camera).
+                        anchorNormalIsWall = false
                         nrmX = camPosX - anchorModelMatrix[12]
                         nrmY = camPosY - anchorModelMatrix[13]
                         nrmZ = camPosZ - anchorModelMatrix[14]
@@ -1670,6 +1698,7 @@ class ArRenderer(
                     // [overlayRotationCorrection] can't be computed here — it needs anchorMatrix (the
                     // consensus/fused pose), which isn't built until later this same frame. Defer.
                     overlayRotationCorrectionPending = true
+                    overlayRotationCorrectionApplied = false
                     overlayRotationCorrectionRetryFrames = 0
                     slamManager.updateAnchorTransform(anchorModelMatrix)
                     // Doodle demo: publish the wall plane (anchor point + surface normal) so the
@@ -2079,6 +2108,7 @@ class ArRenderer(
                     OverlayRotationCorrectionDecision.APPLY -> {
                         System.arraycopy(overlayRotationCorrectionCandidate, 0, overlayRotationCorrection, 0, 16)
                         overlayRotationCorrectionPending = false
+                        overlayRotationCorrectionApplied = true
                         overlayRotationCorrectionRetryFrames = 0
                     }
                     OverlayRotationCorrectionDecision.RETRY -> {
@@ -2811,15 +2841,14 @@ class ArRenderer(
                 // Translation stays the live anchor position (cols 12-14 already copied above).
             }
 
-            // Measure taps: the overlay base frame's local z = 0 IS the wall the design is drawn on.
-            // Only meaningful with an established anchor and a real surface normal (otherwise the
-            // frame is the raw anchor pose and its z axis is not known to be the wall normal).
-            drainWallPointQueue(
-                viewMatrix,
-                projMatrix,
-                wallReady = anchorEstablished &&
-                    (anchorSurfaceNormal[0] != 0f || anchorSurfaceNormal[1] != 0f || anchorSurfaceNormal[2] != 0f),
-            )
+            // Measure taps: the overlay base frame's local z = 0 is the wall the design is drawn on —
+            // but only when its normal came from the wall itself and the rotation correction has
+            // been applied (see [anchorNormalIsWall]). With tracking paused, the view is the frozen
+            // last pose while the camera image is live, so refuse rather than return a wrong point.
+            val wallReady = anchorEstablished && isTracking && anchorNormalIsWall &&
+                overlayRotationCorrectionApplied && !overlayRotationCorrectionPending
+            wallMeasureAvailable = anchorEstablished && anchorNormalIsWall && overlayRotationCorrectionApplied
+            drainWallPointQueue(viewMatrix, projMatrix, wallReady = wallReady)
 
             // Center the overlay on the matched-marks centroid instead of the screen-center anchor.
             // overlayMarkCenterLocal is the centroid in the fingerprint anchor's frame; reconstruct

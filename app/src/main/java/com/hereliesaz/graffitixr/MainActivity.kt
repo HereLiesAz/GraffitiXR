@@ -895,6 +895,7 @@ class MainActivity : ComponentActivity() {
                         coopState = coopState,
                         isTouchLocked = mainUiState.isTouchLocked,
                         isWaitingForTap = mainUiState.isWaitingForTap,
+                        isCapturingTarget = mainUiState.isCapturingTarget,
                         onShowJoinScanner = { showJoinScanner = true },
                         onWallPhoto = {
                             if (hasCameraPermission) {
@@ -1345,9 +1346,12 @@ class MainActivity : ComponentActivity() {
                                     nav = navStrings,
                                     onSave = { arViewModel.saveMeasure() },
                                     onRedo = { arViewModel.redoMeasure() },
+                                    // TopCenter: BottomCenter is shared by the post-target and
+                                    // target-incomplete overlays; Top Start/End hold the distance and
+                                    // relocalization badges.
                                     modifier = Modifier
-                                        .align(Alignment.BottomCenter)
-                                        .padding(bottom = 96.dp),
+                                        .align(Alignment.TopCenter)
+                                        .padding(top = 64.dp),
                                 )
                             }
 
@@ -1953,6 +1957,7 @@ class MainActivity : ComponentActivity() {
         coopState: CoopSessionState = CoopSessionState.Idle,
         isTouchLocked: Boolean,
         isWaitingForTap: Boolean = false,
+        isCapturingTarget: Boolean = false,
         onShowJoinScanner: () -> Unit = {},
         onWallPhoto: () -> Unit = {},
         onExportRequested: () -> Unit,
@@ -2141,7 +2146,11 @@ class MainActivity : ComponentActivity() {
                     // Measure — two taps on the wall the design is drawn on. Needs the anchor's wall
                     // frame, and the ARCore backend: standalone has no measurement path yet, and must
                     // offer one only for physically metric targets (SPHERESLAM_TODO §3).
-                    if (arUiState.isAnchorEstablished && !arRailPolicy.standalone) azRailSubItem(
+                    // Hidden while a target capture is under way: both own screen taps.
+                    if (
+                        arUiState.isAnchorEstablished && arUiState.measureAvailable &&
+                        !arRailPolicy.standalone && !isCapturingTarget
+                    ) azRailSubItem(
                         id = "mode.ar.measure",
                         hostId = "mode.ar",
                         text = navStrings.measure,
@@ -3325,6 +3334,9 @@ private fun MeasurePanel(
         }
         androidx.compose.foundation.layout.Column(
             modifier = modifier
+                // Consume taps on the chip itself so they don't fall through as measure taps; its
+                // buttons are children and still receive theirs first.
+                .pointerInput(Unit) { detectTapGestures { } }
                 .background(Color(0xCC000000), RoundedCornerShape(16.dp))
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

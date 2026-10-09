@@ -130,4 +130,51 @@ class WallMeasureTest {
         val ortho = floatArrayOf(1f,0f,0f,0f, 0f,1f,0f,0f, 0f,0f,-1f,0f, 0f,0f,0f,1f)
         assertNull(WallMeasure.screenRay(0.5f, 0.5f, translation(0f, 0f, 0f), ortho))
     }
+
+    @Test
+    fun `off-centre principal point is honoured`() {
+        // ARCore projections carry a principal-point offset in proj[8]/proj[9].
+        val offset = proj.copyOf().also { it[8] = 0.07f; it[9] = -0.05f }
+        val wall = yawThenTranslate(20f, 0.1f, 0.3f, -2.5f)
+        val view = translation(0f, 0f, 0f)
+        val local = floatArrayOf(0.7f, -0.45f)
+        val world = mul(wall, floatArrayOf(local[0], local[1], 0f, 1f))
+        val clip = mul(offset, mul(view, world))
+        val n = floatArrayOf((clip[0] / clip[3] + 1f) / 2f, (1f - clip[1] / clip[3]) / 2f)
+        val ray = WallMeasure.screenRay(n[0], n[1], view, offset)!!
+        val p = WallMeasure.intersectWallLocal(ray, wall)!!
+        assertEquals(0.7f, p[0], 2e-3f); assertEquals(-0.45f, p[1], 2e-3f)
+    }
+
+    @Test
+    fun `obliquity just inside the limit measures, just past it is refused`() {
+        val view = translation(0f, 0f, 0f)
+        val ray = WallMeasure.screenRay(0.5f, 0.5f, view, proj)!!   // straight down -Z
+        // Wall turned 74° / 76° about Y: ray-to-normal angle equals the turn.
+        assertNotNull(WallMeasure.intersectWallLocal(ray, yawThenTranslate(74f, 0f, 0f, -2f)))
+        assertNull(WallMeasure.intersectWallLocal(ray, yawThenTranslate(76f, 0f, 0f, -2f)))
+    }
+
+    @Test
+    fun `points kept in an unmoving frame ignore a drawn-frame correction between taps`() {
+        val view = translation(0f, 0f, 0f)
+        val drawnBefore = translation(0f, 0f, -3f)
+        // Fusion nudges the drawn frame 8 cm sideways (in-plane) between the taps.
+        val drawnAfter = translation(0.08f, 0f, -3f)
+        val backbone = translation(0.2f, -0.1f, -3f) // unfused anchor: does not move
+        fun tapAt(screen: FloatArray, drawn: FloatArray): FloatArray {
+            val ray = WallMeasure.screenRay(screen[0], screen[1], view, proj)!!
+            return WallMeasure.toFrameLocal(WallMeasure.intersectWallWorld(ray, drawn)!!, backbone)!!
+        }
+        // The same two physical spots on the wall plane (x = -1 and x = +1 at z = -3).
+        val left = toScreen(floatArrayOf(-1f, 0f), drawnBefore, view)
+        val right = toScreen(floatArrayOf(1f, 0f), drawnBefore, view)
+        val w = WallMeasure.widthMeters(tapAt(left, drawnBefore), tapAt(right, drawnAfter))!!
+        assertEquals(2f, w, 2e-3f)
+    }
+
+    @Test
+    fun `three-component width uses depth difference`() {
+        assertEquals(5f, WallMeasure.widthMeters(floatArrayOf(0f, 0f, 0f), floatArrayOf(0f, 3f, 4f))!!, 1e-6f)
+    }
 }

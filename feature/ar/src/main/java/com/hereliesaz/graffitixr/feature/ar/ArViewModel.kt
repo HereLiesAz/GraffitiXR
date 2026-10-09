@@ -3982,6 +3982,7 @@ class ArViewModel @Inject constructor(
                 relocDiagnostics = relocDiag,
                 corroborationDiagnostics = corrobDiag,
                 fusionDiagnostics = fusionDiag,
+                measureAvailable = renderer?.wallMeasureAvailable == true,
                 wallFingerprintPoints = wallPoints,
                 scanPhase = newPhase,
                 ambientSectorsCovered = sectorsCovered / 3, // Keep backward compatibility for 30 degree UI units if needed
@@ -4686,7 +4687,8 @@ class ArViewModel @Inject constructor(
     }
 
     // ── AR Measure (BACKLOG Phase 6 step 1) ─────────────────────────────────────────────────────
-    // Wall-local points of the in-progress measurement, parallel to MeasureUi.points.
+    // Points of the in-progress measurement in the unfused anchor frame, parallel to MeasureUi.points.
+    // Main-thread only (tap handler, its viewModelScope continuation, rail clicks).
     private val measureLocalPoints = mutableListOf<FloatArray>()
     private var measureJob: kotlinx.coroutines.Job? = null
 
