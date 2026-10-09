@@ -4978,6 +4978,14 @@ class ArViewModel @Inject constructor(
      */
     fun saveMeasure() {
         val width = _uiState.value.measure.resultMeters ?: return
+        // A guest's project is a spectator copy no Op writes back to the host, so a saved width
+        // would silently diverge and be lost on reconnect. Guests may read a measurement, not keep it.
+        if (_uiState.value.coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) {
+            _feedback.tryEmit(
+                com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error("Only the host can save the wall width."),
+            )
+            return
+        }
         val projectId = projectRepository.currentProject.value?.id ?: return
         val generation = measureGeneration.get()
         measureSaveJob?.cancel()
