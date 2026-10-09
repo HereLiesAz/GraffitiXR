@@ -533,18 +533,26 @@ device, no ARCore) and a half-built AR interaction is worse than a documented pl
   exist and Trace's usage in the field is visible against them — revisiting the taxonomy before
   that would be guessing at a UX that doesn't exist yet.
 
-### Phase 7 — Test backfill (blocked on test infra this sandbox doesn't have)
+### Phase 7 — Test backfill
+
+**Infra decided and built (2026-10-08):** a host-native GoogleTest target
+(`core/nativebridge/src/test/cpp`, `tools/run_native_host_tests.sh`, wired into Android CI) and
+Robolectric for `:core:common`. Instrumented (`androidTest`/emulator) tests remain unbuilt. See
+`docs/testing.md` §2. Per-item status below; the original "blocked" analysis is kept under each.
 
 All four items below were investigated, not skipped on assumption. Each needs test
 infrastructure that does not exist in this repo/environment, verified directly rather than
 inferred:
 
-- [ ] `HomographyTracker`: a known-answer-pose test for the CV→GL conversion (would have caught
-  Phase 2's sign-error bug directly). **Blocked**: pure native C++ (OpenCV), no host OpenCV
+- [x] `HomographyTracker`: a known-answer-pose test for the CV→GL conversion — `HomographyTrackerTest`
+  (host-native). Mutation-checked: restoring the old `C·R·C` flip fails it. Was **blocked**: pure native C++ (OpenCV), no host OpenCV
   available (`pkg-config --exists opencv4` fails, no `libopencv_core*` anywhere on this machine)
   and no `androidTest` source set exists anywhere in the repo to run it on-device instead.
-- [ ] `HomographyFallbackOverlay`: behavioral tests for the texture-clear-on-null path and the
-  `cameraId` wiring. **Blocked**, for two different reasons per path: `clearPose()`'s texture
+- [~] `HomographyFallbackOverlay`: **`cameraId` half done** — `CameraIntrinsicsEstimatorCameraIdTest`
+  (Robolectric, `:core:common`) pins the id → `CameraManager` → intrinsics seam the overlay's
+  analyzer feeds (known ids, calibrated vs pinhole, unknown id → null). **Texture-clear-on-null
+  still open**: needs a live EGL context, i.e. an instrumented test. Was **blocked**, for two
+  different reasons per path: `clearPose()`'s texture
   path is a real `GLSurfaceView.Renderer.onDrawFrame` — needs a live EGL/GL context, not
   reachable from a plain JVM unit test (see `HomographyOverlayRendererTest`'s own existing tests,
   which cover only the pure-math `letterboxViewport`, never `onDrawFrame` itself, for the same
@@ -554,13 +562,17 @@ inferred:
   `@RunWith(RobolectricTestRunner)` anywhere under its `src/test`). Adding Robolectric is a real
   infra decision (new dependency, config across every module with native/Android-framework
   seams) — out of scope for a test-backfill pass, flagged here rather than added silently.
-- [ ] `restoreWallFingerprint`/`alignToFingerprint`: tests asserting stale co-registration state
-  (`mHasFingerprintView`, `mFingerprintAnchorMatrix`, `mWallPatch`) is actually cleared on the
-  paths fixed in Phase 1. **Blocked**: same as the `HomographyTracker` item — native C++ methods
+- [x] `restoreWallFingerprint`/`alignToFingerprint`: stale co-registration state is cleared —
+  `MobileGSFingerprintStateTest` (host-native), mutation-checked. Finding while writing it:
+  `alignToFingerprint` resets the view/anchor/intrinsics but NOT `mWallPatch`, so a peer's wall
+  is corroborated against this device's own canonical patch. Not in Phase 1's scope; flagged,
+  not changed. Was **blocked**: same as the `HomographyTracker` item — native C++ methods
   on `MobileGS`, no gtest/native test binary in the repo, no `androidTest` to exercise the real
   `.so` on-device.
-- [ ] `nativeFeedColorFrame`: a contract test mirroring `nativeFeedYuvFrame`'s buffer-too-small
-  guard. **Note the premise was already slightly off**: no *executable* guard test for
+- [x] `nativeFeedColorFrame`: the guard arithmetic for it and both YUV entry points now lives in
+  `include/FrameBufferGuard.h` and is pinned by `FrameBufferGuardTest`. Extracting it also closed
+  a crash path: `nativeYuvToRgbaBitmap` (no try/catch) accepted a stride narrower than the row,
+  which makes the wrapping `cv::Mat` throw. **Note the premise was already slightly off**: no *executable* guard test for
   `nativeFeedYuvFrame` exists to mirror either (checked: nothing under
   `core/nativebridge/src/test` or `feature/ar/src/test` references `feedYuvFrame`/
   `feedColorFrame`/`sliceDirect`) — the guard itself is real code
