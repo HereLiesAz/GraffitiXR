@@ -1077,6 +1077,30 @@ class ArViewModel @Inject constructor(
      * pose are both known. Empty is the only unresolved sentinel; identity is a legitimate solved
      * transform and must never be used as a fallback.
      */
+    private fun sameStandaloneTransform(
+        a: List<Float>,
+        b: List<Float>,
+        epsilon: Float = 1e-5f,
+    ): Boolean {
+        if (a.size != 16 || b.size != 16) return false
+        return a.indices.all { i ->
+            a[i].isFinite() && b[i].isFinite() &&
+                kotlin.math.abs(a[i] - b[i]) <= epsilon
+        }
+    }
+
+    private fun sameStandaloneTransform(
+        a: FloatArray,
+        b: List<Float>,
+        epsilon: Float = 1e-5f,
+    ): Boolean =
+        a.size == 16 &&
+            b.size == 16 &&
+            a.indices.all { i ->
+                a[i].isFinite() && b[i].isFinite() &&
+                    kotlin.math.abs(a[i] - b[i]) <= epsilon
+            }
+
     fun onStandaloneMapFromFingerprintSolved(mapFromFingerprint: FloatArray) {
         if (
             mapFromFingerprint.size != 16 ||
@@ -1085,29 +1109,40 @@ class ArViewModel @Inject constructor(
 
         val starting = projectRepository.currentProject.value ?: return
         if (starting.sphereSlamFingerprint == null) return
-        if (starting.sphereSlamMapFromFingerprint.size == 16) return
+        val solved = mapFromFingerprint.toList()
+        if (sameStandaloneTransform(solved, starting.sphereSlamMapFromFingerprint)) return
+
         val projectId = starting.id
         val anchorGeneration = starting.sphereSlamAnchorGeneration
-        val solved = mapFromFingerprint.toList()
-
         viewModelScope.launch(dispatchers.io) {
             var committed = false
             projectRepository.updateProject { current ->
                 if (
                     current.id != projectId ||
                     current.sphereSlamFingerprint == null ||
-                    current.sphereSlamAnchorGeneration != anchorGeneration ||
-                    current.sphereSlamMapFromFingerprint.size == 16
+                    current.sphereSlamAnchorGeneration != anchorGeneration
                 ) {
+                    current
+                } else if (sameStandaloneTransform(solved, current.sphereSlamMapFromFingerprint)) {
                     current
                 } else {
                     committed = true
-                    current.copy(sphereSlamMapFromFingerprint = solved)
+                    // This is a precision-layer frame refinement only. The continuously-running
+                    // SphereSLAM photosphere stays intact. A MobileGS feature map built against the
+                    // provisional transform cannot survive the rigid-frame correction, so discard
+                    // only that derived precision map; it will rebuild in the solved map frame.
+                    current.copy(
+                        sphereSlamMapFromFingerprint = solved,
+                        sphereSlamWallFeatureMap = null,
+                        sphereSlamWallFeatureMapFrameVersion =
+                            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                    )
                 }
             }
             if (committed) {
                 appendDiag(
-                    "SphereSLAM map_from_fingerprint persisted generation=$anchorGeneration"
+                    "SphereSLAM map_from_fingerprint refined from same-frame base+KPM pose " +
+                        "generation=$anchorGeneration"
                 )
             }
         }
@@ -2634,8 +2669,16 @@ class ArViewModel @Inject constructor(
                             sphereSlamFingerprint = standaloneFingerprint,
                             sphereSlamFingerprintFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
-                            // A new canonical page is a new standalone object frame. Never carry a
-                            // grown map across that boundary, even when the raw coordinates look sane.
+                            // Precision target replacement never resets the base photosphere. Attach
+                            // the new fingerprint with the capture-time provisional transform when
+                            // available; otherwise leave it unresolved until the same-frame solver
+                            // publishes an exact bridge.
+                            sphereSlamMapFromFingerprint =
+                                pendingStandaloneFingerprintPlacement
+                                    ?.mapFromFingerprint
+                                    ?.takeIf { it.size == 16 && it.all(Float::isFinite) }
+                                    ?.toList()
+                                    ?: emptyList(),
                             sphereSlamWallFeatureMap = null,
                             sphereSlamWallFeatureMapFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
@@ -2759,6 +2802,7 @@ class ArViewModel @Inject constructor(
                             // after the page is gone would let a later standalone runtime restore a
                             // coordinate frame it can no longer reconstruct or verify.
                             sphereSlamFingerprint = null,
+                            sphereSlamMapFromFingerprint = emptyList(),
                             sphereSlamWallFeatureMap = null,
                             sphereSlamWallFeatureMapFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
@@ -3133,9 +3177,14 @@ class ArViewModel @Inject constructor(
 
         if (standaloneBackend) {
             if (map == null) return
-            if (!StandaloneFingerprintFrame.isCenteredPageAnchor(map.anchor)) {
+            val mapFromFingerprint = currentProject.sphereSlamMapFromFingerprint
+            if (
+                mapFromFingerprint.size != 16 ||
+                !sameStandaloneTransform(map.anchor, mapFromFingerprint)
+            ) {
                 appendDiag(
-                    "SphereSLAM explicit map save refused: native map anchor is not centered-page identity",
+                    "SphereSLAM explicit precision-map save refused: " +
+                        "native anchor does not match map_from_fingerprint",
                 )
                 return
             }
