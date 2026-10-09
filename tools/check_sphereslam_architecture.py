@@ -262,7 +262,9 @@ for required in (
 camera_preview = read("feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/CameraPreview.kt")
 # Match the ASSIGNMENT, not a file-wide token: the constant surviving in a comment or import while
 # the property is removed or set to something else must fail.
-_code = "\n".join(line.split("//", 1)[0] for line in camera_preview.splitlines())
+# Block comments go first, so a commented-out assignment inside /* */ cannot satisfy the match.
+_code = re.sub(r"/\*.*?\*/", "", camera_preview, flags=re.S)
+_code = "\n".join(line.split("//", 1)[0] for line in _code.splitlines())
 if not re.search(
     r"imageAnalysisBackpressureStrategy\s*=\s*(?:androidx\.camera\.core\.)?ImageAnalysis\.STRATEGY_KEEP_ONLY_LATEST\b",
     _code,
@@ -271,7 +273,8 @@ if not re.search(
 standalone_analyzer = read(
     "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/SphereSlamStandaloneTrackingAnalyzer.kt"
 )
-for token in ("launch(", "launch {", ".execute(", ".submit(", "Thread("):
+standalone_analyzer = re.sub(r"/\*.*?\*/", "", standalone_analyzer, flags=re.S)
+for token in ("launch(", "launch {", "async {", "async(", "runAsync", ".execute(", ".submit(", "Thread("):
     if token in standalone_analyzer:
         fail(
             f"Standalone analyzer starts asynchronous work ({token!r}); per-frame work must stay synchronous "
