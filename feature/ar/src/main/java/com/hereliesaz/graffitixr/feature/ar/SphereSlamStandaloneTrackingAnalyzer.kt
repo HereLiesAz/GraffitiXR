@@ -14,6 +14,7 @@ import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsicsEstimator
 import com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricMarks
 import com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion
+import com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
 import com.hereliesaz.graffitixr.feature.ar.rendering.ProjectionMatrix
 import com.hereliesaz.graffitixr.feature.ar.util.RotationDeltaMath
 import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintFrame
@@ -100,12 +101,15 @@ data class SphereSlamPhotosphereKeyframe(
     val headingDeg: Float,
     val elevationDeg: Float,
     val orientationQuaternion: FloatArray?,
+    /** Rotation-only GL camera_from_map for the base photosphere at this frame. */
+    val cameraFromMap: FloatArray,
 ) {
     init {
         require(width > 0 && height > 0 && luma.size == width * height)
         require(intrinsics.size == 4 && intrinsics.all { it.isFinite() })
         require(headingDeg.isFinite() && elevationDeg.isFinite())
         require(orientationQuaternion == null || orientationQuaternion.size == 4)
+        require(cameraFromMap.size == 16 && cameraFromMap.all { it.isFinite() })
     }
 }
 
@@ -136,6 +140,11 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private val onFrameTracked: (SphereSlamStandaloneFrame?) -> Unit,
     private val cameraAttitude: () -> Pair<Float, Float>? = { null },
     private val onPhotosphereKeyframe: (SphereSlamPhotosphereKeyframe) -> Unit = {},
+    /**
+     * Solved on a frame where both base-map pose and KPM precision pose are known:
+     * map_from_fingerprint = inverse(camera_from_map) * camera_from_fingerprint.
+     */
+    private val onMapFromFingerprintSolved: (FloatArray) -> Unit = {},
     private val onReferenceReady: (SphereSlamStandaloneSession.Reference) -> Unit = {},
     private val onAtlasPageAdded: (StandaloneAtlasGrowthCandidate) -> Unit = {},
     // Phase 1b of the spherical-coverage map (docs/SPHERESLAM_SPHERE_MAP.md): the device bearing at
@@ -232,6 +241,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     }
     private var lastAtlasGrowthMs = Long.MIN_VALUE
     private var lastPhotosphereKeyframeMs = Long.MIN_VALUE
+    private var photosphereReferenceQuaternion: FloatArray? = null
+    private var photosphereReferenceRotationDeg: Int = 0
+    private var emittedMapBridgeForReference: SphereSlamStandaloneReferenceImage? = null
     // Phase 2: throttle MiDaS inference to a keyframe cadence (not per-frame — ORT CPU inference is
     // too expensive for 30fps and the map builds per-keyframe anyway).
     private var lastDepthMs = Long.MIN_VALUE
@@ -284,6 +296,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         }
 
         if (referenceChanged || fingerprintChanged || mapChanged) {
+            if (referenceChanged) emittedMapBridgeForReference = null
             session?.close()
             session = null
             sessionKey = null
@@ -387,10 +400,12 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             val projection = ProjectionMatrix.buildFrom(intrinsics)
             val direct = directFrame(rotated.bytes)
 
-            // SphereSLAM is the base runtime. Its photosphere updates for the whole standalone
-            // session, before and after fingerprint creation. The fingerprint/teleological layer can
-            // enrich this map, but never owns its lifetime.
-            capturePhotosphereKeyframe(rotated, intrinsics, timestampNs)
+            // SphereSLAM is the base runtime. Its map frame is established by the first usable IMU
+            // attitude and remains independent of the later fingerprint. Until depth contributes
+            // translation this pose is intentionally rotation-only: zero translation is the
+            // fixed-standpoint photosphere model, not an invented motion estimate.
+            val cameraFromMap = photosphereCameraFromMap(rotationDeg)
+            capturePhotosphereKeyframe(rotated, intrinsics, timestampNs, cameraFromMap)
             if (referenceImage == null) {
                 slamManager?.setTrackingPoseValid(false)
                 onFrameTracked(null)
@@ -442,6 +457,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                     return
                 }
 
+                maybeEmitMapFromFingerprint(
+                    cameraFromMap = cameraFromMap,
+                    cameraFromFingerprint = lockedPose.cameraFromCanonical,
+                )
                 pendingImuReference?.let(bridge::commitReference)
                 maybeGrowAtlas(
                     active = active,
@@ -658,12 +677,84 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         )
     }
 
+    /**
+     * Base photosphere pose. The first sensor sample defines the map orientation. Translation remains
+     * exactly zero until the geometric/depth layer supplies a baseline; we never synthesize it from
+     * accelerometer integration.
+     */
+    private fun photosphereCameraFromMap(rotationDeg: Int): FloatArray? {
+        val qNow = bridge.latestOrientationSample() ?: return null
+        val qRef = photosphereReferenceQuaternion
+        if (qRef == null) {
+            photosphereReferenceQuaternion = qNow.copyOf()
+            photosphereReferenceRotationDeg = rotationDeg
+            return identityView()
+        }
+
+        val qDeltaBody = RotationDeltaMath.multiplyQuaternions(
+            RotationDeltaMath.conjugate(qNow),
+            qRef,
+        )
+        val deltaBody = RotationDeltaMath.toRotationMatrix3x3(
+            RotationDeltaMath.normalize(qDeltaBody)
+        )
+        val a = RotationDeltaMath.rotationAboutZ(photosphereReferenceRotationDeg)
+        val deltaCamera = RotationDeltaMath.multiplyMat3(
+            RotationDeltaMath.multiplyMat3(a, deltaBody),
+            RotationDeltaMath.transposeMat3(a),
+        )
+        return columnMajorViewFromRowMajorRotation(deltaCamera)
+    }
+
+    private fun maybeEmitMapFromFingerprint(
+        cameraFromMap: FloatArray?,
+        cameraFromFingerprint: FloatArray,
+    ) {
+        val reference = referenceImage ?: return
+        if (cameraFromMap == null || emittedMapBridgeForReference === reference) return
+        if (
+            cameraFromMap.size != 16 ||
+            cameraFromFingerprint.size != 16 ||
+            cameraFromMap.any { !it.isFinite() } ||
+            cameraFromFingerprint.any { !it.isFinite() }
+        ) return
+
+        val mapFromFingerprint = PoseMath.multiply(
+            PoseMath.rigidInverse(cameraFromMap),
+            cameraFromFingerprint,
+        )
+        if (mapFromFingerprint.any { !it.isFinite() }) return
+        emittedMapBridgeForReference = reference
+        onMapFromFingerprintSolved(mapFromFingerprint)
+        onDiagnostic("SphereSLAM map_from_fingerprint solved from same-frame base+KPM pose")
+    }
+
+    private fun identityView(): FloatArray = floatArrayOf(
+        1f, 0f, 0f, 0f,
+        0f, 1f, 0f, 0f,
+        0f, 0f, 1f, 0f,
+        0f, 0f, 0f, 1f,
+    )
+
+    private fun columnMajorViewFromRowMajorRotation(rotation: FloatArray): FloatArray {
+        require(rotation.size == 9)
+        val out = identityView()
+        for (row in 0..2) {
+            for (col in 0..2) {
+                out[col * 4 + row] = rotation[row * 3 + col]
+            }
+        }
+        return out
+    }
+
     private fun capturePhotosphereKeyframe(
         frame: RotatedLuma,
         intrinsics: CameraIntrinsics,
         timestampNs: Long,
+        cameraFromMap: FloatArray?,
     ) {
         val attitude = cameraAttitude() ?: return
+        val mapPose = cameraFromMap ?: return
         val nowMs = android.os.SystemClock.elapsedRealtime()
         if (
             lastPhotosphereKeyframeMs != Long.MIN_VALUE &&
@@ -691,6 +782,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 headingDeg = attitude.first,
                 elevationDeg = attitude.second,
                 orientationQuaternion = bridge.latestOrientationSample(),
+                cameraFromMap = mapPose.copyOf(),
             )
         )
     }
