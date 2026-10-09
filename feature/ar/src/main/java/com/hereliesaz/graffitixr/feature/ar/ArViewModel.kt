@@ -1072,6 +1072,47 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Persist the rigid bridge solved on a frame where the base photosphere pose and precision KPM
+     * pose are both known. Empty is the only unresolved sentinel; identity is a legitimate solved
+     * transform and must never be used as a fallback.
+     */
+    fun onStandaloneMapFromFingerprintSolved(mapFromFingerprint: FloatArray) {
+        if (
+            mapFromFingerprint.size != 16 ||
+            mapFromFingerprint.any { !it.isFinite() }
+        ) return
+
+        val starting = projectRepository.currentProject.value ?: return
+        if (starting.sphereSlamFingerprint == null) return
+        if (starting.sphereSlamMapFromFingerprint.size == 16) return
+        val projectId = starting.id
+        val anchorGeneration = starting.sphereSlamAnchorGeneration
+        val solved = mapFromFingerprint.toList()
+
+        viewModelScope.launch(dispatchers.io) {
+            var committed = false
+            projectRepository.updateProject { current ->
+                if (
+                    current.id != projectId ||
+                    current.sphereSlamFingerprint == null ||
+                    current.sphereSlamAnchorGeneration != anchorGeneration ||
+                    current.sphereSlamMapFromFingerprint.size == 16
+                ) {
+                    current
+                } else {
+                    committed = true
+                    current.copy(sphereSlamMapFromFingerprint = solved)
+                }
+            }
+            if (committed) {
+                appendDiag(
+                    "SphereSLAM map_from_fingerprint persisted generation=$anchorGeneration"
+                )
+            }
+        }
+    }
+
     private fun currentPhotosphereTile(): com.hereliesaz.sphereslam.TileId? {
         val attitude = latestCameraAttitude ?: return null
         return synchronized(spherePhotosphereLock) {
