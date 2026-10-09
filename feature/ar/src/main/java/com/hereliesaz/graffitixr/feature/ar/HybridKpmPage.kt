@@ -19,37 +19,43 @@ class HybridKpmPage(
     val widthMeters: Float,
     val pageFromArtwork: FloatArray,
 ) {
-    /** True when every field is usable; a page that fails this is never restored or persisted. */
+    /**
+     * True when every field is usable; a page that fails this is never restored or persisted.
+     * Dimensions are bounded BEFORE the area is formed: from an imported/peer manifest,
+     * 65537 x 65537 wraps an Int product to 131073 and would otherwise "match" a tiny buffer.
+     */
     fun isValid(): Boolean =
-        width > 0 && height > 0 &&
-            luma.size == width * height &&
+        width in 1..MAX_DIMENSION_PX && height in 1..MAX_DIMENSION_PX &&
+            luma.size.toLong() == width.toLong() * height.toLong() &&
             widthMeters.isFinite() && widthMeters > 0f &&
             pageFromArtwork.size == 16 && pageFromArtwork.all { it.isFinite() } &&
             pageFromArtwork[15] == 1f
 
     companion object {
+        /** Generous ceiling over the capture's 1024-px rectification cap. */
+        const val MAX_DIMENSION_PX = 4096
+
         /**
          * The fingerprint key a page frozen during a capture may commit under, or null if it may not
          * commit yet (or ever). Commits only into the capture's own project, and only once that
-         * project's fingerprint differs from BOTH the value it held when the capture started and the
-         * value it held when the page froze. The fingerprint build starts after the anchor the page
-         * freezes against, so a change after the freeze is this capture's; a change between capture
-         * and freeze can only be an earlier capture's slow build and must not bind this page.
+         * project's fingerprint differs from the value it held when the capture started — whether
+         * that change landed before or after the page froze (the fingerprint build and the page
+         * anchor's first TRACKING frame race).
          *
-         * Residual, accepted: an earlier capture's build that outlasts this capture's entire review
-         * AND freeze would still bind. If this capture's own build then lands, the key mismatch makes
-         * the page inert (not wrong); it is wrong only if this capture's build also fails.
+         * Residual, accepted: if a new capture is started while an EARLIER capture's fingerprint
+         * build is still running, that earlier fingerprint landing can bind this page. When this
+         * capture's own fingerprint then lands, the key mismatch makes the page inert (not wrong);
+         * it is wrong only if this capture's build also fails.
          */
         fun commitKeyOrNull(
             projectId: String,
             captureProjectId: String?,
             fingerprintKey: List<Float>?,
             keyAtCapture: List<Float>?,
-            keyAtFreeze: List<Float>?,
         ): List<Float>? {
-            if (keyAtCapture == null || keyAtFreeze == null || projectId != captureProjectId) return null
+            if (keyAtCapture == null || projectId != captureProjectId) return null
             val key = fingerprintKey?.takeIf { it.size == 16 } ?: return null
-            return key.takeIf { it != keyAtCapture && it != keyAtFreeze }
+            return key.takeIf { it != keyAtCapture }
         }
 
         /** True when a persisted page bound to [boundKey] belongs to the fingerprint [fingerprintKey]. */

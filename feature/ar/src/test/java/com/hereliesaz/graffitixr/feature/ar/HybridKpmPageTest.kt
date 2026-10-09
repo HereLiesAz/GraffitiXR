@@ -27,6 +27,13 @@ class HybridKpmPageTest {
     }
 
     @Test
+    fun `dimensions whose Int area wraps are refused`() {
+        // 65537 * 65537 overflows Int to 131073; a buffer of that size must not validate.
+        assertNull(HybridKpmPage.fromPersisted(ByteArray(131073), 65537, 65537, 1.2f, identity))
+        assertNull(HybridKpmPage.fromPersisted(ByteArray(4097), 4097, 1, 1.2f, identity))
+    }
+
+    @Test
     fun `non-finite relation is invalid`() {
         val bad = identity.toFloatArray().also { it[12] = Float.POSITIVE_INFINITY }
         assertFalse(HybridKpmPage(ByteArray(12), 4, 3, 1.2f, bad).isValid())
@@ -39,35 +46,25 @@ class HybridKpmPageBindingTest {
 
     @Test
     fun `commits under the new fingerprint once it lands`() {
-        org.junit.Assert.assertEquals(new, HybridKpmPage.commitKeyOrNull("p", "p", new, old, old))
+        org.junit.Assert.assertEquals(new, HybridKpmPage.commitKeyOrNull("p", "p", new, old))
     }
 
     @Test
     fun `first-ever target commits once a fingerprint exists`() {
-        org.junit.Assert.assertEquals(new, HybridKpmPage.commitKeyOrNull("p", "p", new, emptyList(), emptyList()))
+        org.junit.Assert.assertEquals(new, HybridKpmPage.commitKeyOrNull("p", "p", new, emptyList()))
     }
 
     @Test
     fun `waits while the fingerprint is still the pre-capture one`() {
-        assertNull(HybridKpmPage.commitKeyOrNull("p", "p", old, old, old))
+        assertNull(HybridKpmPage.commitKeyOrNull("p", "p", old, old))
     }
 
     @Test
     fun `never commits into another project or without a capture`() {
-        assertNull(HybridKpmPage.commitKeyOrNull("other", "p", new, old, old))
-        assertNull(HybridKpmPage.commitKeyOrNull("p", "p", new, null, old))
-        assertNull(HybridKpmPage.commitKeyOrNull("p", "p", new, old, null))
-        assertNull(HybridKpmPage.commitKeyOrNull("p", "p", null, old, old))
-        assertNull(HybridKpmPage.commitKeyOrNull("p", "p", List(15) { 2f }, old, old))
-    }
-
-    @Test
-    fun `an earlier capture's fingerprint landing before this page froze does not bind it`() {
-        val earlier = List(16) { 3f }
-        // Capture started at `old`; the earlier capture's build landed (`earlier`) before freeze.
-        assertNull(HybridKpmPage.commitKeyOrNull("p", "p", earlier, old, earlier))
-        // This capture's own fingerprint lands after the freeze: commits under it.
-        org.junit.Assert.assertEquals(new, HybridKpmPage.commitKeyOrNull("p", "p", new, old, earlier))
+        assertNull(HybridKpmPage.commitKeyOrNull("other", "p", new, old))
+        assertNull(HybridKpmPage.commitKeyOrNull("p", "p", new, null))
+        assertNull(HybridKpmPage.commitKeyOrNull("p", "p", null, old))
+        assertNull(HybridKpmPage.commitKeyOrNull("p", "p", List(15) { 2f }, old))
     }
 
     @Test

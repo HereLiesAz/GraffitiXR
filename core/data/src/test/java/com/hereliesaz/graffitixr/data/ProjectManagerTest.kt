@@ -416,6 +416,25 @@ class ProjectManagerTest {
     }
 
     @Test
+    fun `stale save carrying a fingerprint still keeps the hybrid KPM page`() = runTest {
+        val uri = manager.saveHybridKpmPage(mockContext, "hyb_fp", ByteArray(4))
+        manager.saveProjectExact(
+            mockContext,
+            GraffitiProject(
+                id = "hyb_fp", name = "Wall", hybridKpmPageUri = uri,
+                hybridKpmPageWidthPx = 2, hybridKpmPageHeightPx = 2, hybridKpmPageWidthMeters = 1f,
+            ),
+        )
+        // A snapshot taken after the fingerprint saved but before the page committed.
+        val fp = com.hereliesaz.graffitixr.common.model.Fingerprint(
+            keypoints = emptyList(), points3d = emptyList(), descriptorsData = ByteArray(0),
+            descriptorsRows = 0, descriptorsCols = 0, descriptorsType = 0,
+        )
+        manager.saveProject(mockContext, GraffitiProject(id = "hyb_fp", name = "Wall", fingerprint = fp))
+        assertEquals(uri, manager.loadProjectMetadata(mockContext, "hyb_fp")?.hybridKpmPageUri)
+    }
+
+    @Test
     fun `import rebases the hybrid KPM page URI`() = runTest {
         val manifest =
             """{"id":"hyb_import","name":"Wall","hybridKpmPageUri":"file:///sender/files/projects/hyb_import/hybrid_kpm_page_x.y8.gz","hybridKpmPageWidthPx":2,"hybridKpmPageHeightPx":2,"hybridKpmPageWidthMeters":1.0}"""

@@ -150,7 +150,7 @@ class ProjectManager @Inject constructor(
         // map and cloud anchor id can each legitimately be set on a routine (non-fingerprint) save
         // (e.g. the passive wall-map save), so those instead only fall back to the on-disk value when
         // the incoming project doesn't set one, same as the legacy target-fingerprint references.
-        val incoming = if (preserveExistingCaptureState && projectData.fingerprint == null) {
+        val mergedCapture = if (preserveExistingCaptureState && projectData.fingerprint == null) {
             val existing = try {
                 val f = File(root, "project.json")
                 if (f.exists()) json.decodeFromString<GraffitiProject>(f.readText()) else null
@@ -273,25 +273,6 @@ class ProjectManager @Inject constructor(
                         } else {
                             existing.sphereSlamAtlasPages
                         },
-                    // Hybrid KPM page: the five fields are one unit keyed on the URI, written only
-                    // by the hybrid persist/clear transforms (which use saveProjectExact). A stale
-                    // whole-object writer carrying no URI must not erase or half-overwrite them.
-                    hybridKpmPageUri = projectData.hybridKpmPageUri ?: existing.hybridKpmPageUri,
-                    hybridKpmPageWidthPx =
-                        if (projectData.hybridKpmPageUri != null) projectData.hybridKpmPageWidthPx
-                        else existing.hybridKpmPageWidthPx,
-                    hybridKpmPageHeightPx =
-                        if (projectData.hybridKpmPageUri != null) projectData.hybridKpmPageHeightPx
-                        else existing.hybridKpmPageHeightPx,
-                    hybridKpmPageWidthMeters =
-                        if (projectData.hybridKpmPageUri != null) projectData.hybridKpmPageWidthMeters
-                        else existing.hybridKpmPageWidthMeters,
-                    hybridKpmPageFromArtwork =
-                        if (projectData.hybridKpmPageUri != null) projectData.hybridKpmPageFromArtwork
-                        else existing.hybridKpmPageFromArtwork,
-                    hybridKpmFingerprintKey =
-                        if (projectData.hybridKpmPageUri != null) projectData.hybridKpmFingerprintKey
-                        else existing.hybridKpmFingerprintKey,
                     wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
                     paintMarks = projectData.paintMarks ?: existing.paintMarks,
                     paintGrid = projectData.paintGrid ?: existing.paintGrid,
@@ -302,6 +283,7 @@ class ProjectManager @Inject constructor(
                 )
             } else projectData
         } else projectData
+        val incoming = preserveHybridKpmPage(root, mergedCapture, preserveExistingCaptureState)
 
         val thumbnailUri = if (thumbnail != null) {
             val file = File(root, "thumbnail.png")
@@ -439,6 +421,39 @@ class ProjectManager @Inject constructor(
         if (file.parentFile == root && validName) {
             runCatching { file.delete() }
         }
+    }
+
+    /**
+     * The hybrid KPM page's six fields are one unit keyed on its URI, written only by the hybrid
+     * persist transform (saveProjectExact, which bypasses this). A stale whole-object writer that
+     * carries no page must not erase it — with OR without a fingerprint in hand: a snapshot taken
+     * after a target's fingerprint saved but before its page committed carries the fingerprint and
+     * would skip the fingerprint-null merge above. Keeping an older page is safe: it restores only
+     * while the project's fingerprint matches its key.
+     */
+    private fun preserveHybridKpmPage(
+        root: File,
+        project: GraffitiProject,
+        preserve: Boolean,
+    ): GraffitiProject {
+        if (!preserve || project.hybridKpmPageUri != null) return project
+        val existing = try {
+            val f = File(root, "project.json")
+            if (f.exists()) json.decodeFromString<GraffitiProject>(f.readText()) else null
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        } ?: return project
+        if (existing.hybridKpmPageUri == null) return project
+        return project.copy(
+            hybridKpmPageUri = existing.hybridKpmPageUri,
+            hybridKpmPageWidthPx = existing.hybridKpmPageWidthPx,
+            hybridKpmPageHeightPx = existing.hybridKpmPageHeightPx,
+            hybridKpmPageWidthMeters = existing.hybridKpmPageWidthMeters,
+            hybridKpmPageFromArtwork = existing.hybridKpmPageFromArtwork,
+            hybridKpmFingerprintKey = existing.hybridKpmFingerprintKey,
+        )
     }
 
     /**

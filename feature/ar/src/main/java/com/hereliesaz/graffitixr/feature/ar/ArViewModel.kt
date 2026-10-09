@@ -3844,10 +3844,6 @@ class ArViewModel @Inject constructor(
     // produced the page actually produced a fingerprint. A capture whose fingerprint build fails
     // never commits its page, so a page can never be paired with a different capture's fingerprint.
     private var hybridKeyAtCapture: List<Float>? = null
-    // The project's fingerprint key when this capture's page froze. Only a change AFTER the freeze
-    // counts as this capture's fingerprint landing — an earlier capture's slow build finishing
-    // while this one was under review would otherwise bind this page to that capture's key.
-    private var hybridKeyAtFreeze: List<Float>? = null
     // Project the capture belongs to; a page never commits into a different project.
     private var hybridCaptureProjectId: String? = null
 
@@ -3855,7 +3851,6 @@ class ArViewModel @Inject constructor(
     private fun onHybridCaptureStarted() {
         synchronized(hybridLock) {
             pendingHybridPage = null
-            hybridKeyAtFreeze = null
             val project = projectRepository.currentProject.value
             hybridCaptureProjectId = project?.id
             hybridKeyAtCapture = project?.fingerprint?.captureAnchorCam ?: emptyList()
@@ -3867,8 +3862,6 @@ class ArViewModel @Inject constructor(
         synchronized(hybridLock) {
             if (hybridKeyAtCapture == null) return // no capture this session; nothing to bind to
             pendingHybridPage = page
-            hybridKeyAtFreeze = projectRepository.currentProject.value?.fingerprint?.captureAnchorCam
-                ?: emptyList()
         }
         projectRepository.currentProject.value?.let(::tryCommitPendingHybridPage)
     }
@@ -3884,7 +3877,6 @@ class ArViewModel @Inject constructor(
                 captureProjectId = hybridCaptureProjectId,
                 fingerprintKey = project.fingerprint?.captureAnchorCam,
                 keyAtCapture = hybridKeyAtCapture,
-                keyAtFreeze = hybridKeyAtFreeze,
             ) ?: return // this capture's fingerprint has not landed (or never will)
             pendingHybridPage = null
             page = pending

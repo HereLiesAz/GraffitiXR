@@ -765,6 +765,8 @@ class ArRenderer(
     // page was captured: on a re-capture the old anchor is still live for a few frames and freezing
     // against it pins the page to the placement being replaced.
     private var anchorGeneration = 0L
+    // KPM observations at or before this frame timestamp predate the current anchor (GL thread).
+    private var hybridEligibleAfterNs = Long.MIN_VALUE
     private var hybridCaptureAnchorGeneration = Long.MAX_VALUE
 
     /**
@@ -1752,6 +1754,11 @@ class ArRenderer(
                     // on the session's first anchor, since correction starts null anyway.
                     poseFusion.reset()
                     anchorGeneration++
+                    // KPM observations and pose-history samples from before this anchor existed
+                    // pair against a backbone that was not this anchor (e.g. a restored page that
+                    // armed during the return-visit scan). Drop them; only later frames may correct.
+                    hybridPoseHistory.clear()
+                    hybridEligibleAfterNs = frame.timestamp
                     anchorEstablished = true
                     // Announce it beyond the GL thread. This is the ONLY anchor write that counts as
                     // establishment — the plane refiner and the depth fallback both write poses
@@ -1914,7 +1921,8 @@ class ArRenderer(
                     sphereSlamTracker.isReferenceReady &&
                     hybridReferencePhysicallyMetric &&
                     hybridPageFromArtworkAnchor != null &&
-                    hybridObservation != null
+                    hybridObservation != null &&
+                    hybridObservation.timestampNs > hybridEligibleAfterNs
                 ) {
                     com.hereliesaz.graffitixr.feature.ar.anchor.HybridKpmCorrection.solve(
                         observation = hybridObservation,
