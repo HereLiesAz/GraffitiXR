@@ -817,7 +817,16 @@ class MainActivity : ComponentActivity() {
                 // the controller instance directly; recomposition keeps this var current well
                 // before Settings' button is ever tapped.
                 var guidanceControllerRef: com.hereliesaz.aznavrail.tutorial.AzGuidanceController? = null
-                val guidanceController = AzHostActivityLayout(navController = navController, currentDestination = currentRoute, initiallyExpanded = false) {
+                val guidanceController = AzHostActivityLayout(
+                    navController = navController,
+                    currentDestination = currentRoute,
+                    initiallyExpanded = false,
+                    // AzNavRail 11.54 supports a controlled drawer state. Freeze is a true hands-off
+                    // tracing mode, so force the expanded drawer closed while locked instead of
+                    // trusting an uncontrolled menu to collapse itself after the click.
+                    expanded = if (mainUiState.isTouchLocked) false else null,
+                    disableSwipeToOpen = mainUiState.isTouchLocked,
+                ) {
                     azTheme(
                         activeColor = Cyan,
                         focusColor = Cyan,
@@ -968,7 +977,12 @@ class MainActivity : ComponentActivity() {
                         // state is the user's call, not app state's" rule below: unfreezing does NOT
                         // re-expand it, so a manual re-fold elsewhere in the session is respected.
                         LaunchedEffect(mainUiState.isTouchLocked) {
-                            if (mainUiState.isTouchLocked) hostScope.isFoldedUp = true
+                            if (mainUiState.isTouchLocked) {
+                                // Complete Guide contract: isFoldedUp is the stationary noMenu
+                                // rail's programmatic fold state. noMenu is also true while frozen,
+                                // and the host drawer is controlled closed above.
+                                hostScope.isFoldedUp = true
+                            }
                         }
 
                         MainScreen(
