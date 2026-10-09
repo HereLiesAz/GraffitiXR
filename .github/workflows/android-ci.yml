@@ -20,14 +20,18 @@ name: Android CI
 #  on-device, never in the APK. See SettingsRepository.crashReportToken.)
 
 on:
-  push:
-    branches: [ "**" ]
+  # PRs into main, and the merge itself. Plain branch pushes don't run it, so a PR commit
+  # triggers exactly one event.
   pull_request:
+    branches: [ "main" ]
+  push:
     branches: [ "main" ]
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # One run of this workflow at a time across the whole repo: the latest trigger, from any
+  # branch, cancels whatever run is in progress.
+  group: ${{ github.workflow }}
   cancel-in-progress: true
 
 permissions:
