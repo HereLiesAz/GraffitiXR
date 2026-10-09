@@ -958,23 +958,28 @@ fun SphereSlamStandaloneOverlay(
             !shouldStartStandaloneAnalyzer(
                 cameraIdPresent = id != null,
                 atlasLoaded = restoredAtlas != null,
-            )
+            ) ||
+            id == null ||
+            restoredAtlas == null
         ) {
             onDispose {}
         } else {
+            // Stable non-null locals keep Kotlin's smart casts valid throughout DisposableEffect.
+            val activeCameraId: String = id
+            val activeAtlas: List<SphereSlamStandaloneAtlasReferenceImage> = restoredAtlas
             val executor = Executors.newSingleThreadExecutor { runnable ->
                 Thread(runnable, "sphereslam-standalone-camera").apply { isDaemon = true }
             }
             if (peerOnlyTracking) {
                 val peerSpatial = coopPeerSpatialFrame
                 val peerFingerprint = coopPeerFingerprint
-                if (peerSpatial == null || peerFingerprint.isNullOrEmpty()) {
+                if (peerSpatial == null || peerFingerprint == null || peerFingerprint.isEmpty()) {
                     executor.shutdown()
                     onDispose {}
                 } else {
                     val analyzer = CoopPeerFingerprintAnalyzer(
                         context = context,
-                        cameraId = id,
+                        cameraId = activeCameraId,
                         slam = slamManager,
                         peerFingerprint = peerFingerprint,
                         spatialFrame = peerSpatial,
@@ -994,9 +999,9 @@ fun SphereSlamStandaloneOverlay(
             } else {
                 val analyzer = SphereSlamStandaloneTrackingAnalyzer(
                 context = context,
-                cameraId = id,
+                cameraId = activeCameraId,
                 referenceImage = standaloneReference,
-                atlasReferenceImages = restoredAtlas,
+                atlasReferenceImages = activeAtlas,
                 slamManager = slamManager,
                 mobileGsFingerprint = runtimeMobileGsFingerprint,
                 mobileGsFingerprintFrameVersion = mobileGsFingerprintFrameVersion,
@@ -1149,9 +1154,10 @@ fun SphereSlamStandaloneOverlay(
         peerOnlyTracking,
     ) {
         if (!peerOnlyTracking) {
+            val loadedAtlas = atlasReferenceImages ?: return@LaunchedEffect
             standaloneAnalyzerRef.get()?.updatePrecisionLayer(
                 reference = referenceImage,
-                atlasPages = atlasReferenceImages,
+                atlasPages = loadedAtlas,
                 fingerprint = runtimeMobileGsFingerprint,
                 fingerprintFrameVersion = mobileGsFingerprintFrameVersion,
                 wallFeatureMap = initialMobileGsWallFeatureMap,
