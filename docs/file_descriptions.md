@@ -96,6 +96,8 @@ the real (non-stub) tracker is packaged.
     with the raw sensor-camera ARCore view and unfused artwork backbone from the same clock.
 *   `anchor/HybridKpmCorrection.kt`: metric/age/inlier/reprojection/timestamp gates plus conversion
     of an accepted KPM observation into a corrected artwork anchor for `PoseFusion`.
+*   `anchor/WallMeasure.kt`: pure two-tap wall measurement — screen ray, intersection with the
+    drawn wall plane in wall-local metres, range/obliquity/rigidity gates (AR Measure).
 *   `anchor/PoseFusion.kt`: stores drift fixes as anchor-local corrections. It accepts both the
     legacy MobileGS PnP path and timestamp-aligned hybrid KPM corrections; neither path writes
     renderer camera matrices.

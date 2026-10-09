@@ -824,12 +824,20 @@ fun MainScreen(
         }
 
         val isGuest = arUiState.coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST
+        val isMeasuring = arUiState.measure.active && uiState.editorMode == EditorMode.AR
 
         if (isCameraActive) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(uiState.design?.id, isImageLocked, isWaitingForTap, isTouchLocked, isGuest, uiState.editorMode) {
+                    .pointerInput(uiState.design?.id, isImageLocked, isWaitingForTap, isTouchLocked, isGuest, uiState.editorMode, isMeasuring) {
+                        // Measure taps are wall readings, not edits, so a guest may measure too.
+                        if (isMeasuring) {
+                            detectTapGestures { offset ->
+                                arViewModel.onMeasureTap(offset.x / size.width, offset.y / size.height)
+                            }
+                            return@pointerInput
+                        }
                         if (isGuest) return@pointerInput // Block ALL guest interaction with layers
 
                         // Outside Design there is only ONE layer (the whole design), so transform
@@ -854,7 +862,9 @@ fun MainScreen(
                             )
                         }
                     }
-                    .pointerInput(uiState.design?.id, isImageLocked, isWaitingForTap, isTouchLocked, isGuest, uiState.editorMode) {
+                    .pointerInput(uiState.design?.id, isImageLocked, isWaitingForTap, isTouchLocked, isGuest, uiState.editorMode, isMeasuring) {
+                        // While measuring, a drag must not also move the artwork it is measuring under.
+                        if (isMeasuring) return@pointerInput
                         if (isGuest) return@pointerInput // A co-op guest may not move/scale/rotate the shared design.
                         // Outside Design the whole design is the single layer, so transform gestures
                         // always drive the mode adjustment instead of a per-layer transform.

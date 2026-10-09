@@ -584,4 +584,12 @@
     <string-array name="onboarding_design_layers">
         <item>Öffnen — importiert ein Foto aus deiner Galerie; es landet als neue Ebene.</item>
     </string-array>
+    <string name="nav_measure">Messen</string>
+    <string name="nav_measure_info">Die echte Wand messen: Tippe auf eine Kante, dann auf die andere, auf der Wand mit dem Design. Die Breite wird im Projekt gespeichert – gemessen, nicht geschätzt.</string>
+    <string name="measure_tap_first">Tippe auf die erste Kante der Wand</string>
+    <string name="measure_tap_second">Tippe auf die andere Kante</string>
+    <string name="measure_save">Speichern</string>
+    <string name="measure_redo">Neu messen</string>
+    <string name="measure_failed">Dieser Punkt liegt nicht auf der Wand. Richte das Gerät gerader aus und tippe erneut.</string>
+    <string name="measure_wall_width">Wandbreite</string>
 </resources>

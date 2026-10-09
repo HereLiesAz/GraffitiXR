@@ -207,6 +207,55 @@ class ArRenderer(
             val req = hitTestQueue.poll() ?: break
             req.result.complete(null)
         }
+        failPendingWallPoints()
+    }
+
+    // Measure (BACKLOG Phase 6 step 1): taps resolved against the plane the design is drawn on.
+    private val wallPointQueue = java.util.concurrent.ConcurrentLinkedQueue<PendingHitTest>()
+
+    /**
+     * Resolve normalised screen point ([nx], [ny]) — [0,1], y down, relative to the AR view — to a
+     * point on the wall the design is drawn on, in that wall frame's local (x, y) metres. Served on
+     * the next frame after the overlay base frame is computed; completes null with no established
+     * anchor, a grazing/out-of-range ray, or a destroyed renderer. Await with a timeout.
+     */
+    fun requestWallPoint(nx: Float, ny: Float): kotlinx.coroutines.Deferred<FloatArray?> {
+        val d = kotlinx.coroutines.CompletableDeferred<FloatArray?>()
+        if (isDestroying || session == null) {
+            d.complete(null)
+            return d
+        }
+        wallPointQueue.add(PendingHitTest(nx, ny, d))
+        return d
+    }
+
+    private fun failPendingWallPoints() {
+        while (true) {
+            val req = wallPointQueue.poll() ?: break
+            req.result.complete(null)
+        }
+    }
+
+    /** GL thread, after [overlayBaseScratch] is final for this frame. */
+    private fun drainWallPointQueue(view: FloatArray, proj: FloatArray, wallReady: Boolean) {
+        while (true) {
+            val req = wallPointQueue.poll() ?: break
+            val local = if (!wallReady) {
+                null
+            } else {
+                try {
+                    com.hereliesaz.graffitixr.feature.ar.anchor.WallMeasure.screenRay(req.x, req.y, view, proj)
+                        ?.let {
+                            com.hereliesaz.graffitixr.feature.ar.anchor.WallMeasure
+                                .intersectWallLocal(it, overlayBaseScratch)
+                        }
+                } catch (e: Exception) {
+                    Timber.w(e, "wall-point request failed")
+                    null
+                }
+            }
+            req.result.complete(local)
+        }
     }
 
     private val backgroundRenderer = BackgroundRenderer()
@@ -2761,6 +2810,16 @@ class ArRenderer(
                 overlayBaseScratch[8] = overlayRotScratch2[8]; overlayBaseScratch[9] = overlayRotScratch2[9]; overlayBaseScratch[10] = overlayRotScratch2[10]
                 // Translation stays the live anchor position (cols 12-14 already copied above).
             }
+
+            // Measure taps: the overlay base frame's local z = 0 IS the wall the design is drawn on.
+            // Only meaningful with an established anchor and a real surface normal (otherwise the
+            // frame is the raw anchor pose and its z axis is not known to be the wall normal).
+            drainWallPointQueue(
+                viewMatrix,
+                projMatrix,
+                wallReady = anchorEstablished &&
+                    (anchorSurfaceNormal[0] != 0f || anchorSurfaceNormal[1] != 0f || anchorSurfaceNormal[2] != 0f),
+            )
 
             // Center the overlay on the matched-marks centroid instead of the screen-center anchor.
             // overlayMarkCenterLocal is the centroid in the fingerprint anchor's frame; reconstruct

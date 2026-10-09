@@ -584,4 +584,12 @@
     <string-array name="onboarding_design_layers">
         <item>Apri — importa una foto dalla galleria; viene aggiunta come nuovo livello.</item>
     </string-array>
+    <string name="nav_measure">Misura</string>
+    <string name="nav_measure_info">Misura il muro reale: tocca un bordo, poi l\'altro, sul muro su cui si trova il design. La larghezza viene salvata nel progetto: misurata, non stimata.</string>
+    <string name="measure_tap_first">Tocca il primo bordo del muro</string>
+    <string name="measure_tap_second">Tocca l\'altro bordo</string>
+    <string name="measure_save">Salva</string>
+    <string name="measure_redo">Rifai</string>
+    <string name="measure_failed">Impossibile collocare quel punto sul muro. Inquadra più frontalmente e tocca di nuovo.</string>
+    <string name="measure_wall_width">Larghezza del muro</string>
 </resources>

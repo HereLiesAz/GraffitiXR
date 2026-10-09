@@ -1335,6 +1335,22 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
+                            if (editorUiState.editorMode == EditorMode.AR && arUiState.measure.active &&
+                                !showLibrary && !showSettings
+                            ) {
+                                MeasurePanel(
+                                    measure = arUiState.measure,
+                                    savedWidthMeters = arUiState.wallWidthMeters,
+                                    imperial = arUiState.isImperialUnits,
+                                    nav = navStrings,
+                                    onSave = { arViewModel.saveMeasure() },
+                                    onRedo = { arViewModel.redoMeasure() },
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .padding(bottom = 96.dp),
+                                )
+                            }
+
                             val distanceM = arUiState.distanceToAnchorMeters
                             if (editorUiState.editorMode == EditorMode.AR
                                 && arUiState.isAnchorEstablished
@@ -2111,6 +2127,8 @@ class MainActivity : ComponentActivity() {
                                 // confirming it would register an old target against a freshly-established
                                 // anchor.
                                 arViewModel.clearCaptureForRetry()
+                                // Target and Measure both own screen taps; only one at a time.
+                                arViewModel.cancelMeasure()
                                 mainViewModel.startTargetCapture()
                             } else {
                                 requestPermissions()
@@ -2120,6 +2138,22 @@ class MainActivity : ComponentActivity() {
                     // Flashlight — illuminate the wall in low light while tracking.
                     azRailSubItem(id = "mode.ar.light", hostId = "mode.ar", text = navStrings.light, color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { arViewModel.toggleFlashlight() })
                     azRailSubItem(id = "mode.ar.lock", hostId = "mode.ar", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { editorViewModel.onToggleModeTransformLocked(EditorMode.AR) })
+                    // Measure — two taps on the wall the design is drawn on. Needs the anchor's wall
+                    // frame, and the ARCore backend: standalone has no measurement path yet, and must
+                    // offer one only for physically metric targets (SPHERESLAM_TODO §3).
+                    if (arUiState.isAnchorEstablished && !arRailPolicy.standalone) azRailSubItem(
+                        id = "mode.ar.measure",
+                        hostId = "mode.ar",
+                        text = navStrings.measure,
+                        color = navItemColor,
+                        classifiers = setOf("toggle"),
+                        shape = AzButtonShape.NONE,
+                        disabled = showLibrary,
+                        onClick = {
+                            if (isWaitingForTap) mainViewModel.cancelTapMode()
+                            arViewModel.toggleMeasure()
+                        },
+                    )
                     // Magic — fit the design to the established anchor's extent (falling back to a
                     // legibility auto-tune when there is no anchor yet). onMagicClicked was
                     // implemented and unreachable: the "Magic Wand" the adjustments panel's doc
@@ -2300,6 +2334,7 @@ class MainActivity : ComponentActivity() {
             if (editorUiState.editorMode == EditorMode.AR) {
                 if (isWaitingForTap) azHighlight("target.create", active = Cyan)
                 if (arUiState.isFlashlightOn) azHighlight("mode.ar.light", active = Cyan)
+                if (arUiState.measure.active) azHighlight("mode.ar.measure", active = Cyan)
                 if (editorUiState.modeAdjustments[EditorMode.AR]?.isTransformLocked == true)
                     azHighlight("mode.ar.lock", active = Cyan)
                 if (arUiState.coopRole == CoopRole.HOST) azHighlight("coop.host", active = Cyan)
@@ -3225,13 +3260,7 @@ private fun DistanceBadge(
     val cmLabel = stringResource(DesignR.string.unit_centimeters)
     val mLabel = stringResource(DesignR.string.unit_meters)
 
-    val label = if (imperial) {
-        val feet = distanceMeters * 3.28084f
-        "%.1f %s".format(feet, feetLabel)
-    } else {
-        if (distanceMeters < 1f) "${(distanceMeters * 100).toInt()} %s".format(cmLabel)
-        else "%.1f %s".format(distanceMeters, mLabel)
-    }
+    val label = formatDistance(distanceMeters, imperial, feetLabel, cmLabel, mLabel)
     Box(
         modifier = modifier
             .background(Color(0xCC000000), RoundedCornerShape(20.dp))
@@ -3241,6 +3270,86 @@ private fun DistanceBadge(
             text = label,
             color = Color.White,
         )
+    }
+}
+
+/** Shared metric/imperial distance label (camera distance badge, Measure result). */
+internal fun formatDistance(
+    meters: Float,
+    imperial: Boolean,
+    feetLabel: String,
+    cmLabel: String,
+    mLabel: String,
+): String = if (imperial) {
+    "%.1f %s".format(meters * 3.28084f, feetLabel)
+} else if (meters < 1f) {
+    "${(meters * 100).toInt()} %s".format(cmLabel)
+} else {
+    "%.1f %s".format(meters, mLabel)
+}
+
+/**
+ * AR Measure prompt/result chip plus markers at the accepted taps. Markers are screen-space at the
+ * tap position (they do not follow the wall as the phone moves); the measurement itself is taken in
+ * the wall frame, so moving does not change the result.
+ */
+@Composable
+private fun MeasurePanel(
+    measure: com.hereliesaz.graffitixr.common.model.MeasureUi,
+    savedWidthMeters: Float?,
+    imperial: Boolean,
+    nav: com.hereliesaz.graffitixr.design.theme.NavStrings,
+    onSave: () -> Unit,
+    onRedo: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val feet = stringResource(DesignR.string.unit_feet)
+    val cm = stringResource(DesignR.string.unit_centimeters)
+    val m = stringResource(DesignR.string.unit_meters)
+    Box(Modifier.fillMaxSize()) {
+        androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+            measure.points.forEach { p ->
+                val c = androidx.compose.ui.geometry.Offset(p.nx * size.width, p.ny * size.height)
+                drawCircle(Color.Black, radius = 11.dp.toPx(), center = c)
+                drawCircle(Color.White, radius = 7.dp.toPx(), center = c)
+            }
+            if (measure.points.size == 2) {
+                val a = measure.points[0]; val b = measure.points[1]
+                drawLine(
+                    Color.White,
+                    androidx.compose.ui.geometry.Offset(a.nx * size.width, a.ny * size.height),
+                    androidx.compose.ui.geometry.Offset(b.nx * size.width, b.ny * size.height),
+                    strokeWidth = 2.dp.toPx(),
+                )
+            }
+        }
+        androidx.compose.foundation.layout.Column(
+            modifier = modifier
+                .background(Color(0xCC000000), RoundedCornerShape(16.dp))
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            val result = measure.resultMeters
+            val prompt = when {
+                result != null -> formatDistance(result, imperial, feet, cm, m)
+                measure.points.isEmpty() -> nav.measureTapFirst
+                else -> nav.measureTapSecond
+            }
+            Text(prompt, color = Color.White)
+            if (measure.failed) Text(nav.measureFailed, color = Color(0xFFFFC107))
+            if (result == null && savedWidthMeters != null) {
+                Text(
+                    "${nav.measureWallWidth}: ${formatDistance(savedWidthMeters, imperial, feet, cm, m)}",
+                    color = Color.LightGray,
+                )
+            }
+            if (result != null) {
+                androidx.compose.foundation.layout.Row {
+                    androidx.compose.material3.TextButton(onClick = onRedo) { Text(nav.measureRedo, color = Color.White) }
+                    androidx.compose.material3.TextButton(onClick = onSave) { Text(nav.measureSave, color = Color.Cyan) }
+                }
+            }
+        }
     }
 }
 

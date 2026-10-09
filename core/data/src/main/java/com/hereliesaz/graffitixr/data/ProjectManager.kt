@@ -269,6 +269,9 @@ class ProjectManager @Inject constructor(
                             existing.sphereSlamAtlasPages
                         },
                     wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
+                    // Artist-measured; a stale whole-object writer must not erase it. A deliberate
+                    // clear goes through updateProject (saveProjectExact), which bypasses this merge.
+                    wallWidthMeters = projectData.wallWidthMeters ?: existing.wallWidthMeters,
                     paintMarks = projectData.paintMarks ?: existing.paintMarks,
                     paintGrid = projectData.paintGrid ?: existing.paintGrid,
                     cloudAnchorId = projectData.cloudAnchorId ?: existing.cloudAnchorId,

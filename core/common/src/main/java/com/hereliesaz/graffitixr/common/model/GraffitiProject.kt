@@ -287,6 +287,13 @@ data class GraffitiProject(
     // the artist happens to stand. Height follows the design's aspect. -1 = never placed.
     val arDesignHalfWidthM: Float = -1f,
 
+    /**
+     * Real wall width in metres, measured by the artist with AR Measure (two taps on the plane the
+     * design is drawn on). Null = never measured. The input every later scale-dependent feature
+     * (grid, sections, paintable area — BACKLOG Phase 6) reads; nothing derives it automatically.
+     */
+    val wallWidthMeters: Float? = null,
+
     // How and where the device was held when this project's target was captured — attitude,
     // ARCore's three poses, the frame rotations, and a location fix. Null on projects saved before
     // the app collected any of it. See CaptureEnvironment for why each group is independently

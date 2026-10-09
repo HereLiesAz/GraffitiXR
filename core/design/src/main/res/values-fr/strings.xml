@@ -317,4 +317,12 @@
     <string-array name="onboarding_design_layers">
         <item>Ouvrir — importe une photo depuis votre galerie ; elle atterrit comme nouvelle couche.</item>
     </string-array>
+    <string name="nav_measure">Mesurer</string>
+    <string name="nav_measure_info">Mesurez le vrai mur : touchez un bord, puis l\'autre, sur le mur qui porte le design. La largeur est enregistrée dans le projet : mesurée, pas devinée.</string>
+    <string name="measure_tap_first">Touchez le premier bord du mur</string>
+    <string name="measure_tap_second">Touchez l\'autre bord</string>
+    <string name="measure_save">Enregistrer</string>
+    <string name="measure_redo">Refaire</string>
+    <string name="measure_failed">Impossible de placer ce point sur le mur. Visez plus de face et touchez à nouveau.</string>
+    <string name="measure_wall_width">Largeur du mur</string>
 </resources>
