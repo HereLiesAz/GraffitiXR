@@ -1596,6 +1596,7 @@ class MainActivity : ComponentActivity() {
                                             mainViewModel.onConfirmStandaloneTargetCreation(
                                                 bitmap,
                                                 mask,
+                                                arViewModel.standaloneFingerprintPlacementForConfirm(),
                                             )
                                         } else {
                                             arViewModel.setInitialAnchorFromCapture()
