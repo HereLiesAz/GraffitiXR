@@ -122,6 +122,21 @@ internal fun shouldRestoreLocalArCoreFingerprint(
         !(coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST &&
             peerSpatialFramePresent)
 
+data class StandaloneFingerprintPlacement(
+    /** Column-major GL map_from_fingerprint transform. */
+    val mapFromFingerprint: FloatArray,
+    /** Width of the captured fingerprint plane in photosphere map units. */
+    val referenceWidthUnits: Float,
+    /** True only when the photosphere supplied a physical range rather than normalized radius. */
+    val physicallyMetric: Boolean,
+    val tileId: com.hereliesaz.sphereslam.TileId,
+) {
+    init {
+        require(mapFromFingerprint.size == 16 && mapFromFingerprint.all { it.isFinite() })
+        require(referenceWidthUnits.isFinite() && referenceWidthUnits > 0f)
+    }
+}
+
 @HiltViewModel
 class ArViewModel @Inject constructor(
     private val slamManager: SlamManager,
@@ -1492,6 +1507,9 @@ class ArViewModel @Inject constructor(
 
     @Volatile
     private var pendingTapPosition: Pair<Float, Float>? = null
+
+    @Volatile
+    private var pendingStandaloneFingerprintPlacement: StandaloneFingerprintPlacement? = null
 
     private val visitedSectors = BooleanArray(36) // 10 degree sectors for higher resolution feedback
 
@@ -3007,6 +3025,7 @@ class ArViewModel @Inject constructor(
      */
     private fun clearCaptureState() {
         pendingTapPosition = null
+        pendingStandaloneFingerprintPlacement = null
         _uiState.update {
             it.copy(
                 tempCaptureBitmap = null,
@@ -4291,6 +4310,72 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    fun standaloneFingerprintPlacementForConfirm(): StandaloneFingerprintPlacement? =
+        pendingStandaloneFingerprintPlacement?.copy(
+            mapFromFingerprint = pendingStandaloneFingerprintPlacement!!.mapFromFingerprint.copyOf(),
+        )
+
+    private fun buildStandaloneFingerprintPlacement(
+        tap: Pair<Float, Float>?,
+    ): StandaloneFingerprintPlacement? {
+        val attitude = latestCameraAttitude ?: return null
+        return synchronized(spherePhotosphereLock) {
+            val tileId = spherePhotosphere.tileAt(attitude.first, attitude.second) ?: return@synchronized null
+            val keyframe = spherePhotosphereFrames[tileId] ?: return@synchronized null
+            val tile = spherePhotosphere.tile(tileId) ?: return@synchronized null
+            val wallHeading = spherePhotosphere.snapshot().wallHeadingDeg ?: return@synchronized null
+
+            val fx = keyframe.intrinsics.getOrNull(0) ?: return@synchronized null
+            val fy = keyframe.intrinsics.getOrNull(1) ?: return@synchronized null
+            val cx = keyframe.intrinsics.getOrNull(2) ?: return@synchronized null
+            val cy = keyframe.intrinsics.getOrNull(3) ?: return@synchronized null
+            if (fx <= 0f || fy <= 0f || keyframe.width <= 0 || keyframe.height <= 0) {
+                return@synchronized null
+            }
+
+            val nx = (tap?.first ?: 0.5f).coerceIn(0f, 1f)
+            val ny = (tap?.second ?: 0.5f).coerceIn(0f, 1f)
+            val u = nx * keyframe.width.toFloat()
+            val v = ny * keyframe.height.toFloat()
+            val azimuthOffsetDeg = Math.toDegrees(
+                kotlin.math.atan(((u - cx) / fx).toDouble())
+            ).toFloat()
+            val elevationOffsetDeg = -Math.toDegrees(
+                kotlin.math.atan(((v - cy) / fy).toDouble())
+            ).toFloat()
+
+            val targetAzimuth = keyframe.headingDeg + azimuthOffsetDeg
+            val targetElevation = (keyframe.elevationDeg + elevationOffsetDeg).coerceIn(-89f, 89f)
+            val azimuthDelta = signedAngleDegrees(targetAzimuth, wallHeading)
+
+            // PhotosphereMap is allowed to be normalized. A missing range does NOT mean zero metres:
+            // it means the map currently uses a unit-radius coordinate system and is explicitly
+            // non-metric until depth/other scale evidence upgrades it.
+            val metricRange = tile.rangeMeters?.takeIf { it.isFinite() && it > 0f }
+            val rangeUnits = metricRange ?: 1f
+            val widthUnits =
+                (rangeUnits * keyframe.width.toFloat() / fx).coerceAtLeast(1e-4f)
+
+            StandaloneFingerprintPlacement(
+                mapFromFingerprint = StandaloneFingerprintFrame.mapFromFingerprint(
+                    azimuthDeltaDeg = azimuthDelta,
+                    elevationDeg = targetElevation,
+                    rangeUnits = rangeUnits,
+                ),
+                referenceWidthUnits = widthUnits,
+                physicallyMetric = metricRange != null,
+                tileId = tileId,
+            )
+        }
+    }
+
+    private fun signedAngleDegrees(value: Float, origin: Float): Float {
+        var d = (value - origin) % 360f
+        if (d > 180f) d -= 360f
+        if (d < -180f) d += 360f
+        return d
+    }
+
     /**
      * CameraX/SphereSLAM counterpart to [onTargetCaptured].
      *
@@ -4299,7 +4384,20 @@ class ArViewModel @Inject constructor(
      * Geometry is supplied later by the standalone fingerprint builder in its canonical page frame.
      */
     fun onStandaloneTargetCaptured(bitmap: Bitmap) {
+        val captureTap = pendingTapPosition
         pendingTapPosition = null
+        pendingStandaloneFingerprintPlacement = buildStandaloneFingerprintPlacement(captureTap)
+        pendingStandaloneFingerprintPlacement?.let { placement ->
+            sphereFingerprintAnchorTile = placement.tileId
+            appendDiag(
+                "SphereSLAM fingerprint capture bound to photosphere tile=" +
+                    "${placement.tileId.sector}:${placement.tileId.band} " +
+                    "widthUnits=${"%.4f".format(placement.referenceWidthUnits)} " +
+                    "metric=${placement.physicallyMetric}"
+            )
+        } ?: appendDiag(
+            "SphereSLAM fingerprint capture has no photosphere transform; confirmation will fail closed"
+        )
         // Stop the capture request immediately so CameraX cannot hand us a second full-resolution
         // still while the first one is being prepared for review.
         _uiState.update { it.copy(isCaptureRequested = false) }
@@ -4497,6 +4595,7 @@ class ArViewModel @Inject constructor(
 
     fun clearTapHighlights() {
         pendingTapPosition = null
+        pendingStandaloneFingerprintPlacement = null
         _uiState.update {
             it.copy(
                 tapMarks = emptyList(),
@@ -4514,6 +4613,7 @@ class ArViewModel @Inject constructor(
      */
     fun clearCaptureForRetry() {
         pendingTapPosition = null
+        pendingStandaloneFingerprintPlacement = null
         _uiState.update {
             it.copy(
                 tempCaptureBitmap = null,
