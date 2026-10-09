@@ -177,12 +177,21 @@ class MainViewModel @Inject constructor(
     fun onConfirmStandaloneTargetCreation(
         bitmap: Bitmap?,
         selectionMask: Bitmap?,
+        placement: com.hereliesaz.graffitixr.feature.ar.StandaloneFingerprintPlacement?,
     ) {
         if (bitmap == null) {
             resetCaptureUi()
             Toast.makeText(
                 context,
                 "Capture incomplete. Try creating the target again.",
+                Toast.LENGTH_LONG,
+            ).show()
+            return
+        }
+        if (placement == null) {
+            Toast.makeText(
+                context,
+                "SphereSLAM map is not ready to anchor this fingerprint yet. Keep the camera on the wall and try again.",
                 Toast.LENGTH_LONG,
             ).show()
             return
@@ -208,13 +217,13 @@ class MainViewModel @Inject constructor(
                     return@launch
                 }
 
-                // No external metric measurement belongs in the shared capture UX. Standalone uses a
-                // normalized 1-unit canonical page; the page/fingerprint stay self-consistent and the
-                // project records that this scale is not physically metric.
+                // Fingerprint geometry is authored in the already-running photosphere's units.
+                // Without metric range those units are normalized; the explicit map transform still
+                // places the page correctly in the base SphereSLAM frame.
                 val fp = StandaloneFingerprintBuilder.build(
                     slam = slamManager,
                     bitmap = bitmap,
-                    referenceWidthMeters = 1f,
+                    referenceWidthMeters = placement.referenceWidthUnits,
                     mask = selectionMask,
                 )
                 if (fp == null) {
@@ -261,8 +270,8 @@ class MainViewModel @Inject constructor(
                         committed = true
                         current.copy(
                             sphereSlamReferenceUri = candidateUri,
-                            sphereSlamReferenceWidthMeters = 1f,
-                            sphereSlamReferencePhysicallyMetric = false,
+                            sphereSlamReferenceWidthMeters = placement.referenceWidthUnits,
+                            sphereSlamReferencePhysicallyMetric = placement.physicallyMetric,
                             sphereSlamAnchorGeneration = current.sphereSlamAnchorGeneration + 1L,
                             sphereSlamAnchorFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
@@ -270,6 +279,7 @@ class MainViewModel @Inject constructor(
                             sphereSlamFingerprint = fingerprint,
                             sphereSlamFingerprintFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                            sphereSlamMapFromFingerprint = placement.mapFromFingerprint.toList(),
                             sphereSlamWallFeatureMap = null,
                             sphereSlamWallFeatureMapFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
