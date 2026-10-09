@@ -46,6 +46,53 @@ internal class GuestSession(
     // with keys bound to an already-dead connection.
     @Volatile private var activeCrypto: SessionCrypto? = null
 
+    // ── Protocol v4: this guest's own edits ──────────────────────────────────────────────────
+    private val outbox = GuestOutbox()
+    // The live connection's stream/crypto for flushing the outbox; null outside the live phase.
+    @Volatile private var liveOutput: OutputStream? = null
+    @Volatile private var liveCrypto: SessionCrypto? = null
+    // From BULK_BEGIN; GuestOpPolicy needs it. Kept across a replay-only reconnect (same host).
+    @Volatile private var hostBackend: CoopTrackingBackend? = null
+    // Highest guestSeq written on the CURRENT connection, and highest the host has acknowledged.
+    // A new connection rewinds the first to the second, so unacknowledged edits are resent.
+    @Volatile private var lastSentGuestSeq: Long = 0L
+    @Volatile private var lastAckedGuestSeq: Long = 0L
+    private val flushMutex = Mutex()
+
+    /**
+     * Send one of this guest's own edits to the host. Returns false — and sends nothing — when the
+     * host would refuse it ([GuestOpPolicy]) or it cannot fit a single sealed frame; the caller
+     * reports that the edit stays local. Otherwise the edit is queued until acknowledged, surviving
+     * a reconnect, and the host's re-broadcast of it arrives back as an ordinary DELTA.
+     */
+    fun sendOp(op: Op): Boolean {
+        if (phase == Phase.Ended) return false
+        if (!GuestOpPolicy.allows(op, hostBackend, localBackend)) return false
+        val maxPlaintext = Frame.MAX_PAYLOAD_BYTES - SessionCrypto.SEAL_OVERHEAD_BYTES
+        if (OpCodec.encode(GuestOpPayload(Long.MAX_VALUE, op)).size > maxPlaintext) return false
+        outbox.add(op)
+        scope.launch { flushOutbox() }
+        return true
+    }
+
+    /** Write every queued edit not yet sent on this connection. A write failure leaves them queued. */
+    private suspend fun flushOutbox() {
+        flushMutex.withLock {
+            val output = liveOutput ?: return
+            val crypto = liveCrypto ?: return
+            if (phase != Phase.Live) return
+            for ((seq, op) in outbox.pendingAfter(lastSentGuestSeq)) {
+                try {
+                    writeSecure(output, crypto, FrameType.GUEST_OP, OpCodec.encode(GuestOpPayload(seq, op)))
+                    lastSentGuestSeq = seq
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    return // the read loop notices the dead socket and reconnects; the op stays queued
+                }
+            }
+        }
+    }
+
     private fun randomNonce(): ByteArray = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
     // Guards the check-then-set phase transition in attemptReconnect(): the inbound loop and a
     // failed PONG write can race into it, and without the lock each would run its own full
@@ -234,6 +281,7 @@ internal class GuestSession(
         require(beginPayload.spatialFrame.supportsGuest(localBackend)) {
             "host spatial frame is incompatible with $localBackend"
         }
+        hostBackend = beginPayload.spatialFrame.hostBackend
 
         val fingerprint = receiveChunked(input, crypto, FrameType.BULK_FINGERPRINT, beginPayload.fingerprintBytes)
         val project = receiveChunked(input, crypto, FrameType.BULK_PROJECT, beginPayload.projectBytes)
@@ -290,6 +338,11 @@ internal class GuestSession(
         // this loop's first iteration instead of being re-read (and lost) from the socket.
         firstFrame: Frame.FrameRead? = null,
     ) {
+        // A new connection: resend every edit the host has not acknowledged.
+        liveOutput = output
+        liveCrypto = crypto
+        lastSentGuestSeq = lastAckedGuestSeq
+        scope.launch { flushOutbox() }
         scope.launch {
             var pending = firstFrame
             while (scope.isActive) {
@@ -321,6 +374,13 @@ internal class GuestSession(
                         FrameType.BYE -> {
                             val bye = OpCodec.decode<ByePayload>(frame.payload)
                             close(bye.reason); return@launch
+                        }
+                        FrameType.GUEST_OP_ACK -> {
+                            val ack = OpCodec.decode<GuestOpAckPayload>(frame.payload)
+                            if (ack.lastGuestSeq > lastAckedGuestSeq) {
+                                lastAckedGuestSeq = ack.lastGuestSeq
+                                outbox.ackUpTo(ack.lastGuestSeq)
+                            }
                         }
                         else -> { /* ignore */ }
                     }
@@ -357,6 +417,8 @@ internal class GuestSession(
             phase = Phase.Reconnecting
         }
         _state.value = CoopSessionState.Reconnecting
+        liveOutput = null
+        liveCrypto = null
         try { socket?.close() } catch (_: Exception) {}
         socket = null
         activeCrypto = null

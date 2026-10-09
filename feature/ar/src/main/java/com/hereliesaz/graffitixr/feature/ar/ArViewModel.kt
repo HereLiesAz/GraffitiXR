@@ -195,6 +195,13 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Host side of co-op v4: edits a connected guest made, already re-broadcast in the host's op
+     * order. The editor applies them as undoable, persisted edits without emitting them again.
+     */
+    val guestOps: kotlinx.coroutines.flow.Flow<com.hereliesaz.graffitixr.common.model.Op>
+        get() = collaborationManager.guestOps
+
     /** Invokes the handler, or buffers the op (drop-oldest past the cap) until one is wired. */
     private fun dispatchSpectatorOp(op: com.hereliesaz.graffitixr.common.model.Op) {
         val handler = synchronized(pendingSpectatorOps) {
@@ -251,10 +258,11 @@ class ArViewModel @Inject constructor(
     /**
      * Tell a guest, once per session, that an edit they just made is theirs alone.
      *
-     * The co-op protocol is host-broadcast: a guest receives the host's ops and has no channel to
-     * send its own. That is a real limitation, but the failure mode before this was silence — the
-     * edit applied locally, reached nobody, and the two canvases diverged with neither side told.
-     * Once per session, because the point is to explain the mode, not to nag every gesture.
+     * Since co-op protocol v4 a guest's edits ARE sent to the host. This now fires only for the
+     * ones that cannot be: an AR placement between devices on different tracking backends (each
+     * expresses it in its own wall frame) or an edit too large for one frame. Silence there would
+     * leave the two canvases diverging with neither side told. Once per session, because the point
+     * is to explain the limit, not to nag every gesture.
      */
     private fun observeDroppedGuestEdits() {
         guestEditDropJob?.cancel()
@@ -265,7 +273,7 @@ class ArViewModel @Inject constructor(
                 reportedGuestEditDrop = true
                 _feedback.tryEmit(
                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                        "You're viewing the host's project — your changes stay on this device"
+                        "That change can't be shared with the host — it stays on this device"
                     )
                 )
             }

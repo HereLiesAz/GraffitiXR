@@ -449,8 +449,17 @@ Robust LAN peer-to-peer sync for collaborative painting — **no cloud, no accou
 - **Robustness:** accept-loop survives bad handshakes; ops are lossless across reconnects (seq + encode +
   buffer at enqueue); 15 s socket read timeouts; guests re-sync on host `sessionId` change; bounded
   pre-handler spectator-op buffering. Import/spectator load is hardened against Zip-Slip.
-- **Ops:** layer add/remove/transform/props changes and completed brush strokes stream as `Op`s and apply
-  by id on the receiver with no active-layer side effects.
+- **Ops:** design replace/transform/props/bitmap and per-mode adjustments stream as `Op`s and apply
+  with no active-layer side effects.
+- **Bidirectional (protocol v4):** a guest's edits go to the host as `GUEST_OP` frames (own
+  sequence, queued in `GuestOutbox` until `GUEST_OP_ACK`, resent once after a reconnect, deduped by
+  the host). The host applies each as an undoable, persisted edit and re-broadcasts it in its own
+  DELTA order — the single total order both peers converge on when they edit concurrently
+  (last write in host order wins; a guest may briefly see its own older edit echoed back if it
+  edits again within one round trip). Refused, on both ends (`GuestOpPolicy`): an AR placement
+  between peers on different tracking backends (each expresses it in its own wall frame) and the
+  authoring ops this app ignores; the guest is told once that such a change stays on its device.
+  v3 peers are rejected at the handshake.
 
 **Known/deferred (see `BACKLOG.md`):** a mid-bulk stall in `GuestSession` under investigation;
 `LocalLoopTest.kt` real-socket timeouts are a latent CI-gate risk.

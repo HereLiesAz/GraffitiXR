@@ -664,6 +664,10 @@ class MainActivity : ComponentActivity() {
                     // Also flushes, in order, any spectator ops that arrived before this effect ran.
                     arViewModel.setSpectatorOpHandler { op -> editorViewModel.applySpectatorOp(op) }
                 }
+                // Co-op v4, host side: a connected guest's edits land on the authoritative project.
+                LaunchedEffect(arViewModel, editorViewModel) {
+                    arViewModel.guestOps.collect { op -> editorViewModel.applyGuestOp(op) }
+                }
 
                 // The "Open" rail item can create+open a project (async DB write) and launch the picker
                 // in the same tap. If the user picks before projectId propagates, onAddLayer would

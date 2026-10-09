@@ -371,6 +371,30 @@ class EditorViewModelTest {
     }
 
     @Test
+    fun `a guest edit applies, persists and undoes on the host without being re-emitted`() = runTest {
+        viewModel.setEditorMode(EditorMode.TRACE)
+        addDesign()
+        testDispatcher.scheduler.advanceUntilIdle()
+        fun traceScale() = viewModel.uiState.value.modeAdjustments[EditorMode.TRACE]?.scale ?: 1f
+        val before = traceScale()
+        io.mockk.clearMocks(opEmitter, projectRepository, answers = false)
+
+        viewModel.applyGuestOp(
+            com.hereliesaz.graffitixr.common.model.Op.ModeTransform("TRACE", ModeAdjustment(scale = 3f)),
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(3f, traceScale(), 0.001f)
+        // The host session already re-broadcast it; emitting again would duplicate it on the wire.
+        io.mockk.verify(exactly = 0) { opEmitter.emit(any()) }
+        coVerify { projectRepository.updateProject(any<(GraffitiProject) -> GraffitiProject>()) }
+
+        viewModel.onUndoClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(before, traceScale(), 0.001f)
+    }
+
+    @Test
     fun `redo after a mode switch restores the undone mode's adjustment`() = runTest {
         viewModel.setEditorMode(EditorMode.TRACE)
         addDesign()

@@ -13,6 +13,8 @@ import com.hereliesaz.graffitixr.core.collaboration.wire.DeltaAckPayload
 import com.hereliesaz.graffitixr.core.collaboration.wire.DeltaPayload
 import com.hereliesaz.graffitixr.core.collaboration.wire.Frame
 import com.hereliesaz.graffitixr.core.collaboration.wire.FrameType
+import com.hereliesaz.graffitixr.core.collaboration.wire.GuestOpAckPayload
+import com.hereliesaz.graffitixr.core.collaboration.wire.GuestOpPayload
 import com.hereliesaz.graffitixr.core.collaboration.wire.HelloOkPayload
 import com.hereliesaz.graffitixr.core.collaboration.wire.HelloPayload
 import com.hereliesaz.graffitixr.core.collaboration.wire.HelloRejectedPayload
@@ -53,6 +55,10 @@ internal class HostSession(
     // (or reconnects into a DeltaBuffer gap) more than a few edits into the session, silently
     // handing them an out-of-date project.
     private val snapshotProvider: () -> ProjectSnapshot,
+    // Protocol v4: a guest edit the host accepted, delivered on this session's IO thread. The owner
+    // applies it to the authoritative project (undoable, persisted) WITHOUT emitting it again —
+    // this session has already re-enqueued it into the host's own DELTA order.
+    private val onGuestOp: (Op) -> Unit = {},
 ) : Session() {
 
     /** Spatial identity fixed for the lifetime of this host session. */
@@ -109,6 +115,10 @@ internal class HostSession(
     // Crypto for the current live connection, so close()/BYE can seal on the active channel.
     @Volatile private var activeCrypto: SessionCrypto? = null
     @Volatile private var lastAppliedSeq: Long = 0L
+    // v4 guest edits: the connected guest's backend (for GuestOpPolicy) and the highest guestSeq
+    // already handled, so a resend after a reconnect is acked without being applied twice.
+    @Volatile private var guestBackend: com.hereliesaz.graffitixr.common.model.CoopTrackingBackend? = null
+    @Volatile private var lastGuestSeqHandled: Long = 0L
     private var liveJob: Job? = null
 
     // Serializes all writes to the single connected guest's OutputStream. The outbound,
@@ -382,6 +392,10 @@ internal class HostSession(
         clientSocket = socket
         val isReconnect = hello.lastAppliedSeq > 0
         lastAppliedSeq = hello.lastAppliedSeq
+        guestBackend = hello.localBackend
+        // A fresh join is a new GuestSession whose guestSeq restarts at 1. A reconnect keeps its
+        // counter, so its handled-mark must survive to dedupe resends.
+        if (!isReconnect) lastGuestSeqHandled = 0L
 
         // Replay buffered deltas after lastAppliedSeq. Since seqs are assigned at enqueue, this
         // may overlap ops still sitting unsent in outQueue; the guest's monotonic
@@ -583,6 +597,19 @@ internal class HostSession(
                         }
                     }
                     FrameType.BULK_ACK -> { /* bulk done; ignore */ }
+                    FrameType.GUEST_OP -> {
+                        val guestOp = OpCodec.decode<GuestOpPayload>(frame.payload)
+                        handleGuestOp(guestOp)
+                        try {
+                            writeSecure(
+                                output, crypto, FrameType.GUEST_OP_ACK,
+                                OpCodec.encode(GuestOpAckPayload(lastGuestSeqHandled)),
+                            )
+                        } catch (e: Exception) {
+                            if (e is CancellationException) throw e
+                            enterReconnecting(); return
+                        }
+                    }
                     FrameType.BYE -> {
                         // The guest is closing voluntarily; report the reason it actually sent
                         // (typically UserLeft) rather than the host's own HostClosed, which this
@@ -605,6 +632,29 @@ internal class HostSession(
                 enterReconnecting(); return
             }
         }
+    }
+
+    /**
+     * Apply one guest edit at most once. Accepted ops go to [onGuestOp] and are then re-enqueued as
+     * ordinary host deltas, so the guest (and its replay buffer, and any later bulk) sees them in the
+     * host's single total order — the order both peers converge on when they edit concurrently. A
+     * refused op ([GuestOpPolicy]) is still marked handled so the guest stops resending it.
+     */
+    private fun handleGuestOp(payload: GuestOpPayload) {
+        if (payload.guestSeq <= lastGuestSeqHandled) return
+        lastGuestSeqHandled = payload.guestSeq
+        if (!GuestOpPolicy.allows(payload.op, hostedSpatialFrame.hostBackend, guestBackend)) {
+            Log.w(TAG, "refusing guest ${payload.op.javaClass.simpleName} (guestSeq=${payload.guestSeq})")
+            return
+        }
+        try {
+            onGuestOp(payload.op)
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Log.w(TAG, "guest op handler failed; not re-broadcasting", e)
+            return
+        }
+        enqueueOp(payload.op)
     }
 
     private suspend fun heartbeatLoop(output: OutputStream, crypto: SessionCrypto) {

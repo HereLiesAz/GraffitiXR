@@ -1325,8 +1325,21 @@ class EditorViewModel @Inject constructor(
         blendMode = blendMode
     )
 
-    /** Applies a remote Op received from the host, without echoing it back through opEmitter. */
-    fun applySpectatorOp(op: Op) {
+    /**
+     * Host side of co-op v4: apply an edit a guest made. Treated like a local edit — undoable and
+     * persisted — but NOT emitted: the host session has already re-enqueued it into its own op
+     * order, which is what keeps host and guest converged when both edit at once.
+     */
+    fun applyGuestOp(op: Op) {
+        pushHistory()
+        applySpectatorOp(op) { saveProject() }
+    }
+
+    /**
+     * Applies a remote Op received from the host, without echoing it back through opEmitter.
+     * [onApplied] runs once the op's state is in place (after the async decode, for a bitmap op).
+     */
+    fun applySpectatorOp(op: Op, onApplied: () -> Unit = {}) {
         when (op) {
             is Op.DesignReplace -> dispatch(EditorIntent.RestoreDesign(op.design))
             is Op.DesignTransform -> {
@@ -1362,15 +1375,18 @@ class EditorViewModel @Inject constructor(
                     }
                     withContext(dispatchers.main) {
                         _uiState.update { s -> s.copy(design = s.design?.copy(bitmap = decoded)) }
+                        onApplied()
                     }
                 }
+                return // onApplied runs after the decode, above
             }
             // Authoring ops a peer running the design-side build may still send. This app no longer
             // edits pixels or text, so there is nothing to apply — accepted and ignored rather than
             // breaking the session over a frame it merely doesn't use.
-            is Op.StrokeComplete -> Unit
-            is Op.TextContentChange -> Unit
+            is Op.StrokeComplete -> return
+            is Op.TextContentChange -> return
         }
+        onApplied()
     }
 
     // ── Internals ─────────────────────────────────────────────────────────────
