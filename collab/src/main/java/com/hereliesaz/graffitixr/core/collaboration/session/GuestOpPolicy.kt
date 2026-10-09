@@ -13,6 +13,10 @@ import com.hereliesaz.graffitixr.common.model.Op
  *    project — a dangling asset that then fails every later bulk/export, and, from a hostile guest,
  *    a path of its choosing the host would later load and re-broadcast. Choosing the design image
  *    stays a host action.
+ *  - [Op.DesignBitmapReplace]: the host persists a design as its source image plus effect flags
+ *    (Outline, subject isolation) and re-derives the pixels on load; a guest's rendered pixels carry
+ *    neither, so applying them would last only until the host's next reload or bulk. A guest's
+ *    effect toggle stays on the guest. (It also pairs with a refused DesignReplace on import.)
  *  - an AR [Op.ModeTransform] between peers on DIFFERENT tracking backends. The AR placement is
  *    expressed in each backend's own wall frame (ARCore anchor vs standalone centred KPM page); the
  *    bulk transfer normalises it once (`CoopSpectatorProjectNormalizer`), but a live op carries no
@@ -27,8 +31,8 @@ internal object GuestOpPolicy {
     fun allows(op: Op, hostBackend: CoopTrackingBackend?, guestBackend: CoopTrackingBackend?): Boolean = when (op) {
         is Op.ModeTransform ->
             op.mode != AR_MODE || (hostBackend != null && hostBackend == guestBackend)
-        is Op.StrokeComplete, is Op.TextContentChange, is Op.DesignReplace -> false
-        is Op.DesignTransform, is Op.DesignProps, is Op.DesignBitmapReplace -> true
+        is Op.StrokeComplete, is Op.TextContentChange, is Op.DesignReplace, is Op.DesignBitmapReplace -> false
+        is Op.DesignTransform, is Op.DesignProps -> true
     }
 
     /** `EditorMode.AR.name`; the collab module does not depend on the editor's enum. */

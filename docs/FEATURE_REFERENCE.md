@@ -458,10 +458,16 @@ Robust LAN peer-to-peer sync for collaborative painting — **no cloud, no accou
   apply order — the single total order both peers converge on when they edit concurrently (last
   write in host order wins). Refused, on both ends (`GuestOpPolicy`): choosing/replacing the design
   image (a `Layer` from a guest names a guest-side file), an AR placement between peers on
-  different tracking backends (each expresses it in its own wall frame), and the authoring ops this
-  app ignores; the guest is told once that such a change stays on its device. Guest pixel
-  replacements are rate-limited on the host. A new host session (host restarted) clears the
-  guest's unsent edits — the fresh bulk is the baseline. v3 peers are rejected at the handshake.
+  different tracking backends (each expresses it in its own wall frame), rendered pixels
+  (`DesignBitmapReplace` — the host persists source + Outline/isolation flags, so a guest's Outline
+  or isolation toggle stays local), and the authoring ops this app ignores; the guest is told once
+  that such a change stays on its device. After a guest replaces its design locally, all its design
+  edits stay local until the host's design returns (a host `DesignReplace` or a bulk). Edits made
+  before the host's snapshot is installed are refused, not queued. Target capture is host-only (a
+  guest re-target would split the spatial frames). A guest AR placement on a standalone-hosted
+  session is written to the standalone slot even while the host is in another mode. A new host
+  session (host restarted) clears the guest's unsent edits — the fresh bulk is the baseline. v3
+  peers are rejected at the handshake.
   **Known limit:** an incoming op (the echo of the guest's previous gesture, or a host edit)
   arriving mid-gesture overrides the guest's in-progress drag.
 

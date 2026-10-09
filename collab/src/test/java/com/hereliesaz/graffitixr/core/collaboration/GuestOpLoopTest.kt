@@ -10,6 +10,7 @@ import com.hereliesaz.graffitixr.core.collaboration.session.HostSession
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
@@ -55,6 +56,8 @@ class GuestOpLoopTest {
             )
             guest.connect()
             withTimeout(15_000) { bulk.await() }
+            // Edits are accepted only once the snapshot is installed and the session is live.
+            withTimeout(15_000) { guest.state.first { it is CoopSessionState.Connected } }
             return this
         }
         suspend fun close() {
@@ -64,6 +67,29 @@ class GuestOpLoopTest {
     }
 
     private fun mode(name: String, scale: Float) = Op.ModeTransform(name, ModeAdjustment(scale = scale))
+
+    @Test
+    fun `edits before the host snapshot is installed are refused, not queued`() = runBlocking {
+        val host = HostSession(
+            token = "tok", protocolVersion = 4, localDeviceName = "host", projectId = "p",
+            snapshotProvider = { ProjectSnapshot(ByteArray(8), ByteArray(8), 0, testSpatialFrame()) },
+            onGuestOp = {},
+        )
+        val port = host.startListening()
+        val guest = GuestSession(
+            host = "127.0.0.1", port = port, token = "tok", protocolVersion = 4,
+            localDeviceName = "guest", localBackend = CoopTrackingBackend.ARCORE,
+            onBulkReceived = { _, _, _ -> }, onOp = {},
+            reconnectWindowMs = 10_000L, reconnectIntervalMs = 200L,
+        )
+        // Not connected yet: the open project is the guest's own, not the host's.
+        assertFalse(guest.sendOp(mode("TRACE", 2f)))
+        guest.connect()
+        withTimeout(15_000) { guest.state.first { it is CoopSessionState.Connected } }
+        assertTrue(guest.sendOp(mode("TRACE", 2f)))
+        guest.close(CoopSessionState.EndReason.UserLeft)
+        host.close(CoopSessionState.EndReason.UserLeft)
+    }
 
     @Test
     fun `guest edits reach the host in order and come back in the host's order`() = runBlocking {
@@ -113,6 +139,26 @@ class GuestOpLoopTest {
             id = "x", name = "x", uri = null,
         )
         assertFalse(rig.guest.sendOp(Op.DesignReplace(layer)))
+        rig.close()
+    }
+
+    @Test
+    fun `after a local design replace the guest's design edits stay local until the host's design returns`() = runBlocking {
+        val rig = Rig().start()
+        val layer = com.hereliesaz.graffitixr.common.model.Layer(id = "g", name = "g", uri = null)
+        assertFalse(rig.guest.sendOp(Op.DesignReplace(layer)))
+        // The import's paired pixels and later edits describe the guest's own design, not the host's.
+        assertFalse(rig.guest.sendOp(Op.DesignBitmapReplace(byteArrayOf(1, 2, 3))))
+        assertFalse(rig.guest.sendOp(Op.DesignProps(LayerProps(opacity = 0.3f))))
+        assertFalse(rig.guest.sendOp(mode("TRACE", 4f)))
+        assertNull(withTimeoutOrNull(500) { rig.hostApplied.receive() })
+
+        // The host replaces the design: the guest is editing the shared design again.
+        val hostLayer = com.hereliesaz.graffitixr.common.model.Layer(id = "h", name = "h", uri = null)
+        rig.host.enqueueOp(Op.DesignReplace(hostLayer))
+        assertEquals(Op.DesignReplace(hostLayer), withTimeout(10_000) { rig.guestReceived.receive() })
+        assertTrue(rig.guest.sendOp(mode("TRACE", 4f)))
+        assertEquals(mode("TRACE", 4f), withTimeout(10_000) { rig.hostApplied.receive() })
         rig.close()
     }
 }

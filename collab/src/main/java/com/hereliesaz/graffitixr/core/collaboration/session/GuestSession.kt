@@ -60,6 +60,15 @@ internal class GuestSession(
     @Volatile private var lastSentGuestSeq: Long = 0L
     @Volatile private var lastAckedGuestSeq: Long = 0L
     private val flushMutex = Mutex()
+    // True once a host snapshot is installed locally (Live reached). Until then the local project is
+    // whatever the guest had open before joining — or, after a host restart, a baseline about to be
+    // replaced — so an edit made against it must not be queued for the host.
+    @Volatile private var snapshotInstalled = false
+    // Set when this guest replaced its design locally (a refused DesignReplace). Its later design
+    // ops — the paired DesignBitmapReplace, transforms, props, placements — describe THAT local
+    // design, not the host's, so they are refused too until the host's design is back (a bulk
+    // snapshot or the host's own DesignReplace).
+    @Volatile private var designDiverged = false
 
     /**
      * Send one of this guest's own edits to the host. Returns false — and sends nothing — when the
@@ -68,7 +77,9 @@ internal class GuestSession(
      * a reconnect, and the host's re-broadcast of it arrives back as an ordinary DELTA.
      */
     fun sendOp(op: Op): Boolean {
-        if (phase == Phase.Ended) return false
+        if (phase == Phase.Ended || !snapshotInstalled) return false
+        if (op is Op.DesignReplace) designDiverged = true
+        if (designDiverged) return false
         if (!GuestOpPolicy.allows(op, hostBackend, localBackend)) return false
         val maxPlaintext = Frame.MAX_PAYLOAD_BYTES - SessionCrypto.SEAL_OVERHEAD_BYTES
         if (OpCodec.encode(GuestOpPayload(guestInstance, Long.MAX_VALUE, op)).size > maxPlaintext) return false
@@ -218,6 +229,7 @@ internal class GuestSession(
                         // there; replaying them onto a new host session's freshly bulk-synced project
                         // could overwrite newer host edits. The fresh bulk is the new baseline.
                         outbox.clear()
+                        snapshotInstalled = false
                         lastAckedGuestSeq = 0L
                         lastSentGuestSeq = 0L
                         try { s.close() } catch (_: Exception) {}
@@ -243,6 +255,7 @@ internal class GuestSession(
                         // start with one.
                         require(isReconnect) { "expected BULK_BEGIN for a fresh join, got ${first.type}" }
                     }
+                    snapshotInstalled = true
                     // The host's own name, now that HELLO_OK carries it. Falls back to "host" for
                     // a peer that predates the field — the same string this used to hard-code.
                     _state.value = CoopSessionState.Connected(
@@ -285,6 +298,8 @@ internal class GuestSession(
         crypto: SessionCrypto,
     ) {
         require(begin.type == FrameType.BULK_BEGIN)
+        // A snapshot replaces whatever design this guest had diverged to.
+        designDiverged = false
         val beginPayload = OpCodec.decode<BulkBeginPayload>(begin.payload)
         require(beginPayload.spatialFrame.supportsGuest(localBackend)) {
             "host spatial frame is incompatible with $localBackend"
@@ -373,6 +388,8 @@ internal class GuestSession(
                         FrameType.DELTA -> {
                             val delta = OpCodec.decode<DeltaPayload>(frame.payload)
                             if (delta.seq > lastAppliedSeq) {
+                                // The host's design replaces this guest's local one: shared again.
+                                if (delta.op is Op.DesignReplace) designDiverged = false
                                 onOp(delta.op)
                                 lastAppliedSeq = delta.seq
                             }

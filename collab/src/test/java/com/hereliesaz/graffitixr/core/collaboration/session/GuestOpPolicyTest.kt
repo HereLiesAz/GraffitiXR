@@ -25,7 +25,11 @@ class GuestOpPolicyTest {
         assertTrue(GuestOpPolicy.allows(Op.ModeTransform("TRACE", ModeAdjustment()), ARCORE, SPHERESLAM))
         assertTrue(GuestOpPolicy.allows(Op.DesignProps(LayerProps(opacity = 0.5f)), ARCORE, SPHERESLAM))
         assertTrue(GuestOpPolicy.allows(Op.DesignTransform(List(16) { 0f }), ARCORE, ARCORE))
-        assertTrue(GuestOpPolicy.allows(Op.DesignBitmapReplace(byteArrayOf(1)), ARCORE, ARCORE))
+    }
+
+    @Test
+    fun `a guest's rendered pixels are not sent (the host persists source plus effect flags)`() {
+        assertFalse(GuestOpPolicy.allows(Op.DesignBitmapReplace(byteArrayOf(1)), ARCORE, ARCORE))
     }
 
     @Test

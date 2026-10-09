@@ -4719,6 +4719,9 @@ class ArViewModel @Inject constructor(
     }
 
     fun onScreenTap(nx: Float, ny: Float) {
+        // A co-op guest keeps the session's spatial frame: re-targeting re-anchors only this device
+        // and no Op carries it, so it would split the peers' frames.
+        if (_uiState.value.coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) return
         pendingTapPosition = nx to ny
         // Hand the tap to the renderer so it can measure the camera→point distance at that pixel
         // (and add a fusion support anchor) on the GL thread during capture.

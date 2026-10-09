@@ -666,7 +666,10 @@ class MainActivity : ComponentActivity() {
                 }
                 // Co-op v4, host side: a connected guest's edits land on the authoritative project.
                 LaunchedEffect(arViewModel, editorViewModel) {
-                    arViewModel.setGuestOpHandler { op -> editorViewModel.applyGuestOp(op) }
+                    arViewModel.setGuestOpHandler { op ->
+                        // Hosting picks standalone exactly when ARCore is unavailable (ArViewModel.startHosting).
+                        editorViewModel.applyGuestOp(op, hostedArStandalone = !arViewModel.uiState.value.isArCoreAvailable)
+                    }
                 }
 
                 // The "Open" rail item can create+open a project (async DB write) and launch the picker

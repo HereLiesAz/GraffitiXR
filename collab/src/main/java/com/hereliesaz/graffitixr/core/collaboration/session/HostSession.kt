@@ -123,8 +123,6 @@ internal class HostSession(
     // like a fresh join, re-applying edits already handled.
     @Volatile private var guestInstance: String? = null
     @Volatile private var lastGuestSeqHandled: Long = 0L
-    // Large-pixel guest ops are rate-limited: each one is a full PNG decode on the host.
-    @Volatile private var lastGuestBitmapAtMs: Long = 0L
     private var liveJob: Job? = null
 
     // Serializes all writes to the single connected guest's OutputStream. The outbound,
@@ -655,14 +653,6 @@ internal class HostSession(
             Log.w(TAG, "refusing guest ${payload.op.javaClass.simpleName} (guestSeq=${payload.guestSeq})")
             return
         }
-        if (payload.op is Op.DesignBitmapReplace) {
-            val now = System.nanoTime() / 1_000_000L
-            if (now - lastGuestBitmapAtMs < MIN_GUEST_BITMAP_INTERVAL_MS) {
-                Log.w(TAG, "refusing guest DesignBitmapReplace: rate limit")
-                return
-            }
-            lastGuestBitmapAtMs = now
-        }
         try {
             onGuestOp(payload.op)
         } catch (e: Exception) {
@@ -742,7 +732,6 @@ internal class HostSession(
          * few per second at most); a burst faster than this is either a bug or abuse, and each one
          * costs the host a multi-MB PNG decode.
          */
-        private const val MIN_GUEST_BITMAP_INTERVAL_MS = 250L
         private const val TAG = "HostSession"
 
         // Guests ack every 1s and answer 5s PINGs, so 15s of read silence means a dead or

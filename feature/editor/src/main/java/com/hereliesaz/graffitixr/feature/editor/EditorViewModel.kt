@@ -1337,8 +1337,19 @@ class EditorViewModel @Inject constructor(
      * Undo snapshots the mode the op touches, not the host's active mode. A DesignBitmapReplace is
      * applied but not made undoable: history snapshots strip the bitmap and compare URIs, so an undo
      * entry for it would restore nothing.
+     *
+     * [hostedArStandalone]: whether the session was hosted on standalone SphereSLAM. A guest's AR
+     * placement is in that backend's frame, so it belongs in that backend's persisted slot. When the
+     * slot the editor currently exposes is the OTHER one (the host is in another mode, so the
+     * standalone slot is not swapped in), the placement is written straight to the hosted slot
+     * instead — not undoable from here, since undo only covers the exposed slot.
      */
-    fun applyGuestOp(op: Op) {
+    fun applyGuestOp(op: Op, hostedArStandalone: Boolean = standaloneArBackendActive) {
+        if (op is Op.ModeTransform && op.mode == EditorMode.AR.name && hostedArStandalone != standaloneArBackendActive) {
+            persistHiddenArSlot(op.adjustment, standalone = hostedArStandalone)
+            opEmitter.emit(op)
+            return
+        }
         when (op) {
             is Op.ModeTransform -> runCatching { EditorMode.valueOf(op.mode) }.getOrNull()?.let { mode ->
                 history.pushProperty(
@@ -1352,6 +1363,42 @@ class EditorViewModel @Inject constructor(
         applySpectatorOp(op) {
             saveProject()
             opEmitter.emit(op)
+        }
+    }
+
+    /** Write [adjustment] into the AR slot the editor is not exposing; see [applyGuestOp]. */
+    private fun persistHiddenArSlot(adjustment: ModeAdjustment, standalone: Boolean) {
+        val projectId = _uiState.value.projectId ?: return
+        viewModelScope.launch(dispatchers.main) {
+            editorSaveMutex.withLock {
+                withContext(dispatchers.io) {
+                    try {
+                        projectRepository.updateProject { current ->
+                            when {
+                                current.id != projectId -> current
+                                standalone -> current.copy(
+                                    sphereSlamModeAdjustment = adjustment,
+                                    // Authored in the live session's frame: the current wall generation.
+                                    sphereSlamPlacementAnchorGeneration =
+                                        if (current.sphereSlamReferenceUri != null) {
+                                            current.sphereSlamAnchorGeneration
+                                        } else {
+                                            current.sphereSlamPlacementAnchorGeneration
+                                        },
+                                    lastModified = System.currentTimeMillis(),
+                                )
+                                else -> current.copy(
+                                    modeAdjustments = current.modeAdjustments + (EditorMode.AR.name to adjustment),
+                                    lastModified = System.currentTimeMillis(),
+                                )
+                            }
+                        }
+                    } catch (e: Exception) {
+                        if (e is kotlinx.coroutines.CancellationException) throw e
+                        android.util.Log.e("EditorViewModel", "guest AR placement save failed", e)
+                    }
+                }
+            }
         }
     }
 
