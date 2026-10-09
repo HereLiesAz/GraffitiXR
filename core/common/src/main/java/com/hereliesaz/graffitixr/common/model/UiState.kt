@@ -343,6 +343,12 @@ data class ArUiState(
      */
     val fusionDiagnostics: FusionDiagnostics = FusionDiagnostics(),
     /**
+     * The hybrid KPM sidecar's verdict on its latest observation: outcome plus age, inliers,
+     * reprojection error and implied correction. Why a KPM observation did or did not reach
+     * [fusionDiagnostics]. See [HybridKpmDiagnostics].
+     */
+    val hybridKpmDiagnostics: HybridKpmDiagnostics = HybridKpmDiagnostics(),
+    /**
      * How many 3D points the live wall fingerprint holds — 0 when there is none.
      *
      * The direct answer to "did the target actually get built", read straight from the engine

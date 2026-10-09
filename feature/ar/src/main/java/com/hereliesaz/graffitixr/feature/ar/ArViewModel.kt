@@ -3900,6 +3900,8 @@ class ArViewModel @Inject constructor(
         // is never invoked and so has nothing to report.
         val fusionDiag = renderer?.fusionDiagnostics()
             ?: com.hereliesaz.graffitixr.common.model.FusionDiagnostics()
+        val hybridDiag = renderer?.hybridKpmDiagnostics()
+            ?: com.hereliesaz.graffitixr.common.model.HybridKpmDiagnostics()
         if (isInArMode) {
             renderer?.sphereSlamRuntimeStatus()?.let(::publishSphereSlamRuntimeStatus)
         }
@@ -3912,7 +3914,7 @@ class ArViewModel @Inject constructor(
         // Record unconditionally. The report's whole value is being able to answer "did this ever
         // happen" about a period that has already passed, which is impossible if collection has to
         // be armed first.
-        diagnosticRecorder.record(relocDiag, corrobDiag, fusionDiag, wallPoints, progress)
+        diagnosticRecorder.record(relocDiag, corrobDiag, fusionDiag, wallPoints, progress, hybridDiag)
         // onTick ALWAYS, and only the emit is gated.
         //
         // The watcher goes to some trouble to advance its edge state unconditionally so that a
@@ -3977,6 +3979,7 @@ class ArViewModel @Inject constructor(
                 relocDiagnostics = relocDiag,
                 corroborationDiagnostics = corrobDiag,
                 fusionDiagnostics = fusionDiag,
+                hybridKpmDiagnostics = hybridDiag,
                 wallFingerprintPoints = wallPoints,
                 scanPhase = newPhase,
                 ambientSectorsCovered = sectorsCovered / 3, // Keep backward compatibility for 30 degree UI units if needed

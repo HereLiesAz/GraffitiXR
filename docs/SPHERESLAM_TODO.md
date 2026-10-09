@@ -578,11 +578,18 @@ Implemented:
   - [x] maximum 4 px reprojection error;
   - [x] finite metric page/frame requirement;
   - [x] ARCore itself must currently be tracking.
-- [ ] Add a hard maximum correction translation/angle rejection policy. Existing
+- [x] Add a hard maximum correction translation/angle rejection policy. Existing
   `PoseFusion.COLD_SNAP_DIST_M` / `COLD_SNAP_ANGLE_DEG` classify a correction as a cold relock;
-  they do **not** reject a large but high-confidence KPM correction.
-- [ ] Require repeated-observation agreement before a large/cold KPM snap. A single observation that
-  passes the current quality gates may cold-snap through PoseFusion.
+  they do **not** reject a large but high-confidence KPM correction. `HybridKpmCorrection` now
+  refuses any observation whose anchor-local correction exceeds `MAX_CORRECTION_M` (1.0 m) or
+  `MAX_CORRECTION_DEG` (30°) with `Reject.CORRECTION_TOO_LARGE`. Rebase-invariant (measured on
+  `backbone⁻¹ ∘ corrected`). First-pass ceilings; device tuning is the §10 device items below.
+- [x] Require repeated-observation agreement before a large/cold KPM snap. A single observation that
+  passes the current quality gates may cold-snap through PoseFusion. Now: an observation implying a
+  move past the cold-snap thresholds (vs what is currently drawn) is held as
+  `FusionState.AWAITING_AGREEMENT` until `PoseFusion.HYBRID_REQUIRED_AGREEMENT` (3) candidates agree
+  within 5 cm / 3° of the first inside a 1.5 s window; a disagreeing or expired candidate restarts
+  the count. Small corrections still apply on one observation. `PoseFusionHybridObservationTest`.
 - [x] Add a formal correction decision type:
   `HybridKpmCorrection.Decision/Accepted/Reject`.
 - [x] Feed accepted KPM corrections into `PoseFusion.currentAnchorFromHybridObservation`; never
@@ -597,9 +604,13 @@ Implemented:
   existing blend/cold thresholds.
 - [x] Ensure rejected/missing KPM observations cannot replace ARCore pose; during ARCore tracking
   loss KPM does not become a surrogate continuous tracker.
-- [ ] Expand fusion diagnostics to expose the full KPM decision payload on-screen/reporting:
+- [x] Expand fusion diagnostics to expose the full KPM decision payload on-screen/reporting:
   accepted/rejected reason, observation age, inliers, reprojection error, and correction
   translation/angle. PR #1970 logs accepted/rejected reason + timestamp/inliers/confidence.
+  Now `HybridKpmDiagnostics` (core/common) carries outcome/age/inliers/reprojection/correction
+  mm+deg/agreement count; shown as the overlay's `KPM` row in sidecar mode, logged per new
+  observation (`ARDIAG hybrid KPM …`), and histogrammed + summarized in the shareable diagnostic
+  report when the sidecar ran.
 - [x] Unit-test metric page geometry, page↔ARCore transforms, global-rebase invariance, timestamp
   pairing/clock discontinuity, age/inlier/error gates, known correction deltas, and PoseFusion
   anchor-local holding.

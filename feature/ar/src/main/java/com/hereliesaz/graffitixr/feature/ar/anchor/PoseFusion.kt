@@ -59,6 +59,7 @@ class PoseFusion {
         lastState = FusionState.WAITING_FOR_LOCK
         lastAlpha = -1f
         lastInlierRatio = -1f
+        clearHybridPending()
         // snapsAccepted/snapsRejected intentionally NOT reset: they are session-lifetime eval counters
         // (see diagnostics()), and a re-capture mid-session is not a new session.
     }
@@ -118,6 +119,26 @@ class PoseFusion {
         const val COLD_SNAP_DIST_M = 0.20f
         /** Rotation gap (deg) that counts as a relock. */
         const val COLD_SNAP_ANGLE_DEG = 15f
+
+        /**
+         * Hybrid KPM observations that must agree before a correction beyond the cold-snap
+         * thresholds is applied. At the sidecar's ~10 Hz that is roughly 0.3 s of consistent
+         * evidence. First-pass value; docs/SPHERESLAM_TODO.md §10 tracks device validation.
+         */
+        const val HYBRID_REQUIRED_AGREEMENT = 3
+        /** Two candidate local corrections agree when within this translation (m) … */
+        const val HYBRID_AGREEMENT_DIST_M = 0.05f
+        /** … and this rotation (deg) of the first pending candidate. */
+        const val HYBRID_AGREEMENT_ANGLE_DEG = 3f
+        /** Pending evidence older than this (observation-clock ns) no longer counts. */
+        const val HYBRID_AGREEMENT_WINDOW_NS = 1_500_000_000L
+
+        /** True when two anchor-local corrections are within the agreement tolerances. */
+        fun agrees(a: FloatArray, b: FloatArray): Boolean {
+            val delta = PoseMath.multiply(PoseMath.rigidInverse(a), b)
+            return PoseMath.translationNorm(delta) <= HYBRID_AGREEMENT_DIST_M &&
+                PoseMath.rotationAngleDeg(delta) <= HYBRID_AGREEMENT_ANGLE_DEG
+        }
 
         private fun identity() = floatArrayOf(1f,0f,0f,0f, 0f,1f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
 
@@ -309,6 +330,33 @@ class PoseFusion {
                 // corrections ride through currentBackbone, so an ARCore world rebase cancels out.
                 val correctedCurrent = PoseMath.multiply(currentBackbone, newLocal)
                 val applied = correction?.let { PoseMath.multiply(currentBackbone, it) }
+
+                // Repeated-observation agreement before a LARGE move. "Large" is measured against
+                // what is drawn right now (the standing correction, or the raw backbone before the
+                // first one), with the same thresholds that classify a cold relock. A single KPM
+                // observation that clears every quality gate can still be a wrong wall or a
+                // repeated pattern; it may not drag the artwork past those thresholds alone.
+                // Small corrections are unaffected and still apply on one observation.
+                val drawn = applied ?: currentBackbone
+                if (diverged(drawn, correctedCurrent)) {
+                    val anchorLocal = hybridPending.firstOrNull()
+                    val expired = hybridPendingFirstNs != Long.MIN_VALUE &&
+                        observationTimestampNs - hybridPendingFirstNs > HYBRID_AGREEMENT_WINDOW_NS
+                    if (anchorLocal != null && (expired || !agrees(anchorLocal, newLocal))) {
+                        clearHybridPending()
+                    }
+                    if (hybridPending.isEmpty()) hybridPendingFirstNs = observationTimestampNs
+                    hybridPending.add(newLocal)
+                    if (hybridPending.size < HYBRID_REQUIRED_AGREEMENT) {
+                        lastHybridAgreement = hybridPending.size
+                        lastState = FusionState.AWAITING_AGREEMENT
+                        lastHybridTimestampNs = observationTimestampNs
+                        return PoseMath.multiply(currentBackbone, correction ?: identity())
+                    }
+                    // Enough consistent evidence: proceed with the latest candidate (its divergence
+                    // already makes it cold, so a high-confidence one snaps).
+                }
+                clearHybridPending()
                 val cold = coldStart || applied == null || diverged(applied, correctedCurrent)
                 val highConf =
                     quality >= COLD_SNAP_INLIER_RATIO &&
@@ -343,9 +391,30 @@ class PoseFusion {
      * Used while an asynchronous KPM matcher has no fresh accepted observation this render frame.
      */
     fun holdCurrentAnchor(backbone: FloatArray): FloatArray {
-        if (correction != null) lastState = FusionState.HOLDING
+        // An agreement in progress is still the accurate description of this frame; HOLDING would
+        // hide that a large correction is pending.
+        if (correction != null && lastState != FusionState.AWAITING_AGREEMENT) {
+            lastState = FusionState.HOLDING
+        }
         return PoseMath.multiply(backbone, correction ?: identity())
     }
+
+    // Large-correction candidates (anchor-local, so rebase-invariant) awaiting agreement.
+    private val hybridPending = ArrayList<FloatArray>(HYBRID_REQUIRED_AGREEMENT)
+    private var hybridPendingFirstNs = Long.MIN_VALUE
+    private var lastHybridAgreement = -1
+
+    private fun clearHybridPending() {
+        hybridPending.clear()
+        hybridPendingFirstNs = Long.MIN_VALUE
+        lastHybridAgreement = -1
+    }
+
+    /**
+     * Agreeing large-correction KPM observations collected so far, or -1 when none is pending.
+     * Paired with [HYBRID_REQUIRED_AGREEMENT] for diagnostics.
+     */
+    fun hybridAgreementCount(): Int = lastHybridAgreement
 
     private var lastState = FusionState.WAITING_FOR_LOCK
     private var lastAlpha = -1f
@@ -372,13 +441,8 @@ class PoseFusion {
         if (d == null) {
             mm = -1f; deg = -1f
         } else {
-            val t = PoseMath.translationOf(d)
-            mm = kotlin.math.sqrt(t[0] * t[0] + t[1] * t[1] + t[2] * t[2]) * 1000f
-            val q = PoseMath.matrixToQuaternion(d)
-            // |w| because q and -q are the same rotation; without it a correction just past 180 deg
-            // would report as a tiny one.
-            val w = kotlin.math.abs(q[3]).coerceIn(0f, 1f)
-            deg = Math.toDegrees(2.0 * kotlin.math.acos(w.toDouble())).toFloat()
+            mm = PoseMath.translationNorm(d) * 1000f
+            deg = PoseMath.rotationAngleDeg(d)
         }
         return FusionDiagnostics(
             state = if (d == null && lastState == FusionState.WAITING_FOR_LOCK) {

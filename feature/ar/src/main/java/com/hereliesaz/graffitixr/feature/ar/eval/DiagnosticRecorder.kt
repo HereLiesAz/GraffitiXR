@@ -5,6 +5,8 @@ import com.hereliesaz.graffitixr.common.model.CorroborationDiagnostics
 import com.hereliesaz.graffitixr.common.model.FusionDiagnostics
 import com.hereliesaz.graffitixr.common.model.FusionState
 import com.hereliesaz.graffitixr.common.model.GrowOutcome
+import com.hereliesaz.graffitixr.common.model.HybridKpmDiagnostics
+import com.hereliesaz.graffitixr.common.model.HybridKpmOutcome
 import com.hereliesaz.graffitixr.common.model.RelocDiagnostics
 import com.hereliesaz.graffitixr.common.model.RelocReject
 
@@ -44,6 +46,7 @@ class DiagnosticRecorder(
         val fusion: FusionDiagnostics,
         val wallPoints: Int,
         val progress: Float,
+        val hybrid: HybridKpmDiagnostics,
     )
 
     private val ring = ArrayDeque<Sample>(capacity)
@@ -56,8 +59,11 @@ class DiagnosticRecorder(
         fusion: FusionDiagnostics,
         wallPoints: Int,
         progress: Float,
+        // Defaulted: only the ARCore-sidecar path produces it, and NOT_SAMPLED keeps the hybrid
+        // section out of reports from sessions where it never ran.
+        hybrid: HybridKpmDiagnostics = HybridKpmDiagnostics(),
     ) {
-        ring.addLast(Sample(nowMs(), reloc, corrob, fusion, wallPoints, progress))
+        ring.addLast(Sample(nowMs(), reloc, corrob, fusion, wallPoints, progress, hybrid))
         while (ring.size > capacity) ring.removeFirst()
         totalSeen++
     }
@@ -142,6 +148,10 @@ class DiagnosticRecorder(
         sb.appendLine(histogram("Reloc", ring.map { it.reloc.reject.name }))
         sb.appendLine(histogram("CorrobGate", ring.map { it.reloc.corrobGate.name }))
         sb.appendLine(histogram("SelfGrow", ring.map { it.reloc.growOutcome.name }))
+        // Hybrid KPM sidecar decisions, only when the sidecar ever evaluated an observation —
+        // otherwise a 100%-NOT_SAMPLED row on every non-hybrid report is noise, not a finding.
+        val hybridRan = ring.any { it.hybrid.outcome != HybridKpmOutcome.NOT_SAMPLED }
+        if (hybridRan) sb.appendLine(histogram("HybridKPM", ring.map { it.hybrid.outcome.name }))
         // Blank line before the next block or markdown folds it into the list above, and the
         // findings end up rendered as a continuation of the SelfGrow histogram.
         sb.appendLine()
@@ -250,6 +260,13 @@ class DiagnosticRecorder(
         stat(sb, "correctionDeg", ring.map { it.fusion.correctionDeg }) { it >= 0f }
         stat(sb, "wallPoints", ring.map { it.wallPoints.toFloat() }) { it >= 0f }
         stat(sb, "paintingProgress", ring.map { it.progress }) { it >= 0f }
+        if (hybridRan) {
+            stat(sb, "hybridAgeMs", ring.map { it.hybrid.ageMs }) { it >= 0f }
+            stat(sb, "hybridInliers", ring.map { it.hybrid.inliers.toFloat() }) { it >= 0f }
+            stat(sb, "hybridReprojPx", ring.map { it.hybrid.reprojectionPx }) { it >= 0f }
+            stat(sb, "hybridCorrectionMm", ring.map { it.hybrid.correctionMm }) { it >= 0f }
+            stat(sb, "hybridCorrectionDeg", ring.map { it.hybrid.correctionDeg }) { it >= 0f }
+        }
         sb.appendLine()
 
         // The same sentinel discipline as the table above it, which this line did not follow: it

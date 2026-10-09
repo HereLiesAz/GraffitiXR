@@ -1,23 +1,37 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
+import com.hereliesaz.graffitixr.common.model.FusionState
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class PoseFusionHybridObservationTest {
+
+    /** Feeds one hybrid observation; backbone does not move between solve and render. */
+    private fun PoseFusion.observe(
+        backbone: FloatArray,
+        corrected: FloatArray,
+        ts: Long,
+        confidence: Float = 0.95f,
+        inliers: Int = 30,
+    ) = currentAnchorFromHybridObservation(
+        currentBackbone = backbone,
+        backboneAtObservation = backbone,
+        correctedAnchorAtObservation = corrected,
+        observationTimestampNs = ts,
+        confidence = confidence,
+        inliers = inliers,
+    )
+
     @Test
     fun `hybrid correction is stored anchor locally and survives ARCore world rebase`() {
         val fusion = PoseFusion()
         val solveBackbone = translated(0f, 0f, -2.3f)
         val physicalAnchor = translated(0f, 0f, -2.0f)
 
-        val first = fusion.currentAnchorFromHybridObservation(
-            currentBackbone = solveBackbone,
-            backboneAtObservation = solveBackbone,
-            correctedAnchorAtObservation = physicalAnchor,
-            observationTimestampNs = 100L,
-            confidence = 0.95f,
-            inliers = 30,
-        )
+        // 0.3 m exceeds COLD_SNAP_DIST_M, so it needs three agreeing observations.
+        fusion.observe(solveBackbone, physicalAnchor, 100L)
+        fusion.observe(solveBackbone, physicalAnchor, 200L)
+        val first = fusion.observe(solveBackbone, physicalAnchor, 300L)
         assertEquals(-2.0f, first[14], 1e-4f)
 
         // Simulate an ARCore global world rewrite G = +5m X. Both the live backbone and the physical
@@ -27,7 +41,7 @@ class PoseFusionHybridObservationTest {
             currentBackbone = rebasedBackbone,
             backboneAtObservation = solveBackbone,
             correctedAnchorAtObservation = physicalAnchor,
-            observationTimestampNs = 100L, // same observation -> HOLD
+            observationTimestampNs = 300L, // same observation -> HOLD
             confidence = 0.95f,
             inliers = 30,
         )
@@ -39,15 +53,90 @@ class PoseFusionHybridObservationTest {
     fun `weak hybrid observation cannot create a correction`() {
         val fusion = PoseFusion()
         val backbone = translated(0f,0f,-2.3f)
-        val result = fusion.currentAnchorFromHybridObservation(
-            currentBackbone = backbone,
-            backboneAtObservation = backbone,
-            correctedAnchorAtObservation = translated(0f,0f,-2f),
-            observationTimestampNs = 10L,
-            confidence = 0.2f,
-            inliers = 30,
-        )
+        val result = fusion.observe(backbone, translated(0f,0f,-2f), 10L, confidence = 0.2f)
         assertEquals(-2.3f, result[14], 1e-4f)
+    }
+
+    @Test
+    fun `a single large observation is held, not snapped`() {
+        val fusion = PoseFusion()
+        val backbone = translated(0f, 0f, -2.3f)
+        val out = fusion.observe(backbone, translated(0f, 0f, -2.0f), 100L)
+        assertEquals(-2.3f, out[14], 1e-4f)
+        assertEquals(FusionState.AWAITING_AGREEMENT, fusion.diagnostics().state)
+        assertEquals(1, fusion.hybridAgreementCount())
+        assertEquals(0, fusion.diagnostics().snapsAccepted)
+    }
+
+    @Test
+    fun `two agreeing observations are still not enough, the third snaps`() {
+        val fusion = PoseFusion()
+        val backbone = translated(0f, 0f, -2.3f)
+        assertEquals(-2.3f, fusion.observe(backbone, translated(0f, 0f, -2.0f), 100L)[14], 1e-4f)
+        // 1 cm apart: within the 5 cm agreement tolerance.
+        assertEquals(-2.3f, fusion.observe(backbone, translated(0f, 0.01f, -2.0f), 200L)[14], 1e-4f)
+        assertEquals(2, fusion.hybridAgreementCount())
+        val snapped = fusion.observe(backbone, translated(0f, 0f, -2.0f), 300L)
+        assertEquals(-2.0f, snapped[14], 1e-4f)
+        assertEquals(FusionState.COLD_SNAP, fusion.diagnostics().state)
+        assertEquals(-1, fusion.hybridAgreementCount())
+    }
+
+    @Test
+    fun `a disagreeing observation restarts the count`() {
+        val fusion = PoseFusion()
+        val backbone = translated(0f, 0f, -2.3f)
+        fusion.observe(backbone, translated(0f, 0f, -2.0f), 100L)
+        fusion.observe(backbone, translated(0f, 0f, -2.0f), 200L)
+        // 0.4 m from the pending candidate: a different answer, so the evidence starts over.
+        val out = fusion.observe(backbone, translated(0.4f, 0f, -2.0f), 300L)
+        assertEquals(-2.3f, out[14], 1e-4f)
+        assertEquals(1, fusion.hybridAgreementCount())
+    }
+
+    @Test
+    fun `agreement older than the window does not count`() {
+        val fusion = PoseFusion()
+        val backbone = translated(0f, 0f, -2.3f)
+        fusion.observe(backbone, translated(0f, 0f, -2.0f), 1_000_000_000L)
+        fusion.observe(backbone, translated(0f, 0f, -2.0f), 1_100_000_000L)
+        // 1.6 s after the first: past HYBRID_AGREEMENT_WINDOW_NS (1.5 s), so this is a fresh start.
+        val out = fusion.observe(backbone, translated(0f, 0f, -2.0f), 2_600_000_000L)
+        assertEquals(-2.3f, out[14], 1e-4f)
+        assertEquals(1, fusion.hybridAgreementCount())
+    }
+
+    @Test
+    fun `a small correction still applies on one observation`() {
+        val fusion = PoseFusion()
+        val backbone = translated(0f, 0f, -2.3f)
+        // 5 cm: under COLD_SNAP_DIST_M; first lock, high confidence -> snaps immediately.
+        val out = fusion.observe(backbone, translated(0f, 0f, -2.25f), 100L)
+        assertEquals(-2.25f, out[14], 1e-4f)
+        assertEquals(FusionState.COLD_SNAP, fusion.diagnostics().state)
+    }
+
+    @Test
+    fun `reset clears pending agreement`() {
+        val fusion = PoseFusion()
+        val backbone = translated(0f, 0f, -2.3f)
+        fusion.observe(backbone, translated(0f, 0f, -2.0f), 100L)
+        fusion.observe(backbone, translated(0f, 0f, -2.0f), 200L)
+        fusion.reset()
+        assertEquals(-1, fusion.hybridAgreementCount())
+        val out = fusion.observe(backbone, translated(0f, 0f, -2.0f), 300L)
+        assertEquals(-2.3f, out[14], 1e-4f)
+        assertEquals(1, fusion.hybridAgreementCount())
+    }
+
+    @Test
+    fun `holding keeps reporting the pending agreement`() {
+        val fusion = PoseFusion()
+        val backbone = translated(0f, 0f, -2.3f)
+        fusion.observe(backbone, translated(0f, 0f, -2.25f), 100L) // small: establishes a correction
+        fusion.observe(backbone, translated(0f, 0f, -1.9f), 200L)  // 0.35 m from drawn: pending
+        fusion.holdCurrentAnchor(backbone)
+        assertEquals(FusionState.AWAITING_AGREEMENT, fusion.diagnostics().state)
     }
 
     private fun translated(x: Float, y: Float, z: Float) = floatArrayOf(

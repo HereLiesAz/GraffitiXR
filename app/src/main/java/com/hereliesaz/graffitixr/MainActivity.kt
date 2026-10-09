@@ -1450,6 +1450,7 @@ class MainActivity : ComponentActivity() {
                                     paintingProgress = arUiState.paintingProgress,
                                     featureProgress = arUiState.featureProgress,
                                     sphereSlamStatus = arUiState.sphereSlamRuntimeStatus,
+                                    hybridKpm = arUiState.hybridKpmDiagnostics,
                                     captureCount = diagnosticCaptures,
                                     onShareReport = { shareDiagnosticBundle() },
                                     fusionEnabled = evalFusionOn,
@@ -2669,6 +2670,8 @@ private fun RelocDiagnosticsOverlay(
     paintingProgress: Float,
     featureProgress: Float = -1f,
     sphereSlamStatus: com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeStatus,
+    hybridKpm: com.hereliesaz.graffitixr.common.model.HybridKpmDiagnostics =
+        com.hereliesaz.graffitixr.common.model.HybridKpmDiagnostics(),
     onShareReport: () -> Unit,
     captureCount: Int,
     // The two experiment switches, moved here from the debug-only eval panel.
@@ -2739,6 +2742,26 @@ private fun RelocDiagnosticsOverlay(
             },
         )
         DiagnosticRow("", sphereSignal, androidx.compose.ui.graphics.Color.LightGray)
+        // The sidecar's verdict on its latest observation, with the numbers it decided on. Only in
+        // sidecar mode and only once an observation has been evaluated; the outcome name is the
+        // diagnosis (e.g. CORRECTION_TOO_LARGE vs NO_POSE_PAIR call for different fixes).
+        if (
+            sphereSlamStatus.mode ==
+            com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.ARCORE_SIDECAR &&
+            hybridKpm.outcome != com.hereliesaz.graffitixr.common.model.HybridKpmOutcome.NOT_SAMPLED
+        ) {
+            DiagnosticRow(
+                "KPM",
+                hybridKpm.summary(),
+                when (hybridKpm.outcome) {
+                    com.hereliesaz.graffitixr.common.model.HybridKpmOutcome.ACCEPTED ->
+                        androidx.compose.ui.graphics.Color.Green
+                    com.hereliesaz.graffitixr.common.model.HybridKpmOutcome.AWAITING_AGREEMENT ->
+                        androidx.compose.ui.graphics.Color(0xFFFFC107)
+                    else -> androidx.compose.ui.graphics.Color.Yellow
+                },
+            )
+        }
         DiagnosticRow(
             "Reloc", label,
             if (locked) androidx.compose.ui.graphics.Color.Green else androidx.compose.ui.graphics.Color.Yellow,
@@ -2827,6 +2850,9 @@ private fun RelocDiagnosticsOverlay(
                 // A relock reached fusion this tick and was refused (low inlier ratio) while a
                 // standing correction already existed — distinct from HOLDING ("nothing arrived").
                 com.hereliesaz.graffitixr.common.model.FusionState.RELOCK_REFUSED -> "refusing relock"
+                // A large hybrid KPM move is held until repeated observations agree.
+                com.hereliesaz.graffitixr.common.model.FusionState.AWAITING_AGREEMENT ->
+                    "confirming large move"
             },
             when (fusionState) {
                 // Red for the states that mean corrections are being computed and thrown away, or
@@ -2837,7 +2863,8 @@ private fun RelocDiagnosticsOverlay(
                 com.hereliesaz.graffitixr.common.model.FusionState.DISABLED ->
                     androidx.compose.ui.graphics.Color.Red
                 com.hereliesaz.graffitixr.common.model.FusionState.NO_ANCHOR,
-                com.hereliesaz.graffitixr.common.model.FusionState.WAITING_FOR_LOCK ->
+                com.hereliesaz.graffitixr.common.model.FusionState.WAITING_FOR_LOCK,
+                com.hereliesaz.graffitixr.common.model.FusionState.AWAITING_AGREEMENT ->
                     androidx.compose.ui.graphics.Color(0xFFFFC107)
                 else -> androidx.compose.ui.graphics.Color.White
             },

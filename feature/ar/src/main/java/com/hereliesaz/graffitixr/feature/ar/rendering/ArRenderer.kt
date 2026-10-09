@@ -339,6 +339,13 @@ class ArRenderer(
     }
 
     /**
+     * The hybrid KPM sidecar's decision about its most recent observation, with the evidence it
+     * decided on. NOT_SAMPLED until the sidecar is armed and has evaluated one.
+     */
+    fun hybridKpmDiagnostics(): com.hereliesaz.graffitixr.common.model.HybridKpmDiagnostics =
+        lastHybridKpmDiagnostics
+
+    /**
      * Live status of SphereSLAM's ARCore-sidecar mode.
      *
      * A retained old observation is not evidence of current tracking, so [trackingData] is true only
@@ -746,6 +753,10 @@ class ArRenderer(
     // Fixed page-from-artwork-anchor relation, frozen only when BOTH ARCore anchors track together.
     private var hybridPageFromArtworkAnchor: FloatArray? = null
     private var lastHybridObservationTimestampNs: Long = Long.MIN_VALUE
+    // Decision payload for the most recent KPM observation evaluated; read off the GL thread by
+    // [hybridKpmDiagnostics]. Immutable data class, so a volatile reference swap is a safe publish.
+    @Volatile private var lastHybridKpmDiagnostics =
+        com.hereliesaz.graffitixr.common.model.HybridKpmDiagnostics()
     private val mappingViewMatrixScratch = FloatArray(16)
     private val backboneScratch = FloatArray(16)
     // Scratch for composing the overlay matrix (anchor frame * in-plane transform).
@@ -829,6 +840,7 @@ class ArRenderer(
         hybridPoseHistory.clear()
         hybridPageFromArtworkAnchor = null
         lastHybridObservationTimestampNs = Long.MIN_VALUE
+        lastHybridKpmDiagnostics = com.hereliesaz.graffitixr.common.model.HybridKpmDiagnostics()
 
         // Capture-time replacement calls this from onDrawFrame while sessionLock is already held, so
         // detaching here is serialized with every other ARCore call. Off-GL teardown passes false and
@@ -1812,16 +1824,9 @@ class ArRenderer(
             ) {
                 lastHybridObservationTimestampNs = hybridObservation.timestampNs
                 hybridDecision?.let { decision ->
-                    decision.accepted?.let {
-                        Timber.d(
-                            "ARDIAG hybrid KPM accepted ts=${it.timestampNs} " +
-                                "inliers=${it.inliers} confidence=${it.confidence}"
-                        )
-                    } ?: decision.reject?.let {
-                        Timber.d(
-                            "ARDIAG hybrid KPM rejected ts=${hybridObservation.timestampNs} reason=$it"
-                        )
-                    }
+                    // Published here; refined to AWAITING_AGREEMENT below if PoseFusion holds it.
+                    lastHybridKpmDiagnostics = decision.diagnostics
+                    Timber.d("ARDIAG hybrid KPM ${decision.diagnostics.summary()}")
                 }
             }
 
@@ -1873,7 +1878,24 @@ class ArRenderer(
                         observationTimestampNs = hybridAccepted.timestampNs,
                         confidence = hybridAccepted.confidence,
                         inliers = hybridAccepted.inliers,
-                    )
+                    ).also {
+                        // The quality gates passed; PoseFusion may still be holding a LARGE move
+                        // for agreement. Report that rather than a bare ACCEPTED.
+                        val agreeing = poseFusion.hybridAgreementCount()
+                        val current = lastHybridKpmDiagnostics
+                        if (
+                            agreeing >= 0 &&
+                            current.observationTimestampNs == hybridAccepted.timestampNs
+                        ) {
+                            lastHybridKpmDiagnostics = current.copy(
+                                outcome = com.hereliesaz.graffitixr.common.model.HybridKpmOutcome
+                                    .AWAITING_AGREEMENT,
+                                agreeingObservations = agreeing,
+                                requiredAgreement = com.hereliesaz.graffitixr.feature.ar.anchor
+                                    .PoseFusion.HYBRID_REQUIRED_AGREEMENT,
+                            )
+                        }
+                    }
                 captureAnchorCam != null ->
                     poseFusion.currentAnchor(
                     backbone = backbone,
