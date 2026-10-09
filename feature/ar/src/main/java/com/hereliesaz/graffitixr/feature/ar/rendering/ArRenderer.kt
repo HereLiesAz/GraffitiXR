@@ -1884,7 +1884,7 @@ class ArRenderer(
                         val agreeing = poseFusion.hybridAgreementCount()
                         val current = lastHybridKpmDiagnostics
                         if (
-                            agreeing >= 0 &&
+                            poseFusion.isAwaitingHybridAgreement() &&
                             current.observationTimestampNs == hybridAccepted.timestampNs
                         ) {
                             lastHybridKpmDiagnostics = current.copy(

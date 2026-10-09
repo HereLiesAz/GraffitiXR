@@ -186,7 +186,11 @@ class DiagnosticRecorder(
                     it.fusion.state == FusionState.HOLDING ||
                     // A standing correction exists here too (RELOCK_REFUSED requires one) — only
                     // NEW relocks are being refused, not the fact that fusion ever corrected at all.
-                    it.fusion.state == FusionState.RELOCK_REFUSED }) {
+                    it.fusion.state == FusionState.RELOCK_REFUSED ||
+                    // Holding a large hybrid move for agreement over a STANDING correction: fusion
+                    // has corrected; it is declining one more move. Without a standing correction
+                    // (correctionMm < 0) it genuinely never has.
+                    (it.fusion.state == FusionState.AWAITING_AGREEMENT && it.fusion.correctionMm >= 0f) }) {
                 // Distinguished from a fusion that was ON and never managed to correct anything.
                 //
                 // `ArRenderer.fusionEnabled` ships FALSE and its only writer sits behind the

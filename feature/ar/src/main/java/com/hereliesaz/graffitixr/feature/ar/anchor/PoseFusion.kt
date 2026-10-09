@@ -380,7 +380,10 @@ class PoseFusion {
                 lastState = FusionState.RELOCK_REFUSED
             }
             lastHybridTimestampNs = observationTimestampNs
-        } else if (correction != null) {
+        } else if (correction != null && hybridPending.isEmpty()) {
+            // The same observation re-presented on a later render frame. While a large move is
+            // pending, AWAITING_AGREEMENT is still the accurate description — HOLDING here made the
+            // Fusion row flicker between the two on every frame of one observation's lifetime.
             lastState = FusionState.HOLDING
         }
         return PoseMath.multiply(currentBackbone, correction ?: identity())
@@ -392,8 +395,10 @@ class PoseFusion {
      */
     fun holdCurrentAnchor(backbone: FloatArray): FloatArray {
         // An agreement in progress is still the accurate description of this frame; HOLDING would
-        // hide that a large correction is pending.
-        if (correction != null && lastState != FusionState.AWAITING_AGREEMENT) {
+        // hide that a large correction is pending. Known limit: with no clock here, a pending set
+        // whose evidence stopped arriving keeps this label until the next accepted observation
+        // clears or expires it (the pending set itself cannot apply without fresh agreement).
+        if (correction != null && hybridPending.isEmpty()) {
             lastState = FusionState.HOLDING
         }
         return PoseMath.multiply(backbone, correction ?: identity())
@@ -415,6 +420,14 @@ class PoseFusion {
      * Paired with [HYBRID_REQUIRED_AGREEMENT] for diagnostics.
      */
     fun hybridAgreementCount(): Int = lastHybridAgreement
+
+    /**
+     * True only when the most recent hybrid decision was to hold a large move for agreement — not
+     * merely when a pending set exists. A weak observation that arrives while a set is pending is
+     * refused, and must not be relabelled as part of the agreement.
+     */
+    fun isAwaitingHybridAgreement(): Boolean =
+        lastState == FusionState.AWAITING_AGREEMENT && hybridPending.isNotEmpty()
 
     private var lastState = FusionState.WAITING_FOR_LOCK
     private var lastAlpha = -1f

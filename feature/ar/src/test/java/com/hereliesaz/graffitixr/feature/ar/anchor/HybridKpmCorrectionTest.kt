@@ -131,6 +131,40 @@ class HybridKpmCorrectionTest {
         assertEquals(-1f, d.correctionDeg, 0f)
     }
 
+    @Test
+    fun `rotation past the ceiling is refused`() {
+        val history = HybridPoseHistory()
+        // Backbone rotated 40° about Z at the same depth: translation agrees, rotation does not.
+        history.add(1_000L, identity(), rotZ40AtDepth(-2f))
+        val d = solve(frontObservation(1_000L, 2_000f), geometry, true, identity(), history, 1_050L)
+        assertEquals(HybridKpmCorrection.Reject.CORRECTION_TOO_LARGE, d.reject)
+        assertEquals(40f, d.diagnostics.correctionDeg, 0.05f)
+    }
+
+    @Test
+    fun `the ceiling ignores an ARCore global rebase`() {
+        // Same physical situation as the 1.5 m case but ARCore renumbered its world by +10 m X:
+        // both the sensor view and the backbone carry the rebase, so the verdict must not change.
+        val rebase = translated(10f, 0f, 0f)
+        val viewRebased = translated(-10f, 0f, 0f) // view = inverse(world-from-camera)
+        val history = HybridPoseHistory()
+        history.add(1_000L, viewRebased, multiply(rebase, translated(0f, 0f, -3.5f)))
+        val d = solve(frontObservation(1_000L, 2_000f), geometry, true, identity(), history, 1_050L)
+        assertEquals(HybridKpmCorrection.Reject.CORRECTION_TOO_LARGE, d.reject)
+        assertEquals(1500f, d.diagnostics.correctionMm, 0.1f)
+    }
+
+    // Column-major 40° rotation about Z (cos40 = 0.76604444, sin40 = 0.64278761), at depth z.
+    private fun rotZ40AtDepth(z: Float) = floatArrayOf(
+        0.76604444f, 0.64278761f, 0f, 0f,
+        -0.64278761f, 0.76604444f, 0f, 0f,
+        0f, 0f, 1f, 0f,
+        0f, 0f, z, 1f,
+    )
+
+    // Pure translations commute, so composing them is just adding their columns.
+    private fun multiply(a: FloatArray, b: FloatArray) = translated(a[12] + b[12], a[13] + b[13], a[14] + b[14])
+
     private data class TestObservation(
         val timestampNs: Long,
         val error: Float,

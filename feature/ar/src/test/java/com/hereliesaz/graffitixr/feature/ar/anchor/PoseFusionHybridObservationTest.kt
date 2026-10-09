@@ -2,6 +2,8 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
 
 import com.hereliesaz.graffitixr.common.model.FusionState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PoseFusionHybridObservationTest {
@@ -137,6 +139,28 @@ class PoseFusionHybridObservationTest {
         fusion.observe(backbone, translated(0f, 0f, -1.9f), 200L)  // 0.35 m from drawn: pending
         fusion.holdCurrentAnchor(backbone)
         assertEquals(FusionState.AWAITING_AGREEMENT, fusion.diagnostics().state)
+    }
+
+    @Test
+    fun `re-presenting the pending observation on later frames keeps AWAITING`() {
+        val fusion = PoseFusion()
+        val backbone = translated(0f, 0f, -2.3f)
+        fusion.observe(backbone, translated(0f, 0f, -2.25f), 100L) // small: standing correction
+        fusion.observe(backbone, translated(0f, 0f, -1.9f), 200L)  // large: pending
+        fusion.observe(backbone, translated(0f, 0f, -1.9f), 200L)  // same ts, next render frame
+        assertEquals(FusionState.AWAITING_AGREEMENT, fusion.diagnostics().state)
+        assertTrue(fusion.isAwaitingHybridAgreement())
+    }
+
+    @Test
+    fun `a weak observation during a pending agreement is refused, not counted`() {
+        val fusion = PoseFusion()
+        val backbone = translated(0f, 0f, -2.3f)
+        fusion.observe(backbone, translated(0f, 0f, -2.25f), 100L)
+        fusion.observe(backbone, translated(0f, 0f, -1.9f), 200L)
+        fusion.observe(backbone, translated(0f, 0f, -1.9f), 300L, confidence = 0.2f)
+        assertEquals(FusionState.RELOCK_REFUSED, fusion.diagnostics().state)
+        assertFalse(fusion.isAwaitingHybridAgreement())
     }
 
     private fun translated(x: Float, y: Float, z: Float) = floatArrayOf(
