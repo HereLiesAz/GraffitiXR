@@ -1789,9 +1789,10 @@ class ArViewModel @Inject constructor(
                         loadFingerprintIfExists()
                         // A page frozen this session commits once its own fingerprint lands.
                         tryCommitPendingHybridPage(project)
-                        // Once per project, not per emission: re-arming KPM resets the sidecar.
-                        if (project.id != hybridRestoreProjectId) {
-                            hybridRestoreProjectId = project.id
+                        // Once per project page, not per emission: re-arming KPM resets the sidecar.
+                        // Keyed by URI too, so a page committed after a renderer swap is still offered.
+                        if (hybridRestoreKey(project) != hybridRestoreKey) {
+                            hybridRestoreKey = hybridRestoreKey(project)
                             pushPersistedHybridPage(project)
                         }
                     }
@@ -3873,8 +3874,11 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    // Project whose persisted hybrid page was last offered to the renderer.
-    private var hybridRestoreProjectId: String? = null
+    // Project + page URI whose persisted hybrid page was last offered to the renderer.
+    private var hybridRestoreKey: Pair<String, android.net.Uri?>? = null
+
+    private fun hybridRestoreKey(project: com.hereliesaz.graffitixr.common.model.GraffitiProject) =
+        project.id to project.hybridKpmPageUri
 
     // A page frozen this session, waiting for ITS fingerprint to commit. Guarded by [hybridLock]:
     // written from the GL thread (renderer callbacks) and read from the project collector.
@@ -4056,7 +4060,7 @@ class ArViewModel @Inject constructor(
                     peerSpatialFramePresent = _uiState.value.coopPeerSpatialFrame != null,
                 )
             ) {
-                hybridRestoreProjectId = project.id
+                hybridRestoreKey = hybridRestoreKey(project)
                 pushPersistedHybridPage(project)
             }
         }
