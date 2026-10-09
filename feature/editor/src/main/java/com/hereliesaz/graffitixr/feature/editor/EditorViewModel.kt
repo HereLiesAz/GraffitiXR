@@ -1440,9 +1440,32 @@ class EditorViewModel @Inject constructor(
                         )
                         return@launch
                     }
+                    // Persist like the local import path: bitmap is @Transient, so without a saved
+                    // artifact and URI the peer's pixels vanish on the next reload.
+                    val projectId = _uiState.value.projectId
+                    val localUri = projectId?.let { id ->
+                        try {
+                            withContext(dispatchers.io) {
+                                val path = projectRepository.saveArtifact(
+                                    id, "design_${UUID.randomUUID()}.png", op.png,
+                                )
+                                "file://$path".toUri()
+                            }
+                        } catch (e: Exception) {
+                            if (e is kotlinx.coroutines.CancellationException) throw e
+                            android.util.Log.w("EditorViewModel", "DesignBitmapReplace: persist failed", e)
+                            null
+                        }
+                    }
                     withContext(dispatchers.main) {
-                        _uiState.update { s -> s.copy(design = s.design?.copy(bitmap = decoded)) }
+                        val persisted = localUri != null && isCurrentProject(projectId!!)
+                        _uiState.update { s ->
+                            s.copy(design = s.design?.let { d ->
+                                if (persisted) d.copy(bitmap = decoded, uri = localUri) else d.copy(bitmap = decoded)
+                            })
+                        }
                         onApplied()
+                        if (persisted) saveProject()
                     }
                 }
                 return // onApplied runs after the decode, above
