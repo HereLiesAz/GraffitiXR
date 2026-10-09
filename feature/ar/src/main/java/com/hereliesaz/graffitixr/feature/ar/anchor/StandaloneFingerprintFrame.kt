@@ -85,28 +85,79 @@ object StandaloneFingerprintFrame {
         )
     }
 
-    /** MobileGS standalone object space is intentionally identical to the centred wall frame. */
+    /** MobileGS standalone object space is the fingerprint's local centred wall plane. */
     fun wallToMobileGsObject(point: Point3): FloatArray = point.toFloatArray()
 
     /**
-     * Standalone fingerprint anchor == standalone wall frame.
+     * Place a fingerprint-local wall plane into the already-running SphereSLAM photosphere map.
      *
-     * Existing ARCore fingerprints need a world-space anchor model because their object points live
-     * in a capture-camera frame. Standalone page points already live in the durable wall/anchor
-     * frame, so the object-from-anchor transform is identity.
+     * Map convention is GL-style: +X right across the wall-facing arc, +Y up, and the centre viewing
+     * direction points toward -Z. [azimuthDeltaDeg] is relative to the photosphere's wall heading,
+     * clockwise-positive; [elevationDeg] is positive upward. [rangeUnits] is metres only when the
+     * photosphere has metric range, otherwise it is a normalized map radius.
+     *
+     * Fingerprint local +Z points back toward the camera, matching +X image-right × +Y image-up.
+     * The result is a column-major model matrix `map_from_fingerprint`.
      */
-    fun fingerprintFromAnchor(): FloatArray = identity4()
+    fun mapFromFingerprint(
+        azimuthDeltaDeg: Float,
+        elevationDeg: Float,
+        rangeUnits: Float,
+    ): FloatArray {
+        require(azimuthDeltaDeg.isFinite() && elevationDeg.isFinite())
+        require(rangeUnits.isFinite() && rangeUnits > 0f)
 
-    /** Inverse of [fingerprintFromAnchor]; kept explicit at call sites for frame readability. */
-    fun anchorFromFingerprint(): FloatArray = identity4()
+        val az = Math.toRadians(azimuthDeltaDeg.toDouble())
+        val el = Math.toRadians(elevationDeg.toDouble())
+        val sinAz = kotlin.math.sin(az).toFloat()
+        val cosAz = kotlin.math.cos(az).toFloat()
+        val sinEl = kotlin.math.sin(el).toFloat()
+        val cosEl = kotlin.math.cos(el).toFloat()
+
+        // Camera-origin -> wall target direction in the photosphere map.
+        val forward = floatArrayOf(
+            sinAz * cosEl,
+            sinEl,
+            -cosAz * cosEl,
+        )
+        // Fingerprint +Z is the wall normal facing back toward the camera.
+        val z = floatArrayOf(-forward[0], -forward[1], -forward[2])
+        // Tangent direction for increasing elevation.
+        val y = floatArrayOf(
+            -sinAz * sinEl,
+            cosEl,
+            cosAz * sinEl,
+        )
+        // x = y × z, yielding image-right and a right-handed fingerprint basis.
+        val x = floatArrayOf(
+            y[1] * z[2] - y[2] * z[1],
+            y[2] * z[0] - y[0] * z[2],
+            y[0] * z[1] - y[1] * z[0],
+        )
+
+        return floatArrayOf(
+            x[0], x[1], x[2], 0f,
+            y[0], y[1], y[2], 0f,
+            z[0], z[1], z[2], 0f,
+            forward[0] * rangeUnits,
+            forward[1] * rangeUnits,
+            forward[2] * rangeUnits,
+            1f,
+        )
+    }
 
     /**
-     * True only when a persisted map declares the standalone centred-page anchor.
-     *
-     * The standalone wall frame and fingerprint anchor are intentionally identical, so any
-     * translation/rotation here means the map belongs to some other frame contract and must not be
-     * restored as SphereSLAM state.
+     * Legacy centred-page identity retained only for old-project validation/migration tests.
+     * New standalone precision targets MUST use an explicit photosphere map transform.
      */
+    @Deprecated("Standalone fingerprints now require explicit map_from_fingerprint")
+    fun fingerprintFromAnchor(): FloatArray = identity4()
+
+    @Deprecated("Standalone fingerprints now require explicit map_from_fingerprint")
+    fun anchorFromFingerprint(): FloatArray = identity4()
+
+    /** Legacy identity check; do not use as the new photosphere-frame compatibility test. */
+    @Deprecated("Standalone maps are no longer required to use fingerprint identity")
     fun isCenteredPageAnchor(anchor: FloatArray, epsilon: Float = 1e-5f): Boolean {
         if (anchor.size != 16 || !epsilon.isFinite() || epsilon < 0f) return false
         val identity = identity4()
