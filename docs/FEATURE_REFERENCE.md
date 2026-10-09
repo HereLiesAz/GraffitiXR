@@ -449,8 +449,27 @@ Robust LAN peer-to-peer sync for collaborative painting — **no cloud, no accou
 - **Robustness:** accept-loop survives bad handshakes; ops are lossless across reconnects (seq + encode +
   buffer at enqueue); 15 s socket read timeouts; guests re-sync on host `sessionId` change; bounded
   pre-handler spectator-op buffering. Import/spectator load is hardened against Zip-Slip.
-- **Ops:** layer add/remove/transform/props changes and completed brush strokes stream as `Op`s and apply
-  by id on the receiver with no active-layer side effects.
+- **Ops:** design replace/transform/props/bitmap and per-mode adjustments stream as `Op`s and apply
+  with no active-layer side effects.
+- **Bidirectional (protocol v4):** a guest's edits go to the host as `GUEST_OP` frames (own
+  sequence, queued in `GuestOutbox` until `GUEST_OP_ACK`, resent once after a reconnect, deduped by
+  the host per GuestSession instance). The host applies each as an undoable, persisted edit and
+  emits it at apply time on the main thread, alongside its own edits, so its DELTA order is its
+  apply order — the single total order both peers converge on when they edit concurrently (last
+  write in host order wins). Refused, on both ends (`GuestOpPolicy`): choosing/replacing the design
+  image (a `Layer` from a guest names a guest-side file), an AR placement between peers on
+  different tracking backends (each expresses it in its own wall frame), rendered pixels
+  (`DesignBitmapReplace` — the host persists source + Outline/isolation flags, so a guest's Outline
+  or isolation toggle stays local), and the authoring ops this app ignores; the guest is told once
+  that such a change stays on its device. After a guest replaces its design locally, all its design
+  edits stay local until the host's design returns (a host `DesignReplace` or a bulk). Edits made
+  before the host's snapshot is installed are refused, not queued. Target capture is host-only (a
+  guest re-target would split the spatial frames). A guest AR placement on a standalone-hosted
+  session is written to the standalone slot even while the host is in another mode. A new host
+  session (host restarted) clears the guest's unsent edits — the fresh bulk is the baseline. v3
+  peers are rejected at the handshake.
+  **Known limit:** an incoming op (the echo of the guest's previous gesture, or a host edit)
+  arriving mid-gesture overrides the guest's in-progress drag.
 
 **Known/deferred (see `BACKLOG.md`):** a mid-bulk stall in `GuestSession` under investigation;
 `LocalLoopTest.kt` real-socket timeouts are a latent CI-gate risk.

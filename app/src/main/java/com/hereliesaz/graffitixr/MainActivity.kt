@@ -669,6 +669,13 @@ class MainActivity : ComponentActivity() {
                     // Also flushes, in order, any spectator ops that arrived before this effect ran.
                     arViewModel.setSpectatorOpHandler { op -> editorViewModel.applySpectatorOp(op) }
                 }
+                // Co-op v4, host side: a connected guest's edits land on the authoritative project.
+                LaunchedEffect(arViewModel, editorViewModel) {
+                    arViewModel.setGuestOpHandler { op ->
+                        // Hosting picks standalone exactly when ARCore is unavailable (ArViewModel.startHosting).
+                        editorViewModel.applyGuestOp(op, hostedArStandalone = !arViewModel.uiState.value.isArCoreAvailable)
+                    }
+                }
 
                 // The "Open" rail item can create+open a project (async DB write) and launch the picker
                 // in the same tap. If the user picks before projectId propagates, onAddLayer would

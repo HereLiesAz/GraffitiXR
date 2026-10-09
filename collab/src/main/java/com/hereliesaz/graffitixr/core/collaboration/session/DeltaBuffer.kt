@@ -102,15 +102,8 @@ internal class DeltaBuffer(
      * latest instead of accumulating a megabyte apiece.
      */
     private fun supersede(incoming: Op) {
-        val subsumes: (Op) -> Boolean = when (incoming) {
-            is Op.DesignReplace -> { op -> op !is Op.ModeTransform }
-            is Op.DesignBitmapReplace -> { op -> op is Op.DesignBitmapReplace || op is Op.StrokeComplete }
-            is Op.DesignTransform -> { op -> op is Op.DesignTransform }
-            is Op.DesignProps -> { op -> op is Op.DesignProps }
-            is Op.ModeTransform -> { op -> op is Op.ModeTransform && op.mode == incoming.mode }
-            // A completed stroke is incremental: it builds on what came before and subsumes nothing.
-            is Op.StrokeComplete, is Op.TextContentChange -> return
-        }
+        // A completed stroke is incremental: it builds on what came before and subsumes nothing.
+        val subsumes: (Op) -> Boolean = subsumedBy(incoming) ?: return
         val it = ring.iterator()
         while (it.hasNext()) {
             val entry = it.next()
