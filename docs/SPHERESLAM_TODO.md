@@ -721,10 +721,18 @@ they were the same frame.
 - [ ] Measure standalone KPM matching time at representative CameraX resolutions.
 - [ ] Measure UI/preview FPS with KPM active.
 - [ ] Measure native heap and Java heap while tracking.
-- [ ] Confirm direct frame buffers are reused rather than allocated each frame.
-- [ ] Confirm pending work cannot queue unboundedly.
-- [ ] Add adaptive standalone analysis cadence if KPM exceeds the frame budget.
-- [ ] Preserve low latency over maximum throughput: drop stale frames instead of queueing them.
+- [x] Confirm direct frame buffers are reused rather than allocated each frame:
+  `SphereSlamStandaloneTrackingAnalyzer.directFrame` grows one direct buffer only when a frame is
+  larger and reuses it otherwise. (The heap `ByteArray` from `LumaFrameTransform.packCropAndRotate`
+  is still allocated per frame — a GC-pressure measurement item, not a direct-buffer leak.)
+- [x] Confirm pending work cannot queue unboundedly: the analyzer is synchronous with no per-frame
+  async work and the shared controller pins `STRATEGY_KEEP_ONLY_LATEST`, so at most one frame waits.
+  Both enforced by `tools/check_sphereslam_architecture.py` invariant 7.
+- [x] Add adaptive standalone analysis cadence if KPM exceeds the frame budget: structural — with a
+  synchronous analyzer under KEEP_ONLY_LATEST the analysis rate is bounded by match cost and stale
+  frames are dropped. A deliberate cadence cap (thermal) remains a measurement-driven follow-up.
+- [x] Preserve low latency over maximum throughput: drop stale frames instead of queueing them
+  (`CameraPreview.rememberCameraController` now pins it rather than inheriting CameraX's default).
 - [ ] Measure battery/thermal behavior over a realistic mural session.
 - [ ] Verify background/pause stops CameraX analysis and IMU sampling.
 - [ ] Verify resume recreates/calibrates the standalone session cleanly.

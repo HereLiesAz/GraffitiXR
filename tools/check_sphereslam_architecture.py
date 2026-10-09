@@ -13,6 +13,8 @@ invariants that are easy to accidentally regress during UI/renderer refactors:
 5. The standalone runtime never reaches ARCore-only hit-test/depth/anchor/perception APIs and exposes
    an explicit canonical-wall hit-test seam instead.
 6. Co-op never installs peer geometry without a protocol-v3 backend/scale/wall-frame contract.
+7. Standalone analysis drops stale frames rather than queueing them: the shared CameraX controller
+   pins STRATEGY_KEEP_ONLY_LATEST and the standalone analyzer does no asynchronous per-frame work.
 
 If a future, legitimate architecture change trips this check, update the check together with the
 new explicit seam. Do not simply weaken/remove it.
@@ -254,6 +256,22 @@ for required in (
 ):
     if required not in ar_view_model:
         fail(f"Standalone tracking no longer clears stale ARCore depth state: missing {required!r}.")
+
+# 7. Latency over throughput for standalone analysis.
+camera_preview = read("feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/CameraPreview.kt")
+if "STRATEGY_KEEP_ONLY_LATEST" not in camera_preview or "STRATEGY_BLOCK_PRODUCER" in camera_preview.replace(
+    "STRATEGY_BLOCK_PRODUCER here", ""
+):
+    fail("Shared CameraX controller must pin ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST (drop stale frames).")
+standalone_analyzer = read(
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/SphereSlamStandaloneTrackingAnalyzer.kt"
+)
+for token in ("launch(", "launch {", ".execute(", ".submit(", "Thread("):
+    if token in standalone_analyzer:
+        fail(
+            f"Standalone analyzer starts asynchronous work ({token!r}); per-frame work must stay synchronous "
+            "so backpressure bounds the queue."
+        )
 
 if FAILURES:
     print("SphereSLAM architecture invariant check FAILED:", file=sys.stderr)
