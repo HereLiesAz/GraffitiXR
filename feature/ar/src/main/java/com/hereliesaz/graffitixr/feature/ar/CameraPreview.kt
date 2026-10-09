@@ -121,7 +121,7 @@ fun CameraPreview(
             PreviewView(context).apply {
                 this.controller = controller
                 // FIT_CENTER, not the default FILL_CENTER: both CameraX tracking consumers
-                // (SphereSlamStandaloneOverlay for AR and HomographyFallbackOverlay for Overlay)
+                // (SphereSlamStandaloneOverlay for AR; HomographyFallbackOverlay, currently unmounted)
                 // solve pose against the ImageAnalysis frame's own aspect ratio and draw with a
                 // GL viewport letterboxed to match FIT_CENTER exactly (see
                 // HomographyOverlayRenderer's doc). FILL_CENTER's crop has no such matching
