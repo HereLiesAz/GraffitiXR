@@ -2708,7 +2708,9 @@ class ArRenderer(
                         // KPM is deliberately lower-rate and asynchronous. ARCore still updates
                         // every render frame; SphereSLAM gets a luma snapshot only often enough to
                         // relocalize without turning the GL thread into a photocopier.
-                        if (frameCount % SPHERESLAM_FEED_DIVISOR == 0 &&
+                        // Fusion off means no consumer for KPM observations: skip the CPU work.
+                        if (fusionEnabled &&
+                            frameCount % SPHERESLAM_FEED_DIVISOR == 0 &&
                             sphereSlamTracker.isReferenceReady
                         ) {
                             sphereSlamTracker.submitFrame(
