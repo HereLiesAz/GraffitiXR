@@ -340,17 +340,18 @@ class PoseFusion {
                 val drawn = applied ?: currentBackbone
                 if (diverged(drawn, correctedCurrent)) {
                     val anchorLocal = hybridPending.firstOrNull()
-                    // A timestamp BEFORE the first pending one is a clock discontinuity (ARCore epoch
+                    // A timestamp BEFORE the last pending one is a clock discontinuity (ARCore epoch
                     // change; HybridPoseHistory drops its samples for the same reason): the old
                     // candidates belong to another clock and must not count toward agreement.
                     val expired = hybridPendingFirstNs != Long.MIN_VALUE &&
-                        (observationTimestampNs < hybridPendingFirstNs ||
+                        (observationTimestampNs < hybridPendingLastNs ||
                             observationTimestampNs - hybridPendingFirstNs > HYBRID_AGREEMENT_WINDOW_NS)
                     if (anchorLocal != null && (expired || !agrees(anchorLocal, newLocal))) {
                         clearHybridPending()
                     }
                     if (hybridPending.isEmpty()) hybridPendingFirstNs = observationTimestampNs
                     hybridPending.add(newLocal)
+                    hybridPendingLastNs = observationTimestampNs
                     if (hybridPending.size < HYBRID_REQUIRED_AGREEMENT) {
                         lastHybridAgreement = hybridPending.size
                         lastState = FusionState.AWAITING_AGREEMENT
@@ -415,11 +416,13 @@ class PoseFusion {
     // Large-correction candidates (anchor-local, so rebase-invariant) awaiting agreement.
     private val hybridPending = ArrayList<FloatArray>(HYBRID_REQUIRED_AGREEMENT)
     private var hybridPendingFirstNs = Long.MIN_VALUE
+    private var hybridPendingLastNs = Long.MIN_VALUE
     private var lastHybridAgreement = -1
 
     private fun clearHybridPending() {
         hybridPending.clear()
         hybridPendingFirstNs = Long.MIN_VALUE
+        hybridPendingLastNs = Long.MIN_VALUE
         lastHybridAgreement = -1
     }
 

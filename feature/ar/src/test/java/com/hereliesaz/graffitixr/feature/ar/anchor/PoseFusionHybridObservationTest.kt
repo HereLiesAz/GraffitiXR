@@ -186,6 +186,18 @@ class PoseFusionHybridObservationTest {
         assertEquals(1, fusion.hybridAgreementCount())
     }
 
+    @Test
+    fun `a timestamp before the last pending one discards pending agreement`() {
+        val fusion = PoseFusion()
+        val backbone = translated(0f, 0f, -2.3f)
+        fusion.observe(backbone, translated(0f, 0f, -2.0f), 5_000_000_000L)
+        fusion.observe(backbone, translated(0f, 0f, -2.0f), 5_200_000_000L)
+        // After the first pending timestamp but before the last: still a backward jump.
+        val out = fusion.observe(backbone, translated(0f, 0f, -2.0f), 5_100_000_000L)
+        assertEquals(-2.3f, out[14], 1e-4f)
+        assertEquals(1, fusion.hybridAgreementCount())
+    }
+
     private fun translated(x: Float, y: Float, z: Float) = floatArrayOf(
         1f,0f,0f,0f,
         0f,1f,0f,0f,

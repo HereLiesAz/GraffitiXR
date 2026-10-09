@@ -1955,8 +1955,8 @@ class ArRenderer(
                 hybridObservation != null &&
                 hybridObservation.timestampNs != lastHybridObservationTimestampNs
             ) {
-                lastHybridObservationTimestampNs = hybridObservation.timestampNs
                 hybridDecision?.let { decision ->
+                    lastHybridObservationTimestampNs = hybridObservation.timestampNs
                     // Published here; refined to AWAITING_AGREEMENT below if PoseFusion holds it.
                     // Rejections are final now; an accepted one is logged after that refinement.
                     lastHybridKpmDiagnostics = decision.diagnostics
