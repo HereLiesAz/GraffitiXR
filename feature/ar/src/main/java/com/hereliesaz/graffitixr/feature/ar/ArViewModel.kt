@@ -1606,6 +1606,8 @@ class ArViewModel @Inject constructor(
                         sphereSlamFingerprintFrameVersion =
                             project?.sphereSlamFingerprintFrameVersion
                                 ?: com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                        sphereSlamMapFromFingerprint =
+                            project?.sphereSlamMapFromFingerprint.orEmpty(),
                         sphereSlamWallFeatureMap = project?.sphereSlamWallFeatureMap,
                         sphereSlamWallFeatureMapFrameVersion =
                             project?.sphereSlamWallFeatureMapFrameVersion
