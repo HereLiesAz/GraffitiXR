@@ -860,6 +860,11 @@ class ArRenderer(
     private var hybridCapturedWidthMeters = 0f
     // A persisted page waiting for the GL thread (needs live camera intrinsics to re-arm KPM).
     @Volatile private var pendingHybridRestore: com.hereliesaz.graffitixr.feature.ar.HybridKpmPage? = null
+    // Set by every restoreHybridPage call: the GL thread drops a previously RESTORED page (never a
+    // live capture) before arming the new one, so another project's page cannot linger.
+    @Volatile private var pendingHybridRestoreReplace = false
+    // The armed hybrid reference came from restoreHybridPage, not this session's capture. GL thread.
+    private var hybridReferenceRestored = false
     // Set once this renderer has started a target capture. A persisted page belongs to a target
     // from an earlier session; after a capture it can only be older than what this session holds,
     // so restores are refused for the rest of the renderer's life (also closes the window where a
@@ -896,6 +901,8 @@ class ArRenderer(
      */
     fun restoreHybridPage(page: com.hereliesaz.graffitixr.feature.ar.HybridKpmPage?) {
         if (targetCaptureStarted) return
+        // Flag first: the GL thread reads it before the page, so it never arms a page unreplaced.
+        pendingHybridRestoreReplace = true
         pendingHybridRestore = page?.takeIf { it.isValid() }
     }
     private val mappingViewMatrixScratch = FloatArray(16)
@@ -984,6 +991,7 @@ class ArRenderer(
         lastHybridKpmDiagnostics = com.hereliesaz.graffitixr.common.model.HybridKpmDiagnostics()
         hybridCapturedLuma = null
         hybridCaptureAnchorGeneration = Long.MAX_VALUE
+        hybridReferenceRestored = false
 
         // Capture-time replacement calls this from onDrawFrame while sessionLock is already held, so
         // detaching here is serialized with every other ARCore call. Off-GL teardown passes false and
@@ -1031,6 +1039,7 @@ class ArRenderer(
                 .pageGeometry(page.width, page.height, dpi)
             hybridReferencePhysicallyMetric = true
             hybridPageFromArtworkAnchor = page.pageFromArtwork.copyOf()
+            hybridReferenceRestored = true
             Timber.i(
                 "ARDIAG hybrid KPM page restored ${page.width}x${page.height} " +
                     "wall=${page.widthMeters}m dpi=$dpi"
@@ -1985,6 +1994,10 @@ class ArRenderer(
 
             // Re-arm a persisted hybrid page (SPHERESLAM_TODO §10 durable reopen). Taken exactly
             // once; dropped if this session already owns a hybrid page or a capture is pending.
+            if (pendingHybridRestoreReplace) {
+                pendingHybridRestoreReplace = false
+                if (hybridReferenceRestored) resetHybridReference()
+            }
             if (isTracking) {
                 pendingHybridRestore?.let { page ->
                     pendingHybridRestore = null
@@ -2845,7 +2858,9 @@ class ArRenderer(
                         // KPM is deliberately lower-rate and asynchronous. ARCore still updates
                         // every render frame; SphereSLAM gets a luma snapshot only often enough to
                         // relocalize without turning the GL thread into a photocopier.
-                        if (frameCount % SPHERESLAM_FEED_DIVISOR == 0 &&
+                        // Fusion off means no consumer for KPM observations: skip the CPU work.
+                        if (fusionEnabled &&
+                            frameCount % SPHERESLAM_FEED_DIVISOR == 0 &&
                             sphereSlamTracker.isReferenceReady
                         ) {
                             sphereSlamTracker.submitFrame(

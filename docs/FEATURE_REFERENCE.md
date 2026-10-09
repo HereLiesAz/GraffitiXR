@@ -134,7 +134,11 @@ foreshorten an oblique wall) and the overlay rotation correction was applied
 refused with a re-tap prompt. Save writes `GraffitiProject.wallWidthMeters` (null = never measured;
 `anchor/WallWidthPersistence.kt`) and leaves Measure only once the write lands in the measured
 project — otherwise the reading stays and an error asks to save again;
-Redo starts over. Markers sit at the tapped screen positions. Not offered on standalone SphereSLAM
+Redo starts over. Markers sit at the tapped screen positions. In co-op, Save works for host and
+guest alike (the guest is the primary measurer): the saved width is published as `Op.WallWidth`
+(protocol v5); a guest's goes to the host, which persists it to the authoritative project and
+rebroadcasts it, and a host's goes to its guests. The width is metric, so it crosses between
+backends and devices unconverted; a joining guest gets it in the bulk project archive. Not offered on standalone SphereSLAM
 (no measurement path yet; it must be limited to physically metric targets when added).
 
 ### 1.3 MOCKUP wall-capture flow (`CaptureStep`)
@@ -465,8 +469,8 @@ Robust LAN peer-to-peer sync for collaborative painting — **no cloud, no accou
 - **Robustness:** accept-loop survives bad handshakes; ops are lossless across reconnects (seq + encode +
   buffer at enqueue); 15 s socket read timeouts; guests re-sync on host `sessionId` change; bounded
   pre-handler spectator-op buffering. Import/spectator load is hardened against Zip-Slip.
-- **Ops:** design replace/transform/props/bitmap and per-mode adjustments stream as `Op`s and apply
-  with no active-layer side effects.
+- **Ops:** design replace/transform/props/bitmap, per-mode adjustments and the measured wall width
+  (`Op.WallWidth`, protocol v5) stream as `Op`s and apply with no active-layer side effects.
 - **Bidirectional (protocol v4):** a guest's edits go to the host as `GUEST_OP` frames (own
   sequence, queued in `GuestOutbox` until `GUEST_OP_ACK`, resent once after a reconnect, deduped by
   the host per GuestSession instance). The host applies each as an undoable, persisted edit and
@@ -476,7 +480,8 @@ Robust LAN peer-to-peer sync for collaborative painting — **no cloud, no accou
   image (a `Layer` from a guest names a guest-side file), an AR placement between peers on
   different tracking backends (each expresses it in its own wall frame), rendered pixels
   (`DesignBitmapReplace` — the host persists source + Outline/isolation flags, so a guest's Outline
-  or isolation toggle stays local), and the authoring ops this app ignores; the guest is told once
+  or isolation toggle stays local), an implausible wall width (non-finite or outside (0, 100] m),
+  and the authoring ops this app ignores; the guest is told once
   that such a change stays on its device. After a guest replaces its design locally, all its design
   edits stay local until the host's design returns (a host `DesignReplace` or a bulk). Edits made
   before the host's snapshot is installed are refused, not queued. Target capture is host-only (a

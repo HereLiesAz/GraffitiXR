@@ -74,8 +74,10 @@ class ProjectRepositoryImpl @Inject constructor(
     }
 
     override suspend fun updateProject(project: GraffitiProject) = saveMutex.withLock {
-        projectManager.saveProject(context, project)
-        if (_currentProject.value?.id == project.id) _currentProject.value = project
+        // Publish the merged snapshot actually written: saveProject preserves fields (hybrid page,
+        // wall width, ...) a stale writer omitted, and a later exact save must not erase them.
+        val saved = projectManager.saveProject(context, project)
+        if (_currentProject.value?.id == project.id) _currentProject.value = saved
         refreshProjects()
     }
 

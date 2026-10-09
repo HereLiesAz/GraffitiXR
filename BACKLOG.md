@@ -145,7 +145,8 @@ Verified by `testDebugUnitTest` (413 tests), `externalNativeBuildDebug`, `detekt
 
 Remaining open items (all in `docs/AUDIT.md` under "Still open"): Glasses AR session (kept as WIP
 by decision) and a short list of unreferenced diagnostic/eval knobs. Bidirectional co-op shipped as
-protocol v4 (2026-10-08).
+protocol v4 (2026-10-08); protocol v5 (2026-10-09) adds `Op.WallWidth` so co-op guests (and
+hosts) share Measure results.
 
 #### Glee audit pass (2026-09-04) — not yet acted on
 
@@ -506,7 +507,9 @@ device, no ARCore) and a half-built AR interaction is worse than a documented pl
          Implemented as AR rail ▸ Measure; points are intersected with the drawn wall plane
          (`WallMeasure`), not ARCore plane hit-tests — the target-capture tap path the spec pointed
          at never produced a tap world point, and plane hit-tests miss wall ends outside the
-         detected polygon. Stored as `GraffitiProject.wallWidthMeters`. Original spec: In AR, after a target lock, add a "Measure" tool: tap two points on the
+         detected polygon. Stored as `GraffitiProject.wallWidthMeters`. Co-op: a guest's Save
+         is sent to the host as `Op.WallWidth` (protocol v5), persisted there and rebroadcast;
+         a host's Save reaches its guests the same way. Original spec: In AR, after a target lock, add a "Measure" tool: tap two points on the
          established plane; reuse the existing tap→ray→plane-intersection math the target-capture
          tap path already has (`MainActivity`'s tap handling under `mainUiState.isWaitingForTap`)
          to get both points' world coordinates, and the existing plane/anchor transform to convert

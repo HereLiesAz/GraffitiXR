@@ -151,6 +151,21 @@ class DeltaBufferTest {
     }
 
     @Test
+    fun `a wall width keeps only the newest and survives a design replacement`() {
+        // wallWidthMeters is project state, not design state: DesignReplace must not clear it.
+        val buf = DeltaBuffer()
+        buf.append(1, Op.WallWidth(3f), 10)
+        buf.append(2, Op.WallWidth(4f), 10)
+        val replacement = Op.DesignReplace(Layer(id = "d", name = "design"))
+        buf.append(3, replacement, 10)
+
+        assertEquals(
+            listOf<Pair<Long, Op>>(2L to Op.WallWidth(4f), 3L to replacement),
+            buf.opsAfter(0),
+        )
+    }
+
+    @Test
     fun `replacing the design does not supersede an independent ModeTransform`() {
         // ModeTransform lives on ModeAdjustment, not on the design layer DesignReplace swaps out
         // (see Op.ModeTransform's kdoc) — it is the on-wall placement for one editor mode, and a

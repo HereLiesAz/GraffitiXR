@@ -79,7 +79,8 @@ internal class GuestSession(
     fun sendOp(op: Op): Boolean {
         if (phase == Phase.Ended || !snapshotInstalled) return false
         if (op is Op.DesignReplace) designDiverged = true
-        if (designDiverged) return false
+        // A wall width is project state, not design state, so a locally replaced design doesn't hold it back.
+        if (designDiverged && op !is Op.WallWidth) return false
         if (!GuestOpPolicy.allows(op, hostBackend, localBackend)) return false
         val maxPlaintext = Frame.MAX_PAYLOAD_BYTES - SessionCrypto.SEAL_OVERHEAD_BYTES
         if (OpCodec.encode(GuestOpPayload(guestInstance, Long.MAX_VALUE, op)).size > maxPlaintext) return false

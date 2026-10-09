@@ -54,6 +54,14 @@ class OpCodecTest {
     }
 
     @Test
+    fun `Delta and GuestOp round-trip with WallWidth op`() {
+        val delta = DeltaPayload(seq = 7L, op = Op.WallWidth(4.25f))
+        assertEquals(delta, OpCodec.decode<DeltaPayload>(OpCodec.encode(delta)))
+        val guestOp = GuestOpPayload(guestInstance = "g1", guestSeq = 3L, op = Op.WallWidth(12.5f))
+        assertEquals(guestOp, OpCodec.decode<GuestOpPayload>(OpCodec.encode(guestOp)))
+    }
+
+    @Test
     fun `Bye round-trips with each reason`() {
         CoopSessionState.EndReason.entries.forEach { reason ->
             val original = ByePayload(reason)

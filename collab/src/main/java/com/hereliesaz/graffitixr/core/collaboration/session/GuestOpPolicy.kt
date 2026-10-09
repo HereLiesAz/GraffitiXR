@@ -24,6 +24,10 @@ import com.hereliesaz.graffitixr.common.model.Op
  *  - [Op.StrokeComplete] / [Op.TextContentChange]: authoring ops this app neither emits nor
  *    applies; accepting them would only ship bytes the host discards.
  *
+ * [Op.WallWidth] is accepted only when it is a plausible width (finite, within
+ * (0, [MAX_WALL_WIDTH_M]]), the same bound the Measure tool itself enforces; it is a metric length,
+ * so unlike an AR placement it is valid between any two backends or devices.
+ *
  * Everything else is design state or a non-AR mode's screen-space adjustment, which mean the same
  * thing on both devices.
  */
@@ -32,8 +36,12 @@ internal object GuestOpPolicy {
         is Op.ModeTransform ->
             op.mode != AR_MODE || (hostBackend != null && hostBackend == guestBackend)
         is Op.StrokeComplete, is Op.TextContentChange, is Op.DesignReplace, is Op.DesignBitmapReplace -> false
+        is Op.WallWidth -> op.meters.isFinite() && op.meters > 0f && op.meters <= MAX_WALL_WIDTH_M
         is Op.DesignTransform, is Op.DesignProps -> true
     }
+
+    /** `WallMeasure.MAX_WIDTH_M`; the collab module does not depend on the AR feature. */
+    const val MAX_WALL_WIDTH_M = 100f
 
     /** `EditorMode.AR.name`; the collab module does not depend on the editor's enum. */
     const val AR_MODE = "AR"

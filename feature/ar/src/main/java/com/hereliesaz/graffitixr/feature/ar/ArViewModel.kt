@@ -1773,6 +1773,9 @@ class ArViewModel @Inject constructor(
                     }
                 }
                 if (project != null) {
+                    // A restored hybrid page belongs to its project; drop it on a switch (including
+                    // to a co-op spectator project, which never offers a replacement).
+                    if (project.id != loadedProjectId) renderer?.restoreHybridPage(null)
                     loadedProjectId = project.id
                     // Native MobileGS has exactly one active fingerprint frame. Standalone owns it
                     // on non-ARCore devices; an ARCore co-op GUEST also owns it once protocol-v3 peer
@@ -1789,9 +1792,10 @@ class ArViewModel @Inject constructor(
                         loadFingerprintIfExists()
                         // A page frozen this session commits once its own fingerprint lands.
                         tryCommitPendingHybridPage(project)
-                        // Once per project, not per emission: re-arming KPM resets the sidecar.
-                        if (project.id != hybridRestoreProjectId) {
-                            hybridRestoreProjectId = project.id
+                        // Once per project page, not per emission: re-arming KPM resets the sidecar.
+                        // Keyed by URI too, so a page committed after a renderer swap is still offered.
+                        if (hybridRestoreKey(project) != hybridRestoreKey) {
+                            hybridRestoreKey = hybridRestoreKey(project)
                             pushPersistedHybridPage(project)
                         }
                     }
@@ -3875,8 +3879,11 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    // Project whose persisted hybrid page was last offered to the renderer.
-    private var hybridRestoreProjectId: String? = null
+    // Project + page URI whose persisted hybrid page was last offered to the renderer.
+    private var hybridRestoreKey: Pair<String, android.net.Uri?>? = null
+
+    private fun hybridRestoreKey(project: com.hereliesaz.graffitixr.common.model.GraffitiProject) =
+        project.id to project.hybridKpmPageUri
 
     // A page frozen this session, waiting for ITS fingerprint to commit. Guarded by [hybridLock]:
     // written from the GL thread (renderer callbacks) and read from the project collector.
@@ -4058,7 +4065,7 @@ class ArViewModel @Inject constructor(
                     peerSpatialFramePresent = _uiState.value.coopPeerSpatialFrame != null,
                 )
             ) {
-                hybridRestoreProjectId = project.id
+                hybridRestoreKey = hybridRestoreKey(project)
                 pushPersistedHybridPage(project)
             }
         }
@@ -4978,17 +4985,15 @@ class ArViewModel @Inject constructor(
      * Persist the finished measurement as the project's wall width, and leave Measure only once it
      * is saved. On failure (write error, or the project changed underneath) the reading stays on
      * screen and the artist is told, so it can be saved again rather than silently lost.
+     *
+     * In co-op the saved width is also published as [com.hereliesaz.graffitixr.common.model.Op.WallWidth],
+     * for either role: a host's goes to its guests; a guest's (the usual case — the guest is the one
+     * walking the wall) goes to the host, which persists it to the real project and rebroadcasts it.
+     * Nothing here depends on the device or input the artist used, so a glasses-driven session
+     * behaves the same.
      */
     fun saveMeasure() {
         val width = _uiState.value.measure.resultMeters ?: return
-        // A guest's project is a spectator copy no Op writes back to the host, so a saved width
-        // would silently diverge and be lost on reconnect. Guests may read a measurement, not keep it.
-        if (_uiState.value.coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) {
-            _feedback.tryEmit(
-                com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error("Only the host can save the wall width."),
-            )
-            return
-        }
         val projectId = projectRepository.currentProject.value?.id ?: return
         val generation = measureGeneration.get()
         measureSaveJob?.cancel()
@@ -4999,6 +5004,8 @@ class ArViewModel @Inject constructor(
             }
             if (measureGeneration.get() != generation) return@launch // Redo/cancel superseded it
             if (saved) {
+                // Outside a session this has nowhere to go and is dropped by the manager.
+                collaborationManager.submitOp(com.hereliesaz.graffitixr.common.model.Op.WallWidth(width))
                 cancelMeasure()
             } else {
                 _feedback.tryEmit(
