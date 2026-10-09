@@ -211,6 +211,34 @@ data class GraffitiProject(
      */
     val sphereSlamAtlasPages: List<SphereSlamAtlasPage> = emptyList(),
 
+    /**
+     * Hybrid (ARCore-primary) KPM sidecar page: the metric, perspective-rectified wall image the
+     * sidecar matched against, stored as gzip'd raw 8-bit luma (`hybrid_kpm_page_<uuid>.y8.gz`,
+     * exact round trip — no colour conversion). Null when no metric ARCore wall plane was available
+     * at capture, or before any capture. Unrelated to [sphereSlamReferenceUri] (standalone page 0).
+     */
+    @Serializable(with = UriSerializer::class)
+    val hybridKpmPageUri: Uri? = null,
+    /** Pixel width of [hybridKpmPageUri]'s luma image. */
+    val hybridKpmPageWidthPx: Int = 0,
+    /** Pixel height of [hybridKpmPageUri]'s luma image. */
+    val hybridKpmPageHeightPx: Int = 0,
+    /** Measured physical width of the page in metres (from the ARCore wall plane at capture). */
+    val hybridKpmPageWidthMeters: Float = 0f,
+    /**
+     * Column-major 4x4 `page_from_artwork`: the centred KPM page frame relative to the ARCore artwork
+     * anchor, frozen while both tracked together. Rigid, ARCore-world-independent, so it stays valid
+     * across sessions once the artwork anchor is re-established on the same wall. Empty unless all
+     * four fields above are set.
+     */
+    val hybridKpmPageFromArtwork: List<Float> = emptyList(),
+    /**
+     * `fingerprint.captureAnchorCam` of the ARCore target this page's relation was frozen against.
+     * The page is restored only while [fingerprint] still carries this exact value: a later target,
+     * or a capture whose fingerprint never committed, leaves the page inert rather than wrong.
+     */
+    val hybridKpmFingerprintKey: List<Float> = emptyList(),
+
     val refinementPaths: List<RefinementPath> = emptyList(),
 
     // Legacy visual state grouped to fix binary compatibility issues with large data classes.

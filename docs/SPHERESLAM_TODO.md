@@ -566,9 +566,21 @@ Implemented:
   - [x] freeze `page_from_artwork` only while both the page anchor and artwork consensus anchor
     are tracking;
   - [x] unit-test that `page_from_artwork` is invariant under a global ARCore world rebase.
-- [ ] Persist the hybrid rectified page plus page↔artwork relation across process restart/project
+- [x] Persist the hybrid rectified page plus page↔artwork relation across process restart/project
   reopen. PR #1970 keeps them runtime-only; a reopened project still falls back to the durable
-  MobileGS return-visit/fingerprint path until a new hybrid page is captured.
+  MobileGS return-visit/fingerprint path until a new hybrid page is captured. Now persisted as
+  `GraffitiProject.hybridKpmPage*` (gzip'd raw luma `hybrid_kpm_page_<uuid>.y8.gz`, pixel size,
+  metric width, `page_from_artwork`) plus `hybridKpmFingerprintKey` — the
+  `fingerprint.captureAnchorCam` of the target the relation was frozen against. The relation freezes
+  only against an anchor established AFTER the page's capture (re-captures no longer freeze against
+  the outgoing anchor); the page commits only once that capture's own fingerprint lands on the
+  project (a failed fingerprint build never commits its page), and restores only while the project's
+  fingerprint still matches the key, so an older page goes inert rather than wrong. Rebased on
+  import (dropped, not fatal, when the archive lacks the file), re-armed on the first tracking frame
+  of a later session with no ARCore page anchor (the solve needs only the relation + live backbone),
+  and refused for the rest of a session once a new capture starts. Corrections still require the artwork
+  anchor to be re-established first, which the MobileGS return-visit path does. Device validation
+  of a reopen-then-correct cycle is still open with the other §10 device items.
 - [x] Maintain a bounded ARCore pose/backbone history keyed by camera frame timestamp.
 - [x] Pair each asynchronous KPM observation with the nearest sensor-view + unfused consensus sample
   within a strict 40 ms timestamp window; no render-time pose substitution is allowed.
