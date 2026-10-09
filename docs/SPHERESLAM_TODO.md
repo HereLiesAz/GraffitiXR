@@ -730,12 +730,15 @@ they were the same frame.
   `SphereSlamStandaloneTrackingAnalyzer.directFrame` grows one direct buffer only when a frame is
   larger and reuses it otherwise. (The heap `ByteArray` from `LumaFrameTransform.packCropAndRotate`
   is still allocated per frame — a GC-pressure measurement item, not a direct-buffer leak.)
-- [x] Confirm pending work cannot queue unboundedly: the analyzer is synchronous with no per-frame
-  async work and the shared controller pins `STRATEGY_KEEP_ONLY_LATEST`, so at most one frame waits.
-  Both enforced by `tools/check_sphereslam_architecture.py` invariant 7.
-- [x] Add adaptive standalone analysis cadence if KPM exceeds the frame budget: structural — with a
-  synchronous analyzer under KEEP_ONLY_LATEST the analysis rate is bounded by match cost and stale
-  frames are dropped. A deliberate cadence cap (thermal) remains a measurement-driven follow-up.
+- [ ] Confirm pending work cannot queue unboundedly. **Camera side done:** the analyzer does its
+  matching synchronously and the shared controller pins `STRATEGY_KEEP_ONLY_LATEST`, so at most one
+  camera frame waits (enforced by `tools/check_sphereslam_architecture.py` invariant 7). **Still
+  open:** each tracked frame's `onFrameTracked` → `SphereSlamStandaloneOverlay.consumeTrackedFrame`
+  posts a main-thread runnable without waiting, so a slow UI thread can accumulate per-frame updates
+  and replay stale ticks in a burst; coalesce to a latest-value update.
+- [ ] Add adaptive standalone analysis cadence if KPM exceeds the frame budget. KEEP_ONLY_LATEST
+  drops stale frames but does NOT throttle: when matching exceeds the budget the analyzer stays
+  continuously saturated. A match-duration-driven sampling interval is still required.
 - [x] Preserve low latency over maximum throughput: drop stale frames instead of queueing them
   (`CameraPreview.rememberCameraController` now pins it rather than inheriting CameraX's default).
 - [ ] Measure battery/thermal behavior over a realistic mural session.

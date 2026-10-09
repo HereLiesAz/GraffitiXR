@@ -259,10 +259,14 @@ for required in (
 
 # 7. Latency over throughput for standalone analysis.
 camera_preview = read("feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/CameraPreview.kt")
-if "STRATEGY_KEEP_ONLY_LATEST" not in camera_preview or "STRATEGY_BLOCK_PRODUCER" in camera_preview.replace(
-    "STRATEGY_BLOCK_PRODUCER here", ""
+# Match the ASSIGNMENT, not a file-wide token: the constant surviving in a comment or import while
+# the property is removed or set to something else must fail.
+_code = "\n".join(line.split("//", 1)[0] for line in camera_preview.splitlines())
+if not re.search(
+    r"imageAnalysisBackpressureStrategy\s*=\s*(?:androidx\.camera\.core\.)?ImageAnalysis\.STRATEGY_KEEP_ONLY_LATEST\b",
+    _code,
 ):
-    fail("Shared CameraX controller must pin ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST (drop stale frames).")
+    fail("Shared CameraX controller must assign imageAnalysisBackpressureStrategy = ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST.")
 standalone_analyzer = read(
     "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/SphereSlamStandaloneTrackingAnalyzer.kt"
 )
