@@ -31,18 +31,25 @@ class HybridKpmPage(
         /**
          * The fingerprint key a page frozen during a capture may commit under, or null if it may not
          * commit yet (or ever). Commits only into the capture's own project, and only once that
-         * project's fingerprint has moved off the value it held when the capture started — proof the
-         * capture behind the page produced the fingerprint now on the project.
+         * project's fingerprint differs from BOTH the value it held when the capture started and the
+         * value it held when the page froze. The fingerprint build starts after the anchor the page
+         * freezes against, so a change after the freeze is this capture's; a change between capture
+         * and freeze can only be an earlier capture's slow build and must not bind this page.
+         *
+         * Residual, accepted: an earlier capture's build that outlasts this capture's entire review
+         * AND freeze would still bind. If this capture's own build then lands, the key mismatch makes
+         * the page inert (not wrong); it is wrong only if this capture's build also fails.
          */
         fun commitKeyOrNull(
             projectId: String,
             captureProjectId: String?,
             fingerprintKey: List<Float>?,
             keyAtCapture: List<Float>?,
+            keyAtFreeze: List<Float>?,
         ): List<Float>? {
-            if (keyAtCapture == null || projectId != captureProjectId) return null
+            if (keyAtCapture == null || keyAtFreeze == null || projectId != captureProjectId) return null
             val key = fingerprintKey?.takeIf { it.size == 16 } ?: return null
-            return key.takeIf { it != keyAtCapture }
+            return key.takeIf { it != keyAtCapture && it != keyAtFreeze }
         }
 
         /** True when a persisted page bound to [boundKey] belongs to the fingerprint [fingerprintKey]. */

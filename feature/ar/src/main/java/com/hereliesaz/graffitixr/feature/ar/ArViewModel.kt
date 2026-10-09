@@ -3844,6 +3844,10 @@ class ArViewModel @Inject constructor(
     // produced the page actually produced a fingerprint. A capture whose fingerprint build fails
     // never commits its page, so a page can never be paired with a different capture's fingerprint.
     private var hybridKeyAtCapture: List<Float>? = null
+    // The project's fingerprint key when this capture's page froze. Only a change AFTER the freeze
+    // counts as this capture's fingerprint landing — an earlier capture's slow build finishing
+    // while this one was under review would otherwise bind this page to that capture's key.
+    private var hybridKeyAtFreeze: List<Float>? = null
     // Project the capture belongs to; a page never commits into a different project.
     private var hybridCaptureProjectId: String? = null
 
@@ -3851,6 +3855,7 @@ class ArViewModel @Inject constructor(
     private fun onHybridCaptureStarted() {
         synchronized(hybridLock) {
             pendingHybridPage = null
+            hybridKeyAtFreeze = null
             val project = projectRepository.currentProject.value
             hybridCaptureProjectId = project?.id
             hybridKeyAtCapture = project?.fingerprint?.captureAnchorCam ?: emptyList()
@@ -3862,6 +3867,8 @@ class ArViewModel @Inject constructor(
         synchronized(hybridLock) {
             if (hybridKeyAtCapture == null) return // no capture this session; nothing to bind to
             pendingHybridPage = page
+            hybridKeyAtFreeze = projectRepository.currentProject.value?.fingerprint?.captureAnchorCam
+                ?: emptyList()
         }
         projectRepository.currentProject.value?.let(::tryCommitPendingHybridPage)
     }
@@ -3877,6 +3884,7 @@ class ArViewModel @Inject constructor(
                 captureProjectId = hybridCaptureProjectId,
                 fingerprintKey = project.fingerprint?.captureAnchorCam,
                 keyAtCapture = hybridKeyAtCapture,
+                keyAtFreeze = hybridKeyAtFreeze,
             ) ?: return // this capture's fingerprint has not landed (or never will)
             pendingHybridPage = null
             page = pending
@@ -3943,27 +3951,32 @@ class ArViewModel @Inject constructor(
                         )
                     }
                 }
-            } catch (e: Exception) {
-                if (e !is kotlinx.coroutines.CancellationException) {
-                    // Not fatal: the sidecar works for this session; only reopen falls back to MobileGS.
-                    Timber.e(e, "Hybrid KPM page save failed")
-                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
+            } catch (e: Exception) {
+                // Not fatal and never rethrown (an uncaught throw here would crash the app): the
+                // sidecar works for this session; only a reopen falls back to MobileGS.
+                Timber.e(e, "Hybrid KPM page save failed")
             } finally {
                 // Decide from authoritative state, not a local flag: updateProject persists before it
                 // publishes, and can throw or be cancelled on either side of that.
                 withContext(NonCancellable) {
-                    val committed = projectRepository.currentProject.value
-                        ?.takeIf { it.id == projectId }?.hybridKpmPageUri == newUri ||
-                        runCatching {
-                            projectManager.loadProjectMetadata(appContext, projectId)?.hybridKpmPageUri == newUri
-                        }.getOrDefault(false)
-                    if (newUri != null && committed) {
-                        if (previousUri != newUri) {
+                    val inMemory = newUri != null && projectRepository.currentProject.value
+                        ?.takeIf { it.id == projectId }?.hybridKpmPageUri == newUri
+                    val onDisk = newUri != null && runCatching {
+                        projectManager.loadProjectMetadata(appContext, projectId)?.hybridKpmPageUri == newUri
+                    }.getOrDefault(false)
+                    when {
+                        // Fully committed: the superseded file is unreferenced everywhere.
+                        inMemory && previousUri != newUri ->
                             projectManager.deleteHybridKpmPage(appContext, projectId, previousUri)
-                        }
-                    } else {
-                        projectManager.deleteHybridKpmPage(appContext, projectId, newUri)
+                        // Neither side references the new file: it never became authoritative.
+                        !inMemory && !onDisk ->
+                            projectManager.deleteHybridKpmPage(appContext, projectId, newUri)
+                        // Half-committed (on disk, not yet published): keep BOTH files. An orphan
+                        // is harmless; deleting the previous one could leave the in-memory project —
+                        // and the next save — pointing at a missing file.
+                        else -> Unit
                     }
                 }
             }
