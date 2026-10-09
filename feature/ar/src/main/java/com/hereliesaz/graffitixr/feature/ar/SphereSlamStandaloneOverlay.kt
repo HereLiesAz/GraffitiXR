@@ -246,6 +246,8 @@ fun SphereSlamStandaloneOverlay(
     mobileGsFingerprint: Fingerprint? = null,
     mobileGsFingerprintFrameVersion: Int =
         com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+    /** Explicit GL map_from_fingerprint bridge into the base SphereSLAM photosphere. */
+    mobileGsMapFromFingerprint: List<Float> = emptyList(),
     mobileGsWallFeatureMap: WallFeatureMap? = null,
     mobileGsWallFeatureMapFrameVersion: Int =
         com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
@@ -1151,6 +1153,7 @@ fun SphereSlamStandaloneOverlay(
         referenceImage,
         runtimeMobileGsFingerprint,
         mobileGsFingerprintFrameVersion,
+        mobileGsMapFromFingerprint,
         atlasReferenceImages,
         initialMobileGsWallFeatureMap,
         initialMobileGsWallFeatureMapFrameVersion,
@@ -1163,6 +1166,8 @@ fun SphereSlamStandaloneOverlay(
                 atlasPages = loadedAtlas,
                 fingerprint = runtimeMobileGsFingerprint,
                 fingerprintFrameVersion = mobileGsFingerprintFrameVersion,
+                mapFromFingerprint =
+                    mobileGsMapFromFingerprint.takeIf { it.size == 16 }?.toFloatArray(),
                 wallFeatureMap = initialMobileGsWallFeatureMap,
                 wallFeatureMapFrameVersion = initialMobileGsWallFeatureMapFrameVersion,
             )
