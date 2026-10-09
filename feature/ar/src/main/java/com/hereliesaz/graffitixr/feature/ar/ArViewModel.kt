@@ -1770,6 +1770,9 @@ class ArViewModel @Inject constructor(
                     }
                 }
                 if (project != null) {
+                    // A restored hybrid page belongs to its project; drop it on a switch (including
+                    // to a co-op spectator project, which never offers a replacement).
+                    if (project.id != loadedProjectId) renderer?.restoreHybridPage(null)
                     loadedProjectId = project.id
                     // Native MobileGS has exactly one active fingerprint frame. Standalone owns it
                     // on non-ARCore devices; an ARCore co-op GUEST also owns it once protocol-v3 peer
