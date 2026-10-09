@@ -39,6 +39,8 @@ import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.UnavailableException
 import com.hereliesaz.graffitixr.common.model.CameraTargetFps
 import com.hereliesaz.graffitixr.common.model.ArUiState
+import com.hereliesaz.graffitixr.common.model.MeasureUi
+import com.hereliesaz.graffitixr.common.model.TapMark
 import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.sensor.Vec3
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
@@ -1745,6 +1747,7 @@ class ArViewModel @Inject constructor(
                             project?.sphereSlamWallFeatureMapFrameVersion
                                 ?: com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                         sphereSlamAtlasPages = project?.sphereSlamAtlasPages.orEmpty(),
+                        wallWidthMeters = project?.wallWidthMeters,
                     )
                 }
                 if (
@@ -2217,7 +2220,9 @@ class ArViewModel @Inject constructor(
         // repository. Left standing it made the NEXT session pause splat mapping on its first
         // tracking frame (updateAutoMapping gates on it) and report scanPhase COMPLETE on a session
         // that never scanned. Sixth field to be cleared in one place and not its sibling.
-        _uiState.update { it.copy(isAnchorEstablished = false, backboneTooSmall = false) }
+        _uiState.update {
+            it.copy(isAnchorEstablished = false, backboneTooSmall = false, measure = MeasureUi())
+        }
         // Anchor gone — re-arm acquire-then-lock so the next session frames in AUTO, and clear any
         // manual focus override so the automatic behavior applies again.
         focusManuallyOverridden = false
@@ -4187,6 +4192,7 @@ class ArViewModel @Inject constructor(
                 relocDiagnostics = relocDiag,
                 corroborationDiagnostics = corrobDiag,
                 fusionDiagnostics = fusionDiag,
+                measureAvailable = renderer?.wallMeasureAvailable == true,
                 wallFingerprintPoints = wallPoints,
                 scanPhase = newPhase,
                 ambientSectorsCovered = sectorsCovered / 3, // Keep backward compatibility for 30 degree UI units if needed
@@ -4890,6 +4896,122 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    // ── AR Measure (BACKLOG Phase 6 step 1) ─────────────────────────────────────────────────────
+    // Points of the in-progress measurement in the unfused anchor frame, parallel to MeasureUi.points.
+    // Main-thread only (tap handler, its viewModelScope continuation, rail clicks).
+    private val measureLocalPoints = mutableListOf<FloatArray>()
+    // The first tap's wall plane (anchor-local); the second tap is intersected with it.
+    private var measurePlaneLocal: FloatArray? = null
+    private var measureJob: kotlinx.coroutines.Job? = null
+    private var measureSaveJob: kotlinx.coroutines.Job? = null
+    // Bumped whenever the on-screen reading is discarded (start/Redo/cancel); a save checks it inside
+    // the persistence transform so a stale width can't be written after a newer one.
+    private val measureGeneration = java.util.concurrent.atomic.AtomicInteger(0)
+
+    /** Toggle Measure. Starting requires an established anchor (the wall frame to measure in). */
+    fun toggleMeasure() {
+        if (_uiState.value.measure.active) {
+            cancelMeasure()
+            return
+        }
+        if (!_uiState.value.isAnchorEstablished) return
+        measureJob?.cancel()
+        measureSaveJob?.cancel()
+        measureGeneration.incrementAndGet()
+        measureLocalPoints.clear()
+        measurePlaneLocal = null
+        _uiState.update { it.copy(measure = MeasureUi(active = true)) }
+    }
+
+    fun cancelMeasure() {
+        measureJob?.cancel()
+        measureSaveJob?.cancel()
+        measureGeneration.incrementAndGet()
+        measureLocalPoints.clear()
+        measurePlaneLocal = null
+        _uiState.update { it.copy(measure = MeasureUi()) }
+    }
+
+    /** Start over without leaving Measure (the "Redo" action). */
+    fun redoMeasure() {
+        measureJob?.cancel()
+        measureSaveJob?.cancel()
+        measureGeneration.incrementAndGet()
+        measureLocalPoints.clear()
+        measurePlaneLocal = null
+        _uiState.update { it.copy(measure = MeasureUi(active = true)) }
+    }
+
+    /** A screen tap while Measure is active. Ignored once two points are in or one is resolving. */
+    fun onMeasureTap(nx: Float, ny: Float) {
+        val state = _uiState.value.measure
+        if (!state.active || state.points.size >= 2 || measureJob?.isActive == true) return
+        val r = renderer ?: return
+        measureJob = viewModelScope.launch {
+            val point = kotlinx.coroutines.withTimeoutOrNull(MEASURE_TAP_TIMEOUT_MS) {
+                r.requestWallPoint(nx, ny, measurePlaneLocal).await()
+            }
+            if (!_uiState.value.measure.active) return@launch
+            if (point == null) {
+                _uiState.update { it.copy(measure = it.measure.copy(failed = true)) }
+                return@launch
+            }
+            if (measureLocalPoints.isEmpty()) measurePlaneLocal = point.planeLocal
+            measureLocalPoints += point.local
+            val points = _uiState.value.measure.points + TapMark(nx, ny, -1f)
+            val width = if (measureLocalPoints.size == 2) {
+                com.hereliesaz.graffitixr.feature.ar.anchor.WallMeasure
+                    .widthMeters(measureLocalPoints[0], measureLocalPoints[1])
+            } else {
+                null
+            }
+            if (measureLocalPoints.size == 2 && width == null) {
+                // Out of the plausible range (too close together, or beyond 100 m): keep the first
+                // point and ask for the second again.
+                measureLocalPoints.removeAt(1)
+                _uiState.update { it.copy(measure = it.measure.copy(failed = true)) }
+                return@launch
+            }
+            _uiState.update {
+                it.copy(measure = it.measure.copy(points = points, resultMeters = width, failed = false))
+            }
+        }
+    }
+
+    /**
+     * Persist the finished measurement as the project's wall width, and leave Measure only once it
+     * is saved. On failure (write error, or the project changed underneath) the reading stays on
+     * screen and the artist is told, so it can be saved again rather than silently lost.
+     */
+    fun saveMeasure() {
+        val width = _uiState.value.measure.resultMeters ?: return
+        // A guest's project is a spectator copy no Op writes back to the host, so a saved width
+        // would silently diverge and be lost on reconnect. Guests may read a measurement, not keep it.
+        if (_uiState.value.coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) {
+            _feedback.tryEmit(
+                com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error("Only the host can save the wall width."),
+            )
+            return
+        }
+        val projectId = projectRepository.currentProject.value?.id ?: return
+        val generation = measureGeneration.get()
+        measureSaveJob?.cancel()
+        measureSaveJob = viewModelScope.launch {
+            val saved = withContext(dispatchers.io) {
+                com.hereliesaz.graffitixr.feature.ar.anchor.WallWidthPersistence
+                    .save(projectRepository, projectId, width) { measureGeneration.get() == generation }
+            }
+            if (measureGeneration.get() != generation) return@launch // Redo/cancel superseded it
+            if (saved) {
+                cancelMeasure()
+            } else {
+                _feedback.tryEmit(
+                    com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error("Couldn't save the wall width. Try Save again."),
+                )
+            }
+        }
+    }
+
     fun onScreenTap(nx: Float, ny: Float) {
         // A co-op guest keeps the session's spatial frame: re-targeting re-anchors only this device
         // and no Op carries it, so it would split the peers' frames.
@@ -5095,6 +5217,8 @@ class ArViewModel @Inject constructor(
 
     // --- Doodle demo: headless fingerprint build ---
     internal companion object {
+        /** How long a Measure tap waits for the GL thread to resolve it. */
+        private const val MEASURE_TAP_TIMEOUT_MS = 1_000L
         /** How often the AR session checks whether the map has grown enough to be worth rewriting. */
         const val AUTOSAVE_INTERVAL_MS = 30_000L
 

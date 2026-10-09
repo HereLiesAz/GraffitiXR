@@ -121,6 +121,22 @@ page scale into a distance. (Renamed from
 depth on devices that had none; `StereoDepthProvider`/`StereoProcessor` were removed and the flag collapsed
 into `isHardwareStereoActive`, the only one that was ever real.)
 
+**Measure (wall width):** AR rail ▸ Measure, shown once an anchor is established on the ARCore
+backend. Two taps on the wall; each tap's camera ray is intersected with the plane the design is
+drawn on (the overlay base frame's local z = 0, `anchor/WallMeasure.kt`). The first tap's plane is
+frozen anchor-locally and reused for the second tap, so a fusion re-orientation between taps
+cannot tilt it; the hit is then kept
+relative to the unfused ARCore consensus anchor, so a fusion correction landing between the two taps
+does not change the result. Offered only when the plane is the real wall: the anchor's normal came
+from a VERTICAL ARCore plane (not a floor/tabletop, not a depth/feature-point or fallback anchor, whose camera-facing normal would
+foreshorten an oblique wall) and the overlay rotation correction was applied
+(`ArUiState.measureAvailable`). Taps while ARCore is not tracking are refused individually. Rays steeper than 75° to the wall, hits outside 0.1–10 m, and widths outside 0.05–100 m are
+refused with a re-tap prompt. Save writes `GraffitiProject.wallWidthMeters` (null = never measured;
+`anchor/WallWidthPersistence.kt`) and leaves Measure only once the write lands in the measured
+project — otherwise the reading stays and an error asks to save again;
+Redo starts over. Markers sit at the tapped screen positions. Not offered on standalone SphereSLAM
+(no measurement path yet; it must be limited to physically metric targets when added).
+
 ### 1.3 MOCKUP wall-capture flow (`CaptureStep`)
 
 `NONE → CAPTURE → RECTIFY → MASK → REVIEW` — grab a wall photo, rectify perspective, mask the paintable

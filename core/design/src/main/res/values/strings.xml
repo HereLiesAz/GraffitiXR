@@ -607,4 +607,12 @@
     </string-array>
 
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
+    <string name="nav_measure">Measure</string>
+    <string name="nav_measure_info">Measure the real wall: tap one edge, then the other, on the wall the design sits on. The width is saved with the project so scale is measured, not guessed.</string>
+    <string name="measure_tap_first">Tap the first edge of the wall</string>
+    <string name="measure_tap_second">Tap the other edge</string>
+    <string name="measure_save">Save</string>
+    <string name="measure_redo">Redo</string>
+    <string name="measure_failed">Couldn\'t place that point on the wall. Aim more squarely and tap again.</string>
+    <string name="measure_wall_width">Wall width</string>
 </resources>

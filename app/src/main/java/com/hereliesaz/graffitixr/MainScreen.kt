@@ -824,12 +824,21 @@ fun MainScreen(
         }
 
         val isGuest = arUiState.coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST
+        val isMeasuring = arUiState.measure.active && uiState.editorMode == EditorMode.AR
 
         if (isCameraActive) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(uiState.design?.id, isImageLocked, isWaitingForTap, isTouchLocked, isGuest, uiState.editorMode) {
+                    .pointerInput(uiState.design?.id, isImageLocked, isWaitingForTap, isTouchLocked, isGuest, uiState.editorMode, isMeasuring) {
+                        // Measure taps are wall readings, not edits, so a guest may measure too —
+                        // but not through a touch lock.
+                        if (isMeasuring && !isTouchLocked) {
+                            detectTapGestures { offset ->
+                                arViewModel.onMeasureTap(offset.x / size.width, offset.y / size.height)
+                            }
+                            return@pointerInput
+                        }
                         // Guests edit too since co-op v4: their edits are sent to the host. Target
                         // capture stays host-only (below).
 
@@ -859,7 +868,9 @@ fun MainScreen(
                             )
                         }
                     }
-                    .pointerInput(uiState.design?.id, isImageLocked, isWaitingForTap, isTouchLocked, isGuest, uiState.editorMode) {
+                    .pointerInput(uiState.design?.id, isImageLocked, isWaitingForTap, isTouchLocked, isGuest, uiState.editorMode, isMeasuring) {
+                        // While measuring, a drag must not also move the artwork it is measuring under.
+                        if (isMeasuring) return@pointerInput
                         // Outside Design the whole design is the single layer, so transform gestures
                         // always drive the mode adjustment instead of a per-layer transform.
                         val editingMode = uiState.editorMode != EditorMode.DESIGN

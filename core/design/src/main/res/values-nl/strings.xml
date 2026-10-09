@@ -586,4 +586,12 @@
     <string-array name="onboarding_design_layers">
         <item>Open — importeert een foto uit je galerij; deze komt terecht als een nieuwe laag.</item>
     </string-array>
+    <string name="nav_measure">Meten</string>
+    <string name="nav_measure_info">Meet de echte muur: tik op de ene rand en dan op de andere, op de muur waar het ontwerp op staat. De breedte wordt bij het project opgeslagen: gemeten, niet geschat.</string>
+    <string name="measure_tap_first">Tik op de eerste rand van de muur</string>
+    <string name="measure_tap_second">Tik op de andere rand</string>
+    <string name="measure_save">Opslaan</string>
+    <string name="measure_redo">Opnieuw</string>
+    <string name="measure_failed">Dat punt kon niet op de muur worden geplaatst. Richt rechter op de muur en tik opnieuw.</string>
+    <string name="measure_wall_width">Muurbreedte</string>
 </resources>

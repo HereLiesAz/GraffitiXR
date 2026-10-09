@@ -586,4 +586,12 @@
     <string-array name="onboarding_design_layers">
         <item>Megnyitás — fotót importál a galériádból; új rétegként kerül be.</item>
     </string-array>
+    <string name="nav_measure">Mérés</string>
+    <string name="nav_measure_info">Mérd meg a valódi falat: koppints az egyik szélére, majd a másikra azon a falon, ahol a terv van. A szélesség a projekttel együtt mentődik – mért, nem becsült.</string>
+    <string name="measure_tap_first">Koppints a fal első szélére</string>
+    <string name="measure_tap_second">Koppints a másik szélére</string>
+    <string name="measure_save">Mentés</string>
+    <string name="measure_redo">Újra</string>
+    <string name="measure_failed">Ezt a pontot nem sikerült a falra helyezni. Célozz egyenesebben, és koppints újra.</string>
+    <string name="measure_wall_width">Falszélesség</string>
 </resources>

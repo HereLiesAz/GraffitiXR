@@ -25,6 +25,18 @@ data class EvalLiveMetrics(
  *  (-1 when depth was unavailable/out of range at that pixel). */
 data class TapMark(val nx: Float, val ny: Float, val distanceMeters: Float)
 
+/**
+ * AR Measure (two taps on the wall the design is drawn on). [points] are the accepted taps in
+ * normalised screen coordinates for on-screen markers; [resultMeters] is set once both resolve.
+ * [failed] flags the last tap as unresolvable (grazing angle, off the wall, no anchor).
+ */
+data class MeasureUi(
+    val active: Boolean = false,
+    val points: List<TapMark> = emptyList(),
+    val resultMeters: Float? = null,
+    val failed: Boolean = false,
+)
+
 data class ArUiState(
     val isScanning: Boolean = false,
     val splatCount: Int = 0,
@@ -32,6 +44,15 @@ data class ArUiState(
     // True once a target fingerprint has been saved to the current project.
     // Controls whether artwork is rendered in AR space (via OverlayRenderer).
     val isAnchorEstablished: Boolean = false,
+    /** AR Measure tool state; see [MeasureUi]. */
+    val measure: MeasureUi = MeasureUi(),
+    /**
+     * The anchor's drawn frame is a real wall plane (plane-sourced normal, rotation correction
+     * applied), so Measure can be offered. False on depth/feature-point/fallback anchors.
+     */
+    val measureAvailable: Boolean = false,
+    /** The project's saved wall width (m), mirrored for display; null = never measured. */
+    val wallWidthMeters: Float? = null,
     // First-run onboarding signals. isArReady flips true the first frame ARCore reports TRACKING
     // (ARCore has finished initializing); planeDetected flips true the first time a tracking plane
     // is found. Both are latching (never reset within a session) and drive the onboarding overlay's

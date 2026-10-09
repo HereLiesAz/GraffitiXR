@@ -502,7 +502,11 @@ device, no ARCore) and a half-built AR interaction is worse than a documented pl
   bookkeeping — risks exactly the kind of half-finished, unverifiable AR change the earlier
   phases in this same plan had to root-cause and fix. Decided spec, for whoever picks this up
   next (a fresh session or a human, with a device to test against):
-    1. **Measure.** In AR, after a target lock, add a "Measure" tool: tap two points on the
+    1. **[x] Measure — shipped (2026-10-08), not yet device-validated against a tape measure.**
+         Implemented as AR rail ▸ Measure; points are intersected with the drawn wall plane
+         (`WallMeasure`), not ARCore plane hit-tests — the target-capture tap path the spec pointed
+         at never produced a tap world point, and plane hit-tests miss wall ends outside the
+         detected polygon. Stored as `GraffitiProject.wallWidthMeters`. Original spec: In AR, after a target lock, add a "Measure" tool: tap two points on the
          established plane; reuse the existing tap→ray→plane-intersection math the target-capture
          tap path already has (`MainActivity`'s tap handling under `mainUiState.isWaitingForTap`)
          to get both points' world coordinates, and the existing plane/anchor transform to convert

@@ -586,4 +586,12 @@
     <string-array name="onboarding_design_layers">
         <item>Öppna — importerar ett foto från ditt galleri; det hamnar som ett nytt lager.</item>
     </string-array>
+    <string name="nav_measure">Mät</string>
+    <string name="nav_measure_info">Mät den riktiga väggen: tryck på ena kanten, sedan den andra, på väggen där designen sitter. Bredden sparas i projektet – uppmätt, inte gissad.</string>
+    <string name="measure_tap_first">Tryck på väggens första kant</string>
+    <string name="measure_tap_second">Tryck på den andra kanten</string>
+    <string name="measure_save">Spara</string>
+    <string name="measure_redo">Gör om</string>
+    <string name="measure_failed">Punkten kunde inte placeras på väggen. Sikta mer rakt mot väggen och tryck igen.</string>
+    <string name="measure_wall_width">Väggbredd</string>
 </resources>

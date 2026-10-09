@@ -584,4 +584,12 @@
     <string-array name="onboarding_design_layers">
         <item>Åpne — importerer et bilde fra galleriet ditt; det havner som et nytt lag.</item>
     </string-array>
+    <string name="nav_measure">Mål</string>
+    <string name="nav_measure_info">Mål den virkelige veggen: trykk på den ene kanten, deretter den andre, på veggen designet står på. Bredden lagres i prosjektet – målt, ikke gjettet.</string>
+    <string name="measure_tap_first">Trykk på veggens første kant</string>
+    <string name="measure_tap_second">Trykk på den andre kanten</string>
+    <string name="measure_save">Lagre</string>
+    <string name="measure_redo">Gjør om</string>
+    <string name="measure_failed">Kunne ikke plassere punktet på veggen. Sikt mer rett mot veggen og trykk igjen.</string>
+    <string name="measure_wall_width">Veggbredde</string>
 </resources>

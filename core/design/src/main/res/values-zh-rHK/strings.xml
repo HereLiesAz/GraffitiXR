@@ -586,4 +586,12 @@
     <string-array name="onboarding_design_layers">
         <item>開啟 — 從相簿匯入一張相片；它會作為新圖層放置。</item>
     </string-array>
+    <string name="nav_measure">量度</string>
+    <string name="nav_measure_info">量度真實的牆面:在放置設計的牆上先點一邊邊緣,再點另一邊。寬度會隨項目儲存——是量度值,而非估計值。</string>
+    <string name="measure_tap_first">點按牆的第一個邊緣</string>
+    <string name="measure_tap_second">點按另一邊邊緣</string>
+    <string name="measure_save">儲存</string>
+    <string name="measure_redo">重新量度</string>
+    <string name="measure_failed">無法將該點放到牆上。請更正對牆面後再點按。</string>
+    <string name="measure_wall_width">牆寬</string>
 </resources>
