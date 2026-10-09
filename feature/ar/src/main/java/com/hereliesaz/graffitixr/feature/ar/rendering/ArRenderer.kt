@@ -755,6 +755,17 @@ class ArRenderer(
     private var hybridCapturedWidthMeters = 0f
     // A persisted page waiting for the GL thread (needs live camera intrinsics to re-arm KPM).
     @Volatile private var pendingHybridRestore: com.hereliesaz.graffitixr.feature.ar.HybridKpmPage? = null
+    // Set once this renderer has started a target capture. A persisted page belongs to a target
+    // from an earlier session; after a capture it can only be older than what this session holds,
+    // so restores are refused for the rest of the renderer's life (also closes the window where a
+    // slow IO read lands after the capture already discarded the queued restore).
+    @Volatile private var targetCaptureStarted = false
+    // Bumped every time an artwork anchor is established (capture confirm OR return-visit reloc).
+    // The page↔artwork relation may only freeze against an anchor established AFTER the hybrid
+    // page was captured: on a re-capture the old anchor is still live for a few frames and freezing
+    // against it pins the page to the placement being replaced.
+    private var anchorGeneration = 0L
+    private var hybridCaptureAnchorGeneration = Long.MAX_VALUE
 
     /**
      * Emitted on the GL thread once a freshly captured metric page AND its page↔artwork relation
@@ -763,8 +774,11 @@ class ArRenderer(
     @Volatile var onHybridPageFrozen: ((com.hereliesaz.graffitixr.feature.ar.HybridKpmPage) -> Unit)? = null
 
     /**
-     * Emitted on the GL thread when a new ARCore target capture begins: any persisted hybrid page is
-     * relative to the artwork anchor being replaced and must be cleared before a new one exists.
+     * Emitted on the GL thread when a new ARCore target capture begins. The owner must drop any
+     * frozen-but-uncommitted page from an earlier capture; it must NOT eagerly delete the persisted
+     * page, because a capture can still be cancelled or fail to produce a fingerprint, and the
+     * persisted page is bound to its fingerprint (see ArViewModel) and simply stops restoring once a
+     * newer fingerprint replaces it.
      */
     @Volatile var onHybridPageInvalidated: (() -> Unit)? = null
 
@@ -774,6 +788,7 @@ class ArRenderer(
      * always newer than anything on disk.
      */
     fun restoreHybridPage(page: com.hereliesaz.graffitixr.feature.ar.HybridKpmPage?) {
+        if (targetCaptureStarted) return
         pendingHybridRestore = page?.takeIf { it.isValid() }
     }
     private val mappingViewMatrixScratch = FloatArray(16)
@@ -860,6 +875,7 @@ class ArRenderer(
         hybridPageFromArtworkAnchor = null
         lastHybridObservationTimestampNs = Long.MIN_VALUE
         hybridCapturedLuma = null
+        hybridCaptureAnchorGeneration = Long.MAX_VALUE
 
         // Capture-time replacement calls this from onDrawFrame while sessionLock is already held, so
         // detaching here is serialized with every other ARCore call. Off-GL teardown passes false and
@@ -1735,6 +1751,7 @@ class ArRenderer(
                     // different event from the anchor itself changing. Reset unconditionally; a no-op
                     // on the session's first anchor, since correction starts null anyway.
                     poseFusion.reset()
+                    anchorGeneration++
                     anchorEstablished = true
                     // Announce it beyond the GL thread. This is the ONLY anchor write that counts as
                     // establishment — the plane refiner and the depth fallback both write poses
@@ -1846,6 +1863,7 @@ class ArRenderer(
                     pendingHybridRestore = null
                     if (
                         !captureRequested &&
+                        !targetCaptureStarted &&
                         hybridReferenceGeometry == null &&
                         hybridPageFromArtworkAnchor == null
                     ) {
@@ -1860,6 +1878,7 @@ class ArRenderer(
             if (
                 hybridPageFromArtworkAnchor == null &&
                 anchorEstablished &&
+                anchorGeneration > hybridCaptureAnchorGeneration &&
                 isTracking &&
                 activeAnchorCount() > 0
             ) {
@@ -2361,10 +2380,11 @@ class ArRenderer(
             if (captureRequested) {
                 captureRequested = false
                 resetHybridReference()
-                // A new target replaces the artwork anchor any persisted hybrid relation is
-                // expressed against; clear it now, before a replacement exists, so process death
-                // between here and the next freeze can never pair an old page with a new anchor.
+                // A new target may replace the artwork anchor any hybrid relation is expressed
+                // against. Drop the queued restore and tell the owner; persistence is bound to the
+                // fingerprint, so nothing on disk needs touching here.
                 pendingHybridRestore = null
+                targetCaptureStarted = true
                 onHybridPageInvalidated?.invoke()
                 try {
                     frame.acquireCameraImage().use { image ->
@@ -2532,7 +2552,9 @@ class ArRenderer(
                                 )
                                 hybridReferenceGeometry = reference.pageGeometry
                                 hybridReferencePhysicallyMetric = true
-                                // Held for persistence until the page↔artwork relation freezes.
+                                // Held for persistence until the page↔artwork relation freezes
+                                // against an anchor established after this capture.
+                                hybridCaptureAnchorGeneration = anchorGeneration
                                 hybridCapturedLuma = reference.luma
                                 hybridCapturedWidth = reference.width
                                 hybridCapturedHeight = reference.height

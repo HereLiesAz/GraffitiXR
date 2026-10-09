@@ -229,9 +229,15 @@ data class GraffitiProject(
      * Column-major 4x4 `page_from_artwork`: the centred KPM page frame relative to the ARCore artwork
      * anchor, frozen while both tracked together. Rigid, ARCore-world-independent, so it stays valid
      * across sessions once the artwork anchor is re-established on the same wall. Empty unless all
-     * four fields above are set; a new ARCore target capture always clears all five.
+     * four fields above are set.
      */
     val hybridKpmPageFromArtwork: List<Float> = emptyList(),
+    /**
+     * `fingerprint.captureAnchorCam` of the ARCore target this page's relation was frozen against.
+     * The page is restored only while [fingerprint] still carries this exact value: a later target,
+     * or a capture whose fingerprint never committed, leaves the page inert rather than wrong.
+     */
+    val hybridKpmFingerprintKey: List<Float> = emptyList(),
 
     val refinementPaths: List<RefinementPath> = emptyList(),
 

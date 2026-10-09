@@ -28,6 +28,27 @@ class HybridKpmPage(
             pageFromArtwork[15] == 1f
 
     companion object {
+        /**
+         * The fingerprint key a page frozen during a capture may commit under, or null if it may not
+         * commit yet (or ever). Commits only into the capture's own project, and only once that
+         * project's fingerprint has moved off the value it held when the capture started — proof the
+         * capture behind the page produced the fingerprint now on the project.
+         */
+        fun commitKeyOrNull(
+            projectId: String,
+            captureProjectId: String?,
+            fingerprintKey: List<Float>?,
+            keyAtCapture: List<Float>?,
+        ): List<Float>? {
+            if (keyAtCapture == null || projectId != captureProjectId) return null
+            val key = fingerprintKey?.takeIf { it.size == 16 } ?: return null
+            return key.takeIf { it != keyAtCapture }
+        }
+
+        /** True when a persisted page bound to [boundKey] belongs to the fingerprint [fingerprintKey]. */
+        fun isBoundTo(fingerprintKey: List<Float>?, boundKey: List<Float>): Boolean =
+            fingerprintKey != null && fingerprintKey.size == 16 && fingerprintKey == boundKey
+
         /** Rebuild from persisted project fields; null when they are absent or inconsistent. */
         fun fromPersisted(
             luma: ByteArray?,

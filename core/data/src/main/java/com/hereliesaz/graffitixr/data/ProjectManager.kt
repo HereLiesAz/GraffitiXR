@@ -60,6 +60,8 @@ class ProjectManager @Inject constructor(
         /** Filename shape of [saveHybridKpmPage] output; [deleteHybridKpmPage] refuses anything else. */
         private const val HYBRID_KPM_PAGE_PREFIX = "hybrid_kpm_page_"
         private const val HYBRID_KPM_PAGE_SUFFIX = ".y8.gz"
+        /** Generous ceiling (4096²) over the 1024-px capture cap, so a bad manifest cannot OOM. */
+        private const val MAX_HYBRID_KPM_PAGE_BYTES = 4096 * 4096
         /**
          * Cap on total decompressed bytes accepted from an imported/peer-received `.gxr` archive.
          * Both sources are untrusted (a shared file, or the co-op wire), so a zip bomb must not
@@ -287,6 +289,9 @@ class ProjectManager @Inject constructor(
                     hybridKpmPageFromArtwork =
                         if (projectData.hybridKpmPageUri != null) projectData.hybridKpmPageFromArtwork
                         else existing.hybridKpmPageFromArtwork,
+                    hybridKpmFingerprintKey =
+                        if (projectData.hybridKpmPageUri != null) projectData.hybridKpmFingerprintKey
+                        else existing.hybridKpmFingerprintKey,
                     wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
                     paintMarks = projectData.paintMarks ?: existing.paintMarks,
                     paintGrid = projectData.paintGrid ?: existing.paintGrid,
@@ -473,7 +478,9 @@ class ProjectManager @Inject constructor(
      * when the file is missing, unreadable, or does not hold exactly [expectedBytes] bytes.
      */
     suspend fun readHybridKpmPage(uri: Uri, expectedBytes: Int): ByteArray? = withContext(Dispatchers.IO) {
-        if (expectedBytes <= 0) return@withContext null
+        // The size comes from project.json, which may be an imported or peer-sent manifest; refuse
+        // anything a real page (≤ 1024 px per side at capture) could not be, before allocating.
+        if (expectedBytes <= 0 || expectedBytes > MAX_HYBRID_KPM_PAGE_BYTES) return@withContext null
         val path = uri.path ?: return@withContext null
         runCatching {
             java.util.zip.GZIPInputStream(File(path).inputStream().buffered()).use { gz ->
@@ -828,13 +835,30 @@ class ProjectManager @Inject constructor(
                 thumbnailUri = localUri(migrated.thumbnailUri),
                 targetImageUris = migrated.targetImageUris.map { localUri(it)!! },
                 sphereSlamReferenceUri = localUri(migrated.sphereSlamReferenceUri),
-                hybridKpmPageUri = localUri(migrated.hybridKpmPageUri),
                 sphereSlamAtlasPages = migrated.sphereSlamAtlasPages.map { page ->
                     page.copy(referenceUri = localUri(page.referenceUri)!!)
                 },
                 evolutionImageUris = migrated.evolutionImageUris.map { localUri(it)!! },
                 targetFingerprintPath = migrated.targetFingerprintPath?.let { localPath(it).absolutePath },
-            )
+            ).let { relocated ->
+                // The hybrid page is an optional accelerator, not project content: a sender's
+                // archive that lacks the file drops the page rather than failing the whole import.
+                val hybridUri = migrated.hybridKpmPageUri?.let { uri ->
+                    runCatching { localUri(uri) }.getOrNull()
+                }
+                if (hybridUri != null) {
+                    relocated.copy(hybridKpmPageUri = hybridUri)
+                } else {
+                    relocated.copy(
+                        hybridKpmPageUri = null,
+                        hybridKpmPageWidthPx = 0,
+                        hybridKpmPageHeightPx = 0,
+                        hybridKpmPageWidthMeters = 0f,
+                        hybridKpmPageFromArtwork = emptyList(),
+                        hybridKpmFingerprintKey = emptyList(),
+                    )
+                }
+            }
         }
     }
 

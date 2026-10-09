@@ -428,6 +428,24 @@ class ProjectManagerTest {
     }
 
     @Test
+    fun `import without the hybrid page file drops the page instead of failing`() = runTest {
+        val manifest =
+            """{"id":"hyb_missing","name":"Wall","hybridKpmPageUri":"file:///sender/files/projects/hyb_missing/hybrid_kpm_page_gone.y8.gz","hybridKpmPageWidthPx":2,"hybridKpmPageHeightPx":2,"hybridKpmPageWidthMeters":1.0,"hybridKpmFingerprintKey":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]}"""
+                .toByteArray()
+        val imported = importZip(zipOf("project.json" to manifest))
+        assertNotNull(imported)
+        assertNull(imported?.hybridKpmPageUri)
+        assertEquals(0, imported?.hybridKpmPageWidthPx)
+        assertTrue(imported?.hybridKpmFingerprintKey?.isEmpty() == true)
+    }
+
+    @Test
+    fun `hybrid KPM read refuses an absurd manifest size before allocating`() = runTest {
+        val uri = manager.saveHybridKpmPage(mockContext, "hyb_huge", ByteArray(4))
+        assertNull(manager.readHybridKpmPage(uri, Int.MAX_VALUE))
+    }
+
+    @Test
     fun `legacy project has no hybrid KPM page`() = runTest {
         val projectDir = File(tempFilesDir, "projects/pre_hyb").also { it.mkdirs() }
         File(projectDir, "project.json").writeText("""{"id":"pre_hyb","name":"Old"}""")

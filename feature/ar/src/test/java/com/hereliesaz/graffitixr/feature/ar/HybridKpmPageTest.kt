@@ -32,3 +32,39 @@ class HybridKpmPageTest {
         assertFalse(HybridKpmPage(ByteArray(12), 4, 3, 1.2f, bad).isValid())
     }
 }
+
+class HybridKpmPageBindingTest {
+    private val old = List(16) { 1f }
+    private val new = List(16) { 2f }
+
+    @Test
+    fun `commits under the new fingerprint once it lands`() {
+        org.junit.Assert.assertEquals(new, HybridKpmPage.commitKeyOrNull("p", "p", new, old))
+    }
+
+    @Test
+    fun `first-ever target commits once a fingerprint exists`() {
+        org.junit.Assert.assertEquals(new, HybridKpmPage.commitKeyOrNull("p", "p", new, emptyList()))
+    }
+
+    @Test
+    fun `waits while the fingerprint is still the pre-capture one`() {
+        assertNull(HybridKpmPage.commitKeyOrNull("p", "p", old, old))
+    }
+
+    @Test
+    fun `never commits into another project or without a capture`() {
+        assertNull(HybridKpmPage.commitKeyOrNull("other", "p", new, old))
+        assertNull(HybridKpmPage.commitKeyOrNull("p", "p", new, null))
+        assertNull(HybridKpmPage.commitKeyOrNull("p", "p", null, old))
+        assertNull(HybridKpmPage.commitKeyOrNull("p", "p", List(15) { 2f }, old))
+    }
+
+    @Test
+    fun `restores only against its own fingerprint`() {
+        assertTrue(HybridKpmPage.isBoundTo(new, new))
+        assertFalse(HybridKpmPage.isBoundTo(old, new))
+        assertFalse(HybridKpmPage.isBoundTo(null, new))
+        assertFalse(HybridKpmPage.isBoundTo(emptyList(), emptyList()))
+    }
+}
