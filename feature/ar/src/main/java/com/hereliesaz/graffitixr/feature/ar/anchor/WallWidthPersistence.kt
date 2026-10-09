@@ -8,13 +8,20 @@ object WallWidthPersistence {
     /**
      * Set [widthMeters] as project [projectId]'s wall width. True only when that project was the
      * one written; false when the write threw or a different project was current by the time the
-     * transform ran (the caller keeps the reading and tells the artist).
+     * transform ran (the caller keeps the reading and tells the artist). [isCurrent] is checked
+     * inside the transform, so a reading discarded (Redo/cancel) before the write lands is never
+     * persisted over a newer one; such a save writes nothing and returns false.
      */
-    suspend fun save(repository: ProjectRepository, projectId: String, widthMeters: Float): Boolean {
+    suspend fun save(
+        repository: ProjectRepository,
+        projectId: String,
+        widthMeters: Float,
+        isCurrent: () -> Boolean = { true },
+    ): Boolean {
         var applied = false
         return try {
             repository.updateProject {
-                if (it.id == projectId) {
+                if (it.id == projectId && isCurrent()) {
                     applied = true
                     it.copy(wallWidthMeters = widthMeters)
                 } else {

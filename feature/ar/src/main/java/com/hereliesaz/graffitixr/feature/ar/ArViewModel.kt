@@ -4896,6 +4896,10 @@ class ArViewModel @Inject constructor(
     // The first tap's wall plane (anchor-local); the second tap is intersected with it.
     private var measurePlaneLocal: FloatArray? = null
     private var measureJob: kotlinx.coroutines.Job? = null
+    private var measureSaveJob: kotlinx.coroutines.Job? = null
+    // Bumped whenever the on-screen reading is discarded (start/Redo/cancel); a save checks it inside
+    // the persistence transform so a stale width can't be written after a newer one.
+    private val measureGeneration = java.util.concurrent.atomic.AtomicInteger(0)
 
     /** Toggle Measure. Starting requires an established anchor (the wall frame to measure in). */
     fun toggleMeasure() {
@@ -4905,6 +4909,8 @@ class ArViewModel @Inject constructor(
         }
         if (!_uiState.value.isAnchorEstablished) return
         measureJob?.cancel()
+        measureSaveJob?.cancel()
+        measureGeneration.incrementAndGet()
         measureLocalPoints.clear()
         measurePlaneLocal = null
         _uiState.update { it.copy(measure = MeasureUi(active = true)) }
@@ -4912,6 +4918,8 @@ class ArViewModel @Inject constructor(
 
     fun cancelMeasure() {
         measureJob?.cancel()
+        measureSaveJob?.cancel()
+        measureGeneration.incrementAndGet()
         measureLocalPoints.clear()
         measurePlaneLocal = null
         _uiState.update { it.copy(measure = MeasureUi()) }
@@ -4920,6 +4928,8 @@ class ArViewModel @Inject constructor(
     /** Start over without leaving Measure (the "Redo" action). */
     fun redoMeasure() {
         measureJob?.cancel()
+        measureSaveJob?.cancel()
+        measureGeneration.incrementAndGet()
         measureLocalPoints.clear()
         measurePlaneLocal = null
         _uiState.update { it.copy(measure = MeasureUi(active = true)) }
@@ -4969,13 +4979,16 @@ class ArViewModel @Inject constructor(
     fun saveMeasure() {
         val width = _uiState.value.measure.resultMeters ?: return
         val projectId = projectRepository.currentProject.value?.id ?: return
-        viewModelScope.launch {
+        val generation = measureGeneration.get()
+        measureSaveJob?.cancel()
+        measureSaveJob = viewModelScope.launch {
             val saved = withContext(dispatchers.io) {
                 com.hereliesaz.graffitixr.feature.ar.anchor.WallWidthPersistence
-                    .save(projectRepository, projectId, width)
+                    .save(projectRepository, projectId, width) { measureGeneration.get() == generation }
             }
+            if (measureGeneration.get() != generation) return@launch // Redo/cancel superseded it
             if (saved) {
-                if (_uiState.value.measure.resultMeters == width) cancelMeasure()
+                cancelMeasure()
             } else {
                 _feedback.tryEmit(
                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error("Couldn't save the wall width. Try Save again."),

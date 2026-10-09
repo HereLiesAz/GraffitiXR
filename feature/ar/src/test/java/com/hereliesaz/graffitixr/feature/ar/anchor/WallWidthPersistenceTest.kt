@@ -39,4 +39,11 @@ class WallWidthPersistenceTest {
         coEvery { repo.updateProject(any<(GraffitiProject) -> GraffitiProject>()) } throws java.io.IOException("disk full")
         assertFalse(WallWidthPersistence.save(repo, "p", 3.25f))
     }
+
+    @Test
+    fun `a reading superseded before the write lands is not persisted`() = runTest {
+        stored = GraffitiProject(id = "p", name = "Wall", wallWidthMeters = 2f)
+        assertFalse(WallWidthPersistence.save(repo, "p", 3.25f) { false })
+        assertEquals(2f, stored!!.wallWidthMeters!!, 0f)
+    }
 }

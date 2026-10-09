@@ -722,6 +722,10 @@ class ArRenderer(
     // direction, a camera-facing plane that foreshortens an oblique wall.
     private var anchorNormalIsWall = false
     private var overlayRotationCorrectionApplied = false
+    // A reloc-restored anchor's wall-ness is only inferred from viewing angle (a floor or table
+    // seen obliquely passes too), so Measure stays off until a live VERTICAL plane hit at the
+    // anchor confirms it (see [confirmRelocWallFromPlaneHit]).
+    private var relocWallUnconfirmed = false
 
     /**
      * True while the established anchor's drawn frame is a trustworthy wall plane for Measure (see
@@ -1712,13 +1716,17 @@ class ArRenderer(
                         val cos = if (tcl > 1e-4f && yl > 1e-4f) (yx * tcx + yy * tcy + yz * tcz) / (tcl * yl) else 0f
                         if (kotlin.math.abs(cos) > 0.5f) {
                             nrmX = yx; nrmY = yy; nrmZ = yz
-                            anchorNormalIsWall = true
+                            // Not yet trusted for Measure: confirmed per frame by a live VERTICAL hit.
+                            anchorNormalIsWall = false
+                            relocWallUnconfirmed = true
                         } else {
                             nrmX = tcx; nrmY = tcy; nrmZ = tcz
                             anchorNormalIsWall = false
+                            relocWallUnconfirmed = false
                         }
                         haveNormal = true
                     } else if (chosen != null) {
+                        relocWallUnconfirmed = false
                         val pose = chosen.hitPose
                         val dx = pose.tx() - camPosX
                         val dy = pose.ty() - camPosY
@@ -1780,6 +1788,7 @@ class ArRenderer(
                         )
                         // Free/fallback anchor: face the user directly (anchor→camera).
                         anchorNormalIsWall = false
+                        relocWallUnconfirmed = false
                         nrmX = camPosX - anchorModelMatrix[12]
                         nrmY = camPosY - anchorModelMatrix[13]
                         nrmZ = camPosZ - anchorModelMatrix[14]
@@ -3006,6 +3015,9 @@ class ArRenderer(
             // but only when its normal came from the wall itself and the rotation correction has
             // been applied (see [anchorNormalIsWall]). With tracking paused, the view is the frozen
             // last pose while the camera image is live, so refuse rather than return a wrong point.
+            if (relocWallUnconfirmed && anchorEstablished && isTracking && frameCount % 15 == 0) {
+                confirmRelocWallFromPlaneHit(frame, anchorMatrix)
+            }
             val wallReady = anchorEstablished && isTracking && anchorNormalIsWall &&
                 overlayRotationCorrectionApplied && !overlayRotationCorrectionPending
             wallMeasureAvailable = anchorEstablished && anchorNormalIsWall && overlayRotationCorrectionApplied
@@ -3253,6 +3265,37 @@ class ArRenderer(
 
     fun setPrimaryAnchor(anchor: com.google.ar.core.Anchor) {
         anchorOrchestrator.setInitialAnchor(anchor)
+    }
+
+    /**
+     * Confirms a reloc-restored anchor as a wall: a screen-centre hit on a tracked VERTICAL plane
+     * whose normal matches [anchorSurfaceNormal] and which passes within a few cm of the anchor.
+     * Only then is [anchorNormalIsWall] set, so Measure never offers wall width on a floor/table.
+     */
+    private fun confirmRelocWallFromPlaneHit(frame: Frame, anchorMatrix: FloatArray) {
+        val n = anchorSurfaceNormal
+        if (n[0] == 0f && n[1] == 0f && n[2] == 0f) return
+        val hits = try {
+            frame.hitTest(0.5f * surfaceWidth.toFloat(), 0.5f * surfaceHeight.toFloat())
+        } catch (_: Exception) { return }
+        for (h in hits) {
+            val plane = h.trackable as? com.google.ar.core.Plane ?: continue
+            if (plane.type != com.google.ar.core.Plane.Type.VERTICAL) continue
+            if (plane.trackingState != TrackingState.TRACKING || plane.subsumedBy != null) continue
+            if (!plane.isPoseInPolygon(h.hitPose)) continue
+            val axis = FloatArray(3)
+            h.hitPose.getTransformedAxis(1, 1f, axis, 0)
+            val dot = axis[0] * n[0] + axis[1] * n[1] + axis[2] * n[2]
+            if (kotlin.math.abs(dot) < 0.9f) continue
+            // Anchor's offset from the hit plane, along the plane normal.
+            val off = (anchorMatrix[12] - h.hitPose.tx()) * axis[0] +
+                (anchorMatrix[13] - h.hitPose.ty()) * axis[1] +
+                (anchorMatrix[14] - h.hitPose.tz()) * axis[2]
+            if (kotlin.math.abs(off) > 0.1f) continue
+            anchorNormalIsWall = true
+            relocWallUnconfirmed = false
+            return
+        }
     }
 
     /**
