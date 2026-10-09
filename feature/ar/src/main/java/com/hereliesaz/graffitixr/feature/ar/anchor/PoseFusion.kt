@@ -340,8 +340,12 @@ class PoseFusion {
                 val drawn = applied ?: currentBackbone
                 if (diverged(drawn, correctedCurrent)) {
                     val anchorLocal = hybridPending.firstOrNull()
+                    // A timestamp BEFORE the first pending one is a clock discontinuity (ARCore epoch
+                    // change; HybridPoseHistory drops its samples for the same reason): the old
+                    // candidates belong to another clock and must not count toward agreement.
                     val expired = hybridPendingFirstNs != Long.MIN_VALUE &&
-                        observationTimestampNs - hybridPendingFirstNs > HYBRID_AGREEMENT_WINDOW_NS
+                        (observationTimestampNs < hybridPendingFirstNs ||
+                            observationTimestampNs - hybridPendingFirstNs > HYBRID_AGREEMENT_WINDOW_NS)
                     if (anchorLocal != null && (expired || !agrees(anchorLocal, newLocal))) {
                         clearHybridPending()
                     }
@@ -378,6 +382,10 @@ class PoseFusion {
                 snapsAccepted++
             } else if (correction != null) {
                 lastState = FusionState.RELOCK_REFUSED
+            } else if (lastState == FusionState.AWAITING_AGREEMENT) {
+                // Refused with no standing correction while a large move was pending: still
+                // "waiting for the first lock", and not this observation's agreement.
+                lastState = FusionState.WAITING_FOR_LOCK
             }
             lastHybridTimestampNs = observationTimestampNs
         } else if (correction != null && hybridPending.isEmpty()) {

@@ -753,6 +753,9 @@ class ArRenderer(
     // Fixed page-from-artwork-anchor relation, frozen only when BOTH ARCore anchors track together.
     private var hybridPageFromArtworkAnchor: FloatArray? = null
     private var lastHybridObservationTimestampNs: Long = Long.MIN_VALUE
+    // An accepted observation's log line waits until PoseFusion has decided whether it is held for
+    // agreement, so logcat and the overlay agree. GL thread only.
+    private var logHybridAcceptedPending = false
     // Decision payload for the most recent KPM observation evaluated; read off the GL thread by
     // [hybridKpmDiagnostics]. Immutable data class, so a volatile reference swap is a safe publish.
     @Volatile private var lastHybridKpmDiagnostics =
@@ -1825,8 +1828,10 @@ class ArRenderer(
                 lastHybridObservationTimestampNs = hybridObservation.timestampNs
                 hybridDecision?.let { decision ->
                     // Published here; refined to AWAITING_AGREEMENT below if PoseFusion holds it.
+                    // Rejections are final now; an accepted one is logged after that refinement.
                     lastHybridKpmDiagnostics = decision.diagnostics
-                    Timber.d("ARDIAG hybrid KPM ${decision.diagnostics.summary()}")
+                    if (decision.accepted == null) Timber.d("ARDIAG hybrid KPM ${decision.diagnostics.summary()}")
+                    else logHybridAcceptedPending = true
                 }
             }
 
@@ -1894,6 +1899,10 @@ class ArRenderer(
                                 requiredAgreement = com.hereliesaz.graffitixr.feature.ar.anchor
                                     .PoseFusion.HYBRID_REQUIRED_AGREEMENT,
                             )
+                        }
+                        if (logHybridAcceptedPending) {
+                            logHybridAcceptedPending = false
+                            Timber.d("ARDIAG hybrid KPM ${lastHybridKpmDiagnostics.summary()}")
                         }
                     }
                 captureAnchorCam != null ->

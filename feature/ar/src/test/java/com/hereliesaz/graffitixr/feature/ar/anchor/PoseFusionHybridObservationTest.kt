@@ -163,6 +163,29 @@ class PoseFusionHybridObservationTest {
         assertFalse(fusion.isAwaitingHybridAgreement())
     }
 
+    @Test
+    fun `a weak observation while the first large move is pending is not reported as awaiting`() {
+        val fusion = PoseFusion()
+        val backbone = translated(0f, 0f, -2.3f)
+        fusion.observe(backbone, translated(0f, 0f, -2.0f), 100L)                 // large, pending, no correction
+        fusion.observe(backbone, translated(0f, 0f, -2.0f), 200L, confidence = 0.2f)
+        assertFalse(fusion.isAwaitingHybridAgreement())
+        assertEquals(FusionState.WAITING_FOR_LOCK, fusion.diagnostics().state)
+    }
+
+    @Test
+    fun `a backward clock jump discards pending agreement`() {
+        val fusion = PoseFusion()
+        val backbone = translated(0f, 0f, -2.3f)
+        fusion.observe(backbone, translated(0f, 0f, -2.0f), 5_000_000_000L)
+        fusion.observe(backbone, translated(0f, 0f, -2.0f), 5_100_000_000L)
+        // New ARCore clock epoch: timestamps restart lower. One new observation must not complete
+        // agreement with two from the old epoch.
+        val out = fusion.observe(backbone, translated(0f, 0f, -2.0f), 1_000L)
+        assertEquals(-2.3f, out[14], 1e-4f)
+        assertEquals(1, fusion.hybridAgreementCount())
+    }
+
     private fun translated(x: Float, y: Float, z: Float) = floatArrayOf(
         1f,0f,0f,0f,
         0f,1f,0f,0f,
