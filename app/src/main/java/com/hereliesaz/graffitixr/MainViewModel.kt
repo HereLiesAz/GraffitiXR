@@ -283,7 +283,9 @@ class MainViewModel @Inject constructor(
                             sphereSlamWallFeatureMap = null,
                             sphereSlamWallFeatureMapFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
-                            sphereSlamKeyframeOrientations = null,
+                            // Base photosphere history belongs to SphereSLAM and survives precision
+                            // fingerprint creation/recapture. Only the fingerprint-relative KPM atlas
+                            // is replaced here.
                             sphereSlamAtlasPages = emptyList(),
                             paintMarks = null,
                             paintGrid = null,
