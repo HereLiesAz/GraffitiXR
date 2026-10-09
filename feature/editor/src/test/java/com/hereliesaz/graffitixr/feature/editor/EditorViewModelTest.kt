@@ -371,7 +371,7 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `a guest edit applies, persists and undoes on the host without being re-emitted`() = runTest {
+    fun `a guest edit applies, persists, is emitted once at apply time, and undoes`() = runTest {
         viewModel.setEditorMode(EditorMode.TRACE)
         addDesign()
         testDispatcher.scheduler.advanceUntilIdle()
@@ -379,19 +379,25 @@ class EditorViewModelTest {
         val before = traceScale()
         io.mockk.clearMocks(opEmitter, projectRepository, answers = false)
 
-        viewModel.applyGuestOp(
-            com.hereliesaz.graffitixr.common.model.Op.ModeTransform("TRACE", ModeAdjustment(scale = 3f)),
-        )
+        val op = com.hereliesaz.graffitixr.common.model.Op.ModeTransform("TRACE", ModeAdjustment(scale = 3f))
+        viewModel.setEditorMode(EditorMode.DESIGN) // the host is elsewhere; undo must still target TRACE
+        viewModel.applyGuestOp(op)
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(3f, traceScale(), 0.001f)
-        // The host session already re-broadcast it; emitting again would duplicate it on the wire.
-        io.mockk.verify(exactly = 0) { opEmitter.emit(any()) }
+        // Emitted exactly once, from the host's apply — that emit IS the re-broadcast.
+        io.mockk.verify(exactly = 1) { opEmitter.emit(op) }
         coVerify { projectRepository.updateProject(any<(GraffitiProject) -> GraffitiProject>()) }
 
         viewModel.onUndoClicked()
         testDispatcher.scheduler.advanceUntilIdle()
         assertEquals(before, traceScale(), 0.001f)
+        // The undo reaches the guest too.
+        io.mockk.verify {
+            opEmitter.emit(
+                com.hereliesaz.graffitixr.common.model.Op.ModeTransform("TRACE", ModeAdjustment(scale = before)),
+            )
+        }
     }
 
     @Test

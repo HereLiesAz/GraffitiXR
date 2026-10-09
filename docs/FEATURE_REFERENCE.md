@@ -453,13 +453,17 @@ Robust LAN peer-to-peer sync for collaborative painting — **no cloud, no accou
   with no active-layer side effects.
 - **Bidirectional (protocol v4):** a guest's edits go to the host as `GUEST_OP` frames (own
   sequence, queued in `GuestOutbox` until `GUEST_OP_ACK`, resent once after a reconnect, deduped by
-  the host). The host applies each as an undoable, persisted edit and re-broadcasts it in its own
-  DELTA order — the single total order both peers converge on when they edit concurrently
-  (last write in host order wins; a guest may briefly see its own older edit echoed back if it
-  edits again within one round trip). Refused, on both ends (`GuestOpPolicy`): an AR placement
-  between peers on different tracking backends (each expresses it in its own wall frame) and the
-  authoring ops this app ignores; the guest is told once that such a change stays on its device.
-  v3 peers are rejected at the handshake.
+  the host per GuestSession instance). The host applies each as an undoable, persisted edit and
+  emits it at apply time on the main thread, alongside its own edits, so its DELTA order is its
+  apply order — the single total order both peers converge on when they edit concurrently (last
+  write in host order wins). Refused, on both ends (`GuestOpPolicy`): choosing/replacing the design
+  image (a `Layer` from a guest names a guest-side file), an AR placement between peers on
+  different tracking backends (each expresses it in its own wall frame), and the authoring ops this
+  app ignores; the guest is told once that such a change stays on its device. Guest pixel
+  replacements are rate-limited on the host. A new host session (host restarted) clears the
+  guest's unsent edits — the fresh bulk is the baseline. v3 peers are rejected at the handshake.
+  **Known limit:** an incoming op (the echo of the guest's previous gesture, or a host edit)
+  arriving mid-gesture overrides the guest's in-progress drag.
 
 **Known/deferred (see `BACKLOG.md`):** a mid-bulk stall in `GuestSession` under investigation;
 `LocalLoopTest.kt` real-socket timeouts are a latent CI-gate risk.

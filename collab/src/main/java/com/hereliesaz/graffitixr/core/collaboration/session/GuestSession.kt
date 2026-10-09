@@ -48,6 +48,8 @@ internal class GuestSession(
 
     // ── Protocol v4: this guest's own edits ──────────────────────────────────────────────────
     private val outbox = GuestOutbox()
+    // Identifies this GuestSession to the host's dedupe; a new instance restarts guestSeq at 1.
+    private val guestInstance: String = java.util.UUID.randomUUID().toString()
     // The live connection's stream/crypto for flushing the outbox; null outside the live phase.
     @Volatile private var liveOutput: OutputStream? = null
     @Volatile private var liveCrypto: SessionCrypto? = null
@@ -69,7 +71,7 @@ internal class GuestSession(
         if (phase == Phase.Ended) return false
         if (!GuestOpPolicy.allows(op, hostBackend, localBackend)) return false
         val maxPlaintext = Frame.MAX_PAYLOAD_BYTES - SessionCrypto.SEAL_OVERHEAD_BYTES
-        if (OpCodec.encode(GuestOpPayload(Long.MAX_VALUE, op)).size > maxPlaintext) return false
+        if (OpCodec.encode(GuestOpPayload(guestInstance, Long.MAX_VALUE, op)).size > maxPlaintext) return false
         outbox.add(op)
         scope.launch { flushOutbox() }
         return true
@@ -83,7 +85,7 @@ internal class GuestSession(
             if (phase != Phase.Live) return
             for ((seq, op) in outbox.pendingAfter(lastSentGuestSeq)) {
                 try {
-                    writeSecure(output, crypto, FrameType.GUEST_OP, OpCodec.encode(GuestOpPayload(seq, op)))
+                    writeSecure(output, crypto, FrameType.GUEST_OP, OpCodec.encode(GuestOpPayload(guestInstance, seq, op)))
                     lastSentGuestSeq = seq
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
@@ -212,6 +214,12 @@ internal class GuestSession(
                         // fresh join (lastAppliedSeq == 0), which triggers a full bulk re-sync.
                         sessionId = null
                         lastAppliedSeq = 0L
+                        // Edits queued for the old host session may or may not have been applied
+                        // there; replaying them onto a new host session's freshly bulk-synced project
+                        // could overwrite newer host edits. The fresh bulk is the new baseline.
+                        outbox.clear()
+                        lastAckedGuestSeq = 0L
+                        lastSentGuestSeq = 0L
                         try { s.close() } catch (_: Exception) {}
                         socket = null
                         return false
@@ -338,11 +346,17 @@ internal class GuestSession(
         // this loop's first iteration instead of being re-read (and lost) from the socket.
         firstFrame: Frame.FrameRead? = null,
     ) {
-        // A new connection: resend every edit the host has not acknowledged.
-        liveOutput = output
-        liveCrypto = crypto
-        lastSentGuestSeq = lastAckedGuestSeq
-        scope.launch { flushOutbox() }
+        // A new connection: resend every edit the host has not acknowledged. The rewind happens
+        // under flushMutex so a flush still finishing on the previous connection can't advance
+        // lastSentGuestSeq past it afterwards.
+        scope.launch {
+            flushMutex.withLock {
+                liveOutput = output
+                liveCrypto = crypto
+                lastSentGuestSeq = lastAckedGuestSeq
+            }
+            flushOutbox()
+        }
         scope.launch {
             var pending = firstFrame
             while (scope.isActive) {

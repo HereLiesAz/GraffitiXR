@@ -52,6 +52,10 @@ internal class GuestOutbox(private val maxOps: Int = DEFAULT_MAX_OPS) {
     @Synchronized
     fun size(): Int = queue.size
 
+    /** Drop everything (a new host session: its bulk snapshot is the new baseline). */
+    @Synchronized
+    fun clear() = queue.clear()
+
     companion object {
         const val DEFAULT_MAX_OPS = 256
     }

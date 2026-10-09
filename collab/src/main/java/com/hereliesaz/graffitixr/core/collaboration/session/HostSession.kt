@@ -56,8 +56,8 @@ internal class HostSession(
     // handing them an out-of-date project.
     private val snapshotProvider: () -> ProjectSnapshot,
     // Protocol v4: a guest edit the host accepted, delivered on this session's IO thread. The owner
-    // applies it to the authoritative project (undoable, persisted) WITHOUT emitting it again —
-    // this session has already re-enqueued it into the host's own DELTA order.
+    // applies it to the authoritative project and THEN emits it like a local edit (enqueueOp), so
+    // the host's DELTA order is its apply order — see EditorViewModel.applyGuestOp.
     private val onGuestOp: (Op) -> Unit = {},
 ) : Session() {
 
@@ -118,7 +118,13 @@ internal class HostSession(
     // v4 guest edits: the connected guest's backend (for GuestOpPolicy) and the highest guestSeq
     // already handled, so a resend after a reconnect is acked without being applied twice.
     @Volatile private var guestBackend: com.hereliesaz.graffitixr.common.model.CoopTrackingBackend? = null
+    // Dedupe is per GuestSession INSTANCE (GuestOpPayload.guestInstance), not per connection: a
+    // reconnect whose guest never received a DELTA still reports lastAppliedSeq 0 and would look
+    // like a fresh join, re-applying edits already handled.
+    @Volatile private var guestInstance: String? = null
     @Volatile private var lastGuestSeqHandled: Long = 0L
+    // Large-pixel guest ops are rate-limited: each one is a full PNG decode on the host.
+    @Volatile private var lastGuestBitmapAtMs: Long = 0L
     private var liveJob: Job? = null
 
     // Serializes all writes to the single connected guest's OutputStream. The outbound,
@@ -393,9 +399,6 @@ internal class HostSession(
         val isReconnect = hello.lastAppliedSeq > 0
         lastAppliedSeq = hello.lastAppliedSeq
         guestBackend = hello.localBackend
-        // A fresh join is a new GuestSession whose guestSeq restarts at 1. A reconnect keeps its
-        // counter, so its handled-mark must survive to dedupe resends.
-        if (!isReconnect) lastGuestSeqHandled = 0L
 
         // Replay buffered deltas after lastAppliedSeq. Since seqs are assigned at enqueue, this
         // may overlap ops still sitting unsent in outQueue; the guest's monotonic
@@ -641,20 +644,31 @@ internal class HostSession(
      * refused op ([GuestOpPolicy]) is still marked handled so the guest stops resending it.
      */
     private fun handleGuestOp(payload: GuestOpPayload) {
+        if (payload.guestInstance != guestInstance) {
+            // A different GuestSession (a fresh join, or the app restarted): its counter restarts.
+            guestInstance = payload.guestInstance
+            lastGuestSeqHandled = 0L
+        }
         if (payload.guestSeq <= lastGuestSeqHandled) return
         lastGuestSeqHandled = payload.guestSeq
         if (!GuestOpPolicy.allows(payload.op, hostedSpatialFrame.hostBackend, guestBackend)) {
             Log.w(TAG, "refusing guest ${payload.op.javaClass.simpleName} (guestSeq=${payload.guestSeq})")
             return
         }
+        if (payload.op is Op.DesignBitmapReplace) {
+            val now = System.nanoTime() / 1_000_000L
+            if (now - lastGuestBitmapAtMs < MIN_GUEST_BITMAP_INTERVAL_MS) {
+                Log.w(TAG, "refusing guest DesignBitmapReplace: rate limit")
+                return
+            }
+            lastGuestBitmapAtMs = now
+        }
         try {
             onGuestOp(payload.op)
         } catch (e: Exception) {
             if (e is CancellationException) throw e
-            Log.w(TAG, "guest op handler failed; not re-broadcasting", e)
-            return
+            Log.w(TAG, "guest op handler failed", e)
         }
-        enqueueOp(payload.op)
     }
 
     private suspend fun heartbeatLoop(output: OutputStream, crypto: SessionCrypto) {
@@ -722,6 +736,13 @@ internal class HostSession(
          * long enough for the editor's deferred save to reach disk, which is what the snapshot reads.
          */
         private const val BULK_PERSIST_GRACE_MS = 5_000L
+
+        /**
+         * Minimum spacing of guest pixel replacements. A guest applies effects at human speed (a
+         * few per second at most); a burst faster than this is either a bug or abuse, and each one
+         * costs the host a multi-MB PNG decode.
+         */
+        private const val MIN_GUEST_BITMAP_INTERVAL_MS = 250L
         private const val TAG = "HostSession"
 
         // Guests ack every 1s and answer 5s PINGs, so 15s of read silence means a dead or

@@ -195,12 +195,42 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    // ── Host side of co-op v4: edits a connected guest made ─────────────────────────────────
+    // Collected HERE, for the ViewModel's lifetime, rather than in an Activity-scoped effect: the
+    // host session acknowledges a guest edit on arrival, so one that reached a collector that was
+    // being torn down (Activity recreation) would be acked and never applied. Unbounded on purpose
+    // for the same reason; HostSession rate-limits the only large op (DesignBitmapReplace).
+    private val pendingGuestOps = ArrayDeque<com.hereliesaz.graffitixr.common.model.Op>()
+    @Volatile private var guestOpHandler: ((com.hereliesaz.graffitixr.common.model.Op) -> Unit)? = null
+
+    init {
+        viewModelScope.launch {
+            collaborationManager.guestOps.collect { op ->
+                val handler = synchronized(pendingGuestOps) {
+                    guestOpHandler ?: run { pendingGuestOps.addLast(op); null }
+                }
+                handler?.invoke(op)
+            }
+        }
+    }
+
     /**
-     * Host side of co-op v4: edits a connected guest made, already re-broadcast in the host's op
-     * order. The editor applies them as undoable, persisted edits without emitting them again.
+     * Wire the editor that applies guest edits on the host (EditorViewModel.applyGuestOp). Drains
+     * any backlog first, in order, before publishing — the same FIFO discipline as
+     * [setSpectatorOpHandler].
      */
-    val guestOps: kotlinx.coroutines.flow.Flow<com.hereliesaz.graffitixr.common.model.Op>
-        get() = collaborationManager.guestOps
+    fun setGuestOpHandler(handler: (com.hereliesaz.graffitixr.common.model.Op) -> Unit) {
+        while (true) {
+            val op = synchronized(pendingGuestOps) {
+                if (pendingGuestOps.isEmpty()) {
+                    guestOpHandler = handler
+                    return
+                }
+                pendingGuestOps.removeFirst()
+            }
+            handler(op)
+        }
+    }
 
     /** Invokes the handler, or buffers the op (drop-oldest past the cap) until one is wired. */
     private fun dispatchSpectatorOp(op: com.hereliesaz.graffitixr.common.model.Op) {

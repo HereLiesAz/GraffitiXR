@@ -666,7 +666,7 @@ class MainActivity : ComponentActivity() {
                 }
                 // Co-op v4, host side: a connected guest's edits land on the authoritative project.
                 LaunchedEffect(arViewModel, editorViewModel) {
-                    arViewModel.guestOps.collect { op -> editorViewModel.applyGuestOp(op) }
+                    arViewModel.setGuestOpHandler { op -> editorViewModel.applyGuestOp(op) }
                 }
 
                 // The "Open" rail item can create+open a project (async DB write) and launch the picker

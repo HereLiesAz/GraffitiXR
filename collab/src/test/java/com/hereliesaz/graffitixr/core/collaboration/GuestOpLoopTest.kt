@@ -32,13 +32,17 @@ class GuestOpLoopTest {
         val hostApplied = Channel<Op>(Channel.UNLIMITED)
         val guestReceived = Channel<Op>(Channel.UNLIMITED)
         val bulk = CompletableDeferred<Unit>()
-        val host = HostSession(
-            token = "tok", protocolVersion = 4, localDeviceName = "host", projectId = "p",
-            snapshotProvider = {
-                ProjectSnapshot(ByteArray(8), ByteArray(8), 0, testSpatialFrame(backend = hostBackend))
-            },
-            onGuestOp = { hostApplied.trySend(it) },
-        )
+        lateinit var host: HostSession
+        init {
+            host = HostSession(
+                token = "tok", protocolVersion = 4, localDeviceName = "host", projectId = "p",
+                snapshotProvider = {
+                    ProjectSnapshot(ByteArray(8), ByteArray(8), 0, testSpatialFrame(backend = hostBackend))
+                },
+                // What the app does (EditorViewModel.applyGuestOp): apply, then emit like a local edit.
+                onGuestOp = { op -> hostApplied.trySend(op); host.enqueueOp(op) },
+            )
+        }
         lateinit var guest: GuestSession
         suspend fun start(): Rig {
             val port = host.startListening()
@@ -99,6 +103,16 @@ class GuestOpLoopTest {
         assertEquals(mode("TRACE", 5f), withTimeout(20_000) { rig.hostApplied.receive() })
         // Exactly once: neither op is re-applied by later resends.
         assertNull(withTimeoutOrNull(1_500) { rig.hostApplied.receive() })
+        rig.close()
+    }
+
+    @Test
+    fun `a guest cannot replace the design (its uri names a guest-side file)`() = runBlocking {
+        val rig = Rig().start()
+        val layer = com.hereliesaz.graffitixr.common.model.Layer(
+            id = "x", name = "x", uri = null,
+        )
+        assertFalse(rig.guest.sendOp(Op.DesignReplace(layer)))
         rig.close()
     }
 }

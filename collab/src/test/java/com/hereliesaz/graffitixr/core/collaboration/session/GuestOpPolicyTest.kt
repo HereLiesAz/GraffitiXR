@@ -29,6 +29,12 @@ class GuestOpPolicyTest {
     }
 
     @Test
+    fun `a guest cannot replace the design`() {
+        val layer = com.hereliesaz.graffitixr.common.model.Layer(id = "x", name = "x", uri = null)
+        assertFalse(GuestOpPolicy.allows(Op.DesignReplace(layer), ARCORE, ARCORE))
+    }
+
+    @Test
     fun `authoring ops this app ignores are not sent`() {
         assertFalse(GuestOpPolicy.allows(Op.StrokeComplete(BrushStroke(points = listOf(1f))), ARCORE, ARCORE))
         assertFalse(GuestOpPolicy.allows(Op.TextContentChange("x"), ARCORE, ARCORE))

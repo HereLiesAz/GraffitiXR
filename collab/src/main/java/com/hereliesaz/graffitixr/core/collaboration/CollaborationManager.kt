@@ -84,6 +84,8 @@ class CollaborationManager @Inject constructor() {
         snapshotProvider: () -> ProjectSnapshot,
     ): String {
         check(hostSession == null && guestSession == null) { "already in a session" }
+        // A previous session's undelivered guest edits belong to that session, not this one.
+        while (_guestOps.tryReceive().isSuccess) Unit
         val token = QrPayload.newToken()
         val session = HostSession(
             token = token,
@@ -198,8 +200,9 @@ class CollaborationManager @Inject constructor() {
 
     /**
      * Guest edits the host accepted (protocol v4), for the host's editor to apply to the
-     * authoritative project. Already re-broadcast by the host session; the consumer must NOT emit
-     * them again. Unbounded: dropping one would silently desync host from guest.
+     * authoritative project and then emit like a local edit (that emit is the re-broadcast).
+     * Unbounded: dropping one would silently desync host from guest. Single consumer
+     * (ArViewModel, for its whole lifetime).
      */
     private val _guestOps = kotlinx.coroutines.channels.Channel<Op>(kotlinx.coroutines.channels.Channel.UNLIMITED)
     val guestOps: kotlinx.coroutines.flow.Flow<Op> = _guestOps.receiveAsFlow()

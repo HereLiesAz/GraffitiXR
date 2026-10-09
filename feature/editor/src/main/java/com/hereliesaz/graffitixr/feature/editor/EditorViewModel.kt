@@ -455,6 +455,9 @@ class EditorViewModel @Inject constructor(
         // from once the pre-Reset stash was cleared by RestoreDesign just above.
         if (command.oldMode != null && command.oldModeAdjustment != null) {
             dispatch(EditorIntent.SetModeAdjustment(command.oldMode, command.oldModeAdjustment))
+            // Co-op: the restored placement must reach the peer too. emitDesignResync below covers
+            // only the design's own props/transform.
+            opEmitter.emit(Op.ModeTransform(command.oldMode.name, command.oldModeAdjustment))
         }
         saveProject()
         emitDesignResync(restored)
@@ -1326,13 +1329,30 @@ class EditorViewModel @Inject constructor(
     )
 
     /**
-     * Host side of co-op v4: apply an edit a guest made. Treated like a local edit — undoable and
-     * persisted — but NOT emitted: the host session has already re-enqueued it into its own op
-     * order, which is what keeps host and guest converged when both edit at once.
+     * Host side of co-op v4: apply an edit a guest made, as if it were a local edit — undoable,
+     * persisted, and emitted HERE, on the main thread, in the same stream as the host's own edits.
+     * Emitting at apply time (not when the frame arrived on the session thread) is what makes the
+     * host's send order equal its apply order, so host and guest converge when both edit at once.
+     *
+     * Undo snapshots the mode the op touches, not the host's active mode. A DesignBitmapReplace is
+     * applied but not made undoable: history snapshots strip the bitmap and compare URIs, so an undo
+     * entry for it would restore nothing.
      */
     fun applyGuestOp(op: Op) {
-        pushHistory()
-        applySpectatorOp(op) { saveProject() }
+        when (op) {
+            is Op.ModeTransform -> runCatching { EditorMode.valueOf(op.mode) }.getOrNull()?.let { mode ->
+                history.pushProperty(
+                    currentDesignSnapshot(), mode, _uiState.value.modeAdjustments[mode] ?: ModeAdjustment(),
+                )
+                updateHistoryCounts()
+            }
+            is Op.DesignBitmapReplace -> Unit
+            else -> pushHistory()
+        }
+        applySpectatorOp(op) {
+            saveProject()
+            opEmitter.emit(op)
+        }
     }
 
     /**
