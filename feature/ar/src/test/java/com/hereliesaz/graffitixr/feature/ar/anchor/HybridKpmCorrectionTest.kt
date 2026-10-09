@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
+import com.hereliesaz.graffitixr.common.model.HybridKpmOutcome
 import com.hereliesaz.sphereslam.SphereSlamPoseMath
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -82,6 +83,87 @@ class HybridKpmCorrectionTest {
         )
         assertEquals(HybridKpmCorrection.Reject.NO_POSE_PAIR, decision.reject)
     }
+
+    @Test
+    fun `accepted decision carries the full diagnostic payload`() {
+        val history = HybridPoseHistory()
+        history.add(2_000_000L, identity(), translated(0f, 0f, -2.3f))
+        val decision = solve(frontObservation(2_000_000L, 2_000f), geometry, true, identity(), history, 12_000_000L)
+        val d = decision.diagnostics
+        assertEquals(HybridKpmOutcome.ACCEPTED, d.outcome)
+        assertEquals(2_000_000L, d.observationTimestampNs)
+        assertEquals(10f, d.ageMs, 1e-4f)          // (12_000_000 - 2_000_000) ns
+        assertEquals(24, d.inliers)
+        assertEquals(1f, d.reprojectionPx, 1e-6f)
+        assertEquals(300f, d.correctionMm, 0.1f)   // backbone at -2.3 m, KPM page at -2.0 m
+        assertEquals(0f, d.correctionDeg, 0.1f)
+    }
+
+    @Test
+    fun `an implausibly large correction is refused outright`() {
+        val history = HybridPoseHistory()
+        // KPM says -2.0 m, ARCore's anchor sits at -3.5 m: a 1.5 m "drift" is a wrong wall.
+        history.add(1_000L, identity(), translated(0f, 0f, -3.5f))
+        val decision = solve(frontObservation(1_000L, 2_000f), geometry, true, identity(), history, 1_050L)
+        assertNull(decision.accepted)
+        assertEquals(HybridKpmCorrection.Reject.CORRECTION_TOO_LARGE, decision.reject)
+        assertEquals(HybridKpmOutcome.CORRECTION_TOO_LARGE, decision.diagnostics.outcome)
+        assertEquals(1500f, decision.diagnostics.correctionMm, 0.1f)
+    }
+
+    @Test
+    fun `a correction just under the ceiling is still accepted`() {
+        val history = HybridPoseHistory()
+        history.add(1_000L, identity(), translated(0f, 0f, -2.99f))  // 0.99 m
+        val decision = solve(frontObservation(1_000L, 2_000f), geometry, true, identity(), history, 1_050L)
+        assertNotNull(decision.accepted)
+    }
+
+    @Test
+    fun `an early reject reports what was known and leaves later fields unset`() {
+        val history = HybridPoseHistory()
+        history.add(1_000L, identity(), translated(0f, 0f, -2f))
+        val d = solve(frontObservation(1_000L, 2_000f).copy(inliers = 3), geometry, true, identity(), history, 1_050L)
+            .diagnostics
+        assertEquals(HybridKpmOutcome.TOO_FEW_INLIERS, d.outcome)
+        assertEquals(3, d.inliers)
+        assertEquals(-1f, d.correctionMm, 0f)
+        assertEquals(-1f, d.correctionDeg, 0f)
+    }
+
+    @Test
+    fun `rotation past the ceiling is refused`() {
+        val history = HybridPoseHistory()
+        // Backbone rotated 40° about Z at the same depth: translation agrees, rotation does not.
+        history.add(1_000L, identity(), rotZ40AtDepth(-2f))
+        val d = solve(frontObservation(1_000L, 2_000f), geometry, true, identity(), history, 1_050L)
+        assertEquals(HybridKpmCorrection.Reject.CORRECTION_TOO_LARGE, d.reject)
+        assertEquals(40f, d.diagnostics.correctionDeg, 0.05f)
+    }
+
+    @Test
+    fun `the ceiling ignores an ARCore global rebase`() {
+        // Same physical situation as the 1.5 m case but ARCore renumbered its world by +10 m X:
+        // both the sensor view and the backbone carry the rebase, so the verdict must not change.
+        val rebase = translated(10f, 0f, 0f)
+        val viewRebased = translated(-10f, 0f, 0f) // view = inverse(world-from-camera)
+        val history = HybridPoseHistory()
+        history.add(1_000L, viewRebased, multiply(rebase, translated(0f, 0f, -3.5f)))
+        val d = solve(frontObservation(1_000L, 2_000f), geometry, true, identity(), history, 1_050L)
+        assertEquals(HybridKpmCorrection.Reject.CORRECTION_TOO_LARGE, d.reject)
+        assertEquals(1500f, d.diagnostics.correctionMm, 0.1f)
+    }
+
+    // Column-major 40° rotation about Z (cos40 = 0.76604444, sin40 = 0.64278761), at depth z.
+    private fun rotZ40AtDepth(z: Float) = floatArrayOf(
+        0.76604444f, 0.64278761f, 0f, 0f,
+        -0.64278761f, 0.76604444f, 0f, 0f,
+        0f, 0f, 1f, 0f,
+        0f, 0f, z, 1f,
+    )
+
+    // Pure translations commute, so composing them is just adding their columns.
+    private fun multiply(a: FloatArray, b: FloatArray) = translated(a[12] + b[12], a[13] + b[13], a[14] + b[14])
 
     private data class TestObservation(
         val timestampNs: Long,

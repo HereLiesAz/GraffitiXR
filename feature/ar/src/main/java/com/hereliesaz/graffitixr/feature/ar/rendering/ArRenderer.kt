@@ -411,6 +411,13 @@ class ArRenderer(
     }
 
     /**
+     * The hybrid KPM sidecar's decision about its most recent observation, with the evidence it
+     * decided on. NOT_SAMPLED until the sidecar is armed and has evaluated one.
+     */
+    fun hybridKpmDiagnostics(): com.hereliesaz.graffitixr.common.model.HybridKpmDiagnostics =
+        lastHybridKpmDiagnostics
+
+    /**
      * Live status of SphereSLAM's ARCore-sidecar mode.
      *
      * A retained old observation is not evidence of current tracking, so [trackingData] is true only
@@ -837,6 +844,13 @@ class ArRenderer(
     // Fixed page-from-artwork-anchor relation, frozen only when BOTH ARCore anchors track together.
     private var hybridPageFromArtworkAnchor: FloatArray? = null
     private var lastHybridObservationTimestampNs: Long = Long.MIN_VALUE
+    // An accepted observation's log line waits until PoseFusion has decided whether it is held for
+    // agreement, so logcat and the overlay agree. GL thread only.
+    private var logHybridAcceptedPending = false
+    // Decision payload for the most recent KPM observation evaluated; read off the GL thread by
+    // [hybridKpmDiagnostics]. Immutable data class, so a volatile reference swap is a safe publish.
+    @Volatile private var lastHybridKpmDiagnostics =
+        com.hereliesaz.graffitixr.common.model.HybridKpmDiagnostics()
     // This session's freshly captured metric page, held until the page↔artwork relation freezes and
     // the two can be persisted as one unit. Null for a restored page (already persisted) and after
     // emit. GL-thread only.
@@ -974,6 +988,7 @@ class ArRenderer(
         hybridPoseHistory.clear()
         hybridPageFromArtworkAnchor = null
         lastHybridObservationTimestampNs = Long.MIN_VALUE
+        lastHybridKpmDiagnostics = com.hereliesaz.graffitixr.common.model.HybridKpmDiagnostics()
         hybridCapturedLuma = null
         hybridCaptureAnchorGeneration = Long.MAX_VALUE
         hybridReferenceRestored = false
@@ -2058,18 +2073,13 @@ class ArRenderer(
                 hybridObservation != null &&
                 hybridObservation.timestampNs != lastHybridObservationTimestampNs
             ) {
-                lastHybridObservationTimestampNs = hybridObservation.timestampNs
                 hybridDecision?.let { decision ->
-                    decision.accepted?.let {
-                        Timber.d(
-                            "ARDIAG hybrid KPM accepted ts=${it.timestampNs} " +
-                                "inliers=${it.inliers} confidence=${it.confidence}"
-                        )
-                    } ?: decision.reject?.let {
-                        Timber.d(
-                            "ARDIAG hybrid KPM rejected ts=${hybridObservation.timestampNs} reason=$it"
-                        )
-                    }
+                    lastHybridObservationTimestampNs = hybridObservation.timestampNs
+                    // Published here; refined to AWAITING_AGREEMENT below if PoseFusion holds it.
+                    // Rejections are final now; an accepted one is logged after that refinement.
+                    lastHybridKpmDiagnostics = decision.diagnostics
+                    if (decision.accepted == null) Timber.d("ARDIAG hybrid KPM ${decision.diagnostics.summary()}")
+                    else logHybridAcceptedPending = true
                 }
             }
 
@@ -2121,7 +2131,28 @@ class ArRenderer(
                         observationTimestampNs = hybridAccepted.timestampNs,
                         confidence = hybridAccepted.confidence,
                         inliers = hybridAccepted.inliers,
-                    )
+                    ).also {
+                        // The quality gates passed; PoseFusion may still be holding a LARGE move
+                        // for agreement. Report that rather than a bare ACCEPTED.
+                        val agreeing = poseFusion.hybridAgreementCount()
+                        val current = lastHybridKpmDiagnostics
+                        if (
+                            poseFusion.isAwaitingHybridAgreement() &&
+                            current.observationTimestampNs == hybridAccepted.timestampNs
+                        ) {
+                            lastHybridKpmDiagnostics = current.copy(
+                                outcome = com.hereliesaz.graffitixr.common.model.HybridKpmOutcome
+                                    .AWAITING_AGREEMENT,
+                                agreeingObservations = agreeing,
+                                requiredAgreement = com.hereliesaz.graffitixr.feature.ar.anchor
+                                    .PoseFusion.HYBRID_REQUIRED_AGREEMENT,
+                            )
+                        }
+                        if (logHybridAcceptedPending) {
+                            logHybridAcceptedPending = false
+                            Timber.d("ARDIAG hybrid KPM ${lastHybridKpmDiagnostics.summary()}")
+                        }
+                    }
                 captureAnchorCam != null ->
                     poseFusion.currentAnchor(
                     backbone = backbone,
