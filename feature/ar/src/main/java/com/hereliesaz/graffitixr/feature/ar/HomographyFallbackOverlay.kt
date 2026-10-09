@@ -75,6 +75,11 @@ private val DEFAULT_UNWARP_POINTS = listOf(
  * @param onPoseTracked observes each frame's tracking result — null means lost, which also
  *   drives this composable's own "Reacquiring target…" banner (ARCore's `TrackingState`
  *   equivalent). Optional — for a caller that additionally wants the raw pose stream.
+ * @param onDesignTrackedChange reports whether this overlay is currently drawing the design
+ *   itself (a reference is set AND the latest frame produced a pose). False before a target is
+ *   captured, while capturing/unwarping, while tracking is lost, and when leaving composition — the
+ *   caller must keep drawing the design its own way in those states, or the design vanishes from
+ *   the camera feed until a target is captured.
  */
 @OptIn(ExperimentalCamera2Interop::class)
 @Composable
@@ -82,6 +87,7 @@ fun HomographyFallbackOverlay(
     cameraController: LifecycleCameraController,
     designBitmap: Bitmap?,
     onPoseTracked: (HomographyArTracker.HomographyPose?) -> Unit = {},
+    onDesignTrackedChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -92,6 +98,12 @@ fun HomographyFallbackOverlay(
     // needs >= 30 ORB features) so the "Capture Target" screen can say why instead of the user
     // just landing back there with no explanation. Cleared on the next capture attempt.
     var referenceRejected by remember { mutableStateOf(false) }
+    // True only while the GL quad below has a live pose to draw the design at. Starts false (no
+    // frame yet) so the caller's untracked 2D draw stays up until tracking actually takes over.
+    var hasPose by remember { mutableStateOf(false) }
+    val designTracked = referenceBitmap != null && hasPose
+    LaunchedEffect(designTracked) { onDesignTrackedChange(designTracked) }
+    DisposableEffect(Unit) { onDispose { onDesignTrackedChange(false) } }
 
     if (referenceBitmap == null) {
         val scope = rememberCoroutineScope()
@@ -197,6 +209,7 @@ fun HomographyFallbackOverlay(
             glRenderer.setExtent(objectHalfW, objectHalfH)
         } else {
             referenceRejected = true
+            hasPose = false
             referenceBitmap = null
             rawCaptureBitmap = null
         }
@@ -228,6 +241,7 @@ fun HomographyFallbackOverlay(
             val analyzer = HomographyTrackingAnalyzer(context, id, bridgedTracker) { frame ->
                 onPoseTracked(frame?.pose)
                 isTrackingLost = frame == null
+                hasPose = frame != null
                 trackingConfidence = frame?.pose?.confidence ?: 0f
                 if (frame != null) {
                     glRenderer.updatePose(frame.pose.viewMatrix, frame.projMatrix, frame.frameAspect)

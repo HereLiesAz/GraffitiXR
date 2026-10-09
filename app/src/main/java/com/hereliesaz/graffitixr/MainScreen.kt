@@ -82,6 +82,9 @@ fun MainScreen(
     // ARCore mode publishes metres/pixel through ArRenderer. Standalone SphereSLAM has no
     // ArRenderer, so its CameraX/KPM path publishes the same wall-unit/pixel quantity here.
     var standaloneArUnitsPerPixel by remember { mutableFloatStateOf(0f) }
+    // Set by HomographyFallbackOverlay while it is drawing the tracked design itself (see the
+    // isOverlayFallbackActive gate on the 2D design draw below).
+    var overlayFallbackTracking by remember { mutableStateOf(false) }
 
     val bgColor = if (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY) Transparent else uiState.canvasBackground
     Box(modifier = Modifier.fillMaxSize().background(bgColor)) {
@@ -665,12 +668,13 @@ fun MainScreen(
                     // BridgedHomographyTracker instead of leaving the design a manually-dragged,
                     // untracked overlay. Self-contained (owns its own capture UI, tracker, and GL
                     // surface) — see HomographyFallbackOverlay's doc. The manual 2D design-layer
-                    // draw below is suppressed for this exact combination (editorMode/isArCoreAvailable
-                    // guard on its own `if`) so the two don't render the design twice.
+                    // draw below is suppressed only while this overlay reports it is actually
+                    // drawing the tracked design, so the two don't render it twice.
                     if (!arUiState.isArCoreAvailable) {
                         com.hereliesaz.graffitixr.feature.ar.HomographyFallbackOverlay(
                             cameraController = cameraController,
                             designBitmap = uiState.design?.takeIf { it.isVisible }?.bitmap,
+                            onDesignTrackedChange = { overlayFallbackTracking = it },
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
@@ -736,8 +740,11 @@ fun MainScreen(
 
         // Overlay mode on an ARCore-unavailable device renders the design GL-side, tracked, inside
         // HomographyFallbackOverlay above — this manual, untracked 2D draw would otherwise show a
-        // second, unaligned copy of the same design on top of it.
-        val isOverlayFallbackActive = uiState.editorMode == EditorMode.OVERLAY && !arUiState.isArCoreAvailable
+        // second, unaligned copy of the same design on top of it. Only while it is actually
+        // tracking, though: gating on ARCore availability alone hid the design over the camera
+        // feed from the moment availability resolved until a target was captured and locked.
+        val isOverlayFallbackActive = uiState.editorMode == EditorMode.OVERLAY &&
+            !arUiState.isArCoreAvailable && overlayFallbackTracking
         if (uiState.editorMode != EditorMode.AR && !isOverlayFallbackActive) {
             // Per-mode whole-design adjustment: position/scale/rotate/fade and tone the entire
             // composited design as a unit for this mode (DESIGN mode is the global, unadjusted view).
