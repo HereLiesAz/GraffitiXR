@@ -134,6 +134,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     @Volatile private var mobileGsFingerprint: Fingerprint? = null,
     @Volatile private var mobileGsFingerprintFrameVersion: Int =
         com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+    @Volatile private var mobileGsMapFromFingerprint: FloatArray? = null,
     @Volatile private var mobileGsWallFeatureMap: WallFeatureMap? = null,
     @Volatile private var mobileGsWallFeatureMapFrameVersion: Int =
         com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
@@ -270,6 +271,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         atlasPages: List<SphereSlamStandaloneAtlasReferenceImage>,
         fingerprint: Fingerprint?,
         fingerprintFrameVersion: Int,
+        mapFromFingerprint: FloatArray?,
         wallFeatureMap: WallFeatureMap?,
         wallFeatureMapFrameVersion: Int,
     ) {
@@ -277,13 +279,15 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
 
         val referenceChanged = referenceImage !== reference
         val fingerprintChanged = mobileGsFingerprint !== fingerprint ||
-            mobileGsFingerprintFrameVersion != fingerprintFrameVersion
+            mobileGsFingerprintFrameVersion != fingerprintFrameVersion ||
+            !sameTransform(mobileGsMapFromFingerprint, mapFromFingerprint)
         val mapChanged = mobileGsWallFeatureMap !== wallFeatureMap ||
             mobileGsWallFeatureMapFrameVersion != wallFeatureMapFrameVersion
 
         referenceImage = reference
         mobileGsFingerprint = fingerprint
         mobileGsFingerprintFrameVersion = fingerprintFrameVersion
+        mobileGsMapFromFingerprint = mapFromFingerprint?.copyOf()
         mobileGsWallFeatureMap = wallFeatureMap
         mobileGsWallFeatureMapFrameVersion = wallFeatureMapFrameVersion
 
@@ -1086,12 +1090,27 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         }
         if (fp == null || fp.descriptorsRows <= 0 || fp.points3d.size != fp.descriptorsRows * 3) {
             // Native MobileGS is process-global. A standalone project with no seed must explicitly
-            // clear a prior project's fingerprint AND its wide-wall map rather than continuing to
-            // match coordinates from the previous project's frame.
+            // clear a prior project's precision layer without touching the base photosphere.
             slam.clearWallFingerprint()
             slam.clearWallFeatureMap()
             slam.overlayMarkCenterLocal = null
             slam.captureAnchorCam = null
+            return
+        }
+
+        val mapFromFingerprint = mobileGsMapFromFingerprint
+        if (
+            mapFromFingerprint == null ||
+            mapFromFingerprint.size != 16 ||
+            mapFromFingerprint.any { !it.isFinite() }
+        ) {
+            slam.clearWallFingerprint()
+            slam.clearWallFeatureMap()
+            slam.overlayMarkCenterLocal = null
+            slam.captureAnchorCam = null
+            onDiagnostic(
+                "SphereSLAM MobileGS seed refused: missing finite photosphere map_from_fingerprint"
+            )
             return
         }
 
@@ -1101,7 +1120,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             cols = fp.descriptorsCols,
             type = fp.descriptorsType,
             points3d = fp.points3d.toFloatArray(),
-            anchorMatrix = StandaloneFingerprintFrame.anchorFromFingerprint(),
+            anchorMatrix = mapFromFingerprint,
             intrinsics = floatArrayOf(intrinsics.fx, intrinsics.fy, intrinsics.cx, intrinsics.cy),
             // Deliberately empty: the optional native rectifier interprets this as an ARCore
             // capture-camera view. Standalone points already live in the durable page/wall frame.
@@ -1116,12 +1135,12 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         val mapFrameOk =
             mobileGsWallFeatureMapFrameVersion == expectedFrameVersion &&
                 map != null &&
-                StandaloneFingerprintFrame.isCenteredPageAnchor(map.anchor)
+                sameTransform(map.anchor, mapFromFingerprint)
         if (mapFrameOk) {
             val compatibleMap = requireNotNull(map)
             slam.restoreWallFeatureMap(compatibleMap)
             onDiagnostic(
-                "SphereSLAM MobileGS map restored backend=standalone-kpm frame=centered-page " +
+                "SphereSLAM MobileGS map restored backend=standalone-kpm frame=photosphere-map " +
                     "version=" + mobileGsWallFeatureMapFrameVersion +
                     " points=" + compatibleMap.pointCount,
             )
@@ -1140,7 +1159,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             }
         }
         onDiagnostic(
-            "SphereSLAM MobileGS seed backend=standalone-kpm frame=centered-page " +
+            "SphereSLAM MobileGS seed backend=standalone-kpm frame=photosphere-map " +
                 "version=" + mobileGsFingerprintFrameVersion +
                 " rows=" + fp.descriptorsRows + " type=" + fp.descriptorsType,
         )
@@ -1263,6 +1282,18 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             else -> StandaloneCameraTimestampSource.UNKNOWN
         }
     }.getOrDefault(StandaloneCameraTimestampSource.UNKNOWN)
+
+    private fun sameTransform(
+        a: FloatArray?,
+        b: FloatArray?,
+        epsilon: Float = 1e-5f,
+    ): Boolean {
+        if (a == null || b == null || a.size != 16 || b.size != 16) return false
+        return a.indices.all { i ->
+            a[i].isFinite() && b[i].isFinite() &&
+                kotlin.math.abs(a[i] - b[i]) <= epsilon
+        }
+    }
 
     override fun close() {
         if (closed) return
