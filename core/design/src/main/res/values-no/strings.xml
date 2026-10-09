@@ -592,4 +592,9 @@
     <string name="measure_redo">Gjør om</string>
     <string name="measure_failed">Kunne ikke plassere punktet på veggen. Sikt mer rett mot veggen og trykk igjen.</string>
     <string name="measure_wall_width">Veggbredde</string>
+    <!-- Overlay > Gyro (tripod stabilisation) -->
+    <string name="nav_gyro">Gyro</string>
+    <string name="nav_gyro_info">På stativ holder designet stille på veggen mot små vibrasjoner ved hjelp av bevegelsessensoren. Slå på når telefonen står; slipper hvis telefonen flyttes.</string>
+    <string name="gyro_released_moved">Gyro sluppet: telefonen ble flyttet for mye.</string>
+    <string name="gyro_unavailable">Gyro trenger en rotasjonssensor som denne enheten ikke har.</string>
 </resources>

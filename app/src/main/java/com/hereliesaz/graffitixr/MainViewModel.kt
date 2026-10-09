@@ -54,6 +54,9 @@ data class MainUiState(
     // plus a full feature build — so without a SEPARATE flag surviving that unmount, the artist
     // saw a plain AR feed with no indication anything was happening.
     val isConfirmingTarget: Boolean = false,
+    // Overlay ▸ Gyro: hold the drawn design still against tripod vibration (see
+    // OverlayGyroStabilizer). Overlay-only; MainScreen turns it off on leaving Overlay.
+    val isOverlayGyroActive: Boolean = false,
 )
 
 @HiltViewModel
@@ -118,6 +121,10 @@ class MainViewModel @Inject constructor(
 
     fun setTouchLocked(locked: Boolean) {
         _uiState.update { it.copy(isTouchLocked = locked) }
+    }
+
+    fun setOverlayGyroActive(active: Boolean) {
+        _uiState.update { it.copy(isOverlayGyroActive = active) }
     }
 
     fun startTargetCapture() {

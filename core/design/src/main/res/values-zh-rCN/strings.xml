@@ -612,4 +612,9 @@
     <string name="measure_redo">重测</string>
     <string name="measure_failed">无法将该点放到墙上。请更正对墙面后再点按。</string>
     <string name="measure_wall_width">墙宽</string>
+    <!-- Overlay > Gyro (tripod stabilisation) -->
+    <string name="nav_gyro">陀螺仪</string>
+    <string name="nav_gyro_info">使用三脚架时,借助运动传感器抵消细微震动,让设计稳定在墙面上。手机架好后再开启;手机被移动时会自动解除。</string>
+    <string name="gyro_released_moved">陀螺仪已解除:手机移动幅度过大。</string>
+    <string name="gyro_unavailable">陀螺仪需要旋转传感器,但此设备未提供。</string>
 </resources>

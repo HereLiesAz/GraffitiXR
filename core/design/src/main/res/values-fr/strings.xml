@@ -325,4 +325,9 @@
     <string name="measure_redo">Refaire</string>
     <string name="measure_failed">Impossible de placer ce point sur le mur. Visez plus de face et touchez à nouveau.</string>
     <string name="measure_wall_width">Largeur du mur</string>
+    <!-- Overlay > Gyro (tripod stabilisation) -->
+    <string name="nav_gyro">Gyro</string>
+    <string name="nav_gyro_info">Sur trépied, maintient le design immobile sur le mur malgré les petites vibrations grâce au capteur de mouvement. Activez-le une fois le téléphone installé ; il se relâche si le téléphone bouge.</string>
+    <string name="gyro_released_moved">Gyro relâché : le téléphone a trop bougé.</string>
+    <string name="gyro_unavailable">Gyro nécessite un capteur de rotation que cet appareil ne fournit pas.</string>
 </resources>

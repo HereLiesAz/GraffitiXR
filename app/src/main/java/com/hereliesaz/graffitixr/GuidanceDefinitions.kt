@@ -40,7 +40,7 @@ internal val DECORATED_IDS = setOf(
     "target.create", "mode.ar.light", "mode.ar.lock", "mode.ar.measure",
     "coop", "coop.host", "coop.join",
     "mode.ar",
-    "mode.overlay.light", "mode.overlay.lock",
+    "mode.overlay.light", "mode.overlay.lock", "mode.overlay.gyro",
     "mode.mockup.lock",
     "mode.trace.freeze",
     "design.adjust", "design.balance", "design.invert", "design.outline", "design.isolate",

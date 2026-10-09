@@ -592,4 +592,9 @@
     <string name="measure_redo">Repetir</string>
     <string name="measure_failed">No se pudo situar ese punto en la pared. Apunta más de frente y vuelve a tocar.</string>
     <string name="measure_wall_width">Ancho de la pared</string>
+    <!-- Overlay > Gyro (tripod stabilisation) -->
+    <string name="nav_gyro">Giro</string>
+    <string name="nav_gyro_info">En trípode, mantiene el diseño quieto en la pared frente a pequeñas vibraciones usando el sensor de movimiento. Actívalo con el teléfono ya fijo; se suelta si el teléfono se mueve.</string>
+    <string name="gyro_released_moved">Giro desactivado: el teléfono se movió demasiado.</string>
+    <string name="gyro_unavailable">Giro necesita un sensor de rotación que este dispositivo no ofrece.</string>
 </resources>

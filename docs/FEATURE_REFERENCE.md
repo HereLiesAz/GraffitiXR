@@ -141,6 +141,29 @@ rebroadcasts it, and a host's goes to its guests. The width is metric, so it cro
 backends and devices unconverted; a joining guest gets it in the bulk project archive. Not offered on standalone SphereSLAM
 (no measurement path yet; it must be limited to physically metric targets when added).
 
+### 1.2a OVERLAY ▸ Gyro (tripod stabilisation)
+
+**Gyro** is a toggle sub-item under the Overlay rail folder (cyan while engaged). It is for a phone
+mounted on a tripod: very small vibrations make the camera image shimmy under the screen-fixed
+design, and Gyro moves the drawn design with the wall instead.
+
+- **On:** captures the current device orientation (`TYPE_GAME_ROTATION_VECTOR`, via
+  `GyroOrientationBridge`) as the reference. Every frame the orientation delta since then becomes the
+  pure-rotation screen homography `H = K·R·K⁻¹` (`OverlayGyroCompensationMath`), with K from
+  `CameraIntrinsicsEstimator` scaled to the FIT_CENTER preview (a nominal 68° field of view if Camera2
+  reports nothing). `H` is drawn as an extra screen-space transform around Overlay's whole-design
+  draw, so the design's edits and Overlay's `ModeAdjustment` are unchanged.
+- **Release:** rotation beyond **3°** since the reference (tripod bumped, phone picked up)
+  releases Gyro with a short toast; so does a device with no rotation-vector sensor. Turning it off,
+  leaving Overlay, or opening the library releases the sensor listener and stops MiDaS; the design
+  returns to its normal Overlay placement. A display-rotation change re-captures the reference.
+- **Depth (MiDaS):** `DepthEstimator` runs once when Gyro turns on and then every **15 s**, on a
+  downsampled ImageCapture still on a background dispatcher, sampling the surface under the design
+  as a *relative* inverse depth. That feeds only the plane-induced parallax term `t·nᵀ/d`, and
+  **translation is not measured**, so the term is off and depth does not change the drawn result
+  today. Pure rotation is exact without depth.
+- Overlay **Export** composites the design at its uncompensated position (sub-degree difference).
+
 ### 1.3 MOCKUP wall-capture flow (`CaptureStep`)
 
 `NONE → CAPTURE → RECTIFY → MASK → REVIEW` — grab a wall photo, rectify perspective, mask the paintable

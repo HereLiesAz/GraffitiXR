@@ -594,4 +594,9 @@
     <string name="measure_redo">Újra</string>
     <string name="measure_failed">Ezt a pontot nem sikerült a falra helyezni. Célozz egyenesebben, és koppints újra.</string>
     <string name="measure_wall_width">Falszélesség</string>
+    <!-- Overlay > Gyro (tripod stabilisation) -->
+    <string name="nav_gyro">Giroszkóp</string>
+    <string name="nav_gyro_info">Állványon a mozgásérzékelővel a falon tartja a dizájnt apró rezgések ellenére. Kapcsold be, ha a telefon már a helyén van; ha elmozdul, elengedi.</string>
+    <string name="gyro_released_moved">Giroszkóp kikapcsolva: a telefon túl sokat mozdult.</string>
+    <string name="gyro_unavailable">A giroszkóphoz forgásérzékelő kell, amit ez az eszköz nem jelez.</string>
 </resources>
