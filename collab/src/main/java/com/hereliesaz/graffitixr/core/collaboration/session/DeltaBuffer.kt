@@ -82,18 +82,18 @@ internal class DeltaBuffer(
      * Drop buffered entries that [incoming] makes redundant.
      *
      * There is one design, so every op scoped to it (pixels, transform, tone, strokes, text) is
-     * subsumed by a wholesale replacement of that design. [Op.ModeTransform] is the one exception:
-     * it lives on [ModeAdjustment], not on the design layer (see its kdoc), so it is independent
-     * per-mode placement state that a [Op.DesignReplace] does not carry and must not clear. Four
-     * ops SUBSUME earlier entries:
+     * subsumed by a wholesale replacement of that design. [Op.ModeTransform] and [Op.WallWidth] are
+     * the exceptions: they live on the project ([ModeAdjustment], `wallWidthMeters`), not on the
+     * design layer, so they are independent state that a [Op.DesignReplace] does not carry and must
+     * not clear. Four kinds of op SUBSUME earlier entries:
      *
      *  * [Op.DesignReplace] replaces the whole design object — pixels, transform and tone — so
      *    nothing design-scoped buffered before it can still matter. It does NOT subsume
-     *    [Op.ModeTransform] for the reason above.
+     *    [Op.ModeTransform] or [Op.WallWidth] for the reason above.
      *  * [Op.DesignBitmapReplace] defines the pixels outright, so it subsumes earlier pixel ops
      *    (another bitmap replace, or a completed stroke) but NOT transform or tone, which are
      *    separate state a replacement does not carry.
-     *  * [Op.DesignTransform], [Op.DesignProps] and [Op.ModeTransform] each carry an ABSOLUTE value
+     *  * [Op.DesignTransform], [Op.DesignProps], [Op.WallWidth] and [Op.ModeTransform] each carry an ABSOLUTE value
      *    rather than a delta, so the newest one is the only one worth replaying — [Op.ModeTransform]
      *    only supersedes a buffered entry for the SAME mode, since each mode's adjustment is
      *    independent state.

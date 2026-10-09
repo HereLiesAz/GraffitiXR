@@ -208,6 +208,12 @@ class CollaborationManager @Inject constructor() {
     val guestOps: kotlinx.coroutines.flow.Flow<Op> = _guestOps.receiveAsFlow()
 
     /** Called by OpEmitterImpl on every editor mutation. */
+    /**
+     * Publish a local edit to the session, whatever this device's role: as host it is broadcast; as
+     * guest it is sent to the host. For callers outside the editor's [OpEmitterImpl] (e.g. Measure).
+     */
+    fun submitOp(op: Op) = enqueueHostOp(op)
+
     internal fun enqueueHostOp(op: Op) {
         val host = hostSession
         if (host != null) {

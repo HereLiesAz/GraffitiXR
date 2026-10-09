@@ -39,6 +39,18 @@ class GuestOpPolicyTest {
     }
 
     @Test
+    fun `a measured wall width crosses between any backends, if plausible`() {
+        assertTrue(GuestOpPolicy.allows(Op.WallWidth(6.5f), ARCORE, SPHERESLAM))
+        assertTrue(GuestOpPolicy.allows(Op.WallWidth(6.5f), SPHERESLAM, ARCORE))
+        assertTrue(GuestOpPolicy.allows(Op.WallWidth(6.5f), null, ARCORE))
+        assertFalse(GuestOpPolicy.allows(Op.WallWidth(0f), ARCORE, ARCORE))
+        assertFalse(GuestOpPolicy.allows(Op.WallWidth(-1f), ARCORE, ARCORE))
+        assertFalse(GuestOpPolicy.allows(Op.WallWidth(Float.NaN), ARCORE, ARCORE))
+        assertFalse(GuestOpPolicy.allows(Op.WallWidth(Float.POSITIVE_INFINITY), ARCORE, ARCORE))
+        assertFalse(GuestOpPolicy.allows(Op.WallWidth(GuestOpPolicy.MAX_WALL_WIDTH_M + 1f), ARCORE, ARCORE))
+    }
+
+    @Test
     fun `authoring ops this app ignores are not sent`() {
         assertFalse(GuestOpPolicy.allows(Op.StrokeComplete(BrushStroke(points = listOf(1f))), ARCORE, ARCORE))
         assertFalse(GuestOpPolicy.allows(Op.TextContentChange("x"), ARCORE, ARCORE))

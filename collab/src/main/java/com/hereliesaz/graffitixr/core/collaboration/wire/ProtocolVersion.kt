@@ -14,7 +14,11 @@ package com.hereliesaz.graffitixr.core.collaboration.wire
  * v4 makes co-op bidirectional: a guest sends its own edits as GUEST_OP frames and the host acks
  * them with GUEST_OP_ACK. A v3 host would silently ignore GUEST_OP (its inbound loop drops unknown
  * frame types), so the guest's edits would vanish with no signal — hence a hard version break.
+ *
+ * v5 adds [com.hereliesaz.graffitixr.common.model.Op.WallWidth] (Measure results, sent by host and
+ * guest alike). A v4 peer cannot decode that sealed-class variant, so the width would be lost
+ * mid-session — hence another hard version break.
  */
 internal object ProtocolVersion {
-    const val CURRENT: Int = 4
+    const val CURRENT: Int = 5
 }

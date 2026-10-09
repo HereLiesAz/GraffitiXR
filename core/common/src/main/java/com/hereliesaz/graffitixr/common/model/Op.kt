@@ -35,6 +35,16 @@ sealed class Op {
     @Serializable
     data class ModeTransform(val mode: String, val adjustment: ModeAdjustment) : Op()
 
+    /**
+     * The project's measured wall width (AR Measure, `GraffitiProject.wallWidthMeters`) was saved.
+     * A real-world length in metres, so it means the same thing on every peer whatever its tracking
+     * backend or device (phone, or a phone driving glasses) — unlike an AR [ModeTransform] it needs
+     * no frame conversion. Sent by the host when it saves one, and by a guest (protocol v5), whose
+     * Measure is the primary way the width gets taken: the host persists it and rebroadcasts it.
+     */
+    @Serializable
+    data class WallWidth(val meters: Float) : Op()
+
     @Serializable
     data class DesignProps(val props: LayerProps) : Op()
 

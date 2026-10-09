@@ -16,6 +16,12 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34])
 class CollaborationManagerProtocolTest {
     @Test
+    fun `wall width ops are a v5 protocol feature`() {
+        // Op.WallWidth is undecodable by a v4 peer, so the version must exclude v4 sessions.
+        assertTrue(ProtocolVersion.CURRENT >= 5)
+    }
+
+    @Test
     fun `old QR is rejected locally as version mismatch before socket connect`() = runBlocking {
         val manager = CollaborationManager()
         val qr = QrPayload(

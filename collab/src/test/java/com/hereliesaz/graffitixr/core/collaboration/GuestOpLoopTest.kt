@@ -105,6 +105,25 @@ class GuestOpLoopTest {
     }
 
     @Test
+    fun `a guest's measured wall width reaches the host and is rebroadcast, across backends`() = runBlocking {
+        // The primary Measure flow: the guest walks the wall and saves; the host persists and echoes.
+        val rig = Rig(CoopTrackingBackend.SPHERESLAM, CoopTrackingBackend.ARCORE).start()
+        assertTrue(rig.guest.sendOp(Op.WallWidth(7.5f)))
+        assertEquals(Op.WallWidth(7.5f), withTimeout(10_000) { rig.hostApplied.receive() })
+        assertEquals(Op.WallWidth(7.5f), withTimeout(10_000) { rig.guestReceived.receive() })
+        rig.close()
+    }
+
+    @Test
+    fun `a host's saved wall width reaches the guest`() = runBlocking {
+        val rig = Rig().start()
+        rig.host.enqueueOp(Op.WallWidth(3.2f))
+        assertEquals(Op.WallWidth(3.2f), withTimeout(10_000) { rig.guestReceived.receive() })
+        assertNull(withTimeoutOrNull(500) { rig.hostApplied.receive() })
+        rig.close()
+    }
+
+    @Test
     fun `an AR placement between different backends is refused on the guest and never sent`() = runBlocking {
         val rig = Rig(CoopTrackingBackend.SPHERESLAM, CoopTrackingBackend.ARCORE).start()
         assertFalse(rig.guest.sendOp(mode("AR", 2f)))

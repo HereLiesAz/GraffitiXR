@@ -4982,17 +4982,15 @@ class ArViewModel @Inject constructor(
      * Persist the finished measurement as the project's wall width, and leave Measure only once it
      * is saved. On failure (write error, or the project changed underneath) the reading stays on
      * screen and the artist is told, so it can be saved again rather than silently lost.
+     *
+     * In co-op the saved width is also published as [com.hereliesaz.graffitixr.common.model.Op.WallWidth],
+     * for either role: a host's goes to its guests; a guest's (the usual case — the guest is the one
+     * walking the wall) goes to the host, which persists it to the real project and rebroadcasts it.
+     * Nothing here depends on the device or input the artist used, so a glasses-driven session
+     * behaves the same.
      */
     fun saveMeasure() {
         val width = _uiState.value.measure.resultMeters ?: return
-        // A guest's project is a spectator copy no Op writes back to the host, so a saved width
-        // would silently diverge and be lost on reconnect. Guests may read a measurement, not keep it.
-        if (_uiState.value.coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) {
-            _feedback.tryEmit(
-                com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error("Only the host can save the wall width."),
-            )
-            return
-        }
         val projectId = projectRepository.currentProject.value?.id ?: return
         val generation = measureGeneration.get()
         measureSaveJob?.cancel()
@@ -5003,6 +5001,8 @@ class ArViewModel @Inject constructor(
             }
             if (measureGeneration.get() != generation) return@launch // Redo/cancel superseded it
             if (saved) {
+                // Outside a session this has nowhere to go and is dropped by the manager.
+                collaborationManager.submitOp(com.hereliesaz.graffitixr.common.model.Op.WallWidth(width))
                 cancelMeasure()
             } else {
                 _feedback.tryEmit(

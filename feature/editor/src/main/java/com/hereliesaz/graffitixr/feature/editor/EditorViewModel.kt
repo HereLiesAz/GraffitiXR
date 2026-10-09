@@ -1343,8 +1343,16 @@ class EditorViewModel @Inject constructor(
      * slot the editor currently exposes is the OTHER one (the host is in another mode, so the
      * standalone slot is not swapped in), the placement is written straight to the hosted slot
      * instead — not undoable from here, since undo only covers the exposed slot.
+     *
+     * A guest's [Op.WallWidth] (its Measure Save) is project data, not an editor edit: it is
+     * persisted to the authoritative project and rebroadcast once written, with no undo entry
+     * (Measure's own Save is not undoable either).
      */
     fun applyGuestOp(op: Op, hostedArStandalone: Boolean = standaloneArBackendActive) {
+        if (op is Op.WallWidth) {
+            persistWallWidth(op.meters) { opEmitter.emit(op) }
+            return
+        }
         if (op is Op.ModeTransform && op.mode == EditorMode.AR.name && hostedArStandalone != standaloneArBackendActive) {
             persistHiddenArSlot(op.adjustment, standalone = hostedArStandalone)
             opEmitter.emit(op)
@@ -1363,6 +1371,37 @@ class EditorViewModel @Inject constructor(
         applySpectatorOp(op) {
             saveProject()
             opEmitter.emit(op)
+        }
+    }
+
+    /**
+     * Write a co-op [Op.WallWidth] into the current project (the host's authoritative one, or a
+     * guest's spectator copy). The AR screen reads `wallWidthMeters` from the project flow, so this
+     * is all a peer's Measure result needs to show up. [onWritten] runs only if it was written.
+     */
+    private fun persistWallWidth(meters: Float, onWritten: () -> Unit = {}) {
+        val projectId = _uiState.value.projectId ?: return
+        viewModelScope.launch(dispatchers.main) {
+            var applied = false
+            editorSaveMutex.withLock {
+                withContext(dispatchers.io) {
+                    try {
+                        projectRepository.updateProject { current ->
+                            if (current.id != projectId) {
+                                current
+                            } else {
+                                applied = true
+                                current.copy(wallWidthMeters = meters, lastModified = System.currentTimeMillis())
+                            }
+                        }
+                    } catch (e: Exception) {
+                        if (e is kotlinx.coroutines.CancellationException) throw e
+                        applied = false
+                        android.util.Log.e("EditorViewModel", "co-op wall width save failed", e)
+                    }
+                }
+            }
+            if (applied) onWritten()
         }
     }
 
@@ -1425,6 +1464,10 @@ class EditorViewModel @Inject constructor(
                 }
             }
             is Op.DesignProps -> dispatch(EditorIntent.SetDesignProps(op.props))
+            is Op.WallWidth -> {
+                persistWallWidth(op.meters, onApplied)
+                return // onApplied runs once the width is written
+            }
             is Op.DesignBitmapReplace -> {
                 if (_uiState.value.design == null) return
                 viewModelScope.launch(dispatchers.default) {
