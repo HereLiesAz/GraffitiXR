@@ -57,6 +57,9 @@ class ProjectManager @Inject constructor(
 
     companion object {
         private const val SPECTATOR_PREFIX = "coop_"
+        /** Filename shape of [saveHybridKpmPage] output; [deleteHybridKpmPage] refuses anything else. */
+        private const val HYBRID_KPM_PAGE_PREFIX = "hybrid_kpm_page_"
+        private const val HYBRID_KPM_PAGE_SUFFIX = ".y8.gz"
         /**
          * Cap on total decompressed bytes accepted from an imported/peer-received `.gxr` archive.
          * Both sources are untrusted (a shared file, or the co-op wire), so a zip bomb must not
@@ -268,6 +271,22 @@ class ProjectManager @Inject constructor(
                         } else {
                             existing.sphereSlamAtlasPages
                         },
+                    // Hybrid KPM page: the five fields are one unit keyed on the URI, written only
+                    // by the hybrid persist/clear transforms (which use saveProjectExact). A stale
+                    // whole-object writer carrying no URI must not erase or half-overwrite them.
+                    hybridKpmPageUri = projectData.hybridKpmPageUri ?: existing.hybridKpmPageUri,
+                    hybridKpmPageWidthPx =
+                        if (projectData.hybridKpmPageUri != null) projectData.hybridKpmPageWidthPx
+                        else existing.hybridKpmPageWidthPx,
+                    hybridKpmPageHeightPx =
+                        if (projectData.hybridKpmPageUri != null) projectData.hybridKpmPageHeightPx
+                        else existing.hybridKpmPageHeightPx,
+                    hybridKpmPageWidthMeters =
+                        if (projectData.hybridKpmPageUri != null) projectData.hybridKpmPageWidthMeters
+                        else existing.hybridKpmPageWidthMeters,
+                    hybridKpmPageFromArtwork =
+                        if (projectData.hybridKpmPageUri != null) projectData.hybridKpmPageFromArtwork
+                        else existing.hybridKpmPageFromArtwork,
                     wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
                     paintMarks = projectData.paintMarks ?: existing.paintMarks,
                     paintGrid = projectData.paintGrid ?: existing.paintGrid,
@@ -415,6 +434,72 @@ class ProjectManager @Inject constructor(
         if (file.parentFile == root && validName) {
             runCatching { file.delete() }
         }
+    }
+
+    /**
+     * Writes the hybrid (ARCore-sidecar) KPM page as gzip'd raw 8-bit luma and returns its URI.
+     *
+     * Raw luma rather than PNG: the matcher consumes luma, and a grey ARGB bitmap round trip through
+     * PNG and back through a luma formula is not guaranteed bit-exact. Versioned filename, temp file,
+     * fsync, rename — the same commit discipline as [saveSphereSlamReference].
+     */
+    suspend fun saveHybridKpmPage(
+        context: Context,
+        projectId: String,
+        luma: ByteArray,
+    ): Uri = withContext(Dispatchers.IO) {
+        require(luma.isNotEmpty())
+        val root = File(context.filesDir, "projects/$projectId").also { if (!it.exists()) it.mkdirs() }
+        val target = File(root, "${HYBRID_KPM_PAGE_PREFIX}${UUID.randomUUID()}$HYBRID_KPM_PAGE_SUFFIX")
+        val tmp = File.createTempFile(HYBRID_KPM_PAGE_PREFIX, ".tmp", root)
+        try {
+            FileOutputStream(tmp).use { out ->
+                java.util.zip.GZIPOutputStream(out).let { gz ->
+                    gz.write(luma)
+                    gz.finish()
+                }
+                out.flush()
+                out.fd.sync()
+            }
+            check(tmp.renameTo(target)) { "Could not install hybrid KPM page" }
+        } finally {
+            if (tmp.exists()) tmp.delete()
+        }
+        uriProvider.getUriForFile(target)
+    }
+
+    /**
+     * Reads a page written by [saveHybridKpmPage]. Returns null — never a partial or padded buffer —
+     * when the file is missing, unreadable, or does not hold exactly [expectedBytes] bytes.
+     */
+    suspend fun readHybridKpmPage(uri: Uri, expectedBytes: Int): ByteArray? = withContext(Dispatchers.IO) {
+        if (expectedBytes <= 0) return@withContext null
+        val path = uri.path ?: return@withContext null
+        runCatching {
+            java.util.zip.GZIPInputStream(File(path).inputStream().buffered()).use { gz ->
+                val out = ByteArray(expectedBytes)
+                var read = 0
+                while (read < expectedBytes) {
+                    val n = gz.read(out, read, expectedBytes - read)
+                    if (n < 0) return@use null
+                    read += n
+                }
+                if (gz.read() != -1) null else out
+            }
+        }.getOrNull()
+    }
+
+    /** Best-effort deletion of a hybrid KPM page owned by [projectId]; never outside its directory. */
+    suspend fun deleteHybridKpmPage(
+        context: Context,
+        projectId: String,
+        uri: Uri?,
+    ) = withContext(Dispatchers.IO) {
+        val path = uri?.path ?: return@withContext
+        val root = File(context.filesDir, "projects/$projectId").canonicalFile
+        val file = File(path).canonicalFile
+        val validName = file.name.startsWith(HYBRID_KPM_PAGE_PREFIX) && file.name.endsWith(HYBRID_KPM_PAGE_SUFFIX)
+        if (file.parentFile == root && validName) runCatching { file.delete() }
     }
 
     /** Write one additional rectified KPM page without changing canonical page 0. */
@@ -743,6 +828,7 @@ class ProjectManager @Inject constructor(
                 thumbnailUri = localUri(migrated.thumbnailUri),
                 targetImageUris = migrated.targetImageUris.map { localUri(it)!! },
                 sphereSlamReferenceUri = localUri(migrated.sphereSlamReferenceUri),
+                hybridKpmPageUri = localUri(migrated.hybridKpmPageUri),
                 sphereSlamAtlasPages = migrated.sphereSlamAtlasPages.map { page ->
                     page.copy(referenceUri = localUri(page.referenceUri)!!)
                 },

@@ -368,6 +368,76 @@ class ProjectManagerTest {
     }
 
     @Test
+    fun `hybrid KPM page round-trips bit-exact`() = runTest {
+        val luma = ByteArray(6 * 4) { (it * 37).toByte() }
+        val uri = manager.saveHybridKpmPage(mockContext, "hyb_rt", luma)
+        assertTrue(File(uri.path!!).name.startsWith("hybrid_kpm_page_"))
+        assertArrayEquals(luma, manager.readHybridKpmPage(uri, 24))
+    }
+
+    @Test
+    fun `hybrid KPM page of the wrong size reads as null, never padded or truncated`() = runTest {
+        val uri = manager.saveHybridKpmPage(mockContext, "hyb_size", ByteArray(24) { 7 })
+        assertNull(manager.readHybridKpmPage(uri, 25))
+        assertNull(manager.readHybridKpmPage(uri, 23))
+        assertNull(manager.readHybridKpmPage(uri, 0))
+    }
+
+    @Test
+    fun `hybrid KPM delete refuses files it did not write`() = runTest {
+        val root = File(tempFilesDir, "projects/hyb_del").also { it.mkdirs() }
+        val design = File(root, "design.png").apply { writeBytes(byteArrayOf(1)) }
+        manager.deleteHybridKpmPage(mockContext, "hyb_del", Uri.fromFile(design))
+        assertTrue(design.exists())
+        val page = manager.saveHybridKpmPage(mockContext, "hyb_del", byteArrayOf(1, 2))
+        manager.deleteHybridKpmPage(mockContext, "hyb_del", page)
+        assertFalse(File(page.path!!).exists())
+    }
+
+    @Test
+    fun `stale whole-object save keeps the hybrid KPM page`() = runTest {
+        val uri = manager.saveHybridKpmPage(mockContext, "hyb_stale", ByteArray(4))
+        val relation = List(16) { if (it % 5 == 0) 1f else 0f }
+        manager.saveProject(
+            mockContext,
+            GraffitiProject(
+                id = "hyb_stale", name = "Wall",
+                hybridKpmPageUri = uri, hybridKpmPageWidthPx = 2, hybridKpmPageHeightPx = 2,
+                hybridKpmPageWidthMeters = 1.5f, hybridKpmPageFromArtwork = relation,
+            ),
+        )
+        // A writer holding an old snapshot (no hybrid fields) saves over it.
+        manager.saveProject(mockContext, GraffitiProject(id = "hyb_stale", name = "Renamed"))
+        val loaded = manager.loadProjectMetadata(mockContext, "hyb_stale")
+        assertEquals(uri, loaded?.hybridKpmPageUri)
+        assertEquals(2, loaded?.hybridKpmPageWidthPx)
+        assertEquals(1.5f, loaded?.hybridKpmPageWidthMeters ?: 0f, 0f)
+        assertEquals(relation, loaded?.hybridKpmPageFromArtwork)
+    }
+
+    @Test
+    fun `import rebases the hybrid KPM page URI`() = runTest {
+        val manifest =
+            """{"id":"hyb_import","name":"Wall","hybridKpmPageUri":"file:///sender/files/projects/hyb_import/hybrid_kpm_page_x.y8.gz","hybridKpmPageWidthPx":2,"hybridKpmPageHeightPx":2,"hybridKpmPageWidthMeters":1.0}"""
+                .toByteArray()
+        val imported = importZip(zipOf("project.json" to manifest, "hybrid_kpm_page_x.y8.gz" to byteArrayOf(9)))
+        assertEquals(
+            File(tempFilesDir, "projects/hyb_import/hybrid_kpm_page_x.y8.gz").canonicalFile,
+            imported?.hybridKpmPageUri?.path?.let(::File)?.canonicalFile,
+        )
+    }
+
+    @Test
+    fun `legacy project has no hybrid KPM page`() = runTest {
+        val projectDir = File(tempFilesDir, "projects/pre_hyb").also { it.mkdirs() }
+        File(projectDir, "project.json").writeText("""{"id":"pre_hyb","name":"Old"}""")
+        val loaded = manager.loadProjectMetadata(mockContext, "pre_hyb")
+        assertNull(loaded?.hybridKpmPageUri)
+        assertEquals(0, loaded?.hybridKpmPageWidthPx)
+        assertTrue(loaded?.hybridKpmPageFromArtwork?.isEmpty() == true)
+    }
+
+    @Test
     fun `legacy project without SphereSLAM fields gets safe standalone defaults`() = runTest {
         val projectDir = File(tempFilesDir, "projects/pre_slam").also { it.mkdirs() }
         File(projectDir, "project.json").writeText(

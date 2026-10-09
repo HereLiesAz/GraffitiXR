@@ -1746,6 +1746,11 @@ class ArViewModel @Inject constructor(
                     ) {
                         loadMapIfExists()
                         loadFingerprintIfExists()
+                        // Once per project, not per emission: re-arming KPM resets the sidecar.
+                        if (project.id != hybridRestoreProjectId) {
+                            hybridRestoreProjectId = project.id
+                            pushPersistedHybridPage(project)
+                        }
                     }
                 }
             }
@@ -3825,6 +3830,116 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    // Project whose persisted hybrid page was last offered to the renderer.
+    private var hybridRestoreProjectId: String? = null
+    // Bumped per ARCore capture (invalidation). A page frozen under generation N may commit only
+    // while N is current; a clear for N is skipped once a page for N (or later) has committed.
+    // Without this the clear and the persist race on the IO dispatcher and a late clear could
+    // erase the page it was meant to precede.
+    private val hybridPageGeneration = java.util.concurrent.atomic.AtomicLong(0L)
+    @Volatile private var hybridCommittedGeneration = -1L
+
+    /** Load [project]'s persisted hybrid KPM page off the main thread and hand it to the renderer. */
+    private fun pushPersistedHybridPage(project: com.hereliesaz.graffitixr.common.model.GraffitiProject) {
+        val uri = project.hybridKpmPageUri ?: return
+        val r = renderer ?: return
+        viewModelScope.launch(dispatchers.io) {
+            val luma = projectManager.readHybridKpmPage(
+                uri,
+                project.hybridKpmPageWidthPx * project.hybridKpmPageHeightPx,
+            )
+            val page = HybridKpmPage.fromPersisted(
+                luma = luma,
+                width = project.hybridKpmPageWidthPx,
+                height = project.hybridKpmPageHeightPx,
+                widthMeters = project.hybridKpmPageWidthMeters,
+                pageFromArtwork = project.hybridKpmPageFromArtwork,
+            )
+            // Only if the project and renderer are still the ones this was loaded for.
+            if (page != null && renderer === r && projectRepository.currentProject.value?.id == project.id) {
+                r.restoreHybridPage(page)
+            } else if (page == null) {
+                Timber.w("Persisted hybrid KPM page unreadable or inconsistent; sidecar stays off")
+            }
+        }
+    }
+
+    /**
+     * Persist a freshly frozen hybrid page. Same commit discipline as the standalone reference:
+     * write a new versioned file, commit metadata through an exact transform guarded on project id,
+     * then delete the superseded file (or the new one, if the transform did not apply).
+     */
+    private fun persistHybridKpmPage(page: HybridKpmPage, generation: Long) {
+        val projectId = projectRepository.currentProject.value?.id ?: return
+        viewModelScope.launch(dispatchers.io) {
+            var newUri: android.net.Uri? = null
+            var previousUri: android.net.Uri? = null
+            var applied = false
+            try {
+                newUri = projectManager.saveHybridKpmPage(appContext, projectId, page.luma)
+                val candidate = newUri
+                projectRepository.updateProject { current ->
+                    if (current.id != projectId || generation != hybridPageGeneration.get()) {
+                        current
+                    } else {
+                        applied = true
+                        hybridCommittedGeneration = generation
+                        previousUri = current.hybridKpmPageUri
+                        current.copy(
+                            hybridKpmPageUri = candidate,
+                            hybridKpmPageWidthPx = page.width,
+                            hybridKpmPageHeightPx = page.height,
+                            hybridKpmPageWidthMeters = page.widthMeters,
+                            hybridKpmPageFromArtwork = page.pageFromArtwork.toList(),
+                        )
+                    }
+                }
+                if (applied) {
+                    projectManager.deleteHybridKpmPage(appContext, projectId, previousUri)
+                } else {
+                    projectManager.deleteHybridKpmPage(appContext, projectId, newUri)
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                // Not fatal: the sidecar works for this session; only reopen falls back to MobileGS.
+                if (!applied) projectManager.deleteHybridKpmPage(appContext, projectId, newUri)
+                Timber.e(e, "Hybrid KPM page save failed")
+            }
+        }
+    }
+
+    /** Clear the persisted hybrid page (a new ARCore target is replacing the artwork anchor). */
+    private fun clearHybridKpmPage(generation: Long) {
+        val projectId = projectRepository.currentProject.value?.id ?: return
+        viewModelScope.launch(dispatchers.io) {
+            var previousUri: android.net.Uri? = null
+            try {
+                projectRepository.updateProject { current ->
+                    if (
+                        current.id != projectId ||
+                        current.hybridKpmPageUri == null ||
+                        hybridCommittedGeneration >= generation
+                    ) {
+                        current
+                    } else {
+                        previousUri = current.hybridKpmPageUri
+                        current.copy(
+                            hybridKpmPageUri = null,
+                            hybridKpmPageWidthPx = 0,
+                            hybridKpmPageHeightPx = 0,
+                            hybridKpmPageWidthMeters = 0f,
+                            hybridKpmPageFromArtwork = emptyList(),
+                        )
+                    }
+                }
+                projectManager.deleteHybridKpmPage(appContext, projectId, previousUri)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                Timber.e(e, "Hybrid KPM page clear failed")
+            }
+        }
+    }
+
     fun attachSessionToRenderer(r: ArRenderer?) {
         // Synchronous on purpose. ArRenderer.attachSession() already guards the session read with
         // its own ReentrantLock and null-checks, and onDrawFrame swallows a torn-down session, so
@@ -3852,6 +3967,23 @@ class ArViewModel @Inject constructor(
                     if (e is kotlinx.coroutines.CancellationException) throw e
                     Timber.e(e, "Design size save failed")
                 }
+            }
+        }
+        // Both callbacks arrive on the GL thread in capture order; the generation is taken there,
+        // synchronously, so the two IO jobs they start cannot commit out of order.
+        renderer?.onHybridPageFrozen = { page -> persistHybridKpmPage(page, hybridPageGeneration.get()) }
+        renderer?.onHybridPageInvalidated = { clearHybridKpmPage(hybridPageGeneration.incrementAndGet()) }
+        // A fresh renderer has no hybrid page; offer it the persisted one.
+        projectRepository.currentProject.value?.let { project ->
+            if (
+                shouldRestoreLocalArCoreFingerprint(
+                    isArCoreAvailable = _uiState.value.isArCoreAvailable,
+                    coopRole = _uiState.value.coopRole,
+                    peerSpatialFramePresent = _uiState.value.coopPeerSpatialFrame != null,
+                )
+            ) {
+                hybridRestoreProjectId = project.id
+                pushPersistedHybridPage(project)
             }
         }
         // Re-apply the experiment switches to the FRESH renderer.
