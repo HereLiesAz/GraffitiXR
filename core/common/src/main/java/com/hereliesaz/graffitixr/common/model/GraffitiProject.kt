@@ -179,6 +179,16 @@ data class GraffitiProject(
     val sphereSlamFingerprintFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
 
     /**
+     * Column-major GL 4x4 `map_from_fingerprint` transform for standalone SphereSLAM.
+     *
+     * The photosphere/map is the base tracking frame and exists before the fingerprint. The later
+     * fingerprint is therefore NOT the map origin; this transform places its local page coordinates
+     * into the already-running SphereSLAM map. Empty means legacy/unknown and must fail closed rather
+     * than being silently treated as identity.
+     */
+    val sphereSlamMapFromFingerprint: List<Float> = emptyList(),
+
+    /**
      * Wide-area MobileGS feature map for the standalone SphereSLAM backend.
      *
      * Kept separate from [wallFeatureMap], whose points are in the legacy ARCore fingerprint frame.
