@@ -83,32 +83,43 @@ class StandaloneFingerprintFrameTest {
     }
 
     @Test
-    fun standaloneFingerprintAndAnchorFrames_areIdentityRelated() {
-        val identity = floatArrayOf(
-            1f, 0f, 0f, 0f,
-            0f, 1f, 0f, 0f,
-            0f, 0f, 1f, 0f,
-            0f, 0f, 0f, 1f,
+    fun centerPhotosphereFingerprint_hasExplicitNonIdentityMapTransform() {
+        val m = StandaloneFingerprintFrame.mapFromFingerprint(
+            azimuthDeltaDeg = 0f,
+            elevationDeg = 0f,
+            rangeUnits = 1f,
         )
-        assertArrayEquals(identity, StandaloneFingerprintFrame.fingerprintFromAnchor(), 0f)
-        assertArrayEquals(identity, StandaloneFingerprintFrame.anchorFromFingerprint(), 0f)
-        assertTrue(StandaloneFingerprintFrame.isCenteredPageAnchor(identity))
+
+        // Centre view points down -Z; the target plane is one normalized map unit in front.
+        assertEquals(0f, m[12], 1e-6f)
+        assertEquals(0f, m[13], 1e-6f)
+        assertEquals(-1f, m[14], 1e-6f)
+        assertFalse(StandaloneFingerprintFrame.isCenteredPageAnchor(m))
+
+        // Local +X remains map +X, +Y remains map +Y, +Z faces back toward the camera.
+        assertEquals(1f, m[0], 1e-6f)
+        assertEquals(1f, m[5], 1e-6f)
+        assertEquals(1f, m[10], 1e-6f)
     }
 
     @Test
-    fun persistedMapAnchor_rejectsAnyForeignFrameTransform() {
-        val translated = StandaloneFingerprintFrame.anchorFromFingerprint().also {
-            it[12] = 0.25f
-        }
-        val rotated = StandaloneFingerprintFrame.anchorFromFingerprint().also {
-            it[0] = 0f
-            it[1] = 1f
-            it[4] = -1f
-            it[5] = 0f
-        }
+    fun photosphereFingerprintTransform_isRightHandedAtObliqueDirection() {
+        val m = StandaloneFingerprintFrame.mapFromFingerprint(
+            azimuthDeltaDeg = 30f,
+            elevationDeg = 15f,
+            rangeUnits = 2f,
+        )
+        val x = floatArrayOf(m[0], m[1], m[2])
+        val y = floatArrayOf(m[4], m[5], m[6])
+        val z = floatArrayOf(m[8], m[9], m[10])
+        val cross = floatArrayOf(
+            x[1] * y[2] - x[2] * y[1],
+            x[2] * y[0] - x[0] * y[2],
+            x[0] * y[1] - x[1] * y[0],
+        )
+        assertArrayEquals(z, cross, 1e-5f)
 
-        assertFalse(StandaloneFingerprintFrame.isCenteredPageAnchor(translated))
-        assertFalse(StandaloneFingerprintFrame.isCenteredPageAnchor(rotated))
-        assertFalse(StandaloneFingerprintFrame.isCenteredPageAnchor(FloatArray(0)))
+        val radius = kotlin.math.sqrt(m[12] * m[12] + m[13] * m[13] + m[14] * m[14])
+        assertEquals(2f, radius, 1e-5f)
     }
 }
