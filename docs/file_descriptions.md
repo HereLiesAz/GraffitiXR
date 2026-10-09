@@ -126,6 +126,10 @@ the real (non-stub) tracker is packaged.
 *   `HomographyFallbackOverlay.kt` / `HomographyArTracker.kt`: legacy planar live tracking used by
     Overlay mode on non-ARCore devices; not the standalone AR backend. Until it has a live pose
     (no target captured yet, or tracking lost) Overlay keeps the normal untracked 2D design draw.
+    Once tracked it draws the same design: `MainScreen` bakes Overlay's tone/opacity into the
+    texture via `compositeDesignForAr`, and the mode/layer placement is applied on the quad.
+*   `OverlayTrackedPlacement.kt`: pure mapping of Overlay's 2D screen-pixel placement (layer and
+    whole-design offset/scale/rotation, `ContentScale.Fit`) onto the tracked target's units.
 *   `computervision/DualAnalyzer.kt`: ARCore-side `ImageAnalysis.Analyzer` for relocalization
     callbacks and light estimation.
 *   `src/test/.../ArViewModelTest.kt` plus standalone/hybrid tests: lifecycle/persistence,

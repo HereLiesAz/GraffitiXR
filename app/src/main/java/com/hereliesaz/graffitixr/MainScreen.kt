@@ -671,9 +671,29 @@ fun MainScreen(
                     // draw below is suppressed only while this overlay reports it is actually
                     // drawing the tracked design, so the two don't render it twice.
                     if (!arUiState.isArCoreAvailable) {
+                        val fallbackDesign = uiState.design?.takeIf { it.isVisible && it.bitmap != null }
+                        val overlayAdj = uiState.modeAdjustments[EditorMode.OVERLAY]
+                        var fallbackTexture by remember { mutableStateOf<AndroidBitmap?>(null) }
+                        // Once tracked, the design must look as it did in the 2D draw below: bake
+                        // the same per-layer x whole-design tone/opacity into the texture (AR's
+                        // treatment), keyed only on tone so pan/zoom never re-composites.
+                        LaunchedEffect(
+                            fallbackDesign,
+                            overlayAdj?.brightness,
+                            overlayAdj?.contrast,
+                            overlayAdj?.saturation,
+                            overlayAdj?.opacity,
+                            overlayAdj?.isInverted,
+                        ) {
+                            fallbackTexture = fallbackDesign?.let {
+                                withContext(Dispatchers.Default) { compositeDesignForAr(it, overlayAdj) }
+                            }
+                        }
                         com.hereliesaz.graffitixr.feature.ar.HomographyFallbackOverlay(
                             cameraController = cameraController,
-                            designBitmap = uiState.design?.takeIf { it.isVisible }?.bitmap,
+                            designBitmap = fallbackTexture,
+                            design = fallbackDesign,
+                            adjustment = overlayAdj,
                             onDesignTrackedChange = { overlayFallbackTracking = it },
                             modifier = Modifier.fillMaxSize(),
                         )
