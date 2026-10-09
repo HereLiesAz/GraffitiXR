@@ -34,6 +34,19 @@ class ProjectRepositoryImplTest {
     }
 
     @Test
+    fun `whole-object update publishes the merged project that was persisted`() = runTest {
+        val manager = mockk<ProjectManager>(relaxed = true)
+        val context = mockk<Context>(relaxed = true)
+        val repo = ProjectRepositoryImpl(context, manager)
+        repo.createProject(GraffitiProject(id = "merged", name = "Wall"))
+        val stale = GraffitiProject(id = "merged", name = "Renamed")
+        val merged = stale.copy(arDesignHalfWidthM = 1.25f)
+        coEvery { manager.saveProject(context, stale) } returns merged
+        repo.updateProject(stale)
+        assertEquals(merged, repo.currentProject.value)
+    }
+
+    @Test
     fun `deletion waits for an active save and does not resurrect the project`() = runTest {
         val manager = mockk<ProjectManager>(relaxed = true)
         val context = mockk<Context>(relaxed = true)

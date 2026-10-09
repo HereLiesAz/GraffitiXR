@@ -101,7 +101,7 @@ class ProjectManager @Inject constructor(
         projectData: GraffitiProject,
         targetImages: List<Bitmap>? = null,
         thumbnail: Bitmap? = null,
-    ) = saveProjectInternal(
+    ): GraffitiProject = saveProjectInternal(
         context = context,
         projectData = projectData,
         targetImages = targetImages,
@@ -122,7 +122,7 @@ class ProjectManager @Inject constructor(
     suspend fun saveProjectExact(
         context: Context,
         projectData: GraffitiProject,
-    ) = saveProjectInternal(
+    ): GraffitiProject = saveProjectInternal(
         context = context,
         projectData = projectData,
         targetImages = null,
@@ -136,7 +136,7 @@ class ProjectManager @Inject constructor(
         targetImages: List<Bitmap>?,
         thumbnail: Bitmap?,
         preserveExistingCaptureState: Boolean,
-    ) = withContext(Dispatchers.IO) {
+    ): GraffitiProject = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/${projectData.id}")
         if (!root.exists()) root.mkdirs()
 
@@ -323,6 +323,8 @@ class ProjectManager @Inject constructor(
 
         val jsonString = json.encodeToString(updatedGraffitiProject)
         atomicWriteText(File(root, "project.json"), jsonString)
+        // Return what was actually persisted (after preserve-merges) so callers publish that.
+        updatedGraffitiProject
     }
 
     /**
