@@ -111,7 +111,9 @@ This must happen before treating the branch as merge-ready.
 - [x] Compile the native `:core:nativebridge` target for every release ABI. Android CI release
   packaging verified `libgraffitixr.so` plus the KPM JNI symbols in both `arm64-v8a` and
   `armeabi-v7a`.
-- [ ] Build at least one debug APK containing artoolkitX KPM.
+- [x] Build at least one debug APK containing artoolkitX KPM. `assembleDebug` (2026-10-08) produced
+  a debug APK that `check_sphereslam_apk.py --variant debug` confirms carries the real (non-stub)
+  KPM native library, JNI symbols and preserved API classes for arm64-v8a and armeabi-v7a.
 - [x] Build the normal release artifact(s): Android CI `release-build` completed
   `assembleRelease` successfully with the real artoolkitX submodule initialized.
 - [x] Inspect the merged manifest and confirm (enforced by `check_sphereslam_manifest.py` in the
@@ -122,8 +124,11 @@ This must happen before treating the branch as merge-ready.
 - [x] Confirm ProGuard/R8 does not strip the KPM JNI entry points or standalone classes:
   `check_sphereslam_apk.py --variant release` passed against the shrunk release APK and found all
   required JNI symbols plus the preserved KPM/SphereSLAM DEX descriptors.
-- [ ] Confirm no duplicate native symbol/source issue was introduced by the explicit artoolkitX AR
-  source list.
+- [x] Confirm no duplicate native symbol/source issue was introduced by the explicit artoolkitX AR
+  source list. Moot in its original form: artoolkitX/KPM now arrives prebuilt in the SphereSLAM
+  0.23.5 artifacts and `core/nativebridge/src/main/cpp/CMakeLists.txt` compiles no artoolkitX
+  sources. Both the debug link (2026-10-08, local) and release link (CI) succeed, which a duplicate
+  strong symbol would fail.
 - [x] Add/enable CI for branch/PR validation; PR #1961 ran Android CI with the artoolkitX
   submodule enabled in the release-build job.
 - [x] Re-run release CI after the ARUtil/minizip/SHA-1 support-source fix; the release build
