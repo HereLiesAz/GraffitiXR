@@ -3039,7 +3039,13 @@ private fun EvalOverlay(
         DiagnosticRow("Jitter", "%.1fmm".format(metrics.jitterMm), androidx.compose.ui.graphics.Color.White)
         DiagnosticRow("Avail", "%.0f%%".format(metrics.availability * 100), androidx.compose.ui.graphics.Color.White)
         DiagnosticRow("Recovery", metrics.recoveryMs?.let { "${it}ms" } ?: "—", androidx.compose.ui.graphics.Color.White)
-        DiagnosticRow("Stage ms", metrics.stageMs.joinToString(" ") { "%.1f".format(it) }, androidx.compose.ui.graphics.Color.Yellow)
+        // Only pnpReloc is timed natively; the other four slots are a permanent -1 sentinel. See
+        // StageTimings for why they are not printed.
+        DiagnosticRow(
+            "Reloc ms",
+            com.hereliesaz.graffitixr.feature.ar.eval.StageTimings.formatHud(metrics.stageMs),
+            androidx.compose.ui.graphics.Color.Yellow,
+        )
         DiagnosticRow("FP pts", metrics.wallCount.toString(), androidx.compose.ui.graphics.Color.Green)
         DiagnosticRow("Batt", "%.0fmA".format(metrics.batteryMa), androidx.compose.ui.graphics.Color.White)
         androidx.compose.foundation.layout.Row {
