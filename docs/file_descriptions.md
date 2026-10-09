@@ -123,8 +123,8 @@ the real (non-stub) tracker is packaged.
 *   `rendering/BackgroundRenderer.kt`: OpenGL ES shader that renders ARCore's `EXTERNAL_OES`
     camera texture full-screen.
 *   `CameraPreview.kt`: shared CameraX preview for Overlay and standalone SphereSLAM AR.
-*   `HomographyFallbackOverlay.kt` / `HomographyArTracker.kt`: legacy planar live tracking used by
-    Overlay mode on non-ARCore devices; not the standalone AR backend.
+*   `HomographyFallbackOverlay.kt` / `HomographyArTracker.kt`: legacy planar live tracking, currently
+    unmounted (Overlay draws the edited design over the camera untracked); not the standalone AR backend.
 *   `computervision/DualAnalyzer.kt`: ARCore-side `ImageAnalysis.Analyzer` for relocalization
     callbacks and light estimation.
 *   `src/test/.../ArViewModelTest.kt` plus standalone/hybrid tests: lifecycle/persistence,

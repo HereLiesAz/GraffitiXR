@@ -57,6 +57,7 @@ class ProjectRepositoryImplTest {
         coEvery { manager.saveProjectExact(context, any()) } coAnswers {
             started.complete(Unit)
             finish.await()
+            secondArg<GraffitiProject>()
         }
         val save = async { repo.updateProject { it.copy(name = "Updated") } }
         started.await()
