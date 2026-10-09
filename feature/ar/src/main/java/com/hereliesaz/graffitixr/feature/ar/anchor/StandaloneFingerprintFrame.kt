@@ -147,6 +147,28 @@ object StandaloneFingerprintFrame {
     }
 
     /**
+     * Rebase a precision pose into the already-existing SphereSLAM map.
+     *
+     * Both inputs are column-major GL rigid transforms:
+     *   camera_from_map = camera_from_fingerprint * fingerprint_from_map
+     *                   = camera_from_fingerprint * inverse(map_from_fingerprint)
+     *
+     * This is the critical layering boundary: fingerprint/KPM/teleological tracking may refine the
+     * camera, but it never turns the fingerprint into the world origin.
+     */
+    fun cameraFromMap(
+        cameraFromFingerprint: FloatArray,
+        mapFromFingerprint: FloatArray,
+    ): FloatArray {
+        require(cameraFromFingerprint.size == 16 && cameraFromFingerprint.all { it.isFinite() })
+        require(mapFromFingerprint.size == 16 && mapFromFingerprint.all { it.isFinite() })
+        return PoseMath.multiply(
+            cameraFromFingerprint,
+            PoseMath.rigidInverse(mapFromFingerprint),
+        )
+    }
+
+    /**
      * Legacy centred-page identity retained only for old-project validation/migration tests.
      * New standalone precision targets MUST use an explicit photosphere map transform.
      */

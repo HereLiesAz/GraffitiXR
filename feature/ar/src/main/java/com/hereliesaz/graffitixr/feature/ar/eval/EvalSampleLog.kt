@@ -1,7 +1,10 @@
 package com.hereliesaz.graffitixr.feature.ar.eval
 
 /** One throttled measurement tick. stageMs is indexed by the stage contract: 0=voxelUpdate,
- *  1=voxelKeyframe, 2=surfaceMesh, 3=draw, 4=pnpReloc. */
+ *  1=voxelKeyframe, 2=surfaceMesh, 3=draw, 4=pnpReloc. Slots 0-3 are always
+ *  [StageTimings.NOT_MEASURED] (-1) — those stages were never implemented natively — and slot 4 is
+ *  -1 for an interval with no reloc pass. The CSV writes the sentinel verbatim, matching every other
+ *  `-1` = not-sampled column; analysis must filter it rather than average it. */
 data class EvalSample(
     val tsMs: Long,
     val deviceClass: String,   // "dual" or "mono"

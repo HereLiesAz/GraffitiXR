@@ -444,11 +444,6 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 bridgeAvailable = canBridge(),
             )
 
-            // MobileGS always gets the frame; it sees the RAW accepted KPM pose when one locked this
-            // frame, else null — unchanged by the correction, which only affects the displayed pose.
-            val acceptedRawView = if (outcome.accepted) pose!!.cameraFromCanonical else null
-            feedMobileGsFrame(direct, rotated, timestampNs, projection, acceptedRawView)
-
             if (outcome.accepted) {
                 // The loop accepts only a non-null candidate, so a pose is present here.
                 val lockedPose = requireNotNull(pose)
@@ -465,6 +460,26 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                     cameraFromMap = cameraFromMap,
                     cameraFromFingerprint = lockedPose.cameraFromCanonical,
                 )
+
+                // KPM and MobileGS are precision/enrichment estimators in fingerprint-local space.
+                // Convert their accepted result into the base SphereSLAM map before publishing a
+                // camera pose or handing one to MobileGS. The fingerprint never becomes the world.
+                val mapFromFingerprint = mobileGsMapFromFingerprint
+                    ?.takeIf { it.size == 16 && it.all(Float::isFinite) }
+                val acceptedRawMapView = mapFromFingerprint?.let {
+                    StandaloneFingerprintFrame.cameraFromMap(
+                        cameraFromFingerprint = lockedPose.cameraFromCanonical,
+                        mapFromFingerprint = it,
+                    )
+                }
+                feedMobileGsFrame(
+                    direct,
+                    rotated,
+                    timestampNs,
+                    projection,
+                    acceptedRawMapView,
+                )
+
                 pendingImuReference?.let(bridge::commitReference)
                 maybeGrowAtlas(
                     active = active,
@@ -473,10 +488,22 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                     intrinsics = intrinsics,
                 )
                 maybePushDepth(rotated)
-                // outcome.renderPose = stabilize(fuseWithReloc(rawKpm)): the raw pose nudged toward a
-                // corroborating MobileGS reloc (drift trim), then smoothed. Gating, the atlas and the
-                // MobileGS feed all used the RAW pose — only the displayed pose is fused.
-                val renderView = outcome.renderPose!!
+
+                val precisionRenderView = outcome.renderPose!!
+                val renderView = mapFromFingerprint?.let {
+                    StandaloneFingerprintFrame.cameraFromMap(
+                        cameraFromFingerprint = precisionRenderView,
+                        mapFromFingerprint = it,
+                    )
+                } ?: cameraFromMap
+
+                // Without either an explicit map bridge or a base-map pose, there is no truthful
+                // camera_from_map to render. Keep mapping, but fail closed on artwork placement.
+                if (renderView == null) {
+                    onFrameTracked(null)
+                    return
+                }
+
                 val tracked = SphereSlamStandaloneFrame(
                     viewMatrix = renderView,
                     projMatrix = projection,
@@ -486,8 +513,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                     pageNo = lockedPose.pageNo,
                     reprojectionError = lockedPose.reprojectionError,
                     inlierCount = lockedPose.inlierCount,
+                    // Scale is relative to the fingerprint plane, so measure depth in the
+                    // precision frame even though rendering itself now uses camera_from_map.
                     unitsPerPixel = unitsPerPixel(
-                        renderView,
+                        precisionRenderView,
                         projection,
                         rotated.height,
                     ),
@@ -500,6 +529,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 onFrameTracked(tracked)
                 return
             }
+
+            // A visual miss still feeds pixels to the precision relocalizer, but with no current
+            // camera pose. This cannot overwrite the base-map pose with stale KPM state.
+            feedMobileGsFrame(direct, rotated, timestampNs, projection, null)
 
             // Not accepted: classify why for the failure taxonomy, then emit the bridge frame or null
             // per the loop's state decision. (Capture into a local val so the null check smart-casts.)
@@ -728,6 +761,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             cameraFromFingerprint,
         )
         if (mapFromFingerprint.any { !it.isFinite() }) return
+        // Publish locally first so this very analyzer can rebase the next precision pose even before
+        // the asynchronous project write/reload completes.
+        mobileGsMapFromFingerprint = mapFromFingerprint.copyOf()
         emittedMapBridgeForReference = reference
         onMapFromFingerprintSolved(mapFromFingerprint)
         onDiagnostic("SphereSLAM map_from_fingerprint solved from same-frame base+KPM pose")
@@ -1200,9 +1236,11 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
      * ignored. So the loop can reduce accumulated drift but can never yank the overlay to a bad pose,
      * and it only ever blends, never snaps.
      *
-     * `reloc[0..15]` is `camera_from_fingerprint` in the CV convention; the standalone fingerprint is
-     * the centered-page (canonical wall) reference, so [MetricMarks.glViewToCv] (its own inverse)
-     * maps it into the GL `camera_from_canonical` frame the KPM view already uses.
+     * Both inputs here intentionally remain in the precision fingerprint frame:
+     * `reloc[0..15]` is CV `camera_from_fingerprint`, while [kpmView] is GL
+     * `camera_from_fingerprint`. [MetricMarks.glViewToCv] converts the former into the latter so
+     * they can corroborate each other. Only AFTER this local precision fusion is the result rebased
+     * through explicit `map_from_fingerprint` into the base SphereSLAM map.
      */
     private fun fuseWithReloc(kpmView: FloatArray): FloatArray {
         val slam = slamManager ?: return kpmView

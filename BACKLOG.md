@@ -143,8 +143,9 @@ Verified by `testDebugUnitTest` (413 tests), `externalNativeBuildDebug`, `detekt
 
 - _No open security alerts._ (CodeQL #3/#4/#5 SRI and the Bouncy Castle advisories #23/#24/#25 are resolved — see the Done section above.)
 
-Remaining open items (all in `docs/AUDIT.md` under "Still open"): Glasses AR session,
-bidirectional co-op, and a short list of unreferenced diagnostic/eval knobs.
+Remaining open items (all in `docs/AUDIT.md` under "Still open"): Glasses AR session (kept as WIP
+by decision) and a short list of unreferenced diagnostic/eval knobs. Bidirectional co-op shipped as
+protocol v4 (2026-10-08).
 
 #### Glee audit pass (2026-09-04) — not yet acted on
 
@@ -211,9 +212,11 @@ Correctness bugs, worst first:
   it's ~640 LOC (per this file's own earlier "Still open" note above), not ~400, and it's tracked
   there as deliberate WIP (`glassesWorldHitForTimestamp` needs a real glasses-side world lookup —
   substantial new native/SDK integration — not dead code with no intent behind it). Deleting it
-  reverses that prior decision; that's a product call, not a cleanup. Left for the repo owner:
-  either commit to finishing it or explicitly kill it — either way, fix the README claim to match
-  whichever is chosen.
+  reverses that prior decision; that's a product call, not a cleanup. **Decided (2026-10-08, repo
+  owner): keep as WIP.** The README claim this item cited is already gone (README now lists only
+  the "wearable abstraction" module role, not a removal), and `docs/FEATURE_REFERENCE.md` §10
+  already labels the subsystem WIP/deferred, so no doc change was needed to match the decision.
+  Finishing it stays tracked in `docs/AUDIT.md` "Still open".
 - ~~Live docs still describe the deleted voxel/splat engine, a stencil generator with no source
   files, and other removed features as shipping~~ — **fixed.** All core English docs
   (`ARCHITECTURE.md`, `BLUEPRINT.md`, `file_descriptions.md`, `performance.md`, `testing.md`,
@@ -455,8 +458,9 @@ device, no ARCore) and a half-built AR interaction is worse than a documented pl
   fixing anything — caught by a Codex review on the PR before merge. Landed as "Progress" instead,
   in both the debug-overlay row and the persistent HUD bar (which previously had no label at all,
   inviting exactly this confusion via its traffic-light coloring). `RelocStatusBadge`'s own
-  "Matched X%" wording is a separate, not-yet-fixed issue — not touched here to keep this fix
-  minimal to what was actually wrong.
+  "Matched X%" wording was a separate issue — **since fixed**: `matched_percent` reads
+  "%1$d%% painted" (and its translation) in all 15 locale `strings.xml` files (re-verified
+  2026-10-08).
 - [x] **The tracked "no-cloud blocks crew fingerprint-sharing" tension is factually resolved, not
   open**: `.gxr` project export already round-trips the wall fingerprint and is byte-identical to
   Co-op's own bulk-sync payload. The real gap was affordance: it was buried inside "Save", landing
