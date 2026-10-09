@@ -103,6 +103,32 @@ class StandaloneFingerprintFrameTest {
     }
 
     @Test
+    fun cameraFromMap_removesFingerprintModelTransform() {
+        val mapFromFingerprint = StandaloneFingerprintFrame.mapFromFingerprint(
+            azimuthDeltaDeg = 25f,
+            elevationDeg = -10f,
+            rangeUnits = 2.5f,
+        )
+
+        // Camera at the map origin: camera_from_fingerprint is exactly map_from_fingerprint.
+        val cameraFromMap = StandaloneFingerprintFrame.cameraFromMap(
+            cameraFromFingerprint = mapFromFingerprint,
+            mapFromFingerprint = mapFromFingerprint,
+        )
+
+        assertArrayEquals(
+            floatArrayOf(
+                1f, 0f, 0f, 0f,
+                0f, 1f, 0f, 0f,
+                0f, 0f, 1f, 0f,
+                0f, 0f, 0f, 1f,
+            ),
+            cameraFromMap,
+            1e-5f,
+        )
+    }
+
+    @Test
     fun photosphereFingerprintTransform_isRightHandedAtObliqueDirection() {
         val m = StandaloneFingerprintFrame.mapFromFingerprint(
             azimuthDeltaDeg = 30f,
