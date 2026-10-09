@@ -177,4 +177,28 @@ class WallMeasureTest {
     fun `three-component width uses depth difference`() {
         assertEquals(5f, WallMeasure.widthMeters(floatArrayOf(0f, 0f, 0f), floatArrayOf(0f, 3f, 4f))!!, 1e-6f)
     }
+
+    @Test
+    fun `second tap on the first tap's frozen plane ignores a drawn-frame re-orientation`() {
+        val view = translation(0f, 0f, 0f)
+        val backbone = translation(0.2f, -0.1f, -3f)   // unfused anchor: does not move
+        val drawnBefore = translation(0f, 0f, -3f)     // the wall: z = -3, facing the camera
+        // Fusion yaws the drawn frame 10° about its origin between the taps.
+        val drawnAfter = PoseMath.multiply(drawnBefore, yawThenTranslate(10f, 0f, 0f, 0f))
+        // Plane frozen at tap 1, the way the renderer stores it: inv(backbone) · drawn.
+        val planeLocal = PoseMath.multiply(PoseMath.rigidInverse(backbone), drawnBefore)
+        fun tap(screen: FloatArray, planeWorld: FloatArray): FloatArray {
+            val ray = WallMeasure.screenRay(screen[0], screen[1], view, proj)!!
+            return WallMeasure.toFrameLocal(WallMeasure.intersectWallWorld(ray, planeWorld)!!, backbone)!!
+        }
+        val left = toScreen(floatArrayOf(-1f, 0f), drawnBefore, view)
+        val right = toScreen(floatArrayOf(1.5f, 0f), drawnBefore, view)
+        val a = tap(left, PoseMath.multiply(backbone, planeLocal))
+        val frozen = tap(right, PoseMath.multiply(backbone, planeLocal))
+        val unfrozen = tap(right, drawnAfter)
+        assertEquals(2.5f, WallMeasure.widthMeters(a, frozen)!!, 2e-3f)
+        // Control: re-reading the re-oriented drawn plane would have moved the second point.
+        val drift = WallMeasure.widthMeters(a, unfrozen)!! - 2.5f
+        org.junit.Assert.assertTrue("re-oriented plane should change the width, drift=$drift", kotlin.math.abs(drift) > 0.05f)
+    }
 }

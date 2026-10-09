@@ -4690,6 +4690,8 @@ class ArViewModel @Inject constructor(
     // Points of the in-progress measurement in the unfused anchor frame, parallel to MeasureUi.points.
     // Main-thread only (tap handler, its viewModelScope continuation, rail clicks).
     private val measureLocalPoints = mutableListOf<FloatArray>()
+    // The first tap's wall plane (anchor-local); the second tap is intersected with it.
+    private var measurePlaneLocal: FloatArray? = null
     private var measureJob: kotlinx.coroutines.Job? = null
 
     /** Toggle Measure. Starting requires an established anchor (the wall frame to measure in). */
@@ -4701,12 +4703,14 @@ class ArViewModel @Inject constructor(
         if (!_uiState.value.isAnchorEstablished) return
         measureJob?.cancel()
         measureLocalPoints.clear()
+        measurePlaneLocal = null
         _uiState.update { it.copy(measure = MeasureUi(active = true)) }
     }
 
     fun cancelMeasure() {
         measureJob?.cancel()
         measureLocalPoints.clear()
+        measurePlaneLocal = null
         _uiState.update { it.copy(measure = MeasureUi()) }
     }
 
@@ -4714,6 +4718,7 @@ class ArViewModel @Inject constructor(
     fun redoMeasure() {
         measureJob?.cancel()
         measureLocalPoints.clear()
+        measurePlaneLocal = null
         _uiState.update { it.copy(measure = MeasureUi(active = true)) }
     }
 
@@ -4723,15 +4728,16 @@ class ArViewModel @Inject constructor(
         if (!state.active || state.points.size >= 2 || measureJob?.isActive == true) return
         val r = renderer ?: return
         measureJob = viewModelScope.launch {
-            val local = kotlinx.coroutines.withTimeoutOrNull(MEASURE_TAP_TIMEOUT_MS) {
-                r.requestWallPoint(nx, ny).await()
+            val point = kotlinx.coroutines.withTimeoutOrNull(MEASURE_TAP_TIMEOUT_MS) {
+                r.requestWallPoint(nx, ny, measurePlaneLocal).await()
             }
             if (!_uiState.value.measure.active) return@launch
-            if (local == null) {
+            if (point == null) {
                 _uiState.update { it.copy(measure = it.measure.copy(failed = true)) }
                 return@launch
             }
-            measureLocalPoints += local
+            if (measureLocalPoints.isEmpty()) measurePlaneLocal = point.planeLocal
+            measureLocalPoints += point.local
             val points = _uiState.value.measure.points + TapMark(nx, ny, -1f)
             val width = if (measureLocalPoints.size == 2) {
                 com.hereliesaz.graffitixr.feature.ar.anchor.WallMeasure
@@ -4752,21 +4758,27 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    /** Persist the finished measurement as the project's wall width and leave Measure. */
+    /**
+     * Persist the finished measurement as the project's wall width, and leave Measure only once it
+     * is saved. On failure (write error, or the project changed underneath) the reading stays on
+     * screen and the artist is told, so it can be saved again rather than silently lost.
+     */
     fun saveMeasure() {
         val width = _uiState.value.measure.resultMeters ?: return
         val projectId = projectRepository.currentProject.value?.id ?: return
-        viewModelScope.launch(dispatchers.io) {
-            try {
-                projectRepository.updateProject {
-                    if (it.id == projectId) it.copy(wallWidthMeters = width) else it
-                }
-            } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
-                Timber.e(e, "Wall width save failed")
+        viewModelScope.launch {
+            val saved = withContext(dispatchers.io) {
+                com.hereliesaz.graffitixr.feature.ar.anchor.WallWidthPersistence
+                    .save(projectRepository, projectId, width)
+            }
+            if (saved) {
+                if (_uiState.value.measure.resultMeters == width) cancelMeasure()
+            } else {
+                _feedback.tryEmit(
+                    com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error("Couldn't save the wall width. Try Save again."),
+                )
             }
         }
-        cancelMeasure()
     }
 
     fun onScreenTap(nx: Float, ny: Float) {

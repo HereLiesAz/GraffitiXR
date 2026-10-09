@@ -211,22 +211,38 @@ class ArRenderer(
     }
 
     // Measure (BACKLOG Phase 6 step 1): taps resolved against the plane the design is drawn on.
-    private val wallPointQueue = java.util.concurrent.ConcurrentLinkedQueue<PendingHitTest>()
+    private class PendingWallPoint(
+        val x: Float,
+        val y: Float,
+        val planeLocal: FloatArray?,
+        val result: kotlinx.coroutines.CompletableDeferred<WallPoint?>,
+    )
+    private val wallPointQueue = java.util.concurrent.ConcurrentLinkedQueue<PendingWallPoint>()
+
+    /**
+     * A measured wall point and the wall plane it was taken on, both relative to the UNFUSED ARCore
+     * consensus anchor (so fusion corrections cannot move either).
+     *
+     * @property local the hit (x, y, z), metres, anchor-local.
+     * @property planeLocal the wall frame (local z = 0 is the plane), anchor-local, 4x4 column-major.
+     */
+    class WallPoint(val local: FloatArray, val planeLocal: FloatArray)
 
     /**
      * Resolve normalised screen point ([nx], [ny]) — [0,1], y down, relative to the AR view — to a
-     * point on the wall the design is drawn on, as (x, y, z) metres in the unfused ARCore anchor's
-     * local frame (so fusion corrections between taps do not move it). Served on
-     * the next frame after the overlay base frame is computed; completes null with no established
-     * anchor, a grazing/out-of-range ray, or a destroyed renderer. Await with a timeout.
+     * point on the wall. With [planeLocal] null the plane is the one the design is drawn on right
+     * now; pass the FIRST point's [WallPoint.planeLocal] for the second tap so both points lie on one
+     * plane even if fusion re-orients the drawn frame between taps. Served on the next frame after
+     * the overlay base frame is computed; completes null with no trustworthy wall frame, a
+     * grazing/out-of-range ray, or a destroyed renderer. Await with a timeout.
      */
-    fun requestWallPoint(nx: Float, ny: Float): kotlinx.coroutines.Deferred<FloatArray?> {
-        val d = kotlinx.coroutines.CompletableDeferred<FloatArray?>()
+    fun requestWallPoint(nx: Float, ny: Float, planeLocal: FloatArray? = null): kotlinx.coroutines.Deferred<WallPoint?> {
+        val d = kotlinx.coroutines.CompletableDeferred<WallPoint?>()
         if (isDestroying || session == null) {
             d.complete(null)
             return d
         }
-        wallPointQueue.add(PendingHitTest(nx, ny, d))
+        wallPointQueue.add(PendingWallPoint(nx, ny, planeLocal?.copyOf(), d))
         return d
     }
 
@@ -241,28 +257,27 @@ class ArRenderer(
     private fun drainWallPointQueue(view: FloatArray, proj: FloatArray, wallReady: Boolean) {
         while (true) {
             val req = wallPointQueue.poll() ?: break
-            val local = if (!wallReady) {
+            val point = if (!wallReady) {
                 null
             } else {
                 try {
-                    // Plane from the drawn wall frame; point kept relative to the UNFUSED ARCore
-                    // consensus anchor (backbone), so a fusion correction landing between the two
-                    // taps cannot change the measured distance.
-                    com.hereliesaz.graffitixr.feature.ar.anchor.WallMeasure.screenRay(req.x, req.y, view, proj)
-                        ?.let {
-                            com.hereliesaz.graffitixr.feature.ar.anchor.WallMeasure
-                                .intersectWallWorld(it, overlayBaseScratch)
-                        }
-                        ?.let {
-                            com.hereliesaz.graffitixr.feature.ar.anchor.WallMeasure
-                                .toFrameLocal(it, backboneScratch)
-                        }
+                    val wm = com.hereliesaz.graffitixr.feature.ar.anchor.WallMeasure
+                    val pm = com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
+                    // The plane: the first tap's, carried through the unfused backbone, or the drawn
+                    // wall frame expressed anchor-locally.
+                    val planeLocal = req.planeLocal
+                        ?: pm.multiply(pm.rigidInverse(backboneScratch), overlayBaseScratch)
+                    val planeWorld = pm.multiply(backboneScratch, planeLocal)
+                    wm.screenRay(req.x, req.y, view, proj)
+                        ?.let { wm.intersectWallWorld(it, planeWorld) }
+                        ?.let { wm.toFrameLocal(it, backboneScratch) }
+                        ?.let { WallPoint(it, planeLocal) }
                 } catch (e: Exception) {
                     Timber.w(e, "wall-point request failed")
                     null
                 }
             }
-            req.result.complete(local)
+            req.result.complete(point)
         }
     }
 
@@ -1650,7 +1665,10 @@ class ArRenderer(
                                 val axis = FloatArray(3)
                                 pose.getTransformedAxis(1, 1f, axis, 0) // local +Y = plane normal
                                 nrmX = axis[0]; nrmY = axis[1]; nrmZ = axis[2]
-                                anchorNormalIsWall = true
+                                // Any plane gives a real surface normal, but only a VERTICAL one is a
+                                // wall: a floor or tabletop hit must not offer "wall width".
+                                anchorNormalIsWall = (chosen.trackable as com.google.ar.core.Plane).type ==
+                                    com.google.ar.core.Plane.Type.VERTICAL
                             } else {
                                 nrmX = -dx; nrmY = -dy; nrmZ = -dz // toward the camera
                                 anchorNormalIsWall = false
