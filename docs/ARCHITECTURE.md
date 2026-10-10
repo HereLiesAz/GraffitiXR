@@ -87,6 +87,14 @@ Both roles are implemented. Standalone still has explicit capability differences
 than pretending to have free-space inertial translation. See
 [`SPHERESLAM_ARCORE_SIDECAR.md`](SPHERESLAM_ARCORE_SIDECAR.md).
 
+Since SphereSLAM 0.24.0 the generic pieces of both roles are library code consumed by
+`:feature:ar`: the sidecar gates/pairing/agreement fusion (`sidecar.HybridKpmCorrection`,
+`HybridPoseHistory`, `HybridAnchorFusion`, `MetricPageRectification`), the attitude bridge
+(`attitude.*`), camera geometry (`camera.*`), rigid/rotation math (`math.*`), photosphere keyframes
+and fingerprint placement, the embedded coverage wash (`:overlay`) and MiDaS depth (`:models`). The
+app keeps the ARCore wiring, PoseFusion's ARCore backbone, MobileGS, persistence and UI. See
+[`SPHERESLAM_TODO.md`](SPHERESLAM_TODO.md) for the list.
+
 ## Data Flow (AR Pipeline)
 
 Each ARCore tracking frame, roughly:

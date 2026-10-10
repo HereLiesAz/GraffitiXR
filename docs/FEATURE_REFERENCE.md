@@ -147,11 +147,11 @@ backends and devices unconverted; a joining guest gets it in the bulk project ar
 mounted on a tripod: very small vibrations make the camera image shimmy under the screen-fixed
 design, and Gyro moves the drawn design with the wall instead.
 
-- **On:** captures the current device orientation (`TYPE_GAME_ROTATION_VECTOR`, via
-  `GyroOrientationBridge`) as the reference. Every frame the orientation delta since then becomes the
-  pure-rotation screen homography `H = K·R·K⁻¹` (`OverlayGyroCompensationMath`), with K from
-  `CameraIntrinsicsEstimator` scaled to the FIT_CENTER preview (a nominal 68° field of view if Camera2
-  reports nothing). `H` is drawn as an extra screen-space transform around Overlay's whole-design
+- **On:** captures the current device orientation (`TYPE_GAME_ROTATION_VECTOR`, via SphereSLAM's
+  `GameRotationAttitudeSource`) as the reference. Every frame the orientation delta since then becomes
+  the pure-rotation screen homography `H = K·R·K⁻¹` (SphereSLAM `GyroCompensationMath`), with K from
+  `CameraIntrinsicsEstimator` scaled to the FIT_CENTER preview (`ScreenIntrinsics`; a nominal 68°
+  field of view if Camera2 reports nothing). `H` is drawn as an extra screen-space transform around Overlay's whole-design
   draw, so the design's edits and Overlay's `ModeAdjustment` are unchanged.
 - **Release:** rotation beyond **3°** since the reference (tripod bumped, phone picked up)
   releases Gyro with a short toast; so does a device with no rotation-vector sensor. Turning it off,

@@ -66,7 +66,9 @@ This document lists key files in the repository and their purposes.
 
 ### SphereSLAM (published dependency)
 
-SphereSLAM 0.23.5 public API baseline: GraffitiXR consumes the supported planar/coverage surface and explicitly opts into the experimental `:reloc` surface while preserving its existing `Standalone*` aliases.
+SphereSLAM 0.24.0 public API baseline: GraffitiXR consumes the supported planar/coverage surface
+and toolkit packages, and explicitly opts into the experimental `:reloc` and `:models` surfaces while
+preserving its existing `Standalone*` aliases.
 
 The KPM planar tracker is no longer built in this repo. It is consumed as the published
 `com.github.HereLiesAz.SphereSLAM:sphereslam` artifact, which carries the Kotlin API
@@ -77,6 +79,22 @@ the real (non-stub) tracker is packaged.
 
 *   The native KPM atlas/session is rebuildable state and is never persisted; projects store the
     rectified reference PNG plus scale metadata.
+*   Generic SLAM code that used to live here now comes from the library (0.24.0):
+    `math.RigidMath` / `math.RotationMath` (was `anchor/PoseMath`, `util/RotationDeltaMath`,
+    `MetricMarks.glViewToCv`); `camera.*` (was `core/common` `CameraIntrinsicsEstimator`,
+    `StandaloneCameraCalibration`, `anchor/CaptureRotation`, `LumaFrameTransform`,
+    `rendering/ProjectionMatrix`, the Gyro screen intrinsics); `attitude.*` (was
+    `GyroOrientationBridge` and the analyzer's bridge math); `SphereSlam.isOperational()` (was
+    `pose/SphereSlamRuntimeProbe`); `sidecar.*` (was `anchor/HybridPoseHistory`,
+    `HybridKpmCorrection`, `HybridPageFrame`, `HybridMetricKpmReference` and PoseFusion's
+    hybrid-agreement path); `PhotosphereKeyframeStore` / `PhotosphereFingerprintFrame` /
+    `PhotosphereMap.directionOfPixel` (was ArViewModel's keyframe map and placement math and
+    `anchor/StandaloneFingerprintFrame`); `gyro.GyroCompensationMath` (was
+    `util/OverlayGyroCompensationMath`); `:overlay` `CoverageGlowRenderer` (was the app's scissor
+    wash); `:models` `DepthEstimator` (was `depth/DepthEstimator`); `:reloc` `PoseBlend` for the
+    standalone reloc corroboration blend.
+*   `core/common` `sensor/CameraIntrinsics` and `model/HybridKpmDiagnostics`/`HybridKpmOutcome` are
+    typealiases of the library types (`core/common` depends on `:sphereslam` with `api`).
 
 ## Feature Modules
 
@@ -87,32 +105,37 @@ the real (non-stub) tracker is packaged.
     keeps `ArCorePoseSource` as the primary camera pose, calls backend-neutral
     `setTrackingPoseValid`/`updateCamera`/`feedYuvFrame`, owns the asynchronous hybrid KPM sidecar,
     and composes only accepted timestamp-aligned corrections through `PoseFusion`.
-*   `HybridMetricKpmReference.kt`: derives a physical rectangle from the ARCore wall plane,
-    perspective-rectifies the captured sensor image to that physical aspect, and computes explicit
-    KPM DPI/centered page geometry; a raw perspective photo is never treated as metric.
+*   Hybrid KPM sidecar math is SphereSLAM's `sidecar` package, wired here by `ArRenderer`:
+    `MetricPageRectification` (physical rectangle on the ARCore wall plane, rectified to its
+    physical aspect, explicit KPM DPI/page geometry), `HybridPoseHistory` (timestamp pairing with
+    the raw sensor-camera ARCore view and unfused backbone), `HybridKpmCorrection` (metric/age/
+    inlier/reprojection/plausibility gates + solve) and `HybridPageFrame` (`world_from_page`,
+    `page_from_artwork`).
 *   `HybridKpmPage.kt`: the persisted form of a hybrid KPM page (raw luma, pixel size, metric width,
     `page_from_artwork`) with validation; DPI/geometry are recomputed on restore, never stored.
-*   `anchor/HybridPageFrame.kt`: pure ARCore/KPM frame conversion
-    (`world_from_page`, `page_from_artwork`) with world-rebase-invariant math.
-*   `anchor/HybridPoseHistory.kt`: bounded timestamp history pairing asynchronous KPM observations
-    with the raw sensor-camera ARCore view and unfused artwork backbone from the same clock.
-*   `anchor/HybridKpmCorrection.kt`: metric/age/inlier/reprojection/timestamp gates plus conversion
-    of an accepted KPM observation into a corrected artwork anchor for `PoseFusion`.
 *   `anchor/WallMeasure.kt`: pure two-tap wall measurement — screen ray, intersection with the
     drawn wall plane in wall-local metres, range/obliquity/rigidity gates (AR Measure).
 *   `anchor/WallWidthPersistence.kt`: writes a Measure result to the project it was taken in;
     reports unsaved on a write failure or a project switch.
-*   `anchor/PoseFusion.kt`: stores drift fixes as anchor-local corrections. It accepts both the
-    legacy MobileGS PnP path and timestamp-aligned hybrid KPM corrections; neither path writes
-    renderer camera matrices.
+*   `anchor/PoseFusion.kt`: stores drift fixes as one anchor-local correction over the ARCore
+    backbone. The MobileGS PnP path is its own; the timestamp-aligned hybrid KPM path delegates to
+    SphereSLAM `sidecar.HybridAnchorFusion` (repeated-observation agreement before a large move)
+    while keeping the shared correction and `FusionDiagnostics`. Neither path writes renderer
+    camera matrices.
 *   `SphereSlamStandaloneOverlay.kt`: non-ARCore AR surface. Owns rectified wall-target capture,
     CameraX analyzer lifecycle, KPM/reacquisition HUD, GL overlay, target restore, and copyable
     diagnostics.
 *   `SphereSlamStandaloneTrackingAnalyzer.kt`: synchronous display-oriented CameraX luma →
     calibrated KPM pose pipeline with quality gates, observation-age checks, pose-jump rejection,
-    tracking-state hysteresis, and the short rotation-only IMU bridge.
+    tracking-state hysteresis, and the short rotation-only IMU bridge (SphereSLAM
+    `GameRotationAttitudeSource` + `AttitudeRotationBridge`, body→camera
+    `DeviceCameraRotation.cameraFromDevice(SENSOR_ORIENTATION, rotationDegrees)`). Emits SphereSLAM
+    `PhotosphereKeyframe`s; corroborates MobileGS reloc with `:reloc` `PoseBlend`.
 *   `StandaloneWallHitTest.kt`: ARCore-independent screen-pixel → canonical wall intersection.
-*   `StandalonePhotosphereCapture.kt`: pure capture-time seam that picks the camera view (attitude + intrinsics) a standalone fingerprint is bound to in the base photosphere, and names why it cannot (no rotation sensor / attitude not ready / no keyframe yet) for artist feedback.
+*   `StandalonePhotosphereCapture.kt`: names why a standalone fingerprint cannot be bound to the
+    base photosphere (no rotation sensor / attitude not ready / no keyframe yet) and the
+    artist-facing message. The capture view and placement are SphereSLAM's
+    (`PhotosphereKeyframeStore.view`, `PhotosphereFingerprintFrame.placement`, roll-aware).
     Back-projects calibrated CameraX rays onto SphereSLAM z=0 and accepts only visually locked,
     registered page/atlas coverage; no synthetic depth or ARCore `Frame.hitTest`.
 *   `StandaloneAtlasGrowth.kt`: chooses/rectifies additional KPM wall pages and registers each into
@@ -120,24 +143,28 @@ the real (non-stub) tracker is packaged.
 *   `StandaloneFailure.kt` / `StandaloneDiagnostics.kt`: typed standalone failure taxonomy and the
     compact diagnostic dump contract.
 *   `rendering/HomographyOverlayRenderer.kt`: transparent CameraX GL overlay renderer shared by
-    standalone SphereSLAM AR and the legacy homography Overlay tracker.
+    standalone SphereSLAM AR and the legacy homography Overlay tracker. In standalone it embeds
+    SphereSLAM `:overlay` `CoverageGlowRenderer` (complement wash, holes =
+    `PhotosphereMap.currentRegions()`) before the design.
 *   `rendering/BackgroundRenderer.kt`: OpenGL ES shader that renders ARCore's `EXTERNAL_OES`
     camera texture full-screen.
 *   `CameraPreview.kt`: shared CameraX preview for Overlay and standalone SphereSLAM AR.
-*   `OverlayGyroStabilizer.kt`: Overlay ▸ Gyro (tripod stabilisation). `rememberOverlayGyroCompensation`
-    captures a rotation-vector reference (`GyroOrientationBridge`), publishes the per-frame
-    pure-rotation screen homography MainScreen draws the Overlay design through, auto-releases past
-    3°, and runs a slow (15 s) background MiDaS sample of the surface under the design.
-*   `util/OverlayGyroCompensationMath.kt`: pure math for Gyro — body→display axis remap, rotation
-    angle, FIT_CENTER screen intrinsics, `K·(R + t·nᵀ)·K⁻¹` homography, MiDaS patch sampling;
-    pinned by `OverlayGyroCompensationMathTest`.
-*   `HomographyFallbackOverlay.kt` / `HomographyArTracker.kt`: legacy planar live tracking, currently
-    unmounted (Overlay draws the edited design over the camera untracked); not the standalone AR backend.
+*   `OverlayGyroStabilizer.kt`: Overlay ▸ Gyro (tripod stabilisation) Compose wiring.
+    `rememberOverlayGyroCompensation` captures a game-rotation reference (SphereSLAM
+    `GameRotationAttitudeSource`), publishes the per-frame pure-rotation screen homography
+    (SphereSLAM `gyro.GyroCompensationMath`, `camera.ScreenIntrinsics`) MainScreen draws the Overlay
+    design through, auto-releases past 3°, and runs a slow (15 s) background MiDaS sample (`:models`
+    `DepthEstimator`) of the surface under the design.
+*   `HomographyFallbackOverlay.kt` / `HomographyArTracker.kt` / `BridgedHomographyTracker.kt`: legacy
+    planar live tracking with a short SphereSLAM attitude bridge, currently unmounted (Overlay draws
+    the edited design over the camera untracked); not the standalone AR backend.
 *   `computervision/DualAnalyzer.kt`: ARCore-side `ImageAnalysis.Analyzer` for relocalization
     callbacks and light estimation.
 *   `src/test/.../ArViewModelTest.kt` plus standalone/hybrid tests: lifecycle/persistence,
-    calibration, tracking-state/failure, metric KPM page geometry, page↔ARCore frame invariance,
-    timestamp pairing, correction gates, and PoseFusion world-rebase behavior.
+    tracking-state/failure, the gyro-bridge wiring, and PoseFusion world-rebase/agreement behavior
+    (including an `Observation.forTesting` → `HybridKpmCorrection` → `PoseFusion` wiring test). The
+    moved math (metric page geometry, page↔ARCore frame invariance, timestamp pairing, correction
+    gates, camera geometry, rotation math) is tested in SphereSLAM.
 
 ### `:feature:editor`
 *   `EditorViewModel.kt`: Placement and legibility for the single design image (there is no
@@ -150,7 +177,8 @@ the real (non-stub) tracker is packaged.
 *   `ProjectLibraryScreen.kt`: Full-screen project list UI.
 
 ---
-*Documentation updated on 2026-10-01: added the dual ARCore/SphereSLAM backend ownership,
+*Documentation updated on 2026-10-10: generic SLAM code moved into SphereSLAM 0.24.0 (see the
+SphereSLAM section). Earlier 2026-10-01 update: added the dual ARCore/SphereSLAM backend ownership,
 standalone CameraX/KPM files, co-op frame calibration, and metric hybrid KPM→PoseFusion files. Earlier 2026-09-04 update removed the Persistent Voxel Memory /
 `slamManager.draw()` /
 `VoxelHash.*` / `StereoProcessor.cpp` claims (none of those files or methods exist), corrected the

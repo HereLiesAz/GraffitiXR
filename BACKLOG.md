@@ -148,9 +148,14 @@ by decision) and a short list of unreferenced diagnostic/eval knobs. Bidirection
 protocol v4 (2026-10-08); protocol v5 (2026-10-09) adds `Op.WallWidth` so co-op guests (and
 hosts) share Measure results.
 
+- [ ] SphereSLAM 0.24.0 consolidation (2026-10-10) needs on-device verification — see
+  `docs/SPHERESLAM_TODO.md` ("Device verification still owed for this move"): the gyro-bridge /
+  photosphere device→camera rotation fix in portrait and both landscapes, roll-aware fingerprint
+  placement, the embedded coverage wash (camera visible, wash beneath the artwork), hybrid KPM
+  agreement in mixed MobileGS + KPM sessions, and MiDaS loading from the `:models` asset.
 - [ ] Overlay ▸ Gyro (tripod stabilisation, 2026-10-09) needs on-device verification: the design
-  should move WITH the wall when the tripod head is nudged (sign/axes pinned only by
-  `OverlayGyroCompensationMathTest`, not hardware), in portrait and both landscapes; the
+  should move WITH the wall when the tripod head is nudged (sign/axes pinned only by SphereSLAM's
+  `GyroCompensationMathTest`, not hardware), in portrait and both landscapes; the
   perspective `Matrix` concat around the graphicsLayer must render on hardware canvases; the 3°
   release threshold and 15 s MiDaS cadence are first guesses; slow `GAME_ROTATION_VECTOR` yaw drift
   on long sessions is uncorrected (it eventually trips the release). MiDaS depth is sampled but
@@ -563,9 +568,10 @@ inferred:
   (host-native). Mutation-checked: restoring the old `C·R·C` flip fails it. Was **blocked**: pure native C++ (OpenCV), no host OpenCV
   available (`pkg-config --exists opencv4` fails, no `libopencv_core*` anywhere on this machine)
   and no `androidTest` source set exists anywhere in the repo to run it on-device instead.
-- [~] `HomographyFallbackOverlay`: **`cameraId` half done** — `CameraIntrinsicsEstimatorCameraIdTest`
-  (Robolectric, `:core:common`) pins the id → `CameraManager` → intrinsics seam the overlay's
-  analyzer feeds (known ids, calibrated vs pinhole, unknown id → null). **Texture-clear-on-null
+- [~] `HomographyFallbackOverlay`: **`cameraId` half done** — the id → `CameraManager` →
+  intrinsics seam the overlay's analyzer feeds is SphereSLAM's `camera.CameraIntrinsicsEstimator`
+  since 0.24.0 and is tested there (the app's `CameraIntrinsicsEstimatorCameraIdTest` went with
+  the move). **Texture-clear-on-null
   still open**: needs a live EGL context, i.e. an instrumented test. Was **blocked**, for two
   different reasons per path: `clearPose()`'s texture
   path is a real `GLSurfaceView.Renderer.onDrawFrame` — needs a live EGL/GL context, not

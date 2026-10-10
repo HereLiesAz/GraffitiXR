@@ -1,7 +1,6 @@
 // FILE: feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/ArViewModel.kt
 package com.hereliesaz.graffitixr.feature.ar
 
-
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent

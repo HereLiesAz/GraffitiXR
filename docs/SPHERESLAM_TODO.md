@@ -1,8 +1,83 @@
 # SphereSLAM Implementation TODO
 
-## SphereSLAM 0.23.5 library API migration — no-regression contract
+## SphereSLAM 0.24.0 — generic SLAM code moved into the library (app half)
 
-The app now consumes SphereSLAM **0.23.5** across `:sphereslam`, `:overlay`, and `:reloc`.
+The app now consumes SphereSLAM **0.24.0** (tag `0.24.0`, library PR #28) across `:sphereslam`,
+`:overlay`, `:reloc` and `:models`. The library absorbed GraffitiXR's generic SLAM code; the app
+copies are deleted and replaced by the library API. Behavior is otherwise unchanged except for the
+listed fixes.
+
+Moved (app copy deleted → library API):
+
+- [x] `anchor/PoseMath`, `util/RotationDeltaMath`, `MetricMarks.glViewToCv` →
+  `math.RigidMath` / `math.RotationMath`. App-only display-orientation helpers
+  (`MetricMarks.glViewToCvDisplay`, `glViewDisplayOriented`) stay.
+- [x] `core/common` `CameraIntrinsicsEstimator`, `StandaloneCameraCalibration`,
+  `anchor/CaptureRotation`, `LumaFrameTransform`, `rendering/ProjectionMatrix`, Gyro screen
+  intrinsics → `camera.*`. `core/common` `sensor/CameraIntrinsics` is a typealias of
+  `camera.CameraIntrinsics` (kept for the `SensorSource` vocabulary).
+- [x] `GyroOrientationBridge` + `rotateViewPoseKeepingCameraCenter` → `attitude.GameRotationAttitudeSource`,
+  `AttitudeRotationBridge`, `DeviceCameraRotation`, `RotationMath.rotateAboutCameraCentre`
+  (standalone analyzer, base photosphere pose, `BridgedHomographyTracker`, Overlay ▸ Gyro).
+- [x] `pose/SphereSlamRuntimeProbe` → `SphereSlam.isOperational()`.
+- [x] `anchor/HybridPoseHistory`, `HybridKpmCorrection` (incl. its `solveRaw` test seam),
+  `HybridPageFrame`, `HybridMetricKpmReference` → `sidecar.*` (`MetricPageRectification`);
+  tests use `SphereSlamTracker.Observation.forTesting`. `PoseFusion` keeps the ARCore backbone and
+  MobileGS reloc path and delegates its hybrid path to `sidecar.HybridAnchorFusion`.
+  `core/common` `HybridKpmDiagnostics`/`HybridKpmOutcome` are typealiases of the sidecar records.
+  `HybridKpmPage` persistence stays in the app.
+- [x] ArViewModel keyframe map + `buildStandaloneFingerprintPlacement`/`signedAngleDegrees` +
+  `anchor/StandaloneFingerprintFrame` → `PhotosphereKeyframeStore`, `PhotosphereKeyframe`,
+  `PhotosphereFingerprintFrame` (`placement`, `cameraFromMap`, `referencePixelToWall`).
+  `StandalonePhotosphereCapture` keeps only the blocker reasons and artist-facing messages.
+- [x] `util/OverlayGyroCompensationMath` → `gyro.GyroCompensationMath` (`OverlayGyroStabilizer`
+  Compose wiring stays).
+- [x] `SphereTileGlowMask` scissor wash + `HomographyOverlayRenderer.setCoverageGlow` →
+  `:overlay` `CoverageGlowRenderer` (`FillMode.COMPLEMENT`, white, α 0.14) fed
+  `CoverageGlowProjection.projectRegions(PhotosphereMap.currentRegions(), …)` and drawn with
+  `drawEmbedded()` inside the artwork renderer before the design (glow beneath the artwork, camera
+  visible; `setEGLConfigChooser(8, 8, 8, 8, 16, 0)` unchanged).
+- [x] `depth/DepthEstimator` → `:models` `DepthEstimator`; the duplicate
+  `core/nativebridge/src/main/assets/midas_v21_small_256_int8.onnx` is removed. `superpoint.onnx`
+  and `zerodce.onnx` (and `distortion_head.onnx`) stay: `GraffitiJNI.cpp` loads them through
+  `AAssetManager`; the `:models` AAR's copies are byte-identical.
+
+Fixes picked up with the move:
+
+- [x] Device→camera rotation for the gyro bridge and the base photosphere pose is
+  `DeviceCameraRotation.cameraFromDevice(SENSOR_ORIENTATION, rotationDegrees)` (= display rotation
+  for the display-upright tracked image). The app conjugated by `R_z(rotationDegrees)`, wrong for
+  any sensor not mounted at 0° (a 90° rear sensor in portrait passed 90° where 0° is right).
+- [x] `SphereSlamStandaloneTrackingAnalyzer.fuseWithReloc` corroborates/blends two VIEW matrices
+  with `:reloc` `PoseBlend` (camera-centre divergence + camera-centre lerp) instead of PoseFusion's
+  model-matrix translation-column helpers.
+- [x] Fingerprint placement rotates the tapped pixel's ray through heading, elevation **and roll**
+  (`PhotosphereMap.directionOfPixel`) instead of adding `atan` offsets to heading/elevation; the
+  bound tile is the tapped direction's tile.
+- [x] Coverage-wash holes are the current tiles' projected extents, not screen-aligned rectangles.
+- [x] Camera2 intrinsics for an aspect-changing stream are a centred crop + uniform scale (library
+  estimator) instead of independent x/y scaling.
+
+Deferred (deliberately NOT moved): the standalone photosphere runtime/atlas growth
+(`StandaloneAtlasGrowth`, the analyzer's map-frame bookkeeping), the native MobileGS relocalizer, and
+`HomographyTracker`.
+
+Device verification still owed for this move:
+
+- [ ] Standalone (non-ARCore) phone, portrait AND both landscapes: a brief hand-over-lens dropout
+  bridges the artwork the same way the phone turns (the device→camera fix), and the photosphere
+  coverage holes line up with the scanned directions.
+- [ ] Fingerprint capture with the phone rolled (and in landscape) lands the target where tapped.
+- [ ] Coverage wash: camera preview visible, wash beneath the artwork, holes over scanned tiles.
+- [ ] Overlay ▸ Gyro still holds the design on a tripod and auto-releases past 3°.
+- [ ] Hybrid (ARCore + KPM sidecar): metric page capture/restore still arms, a large correction
+  still waits for three agreeing observations; mixed MobileGS-reloc + KPM sessions behave.
+- [ ] MiDaS loads from the `:models` asset (diagnostic "depth: …" line) with the feature-map flag on.
+
+## SphereSLAM 0.23.5 library API migration — no-regression contract (historical)
+
+The app consumed SphereSLAM **0.23.5** across `:sphereslam`, `:overlay`, and `:reloc` at this
+point (superseded by 0.24.0 above).
 This is an API-surface migration, **not** a feature consolidation. The following behavior must remain
 true throughout and after the migration:
 
@@ -42,6 +117,7 @@ The 0.23.5 naming changes used by GraffitiXR are:
 - the old internal `SphereSlam.smokeTest` diagnostic is replaced by
   `SphereSlamRuntimeProbe`, which uses only public API while preserving the stronger fail-closed
   check: native availability plus calibrated engine creation, nonzero/ready session, and teardown.
+  (0.24.0: the library ships this probe as `SphereSlam.isOperational()`; the app copy is gone.)
 
 No existing tracking, persistence, fusion, atlas, co-op, or UI capability is intentionally removed
 by this migration.
