@@ -458,7 +458,9 @@ class ProjectManagerTest {
     @Test
     fun `import rebases the hybrid KPM page URI`() = runTest {
         val manifest =
-            """{"id":"hyb_import","name":"Wall","hybridKpmPageUri":"file:///sender/files/projects/hyb_import/hybrid_kpm_page_x.y8.gz","hybridKpmPageWidthPx":2,"hybridKpmPageHeightPx":2,"hybridKpmPageWidthMeters":1.0}"""
+            ("""{"id":"hyb_import","name":"Wall","hybridKpmPageUri":"file:///sender/files/projects/hyb_import/""" +
+                """hybrid_kpm_page_x.y8.gz","hybridKpmPageWidthPx":2,"hybridKpmPageHeightPx":""" +
+                """2,"hybridKpmPageWidthMeters":1.0}""")
                 .toByteArray()
         val imported = importZip(zipOf("project.json" to manifest, "hybrid_kpm_page_x.y8.gz" to byteArrayOf(9)))
         assertEquals(
@@ -470,7 +472,9 @@ class ProjectManagerTest {
     @Test
     fun `import without the hybrid page file drops the page instead of failing`() = runTest {
         val manifest =
-            """{"id":"hyb_missing","name":"Wall","hybridKpmPageUri":"file:///sender/files/projects/hyb_missing/hybrid_kpm_page_gone.y8.gz","hybridKpmPageWidthPx":2,"hybridKpmPageHeightPx":2,"hybridKpmPageWidthMeters":1.0,"hybridKpmFingerprintKey":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]}"""
+            ("""{"id":"hyb_missing","name":"Wall","hybridKpmPageUri":"file:///sender/files/projects/hyb_missing/""" +
+                """hybrid_kpm_page_gone.y8.gz","hybridKpmPageWidthPx":2,"hybridKpmPageHeightPx":""" +
+                """2,"hybridKpmPageWidthMeters":1.0,"hybridKpmFingerprintKey":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]}""")
                 .toByteArray()
         val imported = importZip(zipOf("project.json" to manifest))
         assertNotNull(imported)
@@ -512,7 +516,9 @@ class ProjectManagerTest {
     @Test
     fun `import rebases versioned SphereSLAM reference URI`() = runTest {
         val manifest =
-            """{"id":"slam_import","name":"Wall","sphereSlamReferenceUri":"file:///sender/files/projects/slam_import/sphereslam_reference_abc.png","sphereSlamReferenceWidthMeters":2.5,"sphereSlamReferencePhysicallyMetric":true}"""
+            ("""{"id":"slam_import","name":"Wall","sphereSlamReferenceUri":"file:///sender/files/projects/""" +
+                """slam_import/sphereslam_reference_abc.png","sphereSlamReferenceWidthMeters":""" +
+                """2.5,"sphereSlamReferencePhysicallyMetric":true}""")
                 .toByteArray()
         val imported = importZip(
             zipOf(
@@ -588,7 +594,9 @@ class ProjectManagerTest {
             GraffitiProject(id = "same_slam", name = "Existing"),
         )
         val manifest =
-            """{"id":"same_slam","name":"Imported","sphereSlamReferenceUri":"file:///sender/files/projects/same_slam/sphereslam_reference_abc.png","sphereSlamReferenceWidthMeters":2.0,"sphereSlamReferencePhysicallyMetric":true}"""
+            ("""{"id":"same_slam","name":"Imported","sphereSlamReferenceUri":"file:///sender/files/projects/""" +
+                """same_slam/sphereslam_reference_abc.png","sphereSlamReferenceWidthMeters":""" +
+                """2.0,"sphereSlamReferencePhysicallyMetric":true}""")
                 .toByteArray()
 
         val imported = importZip(
@@ -629,7 +637,9 @@ class ProjectManagerTest {
             val coopManager = ProjectManager(mockContext, uriProvider, provider)
 
             val manifest =
-                """{"id":"host_slam","name":"Host","sphereSlamReferenceUri":"file:///host/files/projects/host_slam/sphereslam_reference_abc.png","sphereSlamReferenceWidthMeters":1.75,"sphereSlamReferencePhysicallyMetric":true}"""
+                ("""{"id":"host_slam","name":"Host","sphereSlamReferenceUri":"file:///host/files/projects/host_slam/""" +
+                    """sphereslam_reference_abc.png","sphereSlamReferenceWidthMeters":""" +
+                    """1.75,"sphereSlamReferencePhysicallyMetric":true}""")
                     .toByteArray()
 
             val loaded = coopManager.loadAsSpectator(

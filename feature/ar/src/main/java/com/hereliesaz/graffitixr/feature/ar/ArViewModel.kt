@@ -1195,16 +1195,6 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    private fun resetSphereCoverage() {
-        synchronized(spherePhotosphereLock) {
-            spherePhotosphere.reset()
-            spherePhotosphereFrames.clear()
-            refreshSphereTileGlowLocked()
-        }
-        standalonePhotosphereActive = false
-        sphereFingerprintAnchorTile = null
-    }
-
     private val _evalAutoFocusEnabled = MutableStateFlow(true)
 
     /** ARCore autofocus: ON is `FocusMode.AUTO`, OFF is `FocusMode.FIXED`. */
