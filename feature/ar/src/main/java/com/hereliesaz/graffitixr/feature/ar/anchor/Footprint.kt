@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
 
 import kotlin.math.abs
 import kotlin.math.max
+import com.hereliesaz.sphereslam.math.RigidMath
 
 /**
  * The **footprint operator** Φ — see `docs/research/PAPER.md` §5.
@@ -27,7 +28,7 @@ import kotlin.math.max
  *
  * `M` is the overlay's composed model matrix, and it is **not rigid** — `ArRenderer` folds the
  * user's pinch into it via `Matrix.scaleM(.., overlayScale, overlayScale, 1f)`. Inverting it with
- * [PoseMath.rigidInverse] (which transposes) is wrong by `s²`: at `overlayScale = 2` a feature
+ * [RigidMath.rigidInverse] (which transposes) is wrong by `s²`: at `overlayScale = 2` a feature
  * sitting exactly on the design edge comes out at `‖Φ‖∞ = 4`, is classified [Region.OUTSIDE], and
  * gets promoted into the backbone — the set defined as wall that never gets painted. Every feature
  * under the artwork would land there, which is precisely the corruption the partition exists to
@@ -39,7 +40,7 @@ import kotlin.math.max
  *    `of(rigidAnchor, halfW * s, halfH * s, ...)`. Keeps Φ a pure rigid-frame operation and makes
  *    the scale dependency visible at the call site.
  *  - Pass the composed matrix and let [ofComposed] divide the scale out via
- *    [PoseMath.similarityInverse].
+ *    [RigidMath.similarityInverse].
  */
 object Footprint {
 
@@ -78,7 +79,7 @@ object Footprint {
         halfW: Float, halfH: Float,
         x: Float, y: Float, z: Float,
         out: FloatArray = FloatArray(2),
-    ): FloatArray = project(PoseMath.rigidInverse(anchorModel), halfW, halfH, x, y, z, out)
+    ): FloatArray = project(RigidMath.rigidInverse(anchorModel), halfW, halfH, x, y, z, out)
 
     /**
      * As [of], but for a model matrix that carries a uniform in-plane scale (the composed overlay
@@ -90,7 +91,7 @@ object Footprint {
         halfW: Float, halfH: Float,
         x: Float, y: Float, z: Float,
         out: FloatArray = FloatArray(2),
-    ): FloatArray = project(PoseMath.similarityInverse(composedModel), halfW, halfH, x, y, z, out)
+    ): FloatArray = project(RigidMath.similarityInverse(composedModel), halfW, halfH, x, y, z, out)
 
     /**
      * Pre-compute the inverse once, for a whole capture's worth of features.
@@ -106,10 +107,10 @@ object Footprint {
      * for (p in points) { Footprint.ofInverted(inv, halfW, halfH, p.x, p.y, p.z, uv); ... }
      * ```
      */
-    fun inverseOfRigid(anchorModel: FloatArray): FloatArray = PoseMath.rigidInverse(anchorModel)
+    fun inverseOfRigid(anchorModel: FloatArray): FloatArray = RigidMath.rigidInverse(anchorModel)
 
     /** As [inverseOfRigid], for a model matrix carrying the overlay's in-plane scale. */
-    fun inverseOfComposed(composedModel: FloatArray): FloatArray = PoseMath.similarityInverse(composedModel)
+    fun inverseOfComposed(composedModel: FloatArray): FloatArray = RigidMath.similarityInverse(composedModel)
 
     /**
      * Φ from an inverse produced by [inverseOfRigid] or [inverseOfComposed]. The extents must match

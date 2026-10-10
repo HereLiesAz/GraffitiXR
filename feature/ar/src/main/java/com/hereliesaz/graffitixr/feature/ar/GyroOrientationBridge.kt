@@ -8,7 +8,7 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.SystemClock
 import androidx.annotation.VisibleForTesting
-import com.hereliesaz.graffitixr.feature.ar.util.RotationDeltaMath
+import com.hereliesaz.sphereslam.math.RotationMath
 import timber.log.Timber
 
 /**
@@ -52,7 +52,7 @@ import timber.log.Timber
  * Verify by starting a bridge (or forcing one) and rotating the phone one way; the bridged overlay
  * should turn the same way it would under live vision tracking, not the opposite.
  *
- * `R_z` itself is not the open question: [RotationDeltaMath.rotationAboutZ] of a `Surface.ROTATION_*`
+ * `R_z` itself is not the open question: [RotationMath.rotationAboutZ] of a `Surface.ROTATION_*`
  * angle is exactly `SensorManager.remapCoordinateSystem`'s body-to-display remap (pinned in
  * `OverlayGyroCompensationMathTest`). What is unverified is the ANGLE fed to it here — callers pass
  * CameraX `imageInfo.rotationDegrees` (`sensorOrientation − displayRotation` for a rear camera),
@@ -142,7 +142,7 @@ class GyroOrientationBridge(context: Context) : SensorEventListener {
      */
     @VisibleForTesting
     internal fun ingestRotationQuaternion(x: Float, y: Float, z: Float, w: Float) {
-        latestQuaternion = RotationDeltaMath.normalize(floatArrayOf(x, y, z, w))
+        latestQuaternion = RotationMath.normalize(floatArrayOf(x, y, z, w))
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
@@ -222,11 +222,11 @@ class GyroOrientationBridge(context: Context) : SensorEventListener {
         // lastGoodRotation, where A is the fixed IMU-body-to-camera-optical alignment — the
         // CDD-guaranteed Z-axis identity composed with the display's quarter-turn IN EFFECT AT
         // REFERENCE TIME (see [commitReference]).
-        val qDeltaBody = RotationDeltaMath.multiplyQuaternions(RotationDeltaMath.conjugate(qNow), qRef)
-        val deltaBody = RotationDeltaMath.toRotationMatrix3x3(RotationDeltaMath.normalize(qDeltaBody))
-        val a = RotationDeltaMath.rotationAboutZ(referenceRotationDeg)
-        val aT = RotationDeltaMath.transposeMat3(a)
-        return RotationDeltaMath.multiplyMat3(RotationDeltaMath.multiplyMat3(a, deltaBody), aT)
+        val qDeltaBody = RotationMath.multiplyQuaternions(RotationMath.conjugate(qNow), qRef)
+        val deltaBody = RotationMath.toRotationMatrix3x3(RotationMath.normalize(qDeltaBody))
+        val a = RotationMath.rotationAboutZ(referenceRotationDeg)
+        val aT = RotationMath.transposeMat3(a)
+        return RotationMath.multiplyMat3(RotationMath.multiplyMat3(a, deltaBody), aT)
     }
 
     /**
@@ -236,10 +236,10 @@ class GyroOrientationBridge(context: Context) : SensorEventListener {
      *
      * @param lastGoodRotation the row-major 3x3 rotation block of the last confidently-tracked
      *   [HomographyArTracker.HomographyPose.viewMatrix] (its column-major upper-left 3x3,
-     *   transposed to row-major — see [RotationDeltaMath]'s doc on the convention split).
+     *   transposed to row-major — see [RotationMath]'s doc on the convention split).
      */
     fun bridgedRotation(lastGoodRotation: FloatArray): FloatArray? {
         val deltaCamera = cameraRotationDelta() ?: return null
-        return RotationDeltaMath.multiplyMat3(deltaCamera, lastGoodRotation)
+        return RotationMath.multiplyMat3(deltaCamera, lastGoodRotation)
     }
 }

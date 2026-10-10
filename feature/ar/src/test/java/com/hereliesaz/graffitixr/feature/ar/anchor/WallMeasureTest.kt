@@ -6,6 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 import kotlin.math.cos
 import kotlin.math.sin
+import com.hereliesaz.sphereslam.math.RigidMath
 
 /**
  * Expected values come from FORWARD projection (wall-local → world → clip → screen) through plain
@@ -65,7 +66,7 @@ class WallMeasureTest {
     fun `oblique wall and moved camera still recover points and the width`() {
         val wall = yawThenTranslate(35f, 0.4f, -0.2f, -4f)
         // view = inverse(camera pose); camera at (0.3, 0.1, 0.5) yawed -10°.
-        val view = PoseMath.rigidInverse(yawThenTranslate(-10f, 0.3f, 0.1f, 0.5f))
+        val view = RigidMath.rigidInverse(yawThenTranslate(-10f, 0.3f, 0.1f, 0.5f))
         val a = measure(floatArrayOf(-1.2f, 0.3f), wall, view)!!
         val b = measure(floatArrayOf(0.9f, -0.1f), wall, view)!!
         assertEquals(-1.2f, a[0], 2e-3f); assertEquals(0.3f, a[1], 2e-3f)
@@ -79,8 +80,8 @@ class WallMeasureTest {
         val wall = translation(0f, 0f, -3f)
         val view = translation(0f, 0f, 0f)
         val g = yawThenTranslate(50f, 7f, -2f, 11f)  // an ARCore world rebase
-        val wallG = PoseMath.multiply(g, wall)
-        val viewG = PoseMath.multiply(view, PoseMath.rigidInverse(g))
+        val wallG = RigidMath.multiply(g, wall)
+        val viewG = RigidMath.multiply(view, RigidMath.rigidInverse(g))
         val p = measure(floatArrayOf(0.5f, -0.4f), wallG, viewG)!!
         assertEquals(0.5f, p[0], 1e-3f); assertEquals(-0.4f, p[1], 1e-3f)
     }
@@ -184,17 +185,17 @@ class WallMeasureTest {
         val backbone = translation(0.2f, -0.1f, -3f)   // unfused anchor: does not move
         val drawnBefore = translation(0f, 0f, -3f)     // the wall: z = -3, facing the camera
         // Fusion yaws the drawn frame 10° about its origin between the taps.
-        val drawnAfter = PoseMath.multiply(drawnBefore, yawThenTranslate(10f, 0f, 0f, 0f))
+        val drawnAfter = RigidMath.multiply(drawnBefore, yawThenTranslate(10f, 0f, 0f, 0f))
         // Plane frozen at tap 1, the way the renderer stores it: inv(backbone) · drawn.
-        val planeLocal = PoseMath.multiply(PoseMath.rigidInverse(backbone), drawnBefore)
+        val planeLocal = RigidMath.multiply(RigidMath.rigidInverse(backbone), drawnBefore)
         fun tap(screen: FloatArray, planeWorld: FloatArray): FloatArray {
             val ray = WallMeasure.screenRay(screen[0], screen[1], view, proj)!!
             return WallMeasure.toFrameLocal(WallMeasure.intersectWallWorld(ray, planeWorld)!!, backbone)!!
         }
         val left = toScreen(floatArrayOf(-1f, 0f), drawnBefore, view)
         val right = toScreen(floatArrayOf(1.5f, 0f), drawnBefore, view)
-        val a = tap(left, PoseMath.multiply(backbone, planeLocal))
-        val frozen = tap(right, PoseMath.multiply(backbone, planeLocal))
+        val a = tap(left, RigidMath.multiply(backbone, planeLocal))
+        val frozen = tap(right, RigidMath.multiply(backbone, planeLocal))
         val unfrozen = tap(right, drawnAfter)
         assertEquals(2.5f, WallMeasure.widthMeters(a, frozen)!!, 2e-3f)
         // Control: re-reading the re-oriented drawn plane would have moved the second point.

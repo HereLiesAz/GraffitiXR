@@ -8,6 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.hereliesaz.sphereslam.math.RotationMath
 
 /**
  * Pins the sign conventions of [OverlayGyroCompensationMath] — the part of Overlay's Gyro toggle
@@ -120,7 +121,7 @@ class OverlayGyroCompensationMathTest {
      * Independent model of `SensorManager.remapCoordinateSystem(inR, X, Y, outR)` as AOSP implements
      * it (`outR = inR · r`): argument X names the NEW axis (and sign) the device x axis lands on, Y the
      * same for device y, and device z completes the right-handed frame. Returned as the row-major
-     * `v_new = M · v_device` component map. Written from that rule, not from RotationDeltaMath.
+     * `v_new = M · v_device` component map. Written from that rule, not from RotationMath.
      */
     private fun remapLikeSensorManager(axisX: Int, axisY: Int): FloatArray {
         val m = FloatArray(9)
@@ -155,12 +156,12 @@ class OverlayGyroCompensationMathTest {
             for (i in 0..8) assertClose(expected[i], actual[i])
         }
         // Spelled out for 90: screen x = -body y, screen y = body x.
-        val v90 = RotationDeltaMath.multiplyMat3Vec3(
+        val v90 = RotationMath.multiplyMat3Vec3(
             OverlayGyroCompensationMath.bodyToDisplay(90), floatArrayOf(1f, 2f, 3f),
         )
         assertClose(-2f, v90[0]); assertClose(1f, v90[1]); assertClose(3f, v90[2])
-        // ...and it is RotationDeltaMath.rotationAboutZ(+90), not the negated angle.
-        val rz90 = RotationDeltaMath.rotationAboutZ(90)
+        // ...and it is RotationMath.rotationAboutZ(+90), not the negated angle.
+        val rz90 = RotationMath.rotationAboutZ(90)
         for (i in 0..8) assertClose(rz90[i], table.getValue(90)[i])
     }
 

@@ -1,5 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
+import com.hereliesaz.sphereslam.math.RigidMath
+
 /**
  * Rigid frame conversions at the ARCore ↔ metric-KPM seam.
  *
@@ -12,7 +14,7 @@ object HybridPageFrame {
         sensorView: FloatArray,
         cameraFromPage: FloatArray,
     ): FloatArray =
-        PoseMath.multiply(PoseMath.rigidInverse(sensorView), cameraFromPage)
+        RigidMath.multiply(RigidMath.rigidInverse(sensorView), cameraFromPage)
 
     /**
      * Immutable centered-page-from-artwork relation. Under any ARCore global rebase G:
@@ -23,5 +25,5 @@ object HybridPageFrame {
         worldFromPage: FloatArray,
         worldFromArtwork: FloatArray,
     ): FloatArray =
-        PoseMath.multiply(PoseMath.rigidInverse(worldFromPage), worldFromArtwork)
+        RigidMath.multiply(RigidMath.rigidInverse(worldFromPage), worldFromArtwork)
 }

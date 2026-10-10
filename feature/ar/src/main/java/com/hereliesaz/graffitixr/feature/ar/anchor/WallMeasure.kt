@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
 
 import kotlin.math.abs
 import kotlin.math.sqrt
+import com.hereliesaz.sphereslam.math.RigidMath
 
 /**
  * Two-tap wall measurement (BACKLOG Phase 6, step 1 "Measure"). Pure geometry, no Android/ARCore.
@@ -54,7 +55,7 @@ object WallMeasure {
         // matrix, clip.x = P0·x + P8·z and clip.w = -z, so at z = -1: ndcX = P0·x - P8.
         val cx = (ndcX + proj[8]) / proj[0]
         val cy = (ndcY + proj[9]) / proj[5]
-        val camToWorld = PoseMath.rigidInverse(view)
+        val camToWorld = RigidMath.rigidInverse(view)
         val dx = camToWorld[0] * cx + camToWorld[4] * cy - camToWorld[8]
         val dy = camToWorld[1] * cx + camToWorld[5] * cy - camToWorld[9]
         val dz = camToWorld[2] * cx + camToWorld[6] * cy - camToWorld[10]
@@ -76,8 +77,8 @@ object WallMeasure {
     /** World point [p] expressed in rigid [frame]'s local coordinates (x, y, z), or null. */
     fun toFrameLocal(p: FloatArray, frame: FloatArray): FloatArray? {
         if (p.size < 3 || frame.size != 16 || frame.any { !it.isFinite() }) return null
-        if (abs(PoseMath.scaleOf(frame) - 1f) > RIGID_SCALE_TOLERANCE) return null
-        val inv = PoseMath.rigidInverse(frame)
+        if (abs(RigidMath.scaleOf(frame) - 1f) > RIGID_SCALE_TOLERANCE) return null
+        val inv = RigidMath.rigidInverse(frame)
         val out = FloatArray(3) { r -> inv[r] * p[0] + inv[4 + r] * p[1] + inv[8 + r] * p[2] + inv[12 + r] }
         return out.takeIf { o -> o.all { it.isFinite() } }
     }
@@ -89,7 +90,7 @@ object WallMeasure {
      */
     fun intersectWallWorld(ray: Ray, wallModel: FloatArray): FloatArray? {
         if (wallModel.size != 16 || wallModel.any { !it.isFinite() }) return null
-        if (abs(PoseMath.scaleOf(wallModel) - 1f) > RIGID_SCALE_TOLERANCE) return null
+        if (abs(RigidMath.scaleOf(wallModel) - 1f) > RIGID_SCALE_TOLERANCE) return null
         val nx = wallModel[8]; val ny = wallModel[9]; val nz = wallModel[10]
         val d = ray.direction; val o = ray.origin
         val denom = nx * d[0] + ny * d[1] + nz * d[2]

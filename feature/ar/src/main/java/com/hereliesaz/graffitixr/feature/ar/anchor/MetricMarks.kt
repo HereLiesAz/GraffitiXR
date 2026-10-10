@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
+import com.hereliesaz.sphereslam.math.RigidMath
 import kotlin.math.hypot
 
 /**
@@ -13,7 +14,7 @@ import kotlin.math.hypot
  * result drops straight into the existing reloc PnP (objPts = these points).
  *
  * Conventions: view matrices are column-major 4x4. [Triangulation] expects **CV-convention** views
- * (camera looks +Z); ARCore/OpenGL views look −Z, so convert them with [glViewToCv] first.
+ * (camera looks +Z); ARCore/OpenGL views look −Z, so convert them with [RigidMath.glViewToCv] first.
  */
 object MetricMarks {
 
@@ -28,20 +29,7 @@ object MetricMarks {
     }
 
     /**
-     * Convert an OpenGL/ARCore world→camera view (camera looks −Z) to CV convention (camera looks
-     * +Z) by negating the camera Y and Z axes — i.e. rows 1 and 2 of the matrix.
-     */
-    fun glViewToCv(view: FloatArray): FloatArray {
-        val v = view.copyOf()
-        for (col in 0 until 4) {              // element (row,col) = v[col*4+row], column-major
-            v[col * 4 + 1] = -v[col * 4 + 1]  // row 1 (camera Y)
-            v[col * 4 + 2] = -v[col * 4 + 2]  // row 2 (camera Z)
-        }
-        return v
-    }
-
-    /**
-     * [glViewToCv], then rotated into the **display** camera frame — `IMPLEMENTATION.md` Phase 0,
+     * [RigidMath.glViewToCv], then rotated into the **display** camera frame — `IMPLEMENTATION.md` Phase 0,
      * convention B: every capture-side quantity lives in display orientation.
      *
      * The capture path rotates the bitmap and the intrinsics by `rotationNeeded` and left the view
@@ -65,7 +53,7 @@ object MetricMarks {
     fun glViewToCvDisplay(view: FloatArray, rotationDeg: Int): FloatArray {
         val r = ((rotationDeg % 360) + 360) % 360
         require(r % 90 == 0) { "rotationDeg must be a multiple of 90, was $rotationDeg" }
-        val cv = glViewToCv(view)
+        val cv = RigidMath.glViewToCv(view)
         if (r == 0) return cv                     // R_z(0) == I; skip the multiply entirely
         return rotateZ(cv, r)
     }
@@ -75,7 +63,7 @@ object MetricMarks {
      * for the capture view matrix handed to native, which expects GL (`IMPLEMENTATION.md` 0.10).
      *
      * **The sign flips, and that is not a typo.** Writing `D = diag(1,-1,-1)` for the GL↔CV axis
-     * conversion that [glViewToCv] performs, we need `GL_display` such that
+     * conversion that [RigidMath.glViewToCv] performs, we need `GL_display` such that
      * `D · GL_display = R_z(θ) · D · GL_sensor`. Since `D` is its own inverse,
      * `GL_display = D · R_z(θ) · D · GL_sensor`, and
      *
@@ -130,7 +118,7 @@ object MetricMarks {
      * non-degenerate, in front of both cameras, and reproject within [maxReprojPx] in both views.
      * Returns an empty result if the baseline is below [minBaselineM] (geometry too weak to trust).
      *
-     * @param cvView0 / cvView1 CV-convention world→camera views (see [glViewToCv]).
+     * @param cvView0 / cvView1 CV-convention world→camera views (see [RigidMath.glViewToCv]).
      */
     fun triangulate(
         corrs: List<Corr>,

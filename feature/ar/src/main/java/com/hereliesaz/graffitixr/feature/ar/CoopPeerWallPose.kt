@@ -1,8 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import com.hereliesaz.graffitixr.common.model.CoopSpatialFrame
-import com.hereliesaz.graffitixr.feature.ar.anchor.MetricMarks
-import com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
+import com.hereliesaz.sphereslam.math.RigidMath
 
 internal data class CoopPeerWallPose(
     val viewMatrix: FloatArray,
@@ -15,7 +14,7 @@ internal data class CoopPeerWallPose(
  * Turns MobileGS's peer-fingerprint PnP result into the one shared co-op wall view.
  *
  * Native PnP publishes CV camera-from-fingerprint. The v3 spatial descriptor supplies
- * fingerprint-from-host-wall. [MetricMarks.glViewToCv] is an involution (row Y/Z sign flip), so
+ * fingerprint-from-host-wall. [RigidMath.glViewToCv] is an involution (row Y/Z sign flip), so
  * applying it to the CV matrix produces the GL camera matrix used by the transparent renderer.
  */
 internal object CoopPeerWallPoseSolver {
@@ -33,8 +32,8 @@ internal object CoopPeerWallPoseSolver {
         val pnpCv = reloc.copyOfRange(0, 16)
         if (pnpCv.any { !it.isFinite() }) return null
         val fingerprintFromWall = spatialFrame.fingerprintFromWall.toFloatArray()
-        val cameraGlFromFingerprint = MetricMarks.glViewToCv(pnpCv)
-        val cameraGlFromWall = PoseMath.multiply(cameraGlFromFingerprint, fingerprintFromWall)
+        val cameraGlFromFingerprint = RigidMath.glViewToCv(pnpCv)
+        val cameraGlFromWall = RigidMath.multiply(cameraGlFromFingerprint, fingerprintFromWall)
         if (cameraGlFromWall.any { !it.isFinite() }) return null
         return CoopPeerWallPose(cameraGlFromWall, inliers, matches, seq)
     }

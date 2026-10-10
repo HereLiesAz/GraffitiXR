@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
 import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.sphereslam.math.RigidMath
 
 /**
  * `IMPLEMENTATION.md` **Phase 2** — tag every fingerprint point with its region relative to the
@@ -166,7 +167,7 @@ object FingerprintPartition {
         if (fingerprint.points3d.isEmpty()) return fingerprint
         if (fingerprint.captureAnchorCam.size != 16) return fingerprint
         if (!design.isUsable) return fingerprint
-        val designInPointFrame = PoseMath.multiply(
+        val designInPointFrame = RigidMath.multiply(
             fingerprint.captureAnchorCam.toFloatArray(), design.rigidModelAnchorLocal,
         )
         return fingerprint.copy(

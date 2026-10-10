@@ -14,9 +14,9 @@ import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsicsEstimator
 import com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricMarks
 import com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion
-import com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
+import com.hereliesaz.sphereslam.math.RigidMath
 import com.hereliesaz.graffitixr.feature.ar.rendering.ProjectionMatrix
-import com.hereliesaz.graffitixr.feature.ar.util.RotationDeltaMath
+import com.hereliesaz.sphereslam.math.RotationMath
 import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintFrame
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.sphereslam.SphereSlamCalibration
@@ -728,17 +728,17 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             return identityView()
         }
 
-        val qDeltaBody = RotationDeltaMath.multiplyQuaternions(
-            RotationDeltaMath.conjugate(qNow),
+        val qDeltaBody = RotationMath.multiplyQuaternions(
+            RotationMath.conjugate(qNow),
             qRef,
         )
-        val deltaBody = RotationDeltaMath.toRotationMatrix3x3(
-            RotationDeltaMath.normalize(qDeltaBody)
+        val deltaBody = RotationMath.toRotationMatrix3x3(
+            RotationMath.normalize(qDeltaBody)
         )
-        val a = RotationDeltaMath.rotationAboutZ(photosphereReferenceRotationDeg)
-        val deltaCamera = RotationDeltaMath.multiplyMat3(
-            RotationDeltaMath.multiplyMat3(a, deltaBody),
-            RotationDeltaMath.transposeMat3(a),
+        val a = RotationMath.rotationAboutZ(photosphereReferenceRotationDeg)
+        val deltaCamera = RotationMath.multiplyMat3(
+            RotationMath.multiplyMat3(a, deltaBody),
+            RotationMath.transposeMat3(a),
         )
         return columnMajorViewFromRowMajorRotation(deltaCamera)
     }
@@ -756,8 +756,8 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             cameraFromFingerprint.any { !it.isFinite() }
         ) return
 
-        val mapFromFingerprint = PoseMath.multiply(
-            PoseMath.rigidInverse(cameraFromMap),
+        val mapFromFingerprint = RigidMath.multiply(
+            RigidMath.rigidInverse(cameraFromMap),
             cameraFromFingerprint,
         )
         if (mapFromFingerprint.any { !it.isFinite() }) return
@@ -1238,7 +1238,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
      *
      * Both inputs here intentionally remain in the precision fingerprint frame:
      * `reloc[0..15]` is CV `camera_from_fingerprint`, while [kpmView] is GL
-     * `camera_from_fingerprint`. [MetricMarks.glViewToCv] converts the former into the latter so
+     * `camera_from_fingerprint`. [RigidMath.glViewToCv] converts the former into the latter so
      * they can corroborate each other. Only AFTER this local precision fusion is the result rebased
      * through explicit `map_from_fingerprint` into the base SphereSLAM map.
      */
@@ -1254,7 +1254,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         val inliers = reloc[16]
         val inlierRatio = if (matches > 0f) inliers / matches else 0f
         if (inlierRatio < PoseFusion.MIN_INLIER_RATIO || inliers < RELOC_MIN_INLIERS) return kpmView
-        val relocViewGl = MetricMarks.glViewToCv(reloc.copyOfRange(0, 16))
+        val relocViewGl = RigidMath.glViewToCv(reloc.copyOfRange(0, 16))
         if (!relocViewGl.all { it.isFinite() } || relocViewGl[15] != 1f) return kpmView
         // Trust the reloc only when it already corroborates the current KPM pose.
         if (PoseFusion.diverged(kpmView, relocViewGl)) return kpmView
@@ -1400,8 +1400,8 @@ internal fun rotateViewPoseKeepingCameraCenter(
         }
     }
     val translation = floatArrayOf(viewMatrix[12], viewMatrix[13], viewMatrix[14])
-    val rotatedR = RotationDeltaMath.multiplyMat3(deltaCameraRowMajor, rotation)
-    val rotatedT = RotationDeltaMath.multiplyMat3Vec3(deltaCameraRowMajor, translation)
+    val rotatedR = RotationMath.multiplyMat3(deltaCameraRowMajor, rotation)
+    val rotatedT = RotationMath.multiplyMat3Vec3(deltaCameraRowMajor, translation)
 
     val out = FloatArray(16)
     for (row in 0..2) {

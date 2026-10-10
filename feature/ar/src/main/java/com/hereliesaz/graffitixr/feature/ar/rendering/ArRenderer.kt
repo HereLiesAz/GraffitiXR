@@ -262,7 +262,7 @@ class ArRenderer(
             } else {
                 try {
                     val wm = com.hereliesaz.graffitixr.feature.ar.anchor.WallMeasure
-                    val pm = com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
+                    val pm = com.hereliesaz.sphereslam.math.RigidMath
                     // The plane: the first tap's, carried through the unfused backbone, or the drawn
                     // wall frame expressed anchor-locally.
                     val planeLocal = req.planeLocal
@@ -1067,7 +1067,7 @@ class ArRenderer(
         session: Session,
         worldFromLocal: FloatArray,
     ): com.google.ar.core.Anchor {
-        val q = com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
+        val q = com.hereliesaz.sphereslam.math.RigidMath
             .matrixToQuaternion(worldFromLocal)
         return session.createAnchor(
             com.google.ar.core.Pose(
@@ -1726,7 +1726,7 @@ class ArRenderer(
                         // identity rotation and faced the camera. Take +Y when it plausibly faces the
                         // camera (|cos| > 0.5), else the anchor→camera direction, matching both origins.
                         anchorModelMatrix = relocPose.copyOf()
-                        val q = com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath.matrixToQuaternion(relocPose)
+                        val q = com.hereliesaz.sphereslam.math.RigidMath.matrixToQuaternion(relocPose)
                         anchor = activeSession.createAnchor(
                             com.google.ar.core.Pose(
                                 floatArrayOf(relocPose[12], relocPose[13], relocPose[14]),

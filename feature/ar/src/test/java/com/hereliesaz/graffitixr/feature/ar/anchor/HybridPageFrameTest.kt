@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Test
+import com.hereliesaz.sphereslam.math.RigidMath
 
 class HybridPageFrameTest {
     @Test
@@ -10,7 +11,7 @@ class HybridPageFrameTest {
         val cameraFromPage = translated(0.25f, -0.1f, -2f)
 
         val worldFromPage = HybridPageFrame.worldFromPage(sensorView, cameraFromPage)
-        val recomposed = PoseMath.multiply(sensorView, worldFromPage)
+        val recomposed = RigidMath.multiply(sensorView, worldFromPage)
 
         assertArrayEquals(cameraFromPage, recomposed, 1e-5f)
     }
@@ -22,8 +23,8 @@ class HybridPageFrameTest {
         val expected = HybridPageFrame.pageFromArtwork(worldFromPage, worldFromArtwork)
 
         val rebase = translated(7f, -4f, 2f)
-        val rebasedPage = PoseMath.multiply(rebase, worldFromPage)
-        val rebasedArtwork = PoseMath.multiply(rebase, worldFromArtwork)
+        val rebasedPage = RigidMath.multiply(rebase, worldFromPage)
+        val rebasedArtwork = RigidMath.multiply(rebase, worldFromArtwork)
         val actual = HybridPageFrame.pageFromArtwork(rebasedPage, rebasedArtwork)
 
         assertArrayEquals(expected, actual, 1e-5f)

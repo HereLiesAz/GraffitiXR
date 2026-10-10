@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
 
 import com.hereliesaz.graffitixr.common.model.FusionDiagnostics
 import com.hereliesaz.graffitixr.common.model.FusionState
+import com.hereliesaz.sphereslam.math.RigidMath
 
 /**
  * Fuses the ARCore-consensus backbone with mark-PnP relocalization into a single rendered anchor
@@ -135,9 +136,9 @@ class PoseFusion {
 
         /** True when two anchor-local corrections are within the agreement tolerances. */
         fun agrees(a: FloatArray, b: FloatArray): Boolean {
-            val delta = PoseMath.multiply(PoseMath.rigidInverse(a), b)
-            return PoseMath.translationNorm(delta) <= HYBRID_AGREEMENT_DIST_M &&
-                PoseMath.rotationAngleDeg(delta) <= HYBRID_AGREEMENT_ANGLE_DEG
+            val delta = RigidMath.multiply(RigidMath.rigidInverse(a), b)
+            return RigidMath.translationNorm(delta) <= HYBRID_AGREEMENT_DIST_M &&
+                RigidMath.rotationAngleDeg(delta) <= HYBRID_AGREEMENT_ANGLE_DEG
         }
 
         private fun identity() = floatArrayOf(1f,0f,0f,0f, 0f,1f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
@@ -181,9 +182,9 @@ class PoseFusion {
             vCurrent: FloatArray,
             pnpMat: FloatArray,
             captureAnchorCam: FloatArray,
-        ): FloatArray = PoseMath.multiply(
-            PoseMath.rigidInverse(vCurrent),
-            PoseMath.multiply(MetricMarks.glViewToCv(pnpMat), captureAnchorCam),
+        ): FloatArray = RigidMath.multiply(
+            RigidMath.rigidInverse(vCurrent),
+            RigidMath.multiply(RigidMath.glViewToCv(pnpMat), captureAnchorCam),
         )
 
         /** Smoothed interpolation between two rigid poses (translation lerp + quaternion nlerp). */
@@ -197,17 +198,17 @@ class PoseFusion {
             if (reloc.size >= 35 && reloc[34] == 1f) reloc.copyOfRange(19, 35) else null
 
         fun blend(current: FloatArray, target: FloatArray, alpha: Float): FloatArray {
-            val t = PoseMath.lerp(PoseMath.translationOf(current), PoseMath.translationOf(target), alpha)
-            val q = PoseMath.nlerpQuat(PoseMath.matrixToQuaternion(current), PoseMath.matrixToQuaternion(target), alpha)
-            return PoseMath.fromQuaternionTranslation(q, t)
+            val t = RigidMath.lerp(RigidMath.translationOf(current), RigidMath.translationOf(target), alpha)
+            val q = RigidMath.nlerpQuat(RigidMath.matrixToQuaternion(current), RigidMath.matrixToQuaternion(target), alpha)
+            return RigidMath.fromQuaternionTranslation(q, t)
         }
 
         /** True if two rigid poses differ in translation or rotation beyond the cold-snap thresholds. */
         fun diverged(a: FloatArray, b: FloatArray): Boolean {
-            val ta = PoseMath.translationOf(a); val tb = PoseMath.translationOf(b)
+            val ta = RigidMath.translationOf(a); val tb = RigidMath.translationOf(b)
             val dx = ta[0] - tb[0]; val dy = ta[1] - tb[1]; val dz = ta[2] - tb[2]
             if (kotlin.math.sqrt(dx * dx + dy * dy + dz * dz) >= COLD_SNAP_DIST_M) return true
-            val qa = PoseMath.matrixToQuaternion(a); val qb = PoseMath.matrixToQuaternion(b)
+            val qa = RigidMath.matrixToQuaternion(a); val qb = RigidMath.matrixToQuaternion(b)
             val dot = kotlin.math.abs(qa[0]*qb[0] + qa[1]*qb[1] + qa[2]*qb[2] + qa[3]*qb[3]).coerceIn(0f, 1f)
             val angleDeg = Math.toDegrees(2.0 * kotlin.math.acos(dot.toDouble())).toFloat()
             return angleDeg >= COLD_SNAP_ANGLE_DEG
@@ -256,12 +257,12 @@ class PoseFusion {
             val corrected = composeCorrected(solveViewOf(reloc) ?: vCurrent, reloc.copyOf(16), captureAnchorCam)
             // Anchor-local correction such that backbone ∘ L == corrected at snap time. This relative
             // transform is frame-invariant under ARCore's global world-coordinate rewrites.
-            val newLocal = PoseMath.multiply(PoseMath.rigidInverse(backbone), corrected)
+            val newLocal = RigidMath.multiply(RigidMath.rigidInverse(backbone), corrected)
 
             // Cold = first lock after (re)start/tracking-loss, no prior correction, or a fix that
             // diverges far from where we're currently drawing (the pocket case). Compare in the
             // CURRENT world frame by carrying the stored local correction through the live backbone.
-            val applied = correction?.let { PoseMath.multiply(backbone, it) }
+            val applied = correction?.let { RigidMath.multiply(backbone, it) }
             val cold = coldStart || applied == null || diverged(applied, corrected)
             val highConf = inlierRatio >= COLD_SNAP_INLIER_RATIO && inliers >= COLD_SNAP_MIN_INLIERS
 
@@ -294,7 +295,7 @@ class PoseFusion {
         }
         lastSeq = seq
         // fused = backbone ∘ L, re-applied every frame (identity until the first trusted snap).
-        return PoseMath.multiply(backbone, correction ?: identity())
+        return RigidMath.multiply(backbone, correction ?: identity())
     }
 
     /**
@@ -322,14 +323,14 @@ class PoseFusion {
             if (quality < MIN_INLIER_RATIO) snapsRejected++
 
             if (quality >= MIN_INLIER_RATIO) {
-                val newLocal = PoseMath.multiply(
-                    PoseMath.rigidInverse(backboneAtObservation),
+                val newLocal = RigidMath.multiply(
+                    RigidMath.rigidInverse(backboneAtObservation),
                     correctedAnchorAtObservation,
                 )
                 // Compare divergence in the CURRENT world frame. Both the standing and candidate
                 // corrections ride through currentBackbone, so an ARCore world rebase cancels out.
-                val correctedCurrent = PoseMath.multiply(currentBackbone, newLocal)
-                val applied = correction?.let { PoseMath.multiply(currentBackbone, it) }
+                val correctedCurrent = RigidMath.multiply(currentBackbone, newLocal)
+                val applied = correction?.let { RigidMath.multiply(currentBackbone, it) }
 
                 // Repeated-observation agreement before a LARGE move. "Large" is measured against
                 // what is drawn right now (the standing correction, or the raw backbone before the
@@ -356,7 +357,7 @@ class PoseFusion {
                         lastHybridAgreement = hybridPending.size
                         lastState = FusionState.AWAITING_AGREEMENT
                         lastHybridTimestampNs = observationTimestampNs
-                        return PoseMath.multiply(currentBackbone, correction ?: identity())
+                        return RigidMath.multiply(currentBackbone, correction ?: identity())
                     }
                     // Enough consistent evidence: proceed with the latest candidate (its divergence
                     // already makes it cold, so a high-confidence one snaps).
@@ -395,7 +396,7 @@ class PoseFusion {
             // Fusion row flicker between the two on every frame of one observation's lifetime.
             lastState = FusionState.HOLDING
         }
-        return PoseMath.multiply(currentBackbone, correction ?: identity())
+        return RigidMath.multiply(currentBackbone, correction ?: identity())
     }
 
     /**
@@ -410,7 +411,7 @@ class PoseFusion {
         if (correction != null && hybridPending.isEmpty()) {
             lastState = FusionState.HOLDING
         }
-        return PoseMath.multiply(backbone, correction ?: identity())
+        return RigidMath.multiply(backbone, correction ?: identity())
     }
 
     // Large-correction candidates (anchor-local, so rebase-invariant) awaiting agreement.
@@ -465,8 +466,8 @@ class PoseFusion {
         if (d == null) {
             mm = -1f; deg = -1f
         } else {
-            mm = PoseMath.translationNorm(d) * 1000f
-            deg = PoseMath.rotationAngleDeg(d)
+            mm = RigidMath.translationNorm(d) * 1000f
+            deg = RigidMath.rotationAngleDeg(d)
         }
         return FusionDiagnostics(
             state = if (d == null && lastState == FusionState.WAITING_FOR_LOCK) {

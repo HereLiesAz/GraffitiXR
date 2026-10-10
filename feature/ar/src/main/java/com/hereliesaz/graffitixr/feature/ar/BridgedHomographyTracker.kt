@@ -4,7 +4,7 @@ package com.hereliesaz.graffitixr.feature.ar
 import android.content.Context
 import android.graphics.Bitmap
 import com.hereliesaz.graffitixr.feature.ar.HomographyArTracker.HomographyPose
-import com.hereliesaz.graffitixr.feature.ar.util.RotationDeltaMath
+import com.hereliesaz.sphereslam.math.RotationMath
 
 /**
  * [HomographyArTracker] plus [GyroOrientationBridge]: tracks each frame with vision when it can,
@@ -95,8 +95,8 @@ class BridgedHomographyTracker(
             ?: return null // no sensor sample yet — nothing to bridge with.
         val heldRotation = rowMajorRotationOf(held.viewMatrix)
         val heldTranslation = translationOf(held.viewMatrix)
-        val bridgedRotation = RotationDeltaMath.multiplyMat3(deltaCamera, heldRotation)
-        val bridgedTranslation = RotationDeltaMath.multiplyMat3Vec3(deltaCamera, heldTranslation)
+        val bridgedRotation = RotationMath.multiplyMat3(deltaCamera, heldRotation)
+        val bridgedTranslation = RotationMath.multiplyMat3Vec3(deltaCamera, heldTranslation)
 
         // Confidence decays linearly across the bridge window so a caller/UI can visibly distinguish
         // "just locked" from "about to lose it entirely", the same role ARCore's TrackingState plays.

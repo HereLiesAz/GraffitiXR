@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
 import com.hereliesaz.sphereslam.SphereSlamPoseMath
+import com.hereliesaz.sphereslam.math.RigidMath
 
 /**
  * Durable coordinate contract for the ARCore-independent wall fingerprint.
@@ -162,9 +163,9 @@ object StandaloneFingerprintFrame {
     ): FloatArray {
         require(cameraFromFingerprint.size == 16 && cameraFromFingerprint.all { it.isFinite() })
         require(mapFromFingerprint.size == 16 && mapFromFingerprint.all { it.isFinite() })
-        return PoseMath.multiply(
+        return RigidMath.multiply(
             cameraFromFingerprint,
-            PoseMath.rigidInverse(mapFromFingerprint),
+            RigidMath.rigidInverse(mapFromFingerprint),
         )
     }
 

@@ -10,6 +10,7 @@ import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import com.hereliesaz.sphereslam.math.RigidMath
 
 /**
  * Builds a physically metric, fronto-parallel KPM page from the same ARCore wall plane used by the
@@ -82,7 +83,7 @@ internal object HybridMetricKpmReference {
             PlaneMarks.Pixel(centerU, topV),
             PlaneMarks.Pixel(centerU, bottomV),
         )
-        val cvView = MetricMarks.glViewToCv(glView)
+        val cvView = RigidMath.glViewToCv(glView)
         val projected = PlaneMarks.backProject(
             pixels = samples,
             cvView = cvView,
@@ -160,7 +161,7 @@ internal object HybridMetricKpmReference {
             ez[0], ez[1], ez[2], 0f,
             c[0], c[1], c[2], 1f,
         )
-        val cameraFromPageGl = MetricMarks.glViewToCv(cameraFromPageCv)
+        val cameraFromPageGl = RigidMath.glViewToCv(cameraFromPageCv)
 
         val sourceWidthPx = max(
             pixelDistance(src[0], src[1]),

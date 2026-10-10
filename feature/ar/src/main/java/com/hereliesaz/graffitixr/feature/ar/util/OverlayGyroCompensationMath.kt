@@ -3,12 +3,13 @@ package com.hereliesaz.graffitixr.feature.ar.util
 import kotlin.math.abs
 import kotlin.math.acos
 import kotlin.math.tan
+import com.hereliesaz.sphereslam.math.RotationMath
 
 /**
  * Pure math behind Overlay's Gyro rail toggle ([com.hereliesaz.graffitixr.feature.ar.OverlayGyroStabilizer]):
  * a gyro orientation delta in, the screen-space transform that keeps the drawn design pinned to the
  * wall out. Split out so it is unit-testable on the JVM (see `OverlayGyroCompensationMathTest`),
- * mirroring [RotationDeltaMath]'s split from [com.hereliesaz.graffitixr.feature.ar.GyroOrientationBridge].
+ * mirroring [RotationMath]'s split from [com.hereliesaz.graffitixr.feature.ar.GyroOrientationBridge].
  *
  * **Model.** The phone sits on a tripod and only jitters by fractions of a degree. For a camera
  * that only ROTATES, every scene point — whatever its depth — moves on the image by the infinite
@@ -28,7 +29,7 @@ import kotlin.math.tan
  * `Surface.ROTATION_*`), and [homography] flips y/z into the computer-vision camera frame (x right,
  * y down, z into the scene — the rear camera looks out of the BACK, along body −z) before applying K.
  *
- * Matrices are `FloatArray(9)`, row-major, matching [RotationDeltaMath]. A homography's output is
+ * Matrices are `FloatArray(9)`, row-major, matching [RotationMath]. A homography's output is
  * normalised so `h[8] == 1` and is ready for `android.graphics.Matrix.setValues`.
  */
 object OverlayGyroCompensationMath {
@@ -71,14 +72,14 @@ object OverlayGyroCompensationMath {
      * which reversed every pan/tilt compensation in landscape.
      */
     fun bodyToDisplay(displayRotationDeg: Int): FloatArray =
-        RotationDeltaMath.rotationAboutZ(normalizeQuarterTurn(displayRotationDeg))
+        RotationMath.rotationAboutZ(normalizeQuarterTurn(displayRotationDeg))
 
     /** Re-express a body-axes rotation delta in the display's axes: `M · ΔR · Mᵀ`. */
     fun displayDelta(deltaBody: FloatArray, displayRotationDeg: Int): FloatArray {
         val m = bodyToDisplay(displayRotationDeg)
-        return RotationDeltaMath.multiplyMat3(
-            RotationDeltaMath.multiplyMat3(m, deltaBody),
-            RotationDeltaMath.transposeMat3(m),
+        return RotationMath.multiplyMat3(
+            RotationMath.multiplyMat3(m, deltaBody),
+            RotationMath.transposeMat3(m),
         )
     }
 
@@ -158,7 +159,7 @@ object OverlayGyroCompensationMath {
         }
         val k = floatArrayOf(fx, 0f, cx, 0f, fy, cy, 0f, 0f, 1f)
         val kInv = floatArrayOf(1f / fx, 0f, -cx / fx, 0f, 1f / fy, -cy / fy, 0f, 0f, 1f)
-        val h = RotationDeltaMath.multiplyMat3(RotationDeltaMath.multiplyMat3(k, m), kInv)
+        val h = RotationMath.multiplyMat3(RotationMath.multiplyMat3(k, m), kInv)
         val w = h[8]
         if (abs(w) < 1e-9f) return h
         return FloatArray(9) { h[it] / w }

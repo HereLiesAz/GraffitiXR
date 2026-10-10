@@ -5,6 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.cos
 import kotlin.math.sin
+import com.hereliesaz.sphereslam.math.RigidMath
 
 /**
  * `IMPLEMENTATION.md` **0.9** — is `PoseFusion.composeCorrected` actually in consistent frames?
@@ -25,7 +26,7 @@ import kotlin.math.sin
  * The one input that encodes a belief is `pnpMat` — what `solvePnP` would return under zero drift.
  * Rather than assert my own convention, it is built from the repo's OWN shipped bridge:
  *
- *  - `MetricMarks.glViewToCv` is how every fingerprint's capture view is converted, and
+ *  - `RigidMath.glViewToCv` is how every fingerprint's capture view is converted, and
  *  - `MetricFingerprintBuilder` back-projects the fingerprint's 3D points through exactly that CV
  *    view, storing `captureAnchorCam = cvView · anchorModel`.
  *
@@ -77,13 +78,13 @@ class ComposeCorrectedFrameTest {
      * `pnpMat` as the relocalizer would produce it with no drift: the transform taking a point from
      * the fingerprint frame (= the capture CV camera frame) to the live CV camera frame.
      *
-     * Built through `MetricMarks.glViewToCv`, the repo's own converter, rather than by writing
+     * Built through `RigidMath.glViewToCv`, the repo's own converter, rather than by writing
      * `diag(1,-1,-1)` here — so the test inherits the shipped convention instead of asserting one.
      */
     private fun zeroDriftPnp(): FloatArray {
-        val cvCapture = MetricMarks.glViewToCv(vGlCapture)
-        val cvLive = MetricMarks.glViewToCv(vGlLive)
-        return PoseMath.multiply(cvLive, PoseMath.rigidInverse(cvCapture))
+        val cvCapture = RigidMath.glViewToCv(vGlCapture)
+        val cvLive = RigidMath.glViewToCv(vGlLive)
+        return RigidMath.multiply(cvLive, RigidMath.rigidInverse(cvCapture))
     }
 
     /**
@@ -96,7 +97,7 @@ class ComposeCorrectedFrameTest {
     @Test
     fun `zero drift corrects to the anchor itself`() {
         val corrected = PoseFusion.composeCorrected(
-            vGlLive, zeroDriftPnp(), PoseMath.multiply(MetricMarks.glViewToCv(vGlCapture), anchorModel),
+            vGlLive, zeroDriftPnp(), RigidMath.multiply(RigidMath.glViewToCv(vGlCapture), anchorModel),
         )
         assertMatrixEquals(
             "zero drift must correct to the anchor itself; a residual here IS a frame defect",
@@ -122,7 +123,7 @@ class ComposeCorrectedFrameTest {
      * corrected = inv(V_gl(t)) · [D · pnp] · captureAnchorCam
      * ```
      *
-     * `D · pnp` is exactly `MetricMarks.glViewToCv(pnp)`, and `captureAnchorCam` is a quantity
+     * `D · pnp` is exactly `RigidMath.glViewToCv(pnp)`, and `captureAnchorCam` is a quantity
      * Phase 2 already builds, persists and partitions with. So the fix needs no new geometry: it
      * swaps `fpAnchor` for something the project already computes for another reason, and applies
      * one existing converter.
@@ -130,10 +131,10 @@ class ComposeCorrectedFrameTest {
     @Test
     fun `the corrected composition satisfies the invariant`() {
         val captureAnchorCam =
-            PoseMath.multiply(MetricMarks.glViewToCv(vGlCapture), anchorModel)
-        val corrected = PoseMath.multiply(
-            PoseMath.rigidInverse(vGlLive),
-            PoseMath.multiply(MetricMarks.glViewToCv(zeroDriftPnp()), captureAnchorCam),
+            RigidMath.multiply(RigidMath.glViewToCv(vGlCapture), anchorModel)
+        val corrected = RigidMath.multiply(
+            RigidMath.rigidInverse(vGlLive),
+            RigidMath.multiply(RigidMath.glViewToCv(zeroDriftPnp()), captureAnchorCam),
         )
         assertMatrixEquals(
             "the corrected form must return the anchor unchanged under zero drift",
@@ -156,15 +157,15 @@ class ComposeCorrectedFrameTest {
     @Test
     fun `converting pnp on both sides is worse than not converting it at all`() {
         val captureAnchorCam =
-            PoseMath.multiply(MetricMarks.glViewToCv(vGlCapture), anchorModel)
-        val doubled = PoseMath.multiply(
-            PoseMath.rigidInverse(vGlLive),
-            PoseMath.multiply(cvToGlTransform(zeroDriftPnp()), captureAnchorCam),
+            RigidMath.multiply(RigidMath.glViewToCv(vGlCapture), anchorModel)
+        val doubled = RigidMath.multiply(
+            RigidMath.rigidInverse(vGlLive),
+            RigidMath.multiply(cvToGlTransform(zeroDriftPnp()), captureAnchorCam),
         )
         // The ORIGINAL defective composition, written out rather than called: composeCorrected has
         // since been fixed, so there is no longer a function that produces it.
-        val originalDefect = PoseMath.multiply(
-            PoseMath.multiply(PoseMath.rigidInverse(vGlLive), zeroDriftPnp()), anchorModel,
+        val originalDefect = RigidMath.multiply(
+            RigidMath.multiply(RigidMath.rigidInverse(vGlLive), zeroDriftPnp()), anchorModel,
         )
         val worstDoubled = (0 until 16).maxOf { kotlin.math.abs(anchorModel[it] - doubled[it]) }
         val worstOriginal = (0 until 16).maxOf { kotlin.math.abs(anchorModel[it] - originalDefect[it]) }
@@ -187,7 +188,7 @@ class ComposeCorrectedFrameTest {
      * other rather than against my arithmetic.
      */
     private fun cvToGlTransform(m: FloatArray): FloatArray {
-        val dm = MetricMarks.glViewToCv(m)                 // D · m  (rows 1,2 negated)
+        val dm = RigidMath.glViewToCv(m)                 // D · m  (rows 1,2 negated)
         val out = dm.copyOf()
         for (row in 0 until 4) {                           // (D · m) · D  (cols 1,2 negated)
             out[1 * 4 + row] = -out[1 * 4 + row]
@@ -203,7 +204,7 @@ class ComposeCorrectedFrameTest {
     @Test
     fun `the converter negates rows, so the column pass is its mirror`() {
         val m = pose(rxDeg = 21f, ryDeg = -13f, tx = 0.7f, ty = -0.2f, tz = 1.9f)
-        val rowsNegated = MetricMarks.glViewToCv(m)
+        val rowsNegated = RigidMath.glViewToCv(m)
         for (col in 0 until 4) {
             for (row in 0 until 4) {
                 val expected = if (row == 1 || row == 2) -m[col * 4 + row] else m[col * 4 + row]

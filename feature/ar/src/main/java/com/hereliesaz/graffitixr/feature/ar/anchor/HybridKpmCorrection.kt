@@ -4,6 +4,7 @@ import com.hereliesaz.graffitixr.common.model.HybridKpmDiagnostics
 import com.hereliesaz.graffitixr.common.model.HybridKpmOutcome
 import com.hereliesaz.sphereslam.SphereSlamPoseMath
 import com.hereliesaz.sphereslam.SphereSlamTracker
+import com.hereliesaz.sphereslam.math.RigidMath
 
 /**
  * Pure frame algebra and quality gates for ARCore-primary / KPM-correction hybrid tracking.
@@ -159,9 +160,9 @@ object HybridKpmCorrection {
             pageCenterXmm = pageGeometry.centerXmm,
             pageCenterYmm = pageGeometry.centerYmm,
         )
-        val cameraFromAnchor = PoseMath.multiply(cameraFromPage, pageFromAnchor)
-        val correctedWorld = PoseMath.multiply(
-            PoseMath.rigidInverse(sample.viewMatrix),
+        val cameraFromAnchor = RigidMath.multiply(cameraFromPage, pageFromAnchor)
+        val correctedWorld = RigidMath.multiply(
+            RigidMath.rigidInverse(sample.viewMatrix),
             cameraFromAnchor,
         )
         if (correctedWorld.any { !it.isFinite() }) {
@@ -171,9 +172,9 @@ object HybridKpmCorrection {
         // The same anchor-local quantity PoseFusion stores: backbone⁻¹ ∘ corrected at the
         // observation instant. Its magnitude is the drift being corrected, and is invariant under an
         // ARCore global rebase, so the ceiling cannot be tripped by ARCore renumbering its world.
-        val local = PoseMath.multiply(PoseMath.rigidInverse(sample.backboneMatrix), correctedWorld)
-        val correctionM = PoseMath.translationNorm(local)
-        val correctionDeg = PoseMath.rotationAngleDeg(local)
+        val local = RigidMath.multiply(RigidMath.rigidInverse(sample.backboneMatrix), correctedWorld)
+        val correctionM = RigidMath.translationNorm(local)
+        val correctionDeg = RigidMath.rotationAngleDeg(local)
         diag = diag.copy(correctionMm = correctionM * 1000f, correctionDeg = correctionDeg)
         if (
             !correctionM.isFinite() || !correctionDeg.isFinite() ||

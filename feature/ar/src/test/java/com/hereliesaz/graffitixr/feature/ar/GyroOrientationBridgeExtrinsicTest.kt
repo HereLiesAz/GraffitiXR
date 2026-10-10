@@ -10,6 +10,7 @@ import org.junit.Test
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
+import com.hereliesaz.sphereslam.math.RotationMath
 
 /**
  * Closes the loop [GyroOrientationBridge]'s own doc flags as open: the fixed IMU-body→camera-optical
@@ -21,7 +22,7 @@ import kotlin.math.sin
  * `image.imageInfo.rotationDegrees` quantity — with a negative control proving `R_z(−θ)` is wrong.
  *
  * Reference matrices are written independently here (plain cos/sin, row-major `v' = R·v`), not taken
- * from `RotationDeltaMath`, so the thing under test cannot vacuously confirm itself.
+ * from `RotationMath`, so the thing under test cannot vacuously confirm itself.
  */
 class GyroOrientationBridgeExtrinsicTest {
 

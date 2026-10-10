@@ -25,7 +25,7 @@ import com.hereliesaz.graffitixr.common.DispatcherProvider
 import com.hereliesaz.graffitixr.common.util.imageStats
 import com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
-import com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
+import com.hereliesaz.sphereslam.math.RigidMath
 import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder
 import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintFrame
 import kotlinx.coroutines.Job
@@ -3472,7 +3472,7 @@ class ArViewModel @Inject constructor(
             return
         }
         slamManager.setDesignPlacement(
-            PoseMath.multiply(
+            RigidMath.multiply(
                 fingerprint.captureAnchorCam.toFloatArray(), design.rigidModelAnchorLocal,
             ),
             design.halfW,

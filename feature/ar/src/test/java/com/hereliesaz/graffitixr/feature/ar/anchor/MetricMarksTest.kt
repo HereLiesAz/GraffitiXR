@@ -17,17 +17,6 @@ class MetricMarksTest {
         return Triangulation.project(p, x, y, z)!!
     }
 
-    @Test fun `glViewToCv negates the Y and Z rows`() {
-        val gl = floatArrayOf(1f,2f,3f,4f, 5f,6f,7f,8f, 9f,10f,11f,12f, 13f,14f,15f,16f)
-        val cv = MetricMarks.glViewToCv(gl)
-        for (col in 0 until 4) {
-            assertEquals(gl[col*4+0], cv[col*4+0], 0f)     // row 0 unchanged
-            assertEquals(-gl[col*4+1], cv[col*4+1], 0f)    // row 1 negated
-            assertEquals(-gl[col*4+2], cv[col*4+2], 0f)    // row 2 negated
-            assertEquals(gl[col*4+3], cv[col*4+3], 0f)     // row 3 unchanged
-        }
-    }
-
     @Test fun `recovers camera-frame points from a step-aside baseline`() {
         val v0 = viewWithCenter(0f, 0f, 0f)   // keyframe 0 at origin -> cam0 frame == world
         val v1 = viewWithCenter(0.2f, 0f, 0f) // stepped 20cm aside

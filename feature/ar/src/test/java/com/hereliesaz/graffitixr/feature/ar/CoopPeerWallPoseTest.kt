@@ -3,8 +3,7 @@ package com.hereliesaz.graffitixr.feature.ar
 import com.hereliesaz.graffitixr.common.model.CoopSpatialFrame
 import com.hereliesaz.graffitixr.common.model.CoopSpatialScale
 import com.hereliesaz.graffitixr.common.model.CoopTrackingBackend
-import com.hereliesaz.graffitixr.feature.ar.anchor.MetricMarks
-import com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
+import com.hereliesaz.sphereslam.math.RigidMath
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -43,8 +42,8 @@ class CoopPeerWallPoseTest {
         val maybeSolved = CoopPeerWallPoseSolver.solve(reloc, spatial(fingerprintFromWall))
         assertNotNull(maybeSolved)
         val solved = requireNotNull(maybeSolved)
-        val expected = PoseMath.multiply(
-            MetricMarks.glViewToCv(pnpCv),
+        val expected = RigidMath.multiply(
+            RigidMath.glViewToCv(pnpCv),
             fingerprintFromWall,
         )
         assertArrayEquals(expected, solved.viewMatrix, 1e-6f)
