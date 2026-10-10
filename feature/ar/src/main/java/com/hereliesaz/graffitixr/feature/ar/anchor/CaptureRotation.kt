@@ -51,6 +51,23 @@ object CaptureRotation {
     }
 
     /**
+     * Inverse of [rotateIntrinsics]: display-rotated intrinsics back to the raw sensor frame, for a
+     * consumer that un-rotates the bitmap (`postRotate(-rotationDeg)`) because it must index a
+     * sensor-frame buffer such as ARCore depth.
+     *
+     * @param rotatedW / [rotatedH] the **rotated** image dimensions (the display-oriented bitmap).
+     * @param rotationDeg the same `rotationNeeded` that was passed to [rotateIntrinsics].
+     * @return `[fx, fy, cx, cy]` for the raw sensor frame.
+     */
+    fun unrotateIntrinsics(
+        fx: Float, fy: Float, cx: Float, cy: Float,
+        rotatedW: Float, rotatedH: Float,
+        rotationDeg: Int,
+    ): FloatArray =
+        // Rotating the rotated frame by -θ undoes +θ; its "raw" dimensions are the rotated ones.
+        rotateIntrinsics(fx, fy, cx, cy, rotatedW, rotatedH, 360 - ((rotationDeg % 360) + 360) % 360)
+
+    /**
      * Where a raw sensor pixel `(u, v)` lands once the bitmap has been rotated by [rotationDeg].
      *
      * Mirrors `android.graphics.Matrix.postRotate(deg)` followed by `Bitmap.createBitmap`, which
