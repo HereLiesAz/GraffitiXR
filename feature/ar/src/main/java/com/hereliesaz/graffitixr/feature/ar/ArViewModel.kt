@@ -121,6 +121,30 @@ internal fun shouldRestoreLocalArCoreFingerprint(
         !(coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST &&
             peerSpatialFramePresent)
 
+/**
+ * A standalone target-capture tap as `[nx, ny]` fractions of the full [frameWidth] × [frameHeight]
+ * frame. [tap] is a fraction of the camera view of [viewSize] pixels, which shows the frame
+ * `FILL_CENTER`; without a view size the tap is taken as already frame-relative, and without a tap
+ * the frame centre is used (the centre is the centre under any centred crop).
+ */
+internal fun standaloneTapInFrame(
+    tap: Pair<Float, Float>?,
+    viewSize: Pair<Int, Int>?,
+    frameWidth: Int,
+    frameHeight: Int,
+): FloatArray {
+    if (tap == null) return floatArrayOf(0.5f, 0.5f)
+    if (viewSize == null) return floatArrayOf(tap.first, tap.second)
+    return com.hereliesaz.graffitixr.feature.ar.rendering.CameraFillCenter.viewToFrameNormalized(
+        nx = tap.first,
+        ny = tap.second,
+        frameWidth = frameWidth,
+        frameHeight = frameHeight,
+        viewWidth = viewSize.first,
+        viewHeight = viewSize.second,
+    ) ?: floatArrayOf(tap.first, tap.second)
+}
+
 data class StandaloneFingerprintPlacement(
     /** Column-major GL map_from_fingerprint transform. */
     val mapFromFingerprint: FloatArray,
@@ -1642,6 +1666,13 @@ class ArViewModel @Inject constructor(
 
     @Volatile
     private var pendingTapPosition: Pair<Float, Float>? = null
+
+    /**
+     * Pixel size of the camera view [pendingTapPosition] was measured in, or null when the caller
+     * did not supply one. Standalone placement needs it to undo the preview's FILL_CENTER crop.
+     */
+    @Volatile
+    private var pendingTapViewSize: Pair<Int, Int>? = null
 
     @Volatile
     private var pendingStandaloneFingerprintPlacement: StandaloneFingerprintPlacement? = null
@@ -4650,6 +4681,7 @@ class ArViewModel @Inject constructor(
 
     private fun buildStandaloneFingerprintPlacement(
         tap: Pair<Float, Float>?,
+        tapViewSize: Pair<Int, Int>?,
     ): StandaloneFingerprintPlacement? {
         val attitude = latestCameraAttitude ?: return null
         // Roll of the display-upright frame the keyframes and the capture tap live in.
@@ -4665,11 +4697,14 @@ class ArViewModel @Inject constructor(
             // The tapped pixel's direction is rotated through heading, elevation AND roll
             // (PhotosphereMap.directionOfPixel). A missing tile range means the map is still the
             // normalized unit-radius, non-metric frame, not zero metres.
+            // The tap is a fraction of the SCREEN; the view's intrinsics describe the full
+            // display-upright analysis frame, of which the FILL_CENTER preview shows a centre crop.
+            val frameTap = standaloneTapInFrame(tap, tapViewSize, view.width, view.height)
             val placement = com.hereliesaz.sphereslam.PhotosphereFingerprintFrame.placement(
                 map = spherePhotosphere,
                 view = view,
-                nx = tap?.first ?: 0.5f,
-                ny = tap?.second ?: 0.5f,
+                nx = frameTap[0],
+                ny = frameTap[1],
             ) ?: return@synchronized null
             StandaloneFingerprintPlacement(
                 mapFromFingerprint = placement.mapFromFingerprint,
@@ -4699,8 +4734,11 @@ class ArViewModel @Inject constructor(
      */
     fun onStandaloneTargetCaptured(bitmap: Bitmap) {
         val captureTap = pendingTapPosition
+        val captureTapViewSize = pendingTapViewSize
         pendingTapPosition = null
-        pendingStandaloneFingerprintPlacement = buildStandaloneFingerprintPlacement(captureTap)
+        pendingTapViewSize = null
+        pendingStandaloneFingerprintPlacement =
+            buildStandaloneFingerprintPlacement(captureTap, captureTapViewSize)
         pendingStandaloneFingerprintPlacement?.let { placement ->
             sphereFingerprintAnchorTile = placement.tileId
             appendDiag(
@@ -5030,11 +5068,18 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    fun onScreenTap(nx: Float, ny: Float) {
+    /**
+     * A target-capture tap at ([nx], [ny]) as fractions of the camera view. [viewWidthPx] /
+     * [viewHeightPx] are that view's size in pixels: ARCore maps view taps itself (hit test,
+     * `transformCoordinates2d`), but the standalone path must undo CameraPreview's FILL_CENTER crop
+     * to find the tapped pixel in the full frame. Omitted (0), the tap is taken as frame-relative.
+     */
+    fun onScreenTap(nx: Float, ny: Float, viewWidthPx: Int = 0, viewHeightPx: Int = 0) {
         // A co-op guest keeps the session's spatial frame: re-targeting re-anchors only this device
         // and no Op carries it, so it would split the peers' frames.
         if (_uiState.value.coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) return
         pendingTapPosition = nx to ny
+        pendingTapViewSize = if (viewWidthPx > 0 && viewHeightPx > 0) viewWidthPx to viewHeightPx else null
         // Hand the tap to the renderer so it can measure the camera→point distance at that pixel
         // (and add a fusion support anchor) on the GL thread during capture.
         renderer?.pendingCaptureTap = floatArrayOf(nx, ny)

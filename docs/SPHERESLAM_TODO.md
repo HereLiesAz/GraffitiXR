@@ -483,6 +483,15 @@ Remaining:
 - [x] Correct and test standalone gesture coordinates for CameraX `FIT_CENTER` letterboxing:
   camera-frame wall-units/pixel are converted to screen wall-units/pixel using the actual fitted
   viewport height; crop handling remains in the calibrated frame transform.
+- [x] Fill the screen: CameraX preview `FILL_CENTER` (was `FIT_CENTER` letterboxing). The artwork
+  surface draws full-surface with a projection from the frame intrinsics rescaled + cropped exactly
+  as the preview (`CameraFillCenter`, SphereSLAM `CameraIntrinsicsTransforms`/`ProjectionMatrix`);
+  gesture units/pixel use the cover scale; capture taps, the coverage glow's field of view and
+  Overlay ▸ Gyro's screen intrinsics map through the same crop; the analyzers track the full frame
+  rather than the viewport cropRect. Unit-tested as pure math; on-device registration check
+  pending.
+- [ ] Upstream `CameraFillCenter` to SphereSLAM `camera` beside `ScreenIntrinsics` (fill
+  counterpart of `fitCenter`, plus the crop-aware projection and view→frame mapping).
 - [ ] Add GL/instrumentation tests for standalone texture clear/replace if test infrastructure permits.
 - [x] Sanitize and test standalone renderer transforms: non-finite values fall back safely, scale
   uses the shared 0.1–10 editor bounds, rotations normalize, and pathological finite pan values are

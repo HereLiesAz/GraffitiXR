@@ -71,7 +71,9 @@ internal class CoopPeerFingerprintAnalyzer(
             val y = image.planes.firstOrNull() ?: return
             val rawWidth = image.width
             val rawHeight = image.height
-            val crop = image.cropRect
+            // Full buffer, not the FILL_CENTER viewport cropRect — the same reasoning as
+            // SphereSlamStandaloneTrackingAnalyzer.analyze: the screen crop is display-only.
+            val crop = android.graphics.Rect(0, 0, rawWidth, rawHeight)
             if (crop.width() <= 0 || crop.height() <= 0) return
             val rotationDeg = image.imageInfo.rotationDegrees
 
@@ -137,6 +139,7 @@ internal class CoopPeerFingerprintAnalyzer(
                 val tracked = SphereSlamStandaloneFrame(
                     viewMatrix = solved.viewMatrix,
                     projMatrix = projection,
+                    frameIntrinsics = intrinsics,
                     frameAspect = rotated.width.toFloat() / rotated.height.toFloat(),
                     frameHeightPixels = rotated.height,
                     timestampNs = image.imageInfo.timestamp,

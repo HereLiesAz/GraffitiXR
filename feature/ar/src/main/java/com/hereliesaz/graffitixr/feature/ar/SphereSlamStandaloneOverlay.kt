@@ -55,12 +55,14 @@ import com.hereliesaz.graffitixr.common.model.SphereSlamAtlasPage
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import com.hereliesaz.graffitixr.design.theme.rememberAppStrings
+import com.hereliesaz.graffitixr.feature.ar.rendering.CameraFillCenter
 import com.hereliesaz.graffitixr.feature.ar.rendering.HomographyOverlayRenderer
 import com.hereliesaz.sphereslam.CoverageGlowProjection
 import com.hereliesaz.sphereslam.PhotosphereKeyframe
 import com.hereliesaz.sphereslam.SphereCoverage
 import com.hereliesaz.sphereslam.overlay.CoverageGlowRenderer
 import com.hereliesaz.sphereslam.SphereSlamStandaloneSession
+import com.hereliesaz.sphereslam.camera.CameraIntrinsics
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.Dispatchers
@@ -149,6 +151,15 @@ private class SphereTileGlowMask(
             ).apply { fillMode = CoverageGlowRenderer.FillMode.COMPLEMENT }
     }
 }
+
+/**
+ * `[horizontal, vertical]` field of view, in degrees, of what the screen shows of [frame]: the
+ * preview's `FILL_CENTER` crop once the artwork surface has a size, the full frame's own until then
+ * (the first frames can arrive before layout). Null for unusable intrinsics.
+ */
+private fun shownFieldOfViewDegrees(frame: CameraIntrinsics, surface: IntSize): FloatArray? =
+    CameraFillCenter.fieldOfViewDegrees(frame, surface.width, surface.height)
+        ?: CameraFillCenter.fieldOfViewDegrees(frame, frame.width, frame.height)
 
 internal fun shouldStartStandaloneAnalyzer(
     cameraIdPresent: Boolean,
@@ -835,24 +846,22 @@ fun SphereSlamStandaloneOverlay(
         if (frame == null) {
             glRenderer.clearPose()
         } else {
-            glRenderer.updatePose(frame.viewMatrix, frame.projMatrix, frame.frameAspect)
+            glRenderer.updatePose(frame.viewMatrix, frame.frameIntrinsics)
             // The glow is the complement of tile freshness: the entire view glows, and only
             // photosphere tiles whose needsUpdate=false state is current are punched clear.
             val attitude = cameraAttitude()
             val currentRegions = coverageCurrentRegions()
             coverageGlowDirections() // keep the update-side signal hot/read alongside its complement
             if (attitude != null) {
-                val px = frame.projMatrix[0]
-                val py = frame.projMatrix[5]
-                if (px > 1e-4f && py > 1e-4f) {
-                    val hFovDeg = Math.toDegrees(2.0 * kotlin.math.atan(1.0 / px)).toFloat()
-                    val vFovDeg = Math.toDegrees(2.0 * kotlin.math.atan(1.0 / py)).toFloat()
+                // The wash covers the whole surface, i.e. the preview's FILL_CENTER crop — project
+                // the tiles through that cropped field of view, not the full frame's.
+                shownFieldOfViewDegrees(frame.frameIntrinsics, surfaceSize.get())?.let { fov ->
                     coverageGlowMask.update(
                         currentRegions = currentRegions,
                         cameraHeadingDeg = attitude.first,
                         cameraElevationDeg = attitude.second,
-                        horizontalFovDeg = hFovDeg,
-                        verticalFovDeg = vFovDeg,
+                        horizontalFovDeg = fov[0],
+                        verticalFovDeg = fov[1],
                     )
                 }
             } else {
@@ -1054,21 +1063,23 @@ fun SphereSlamStandaloneOverlay(
                     // tile. This path works before a fingerprint/KPM pose exists.
                     onPhotosphereKeyframe(keyframe)
                     val k = keyframe.intrinsics
-                    val fx = k[0]
-                    val fy = k[1]
-                    if (fx > 1e-4f && fy > 1e-4f) {
-                        val hFovDeg = Math.toDegrees(
-                            2.0 * kotlin.math.atan(keyframe.width.toDouble() / (2.0 * fx))
-                        ).toFloat()
-                        val vFovDeg = Math.toDegrees(
-                            2.0 * kotlin.math.atan(keyframe.height.toDouble() / (2.0 * fy))
-                        ).toFloat()
+                    val keyframeIntrinsics = CameraIntrinsics(
+                        fx = k[0],
+                        fy = k[1],
+                        cx = k[2],
+                        cy = k[3],
+                        width = keyframe.width,
+                        height = keyframe.height,
+                    )
+                    // Keyframes are the full display-upright analysis frame; the glow shows the
+                    // preview's FILL_CENTER crop of it.
+                    shownFieldOfViewDegrees(keyframeIntrinsics, surfaceSize.get())?.let { fov ->
                         coverageGlowMask.update(
                             currentRegions = coverageCurrentRegions(),
                             cameraHeadingDeg = keyframe.headingDeg,
                             cameraElevationDeg = keyframe.elevationDeg,
-                            horizontalFovDeg = hFovDeg,
-                            verticalFovDeg = vFovDeg,
+                            horizontalFovDeg = fov[0],
+                            verticalFovDeg = fov[1],
                         )
                     }
                 },

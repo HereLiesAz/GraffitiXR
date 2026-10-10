@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.opengl.GLES30
 import android.opengl.Matrix
+import com.hereliesaz.sphereslam.camera.CameraIntrinsics
 import com.hereliesaz.sphereslam.overlay.CoverageGlowRenderer
 import java.util.concurrent.atomic.AtomicReference
 import javax.microedition.khronos.egl.EGLConfig
@@ -25,18 +26,19 @@ import javax.microedition.khronos.opengles.GL10
  * reasoning [com.hereliesaz.graffitixr.feature.ar.DeviceAttitudeProvider] documents for its own
  * fields: a reader must never see a half-written pose.
  *
- * **Viewport matches the preview's letterbox, not the raw GL surface.** [projMatrix] is solved
- * against the tracked camera frame's own pixel aspect ratio, but this GL surface is stretched to
- * fill its parent `Box` — usually a different aspect than the frame. Drawing into the full surface
- * under those two different aspects would stretch/mis-scale the design relative to what
- * `CameraPreview`'s `PreviewView` is actually showing beneath it, so [onDrawFrame] confines drawing
- * to a centered, aspect-correct sub-rectangle of the surface — the exact `FIT_CENTER` scale-to-fit
- * math `CameraPreview` uses for its own `PreviewView.ScaleType`, computed independently here since
- * a `GLSurfaceView` has no such built-in mode.
+ * **Projection matches the preview's `FILL_CENTER` crop, not the tracked frame.** The tracker
+ * solves against the full camera frame, but `CameraPreview`'s `PreviewView` fills the screen with a
+ * centre crop of it, scaled to cover. Drawing with the frame's own projection would stretch and
+ * mis-scale the design relative to what the artist sees, so this renderer takes the frame's
+ * intrinsics ([updatePose]) and draws on the FULL surface viewport with a projection rebuilt from
+ * those intrinsics rescaled and cropped exactly as the preview is
+ * ([CameraFillCenter.projection]; a `GLSurfaceView` has no built-in scale type). The projection is
+ * cached per (intrinsics, surface size), so steady tracking allocates nothing per frame.
  *
  * **Optional coverage glow.** Standalone SphereSLAM's freshness wash — SphereSLAM's `:overlay`
  * [CoverageGlowRenderer], passed in as [coverageGlow] — is drawn embedded here
- * ([CoverageGlowRenderer.drawEmbedded]), on the full surface and BEFORE the design quad, so it
+ * ([CoverageGlowRenderer.drawEmbedded]), on the full surface (= the preview's cropped field of view;
+ * its caller projects with [CameraFillCenter.fieldOfViewDegrees]) and BEFORE the design quad, so it
  * composites above the camera preview and beneath the artwork. A window-level View cannot do that:
  * this media-overlay surface sits behind the app window, so any View drawn in the window washes over
  * the artwork too. The legacy homography fallback passes none.
@@ -67,8 +69,8 @@ class HomographyOverlayRenderer(
     private val coverageGlow: CoverageGlowRenderer? = null,
 ) : android.opengl.GLSurfaceView.Renderer {
 
-    /** One pose + the projection it was computed against, published together so they can't tear. */
-    data class Frame(val viewMatrix: FloatArray, val projMatrix: FloatArray, val frameAspect: Float)
+    /** One pose + the frame intrinsics it was solved against, published together so they can't tear. */
+    data class Frame(val viewMatrix: FloatArray, val frameIntrinsics: CameraIntrinsics)
 
     private val overlayRenderer = OverlayRenderer(context)
 
@@ -79,6 +81,13 @@ class HomographyOverlayRenderer(
     @Volatile private var extentDirty = false
     @Volatile private var surfaceWidth = 0
     @Volatile private var surfaceHeight = 0
+
+    // GL-thread-only cache of the on-screen projection: rebuilt only when the tracked frame's
+    // intrinsics or the surface size change (CameraIntrinsics is a data class, so == is by value).
+    private var displayProjectionIntrinsics: CameraIntrinsics? = null
+    private var displayProjectionWidth = 0
+    private var displayProjectionHeight = 0
+    private var displayProjection: FloatArray? = null
 
     // Whole-design transform. All six components move together, so they are bundled into one immutable
     // snapshot behind an AtomicReference: writing six loose @Volatile fields let the GL thread read a
@@ -99,9 +108,12 @@ class HomographyOverlayRenderer(
     private val contentRotationTemp4 = FloatArray(16)
     private val contentRotationMul4 = FloatArray(16)
 
-    /** Push a newly tracked pose — called from any thread (typically the CameraX analyzer thread). */
-    fun updatePose(viewMatrix: FloatArray, projMatrix: FloatArray, frameAspect: Float) {
-        latestFrame.set(Frame(viewMatrix, projMatrix, frameAspect))
+    /**
+     * Push a newly tracked pose with the display-upright intrinsics of the full frame it was solved
+     * in — called from any thread (typically the CameraX analyzer thread).
+     */
+    fun updatePose(viewMatrix: FloatArray, frameIntrinsics: CameraIntrinsics) {
+        latestFrame.set(Frame(viewMatrix, frameIntrinsics))
     }
 
     /** Stop drawing until the next [updatePose] — call when tracking is fully lost. */
@@ -174,8 +186,8 @@ class HomographyOverlayRenderer(
     }
 
     override fun onDrawFrame(gl: GL10?) {
-        // glClear must hit the FULL surface, not the letterboxed sub-rect below — otherwise a
-        // frame that arrives at a new aspect leaves the previous frame's bars undrawn-over.
+        // One full-surface viewport for the clear, the wash and the design: the FILL_CENTER crop
+        // lives in the projection (displayProjectionFor), not in a sub-rectangle.
         GLES30.glViewport(0, 0, surfaceWidth, surfaceHeight)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
         // Full-surface wash under the artwork; it never clears and restores the GL state it touches.
@@ -192,8 +204,8 @@ class HomographyOverlayRenderer(
         }
 
         val frame = latestFrame.get() ?: return
-        val viewport = letterboxViewport(surfaceWidth, surfaceHeight, frame.frameAspect)
-        if (viewport != null) GLES30.glViewport(viewport[0], viewport[1], viewport[2], viewport[3])
+        // No truthful on-screen projection before the surface is sized: draw nothing, not a guess.
+        val projection = displayProjectionFor(frame.frameIntrinsics) ?: return
 
         // The camera pose is camera_from_map. The design therefore needs the explicit
         // map_from_fingerprint model anchor before its artist-controlled local adjustment.
@@ -206,10 +218,26 @@ class HomographyOverlayRenderer(
         Matrix.multiplyMM(model4, 0, anchor, 0, localModel4, 0)
         overlayRenderer.draw(
             frame.viewMatrix,
-            frame.projMatrix,
+            projection,
             model4,
             contentRotation = buildContentRotation(t.rotationXDeg, t.rotationYDeg),
         )
+    }
+
+    private fun displayProjectionFor(frameIntrinsics: CameraIntrinsics): FloatArray? {
+        val width = surfaceWidth
+        val height = surfaceHeight
+        if (
+            frameIntrinsics != displayProjectionIntrinsics ||
+            width != displayProjectionWidth ||
+            height != displayProjectionHeight
+        ) {
+            displayProjectionIntrinsics = frameIntrinsics
+            displayProjectionWidth = width
+            displayProjectionHeight = height
+            displayProjection = CameraFillCenter.projection(frameIntrinsics, width, height)
+        }
+        return displayProjection
     }
 
     private fun buildContentRotation(rx: Float, ry: Float): FloatArray? {
@@ -241,26 +269,4 @@ class HomographyOverlayRenderer(
         overlayRenderer.release()
         coverageGlow?.releaseGlResources()
     }
-}
-
-/**
- * `FIT_CENTER`: scale [frameAspect] (width/height) to fit fully inside a [surfaceWidth]x[surfaceHeight]
- * surface, centered — matching `PreviewView.ScaleType.FIT_CENTER` pixel-for-pixel. Returns
- * `[x, y, width, height]` for `glViewport`, or null when there's nothing sane to compute (a surface
- * or aspect that hasn't been set up yet). A plain function, not a method, so it's testable without
- * an EGL context — see [HomographyOverlayRenderer]'s doc for why this match matters.
- */
-internal fun letterboxViewport(surfaceWidth: Int, surfaceHeight: Int, frameAspect: Float): IntArray? {
-    if (surfaceWidth <= 0 || surfaceHeight <= 0 || frameAspect <= 0f) return null
-    val surfaceAspect = surfaceWidth.toFloat() / surfaceHeight.toFloat()
-    val vpW: Int
-    val vpH: Int
-    if (frameAspect > surfaceAspect) {
-        vpW = surfaceWidth
-        vpH = (surfaceWidth / frameAspect).toInt()
-    } else {
-        vpH = surfaceHeight
-        vpW = (surfaceHeight * frameAspect).toInt()
-    }
-    return intArrayOf((surfaceWidth - vpW) / 2, (surfaceHeight - vpH) / 2, vpW, vpH)
 }

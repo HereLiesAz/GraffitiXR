@@ -576,7 +576,8 @@ inferred:
   different reasons per path: `clearPose()`'s texture
   path is a real `GLSurfaceView.Renderer.onDrawFrame` — needs a live EGL/GL context, not
   reachable from a plain JVM unit test (see `HomographyOverlayRendererTest`'s own existing tests,
-  which cover only the pure-math `letterboxViewport`, never `onDrawFrame` itself, for the same
+  which cover only its texture mailbox — the viewport/projection math is `CameraFillCenterTest` —
+  never `onDrawFrame` itself, for the same
   reason). `cameraId` feeds `CameraIntrinsicsEstimator.estimate`, which calls Android's real
   `CameraManager` — throws "not mocked" on plain JVM; this module has no Robolectric dependency
   to shadow it (checked: no `robolectric` reference in `feature/ar/build.gradle.kts`, no

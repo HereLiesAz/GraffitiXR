@@ -17,14 +17,20 @@ import com.hereliesaz.graffitixr.nativebridge.YuvConverter
 
 /**
  * One frame's tracked pose plus the GL projection matrix it was solved against — see
- * [HomographyTrackingAnalyzer]. [frameAspect] (width/height of the frame the pose was solved in,
- * AFTER rotation to display orientation) lets the renderer letterbox its viewport to match exactly
- * what [com.hereliesaz.graffitixr.feature.ar.CameraPreview]'s `PreviewView` is showing — see
+ * [HomographyTrackingAnalyzer]. [frameIntrinsics] are the intrinsics of that same frame AFTER
+ * rotation to display orientation; [frameAspect] is its width/height. The renderer re-derives its
+ * on-screen projection from [frameIntrinsics] through the `FILL_CENTER` crop
+ * [com.hereliesaz.graffitixr.feature.ar.CameraPreview]'s `PreviewView` applies — see
  * [com.hereliesaz.graffitixr.feature.ar.rendering.HomographyOverlayRenderer] for why that match
- * matters (drawing into the full GL surface while the preview beneath it is cropped/letterboxed
- * to a different aspect stretches and mis-scales the overlay relative to what's on screen).
+ * matters (drawing the frame's own projection over a preview cropped to a different aspect
+ * stretches and mis-scales the overlay relative to what's on screen).
  */
-data class HomographyTrackedFrame(val pose: HomographyPose, val projMatrix: FloatArray, val frameAspect: Float)
+data class HomographyTrackedFrame(
+    val pose: HomographyPose,
+    val projMatrix: FloatArray,
+    val frameAspect: Float,
+    val frameIntrinsics: CameraIntrinsics,
+)
 
 /**
  * The CameraX `ImageAnalysis.Analyzer` that actually drives [BridgedHomographyTracker] from a
@@ -105,7 +111,12 @@ class HomographyTrackingAnalyzer(
                 )
                 val frameAspect = rotated.width.toFloat() / rotated.height.toFloat()
                 onFrameTracked(
-                    HomographyTrackedFrame(pose, ProjectionMatrix.buildFrom(rotatedFrameIntrinsics), frameAspect),
+                    HomographyTrackedFrame(
+                        pose,
+                        ProjectionMatrix.buildFrom(rotatedFrameIntrinsics),
+                        frameAspect,
+                        rotatedFrameIntrinsics,
+                    ),
                 )
             } else {
                 onFrameTracked(null)

@@ -120,14 +120,15 @@ fun CameraPreview(
         factory = { context ->
             PreviewView(context).apply {
                 this.controller = controller
-                // FIT_CENTER, not the default FILL_CENTER: both CameraX tracking consumers
-                // (SphereSlamStandaloneOverlay for AR; HomographyFallbackOverlay, currently unmounted)
-                // solve pose against the ImageAnalysis frame's own aspect ratio and draw with a
-                // GL viewport letterboxed to match FIT_CENTER exactly (see
-                // HomographyOverlayRenderer's doc). FILL_CENTER's crop has no such matching
-                // counterpart on the GL side, which stretched/mis-scaled the tracked overlay
-                // relative to what this preview actually shows.
-                scaleType = PreviewView.ScaleType.FIT_CENTER
+                // FILL_CENTER (stated, though it is CameraX's default): the camera fills the
+                // screen, centre-cropped. Everything registered to this image applies the SAME
+                // crop through rendering.CameraFillCenter — the CameraX artwork surface's
+                // projection (HomographyOverlayRenderer), tap → frame mapping, the coverage glow's
+                // field of view and Overlay ▸ Gyro's screen intrinsics. The crop is display-only:
+                // CameraController also hands this view's viewport to ImageAnalysis as a cropRect,
+                // and the tracking analyzers deliberately ignore it to keep solving against the
+                // full frame (see SphereSlamStandaloneTrackingAnalyzer.analyze).
+                scaleType = PreviewView.ScaleType.FILL_CENTER
             }
         },
         update = { view ->

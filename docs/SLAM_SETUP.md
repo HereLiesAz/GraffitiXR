@@ -37,9 +37,12 @@ On devices where ARCore is unavailable, AR mode does **not** construct an ARCore
    exposure;
 4. the artist can enter the real measured page width, or explicitly continue with normalized
    1.0-unit scale;
-5. `SphereSlamStandaloneTrackingAnalyzer` packs the real `ImageProxy.cropRect` Y plane, rotates it
-   into display orientation, estimates Camera2 intrinsics for the raw CameraX frame, applies the crop,
-   and rotates `fx/fy/cx/cy` into the same display frame;
+5. `SphereSlamStandaloneTrackingAnalyzer` packs the full Y plane (deliberately not
+   `ImageProxy.cropRect`, which CameraController sets to the full-screen `FILL_CENTER` preview's
+   on-screen crop), rotates it into display orientation, estimates Camera2 intrinsics for the raw
+   CameraX frame, applies the (full-frame) crop through the same transform, and rotates
+   `fx/fy/cx/cy` into the same display frame. The screen crop is applied only where the frame meets
+   the display (`CameraFillCenter`: artwork projection, taps, coverage glow);
 6. `SphereSlamStandaloneSession` builds a calibrated artoolkitX KPM page and synchronously matches
    each analyzed frame;
 7. KPM camera-from-page is converted to a centered, right-handed OpenGL wall-relative view matrix;
