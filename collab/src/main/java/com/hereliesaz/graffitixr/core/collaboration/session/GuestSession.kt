@@ -489,22 +489,31 @@ internal class GuestSession(
             // be relied on to still be running when a stuck write would need it — force-closes
             // the socket if the write hasn't finished within BYE_TIMEOUT_MS; the resulting
             // IOException is swallowed since the socket is being closed either way.
-            val watchdog = java.util.Timer(true).apply {
-                schedule(
-                    object : java.util.TimerTask() {
-                        override fun run() { try { sock.close() } catch (_: Exception) {} }
-                    },
-                    BYE_TIMEOUT_MS,
-                )
-            }
-            try {
-                withContext(Dispatchers.IO) {
-                    val output = sock.getOutputStream()
-                    Frame.write(output, FrameType.ENC, crypto.seal(FrameType.BYE, OpCodec.encode(ByePayload(reason))))
-                    output.flush()
+            //
+            // The seal+write happens under writeMutex, like every other sealed frame: outside it, the
+            // BYE raced the PONG/DELTA_ACK/GUEST_OP writers for crypto's send counter (GCM nonce reuse)
+            // and could interleave its bytes into a frame mid-write. The lock wait is bounded too — if
+            // a wedged write holds it, the BYE is skipped rather than delaying teardown.
+            val locked = withTimeoutOrNull(BYE_TIMEOUT_MS) { writeMutex.lock(); true } ?: false
+            if (locked) {
+                val watchdog = java.util.Timer(true).apply {
+                    schedule(
+                        object : java.util.TimerTask() {
+                            override fun run() { try { sock.close() } catch (_: Exception) {} }
+                        },
+                        BYE_TIMEOUT_MS,
+                    )
                 }
-            } catch (_: Exception) { /* best-effort */ } finally {
-                watchdog.cancel()
+                try {
+                    withContext(Dispatchers.IO) {
+                        val output = sock.getOutputStream()
+                        Frame.write(output, FrameType.ENC, crypto.seal(FrameType.BYE, OpCodec.encode(ByePayload(reason))))
+                        output.flush()
+                    }
+                } catch (_: Exception) { /* best-effort */ } finally {
+                    watchdog.cancel()
+                    writeMutex.unlock()
+                }
             }
         }
         try { socket?.close() } catch (_: Exception) {}

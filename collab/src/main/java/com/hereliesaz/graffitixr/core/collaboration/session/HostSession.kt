@@ -708,12 +708,25 @@ internal class HostSession(
      * Send a BYE. Before the handshake completes (rejection paths) [crypto] is null and the BYE
      * is plaintext; once a live connection exists it is sealed like every other frame so the
      * guest, which only accepts ENC frames post-handshake, can act on the reason.
+     *
+     * The sealed BYE goes through [writeMutex] like every other sealed frame: sealing and writing it
+     * outside the lock raced the live loops for crypto's send counter (GCM nonce reuse) and
+     * interleaved its bytes with a frame mid-write. The lock wait is bounded by [BYE_LOCK_TIMEOUT_MS]
+     * so a write wedged on a dead guest can't stall teardown; the BYE is simply skipped then.
      */
     private suspend fun sendBye(output: OutputStream, reason: CoopSessionState.EndReason, crypto: SessionCrypto?) {
         try {
             val payload = OpCodec.encode(ByePayload(reason))
             if (crypto != null) {
-                writeFrameTimed(output, FrameType.ENC, crypto.seal(FrameType.BYE, payload))
+                // lock() is cancellable and releases the lock if cancelled after acquiring it, so a
+                // timeout here never leaves the mutex held.
+                val locked = withTimeoutOrNull(BYE_LOCK_TIMEOUT_MS) { writeMutex.lock(); true } ?: false
+                if (!locked) return
+                try {
+                    writeFrameTimed(output, FrameType.ENC, crypto.seal(FrameType.BYE, payload))
+                } finally {
+                    writeMutex.unlock()
+                }
             } else {
                 writeFrameTimed(output, FrameType.BYE, payload)
             }
@@ -726,6 +739,9 @@ internal class HostSession(
          * long enough for the editor's deferred save to reach disk, which is what the snapshot reads.
          */
         private const val BULK_PERSIST_GRACE_MS = 5_000L
+
+        // How long close() waits for the write lock before giving up on the best-effort BYE.
+        private const val BYE_LOCK_TIMEOUT_MS = 1_000L
 
         /**
          * Minimum spacing of guest pixel replacements. A guest applies effects at human speed (a
