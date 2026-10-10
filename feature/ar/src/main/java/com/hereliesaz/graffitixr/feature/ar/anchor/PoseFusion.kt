@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
 import com.hereliesaz.graffitixr.common.model.FusionDiagnostics
 import com.hereliesaz.graffitixr.common.model.FusionState
 import com.hereliesaz.sphereslam.math.RigidMath
+import com.hereliesaz.sphereslam.sidecar.HybridAnchorFusion
 
 /**
  * Fuses the ARCore-consensus backbone with mark-PnP relocalization into a single rendered anchor
@@ -27,6 +28,13 @@ import com.hereliesaz.sphereslam.math.RigidMath
  * the new fix.
  *
  * Stateful only across frames (last seq + current local correction); the geometry is pure.
+ *
+ * **Two correction sources, one correction.** The MobileGS reloc path ([currentAnchor]) is this
+ * app's own. The timestamp-aligned KPM sidecar path ([currentAnchorFromHybridObservation]) is
+ * SphereSLAM's [HybridAnchorFusion] — the same anchor-local algebra plus the repeated-observation
+ * agreement a LARGE move needs before it applies. Both write the single standing correction: the
+ * sidecar's copy is re-synchronised from this one ([HybridAnchorFusion.localCorrection]) before
+ * each sidecar call whenever the reloc path changed it, and read back after.
  */
 class PoseFusion {
     private var lastSeq = 0f
@@ -39,8 +47,16 @@ class PoseFusion {
     // pocket, screen back on — snaps instantly instead of easing in.
     private var coldStart = true
 
+    // The KPM sidecar's fusion (agreement gating + anchor-local blend/snap). Shares [correction]:
+    // false once the reloc path has written a correction the sidecar has not been handed yet.
+    private val hybrid = HybridAnchorFusion()
+    private var hybridInSync = true
+
     /** Re-arm the cold (hard) snap — call on session resume / tracking loss so the next relock is instant. */
-    fun markRelocalizing() { coldStart = true }
+    fun markRelocalizing() {
+        coldStart = true
+        hybrid.markRelocalizing()
+    }
 
     /**
      * Clears the persistent local correction back to its initial (no-correction) state and re-arms
@@ -60,7 +76,8 @@ class PoseFusion {
         lastState = FusionState.WAITING_FOR_LOCK
         lastAlpha = -1f
         lastInlierRatio = -1f
-        clearHybridPending()
+        hybrid.reset()
+        hybridInSync = true
         // snapsAccepted/snapsRejected intentionally NOT reset: they are session-lifetime eval counters
         // (see diagnostics()), and a re-capture mid-session is not a new session.
     }
@@ -120,26 +137,6 @@ class PoseFusion {
         const val COLD_SNAP_DIST_M = 0.20f
         /** Rotation gap (deg) that counts as a relock. */
         const val COLD_SNAP_ANGLE_DEG = 15f
-
-        /**
-         * Hybrid KPM observations that must agree before a correction beyond the cold-snap
-         * thresholds is applied. At the sidecar's ~10 Hz that is roughly 0.3 s of consistent
-         * evidence. First-pass value; docs/SPHERESLAM_TODO.md §10 tracks device validation.
-         */
-        const val HYBRID_REQUIRED_AGREEMENT = 3
-        /** Two candidate local corrections agree when within this translation (m) … */
-        const val HYBRID_AGREEMENT_DIST_M = 0.05f
-        /** … and this rotation (deg) of the first pending candidate. */
-        const val HYBRID_AGREEMENT_ANGLE_DEG = 3f
-        /** Pending evidence older than this (observation-clock ns) no longer counts. */
-        const val HYBRID_AGREEMENT_WINDOW_NS = 1_500_000_000L
-
-        /** True when two anchor-local corrections are within the agreement tolerances. */
-        fun agrees(a: FloatArray, b: FloatArray): Boolean {
-            val delta = RigidMath.multiply(RigidMath.rigidInverse(a), b)
-            return RigidMath.translationNorm(delta) <= HYBRID_AGREEMENT_DIST_M &&
-                RigidMath.rotationAngleDeg(delta) <= HYBRID_AGREEMENT_ANGLE_DEG
-        }
 
         private fun identity() = floatArrayOf(1f,0f,0f,0f, 0f,1f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
 
@@ -278,6 +275,7 @@ class PoseFusion {
                 lastAlpha = alpha
                 blend(correction ?: identity(), newLocal, alpha)
             }
+            hybridInSync = false
             snapsAccepted++
         } else if (isNew && correction != null) {
             // A relock reached fusion THIS tick and was refused by MIN_INLIER_RATIO (above), but a
@@ -305,6 +303,13 @@ class PoseFusion {
      * world frame at the KPM image timestamp. Their relative transform is therefore invariant under
      * any later ARCore global world rebase. Only that local transform survives this method; the old
      * world-frame matrices do not.
+     *
+     * The decision is SphereSLAM's [HybridAnchorFusion]: a correction beyond the cold-snap
+     * thresholds (measured against what is drawn now) must be confirmed by
+     * [HybridAnchorFusion.HYBRID_REQUIRED_AGREEMENT] agreeing observations within
+     * [HybridAnchorFusion.HYBRID_AGREEMENT_WINDOW_NS]; small corrections apply on one observation;
+     * a backward timestamp discards pending evidence. This method keeps the shared correction,
+     * counters and [FusionDiagnostics] state in step with the reloc path.
      */
     fun currentAnchorFromHybridObservation(
         currentBackbone: FloatArray,
@@ -317,72 +322,37 @@ class PoseFusion {
         val isNew =
             observationTimestampNs > 0L &&
                 observationTimestampNs != lastHybridTimestampNs
+        val hadCorrection = correction != null
+        if (!hybridInSync) {
+            // The reloc path moved the standing correction; hand it to the sidecar first.
+            hybrid.localCorrection = correction
+            hybridInSync = true
+        }
+        val fused = hybrid.currentAnchor(
+            currentBackbone = currentBackbone,
+            backboneAtObservation = backboneAtObservation,
+            correctedAnchorAtObservation = correctedAnchorAtObservation,
+            observationTimestampNs = observationTimestampNs,
+            confidence = confidence,
+            inliers = inliers,
+        )
+        correction = hybrid.localCorrection
+
         if (isNew) {
             val quality = confidence.coerceIn(0f, 1f)
             lastInlierRatio = quality
-            if (quality < MIN_INLIER_RATIO) snapsRejected++
-
             if (quality >= MIN_INLIER_RATIO) {
-                val newLocal = RigidMath.multiply(
-                    RigidMath.rigidInverse(backboneAtObservation),
-                    correctedAnchorAtObservation,
-                )
-                // Compare divergence in the CURRENT world frame. Both the standing and candidate
-                // corrections ride through currentBackbone, so an ARCore world rebase cancels out.
-                val correctedCurrent = RigidMath.multiply(currentBackbone, newLocal)
-                val applied = correction?.let { RigidMath.multiply(currentBackbone, it) }
-
-                // Repeated-observation agreement before a LARGE move. "Large" is measured against
-                // what is drawn right now (the standing correction, or the raw backbone before the
-                // first one), with the same thresholds that classify a cold relock. A single KPM
-                // observation that clears every quality gate can still be a wrong wall or a
-                // repeated pattern; it may not drag the artwork past those thresholds alone.
-                // Small corrections are unaffected and still apply on one observation.
-                val drawn = applied ?: currentBackbone
-                if (diverged(drawn, correctedCurrent)) {
-                    val anchorLocal = hybridPending.firstOrNull()
-                    // A timestamp BEFORE the last pending one is a clock discontinuity (ARCore epoch
-                    // change; HybridPoseHistory drops its samples for the same reason): the old
-                    // candidates belong to another clock and must not count toward agreement.
-                    val expired = hybridPendingFirstNs != Long.MIN_VALUE &&
-                        (observationTimestampNs < hybridPendingLastNs ||
-                            observationTimestampNs - hybridPendingFirstNs > HYBRID_AGREEMENT_WINDOW_NS)
-                    if (anchorLocal != null && (expired || !agrees(anchorLocal, newLocal))) {
-                        clearHybridPending()
+                val decided = hybrid.diagnostics()
+                lastState = decided.state.toFusionState()
+                when (decided.state) {
+                    HybridAnchorFusion.State.COLD_SNAP -> {
+                        coldStart = false
+                        lastAlpha = -1f
                     }
-                    if (hybridPending.isEmpty()) hybridPendingFirstNs = observationTimestampNs
-                    hybridPending.add(newLocal)
-                    hybridPendingLastNs = observationTimestampNs
-                    if (hybridPending.size < HYBRID_REQUIRED_AGREEMENT) {
-                        lastHybridAgreement = hybridPending.size
-                        lastState = FusionState.AWAITING_AGREEMENT
-                        lastHybridTimestampNs = observationTimestampNs
-                        return RigidMath.multiply(currentBackbone, correction ?: identity())
-                    }
-                    // Enough consistent evidence: proceed with the latest candidate (its divergence
-                    // already makes it cold, so a high-confidence one snaps).
+                    HybridAnchorFusion.State.BLENDING -> lastAlpha = decided.lastAlpha
+                    else -> Unit
                 }
-                clearHybridPending()
-                val cold = coldStart || applied == null || diverged(applied, correctedCurrent)
-                val highConf =
-                    quality >= COLD_SNAP_INLIER_RATIO &&
-                        inliers >= COLD_SNAP_MIN_INLIERS
-
-                correction = if (cold && highConf) {
-                    coldStart = false
-                    lastState = FusionState.COLD_SNAP
-                    lastAlpha = -1f
-                    newLocal
-                } else {
-                    val effConf =
-                        CONF_FLOOR + (1f - CONF_FLOOR) * quality
-                    val alpha = (BASE_ALPHA * quality * effConf).coerceIn(0f, 1f)
-                    lastState = FusionState.BLENDING
-                    lastAlpha = alpha
-                    blend(correction ?: identity(), newLocal, alpha)
-                }
-                snapsAccepted++
-            } else if (correction != null) {
+            } else if (hadCorrection) {
                 lastState = FusionState.RELOCK_REFUSED
             } else if (lastState == FusionState.AWAITING_AGREEMENT) {
                 // Refused with no standing correction while a large move was pending: still
@@ -390,13 +360,12 @@ class PoseFusion {
                 lastState = FusionState.WAITING_FOR_LOCK
             }
             lastHybridTimestampNs = observationTimestampNs
-        } else if (correction != null && hybridPending.isEmpty()) {
+        } else if (correction != null && !hybridPending()) {
             // The same observation re-presented on a later render frame. While a large move is
-            // pending, AWAITING_AGREEMENT is still the accurate description — HOLDING here made the
-            // Fusion row flicker between the two on every frame of one observation's lifetime.
+            // pending, AWAITING_AGREEMENT is still the accurate description.
             lastState = FusionState.HOLDING
         }
-        return RigidMath.multiply(currentBackbone, correction ?: identity())
+        return fused
     }
 
     /**
@@ -408,30 +377,20 @@ class PoseFusion {
         // hide that a large correction is pending. Known limit: with no clock here, a pending set
         // whose evidence stopped arriving keeps this label until the next accepted observation
         // clears or expires it (the pending set itself cannot apply without fresh agreement).
-        if (correction != null && hybridPending.isEmpty()) {
+        if (correction != null && !hybridPending()) {
             lastState = FusionState.HOLDING
         }
         return RigidMath.multiply(backbone, correction ?: identity())
     }
 
-    // Large-correction candidates (anchor-local, so rebase-invariant) awaiting agreement.
-    private val hybridPending = ArrayList<FloatArray>(HYBRID_REQUIRED_AGREEMENT)
-    private var hybridPendingFirstNs = Long.MIN_VALUE
-    private var hybridPendingLastNs = Long.MIN_VALUE
-    private var lastHybridAgreement = -1
-
-    private fun clearHybridPending() {
-        hybridPending.clear()
-        hybridPendingFirstNs = Long.MIN_VALUE
-        hybridPendingLastNs = Long.MIN_VALUE
-        lastHybridAgreement = -1
-    }
+    /** True while the sidecar holds large-correction candidates awaiting agreement. */
+    private fun hybridPending(): Boolean = hybrid.agreementCount() >= 1
 
     /**
      * Agreeing large-correction KPM observations collected so far, or -1 when none is pending.
-     * Paired with [HYBRID_REQUIRED_AGREEMENT] for diagnostics.
+     * Paired with [HybridAnchorFusion.HYBRID_REQUIRED_AGREEMENT] for diagnostics.
      */
-    fun hybridAgreementCount(): Int = lastHybridAgreement
+    fun hybridAgreementCount(): Int = hybrid.agreementCount()
 
     /**
      * True only when the most recent hybrid decision was to hold a large move for agreement — not
@@ -439,7 +398,16 @@ class PoseFusion {
      * refused, and must not be relabelled as part of the agreement.
      */
     fun isAwaitingHybridAgreement(): Boolean =
-        lastState == FusionState.AWAITING_AGREEMENT && hybridPending.isNotEmpty()
+        lastState == FusionState.AWAITING_AGREEMENT && hybridPending()
+
+    private fun HybridAnchorFusion.State.toFusionState(): FusionState = when (this) {
+        HybridAnchorFusion.State.WAITING_FOR_LOCK -> FusionState.WAITING_FOR_LOCK
+        HybridAnchorFusion.State.COLD_SNAP -> FusionState.COLD_SNAP
+        HybridAnchorFusion.State.BLENDING -> FusionState.BLENDING
+        HybridAnchorFusion.State.HOLDING -> FusionState.HOLDING
+        HybridAnchorFusion.State.RELOCK_REFUSED -> FusionState.RELOCK_REFUSED
+        HybridAnchorFusion.State.AWAITING_AGREEMENT -> FusionState.AWAITING_AGREEMENT
+    }
 
     private var lastState = FusionState.WAITING_FOR_LOCK
     private var lastAlpha = -1f
@@ -479,8 +447,9 @@ class PoseFusion {
             lastInlierRatio = lastInlierRatio,
             correctionMm = mm,
             correctionDeg = deg,
-            snapsAccepted = snapsAccepted,
-            snapsRejected = snapsRejected,
+            // Session-lifetime totals across both correction sources.
+            snapsAccepted = snapsAccepted + hybrid.diagnostics().accepted,
+            snapsRejected = snapsRejected + hybrid.diagnostics().rejected,
         )
     }
 }

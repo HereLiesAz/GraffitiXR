@@ -1,6 +1,11 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
 import com.hereliesaz.graffitixr.common.model.FusionState
+import com.hereliesaz.graffitixr.common.model.HybridKpmOutcome
+import com.hereliesaz.sphereslam.SphereSlamPoseMath
+import com.hereliesaz.sphereslam.SphereSlamTracker
+import com.hereliesaz.sphereslam.sidecar.HybridKpmCorrection
+import com.hereliesaz.sphereslam.sidecar.HybridPoseHistory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -197,6 +202,67 @@ class PoseFusionHybridObservationTest {
         assertEquals(-2.3f, out[14], 1e-4f)
         assertEquals(1, fusion.hybridAgreementCount())
     }
+
+    @Test
+    fun `a SphereSLAM sidecar decision drives the shared correction end to end`() {
+        // The ArRenderer seam: KPM observation -> library gates/solve -> app PoseFusion. ARCore's
+        // backbone drifted 0.3 m; KPM sees the page 2.0 m ahead. Large, so three agreeing
+        // observations must arrive before the correction applies.
+        val fusion = PoseFusion()
+        val history = HybridPoseHistory()
+        val geometry = SphereSlamPoseMath.pageGeometry(1000, 1000, 25.4f)
+        val drifted = translated(0f, 0f, -2.3f)
+        var out = drifted
+        for (ts in listOf(1_000_000L, 2_000_000L, 3_000_000L)) {
+            history.add(ts, identityView(), drifted)
+            val decision = HybridKpmCorrection.solve(
+                observation = SphereSlamTracker.Observation.forTesting(
+                    timestampNs = ts,
+                    error = 1f,
+                    inliers = 30,
+                    cameraFromPage3x4 = floatArrayOf(
+                        1f, 0f, 0f, -500f,
+                        0f, -1f, 0f, 500f,
+                        0f, 0f, -1f, 2_000f,
+                    ),
+                ),
+                pageGeometry = geometry,
+                physicallyMetric = true,
+                pageFromAnchor = identityView(),
+                poseHistory = history,
+                currentFrameTimestampNs = ts + 10_000L,
+            )
+            assertEquals(HybridKpmOutcome.ACCEPTED, decision.diagnostics.outcome)
+            val accepted = requireNotNull(decision.accepted)
+            out = fusion.currentAnchorFromHybridObservation(
+                currentBackbone = drifted,
+                backboneAtObservation = accepted.backboneAtObservation,
+                correctedAnchorAtObservation = accepted.correctedAnchorWorld,
+                observationTimestampNs = accepted.timestampNs,
+                confidence = accepted.confidence,
+                inliers = accepted.inliers,
+            )
+            if (ts < 3_000_000L) assertTrue(fusion.isAwaitingHybridAgreement())
+        }
+        assertEquals(-2.0f, out[14], 1e-3f)
+        assertEquals(FusionState.COLD_SNAP, fusion.diagnostics().state)
+        assertEquals(1, fusion.diagnostics().snapsAccepted)
+    }
+
+    @Test
+    fun `a held sidecar correction keeps riding the live backbone`() {
+        val fusion = PoseFusion()
+        val backbone = translated(0f, 0f, -2.3f)
+        // Sidecar establishes a small correction (5 cm)...
+        fusion.observe(backbone, translated(0f, 0f, -2.25f), 100L)
+        // ...then the same observation re-presented holds it, applied to the live backbone.
+        val held = fusion.observe(backbone, translated(0f, 0f, -2.25f), 100L)
+        assertEquals(-2.25f, held[14], 1e-4f)
+        assertEquals(FusionState.HOLDING, fusion.diagnostics().state)
+        assertEquals(-2.25f, fusion.holdCurrentAnchor(backbone)[14], 1e-4f)
+    }
+
+    private fun identityView() = translated(0f, 0f, 0f)
 
     private fun translated(x: Float, y: Float, z: Float) = floatArrayOf(
         1f,0f,0f,0f,

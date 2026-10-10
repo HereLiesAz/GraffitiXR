@@ -113,11 +113,24 @@ standalone_analyzer = read(
 if "cameraFromCanonical" not in standalone_analyzer:
     fail("Standalone analyzer is not consuming SphereSLAM Pose.cameraFromCanonical.")
 
-hybrid_correction = read(
-    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/anchor/HybridKpmCorrection.kt"
+# The hybrid gates/solve are SphereSLAM's sidecar.HybridKpmCorrection, which reads the public
+# Observation.cameraFromPage3x4 itself. GraffitiXR hands it the tracker's published observation
+# (never a hand-built one; tests use Observation.forTesting) and must not keep a private copy.
+ar_renderer = read(
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/rendering/ArRenderer.kt"
 )
-if "observation.cameraFromPage3x4" not in hybrid_correction:
-    fail("Hybrid correction is not consuming SphereSLAM Observation.cameraFromPage3x4.")
+if "com.hereliesaz.sphereslam.sidecar.HybridKpmCorrection.solve(" not in ar_renderer:
+    fail("ArRenderer no longer gates KPM observations through SphereSLAM sidecar.HybridKpmCorrection.solve.")
+if "observation = hybridObservation" not in ar_renderer:
+    fail("ArRenderer no longer passes the tracker's published Observation to HybridKpmCorrection.solve.")
+for moved in (
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/anchor/HybridKpmCorrection.kt",
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/anchor/HybridPoseHistory.kt",
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/anchor/HybridPageFrame.kt",
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/HybridMetricKpmReference.kt",
+):
+    if (ROOT / moved).exists():
+        fail(f"{moved} was reintroduced; use SphereSLAM's com.hereliesaz.sphereslam.sidecar package.")
 
 # The fail-closed runtime capability probe is the library's SphereSlam.isOperational() (native
 # entry points linked AND a calibrated KPM session creatable/ready/closable). GraffitiXR must gate

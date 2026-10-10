@@ -833,7 +833,7 @@ class ArRenderer(
     // KPM is asynchronous; this ring pairs each observation with the ARCore view + consensus anchor
     // from the SAME sensor timestamp before any correction enters PoseFusion.
     private val hybridPoseHistory =
-        com.hereliesaz.graffitixr.feature.ar.anchor.HybridPoseHistory()
+        com.hereliesaz.sphereslam.sidecar.HybridPoseHistory()
     @Volatile private var hybridReferenceGeometry:
         com.hereliesaz.sphereslam.SphereSlamPoseMath.PageGeometry? = null
     @Volatile private var hybridReferencePhysicallyMetric: Boolean = false
@@ -2027,7 +2027,7 @@ class ArRenderer(
                     val worldFromPage = FloatArray(16)
                     pageAnchor.pose.toMatrix(worldFromPage, 0)
                     val relation =
-                        com.hereliesaz.graffitixr.feature.ar.anchor.HybridPageFrame
+                        com.hereliesaz.sphereslam.sidecar.HybridPageFrame
                             .pageFromArtwork(worldFromPage, backbone)
                     hybridPageFromArtworkAnchor = relation
                     Timber.i("ARDIAG hybrid KPM page↔artwork frame frozen")
@@ -2057,7 +2057,7 @@ class ArRenderer(
                     hybridObservation != null &&
                     hybridObservation.timestampNs > hybridEligibleAfterNs
                 ) {
-                    com.hereliesaz.graffitixr.feature.ar.anchor.HybridKpmCorrection.solve(
+                    com.hereliesaz.sphereslam.sidecar.HybridKpmCorrection.solve(
                         observation = hybridObservation,
                         pageGeometry = sphereSlamTracker.currentReferenceGeometry()
                             ?: hybridReferenceGeometry,
@@ -2144,8 +2144,8 @@ class ArRenderer(
                                 outcome = com.hereliesaz.graffitixr.common.model.HybridKpmOutcome
                                     .AWAITING_AGREEMENT,
                                 agreeingObservations = agreeing,
-                                requiredAgreement = com.hereliesaz.graffitixr.feature.ar.anchor
-                                    .PoseFusion.HYBRID_REQUIRED_AGREEMENT,
+                                requiredAgreement = com.hereliesaz.sphereslam.sidecar
+                                    .HybridAnchorFusion.HYBRID_REQUIRED_AGREEMENT,
                             )
                         }
                         if (logHybridAcceptedPending) {
@@ -2673,7 +2673,7 @@ class ArRenderer(
                         // and register THAT image at a DPI whose KPM units are metres.
                         wallPlane?.let { metricPlane ->
                             val geometry =
-                                com.hereliesaz.graffitixr.feature.ar.HybridMetricKpmReference
+                                com.hereliesaz.sphereslam.sidecar.MetricPageRectification
                                     .deriveGeometry(
                                         imageWidth = image.width,
                                         imageHeight = image.height,
@@ -2687,8 +2687,17 @@ class ArRenderer(
                                         wallPlane = metricPlane,
                                     )
                             val reference = geometry?.let {
-                                com.hereliesaz.graffitixr.feature.ar.HybridMetricKpmReference
-                                    .rectify(bitmap, it)
+                                // Luma of the same sensor-oriented capture the geometry was
+                                // derived in; the library resamples the page quad from it.
+                                val argb = IntArray(bitmap.width * bitmap.height)
+                                bitmap.getPixels(argb, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+                                com.hereliesaz.sphereslam.sidecar.MetricPageRectification.rectify(
+                                    luma = com.hereliesaz.sphereslam.sidecar.MetricPageRectification
+                                        .lumaFromArgb(argb),
+                                    width = bitmap.width,
+                                    height = bitmap.height,
+                                    geometry = it,
+                                )
                             }
                             if (geometry != null && reference != null) {
                                 sphereSlamTracker.reset(
@@ -2723,7 +2732,7 @@ class ArRenderer(
                                 // page origin beside the artwork anchor. No world origin is shared
                                 // with KPM and no raw KPM pose ever becomes the renderer camera pose.
                                 val worldFromPage =
-                                    com.hereliesaz.graffitixr.feature.ar.anchor.HybridPageFrame
+                                    com.hereliesaz.sphereslam.sidecar.HybridPageFrame
                                         .worldFromPage(
                                             sensorView = mappingViewMatrix,
                                             cameraFromPage = geometry.cameraFromPageGl,
