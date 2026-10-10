@@ -229,6 +229,11 @@ android {
 tasks.withType<KotlinCompile>().configureEach {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_21)
+        // MainScreen hands ArViewModel's SphereSLAM :models DepthEstimator to the standalone
+        // overlay; the type is experimental in the library.
+        freeCompilerArgs.add(
+            "-opt-in=com.hereliesaz.sphereslam.models.ExperimentalSphereSlamModelsApi"
+        )
     }
 }
 

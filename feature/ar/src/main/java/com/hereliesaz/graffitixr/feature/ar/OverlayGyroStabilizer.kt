@@ -25,7 +25,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import com.hereliesaz.sphereslam.camera.CameraIntrinsicsEstimator
-import com.hereliesaz.graffitixr.feature.ar.depth.DepthEstimator
+import com.hereliesaz.sphereslam.models.DepthEstimator
 import com.hereliesaz.sphereslam.attitude.GameRotationAttitudeSource
 import com.hereliesaz.sphereslam.camera.ScreenIntrinsics
 import com.hereliesaz.sphereslam.gyro.GyroCompensationMath

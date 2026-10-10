@@ -60,6 +60,8 @@ catalog_aliases = {
     "sphereslam-core": ("sphereslam", "api(libs.sphereslam.core)"),
     "sphereslam-overlay": ("overlay", "implementation(libs.sphereslam.overlay)"),
     "sphereslam-reloc": ("reloc", "api(libs.sphereslam.reloc)"),
+    # MiDaS DepthEstimator (and its bundled ONNX assets) — exposed by the public standalone overlay.
+    "sphereslam-models": ("models", "api(libs.sphereslam.models)"),
 }
 for alias, (artifact, gradle_use) in catalog_aliases.items():
     alias_pattern = re.compile(
@@ -82,6 +84,20 @@ feature_ar_gradle = read("feature/ar/build.gradle.kts")
 required_opt_in = "-opt-in=com.hereliesaz.sphereslam.reloc.ExperimentalSphereSlamRelocApi"
 if required_opt_in not in feature_ar_gradle:
     fail("feature/ar must explicitly opt into SphereSLAM's experimental :reloc API.")
+
+required_models_opt_in = "-opt-in=com.hereliesaz.sphereslam.models.ExperimentalSphereSlamModelsApi"
+if required_models_opt_in not in feature_ar_gradle:
+    fail("feature/ar must explicitly opt into SphereSLAM's experimental :models API.")
+
+# The app's own MiDaS copy is gone; the model ships in the :models AAR. Native code still loads
+# superpoint.onnx / zerodce.onnx / distortion_head.onnx from core/nativebridge assets, so only the
+# MiDaS graph (Kotlin-only consumer) may be absent there.
+for path in (
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/depth/DepthEstimator.kt",
+    "core/nativebridge/src/main/assets/midas_v21_small_256_int8.onnx",
+):
+    if (ROOT / path).exists():
+        fail(f"{path} was reintroduced; MiDaS depth comes from SphereSLAM :models.")
 
 reloc_dep = "api(libs.sphereslam.reloc)"
 if reloc_dep not in feature_ar_gradle:

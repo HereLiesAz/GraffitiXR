@@ -157,7 +157,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     // for depth-calibrated radial map-point placement. Null (the default, and the classic path) means
     // no depth is ever stashed, so the native map builds from wall-plane back-projection exactly as
     // before. The view model supplies this only on the standalone path with the feature-map flag on.
-    private val depthEstimator: com.hereliesaz.graffitixr.feature.ar.depth.DepthEstimator? = null,
+    private val depthEstimator: com.hereliesaz.sphereslam.models.DepthEstimator? = null,
     private val onDiagnostic: (String) -> Unit = {},
     private val onCalibrationChanged: (StandaloneCalibrationDiagnostics) -> Unit = {},
     private val onFailure: (StandaloneFailureEvent) -> Unit = {},

@@ -237,7 +237,7 @@ fun SphereSlamStandaloneOverlay(
      * depth-calibrated radial map-point placement; null is the classic wall-plane path. Owned by the
      * view model — the analyzer uses it but never closes it.
      */
-    depthEstimator: com.hereliesaz.graffitixr.feature.ar.depth.DepthEstimator? = null,
+    depthEstimator: com.hereliesaz.sphereslam.models.DepthEstimator? = null,
     /**
      * Phase 3 guided-sweep coverage over the wall's viewable arc, in `[0, 1]`, or null to hide the
      * hint (classic path / flag off). Shown while locked and still incomplete, to nudge the artist to

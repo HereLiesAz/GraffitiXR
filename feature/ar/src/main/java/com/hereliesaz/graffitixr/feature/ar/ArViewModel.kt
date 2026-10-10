@@ -1254,7 +1254,7 @@ class ArViewModel @Inject constructor(
     // toggle is on. Step 1 just proves it loads+runs on-device (selfTestDepth); Step 2 will feed live
     // frames into the standalone plane/scale path.
     private val depthEstimatorLazy = lazy {
-        com.hereliesaz.graffitixr.feature.ar.depth.DepthEstimator(appContext)
+        com.hereliesaz.sphereslam.models.DepthEstimator(appContext)
     }
     private val depthEstimator get() = depthEstimatorLazy.value
 
@@ -1264,7 +1264,7 @@ class ArViewModel @Inject constructor(
      * estimator opts that session into depth-calibrated radial map-point placement. Single instance,
      * closed in [onCleared], so the analyzer must not close it.
      */
-    fun standaloneDepthEstimatorOrNull(): com.hereliesaz.graffitixr.feature.ar.depth.DepthEstimator? =
+    fun standaloneDepthEstimatorOrNull(): com.hereliesaz.sphereslam.models.DepthEstimator? =
         if (_evalFeatureMapEnabled.value) depthEstimator else null
 
     /** One synthetic-image inference to confirm the depth model loads AND executes on this device. */
