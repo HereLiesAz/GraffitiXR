@@ -12,8 +12,11 @@ import androidx.camera.core.ImageProxy
 import com.hereliesaz.sphereslam.camera.CameraIntrinsics
 import com.hereliesaz.sphereslam.camera.CameraIntrinsicsEstimator
 import com.hereliesaz.sphereslam.camera.CaptureRotation
-import com.hereliesaz.graffitixr.feature.ar.anchor.MetricMarks
 import com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion
+import com.hereliesaz.sphereslam.attitude.AttitudeRotationBridge
+import com.hereliesaz.sphereslam.attitude.AttitudeSample
+import com.hereliesaz.sphereslam.attitude.DeviceCameraRotation
+import com.hereliesaz.sphereslam.attitude.GameRotationAttitudeSource
 import com.hereliesaz.sphereslam.math.RigidMath
 import com.hereliesaz.sphereslam.camera.ProjectionMatrix
 import com.hereliesaz.sphereslam.math.RotationMath
@@ -21,6 +24,7 @@ import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintFrame
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.sphereslam.SphereSlamCalibration
 import com.hereliesaz.sphereslam.SphereSlamStandaloneSession
+import com.hereliesaz.sphereslam.reloc.PoseBlend
 import com.hereliesaz.sphereslam.reloc.RobustTrackingLoop
 import java.nio.ByteBuffer
 import timber.log.Timber
@@ -127,6 +131,9 @@ data class SphereSlamPhotosphereKeyframe(
  * The IMU bridge is rotation-only and lasts at most [maxBridgeMs]. It applies the same camera-space
  * rotation delta to the view rotation and translation column, preserving the held camera centre
  * during a pure rotation. It never double-integrates accelerometer values or invents displacement.
+ * Attitude comes from SphereSLAM's [GameRotationAttitudeSource]; the body->camera rotation is
+ * [DeviceCameraRotation.cameraFromDevice] for this camera's sensor orientation and the CameraX
+ * rotation applied to the tracked (display-upright) image — not `rotationDegrees` itself.
  */
 internal class SphereSlamStandaloneTrackingAnalyzer(
     private val context: Context,
@@ -172,7 +179,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         StandaloneObservationAgePolicy(),
     private val targetQualityConfig: StandaloneTargetQualityConfig =
         StandaloneTargetQualityConfig(),
-    private val bridge: GyroOrientationBridge = GyroOrientationBridge(context),
+    private val attitudeSource: GameRotationAttitudeSource = GameRotationAttitudeSource(context),
     private val trackingStateMachine: StandaloneTrackingStateMachine =
         StandaloneTrackingStateMachine(),
     private val maxBridgeMs: Long = 400L,
@@ -205,6 +212,14 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
 
     private val cameraTimestampSource: StandaloneCameraTimestampSource =
         resolveCameraTimestampSource(context, cameraId)
+
+    /** CameraCharacteristics.SENSOR_ORIENTATION of [cameraId] (a quarter turn; 90 when unknown). */
+    private val sensorOrientationDeg: Int = resolveSensorOrientation(context, cameraId)
+
+    // IMU bridge reference: committed with the attitude sampled just before the last ACCEPTED KPM
+    // frame's solve, with that frame's device->camera rotation fixed for the bridge's life.
+    private var imuBridge: AttitudeRotationBridge? = null
+    private var imuBridgeReferenceAtMs: Long = -1L
 
     private var session: SphereSlamStandaloneSession? = null
     private var sessionKey: SessionKey? = null
@@ -246,7 +261,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private var lastAtlasGrowthMs = Long.MIN_VALUE
     private var lastPhotosphereKeyframeMs = Long.MIN_VALUE
     private var photosphereReferenceQuaternion: FloatArray? = null
-    private var photosphereReferenceRotationDeg: Int = 0
+    private var photosphereCameraFromDevice: FloatArray? = null
     private var emittedMapBridgeForReference: SphereSlamStandaloneReferenceImage? = null
     // Phase 2: throttle MiDaS inference to a keyframe cadence (not per-frame — ORT CPU inference is
     // too expensive for 30fps and the map builds per-keyframe anyway).
@@ -256,7 +271,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
 
     fun start() {
         if (!closed) {
-            bridge.start()
+            attitudeSource.start()
             reportTrackingState(trackingStateMachine.state)
         }
     }
@@ -310,7 +325,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             robustLoop = null
             lastGood = null
             poseStabilizer.reset()
-            bridge.clearReference()
+            clearImuReference()
             lastRelocSeq = 0f
             // Deliberately DO NOT touch lastPhotosphereKeyframeMs or any photosphere state here.
             onDiagnostic(
@@ -402,7 +417,14 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 intrinsics.cy,
             )
 
-            val pendingImuReference = bridge.captureReferenceCandidate(rotationDeg)
+            // The tracked image is the raw buffer rotated CW by rotationDeg, so the device body maps
+            // into its GL camera frame by R_z(sensorOrientation - rotationDeg) (== the display
+            // rotation for a rear camera). Sample the attitude BEFORE the synchronous solve so a
+            // committed reference sits at this frame's capture time.
+            val cameraFromDevice =
+                DeviceCameraRotation.cameraFromDevice(sensorOrientationDeg, rotationDeg)
+            val pendingImuReference = attitudeSource.latestSample()
+            val pendingImuReferenceAtMs = android.os.SystemClock.elapsedRealtime()
             val timestampNs = image.imageInfo.timestamp
             val projection = ProjectionMatrix.buildFrom(intrinsics)
             val direct = directFrame(rotated.bytes)
@@ -411,7 +433,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             // attitude and remains independent of the later fingerprint. Until depth contributes
             // translation this pose is intentionally rotation-only: zero translation is the
             // fixed-standpoint photosphere model, not an invented motion estimate.
-            val cameraFromMap = photosphereCameraFromMap(rotationDeg)
+            val cameraFromMap = photosphereCameraFromMap(cameraFromDevice)
             capturePhotosphereKeyframe(rotated, intrinsics, timestampNs, cameraFromMap)
             if (referenceImage == null) {
                 slamManager?.setTrackingPoseValid(false)
@@ -483,7 +505,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                     acceptedRawMapView,
                 )
 
-                pendingImuReference?.let(bridge::commitReference)
+                pendingImuReference?.let {
+                    commitImuReference(it, cameraFromDevice, pendingImuReferenceAtMs)
+                }
                 maybeGrowAtlas(
                     active = active,
                     frame = rotated,
@@ -610,10 +634,30 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
      */
     private fun canBridge(): Boolean {
         if (lastGood == null) return false
-        val elapsed = bridge.msSinceReference()
+        val elapsed = msSinceImuReference()
         if (elapsed < 0L || elapsed > maxBridgeMs) return false
-        return bridge.cameraRotationDelta() != null
+        return currentImuDelta() != null
     }
+
+    private fun commitImuReference(sample: AttitudeSample, cameraFromDevice: FloatArray, atMs: Long) {
+        imuBridge = AttitudeRotationBridge(cameraFromDevice).also { it.markReference(sample) }
+        imuBridgeReferenceAtMs = atMs
+    }
+
+    private fun clearImuReference() {
+        imuBridge = null
+        imuBridgeReferenceAtMs = -1L
+    }
+
+    /** Milliseconds since the committed IMU reference, or -1 without one. */
+    private fun msSinceImuReference(): Long {
+        if (imuBridge == null || imuBridgeReferenceAtMs < 0L) return -1L
+        return android.os.SystemClock.elapsedRealtime() - imuBridgeReferenceAtMs
+    }
+
+    /** Camera-frame rotation since the committed reference (row-major 3x3), or null. */
+    private fun currentImuDelta(): FloatArray? =
+        imuBridge?.cameraRotationDelta(attitudeSource.latestSample()?.quaternion)
 
     private fun reportFailure(event: StandaloneFailureEvent) {
         if (event.reason == lastFailureReason) return
@@ -722,26 +766,21 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
      * exactly zero until the geometric/depth layer supplies a baseline; we never synthesize it from
      * accelerometer integration.
      */
-    private fun photosphereCameraFromMap(rotationDeg: Int): FloatArray? {
-        val qNow = bridge.latestOrientationSample() ?: return null
+    private fun photosphereCameraFromMap(cameraFromDevice: FloatArray): FloatArray? {
+        val qNow = attitudeSource.latestSample()?.quaternion ?: return null
         val qRef = photosphereReferenceQuaternion
-        if (qRef == null) {
-            photosphereReferenceQuaternion = qNow.copyOf()
-            photosphereReferenceRotationDeg = rotationDeg
+        val referenceCameraFromDevice = photosphereCameraFromDevice
+        if (qRef == null || referenceCameraFromDevice == null) {
+            photosphereReferenceQuaternion = qNow
+            photosphereCameraFromDevice = cameraFromDevice.copyOf()
             return identityView()
         }
 
-        val qDeltaBody = RotationMath.multiplyQuaternions(
-            RotationMath.conjugate(qNow),
-            qRef,
-        )
-        val deltaBody = RotationMath.toRotationMatrix3x3(
-            RotationMath.normalize(qDeltaBody)
-        )
-        val a = RotationMath.rotationAboutZ(photosphereReferenceRotationDeg)
-        val deltaCamera = RotationMath.multiplyMat3(
-            RotationMath.multiplyMat3(a, deltaBody),
-            RotationMath.transposeMat3(a),
+        // Body-frame delta since the map reference, re-expressed in the camera frame the reference
+        // was captured under (fixed for the map's life, like the gyro bridge's reference).
+        val deltaCamera = DeviceCameraRotation.cameraDelta(
+            referenceCameraFromDevice,
+            RotationMath.cameraRotationDelta(qRef, qNow),
         )
         return columnMajorViewFromRowMajorRotation(deltaCamera)
     }
@@ -824,7 +863,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 ),
                 headingDeg = attitude.first,
                 elevationDeg = attitude.second,
-                orientationQuaternion = bridge.latestOrientationSample(),
+                orientationQuaternion = attitudeSource.latestSample()?.quaternion,
                 cameraFromMap = mapPose.copyOf(),
             )
         )
@@ -843,7 +882,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         if (existing != null && key == sessionKey) return existing
 
         existing?.close()
-        bridge.clearReference()
+        clearImuReference()
         lastGood = null
         poseStabilizer.reset()
         lastRelocSeq = 0f
@@ -1101,8 +1140,8 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         )
         // Record the device bearing at this keyframe (the angular glue for the surrounding sphere).
         // Best-effort: skip silently when the sensor hasn't produced a sample.
-        bridge.latestOrientationSample()?.let {
-            onKeyframeOrientation(android.os.SystemClock.elapsedRealtimeNanos(), it)
+        attitudeSource.latestSample()?.let {
+            onKeyframeOrientation(android.os.SystemClock.elapsedRealtimeNanos(), it.quaternion)
         }
     }
 
@@ -1241,9 +1280,14 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
      *
      * Both inputs here intentionally remain in the precision fingerprint frame:
      * `reloc[0..15]` is CV `camera_from_fingerprint`, while [kpmView] is GL
-     * `camera_from_fingerprint`. [RigidMath.glViewToCv] converts the former into the latter so
+     * `camera_from_fingerprint`. [RigidMath.cvViewToGl] converts the former into the latter so
      * they can corroborate each other. Only AFTER this local precision fusion is the result rebased
      * through explicit `map_from_fingerprint` into the base SphereSLAM map.
+     *
+     * Both are camera-from-fingerprint VIEW matrices, so agreement and blending use SphereSLAM's
+     * [PoseBlend], which compares and interpolates camera centres (`-Rᵀt`). (PoseFusion's
+     * model-matrix helpers compared/lerped the translation column, which for a view mixes position
+     * with orientation and swung the blended camera centre off the straight path.)
      */
     private fun fuseWithReloc(kpmView: FloatArray): FloatArray {
         val slam = slamManager ?: return kpmView
@@ -1257,11 +1301,11 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         val inliers = reloc[16]
         val inlierRatio = if (matches > 0f) inliers / matches else 0f
         if (inlierRatio < PoseFusion.MIN_INLIER_RATIO || inliers < RELOC_MIN_INLIERS) return kpmView
-        val relocViewGl = RigidMath.glViewToCv(reloc.copyOfRange(0, 16))
+        val relocViewGl = RigidMath.cvViewToGl(reloc.copyOfRange(0, 16))
         if (!relocViewGl.all { it.isFinite() } || relocViewGl[15] != 1f) return kpmView
         // Trust the reloc only when it already corroborates the current KPM pose.
-        if (PoseFusion.diverged(kpmView, relocViewGl)) return kpmView
-        return PoseFusion.blend(kpmView, relocViewGl, RELOC_ALPHA)
+        if (PoseBlend.diverged(kpmView, relocViewGl)) return kpmView
+        return PoseBlend.blend(kpmView, relocViewGl, RELOC_ALPHA)
     }
 
     private fun bridgeLastGood(
@@ -1273,9 +1317,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         // confirmed by [canBridge] and reflected in the loop's IMU_BRIDGE decision; here we just build
         // the bridged frame. A null return (delta briefly unavailable) renders nothing this frame.
         val held = lastGood ?: return null
-        val delta = bridge.cameraRotationDelta() ?: return null
+        val delta = currentImuDelta() ?: return null
         return held.copy(
-            viewMatrix = rotateViewPoseKeepingCameraCenter(held.viewMatrix, delta),
+            viewMatrix = RotationMath.rotateAboutCameraCentre(held.viewMatrix, delta),
             projMatrix = projection,
             frameAspect = frame.width.toFloat() / frame.height.toFloat(),
             frameHeightPixels = frame.height,
@@ -1324,6 +1368,14 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         }
     }.getOrDefault(StandaloneCameraTimestampSource.UNKNOWN)
 
+    private fun resolveSensorOrientation(context: Context, cameraId: String): Int = runCatching {
+        val manager = context.getSystemService(CameraManager::class.java)
+        val raw = manager.getCameraCharacteristics(cameraId)
+            .get(CameraCharacteristics.SENSOR_ORIENTATION) ?: DEFAULT_SENSOR_ORIENTATION_DEG
+        // SENSOR_ORIENTATION is a multiple of 90 by contract; DeviceCameraRotation requires that.
+        if (raw % 90 == 0) raw else DEFAULT_SENSOR_ORIENTATION_DEG
+    }.getOrDefault(DEFAULT_SENSOR_ORIENTATION_DEG)
+
     private fun sameTransform(
         a: FloatArray?,
         b: FloatArray?,
@@ -1345,8 +1397,8 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         if (closed) return
         closed = true
         slamManager?.setTrackingPoseValid(false)
-        bridge.stop()
-        bridge.clearReference()
+        attitudeSource.stop()
+        clearImuReference()
         lastGood = null
         poseStabilizer.reset()
         lastRelocSeq = 0f
@@ -1366,6 +1418,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     }
 
     private companion object {
+        /** Typical rear-camera mounting, used only when Camera2 cannot report SENSOR_ORIENTATION. */
+        const val DEFAULT_SENSOR_ORIENTATION_DEG = 90
+
         /** Photosphere keyframe cadence; visual mapping runs for the entire standalone session. */
         const val PHOTOSPHERE_KEYFRAME_INTERVAL_MS = 250L
 
@@ -1387,34 +1442,4 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
          */
         const val RELOC_ALPHA = 0.15f
     }
-}
-
-internal fun rotateViewPoseKeepingCameraCenter(
-    viewMatrix: FloatArray,
-    deltaCameraRowMajor: FloatArray,
-): FloatArray {
-    require(viewMatrix.size == 16)
-    require(deltaCameraRowMajor.size == 9)
-
-    val rotation = FloatArray(9)
-    for (row in 0..2) {
-        for (col in 0..2) {
-            rotation[row * 3 + col] = viewMatrix[col * 4 + row]
-        }
-    }
-    val translation = floatArrayOf(viewMatrix[12], viewMatrix[13], viewMatrix[14])
-    val rotatedR = RotationMath.multiplyMat3(deltaCameraRowMajor, rotation)
-    val rotatedT = RotationMath.multiplyMat3Vec3(deltaCameraRowMajor, translation)
-
-    val out = FloatArray(16)
-    for (row in 0..2) {
-        for (col in 0..2) {
-            out[col * 4 + row] = rotatedR[row * 3 + col]
-        }
-    }
-    out[12] = rotatedT[0]
-    out[13] = rotatedT[1]
-    out[14] = rotatedT[2]
-    out[15] = 1f
-    return out
 }

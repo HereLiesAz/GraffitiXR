@@ -7,9 +7,9 @@ import kotlinx.serialization.Serializable
  * **angular glue** for the planned spherical-coverage map (see `docs/SPHERESLAM_SPHERE_MAP.md`).
  *
  * The standalone path has no VIO baseline to place surrounding features in 3D; a recorded bearing
- * per keyframe (from `GyroOrientationBridge`'s game-rotation quaternion) supplies the "which way the
+ * per keyframe (from SphereSLAM's `GameRotationAttitudeSource` game-rotation quaternion) supplies the "which way the
  * camera was pointing" half, with monocular depth later supplying the radius. Today
- * `GyroOrientationBridge` throws its orientation away after each short dropout bridge; this type is
+ * the gyro bridge throws its orientation away after each short dropout bridge; this type is
  * where it is kept instead.
  *
  * **Phase 1 (this type): storage only.** Nothing reads these samples for relocalization yet — they
