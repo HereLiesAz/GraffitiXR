@@ -11,8 +11,11 @@ guard fails the release if:
    same symbols but whose `nativeKpmAvailable` always returns false — i.e. non-functional AR.
 
 The stub is caught two ways: its self-identifying marker string must be absent, and a real
-artoolkitX KPM internal symbol must be present. The dex check confirms R8 preserved the public API
-and native bridge classes the app calls into (kept by the artifact's own consumer ProGuard rules).
+artoolkitX KPM internal symbol must be present. The dex check confirms R8 preserved the JNI bridge class
+under its exact name (kept by :core:nativebridge's consumer ProGuard rules). Since SphereSLAM 0.24.0
+the library no longer ships a blanket `-keep com.hereliesaz.sphereslam.**`, so the public API classes
+the app calls are retained by reachability but may be renamed; for those the check accepts either the
+original dex descriptor or an R8 mapping entry proving the class survived shrinking.
 """
 
 from __future__ import annotations
@@ -36,10 +39,10 @@ JNI_SYMBOLS = (
 # !HAVE_ARX_KPM branch). A real build links artoolkitX and exports its KPM C API instead.
 STUB_MARKER = b"built without HAVE_ARX_KPM"
 REAL_KPM_SYMBOL = b"kpmCreateHandle"
-DEX_MARKERS = (
-    b"Lcom/hereliesaz/sphereslam/nativebridge/KpmBridge;",
-    b"Lcom/hereliesaz/sphereslam/SphereSlamTracker;",
-)
+# JNI contract: must survive R8 under its exact name.
+DEX_MARKERS = (b"Lcom/hereliesaz/sphereslam/nativebridge/KpmBridge;",)
+# Public API the app calls: must survive R8, but may be obfuscated (no blanket keep since 0.24.0).
+RETAINED_API_CLASSES = ("com.hereliesaz.sphereslam.SphereSlamTracker",)
 
 
 def find_apk(variant: str) -> Path:
@@ -49,6 +52,13 @@ def find_apk(variant: str) -> Path:
     if not candidates:
         raise SystemExit(f"No {variant} APK found under app/build/outputs/apk/{variant}")
     return Path(candidates[0])
+
+
+def find_mapping(variant: str) -> str | None:
+    candidates = sorted(glob.glob(f"app/build/outputs/mapping/{variant}/**/mapping.txt", recursive=True))
+    if not candidates:
+        return None
+    return Path(candidates[0]).read_text(encoding="utf-8", errors="replace")
 
 
 def main() -> None:
@@ -97,6 +107,17 @@ def main() -> None:
                         f"{apk}: R8/D8 output missing preserved class descriptor "
                         f"{marker.decode('ascii')}"
                     )
+            mapping = find_mapping(args.variant)
+            for class_name in RETAINED_API_CLASSES:
+                descriptor = f"L{class_name.replace('.', '/')};".encode("ascii")
+                if descriptor in dex_payload:
+                    continue
+                if mapping is not None and f"{class_name} -> " in mapping:
+                    continue
+                errors.append(
+                    f"{apk}: {class_name} absent from dex and not in the R8 mapping "
+                    f"({'none found' if mapping is None else 'stripped'})"
+                )
 
     if errors:
         print("SphereSLAM APK packaging check FAILED:", file=sys.stderr)
