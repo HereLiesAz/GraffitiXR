@@ -312,6 +312,27 @@ class EditorViewModelTest {
     }
 
     @Test
+    fun `sharing persists the editor's current state before exporting`() = runTest {
+        addDesign()
+        every { Uri.fromFile(any()) } returns mockk(relaxed = true)
+        io.mockk.clearMocks(projectRepository, projectManager, answers = false)
+        var stored = GraffitiProject(id = "test-project")
+        coEvery { projectRepository.updateProject(any<(GraffitiProject) -> GraffitiProject>()) } coAnswers {
+            stored = firstArg<(GraffitiProject) -> GraffitiProject>()(stored)
+        }
+
+        viewModel.shareProject()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // The archive reads project.json off disk, so the in-memory design must be written first.
+        assertNotNull(stored.design)
+        coVerifyOrder {
+            projectRepository.updateProject(any<(GraffitiProject) -> GraffitiProject>())
+            projectManager.exportProjectToUri(any(), "test-project", any())
+        }
+    }
+
+    @Test
     fun `saveProject calls updateProject when project exists`() = runTest {
         addDesign()
 

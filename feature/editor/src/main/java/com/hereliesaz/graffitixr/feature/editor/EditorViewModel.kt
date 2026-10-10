@@ -898,24 +898,23 @@ class EditorViewModel @Inject constructor(
      * chooser, mirroring this file's other transient-signal fields (see [onLockedFeedbackShown]).
      */
     fun shareProject() {
-        viewModelScope.launch(dispatchers.io) {
-            val project = projectRepository.currentProject.value
-            if (project == null) {
-                withContext(dispatchers.main) {
-                    Toast.makeText(context, "Nothing to share yet — save a project first.", Toast.LENGTH_SHORT).show()
-                }
-                return@launch
-            }
-            try {
-                // exportProjectToUri reads project.json straight off disk — it isn't routed through
-                // currentProject's in-memory state. saveProject()'s own writes go through
-                // ProjectRepositoryImpl's saveMutex-guarded updateProject(transform), so a save
-                // still in flight when this runs could have this read a stale or torn file. An
-                // identity transform through that same call serializes behind any in-flight save
-                // (the mutex admits only one writer at a time) and re-persists the latest in-memory
-                // state, guaranteeing the file on disk is current before the zip below reads it.
-                projectRepository.updateProject { it }
+        if (projectRepository.currentProject.value == null) {
+            Toast.makeText(context, "Nothing to share yet — save a project first.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        // exportProjectToUri reads project.json straight off disk, not the editor's in-memory state.
+        // Flush that state through the real save path first: saveProject() snapshots the CURRENT
+        // editor state, queues behind any save already in flight (editorSaveMutex, then the
+        // repository's saveMutex), and reports completion only once it is on disk. (An identity
+        // updateProject { it } does not do this — the repository skips a no-op transform outright.)
+        // A failed save has already told the user; sharing a stale archive would hide that.
+        saveProject { saved -> if (saved) exportAndShareProject() }
+    }
 
+    private fun exportAndShareProject() {
+        viewModelScope.launch(dispatchers.io) {
+            val project = projectRepository.currentProject.value ?: return@launch
+            try {
                 val shareDir = File(context.cacheDir, "share").apply { mkdirs() }
                 // project.name is free-form user text (SaveProjectDialog only rejects blank), so a
                 // name like "North/Wall" must not reach the filesystem as a path — File(shareDir,
