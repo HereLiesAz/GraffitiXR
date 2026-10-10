@@ -98,4 +98,18 @@ class EditHistoryTest {
         assertEquals(0, h.undoCount)
         assertEquals(0, h.redoCount)
     }
+
+    @Test
+    fun `referencesDesign sees entries on both stacks`() {
+        val h = EditHistory()
+        h.pushProperty(design("a"))
+        h.pushProperty(design("b"))
+        h.popUndo(counter(design("c")))
+        // "a" remains on undo; "b" was popped and its counterpart "c" sits on redo.
+        assertTrue(h.referencesDesign { it.id == "a" })
+        assertTrue(h.referencesDesign { it.id == "c" })
+        assertFalse(h.referencesDesign { it.id == "z" })
+        h.clear()
+        assertFalse(h.referencesDesign { it.id == "a" })
+    }
 }

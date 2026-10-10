@@ -59,6 +59,9 @@ internal class HostSession(
     // applies it to the authoritative project and THEN emits it like a local edit (enqueueOp), so
     // the host's DELTA order is its apply order — see EditorViewModel.applyGuestOp.
     private val onGuestOp: (Op) -> Unit = {},
+    // How long a dropped guest has to complete a reconnect before the session ends NetworkLost.
+    // Injectable so tests can use a short window instead of the production 30s.
+    private val reconnectWindowMs: Long = 30_000L,
 ) : Session() {
 
     /** Spatial identity fixed for the lifetime of this host session. */
@@ -115,6 +118,11 @@ internal class HostSession(
     // Crypto for the current live connection, so close()/BYE can seal on the active channel.
     @Volatile private var activeCrypto: SessionCrypto? = null
     @Volatile private var lastAppliedSeq: Long = 0L
+    // Bumped each time a connection completes handshake + bulk/replay and goes Live. The reconnect
+    // watcher waits for this to change rather than for clientSocket to be set: clientSocket is
+    // adopted before bulk/replay, so a reconnect that failed partway used to satisfy the watcher,
+    // after which acceptLoop reset clientSocket with nothing left to enforce the timeout.
+    @Volatile private var liveGeneration: Long = 0L
     // v4 guest edits: the connected guest's backend (for GuestOpPolicy) and the highest guestSeq
     // already handled, so a resend after a reconnect is acked without being applied twice.
     @Volatile private var guestBackend: com.hereliesaz.graffitixr.common.model.CoopTrackingBackend? = null
@@ -407,7 +415,12 @@ internal class HostSession(
         // reconstruct its canvas. That is not a failure — it is exactly the case bulk exists for,
         // and falling back to it is what turned buffer overflow from "end the session" into "send
         // more data once".
-        val replay = if (isReconnect) deltaBuffer.opsAfter(lastAppliedSeq) else null
+        //
+        // A lastAppliedSeq beyond anything this session has assigned is equally out of range: the
+        // guest claims ops this host never sent, so an (empty) replay would leave it on whatever
+        // state it has. Serve it a bulk too.
+        val inRange = lastAppliedSeq <= seqCounter.get()
+        val replay = if (isReconnect && inRange) deltaBuffer.opsAfter(lastAppliedSeq) else null
         if (replay != null) {
             replay.forEach { (seq, op) ->
                 // Each entry gets its own try/catch: enqueueOp now rejects an op that can't fit a
@@ -431,6 +444,7 @@ internal class HostSession(
         socket.soTimeout = READ_TIMEOUT_MS
         _state.value = CoopSessionState.Connected(peerName = hello.deviceName)
         phase = Phase.Live
+        liveGeneration++
 
         // Tear down any prior live loops (e.g. from a previous connection before a reconnect)
         // before starting fresh ones, so two outbound loops never drain outQueue concurrently.
@@ -692,10 +706,13 @@ internal class HostSession(
         // during the reconnect window; queued ops wait for the next connection's outbound loop.
         liveJob?.cancel()
         // Wait for the guest to reconnect on the session scope (not liveJob, which we just
-        // cancelled) so this timeout survives the live-loop teardown.
+        // cancelled) so this timeout survives the live-loop teardown. "Reconnected" means a new
+        // connection actually went Live (liveGeneration moved), not merely that one was adopted:
+        // a reconnect that fails during bulk/replay must leave this timeout running.
+        val generationAtDrop = liveGeneration
         scope.launch {
-            val reconnected = withTimeoutOrNull(30_000L) {
-                while (clientSocket == null && isActive) delay(200)
+            val reconnected = withTimeoutOrNull(reconnectWindowMs) {
+                while (liveGeneration == generationAtDrop && isActive) delay(200)
                 true
             } ?: false
             if (!reconnected && phase != Phase.Ended) {
@@ -708,12 +725,25 @@ internal class HostSession(
      * Send a BYE. Before the handshake completes (rejection paths) [crypto] is null and the BYE
      * is plaintext; once a live connection exists it is sealed like every other frame so the
      * guest, which only accepts ENC frames post-handshake, can act on the reason.
+     *
+     * The sealed BYE goes through [writeMutex] like every other sealed frame: sealing and writing it
+     * outside the lock raced the live loops for crypto's send counter (GCM nonce reuse) and
+     * interleaved its bytes with a frame mid-write. The lock wait is bounded by [BYE_LOCK_TIMEOUT_MS]
+     * so a write wedged on a dead guest can't stall teardown; the BYE is simply skipped then.
      */
     private suspend fun sendBye(output: OutputStream, reason: CoopSessionState.EndReason, crypto: SessionCrypto?) {
         try {
             val payload = OpCodec.encode(ByePayload(reason))
             if (crypto != null) {
-                writeFrameTimed(output, FrameType.ENC, crypto.seal(FrameType.BYE, payload))
+                // lock() is cancellable and releases the lock if cancelled after acquiring it, so a
+                // timeout here never leaves the mutex held.
+                val locked = withTimeoutOrNull(BYE_LOCK_TIMEOUT_MS) { writeMutex.lock(); true } ?: false
+                if (!locked) return
+                try {
+                    writeFrameTimed(output, FrameType.ENC, crypto.seal(FrameType.BYE, payload))
+                } finally {
+                    writeMutex.unlock()
+                }
             } else {
                 writeFrameTimed(output, FrameType.BYE, payload)
             }
@@ -727,11 +757,9 @@ internal class HostSession(
          */
         private const val BULK_PERSIST_GRACE_MS = 5_000L
 
-        /**
-         * Minimum spacing of guest pixel replacements. A guest applies effects at human speed (a
-         * few per second at most); a burst faster than this is either a bug or abuse, and each one
-         * costs the host a multi-MB PNG decode.
-         */
+        // How long close() waits for the write lock before giving up on the best-effort BYE.
+        private const val BYE_LOCK_TIMEOUT_MS = 1_000L
+
         private const val TAG = "HostSession"
 
         // Guests ack every 1s and answer 5s PINGs, so 15s of read silence means a dead or

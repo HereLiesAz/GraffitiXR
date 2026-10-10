@@ -75,6 +75,11 @@ internal class EditHistory(private val maxStackSize: Int = 20) {
         return command
     }
 
+    /** True if any undo or redo entry holds a design matching [predicate]. */
+    fun referencesDesign(predicate: (Layer) -> Boolean): Boolean =
+        undoStack.any { it.oldDesign?.let(predicate) == true } ||
+            redoStack.any { it.oldDesign?.let(predicate) == true }
+
     fun clear() {
         undoStack.clear()
         redoStack.clear()

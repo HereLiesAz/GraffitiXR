@@ -57,6 +57,12 @@ class ProjectManager @Inject constructor(
 
     companion object {
         private const val SPECTATOR_PREFIX = "coop_"
+
+        /** Prefix of the design images the editor writes (import and co-op pixel replacement). */
+        private const val DESIGN_FILE_PREFIX = "design_"
+
+        /** Under filesDir, outside projects/: where a spectator archive is built before swap-in. */
+        private const val SPECTATOR_STAGING_DIR = "coop_staging"
         /** Filename shape of [saveHybridKpmPage] output; [deleteHybridKpmPage] refuses anything else. */
         private const val HYBRID_KPM_PAGE_PREFIX = "hybrid_kpm_page_"
         private const val HYBRID_KPM_PAGE_SUFFIX = ".y8.gz"
@@ -150,7 +156,14 @@ class ProjectManager @Inject constructor(
         // map and cloud anchor id can each legitimately be set on a routine (non-fingerprint) save
         // (e.g. the passive wall-map save), so those instead only fall back to the on-disk value when
         // the incoming project doesn't set one, same as the legacy target-fingerprint references.
-        val mergedCapture = if (preserveExistingCaptureState && projectData.fingerprint == null) {
+        //
+        // An incoming fingerprint does not switch the merge off wholesale. Only a fingerprint that
+        // DIFFERS from the persisted one is a new target, and only the state expressed in the old
+        // target's frame (the capture group, legacy refs, wall map, paint marks/grid, cloud anchor,
+        // AR placement width) is taken verbatim from it. A stale writer that merely carries the
+        // already-saved fingerprint gets the full merge, and the frame-independent state below
+        // (SphereSLAM's own page group, the measured wall width) is preserved either way.
+        val mergedCapture = if (preserveExistingCaptureState) {
             val existing = try {
                 val f = File(root, "project.json")
                 if (f.exists()) json.decodeFromString<GraffitiProject>(f.readText()) else null
@@ -160,7 +173,9 @@ class ProjectManager @Inject constructor(
                 null
             }
             if (existing != null) {
-                projectData.copy(
+                val replacesTarget =
+                    projectData.fingerprint != null && projectData.fingerprint != existing.fingerprint
+                val withTarget = if (replacesTarget) projectData else projectData.copy(
                     fingerprint = existing.fingerprint,
                     fingerprintIntrinsics = existing.fingerprintIntrinsics,
                     fingerprintAnchor = existing.fingerprintAnchor,
@@ -170,6 +185,15 @@ class ProjectManager @Inject constructor(
                     // can wipe an existing target.
                     targetFingerprint = projectData.targetFingerprint ?: existing.targetFingerprint,
                     targetFingerprintPath = projectData.targetFingerprintPath ?: existing.targetFingerprintPath,
+                    wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
+                    paintMarks = projectData.paintMarks ?: existing.paintMarks,
+                    paintGrid = projectData.paintGrid ?: existing.paintGrid,
+                    cloudAnchorId = projectData.cloudAnchorId ?: existing.cloudAnchorId,
+                    // Written once by the AR placement; a stale snapshot must not reset it.
+                    arDesignHalfWidthM = if (projectData.arDesignHalfWidthM > 0f) projectData.arDesignHalfWidthM
+                        else existing.arDesignHalfWidthM,
+                )
+                withTarget.copy(
                     // Standalone SphereSLAM's canonical wall page is just as persistent as the
                     // fingerprint: routine/stale saves must not silently erase it.
                     sphereSlamReferenceUri =
@@ -273,16 +297,9 @@ class ProjectManager @Inject constructor(
                         } else {
                             existing.sphereSlamAtlasPages
                         },
-                    wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
                     // Artist-measured; a stale whole-object writer must not erase it. A deliberate
                     // clear goes through updateProject (saveProjectExact), which bypasses this merge.
                     wallWidthMeters = projectData.wallWidthMeters ?: existing.wallWidthMeters,
-                    paintMarks = projectData.paintMarks ?: existing.paintMarks,
-                    paintGrid = projectData.paintGrid ?: existing.paintGrid,
-                    cloudAnchorId = projectData.cloudAnchorId ?: existing.cloudAnchorId,
-                    // Written once by the AR placement; a stale snapshot must not reset it.
-                    arDesignHalfWidthM = if (projectData.arDesignHalfWidthM > 0f) projectData.arDesignHalfWidthM
-                        else existing.arDesignHalfWidthM,
                 )
             } else projectData
         } else projectData
@@ -707,7 +724,7 @@ class ProjectManager @Inject constructor(
             os.use {
                 ZipOutputStream(it).use { zos ->
                     // Use empty string for parent to zip contents directly into the root.
-                    zipFolder(sourceFolder, "", zos)
+                    zipFolder(sourceFolder, "", zos, unreferencedDesignFiles(sourceFolder))
                 }
             }
             true
@@ -952,7 +969,7 @@ class ProjectManager @Inject constructor(
 
         ByteArrayOutputStream().use { baos ->
             ZipOutputStream(baos).use { zos ->
-                zipFolder(sourceFolder, "", zos)
+                zipFolder(sourceFolder, "", zos, unreferencedDesignFiles(sourceFolder))
             }
             baos.toByteArray()
         }
@@ -973,7 +990,10 @@ class ProjectManager @Inject constructor(
      *
      * The copy lives under [spectatorId], never the host's id: a guest who imported the host's .gxr
      * and edited it locally holds a project with that same id, and joining the session must not
-     * overwrite their work. Repeated bulks (reconnects) replace the spectator copy, as they should.
+     * overwrite their work. Repeated bulks (reconnects) replace the spectator copy, as they should:
+     * the archive is extracted into a fresh staging directory that is swapped in for the old copy
+     * whole, and the project is saved exactly, so nothing from a previous join (files, or fields the
+     * host has since cleared) survives into this one.
      */
     suspend fun loadAsSpectator(
         bytes: ByteArray,
@@ -989,6 +1009,7 @@ class ProjectManager @Inject constructor(
         var loaded = false
 
         val extractedFiles = mutableMapOf<String, File>()
+        var stagingDir: File? = null
         try {
             ZipInputStream(bytes.inputStream()).use { zis ->
                 var projectData: GraffitiProject? = null
@@ -1023,10 +1044,14 @@ class ProjectManager @Inject constructor(
                     return@use
                 }
                 val localId = spectatorId(project.id)
-                val destDir = File(appContext.filesDir, "projects/$localId").also { it.mkdirs() }
+                val destDir = File(appContext.filesDir, "projects/$localId")
+                // Staged outside projects/ so a half-built copy is never listed as a project.
+                val staging = File(appContext.filesDir, "$SPECTATOR_STAGING_DIR/${UUID.randomUUID()}")
+                    .also { it.mkdirs() }
+                stagingDir = staging
 
                 for ((name, tmpFile) in extractedFiles) {
-                    val dest = resolveInside(destDir, name)
+                    val dest = resolveInside(staging, name)
                     if (dest == null) {
                         Log.w("ProjectManager", "Skipping zip entry escaping project dir: $name")
                         tmpFile.delete()
@@ -1040,14 +1065,21 @@ class ProjectManager @Inject constructor(
                     }
                 }
 
+                // Validate against the staged copy first: every referenced asset must be in THIS
+                // archive. Only then retire the previous join's copy, whose leftover files could
+                // otherwise satisfy a reference the new archive no longer carries.
+                relocateProjectFiles(project, staging)
+                replaceDirectory(staging, destDir)
                 // Relocate against the HOST's id (the archive's paths carry it), then re-key.
                 val relocated = relocateProjectFiles(project, destDir).copy(id = localId)
                 val normalized = transform(relocated)
                 require(normalized.id == localId) {
                     "spectator transform must preserve isolated project id"
                 }
+                // Exact save: createProject's stale-writer merge would read the previous join's
+                // project.json and resurrect fields this snapshot deliberately lacks.
                 withContext(Dispatchers.Main) {
-                    projectRepositoryProvider.get().createProject(normalized)
+                    projectRepositoryProvider.get().replaceProject(normalized)
                 }
                 loaded = true
             }
@@ -1057,8 +1089,28 @@ class ProjectManager @Inject constructor(
         } finally {
             // Temp files are only renamed away on the success path; clear any stragglers.
             extractedFiles.values.forEach { if (it.exists()) it.delete() }
+            // Renamed into place on success; anything still here is a failed load's leftovers.
+            stagingDir?.let { if (it.exists()) it.deleteRecursively() }
         }
         loaded
+    }
+
+    /**
+     * Swaps [staging] in for [dest] as a whole. The old copy is renamed aside first and restored if
+     * the swap fails, so [dest] is either entirely the old copy or entirely the new one.
+     */
+    private fun replaceDirectory(staging: File, dest: File) {
+        dest.parentFile?.mkdirs()
+        val retired = File(staging.parentFile, "${staging.name}.old")
+        if (dest.exists() && !dest.renameTo(retired)) {
+            // Could not move it aside (unusual on one filesystem): fall back to deleting in place.
+            check(dest.deleteRecursively()) { "Could not clear previous spectator copy" }
+        }
+        if (!staging.renameTo(dest)) {
+            if (retired.exists()) retired.renameTo(dest)
+            error("Could not install spectator copy")
+        }
+        retired.deleteRecursively()
     }
 
     /** Local id for a spectated host project; distinct from the host id so it never collides. */
@@ -1067,8 +1119,30 @@ class ProjectManager @Inject constructor(
 
     // --- End co-op implementation ---
 
-    private fun zipFolder(folder: File, parentFolder: String, zos: ZipOutputStream) {
+    /**
+     * Names of superseded design images in [folder]: root-level `design_*` files that its
+     * project.json no longer mentions. Every import and every co-op pixel replacement writes a new
+     * one, so without this each bulk transfer and export would ship every design the project ever
+     * had. They are only left out of archives, never deleted: an in-memory undo entry may still
+     * point at one, and undo reloads a changed image from its file. No project.json, no exclusions.
+     */
+    private fun unreferencedDesignFiles(folder: File): Set<String> {
+        val manifest = File(folder, "project.json").takeIf { it.isFile }?.readText() ?: return emptySet()
+        return folder.listFiles()
+            ?.filter { it.isFile && it.name.startsWith(DESIGN_FILE_PREFIX) && it.name !in manifest }
+            ?.mapTo(mutableSetOf()) { it.name }
+            ?: emptySet()
+    }
+
+    private fun zipFolder(
+        folder: File,
+        parentFolder: String,
+        zos: ZipOutputStream,
+        // Root-level file names to leave out (see [unreferencedDesignFiles]).
+        excludeAtRoot: Set<String> = emptySet(),
+    ) {
         for (file in folder.listFiles() ?: emptyArray()) {
+            if (parentFolder.isEmpty() && file.name in excludeAtRoot) continue
             // Use relative path from the source folder to avoid nested parent directories in the ZIP.
             val zipPath = if (parentFolder.isEmpty()) file.name else "$parentFolder/${file.name}"
             if (file.isDirectory) {

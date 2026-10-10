@@ -23,12 +23,20 @@ internal class SessionCrypto private constructor(
     private val sendIvSalt: ByteArray, // 12 bytes
     private val recvIvSalt: ByteArray, // 12 bytes
 ) {
-    private var sendCounter: Long = 0
+    // Atomic so two concurrent seal() calls can never draw the same counter (= the same GCM nonce
+    // under this key, which breaks GCM's confidentiality and authenticity). Callers still serialize
+    // seal-then-write under their write lock so frames hit the wire in counter order; this is the
+    // defence in depth for any path that forgets to.
+    private val sendCounter = java.util.concurrent.atomic.AtomicLong(0)
     private var lastRecvCounter: Long = -1
 
-    /** Wrap ([type], [payload]) into an ENC frame payload. Not thread-safe; callers serialize. */
+    /**
+     * Wrap ([type], [payload]) into an ENC frame payload. Safe to call concurrently (every call gets a
+     * unique counter), but callers must still seal and write under one lock: the receiver rejects a
+     * counter that arrives out of order.
+     */
     fun seal(type: FrameType, payload: ByteArray): ByteArray {
-        val counter = sendCounter++
+        val counter = sendCounter.getAndIncrement()
         val counterBytes = counter.toBigEndianBytes()
         val inner = ByteArray(1 + payload.size)
         inner[0] = type.code

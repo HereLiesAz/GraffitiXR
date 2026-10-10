@@ -160,6 +160,11 @@ class EditorViewModel @Inject constructor(
     }
 
     private val history = EditHistory()
+    // Absolute paths of design files this device wrote for a peer's DesignBitmapReplace, in the
+    // current project. Each op writes a fresh file, so without pruning a spectator copy grows by one
+    // full-size PNG per host effect toggle. Only files recorded here are ever deleted, and only once
+    // neither the live design nor the undo/redo history points at them. Main thread only.
+    private val peerWrittenDesignPaths = mutableSetOf<String>()
     private var projectLoadJob: Job? = null
     private var backgroundLoadJob: Job? = null
     private var importJob: Job? = null
@@ -271,6 +276,7 @@ class EditorViewModel @Inject constructor(
                     dispatch(EditorIntent.ClearProject)
                     history.clear()
                     updateHistoryCounts()
+                    peerWrittenDesignPaths.clear()
                 }
             }
         }
@@ -288,6 +294,9 @@ class EditorViewModel @Inject constructor(
         // silently applying stale, previous-project state to the one now on screen.
         history.clear()
         updateHistoryCounts()
+        // Files the previous project's peer wrote belong to THAT project's project.json; never
+        // judge them against this one's design.
+        peerWrittenDesignPaths.clear()
         designSourceBitmap = null
         anchorHalfExtentMeters = null
 
@@ -898,24 +907,23 @@ class EditorViewModel @Inject constructor(
      * chooser, mirroring this file's other transient-signal fields (see [onLockedFeedbackShown]).
      */
     fun shareProject() {
-        viewModelScope.launch(dispatchers.io) {
-            val project = projectRepository.currentProject.value
-            if (project == null) {
-                withContext(dispatchers.main) {
-                    Toast.makeText(context, "Nothing to share yet — save a project first.", Toast.LENGTH_SHORT).show()
-                }
-                return@launch
-            }
-            try {
-                // exportProjectToUri reads project.json straight off disk — it isn't routed through
-                // currentProject's in-memory state. saveProject()'s own writes go through
-                // ProjectRepositoryImpl's saveMutex-guarded updateProject(transform), so a save
-                // still in flight when this runs could have this read a stale or torn file. An
-                // identity transform through that same call serializes behind any in-flight save
-                // (the mutex admits only one writer at a time) and re-persists the latest in-memory
-                // state, guaranteeing the file on disk is current before the zip below reads it.
-                projectRepository.updateProject { it }
+        if (projectRepository.currentProject.value == null) {
+            Toast.makeText(context, "Nothing to share yet — save a project first.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        // exportProjectToUri reads project.json straight off disk, not the editor's in-memory state.
+        // Flush that state through the real save path first: saveProject() snapshots the CURRENT
+        // editor state, queues behind any save already in flight (editorSaveMutex, then the
+        // repository's saveMutex), and reports completion only once it is on disk. (An identity
+        // updateProject { it } does not do this — the repository skips a no-op transform outright.)
+        // A failed save has already told the user; sharing a stale archive would hide that.
+        saveProject { saved -> if (saved) exportAndShareProject() }
+    }
 
+    private fun exportAndShareProject() {
+        viewModelScope.launch(dispatchers.io) {
+            val project = projectRepository.currentProject.value ?: return@launch
+            try {
                 val shareDir = File(context.cacheDir, "share").apply { mkdirs() }
                 // project.name is free-form user text (SaveProjectDialog only rejects blank), so a
                 // name like "North/Wall" must not reach the filesystem as a path — File(shareDir,
@@ -1508,7 +1516,12 @@ class EditorViewModel @Inject constructor(
                             })
                         }
                         onApplied()
-                        if (persisted) saveProject()
+                        if (persisted) {
+                            localUri?.path?.let { peerWrittenDesignPaths += it }
+                            // Prune only after project.json points at the new file, so a crash in
+                            // between never leaves the saved project referencing a deleted one.
+                            saveProject { saved -> if (saved) prunePeerWrittenDesignFiles() }
+                        }
                     }
                 }
                 return // onApplied runs after the decode, above
@@ -1520,6 +1533,24 @@ class EditorViewModel @Inject constructor(
             is Op.TextContentChange -> return
         }
         onApplied()
+    }
+
+    /**
+     * Deletes design files written for earlier peer DesignBitmapReplace ops that nothing points at
+     * any more: not the live design, and no undo/redo entry (undo reloads a changed image from its
+     * URI, so a referenced file must survive). A still-referenced file stays tracked and is retried
+     * on the next replace.
+     */
+    private fun prunePeerWrittenDesignFiles() {
+        val livePath = _uiState.value.design?.uri?.path
+        val stale = peerWrittenDesignPaths.filter { path ->
+            path != livePath && !history.referencesDesign { it.uri?.path == path }
+        }
+        if (stale.isEmpty()) return
+        peerWrittenDesignPaths -= stale.toSet()
+        viewModelScope.launch(dispatchers.io) {
+            stale.forEach { path -> runCatching { File(path).delete() } }
+        }
     }
 
     // ── Internals ─────────────────────────────────────────────────────────────
