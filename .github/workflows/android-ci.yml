@@ -86,16 +86,25 @@ jobs:
       - name: SphereSLAM build contract
         run: python3 tools/check_sphereslam_build_contract.py
 
-      - name: Run detekt
-        # config/detekt/detekt.yml (maxIssues: 0) existed but was never wired into CI, so it was
-        # never actually enforced. continue-on-error is deliberate here: the detekt Gradle plugin
-        # version hasn't been verified clean against this project's Kotlin/AGP versions in CI, so
-        # this reports findings without hard-failing the build until that's confirmed. Tighten to
-        # a hard failure (drop continue-on-error) once a clean run is verified.
-        continue-on-error: true
+      - name: Run detekt (REPORT-ONLY)
+        # REPORT-ONLY, deliberately: detekt runs fine but main is not clean. The 2026-10-10 main run
+        # (98370a8) failed config/detekt/detekt.yml's maxIssues: 0 with 23 findings: :app 15,
+        # :core:data 5, :feature:ar 3 (BACKLOG.md "Build verification" lists them). Until those are
+        # fixed the step surfaces a warning annotation and uploads the reports instead of failing.
+        # To enforce: fix the findings, then replace this `if` with a plain ./gradlew detekt call.
         run: |
           chmod +x gradlew
-          ./gradlew detekt --continue --build-cache --no-daemon --stacktrace
+          if ! ./gradlew detekt --continue --build-cache --no-daemon --stacktrace; then
+            echo "::warning title=detekt (report-only)::detekt found issues; not enforced yet — see BACKLOG.md and the detekt-reports artifact."
+          fi
+
+      - name: Upload detekt reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: detekt-reports
+          path: '**/build/reports/detekt/'
+          if-no-files-found: ignore
 
       - name: Upload test reports
         if: always()

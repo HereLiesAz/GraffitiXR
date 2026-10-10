@@ -12,6 +12,14 @@ continuing to defer verification to some future session. `compileDebugKotlin`,
 `SwallowedException` findings detekt caught in test-only catch blocks (`WallFeatureMapTest.kt`,
 `CaptureEnvironmentTest.kt`) — unnamed the caught exceptions per the project's `_` convention.
 
+- [ ] **detekt is report-only in CI, not enforced.** `android-ci.yml`'s "Run detekt (REPORT-ONLY)"
+  step warns instead of failing because main is not clean: the 2026-10-10 run on `98370a8` failed
+  `maxIssues: 0` with 23 findings — `:app` 15 × `MaxLineLength` (`MainActivity.kt` lines
+  ~2167–2349), `:core:data` 5 × `MaxLineLength` (`ProjectManagerTest.kt`), `:feature:ar` 3
+  (`UnusedPrivateMember` `ArViewModel.resetSphereCoverage`, `TopLevelPropertyNaming` in
+  `HomographyFallbackOverlay.kt:293`, `NewLineAtEndOfFile` in `AnchorOrchestratorDriftTest.kt`).
+  Fix them, verify `./gradlew detekt` passes, then make the step a plain hard-failing call.
+
 ## Security alerts
 
 ### Done
