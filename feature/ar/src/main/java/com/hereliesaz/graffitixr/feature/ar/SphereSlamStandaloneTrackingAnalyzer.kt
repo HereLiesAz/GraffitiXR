@@ -1333,6 +1333,11 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         }
     }
 
+    // Synchronized like analyze()/updatePrecisionLayer(): it tears down the same session, buffers
+    // and state machine, so it must not interleave with a frame or a precision-layer swap that
+    // reaches it from another thread (the overlay posts it to the analysis executor, but nothing
+    // else enforces that).
+    @Synchronized
     override fun close() {
         if (closed) return
         closed = true
