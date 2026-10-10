@@ -112,6 +112,7 @@ the real (non-stub) tracker is packaged.
     calibrated KPM pose pipeline with quality gates, observation-age checks, pose-jump rejection,
     tracking-state hysteresis, and the short rotation-only IMU bridge.
 *   `StandaloneWallHitTest.kt`: ARCore-independent screen-pixel → canonical wall intersection.
+*   `StandalonePhotosphereCapture.kt`: pure capture-time seam that picks the camera view (attitude + intrinsics) a standalone fingerprint is bound to in the base photosphere, and names why it cannot (no rotation sensor / attitude not ready / no keyframe yet) for artist feedback.
     Back-projects calibrated CameraX rays onto SphereSLAM z=0 and accepts only visually locked,
     registered page/atlas coverage; no synthetic depth or ARCore `Frame.hitTest`.
 *   `StandaloneAtlasGrowth.kt`: chooses/rectifies additional KPM wall pages and registers each into

@@ -18,6 +18,9 @@ true throughout and after the migration:
   remain unchanged.
 - [x] Physical-vs-normalized scale semantics remain unchanged.
 - [x] Coverage/glow and camera-attitude behavior remain available.
+  Camera attitude sampling is started by the standalone AR composition (it was previously never
+  started, which silently disabled photosphere keyframes, the glow cut-outs, and every standalone
+  fingerprint placement).
 - [x] Co-op protocol-v3 backend/scale/wall-frame contracts remain unchanged.
 - [x] Existing fail-closed ARCore-only feature boundaries remain enforced.
 - [x] GraffitiXR's public `Standalone*` vocabulary remains available through public aliases to the
@@ -282,6 +285,11 @@ Remaining:
   - [x] excessive over/under-exposure warning using clipped-pixel fraction.
 - [x] Provide useful user-facing reasons for small/flat/blurry captures and too few native KPM
   features.
+- [x] Provide user-facing reasons when a capture cannot bind to the base photosphere (no rotation
+  sensor, attitude not ready, nothing mapped yet) instead of failing silently at Confirm.
+- [ ] Device-check: fresh standalone AR entry logs `camera attitude sampling started`, then
+  `photosphere tile captured`, status `mapping=true`, and a capture logs
+  `fingerprint capture bound to photosphere tile=`.
 - [x] Preserve the previous valid target if a replacement fails native KPM feature validation;
   persistence happens only after the replacement page passes native registration.
 - [x] Confirm recapture logically atomically replaces persisted standalone target metadata and

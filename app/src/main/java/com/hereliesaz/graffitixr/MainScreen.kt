@@ -230,6 +230,27 @@ fun MainScreen(
                         LaunchedEffect(arUiState.isFlashlightOn) {
                             cameraController.enableTorch(arUiState.isFlashlightOn)
                         }
+                        // Camera attitude sampling starts with CameraX + the photosphere
+                        // (SPHERESLAM_SPHERE_MAP.md §5.1). The analyzer records no photosphere
+                        // keyframe without it, so a target capture could never bind to the map.
+                        // Released while paused so the compass does not run in the background.
+                        DisposableEffect(lifecycleOwner) {
+                            if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                                arViewModel.startStandaloneCameraAttitude()
+                            }
+                            val attitudeObserver = LifecycleEventObserver { _, event ->
+                                when (event) {
+                                    Lifecycle.Event.ON_RESUME -> arViewModel.startStandaloneCameraAttitude()
+                                    Lifecycle.Event.ON_PAUSE -> arViewModel.stopStandaloneCameraAttitude()
+                                    else -> {}
+                                }
+                            }
+                            lifecycleOwner.lifecycle.addObserver(attitudeObserver)
+                            onDispose {
+                                lifecycleOwner.lifecycle.removeObserver(attitudeObserver)
+                                arViewModel.stopStandaloneCameraAttitude()
+                            }
+                        }
                         CameraPreview(
                             controller = cameraController,
                             modifier = Modifier.fillMaxSize(),
