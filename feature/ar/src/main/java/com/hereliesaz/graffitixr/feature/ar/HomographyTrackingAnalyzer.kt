@@ -6,11 +6,11 @@ import android.graphics.Bitmap
 import android.graphics.Matrix
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
-import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsics
-import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsicsEstimator
+import com.hereliesaz.sphereslam.camera.CameraIntrinsics
+import com.hereliesaz.sphereslam.camera.CameraIntrinsicsEstimator
 import com.hereliesaz.graffitixr.feature.ar.HomographyArTracker.HomographyPose
-import com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation
-import com.hereliesaz.graffitixr.feature.ar.rendering.ProjectionMatrix
+import com.hereliesaz.sphereslam.camera.CaptureRotation
+import com.hereliesaz.sphereslam.camera.ProjectionMatrix
 import com.hereliesaz.graffitixr.nativebridge.YuvConverter
 
 /**

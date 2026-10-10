@@ -1,6 +1,6 @@
 package com.hereliesaz.graffitixr.feature.ar
 
-import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsics
+import com.hereliesaz.sphereslam.camera.CameraIntrinsics
 import com.hereliesaz.graffitixr.common.sensor.Vec3
 import kotlin.math.abs
 

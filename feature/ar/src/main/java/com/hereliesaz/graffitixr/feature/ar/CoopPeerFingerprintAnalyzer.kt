@@ -4,14 +4,16 @@ import android.content.Context
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import com.hereliesaz.graffitixr.common.model.CoopSpatialFrame
-import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsics
-import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsicsEstimator
-import com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation
-import com.hereliesaz.graffitixr.feature.ar.rendering.ProjectionMatrix
+import com.hereliesaz.sphereslam.camera.CameraIntrinsics
+import com.hereliesaz.sphereslam.camera.CameraIntrinsicsEstimator
+import com.hereliesaz.sphereslam.camera.CaptureRotation
+import com.hereliesaz.sphereslam.camera.ProjectionMatrix
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import java.nio.ByteBuffer
 import kotlin.math.abs
 import timber.log.Timber
+import com.hereliesaz.sphereslam.camera.CameraIntrinsicsTransforms
+import com.hereliesaz.sphereslam.camera.LumaFrameTransform
 
 internal fun shouldHoldCoopPeerPose(
     lastFreshSolveMs: Long,
@@ -91,7 +93,7 @@ internal class CoopPeerFingerprintAnalyzer(
                 rawWidth,
                 rawHeight,
             ) ?: return
-            val cropped = cropCameraIntrinsics(
+            val cropped = CameraIntrinsicsTransforms.crop(
                 intrinsics = rawIntrinsics,
                 cropLeft = crop.left,
                 cropTop = crop.top,

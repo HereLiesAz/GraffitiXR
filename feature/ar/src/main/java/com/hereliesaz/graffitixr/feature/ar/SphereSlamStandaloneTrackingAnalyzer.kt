@@ -9,13 +9,13 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
-import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsics
-import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsicsEstimator
-import com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation
+import com.hereliesaz.sphereslam.camera.CameraIntrinsics
+import com.hereliesaz.sphereslam.camera.CameraIntrinsicsEstimator
+import com.hereliesaz.sphereslam.camera.CaptureRotation
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricMarks
 import com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion
 import com.hereliesaz.sphereslam.math.RigidMath
-import com.hereliesaz.graffitixr.feature.ar.rendering.ProjectionMatrix
+import com.hereliesaz.sphereslam.camera.ProjectionMatrix
 import com.hereliesaz.sphereslam.math.RotationMath
 import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintFrame
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
@@ -24,6 +24,9 @@ import com.hereliesaz.sphereslam.SphereSlamStandaloneSession
 import com.hereliesaz.sphereslam.reloc.RobustTrackingLoop
 import java.nio.ByteBuffer
 import timber.log.Timber
+import com.hereliesaz.sphereslam.camera.CameraIntrinsicsTransforms
+import com.hereliesaz.sphereslam.camera.LumaFrameTransform
+import com.hereliesaz.sphereslam.camera.RotatedLuma
 
 /**
  * Display-oriented reference image consumed by the standalone SphereSLAM CameraX path.
@@ -358,7 +361,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 )
                 return
             }
-            val croppedIntrinsics = cropCameraIntrinsics(
+            val croppedIntrinsics = CameraIntrinsicsTransforms.crop(
                 intrinsics = rawIntrinsics,
                 cropLeft = crop.left,
                 cropTop = crop.top,

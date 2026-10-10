@@ -9,7 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.data.ProjectManager
-import com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation
+import com.hereliesaz.sphereslam.camera.CaptureRotation
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricMarks
 import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder

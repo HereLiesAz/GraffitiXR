@@ -18,7 +18,7 @@ import com.hereliesaz.sphereslam.math.RotationMath
  * a basis change `A · ΔR_body · Aᵀ` ([GyroOrientationBridge.cameraRotationDelta]); for a same-axis
  * (Z) delta the sign of `A` cancels, so only an OFF-axis body delta makes the sign observable. This
  * test drives an off-axis delta (about body X) and pins the sign to `R_z(+θ)` — the same convention
- * [com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation] already verifies for the identical
+ * [com.hereliesaz.sphereslam.camera.CaptureRotation] already verifies for the identical
  * `image.imageInfo.rotationDegrees` quantity — with a negative control proving `R_z(−θ)` is wrong.
  *
  * Reference matrices are written independently here (plain cos/sin, row-major `v' = R·v`), not taken

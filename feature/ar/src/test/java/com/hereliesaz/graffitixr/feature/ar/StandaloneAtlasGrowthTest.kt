@@ -1,6 +1,6 @@
 package com.hereliesaz.graffitixr.feature.ar
 
-import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsics
+import com.hereliesaz.sphereslam.camera.CameraIntrinsics
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull

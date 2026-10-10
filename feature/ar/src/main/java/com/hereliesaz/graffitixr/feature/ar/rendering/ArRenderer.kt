@@ -2596,7 +2596,7 @@ class ArRenderer(
                         // bitmap rotation, turns a sensor ray into R_z(+rotationNeeded) * itself —
                         // and while it lived inline here nothing could drive a pixel through it, so
                         // the derivation and the tests both rested on one reading of these lines.
-                        val intrArr = com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation
+                        val intrArr = com.hereliesaz.sphereslam.camera.CaptureRotation
                             .rotateIntrinsics(fx, fy, cx, cy, rawW, rawH, rotationNeeded)
 
                         // Camera→point distance at the tapped pixel (Sub-project C). Map the tap from
@@ -2836,7 +2836,7 @@ class ArRenderer(
                 // and moves the principal point.
                 run {
                     val dims = intrinsics.imageDimensions
-                    val live = com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation.rotateIntrinsics(
+                    val live = com.hereliesaz.sphereslam.camera.CaptureRotation.rotateIntrinsics(
                         intrinsics.focalLength[0], intrinsics.focalLength[1],
                         intrinsics.principalPoint[0], intrinsics.principalPoint[1],
                         dims[0].toFloat(), dims[1].toFloat(),

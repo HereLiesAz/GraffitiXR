@@ -45,7 +45,7 @@ import timber.log.Timber
  * out of the SCREEN face; the rear camera looks the opposite physical direction, so the shared
  * optical (Z) axis needs no flip — that part is a platform guarantee, not a guess. The remaining
  * freedom is exactly the quarter-turn `rotationDeg` already threads through this codebase's other
- * sensor-to-display conversions (see `com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation`,
+ * sensor-to-display conversions (see `com.hereliesaz.sphereslam.camera.CaptureRotation`,
  * whose own doc notes its convention was ONE PERSON'S READING until `CaptureRotationTest` closed
  * the loop). This class applies that same convention to a rotation delta instead of a pixel, but
  * has no equivalent device-verified test yet — the sign has not been confirmed on hardware.

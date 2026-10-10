@@ -24,7 +24,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsicsEstimator
+import com.hereliesaz.sphereslam.camera.CameraIntrinsicsEstimator
 import com.hereliesaz.graffitixr.feature.ar.depth.DepthEstimator
 import com.hereliesaz.graffitixr.feature.ar.util.OverlayGyroCompensationMath
 import java.util.concurrent.Executor
