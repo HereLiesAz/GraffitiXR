@@ -210,10 +210,10 @@ There is no `release-apk.yml` in this repository — the actual signing secrets,
 |--------|---------|
 | `PLAY_SERVICE_ACCOUNT_JSON` | Full JSON key of a Google Cloud service account with Play release access |
 
-### Build config (already used)
+### Build config
 
-`GOOGLE_SERVICES_API_KEY`, `PROJECT_ID`, `CLIENT_ID`, `ARCORE_API_KEY`. See
-`android-ci.yml` / `merged-build.yml`.
+None. `GOOGLE_SERVICES*`, `PROJECT_ID`, `CLIENT_ID` and `ARCORE_API_KEY` are no longer required:
+no module applies the google-services plugin and nothing in the build reads an ARCore API key.
 
 Crash reporting is **not** credentialed at build time. The old `CRASH_REPORT_TOKEN` build secret was
 removed: it was compiled into `BuildConfig` and shipped inside every published APK, where decompiling

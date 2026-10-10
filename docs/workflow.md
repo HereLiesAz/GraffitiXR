@@ -17,14 +17,11 @@ The actual workflow files present in this repository are `android-ci.yml`, `merg
 -   **Triggers:** Push to any branch, Pull Request to `main`, manual dispatch.
 -   **Steps (common to both):**
     1.  Checkout code.
-    2.  **Inject Google Services:** an inline shell step (not a separate workflow file) substitutes
-        secrets into `app/google-services.json.template` to produce `app/google-services.json`, when
-        the template exists.
-    3.  Set up JDK 21 (Temurin).
-    4.  Decode the base64 `KEYSTORE_RAW` secret to `app/keystore.jks` (falls back to the debug key if
+    2.  Set up JDK 21 (Temurin).
+    3.  Decode the base64 `KEYSTORE_RAW` secret to `app/keystore.jks` (falls back to the debug key if
         the secret is empty).
-    5.  **Test:** `./gradlew test` (unit tests, in a separate job).
-    6.  **Build:** `./gradlew assembleDebug`.
+    4.  **Test:** `./gradlew test` (unit tests, in a separate job).
+    5.  **Build:** `./gradlew assembleDebug`.
 
 `android-ci.yml` is the canonical publisher: on a push, it creates/updates the shared GitHub Release
 tagged `latest-debug-v<major>.<minor>` with the built debug APK. The two workflows previously raced
@@ -42,7 +39,8 @@ There is currently no separate signed-AAB / Google Play publishing workflow — 
 
 ## **4. Local Environment Setup**
 -   **SDK:** Ensure `local.properties` points to your Android SDK.
--   **Keys:** You need `app/google-services.json`. Use the template `app/google-services.json.template` and fill it with dummy data for local compilation if real keys are not available.
+-   **Keys:** None needed to compile. No module applies the google-services plugin, so no
+    `google-services.json` is required (the old template and CI injection step were removed as dead).
 
 
 ---

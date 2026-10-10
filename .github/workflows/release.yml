@@ -1,10 +1,11 @@
 name: Release (build, sign, publish)
 
-# Self-contained release: builds a SIGNED AAB and APK in THIS repo (where the signing, Google
-# services, ARCore and Play secrets live) and publishes them. Publishing was centralized into
-# HereLiesAz/workflows, but that repo does not hold GraffitiXR's secrets and GitHub cannot read
-# secrets across repositories, so the central "Inject Google services" step failed on every push and
-# nothing shipped. Building and publishing here, with this repo's own secrets, is the arrangement that
+# Self-contained release: builds a SIGNED AAB and APK in THIS repo (where the signing and Play
+# secrets live) and publishes them. Publishing was centralized into HereLiesAz/workflows, but that
+# repo does not hold GraffitiXR's secrets and GitHub cannot read secrets across repositories, so the
+# central "Inject Google services" step failed on every push and nothing shipped. (That step is gone
+# here too: no module applies the google-services plugin and nothing reads ARCORE_API_KEY, so
+# google-services.json and the ARCore key were never consumed by the build.) Building and publishing here, with this repo's own secrets, is the arrangement that
 # worked before Sept 16.
 #
 # Deliberately NOT named release-aab.yml / release-apk.yml: those names are registered with the
@@ -90,32 +91,6 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
-      - name: Inject Google services
-        env:
-          # Preferred: the full, real google-services.json pasted as one secret.
-          GOOGLE_SERVICES: ${{ secrets.GOOGLE_SERVICES }}
-          # Fallback: placeholder template + individual values (used only if GOOGLE_SERVICES is unset).
-          GOOGLE_SERVICES_API_KEY: ${{ secrets.GOOGLE_SERVICES_API_KEY }}
-          PROJECT_ID: ${{ secrets.PROJECT_ID }}
-          CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
-        run: |
-          if [ -n "${GOOGLE_SERVICES:-}" ]; then
-            echo "Using full GOOGLE_SERVICES secret."
-            printf '%s' "$GOOGLE_SERVICES" > app/google-services.json
-          elif [ -f "app/google-services.json.template" ]; then
-            echo "GOOGLE_SERVICES unset; injecting from template."
-            sed -e 's/{{\([^}]*\)}}/${\1}/g' app/google-services.json.template | envsubst > app/google-services.json
-          else
-            echo "::error::No GOOGLE_SERVICES secret and no template — cannot produce google-services.json."
-            exit 1
-          fi
-          if [ -z "${ARCORE_API_KEY:-}" ]; then
-            echo "::error::ARCORE_API_KEY secret is empty — a release with a blank ARCore key would ship non-functional AR."
-            exit 1
-          fi
-          echo "ARCORE_API_KEY=$ARCORE_API_KEY" >> local.properties
 
       - name: Decode signing keystore
         env:
