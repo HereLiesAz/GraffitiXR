@@ -381,6 +381,52 @@ class ProjectManagerTest {
         assertNull(manager.loadProjectMetadata(mockContext, "ww_clear")?.wallWidthMeters)
     }
 
+    private fun fingerprint(rows: Int) = com.hereliesaz.graffitixr.common.model.Fingerprint(
+        keypoints = emptyList(), points3d = emptyList(), descriptorsData = ByteArray(rows),
+        descriptorsRows = rows, descriptorsCols = 1, descriptorsType = 0,
+    )
+
+    @Test
+    fun `stale save carrying the saved fingerprint still preserves the other fields`() = runTest {
+        val reference = Uri.fromFile(File(tempFilesDir, "projects/fp_stale/sphereslam_reference_a.png"))
+        manager.saveProjectExact(
+            mockContext,
+            GraffitiProject(
+                id = "fp_stale", name = "Wall", fingerprint = fingerprint(2),
+                wallWidthMeters = 4.2f, cloudAnchorId = "anchor-1", sphereSlamReferenceUri = reference,
+            ),
+        )
+        // A snapshot holding the target but taken before the other fields were written.
+        manager.saveProject(mockContext, GraffitiProject(id = "fp_stale", name = "Renamed", fingerprint = fingerprint(2)))
+        val loaded = manager.loadProjectMetadata(mockContext, "fp_stale")
+        assertEquals(4.2f, loaded?.wallWidthMeters ?: 0f, 0f)
+        assertEquals("anchor-1", loaded?.cloudAnchorId)
+        assertEquals(reference, loaded?.sphereSlamReferenceUri)
+        assertEquals("Renamed", loaded?.name)
+    }
+
+    @Test
+    fun `a new fingerprint replaces the old target's frame state but keeps frame-independent fields`() = runTest {
+        val reference = Uri.fromFile(File(tempFilesDir, "projects/fp_new/sphereslam_reference_a.png"))
+        manager.saveProjectExact(
+            mockContext,
+            GraffitiProject(
+                id = "fp_new", name = "Wall", fingerprint = fingerprint(2),
+                fingerprintIntrinsics = listOf(1f, 2f, 3f, 4f),
+                wallWidthMeters = 4.2f, cloudAnchorId = "anchor-1", sphereSlamReferenceUri = reference,
+            ),
+        )
+        manager.saveProject(mockContext, GraffitiProject(id = "fp_new", name = "Wall", fingerprint = fingerprint(3)))
+        val loaded = manager.loadProjectMetadata(mockContext, "fp_new")
+        assertEquals(fingerprint(3), loaded?.fingerprint)
+        // State expressed in the old target's frame must not be grafted onto the new one.
+        assertTrue(loaded?.fingerprintIntrinsics.isNullOrEmpty())
+        assertNull(loaded?.cloudAnchorId)
+        // The wall width and SphereSLAM's own page are not tied to the AR target.
+        assertEquals(4.2f, loaded?.wallWidthMeters ?: 0f, 0f)
+        assertEquals(reference, loaded?.sphereSlamReferenceUri)
+    }
+
     @Test
     fun `legacy project has no wall width`() = runTest {
         val projectDir = File(tempFilesDir, "projects/pre_ww").also { it.mkdirs() }

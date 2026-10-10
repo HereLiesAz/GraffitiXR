@@ -153,7 +153,14 @@ class ProjectManager @Inject constructor(
         // map and cloud anchor id can each legitimately be set on a routine (non-fingerprint) save
         // (e.g. the passive wall-map save), so those instead only fall back to the on-disk value when
         // the incoming project doesn't set one, same as the legacy target-fingerprint references.
-        val mergedCapture = if (preserveExistingCaptureState && projectData.fingerprint == null) {
+        //
+        // An incoming fingerprint does not switch the merge off wholesale. Only a fingerprint that
+        // DIFFERS from the persisted one is a new target, and only the state expressed in the old
+        // target's frame (the capture group, legacy refs, wall map, paint marks/grid, cloud anchor,
+        // AR placement width) is taken verbatim from it. A stale writer that merely carries the
+        // already-saved fingerprint gets the full merge, and the frame-independent state below
+        // (SphereSLAM's own page group, the measured wall width) is preserved either way.
+        val mergedCapture = if (preserveExistingCaptureState) {
             val existing = try {
                 val f = File(root, "project.json")
                 if (f.exists()) json.decodeFromString<GraffitiProject>(f.readText()) else null
@@ -163,7 +170,9 @@ class ProjectManager @Inject constructor(
                 null
             }
             if (existing != null) {
-                projectData.copy(
+                val replacesTarget =
+                    projectData.fingerprint != null && projectData.fingerprint != existing.fingerprint
+                val withTarget = if (replacesTarget) projectData else projectData.copy(
                     fingerprint = existing.fingerprint,
                     fingerprintIntrinsics = existing.fingerprintIntrinsics,
                     fingerprintAnchor = existing.fingerprintAnchor,
@@ -173,6 +182,15 @@ class ProjectManager @Inject constructor(
                     // can wipe an existing target.
                     targetFingerprint = projectData.targetFingerprint ?: existing.targetFingerprint,
                     targetFingerprintPath = projectData.targetFingerprintPath ?: existing.targetFingerprintPath,
+                    wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
+                    paintMarks = projectData.paintMarks ?: existing.paintMarks,
+                    paintGrid = projectData.paintGrid ?: existing.paintGrid,
+                    cloudAnchorId = projectData.cloudAnchorId ?: existing.cloudAnchorId,
+                    // Written once by the AR placement; a stale snapshot must not reset it.
+                    arDesignHalfWidthM = if (projectData.arDesignHalfWidthM > 0f) projectData.arDesignHalfWidthM
+                        else existing.arDesignHalfWidthM,
+                )
+                withTarget.copy(
                     // Standalone SphereSLAM's canonical wall page is just as persistent as the
                     // fingerprint: routine/stale saves must not silently erase it.
                     sphereSlamReferenceUri =
@@ -276,16 +294,9 @@ class ProjectManager @Inject constructor(
                         } else {
                             existing.sphereSlamAtlasPages
                         },
-                    wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
                     // Artist-measured; a stale whole-object writer must not erase it. A deliberate
                     // clear goes through updateProject (saveProjectExact), which bypasses this merge.
                     wallWidthMeters = projectData.wallWidthMeters ?: existing.wallWidthMeters,
-                    paintMarks = projectData.paintMarks ?: existing.paintMarks,
-                    paintGrid = projectData.paintGrid ?: existing.paintGrid,
-                    cloudAnchorId = projectData.cloudAnchorId ?: existing.cloudAnchorId,
-                    // Written once by the AR placement; a stale snapshot must not reset it.
-                    arDesignHalfWidthM = if (projectData.arDesignHalfWidthM > 0f) projectData.arDesignHalfWidthM
-                        else existing.arDesignHalfWidthM,
                 )
             } else projectData
         } else projectData
