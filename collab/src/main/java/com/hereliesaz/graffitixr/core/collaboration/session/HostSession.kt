@@ -415,7 +415,12 @@ internal class HostSession(
         // reconstruct its canvas. That is not a failure — it is exactly the case bulk exists for,
         // and falling back to it is what turned buffer overflow from "end the session" into "send
         // more data once".
-        val replay = if (isReconnect) deltaBuffer.opsAfter(lastAppliedSeq) else null
+        //
+        // A lastAppliedSeq beyond anything this session has assigned is equally out of range: the
+        // guest claims ops this host never sent, so an (empty) replay would leave it on whatever
+        // state it has. Serve it a bulk too.
+        val inRange = lastAppliedSeq <= seqCounter.get()
+        val replay = if (isReconnect && inRange) deltaBuffer.opsAfter(lastAppliedSeq) else null
         if (replay != null) {
             replay.forEach { (seq, op) ->
                 // Each entry gets its own try/catch: enqueueOp now rejects an op that can't fit a

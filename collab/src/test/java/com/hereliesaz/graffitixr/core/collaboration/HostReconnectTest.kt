@@ -104,6 +104,24 @@ class HostReconnectTest {
         host.close(CoopSessionState.EndReason.UserLeft)
     }
 
+    @Test
+    fun `a resume claiming a seq beyond the host counter is served a bulk`() = runBlocking {
+        val host = HostSession(
+            token = TOKEN,
+            protocolVersion = 1,
+            localDeviceName = "host",
+            projectId = "p1",
+            snapshotProvider = { snapshot() },
+        )
+        val port = host.startListening()
+
+        // The host has assigned no seqs at all; seq 50 cannot be a state it ever sent.
+        RawGuest(port, lastAppliedSeq = 50L).use { guest ->
+            assertEquals(FrameType.BULK_BEGIN, guest.next().type)
+        }
+        host.close(CoopSessionState.EndReason.UserLeft)
+    }
+
     private companion object {
         const val TOKEN = "tok"
     }
