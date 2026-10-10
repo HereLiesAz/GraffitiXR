@@ -759,6 +759,36 @@ class ProjectManagerTest {
         }
     }
 
+    @Test
+    fun `export leaves out superseded design files but keeps every referenced one`() = runTest {
+        val root = File(tempFilesDir, "projects/designs").also { it.mkdirs() }
+        File(root, "design_old.png").writeBytes(byteArrayOf(1))
+        File(root, "design_live.png").writeBytes(byteArrayOf(2))
+        File(root, "design_overlay.png").writeBytes(byteArrayOf(3))
+        File(root, "target_1.png").writeBytes(byteArrayOf(4))
+        File(root, "project.json").writeText(
+            """{"id":"designs","name":"Wall","design":{"uri":"${Uri.fromFile(File(root, "design_live.png"))}"},""" +
+                """"overlayImageUri":"${Uri.fromFile(File(root, "design_overlay.png"))}"}""",
+        )
+        val out = java.io.ByteArrayOutputStream()
+        val resolver = mockk<android.content.ContentResolver>()
+        every { mockContext.contentResolver } returns resolver
+        every { resolver.openOutputStream(any()) } returns out
+
+        assertTrue(manager.exportProjectToUri(mockContext, "designs", Uri.parse("content://test/out.gxr")))
+
+        val names = mutableSetOf<String>()
+        java.util.zip.ZipInputStream(out.toByteArray().inputStream()).use { zis ->
+            while (true) names += (zis.nextEntry ?: break).name
+        }
+        assertEquals(
+            setOf("project.json", "design_live.png", "design_overlay.png", "target_1.png"),
+            names,
+        )
+        // Left out of the archive only; the file itself is untouched (undo may still need it).
+        assertTrue(File(root, "design_old.png").exists())
+    }
+
     // --- Zip extraction temp-file cleanup (duplicate entry names) ---
 
     @Test

@@ -160,6 +160,11 @@ class EditorViewModel @Inject constructor(
     }
 
     private val history = EditHistory()
+    // Absolute paths of design files this device wrote for a peer's DesignBitmapReplace, in the
+    // current project. Each op writes a fresh file, so without pruning a spectator copy grows by one
+    // full-size PNG per host effect toggle. Only files recorded here are ever deleted, and only once
+    // neither the live design nor the undo/redo history points at them. Main thread only.
+    private val peerWrittenDesignPaths = mutableSetOf<String>()
     private var projectLoadJob: Job? = null
     private var backgroundLoadJob: Job? = null
     private var importJob: Job? = null
@@ -271,6 +276,7 @@ class EditorViewModel @Inject constructor(
                     dispatch(EditorIntent.ClearProject)
                     history.clear()
                     updateHistoryCounts()
+                    peerWrittenDesignPaths.clear()
                 }
             }
         }
@@ -288,6 +294,9 @@ class EditorViewModel @Inject constructor(
         // silently applying stale, previous-project state to the one now on screen.
         history.clear()
         updateHistoryCounts()
+        // Files the previous project's peer wrote belong to THAT project's project.json; never
+        // judge them against this one's design.
+        peerWrittenDesignPaths.clear()
         designSourceBitmap = null
         anchorHalfExtentMeters = null
 
@@ -1507,7 +1516,12 @@ class EditorViewModel @Inject constructor(
                             })
                         }
                         onApplied()
-                        if (persisted) saveProject()
+                        if (persisted) {
+                            localUri?.path?.let { peerWrittenDesignPaths += it }
+                            // Prune only after project.json points at the new file, so a crash in
+                            // between never leaves the saved project referencing a deleted one.
+                            saveProject { saved -> if (saved) prunePeerWrittenDesignFiles() }
+                        }
                     }
                 }
                 return // onApplied runs after the decode, above
@@ -1519,6 +1533,24 @@ class EditorViewModel @Inject constructor(
             is Op.TextContentChange -> return
         }
         onApplied()
+    }
+
+    /**
+     * Deletes design files written for earlier peer DesignBitmapReplace ops that nothing points at
+     * any more: not the live design, and no undo/redo entry (undo reloads a changed image from its
+     * URI, so a referenced file must survive). A still-referenced file stays tracked and is retried
+     * on the next replace.
+     */
+    private fun prunePeerWrittenDesignFiles() {
+        val livePath = _uiState.value.design?.uri?.path
+        val stale = peerWrittenDesignPaths.filter { path ->
+            path != livePath && !history.referencesDesign { it.uri?.path == path }
+        }
+        if (stale.isEmpty()) return
+        peerWrittenDesignPaths -= stale.toSet()
+        viewModelScope.launch(dispatchers.io) {
+            stale.forEach { path -> runCatching { File(path).delete() } }
+        }
     }
 
     // ── Internals ─────────────────────────────────────────────────────────────

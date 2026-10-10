@@ -58,6 +58,9 @@ class ProjectManager @Inject constructor(
     companion object {
         private const val SPECTATOR_PREFIX = "coop_"
 
+        /** Prefix of the design images the editor writes (import and co-op pixel replacement). */
+        private const val DESIGN_FILE_PREFIX = "design_"
+
         /** Under filesDir, outside projects/: where a spectator archive is built before swap-in. */
         private const val SPECTATOR_STAGING_DIR = "coop_staging"
         /** Filename shape of [saveHybridKpmPage] output; [deleteHybridKpmPage] refuses anything else. */
@@ -721,7 +724,7 @@ class ProjectManager @Inject constructor(
             os.use {
                 ZipOutputStream(it).use { zos ->
                     // Use empty string for parent to zip contents directly into the root.
-                    zipFolder(sourceFolder, "", zos)
+                    zipFolder(sourceFolder, "", zos, unreferencedDesignFiles(sourceFolder))
                 }
             }
             true
@@ -966,7 +969,7 @@ class ProjectManager @Inject constructor(
 
         ByteArrayOutputStream().use { baos ->
             ZipOutputStream(baos).use { zos ->
-                zipFolder(sourceFolder, "", zos)
+                zipFolder(sourceFolder, "", zos, unreferencedDesignFiles(sourceFolder))
             }
             baos.toByteArray()
         }
@@ -1116,8 +1119,30 @@ class ProjectManager @Inject constructor(
 
     // --- End co-op implementation ---
 
-    private fun zipFolder(folder: File, parentFolder: String, zos: ZipOutputStream) {
+    /**
+     * Names of superseded design images in [folder]: root-level `design_*` files that its
+     * project.json no longer mentions. Every import and every co-op pixel replacement writes a new
+     * one, so without this each bulk transfer and export would ship every design the project ever
+     * had. They are only left out of archives, never deleted: an in-memory undo entry may still
+     * point at one, and undo reloads a changed image from its file. No project.json, no exclusions.
+     */
+    private fun unreferencedDesignFiles(folder: File): Set<String> {
+        val manifest = File(folder, "project.json").takeIf { it.isFile }?.readText() ?: return emptySet()
+        return folder.listFiles()
+            ?.filter { it.isFile && it.name.startsWith(DESIGN_FILE_PREFIX) && it.name !in manifest }
+            ?.mapTo(mutableSetOf()) { it.name }
+            ?: emptySet()
+    }
+
+    private fun zipFolder(
+        folder: File,
+        parentFolder: String,
+        zos: ZipOutputStream,
+        // Root-level file names to leave out (see [unreferencedDesignFiles]).
+        excludeAtRoot: Set<String> = emptySet(),
+    ) {
         for (file in folder.listFiles() ?: emptyArray()) {
+            if (parentFolder.isEmpty() && file.name in excludeAtRoot) continue
             // Use relative path from the source folder to avoid nested parent directories in the ZIP.
             val zipPath = if (parentFolder.isEmpty()) file.name else "$parentFolder/${file.name}"
             if (file.isDirectory) {

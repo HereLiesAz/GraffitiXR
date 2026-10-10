@@ -35,6 +35,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.io.ByteArrayInputStream
+import java.io.File
 
 import com.hereliesaz.graffitixr.common.DispatcherProvider
 import kotlinx.coroutines.CoroutineDispatcher
@@ -329,6 +330,35 @@ class EditorViewModelTest {
         coVerifyOrder {
             projectRepository.updateProject(any<(GraffitiProject) -> GraffitiProject>())
             projectManager.exportProjectToUri(any(), "test-project", any())
+        }
+    }
+
+    @Test
+    fun `a host pixel replacement deletes the file the previous one wrote`() = runTest {
+        addDesign()
+        val dir = kotlin.io.path.createTempDirectory("gxr_guest_design").toFile()
+        try {
+            coEvery { projectRepository.saveArtifact(any(), any(), any()) } coAnswers {
+                File(dir, secondArg<String>()).apply { writeBytes(thirdArg()) }.absolutePath
+            }
+            mockkStatic("com.hereliesaz.graffitixr.common.util.BitmapDecodeKt")
+            every { com.hereliesaz.graffitixr.common.util.decodeBoundedBitmap(any(), any()) } returns
+                mockk(relaxed = true)
+
+            viewModel.applySpectatorOp(com.hereliesaz.graffitixr.common.model.Op.DesignBitmapReplace(byteArrayOf(1)))
+            testDispatcher.scheduler.advanceUntilIdle()
+            val first = dir.listFiles { f -> f.name.startsWith("design_") }!!.single()
+
+            viewModel.applySpectatorOp(com.hereliesaz.graffitixr.common.model.Op.DesignBitmapReplace(byteArrayOf(2)))
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            val designs = dir.listFiles { f -> f.name.startsWith("design_") }!!.toList()
+            assertFalse("superseded design file was kept", first.exists())
+            assertEquals(1, designs.size)
+            assertEquals(designs.single().absolutePath, viewModel.uiState.value.design?.uri?.path)
+        } finally {
+            unmockkStatic("com.hereliesaz.graffitixr.common.util.BitmapDecodeKt")
+            dir.deleteRecursively()
         }
     }
 
