@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.feature.ar.rendering
 import android.graphics.Bitmap
 import io.mockk.mockk
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Test
@@ -75,5 +76,28 @@ class HomographyOverlayRendererTest {
         val command = mailbox.take() as TextureUpdateCommand.Replace
         assertSame(bitmap, command.bitmap)
         assertNull(mailbox.take())
+    }
+
+    @Test
+    fun `coverage glow holes flip to a bottom-left scissor origin`() {
+        // Hole covering the top-left quarter of a 1000x2000 surface.
+        val rects = coverageGlowScissorRects(floatArrayOf(0f, 0f, 0.5f, 0.5f), 1000, 2000)
+        assertEquals(1, rects.size)
+        assertArrayEquals(intArrayOf(0, 1000, 500, 1000), rects[0])
+    }
+
+    @Test
+    fun `coverage glow holes are clamped and off-surface holes dropped`() {
+        val rects = coverageGlowScissorRects(
+            floatArrayOf(
+                -0.25f, 0.75f, 0.25f, 1.25f, // straddles bottom-left corner
+                1.1f, 0.2f, 1.3f, 0.4f, // entirely right of the surface
+            ),
+            1000,
+            2000,
+        )
+        assertEquals(1, rects.size)
+        assertArrayEquals(intArrayOf(0, 0, 250, 500), rects[0])
+        assertEquals(0, coverageGlowScissorRects(floatArrayOf(0f, 0f, 1f, 1f), 0, 2000).size)
     }
 }
