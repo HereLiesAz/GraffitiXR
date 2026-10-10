@@ -3521,6 +3521,8 @@ class ArRenderer(
         val locked = try {
             sessionLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)
         } catch (_: InterruptedException) {
+            // Restore the flag the catch cleared, as [detachSessionBounded] does.
+            Thread.currentThread().interrupt()
             false
         }
         if (!locked) return null
@@ -3544,6 +3546,8 @@ class ArRenderer(
         val locked = try {
             sessionLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)
         } catch (_: InterruptedException) {
+            // Restore the flag the catch cleared, as [detachSessionBounded] does.
+            Thread.currentThread().interrupt()
             false
         }
         if (!locked) return SessionLifecycleOutcome.LockTimeout
@@ -3567,6 +3571,8 @@ class ArRenderer(
         val locked = try {
             sessionLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)
         } catch (_: InterruptedException) {
+            // Restore the flag the catch cleared, as [detachSessionBounded] does.
+            Thread.currentThread().interrupt()
             false
         }
         if (!locked) return SessionLifecycleOutcome.LockTimeout
@@ -3610,6 +3616,7 @@ class ArRenderer(
         val locked = try {
             sessionLock.tryLock(500, TimeUnit.MILLISECONDS)
         } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
             false
         }
         try {
