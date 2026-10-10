@@ -9,7 +9,8 @@ name: Android CI
 # split).
 #
 # Auto-detects app name from settings.gradle.kts / settings.gradle.
-# Reads version from version.properties (Major.Minor.Patch.Build).
+# Debug APK is named Major.Minor.Patch.Build: Major/Minor from version.properties, Patch = commit
+# count (CI_VERSION_PATCH, also the versionName patch), Build = CI_VERSION_CODE.
 #
 # Required secrets: none. The published debug APK is always signed with the default debug key
 # (app/build.gradle.kts never uses the production key for debug builds), so this workflow does not
@@ -158,7 +159,11 @@ jobs:
       - name: Derive CI versionCode
         # Above every versionCode published from version.properties (14730 at the switch), and
         # monotonic per workflow. Read by app/build.gradle.kts; version.properties is not rewritten.
-        run: echo "CI_VERSION_CODE=$((20000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+        # CI_VERSION_PATCH: versionName patch = commit count (full clone), the same value release.yml
+        # stamps on this commit. See app/build.gradle.kts.
+        run: |
+          echo "CI_VERSION_CODE=$((20000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+          echo "CI_VERSION_PATCH=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6
@@ -230,7 +235,7 @@ jobs:
         run: |
           MAJOR=$(grep '^versionMajor=' version.properties | cut -d'=' -f2 | tr -d '\r ')
           MINOR=$(grep '^versionMinor=' version.properties | cut -d'=' -f2 | tr -d '\r ')
-          PATCH=$(grep '^versionPatch=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          PATCH="${CI_VERSION_PATCH}"
           BUILD_NUMBER="${CI_VERSION_CODE}"
           VERSION_NAME="$MAJOR.$MINOR.$PATCH.$BUILD_NUMBER"
           TAG_NAME="latest-debug-v${MAJOR}.${MINOR}"

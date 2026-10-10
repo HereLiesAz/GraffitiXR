@@ -95,7 +95,11 @@ jobs:
       - name: Derive CI versionCode
         # Above every versionCode published from version.properties (14730 at the switch), and
         # monotonic per workflow. Read by app/build.gradle.kts; version.properties is not rewritten.
-        run: echo "CI_VERSION_CODE=$((20000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+        # CI_VERSION_PATCH: versionName patch = commit count (full clone), the same value release.yml
+        # stamps on this commit. See app/build.gradle.kts.
+        run: |
+          echo "CI_VERSION_CODE=$((20000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+          echo "CI_VERSION_PATCH=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6

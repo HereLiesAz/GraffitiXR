@@ -167,11 +167,15 @@ jobs:
           # while staying monotonic across runs and far below the 2,100,000,000 ceiling (allows 9
           # attempts per run; run_number can reach ~209M before overflow).
           echo "ci_version_code=$((1000000 + RUN_NUMBER * 10 + (RUN_ATTEMPT - 1)))" >> "$GITHUB_OUTPUT"
+          # versionName patch: commit count of this commit (full clone above), identical to what
+          # android-ci.yml / merged-build.yml stamp on the same commit. See app/build.gradle.kts.
+          echo "ci_version_patch=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Build signed AAB + APK
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CI_VERSION_CODE: ${{ steps.vcode.outputs.ci_version_code }}
+          CI_VERSION_PATCH: ${{ steps.vcode.outputs.ci_version_patch }}
           KEYSTORE_FILE: ${{ github.workspace }}/app/keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
