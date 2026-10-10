@@ -1,10 +1,11 @@
 name: Release (build, sign, publish)
 
-# Self-contained release: builds a SIGNED AAB and APK in THIS repo (where the signing, Google
-# services, ARCore and Play secrets live) and publishes them. Publishing was centralized into
-# HereLiesAz/workflows, but that repo does not hold GraffitiXR's secrets and GitHub cannot read
-# secrets across repositories, so the central "Inject Google services" step failed on every push and
-# nothing shipped. Building and publishing here, with this repo's own secrets, is the arrangement that
+# Self-contained release: builds a SIGNED AAB and APK in THIS repo (where the signing and Play
+# secrets live) and publishes them. Publishing was centralized into HereLiesAz/workflows, but that
+# repo does not hold GraffitiXR's secrets and GitHub cannot read secrets across repositories, so the
+# central "Inject Google services" step failed on every push and nothing shipped. (That step is gone
+# here too: no module applies the google-services plugin and nothing reads ARCORE_API_KEY, so
+# google-services.json and the ARCore key were never consumed by the build.) Building and publishing here, with this repo's own secrets, is the arrangement that
 # worked before Sept 16.
 #
 # Deliberately NOT named release-aab.yml / release-apk.yml: those names are registered with the
@@ -27,10 +28,63 @@ permissions:
 
 concurrency:
   group: release-publish
-  cancel-in-progress: true
+  # Queue, never cancel: a newer push cancelling this run mid Play upload/commit could leave an open
+  # Play edit or a half-published release. GitHub keeps at most one pending run per group, so a burst
+  # of pushes still collapses to the newest one waiting behind the run in progress.
+  cancel-in-progress: false
 
 jobs:
+  unit-tests:
+    # Test gate: nothing is built for publishing, uploaded to Play or attached to the GitHub release
+    # unless the same unit tests android-ci.yml runs (./gradlew test) and the native host tests pass.
+    # Kept in this workflow (not a cross-workflow dependency) so the gate can't be skipped by run order.
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Derive CI versionCode
+        # Any positive value keeps app/build.gradle.kts from rewriting the tracked version.properties.
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: echo "CI_VERSION_CODE=$((1000000 + RUN_NUMBER * 10 + (RUN_ATTEMPT - 1)))" >> "$GITHUB_ENV"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6.3.0
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        with:
+          cache-read-only: false
+          dependency-graph: disabled
+
+      - name: Run unit tests
+        run: |
+          chmod +x gradlew
+          ./gradlew test --continue --build-cache --no-daemon --stacktrace
+
+      - name: Native host unit tests
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake g++ libopencv-dev libgtest-dev
+          tools/run_native_host_tests.sh
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-unit-test-reports
+          path: '**/build/reports/tests/'
+
   build-and-publish:
+    needs: unit-tests
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -40,32 +94,6 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
-      - name: Inject Google services
-        env:
-          # Preferred: the full, real google-services.json pasted as one secret.
-          GOOGLE_SERVICES: ${{ secrets.GOOGLE_SERVICES }}
-          # Fallback: placeholder template + individual values (used only if GOOGLE_SERVICES is unset).
-          GOOGLE_SERVICES_API_KEY: ${{ secrets.GOOGLE_SERVICES_API_KEY }}
-          PROJECT_ID: ${{ secrets.PROJECT_ID }}
-          CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
-        run: |
-          if [ -n "${GOOGLE_SERVICES:-}" ]; then
-            echo "Using full GOOGLE_SERVICES secret."
-            printf '%s' "$GOOGLE_SERVICES" > app/google-services.json
-          elif [ -f "app/google-services.json.template" ]; then
-            echo "GOOGLE_SERVICES unset; injecting from template."
-            sed -e 's/{{\([^}]*\)}}/${\1}/g' app/google-services.json.template | envsubst > app/google-services.json
-          else
-            echo "::error::No GOOGLE_SERVICES secret and no template — cannot produce google-services.json."
-            exit 1
-          fi
-          if [ -z "${ARCORE_API_KEY:-}" ]; then
-            echo "::error::ARCORE_API_KEY secret is empty — a release with a blank ARCore key would ship non-functional AR."
-            exit 1
-          fi
-          echo "ARCORE_API_KEY=$ARCORE_API_KEY" >> local.properties
 
       - name: Decode signing keystore
         env:
@@ -139,11 +167,15 @@ jobs:
           # while staying monotonic across runs and far below the 2,100,000,000 ceiling (allows 9
           # attempts per run; run_number can reach ~209M before overflow).
           echo "ci_version_code=$((1000000 + RUN_NUMBER * 10 + (RUN_ATTEMPT - 1)))" >> "$GITHUB_OUTPUT"
+          # versionName patch: commit count of this commit (full clone above), identical to what
+          # android-ci.yml / merged-build.yml stamp on the same commit. See app/build.gradle.kts.
+          echo "ci_version_patch=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Build signed AAB + APK
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CI_VERSION_CODE: ${{ steps.vcode.outputs.ci_version_code }}
+          CI_VERSION_PATCH: ${{ steps.vcode.outputs.ci_version_patch }}
           KEYSTORE_FILE: ${{ github.workspace }}/app/keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}

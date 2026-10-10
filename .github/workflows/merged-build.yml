@@ -95,22 +95,11 @@ jobs:
       - name: Derive CI versionCode
         # Above every versionCode published from version.properties (14730 at the switch), and
         # monotonic per workflow. Read by app/build.gradle.kts; version.properties is not rewritten.
-        run: echo "CI_VERSION_CODE=$((20000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
-
-      - name: Decode signing keystore
-        env:
-          KEYSTORE_RAW: ${{ secrets.KEYSTORE_RAW }}
+        # CI_VERSION_PATCH: versionName patch = commit count (full clone), the same value release.yml
+        # stamps on this commit. See app/build.gradle.kts.
         run: |
-          if [ -z "$KEYSTORE_RAW" ]; then
-            echo "::warning::KEYSTORE_RAW secret is empty — building with the default debug key."
-            exit 0
-          fi
-          echo "$KEYSTORE_RAW" | base64 -d > app/keystore.jks
-          if [ ! -s app/keystore.jks ]; then
-            echo "::error::Decoded keystore is empty — KEYSTORE_RAW is not valid base64."
-            exit 1
-          fi
-          echo "Keystore decoded to app/keystore.jks ($(stat -c%s app/keystore.jks) bytes)"
+          echo "CI_VERSION_CODE=$((20000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+          echo "CI_VERSION_PATCH=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6
@@ -133,10 +122,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # No crash-report token is injected: the crash-report credential is entered by the artist in
           # Settings and lives only on-device, never in the APK (see SettingsRepository.crashReportToken).
-          KEYSTORE_FILE: ${{ github.workspace }}/app/keystore.jks
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          # No signing secrets: assembleDebug always uses the default debug key (app/build.gradle.kts
+          # never signs debug builds with the production key), so the keystore is only decoded in
+          # release.yml.
         run: |
           set +e
           ./gradlew assembleDebug --build-cache --no-daemon > build.log 2>&1
