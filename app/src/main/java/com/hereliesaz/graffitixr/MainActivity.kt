@@ -2164,8 +2164,26 @@ class MainActivity : ComponentActivity() {
                         },
                     )
                     // Flashlight — illuminate the wall in low light while tracking.
-                    azRailSubItem(id = "mode.ar.light", hostId = "mode.ar", text = navStrings.light, color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { arViewModel.toggleFlashlight() })
-                    azRailSubItem(id = "mode.ar.lock", hostId = "mode.ar", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { editorViewModel.onToggleModeTransformLocked(EditorMode.AR) })
+                    azRailSubItem(
+                        id = "mode.ar.light",
+                        hostId = "mode.ar",
+                        text = navStrings.light,
+                        color = navItemColor,
+                        classifiers = setOf("toggle"),
+                        shape = AzButtonShape.NONE,
+                        disabled = showLibrary,
+                        onClick = { arViewModel.toggleFlashlight() },
+                    )
+                    azRailSubItem(
+                        id = "mode.ar.lock",
+                        hostId = "mode.ar",
+                        text = "Lock",
+                        color = navItemColor,
+                        classifiers = setOf("toggle", "lock"),
+                        shape = AzButtonShape.NONE,
+                        disabled = showLibrary,
+                        onClick = { editorViewModel.onToggleModeTransformLocked(EditorMode.AR) },
+                    )
                     // Measure — two taps on the wall the design is drawn on. Needs the anchor's wall
                     // frame, and the ARCore backend: standalone has no measurement path yet, and must
                     // offer one only for physically metric targets (SPHERESLAM_TODO §3).
@@ -2190,7 +2208,15 @@ class MainActivity : ComponentActivity() {
                     // legibility auto-tune when there is no anchor yet). onMagicClicked was
                     // implemented and unreachable: the "Magic Wand" the adjustments panel's doc
                     // still described had been removed from that panel's action row.
-                    azRailSubItem(id = "mode.ar.magic", hostId = "mode.ar", text = navStrings.magic, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { editorViewModel.onMagicClicked() })
+                    azRailSubItem(
+                        id = "mode.ar.magic",
+                        hostId = "mode.ar",
+                        text = navStrings.magic,
+                        color = navItemColor,
+                        shape = AzButtonShape.NONE,
+                        disabled = showLibrary,
+                        onClick = { editorViewModel.onMagicClicked() },
+                    )
                     // Co-op requires an explicit shared coordinate frame. Protocol v3 now supplies
                     // that host wall-frame/backend/scale contract for both ARCore and standalone.
                     // The policy still gates unresolved capability; incompatible peers are rejected
@@ -2238,7 +2264,15 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     if (arUiState.coopRole != CoopRole.NONE) {
-                        azRailSubItem(id = "coop.leave", hostId = "coop", text = navStrings.leaveCoop, color = HotPink, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { arViewModel.leaveSession() })
+                        azRailSubItem(
+                            id = "coop.leave",
+                            hostId = "coop",
+                            text = navStrings.leaveCoop,
+                            color = HotPink,
+                            shape = AzButtonShape.NONE,
+                            disabled = showLibrary,
+                            onClick = { arViewModel.leaveSession() },
+                        )
                     }
                 }
             }
@@ -2255,12 +2289,39 @@ class MainActivity : ComponentActivity() {
             )
             // Flashlight — illuminate the wall in low light while overlaying.
             if (editorUiState.editorMode == EditorMode.OVERLAY) {
-                azRailSubItem(id = "mode.overlay.light", hostId = "mode.overlay", text = navStrings.light, color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { arViewModel.toggleFlashlight() })
-                azRailSubItem(id = "mode.overlay.lock", hostId = "mode.overlay", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { editorViewModel.onToggleModeTransformLocked(EditorMode.OVERLAY) })
+                azRailSubItem(
+                    id = "mode.overlay.light",
+                    hostId = "mode.overlay",
+                    text = navStrings.light,
+                    color = navItemColor,
+                    classifiers = setOf("toggle"),
+                    shape = AzButtonShape.NONE,
+                    disabled = showLibrary,
+                    onClick = { arViewModel.toggleFlashlight() },
+                )
+                azRailSubItem(
+                    id = "mode.overlay.lock",
+                    hostId = "mode.overlay",
+                    text = "Lock",
+                    color = navItemColor,
+                    classifiers = setOf("toggle", "lock"),
+                    shape = AzButtonShape.NONE,
+                    disabled = showLibrary,
+                    onClick = { editorViewModel.onToggleModeTransformLocked(EditorMode.OVERLAY) },
+                )
                 // Gyro — tripod stabilisation: pins the drawn design to the wall against tiny
                 // vibrations using the rotation sensor (OverlayGyroStabilizer, mounted in MainScreen).
                 // Toggling on captures the current orientation as the reference; off releases it.
-                azRailSubItem(id = "mode.overlay.gyro", hostId = "mode.overlay", text = navStrings.gyro, color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { mainViewModel.setOverlayGyroActive(!isOverlayGyroActive) })
+                azRailSubItem(
+                    id = "mode.overlay.gyro",
+                    hostId = "mode.overlay",
+                    text = navStrings.gyro,
+                    color = navItemColor,
+                    classifiers = setOf("toggle"),
+                    shape = AzButtonShape.NONE,
+                    disabled = showLibrary,
+                    onClick = { mainViewModel.setOverlayGyroActive(!isOverlayGyroActive) },
+                )
             }
 
             // Mockup ▸ Wall ▸ { Photo (take a photo), File (pick an image) }
@@ -2282,12 +2343,37 @@ class MainActivity : ComponentActivity() {
             if (editorUiState.editorMode == EditorMode.MOCKUP) {
                 azRailSubHostItem(id = "mockup.wall", hostId = "mode.mockup", text = navStrings.wall, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary)
                 azRailSubItem(id = "wall.photo", hostId = "mockup.wall", text = navStrings.photo, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { onWallPhoto() })
-                azRailSubItem(id = "wall.file", hostId = "mockup.wall", text = navStrings.file, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { backgroundPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) })
+                azRailSubItem(
+                    id = "wall.file",
+                    hostId = "mockup.wall",
+                    text = navStrings.file,
+                    color = navItemColor,
+                    shape = AzButtonShape.NONE,
+                    disabled = showLibrary,
+                    onClick = { backgroundPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                )
                 // Clear — only offered once a wall photo is set, so there is something to remove.
                 if (editorUiState.backgroundBitmap != null) {
-                    azRailSubItem(id = "wall.clear", hostId = "mockup.wall", text = navStrings.wallClear, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { editorViewModel.clearBackgroundImage() })
+                    azRailSubItem(
+                        id = "wall.clear",
+                        hostId = "mockup.wall",
+                        text = navStrings.wallClear,
+                        color = navItemColor,
+                        shape = AzButtonShape.NONE,
+                        disabled = showLibrary,
+                        onClick = { editorViewModel.clearBackgroundImage() },
+                    )
                 }
-                azRailSubItem(id = "mode.mockup.lock", hostId = "mode.mockup", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { editorViewModel.onToggleModeTransformLocked(EditorMode.MOCKUP) })
+                azRailSubItem(
+                    id = "mode.mockup.lock",
+                    hostId = "mode.mockup",
+                    text = "Lock",
+                    color = navItemColor,
+                    classifiers = setOf("toggle", "lock"),
+                    shape = AzButtonShape.NONE,
+                    disabled = showLibrary,
+                    onClick = { editorViewModel.onToggleModeTransformLocked(EditorMode.MOCKUP) },
+                )
             }
 
             // Trace ▸ Freeze — the only Trace control. (Lock was removed: a frozen lightbox is
@@ -2305,7 +2391,15 @@ class MainActivity : ComponentActivity() {
                 onExpandedChange = { editorViewModel.onRailHostExpansionChanged("mode.trace", it) },
             )
             if (editorUiState.editorMode == EditorMode.TRACE) {
-                azRailSubItem(id = "mode.trace.freeze", hostId = "mode.trace", text = "Freeze", color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE, disabled = showLibrary, onClick = {
+                azRailSubItem(
+                    id = "mode.trace.freeze",
+                    hostId = "mode.trace",
+                    text = "Freeze",
+                    color = navItemColor,
+                    classifiers = setOf("toggle"),
+                    shape = AzButtonShape.NONE,
+                    disabled = showLibrary,
+                    onClick = {
                     val freezing = !isTouchLocked
                     mainViewModel.setTouchLocked(freezing)
                     if (freezing) editorViewModel.onDismissPanel()
@@ -2322,8 +2416,24 @@ class MainActivity : ComponentActivity() {
                 initiallyExpanded = railExpansion["host.project"] ?: false,
                 onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.project", it) },
             )
-            azRailSubItem(id = "proj.new", hostId = "host.project", text = navStrings.new, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { dashboardViewModel.onNewProjectTriggered() })
-            azRailSubItem(id = "proj.save", hostId = "host.project", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { showSettings = false; showSaveDialog = true })
+            azRailSubItem(
+                id = "proj.new",
+                hostId = "host.project",
+                text = navStrings.new,
+                color = navItemColor,
+                shape = AzButtonShape.NONE,
+                disabled = showLibrary,
+                onClick = { dashboardViewModel.onNewProjectTriggered() },
+            )
+            azRailSubItem(
+                id = "proj.save",
+                hostId = "host.project",
+                text = navStrings.save,
+                color = navItemColor,
+                shape = AzButtonShape.NONE,
+                disabled = showLibrary,
+                onClick = { showSettings = false; showSaveDialog = true },
+            )
             val standaloneArExportBlocked =
                 editorUiState.editorMode == EditorMode.AR &&
                     !arRailPolicy.modePreviewExportAvailable
@@ -2345,8 +2455,24 @@ class MainActivity : ComponentActivity() {
                     onExportRequested()
                 },
             )
-            azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true } })
-            azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { showSettings = true })
+            azRailSubItem(
+                id = "proj.load",
+                hostId = "host.project",
+                text = navStrings.load,
+                color = navItemColor,
+                shape = AzButtonShape.NONE,
+                disabled = showLibrary,
+                onClick = { navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true } },
+            )
+            azRailSubItem(
+                id = "proj.settings",
+                hostId = "host.project",
+                text = navStrings.settings,
+                color = navItemColor,
+                shape = AzButtonShape.NONE,
+                disabled = showLibrary,
+                onClick = { showSettings = true },
+            )
 
 
             // Help — opens AzNavRail's built-in help overlay (populated by azAdvanced(helpList=...)).

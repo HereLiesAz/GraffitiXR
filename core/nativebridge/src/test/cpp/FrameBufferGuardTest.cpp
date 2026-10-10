@@ -1,10 +1,12 @@
 // Pins the JNI frame-buffer bounds arithmetic (include/FrameBufferGuard.h) used by
-// nativeFeedYuvFrame, nativeFeedColorFrame and nativeYuvToRgbaBitmap. Expected byte counts are
+// nativeFeedYuvFrame, nativeFeedColorFrame and nativeYuvToRgbaBitmap, plus the DEPTH16 check in
+// nativeSetWallFingerprint / nativeSetArtworkFingerprint. Expected byte counts are
 // written out by hand, not recomputed with the guard's own formula.
 #include <gtest/gtest.h>
 #include "FrameBufferGuard.h"
 
 using graffitixr::packedFrameFits;
+using graffitixr::plane16Fits;
 using graffitixr::planeFits;
 
 TEST(FrameBufferGuard, YPlaneNeedsLastRowOnlyToWidthNotStride) {
@@ -38,4 +40,23 @@ TEST(FrameBufferGuard, NoWrapOnHugeDimensions) {
     // old inline arithmetic would have compared against and passed.
     EXPECT_FALSE(packedFrameFits(1LL << 20, 65536, 65536, 4));
     EXPECT_TRUE(packedFrameFits(17179869184LL, 65536, 65536, 4));
+}
+
+TEST(FrameBufferGuard, Depth16NeedsTwoBytesPerSampleToTheLastSample) {
+    // ARCore 160x120 DEPTH16, stride 320: (120-1)*320 + 160*2 = 38400 bytes.
+    EXPECT_TRUE(plane16Fits(38400, 160, 120, 320));
+    EXPECT_FALSE(plane16Fits(38399, 160, 120, 320));
+    // Padded stride 352: the final row still stops at its 160th sample. (119*352 + 320 = 42208)
+    EXPECT_TRUE(plane16Fits(42208, 160, 120, 352));
+    EXPECT_FALSE(plane16Fits(42207, 160, 120, 352));
+    // A buffer sized as if samples were one byte (the 8-bit planeFits answer) is too short.
+    EXPECT_FALSE(plane16Fits(119 * 320 + 160, 160, 120, 320));
+}
+
+TEST(FrameBufferGuard, Depth16RefusesStrideNarrowerThanTwoBytesPerSample) {
+    EXPECT_FALSE(plane16Fits(0, 160, 120, 160));   // stride counted in samples, not bytes
+    EXPECT_FALSE(plane16Fits(0, 160, 120, 319));
+    EXPECT_TRUE(plane16Fits(0, 160, 120, 320));    // unknown capacity accepted as elsewhere
+    EXPECT_FALSE(plane16Fits(0, 0, 120, 320));
+    EXPECT_FALSE(plane16Fits(0, 160, 0, 320));
 }

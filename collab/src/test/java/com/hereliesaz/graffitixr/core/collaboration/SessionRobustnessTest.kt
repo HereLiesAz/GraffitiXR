@@ -275,4 +275,79 @@ class SessionRobustnessTest {
         guest.close(CoopSessionState.EndReason.UserLeft)
         server.close()
     }
+
+    @Test
+    fun `a bulk resets the guest's applied seq so the deltas after it are applied`() = runBlocking {
+        val server = ServerSocket(0)
+        val port = server.localPort
+        val token = "tok"
+        val sessionId = "same-session"
+        val received = mutableListOf<Op>()
+        var bulkCount = 0
+
+        // Hand-rolled host, same sessionId throughout. Connection 1: fresh join, then DELTA seq 100
+        // (the guest's applied seq is now 100), then dies. Connection 2: the guest resumes at 100 and
+        // the host answers with a bulk (e.g. its replay can't serve 100), then numbers deltas from
+        // 1 again. Before the reset, the guest's `seq > 100` filter silently dropped seq 1.
+        fun serveOnce(afterBulk: (writeEnc: (FrameType, ByteArray) -> Unit) -> Unit) {
+            val sock = server.accept()
+            sock.soTimeout = 10_000
+            val input = sock.getInputStream()
+            val output = sock.getOutputStream()
+            val hello = OpCodec.decode<HelloPayload>((Frame.read(input) ?: error("no HELLO")).payload)
+            val prk = SessionCrypto.prk(token)
+            val hostNonce = ByteArray(16) { (it + 7).toByte() }
+            Frame.write(
+                output,
+                FrameType.HELLO_OK,
+                OpCodec.encode(
+                    HelloOkPayload(sessionId, 1, hostNonce, SessionCrypto.helloOkProof(prk, hostNonce, hello.guestNonce)),
+                ),
+            )
+            output.flush()
+            val crypto = SessionCrypto.forHost(token, sessionId, hello.guestNonce, hostNonce)
+            val writeEnc: (FrameType, ByteArray) -> Unit = { type, p ->
+                Frame.write(output, FrameType.ENC, crypto.seal(type, p)); output.flush()
+            }
+            writeEnc(FrameType.BULK_BEGIN, OpCodec.encode(BulkBeginPayload("p1", 0, 0, 0, testSpatialFrame())))
+            writeEnc(FrameType.BULK_END, ByteArray(0))
+            afterBulk(writeEnc)
+            Thread.sleep(500)
+            sock.close()
+        }
+
+        val fakeHost = Thread {
+            try {
+                serveOnce { w -> w(FrameType.DELTA, OpCodec.encode(DeltaPayload(100L, stroke(100)))) }
+                serveOnce { w ->
+                    w(FrameType.DELTA, OpCodec.encode(DeltaPayload(1L, stroke(1))))
+                    w(FrameType.DELTA, OpCodec.encode(DeltaPayload(2L, stroke(2))))
+                }
+            } catch (_: Exception) { /* checked on the main thread below */ }
+        }
+        fakeHost.start()
+
+        val guest = GuestSession(
+            host = "127.0.0.1",
+            port = port,
+            token = token,
+            protocolVersion = 1,
+            localDeviceName = "guest",
+            localBackend = CoopTrackingBackend.ARCORE,
+            onBulkReceived = { _, _, _ -> bulkCount++ },
+            onOp = { op -> synchronized(received) { received.add(op) } },
+            reconnectWindowMs = 15_000L,
+            reconnectIntervalMs = 200L,
+        )
+        guest.connect()
+
+        withTimeout(20_000) { while (synchronized(received) { received.size } < 3) delay(100) }
+        fakeHost.join(10_000)
+
+        assertEquals(2, bulkCount)
+        assertEquals(listOf(100, 1, 2), synchronized(received) { received.map(::strokeIndex) })
+
+        guest.close(CoopSessionState.EndReason.UserLeft)
+        server.close()
+    }
 }

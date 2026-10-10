@@ -201,7 +201,8 @@ class ArViewModel @Inject constructor(
     // Collected HERE, for the ViewModel's lifetime, rather than in an Activity-scoped effect: the
     // host session acknowledges a guest edit on arrival, so one that reached a collector that was
     // being torn down (Activity recreation) would be acked and never applied. Unbounded on purpose
-    // for the same reason; HostSession rate-limits the only large op (DesignBitmapReplace).
+    // for the same reason. Nothing here is large: GuestOpPolicy refuses the only bitmap-carrying
+    // guest ops (DesignReplace, DesignBitmapReplace) in HostSession before they reach this queue.
     private val pendingGuestOps = ArrayDeque<com.hereliesaz.graffitixr.common.model.Op>()
     @Volatile private var guestOpHandler: ((com.hereliesaz.graffitixr.common.model.Op) -> Unit)? = null
 
@@ -1193,16 +1194,6 @@ class ArViewModel @Inject constructor(
         return synchronized(spherePhotosphereLock) {
             spherePhotosphere.tileAt(attitude.first, attitude.second)
         }
-    }
-
-    private fun resetSphereCoverage() {
-        synchronized(spherePhotosphereLock) {
-            spherePhotosphere.reset()
-            spherePhotosphereFrames.clear()
-            refreshSphereTileGlowLocked()
-        }
-        standalonePhotosphereActive = false
-        sphereFingerprintAnchorTile = null
     }
 
     private val _evalAutoFocusEnabled = MutableStateFlow(true)
@@ -4805,7 +4796,9 @@ class ArViewModel @Inject constructor(
         }
 
         val tapPos = pendingTapPosition
-        val extent = computePhysicalExtent(depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics, depthBufStride)
+        val extent = computePhysicalExtent(
+            depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics, depthBufStride, displayRotation,
+        )
 
         val rotatedBmp = if (displayRotation != 0) {
             val matrix = android.graphics.Matrix().apply { postRotate(displayRotation.toFloat()) }
@@ -5059,12 +5052,21 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Half-extents of the anchor-region border, from the centre depth sample.
+     *
+     * [colorW]/[colorH] are the RAW sensor-frame image dimensions, while [intrinsics] arrive already
+     * rotated by [rotationDeg] (CaptureRotation.rotateIntrinsics swaps fx/fy on the quarter turns).
+     * Each dimension must be divided by the focal length of the SAME frame, so the quarter turns
+     * read the sensor focals back out of the swapped slots.
+     */
     fun computePhysicalExtent(
         depthBuffer: ByteBuffer?,
         depthW: Int, depthH: Int,
         colorW: Int, colorH: Int,
         intrinsics: FloatArray?,
-        stride: Int
+        stride: Int,
+        rotationDeg: Int = 0,
     ): Pair<Float, Float>? {
         if (depthBuffer == null || intrinsics == null || intrinsics.size < 2) return null
 
@@ -5076,13 +5078,15 @@ class ArViewModel @Inject constructor(
         )
         if (depthM <= 0f) return null
 
-        val fx = intrinsics[0]
-        val fy = intrinsics[1]
-        if (fx <= 0f || fy <= 0f) return null
+        val quarterTurn = (((rotationDeg % 360) + 360) % 360).let { it == 90 || it == 270 }
+        val sensorFx = if (quarterTurn) intrinsics[1] else intrinsics[0]
+        val sensorFy = if (quarterTurn) intrinsics[0] else intrinsics[1]
+        if (sensorFx <= 0f || sensorFy <= 0f) return null
 
-        val halfW = (depthM * (colorW / 2f) / fx) * 0.18f
-        val halfH = (depthM * (colorH / 2f) / fy) * 0.18f
-        
+        // Full frame footprint at the centre depth, scaled down to the border's share of it.
+        val halfW = (depthM * (colorW / 2f) / sensorFx) * ANCHOR_BORDER_FRAME_FRACTION
+        val halfH = (depthM * (colorH / 2f) / sensorFy) * ANCHOR_BORDER_FRAME_FRACTION
+
         return halfW to halfH
     }
 
@@ -5224,6 +5228,15 @@ class ArViewModel @Inject constructor(
         private const val MEASURE_TAP_TIMEOUT_MS = 1_000L
         /** How often the AR session checks whether the map has grown enough to be worth rewriting. */
         const val AUTOSAVE_INTERVAL_MS = 30_000L
+
+        /**
+         * Fraction of the camera's full frame footprint (at the centre depth) that the anchor-region
+         * border spans, per axis. No derivation or measurement behind it is recorded: it is an
+         * empirical first-pass value chosen so the border marks a modest region around the aim point
+         * rather than the whole view. It only sizes that visual border — the artwork quad itself is
+         * always [com.hereliesaz.graffitixr.feature.ar.rendering.OverlayRenderer.QUAD_HALF_EXTENT].
+         */
+        const val ANCHOR_BORDER_FRAME_FRACTION = 0.18f
 
         /**
          * How many new cloud points must accumulate since the last save before the autosave rewrites.

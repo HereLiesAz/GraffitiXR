@@ -281,6 +281,29 @@ class ArViewModelTest {
     }
 
     @Test
+    fun `computePhysicalExtent divides sensor dimensions by sensor-frame focals`() {
+        // 1x1 DEPTH16 buffer reading 2000 mm at the centre.
+        val depth = java.nio.ByteBuffer.allocate(2).order(java.nio.ByteOrder.nativeOrder())
+        depth.putShort(0, 2000.toShort())
+        // Sensor fx=1000, fy=500 on a 1920x1080 frame; after a 90 degree capture rotation the
+        // intrinsics arrive swapped as [500, 1000]. Each axis must still use its own sensor focal.
+        val rotated = viewModel.computePhysicalExtent(
+            depth, 1, 1, colorW = 1920, colorH = 1080,
+            intrinsics = floatArrayOf(500f, 1000f), stride = 2, rotationDeg = 90,
+        )
+        val unrotated = viewModel.computePhysicalExtent(
+            depth, 1, 1, colorW = 1920, colorH = 1080,
+            intrinsics = floatArrayOf(1000f, 500f), stride = 2, rotationDeg = 0,
+        )
+        requireNotNull(rotated); requireNotNull(unrotated)
+        val f = ArViewModel.ANCHOR_BORDER_FRAME_FRACTION
+        assertEquals(2f * 960f / 1000f * f, rotated.first, 1e-5f)
+        assertEquals(2f * 540f / 500f * f, rotated.second, 1e-5f)
+        assertEquals(unrotated.first, rotated.first, 1e-6f)
+        assertEquals(unrotated.second, rotated.second, 1e-6f)
+    }
+
+    @Test
     fun `clearTapHighlights clears keypoints and bitmaps`() = runTest {
         viewModel.clearTapHighlights()
         val state = viewModel.uiState.value

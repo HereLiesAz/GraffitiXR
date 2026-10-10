@@ -32,6 +32,11 @@ import javax.microedition.khronos.opengles.GL10
  * to a centered, aspect-correct sub-rectangle of the surface — the exact `FIT_CENTER` scale-to-fit
  * math `CameraPreview` uses for its own `PreviewView.ScaleType`, computed independently here since
  * a `GLSurfaceView` has no such built-in mode.
+ *
+ * **Optional coverage glow.** Standalone SphereSLAM's freshness wash ([setCoverageGlow]) is drawn
+ * here, on the full surface and BEFORE the design quad, so it composites above the camera preview
+ * and beneath the artwork. A window-level View cannot do that: this media-overlay surface sits
+ * behind the app window, so any View drawn in the window washes over the artwork too.
  */
 internal sealed interface TextureUpdateCommand {
     data class Replace(val bitmap: Bitmap) : TextureUpdateCommand
@@ -86,6 +91,9 @@ class HomographyOverlayRenderer(context: Context) : android.opengl.GLSurfaceView
     private val contentRotation4 = FloatArray(16)
     private val contentRotationTemp4 = FloatArray(16)
     private val contentRotationMul4 = FloatArray(16)
+
+    /** Coverage freshness wash; null = none (the legacy homography fallback never sets one). */
+    private val coverageGlow = AtomicReference<CoverageGlow?>(null)
 
     /** Push a newly tracked pose — called from any thread (typically the CameraX analyzer thread). */
     fun updatePose(viewMatrix: FloatArray, projMatrix: FloatArray, frameAspect: Float) {
@@ -149,6 +157,19 @@ class HomographyOverlayRenderer(context: Context) : android.opengl.GLSurfaceView
         transform.set(sanitized)
     }
 
+    /**
+     * Full-surface translucent white wash of [alpha] with transparent [holes] punched out. [holes] is
+     * packed `[left, top, right, bottom]` quadruples, normalized to the surface with a top-left origin.
+     * Any thread; [clearCoverageGlow] disables the wash.
+     */
+    fun setCoverageGlow(alpha: Float, holes: FloatArray) {
+        coverageGlow.set(CoverageGlow(alpha.coerceIn(0f, 1f), holes.copyOf()))
+    }
+
+    fun clearCoverageGlow() {
+        coverageGlow.set(null)
+    }
+
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES30.glClearColor(0f, 0f, 0f, 0f) // fully transparent — the CameraX preview shows through.
         overlayRenderer.createOnGlThread()
@@ -165,6 +186,7 @@ class HomographyOverlayRenderer(context: Context) : android.opengl.GLSurfaceView
         // frame that arrives at a new aspect leaves the previous frame's bars undrawn-over.
         GLES30.glViewport(0, 0, surfaceWidth, surfaceHeight)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
+        coverageGlow.get()?.let { drawCoverageGlow(it) }
 
         if (extentDirty) {
             overlayRenderer.setExtent(extentHalfW, extentHalfH)
@@ -196,6 +218,28 @@ class HomographyOverlayRenderer(context: Context) : android.opengl.GLSurfaceView
             contentRotation = buildContentRotation(t.rotationXDeg, t.rotationYDeg),
         )
     }
+
+    /**
+     * Clear-based wash: clear the whole surface to the glow, then scissor-clear each hole back to
+     * transparent — the same "everything minus the union of holes" region the old Canvas clipOutRect
+     * pass produced. The surface is premultiplied (TRANSLUCENT), so the white wash is (a, a, a, a).
+     */
+    private fun drawCoverageGlow(glow: CoverageGlow) {
+        val a = glow.alpha
+        GLES30.glClearColor(a, a, a, a)
+        GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
+        GLES30.glClearColor(0f, 0f, 0f, 0f)
+        val rects = coverageGlowScissorRects(glow.holes, surfaceWidth, surfaceHeight)
+        if (rects.isEmpty()) return
+        GLES30.glEnable(GLES30.GL_SCISSOR_TEST)
+        for (r in rects) {
+            GLES30.glScissor(r[0], r[1], r[2], r[3])
+            GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
+        }
+        GLES30.glDisable(GLES30.GL_SCISSOR_TEST)
+    }
+
+    private class CoverageGlow(val alpha: Float, val holes: FloatArray)
 
     private fun buildContentRotation(rx: Float, ry: Float): FloatArray? {
         if (rx == 0f && ry == 0f) return null
@@ -247,4 +291,25 @@ internal fun letterboxViewport(surfaceWidth: Int, surfaceHeight: Int, frameAspec
         vpW = (surfaceHeight * frameAspect).toInt()
     }
     return intArrayOf((surfaceWidth - vpW) / 2, (surfaceHeight - vpH) / 2, vpW, vpH)
+}
+
+/**
+ * Converts normalized top-left-origin `[left, top, right, bottom]` holes into bottom-left-origin
+ * `glScissor` rects `[x, y, width, height]`, clamped to the surface; fully off-surface or empty holes
+ * are dropped. A plain function so the y-flip is testable without an EGL context.
+ */
+internal fun coverageGlowScissorRects(holes: FloatArray, surfaceWidth: Int, surfaceHeight: Int): List<IntArray> {
+    if (surfaceWidth <= 0 || surfaceHeight <= 0) return emptyList()
+    val out = ArrayList<IntArray>(holes.size / 4)
+    var i = 0
+    while (i + 3 < holes.size) {
+        val left = (holes[i] * surfaceWidth).toInt().coerceIn(0, surfaceWidth)
+        val top = (holes[i + 1] * surfaceHeight).toInt().coerceIn(0, surfaceHeight)
+        val right = kotlin.math.ceil(holes[i + 2] * surfaceWidth).toInt().coerceIn(0, surfaceWidth)
+        val bottom = kotlin.math.ceil(holes[i + 3] * surfaceHeight).toInt().coerceIn(0, surfaceHeight)
+        i += 4
+        if (right <= left || bottom <= top) continue
+        out += intArrayOf(left, surfaceHeight - bottom, right - left, bottom - top)
+    }
+    return out
 }

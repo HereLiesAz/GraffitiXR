@@ -313,6 +313,14 @@ internal class GuestSession(
         val end = readSecure(input, crypto) ?: error("EOF before BULK_END")
         require(end.type == FrameType.BULK_END)
 
+        // The snapshot is the new baseline, so the seq this guest had applied before it no longer
+        // describes its state. BULK_* carries no base seq; the host treats a bulk receiver like a
+        // fresh join (it drops queued deltas the snapshot covers and expects the guest to take every
+        // DELTA after it). Keeping an old, possibly higher lastAppliedSeq would make the `seq >
+        // lastAppliedSeq` filter silently drop those. Any delta at or below the snapshot that still
+        // arrives is absolute state, so re-applying it converges.
+        lastAppliedSeq = 0L
+
         writeSecure(output, crypto, FrameType.BULK_ACK, OpCodec.encode(BulkAckPayload(0L)))
 
         onBulkReceived(fingerprint, project, beginPayload.spatialFrame)
@@ -489,22 +497,31 @@ internal class GuestSession(
             // be relied on to still be running when a stuck write would need it — force-closes
             // the socket if the write hasn't finished within BYE_TIMEOUT_MS; the resulting
             // IOException is swallowed since the socket is being closed either way.
-            val watchdog = java.util.Timer(true).apply {
-                schedule(
-                    object : java.util.TimerTask() {
-                        override fun run() { try { sock.close() } catch (_: Exception) {} }
-                    },
-                    BYE_TIMEOUT_MS,
-                )
-            }
-            try {
-                withContext(Dispatchers.IO) {
-                    val output = sock.getOutputStream()
-                    Frame.write(output, FrameType.ENC, crypto.seal(FrameType.BYE, OpCodec.encode(ByePayload(reason))))
-                    output.flush()
+            //
+            // The seal+write happens under writeMutex, like every other sealed frame: outside it, the
+            // BYE raced the PONG/DELTA_ACK/GUEST_OP writers for crypto's send counter (GCM nonce reuse)
+            // and could interleave its bytes into a frame mid-write. The lock wait is bounded too — if
+            // a wedged write holds it, the BYE is skipped rather than delaying teardown.
+            val locked = withTimeoutOrNull(BYE_TIMEOUT_MS) { writeMutex.lock(); true } ?: false
+            if (locked) {
+                val watchdog = java.util.Timer(true).apply {
+                    schedule(
+                        object : java.util.TimerTask() {
+                            override fun run() { try { sock.close() } catch (_: Exception) {} }
+                        },
+                        BYE_TIMEOUT_MS,
+                    )
                 }
-            } catch (_: Exception) { /* best-effort */ } finally {
-                watchdog.cancel()
+                try {
+                    withContext(Dispatchers.IO) {
+                        val output = sock.getOutputStream()
+                        Frame.write(output, FrameType.ENC, crypto.seal(FrameType.BYE, OpCodec.encode(ByePayload(reason))))
+                        output.flush()
+                    }
+                } catch (_: Exception) { /* best-effort */ } finally {
+                    watchdog.cancel()
+                    writeMutex.unlock()
+                }
             }
         }
         try { socket?.close() } catch (_: Exception) {}

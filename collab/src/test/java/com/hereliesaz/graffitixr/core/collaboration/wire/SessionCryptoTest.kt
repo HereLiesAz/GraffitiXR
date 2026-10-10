@@ -79,4 +79,28 @@ class SessionCryptoTest {
         // Same plaintext, different counter => different first 8 (counter) and ciphertext bytes.
         assertFalse(a.contentEquals(b))
     }
+
+    @Test
+    fun `concurrent seals never reuse a counter`() {
+        val (host, _) = pair()
+        val threads = 8
+        val perThread = 500
+        val counters = java.util.concurrent.ConcurrentHashMap.newKeySet<Long>()
+        val start = java.util.concurrent.CountDownLatch(1)
+        val workers = (0 until threads).map {
+            Thread {
+                start.await()
+                repeat(perThread) {
+                    val sealed = host.seal(FrameType.DELTA, byteArrayOf(1))
+                    var c = 0L
+                    for (i in 0 until 8) c = (c shl 8) or (sealed[i].toLong() and 0xFF)
+                    counters.add(c)
+                }
+            }.also { t -> t.start() }
+        }
+        start.countDown()
+        workers.forEach { it.join() }
+        // A duplicate counter would collapse into the set: every seal must have drawn a unique nonce.
+        assertEquals(threads * perThread, counters.size)
+    }
 }

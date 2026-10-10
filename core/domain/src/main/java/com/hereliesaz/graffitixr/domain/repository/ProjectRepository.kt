@@ -38,6 +38,13 @@ interface ProjectRepository {
     suspend fun createProject(project: GraffitiProject)
 
     /**
+     * Saves [project] exactly as given, replacing whatever is persisted under its id, and sets it as
+     * the current project. Unlike [createProject] no field is carried over from an older copy on
+     * disk, so use this for an authoritative full snapshot (e.g. a co-op spectator copy).
+     */
+    suspend fun replaceProject(project: GraffitiProject)
+
+    /**
      * Retrieves a project by its ID.
      * @param id The unique identifier of the project.
      * @return The project, or null if not found.

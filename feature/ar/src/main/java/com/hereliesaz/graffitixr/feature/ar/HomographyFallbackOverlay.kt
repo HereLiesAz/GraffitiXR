@@ -271,7 +271,7 @@ fun HomographyFallbackOverlay(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             )
         }
-    } else if (trackingConfidence < kWeakLockConfidenceThreshold) {
+    } else if (trackingConfidence < WEAK_LOCK_CONFIDENCE_THRESHOLD) {
         // A weaker but still-locked frame — HomographyTracker.h's own doc calls its confidence
         // output "the caller's stand-in for ARCore's TrackingState; a low value means about to
         // lose the target". This is that warning, one step before isTrackingLost's hard loss.
@@ -290,4 +290,4 @@ fun HomographyFallbackOverlay(
 
 // track()'s post-gate confidence range is [kMinInlierRatio (0.35), 1.0] -- anything in the lower
 // portion of that range is a real "about to lose lock" signal, not just noise near the gate.
-private const val kWeakLockConfidenceThreshold = 0.5f
+private const val WEAK_LOCK_CONFIDENCE_THRESHOLD = 0.5f

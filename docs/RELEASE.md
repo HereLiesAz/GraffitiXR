@@ -15,13 +15,11 @@ export KEYSTORE_PASSWORD=... KEY_ALIAS=... KEY_PASSWORD=...
 # → app/build/outputs/bundle/release/app-release.aab
 ```
 
-> **Note (2026-09-22):** `.github/workflows/release-aab.yml` does **not currently exist** in this
-> repository. The only workflows present are `.github/workflows/android-ci.yml` and
-> `.github/workflows/merged-build.yml`, and both build a **debug APK** (`./gradlew assembleDebug`)
-> and publish it as a GitHub Release tagged `latest-debug-v<major>.<minor>` — neither builds a
-> signed release AAB or uploads anything to Google Play. The rest of this section (and §2 below)
-> describes a Play-publishing workflow that does not exist yet; treat it as a design/target, not
-> current behavior, until someone adds that workflow. See `.github/workflows/` for what actually runs.
+CI publishing is `.github/workflows/release.yml` (see [§2](#2-publishing-via-the-workflow)):
+every push to `main` runs the unit + native host tests, then builds a signed AAB + APK, publishes
+the AAB to Google Play and the APK to a GitHub release. `android-ci.yml` separately publishes a
+**debug** APK to the `latest-debug-v<major>.<minor>` prerelease; `merged-build.yml` only builds and
+tests.
 
 ---
 
@@ -42,66 +40,69 @@ The `release` signing config is only created when the keystore file exists
 *and* all three credentials are present; otherwise `bundleRelease` produces an
 **unsigned** bundle (fine for inspection, not for upload) rather than failing.
 
-### versionCode
+### versionCode and versionName
 
-`app/build.gradle.kts` derives `versionCode` from `version.properties`'
-`versionBuild` value, which **auto‑increments on every build** (local or CI —
-there is no `-PversionBuild` override and no git-commit-count formula, despite
-an earlier version of this document). It never resets and is not
-git‑history‑dependent, so it stays monotonic across both local and CI builds
-by construction. `versionName` is `major.minor.patch`, also from
-`version.properties`, with the patch component likewise auto‑incrementing per
-build (see the file's own comments for the minor‑bump‑resets‑patch rule).
+`app/build.gradle.kts` resolves the version from two sources:
+
+- **CI builds** set `CI_VERSION_CODE`, which becomes the `versionCode` verbatim, and
+  `version.properties` is never rewritten. The value is per workflow:
+
+  | Workflow | `CI_VERSION_CODE` | Published to |
+  |----------|-------------------|--------------|
+  | `release.yml` | `1,000,000 + run_number × 10 + (run_attempt − 1)` | Google Play + GitHub release |
+  | `android-ci.yml` | `20,000 + run_number` | `latest-debug-v<maj>.<min>` debug prerelease |
+  | `merged-build.yml` | `20,000 + run_number` | nothing (build/test only) |
+
+  Only `release.yml` codes reach Play. They are monotonic across runs and distinct per re-run
+  attempt, and the 1,000,000 floor clears every code published before the switch (~14,731).
+  The publishing jobs also set `CI_VERSION_PATCH` to the commit count of the built commit
+  (`git rev-list --count HEAD`), so `versionName` is `major.minor.<commit count>`: the same commit
+  gets the same `versionName` from every workflow, and it only grows along `main`. CI jobs that
+  don't publish leave it unset and keep the tracked `versionPatch`.
+- **Local builds** (no `CI_VERSION_CODE`) auto‑increment `versionBuild` (the `versionCode`) and
+  `versionPatch` in `version.properties` on every compiling Gradle invocation; a `versionMinor`
+  bump resets the patch to 0 (see the comments in `app/build.gradle.kts`). There is no
+  `-PversionBuild` override and no git-commit-count `versionCode` formula.
 
 ---
 
 ## 2. Publishing via the workflow
 
-> **This workflow does not exist yet.** There is no `release-aab.yml` (or any AAB/Play-publishing
-> workflow) in `.github/workflows/` as of 2026-09-22 — the description below is aspirational/planned,
-> not a description of current CI behavior. The real workflows (`android-ci.yml`,
-> `merged-build.yml`) build a debug APK on every push and publish it to a GitHub Release; they use
-> JDK **21** (Temurin) and the `KEYSTORE_RAW` base64 secret (decoded to `app/keystore.jks`), not JDK 17
-> or the `KEYSTORE_PRIVATE`/`KEYSTORE_CHAIN` secrets described further below.
+Workflow: **`.github/workflows/release.yml`**.
 
-Planned workflow: **`.github/workflows/release-aab.yml`** — `workflow_dispatch` only.
+Triggers: every push to `main` (except pushes that only touch `version.properties`) and
+`workflow_dispatch` with one input:
 
-Inputs:
+| Input     | Default | Description |
+|-----------|---------|-------------|
+| `publish` | `true`  | Off ⇒ build + upload the signed AAB/APK as the `graffitixr-release` workflow artifact only. |
 
-| Input     | Default    | Description |
-|-----------|------------|-------------|
-| `track`   | `internal` | `internal` / `alpha` / `beta` / `production` |
-| `status`  | `draft`    | `draft` or `completed` |
-| `publish` | `false`    | **Off ⇒ build + upload the `.aab` as a workflow artifact only.** On ⇒ also upload to Play. |
+Publishing (Play and GitHub release) only ever happens for `refs/heads/main`; a dispatch on another
+branch builds the artifact and stops. Runs share the `release-publish` concurrency group with
+`cancel-in-progress: false`, so a newer push queues behind an in-progress publish instead of
+cancelling it mid-upload.
 
-What it does:
+Jobs:
 
-1. Checks out with `fetch-depth: 0` and write access, so a publish run can
-   commit the incremented `versionBuild` in `version.properties` back to `main`.
-2. Injects `google-services.json` and decodes the base64 `KEYSTORE_RAW` secret
-   to `app/keystore.jks` (same steps as `android-ci.yml`/`merged-build.yml` use today). OpenCV needs no
-   fetch step — it's a Maven Central dependency (`org.opencv:opencv`, Java +
-   native via Prefab).
-3. Sets up JDK 21 (Temurin) + Gradle (matching what `android-ci.yml`/`merged-build.yml` actually use
-   today — an earlier version of this document said JDK 17).
-4. Reads `applicationId` from `app/build.gradle.kts` (not hardcoded), for the
-   later Play-upload step.
-5. Runs `bundleRelease` — no `-PversionBuild` override; `versionCode` comes
-   from `version.properties`' auto-incrementing `versionBuild`, and signing
-   from the `KEYSTORE_FILE`/`KEYSTORE_PASSWORD`/`KEY_ALIAS`/`KEY_PASSWORD` env
-   vars (see §1).
-6. Uploads the `.aab` as a build artifact (`graffitixr-release-aab`), then —
-   only once the Play upload (next step) has actually succeeded — commits the
-   new `versionBuild` back to `main` so it never falls behind builds already
-   shipped.
-7. **Only if `publish == true`:** uploads to Play with
-   [`r0adkll/upload-google-play@v1`](https://github.com/r0adkll/upload-google-play)
-   using `serviceAccountJsonPlainText`, the resolved `packageName`
-   (`com.hereliesaz.graffitixr`), the `.aab` glob, and the chosen `track` /
-   `status`.
+1. **`unit-tests`** — `./gradlew test` (the same command as `android-ci.yml`'s unit-tests job) and
+   `tools/run_native_host_tests.sh`. Nothing below runs unless this passes.
+2. **`build-and-publish`** (`needs: unit-tests`):
+   1. Checks out with `fetch-depth: 0`; decodes the base64 `KEYSTORE_RAW` secret to
+      `app/keystore.jks` and fails if it or any of `KEYSTORE_PASSWORD` / `KEY_ALIAS` /
+      `KEY_PASSWORD` is missing, so an unsigned build is never published.
+   2. Sets up JDK 21 (Temurin) + Gradle, reads `applicationId` from `app/build.gradle.kts`, and
+      derives `CI_VERSION_CODE` / `CI_VERSION_PATCH` (see [versionCode](#versioncode-and-versionname)).
+   3. Runs `./gradlew bundleRelease assembleRelease` with the signing env vars, uploads the AAB and
+      APK as the `graffitixr-release` artifact, and runs the SphereSLAM packaging/manifest checks
+      against the release variant.
+   4. Publishes the AAB to Google Play with `.github/scripts/play_multitrack_publish.py`: one Play
+      edit, one bundle upload, then `internal` = `completed` and `alpha` / `beta` / `production` =
+      `draft`, then commit. An uncommitted edit is deleted on failure or cancellation.
+   5. Only after Play succeeded, creates or updates the moving GitHub release
+      `latest-release-v<major>.<minor>` with the signed APK.
 
-Default behaviour is safe: leaving `publish` off just produces a downloadable,
-signed bundle for manual inspection or manual console upload.
+Nothing is committed back to the repository; the version comes from the run, not from
+`version.properties`.
 
 ---
 
@@ -192,10 +193,10 @@ included here.
 
 ## 4. Required repository secrets
 
-### Signing (already used by `android-ci.yml` / `merged-build.yml`)
+### Signing (read only by `release.yml`)
 
-There is no `release-apk.yml` in this repository — the actual signing secrets, as read by
-`android-ci.yml` and `merged-build.yml` today, are:
+`android-ci.yml` and `merged-build.yml` build debug APKs with the default debug key and read no
+signing secrets.
 
 | Secret | Purpose |
 |--------|---------|
@@ -204,16 +205,16 @@ There is no `release-apk.yml` in this repository — the actual signing secrets,
 | `KEY_ALIAS`         | Key alias |
 | `KEY_PASSWORD`      | Key password |
 
-### Google Play publishing (new)
+### Google Play publishing
 
 | Secret | Purpose |
 |--------|---------|
 | `PLAY_SERVICE_ACCOUNT_JSON` | Full JSON key of a Google Cloud service account with Play release access |
 
-### Build config (already used)
+### Build config
 
-`GOOGLE_SERVICES_API_KEY`, `PROJECT_ID`, `CLIENT_ID`, `ARCORE_API_KEY`. See
-`android-ci.yml` / `merged-build.yml`.
+None. `GOOGLE_SERVICES*`, `PROJECT_ID`, `CLIENT_ID` and `ARCORE_API_KEY` are no longer required:
+no module applies the google-services plugin and nothing in the build reads an ARCore API key.
 
 Crash reporting is **not** credentialed at build time. The old `CRASH_REPORT_TOKEN` build secret was
 removed: it was compiled into `BuildConfig` and shipped inside every published APK, where decompiling
@@ -237,10 +238,10 @@ The automated publish step cannot work until these are done **once**:
    secret, and add the signing secrets above if not already present.
 4. **Upload the very first release manually.** For a brand‑new app the Play
    Developer API **cannot** create the first release — the first `.aab` must be
-   uploaded by hand in the Play Console (Internal testing is fine). Run the
-   workflow with `publish = false`, download the `graffitixr-release-aab`
-   artifact, and upload it in the console. After that first manual upload, the
-   workflow can publish subsequent builds with `publish = true`.
+   uploaded by hand in the Play Console (Internal testing is fine). Run
+   `release.yml` via *Run workflow* with `publish` unchecked, download the
+   `graffitixr-release` artifact, and upload its `.aab` in the console. After
+   that first manual upload, pushes to `main` publish automatically.
 
 > If you opt into **Play App Signing** (recommended), the keystore above becomes
 > your **upload** key; Google re‑signs with the managed app‑signing key.

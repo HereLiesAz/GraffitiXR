@@ -75,17 +75,19 @@ private val SPHERESLAM_DEFAULT_UNWARP_POINTS = listOf(
 
 
 /**
- * Draws the inverse of the usual point-glow: a translucent wash covers the whole preview and only
+ * Drives the inverse of the usual point-glow: a translucent wash covers the whole preview and only
  * photosphere tiles that are current are cut transparent. Missing and stale tiles therefore glow by
  * default, exactly matching PhotosphereMap.needsUpdate semantics.
  *
- * Deliberately an ordinary View, not a GL surface: a top-ordered SurfaceView sat above the whole
- * window (hiding all app UI), and its non-premultiplied clear composited as near-solid white.
- * As a window-level View it draws above the camera preview and beneath the media-overlay artwork.
+ * Holds the mask state only; [HomographyOverlayRenderer] draws the wash inside the artwork GL
+ * surface, before the design quad. That is the one place that is both above the camera preview and
+ * beneath the artwork: the artwork surface is `setZOrderMediaOverlay`, which sits behind the app
+ * window, so a window-level View (the earlier implementation) washed over the artwork as well. A
+ * separate top-ordered SurfaceView was worse still — it sat above all app UI.
  */
-private class SphereTileGlowMaskView(
-    context: android.content.Context,
-) : android.view.View(context) {
+private class SphereTileGlowMask(
+    private val renderer: HomographyOverlayRenderer,
+) {
     private data class MaskState(
         val currentDirections: List<SphereCoverage.Direction> = emptyList(),
         val cameraHeadingDeg: Float = 0f,
@@ -96,60 +98,6 @@ private class SphereTileGlowMaskView(
 
     private val state = AtomicReference(MaskState())
 
-    override fun onDraw(canvas: android.graphics.Canvas) {
-        super.onDraw(canvas)
-        val surfaceWidth = width
-        val surfaceHeight = height
-        if (surfaceWidth <= 0 || surfaceHeight <= 0) return
-        val snapshot = state.get()
-
-        canvas.save()
-        if (snapshot.currentDirections.isNotEmpty()) {
-            val marks = CoverageGlowProjection.project(
-                directions = snapshot.currentDirections,
-                cameraHeadingDeg = snapshot.cameraHeadingDeg,
-                cameraElevationDeg = snapshot.cameraElevationDeg,
-                horizontalFovDeg = snapshot.horizontalFovDeg,
-                verticalFovDeg = snapshot.verticalFovDeg,
-            )
-
-            val tileWidthDeg =
-                (SphereCoverage.DEFAULT_VIEWABLE_HALF_ANGLE_DEG * 2f) /
-                    SphereCoverage.DEFAULT_SECTORS.toFloat()
-            val tileHeightDeg =
-                (SphereCoverage.DEFAULT_VIEWABLE_ELEVATION_HALF_ANGLE_DEG * 2f) /
-                    TILE_ELEVATION_BANDS.toFloat()
-            val halfWidthPx =
-                surfaceWidth * 0.5f *
-                    (kotlin.math.tan(Math.toRadians(tileWidthDeg / 2.0)).toFloat() /
-                        kotlin.math.tan(
-                            Math.toRadians(snapshot.horizontalFovDeg / 2.0)
-                        ).toFloat())
-            val halfHeightPx =
-                surfaceHeight * 0.5f *
-                    (kotlin.math.tan(Math.toRadians(tileHeightDeg / 2.0)).toFloat() /
-                        kotlin.math.tan(
-                            Math.toRadians(snapshot.verticalFovDeg / 2.0)
-                        ).toFloat())
-
-            // Current tiles are clipped out of the wash, leaving literal transparent holes.
-            for (mark in marks) {
-                if (!mark.onScreen) continue
-                val cx = (mark.ndcX + 1f) * 0.5f * surfaceWidth
-                val cyTop = (1f - mark.ndcY) * 0.5f * surfaceHeight
-                canvas.clipOutRect(
-                    cx - halfWidthPx,
-                    cyTop - halfHeightPx,
-                    cx + halfWidthPx,
-                    cyTop + halfHeightPx,
-                )
-            }
-        }
-        // Default is glow everywhere. Missing and stale tiles need no explicit geometry.
-        canvas.drawColor(FULL_GLOW_COLOR)
-        canvas.restore()
-    }
-
     fun update(
         currentDirections: List<SphereCoverage.Direction>,
         cameraHeadingDeg: Float? = null,
@@ -158,22 +106,65 @@ private class SphereTileGlowMaskView(
         verticalFovDeg: Float? = null,
     ) {
         val previous = state.get()
-        state.set(
-            previous.copy(
-                currentDirections = currentDirections.toList(),
-                cameraHeadingDeg = cameraHeadingDeg ?: previous.cameraHeadingDeg,
-                cameraElevationDeg = cameraElevationDeg ?: previous.cameraElevationDeg,
-                horizontalFovDeg = horizontalFovDeg ?: previous.horizontalFovDeg,
-                verticalFovDeg = verticalFovDeg ?: previous.verticalFovDeg,
-            )
+        val next = previous.copy(
+            currentDirections = currentDirections.toList(),
+            cameraHeadingDeg = cameraHeadingDeg ?: previous.cameraHeadingDeg,
+            cameraElevationDeg = cameraElevationDeg ?: previous.cameraElevationDeg,
+            horizontalFovDeg = horizontalFovDeg ?: previous.horizontalFovDeg,
+            verticalFovDeg = verticalFovDeg ?: previous.verticalFovDeg,
         )
-        // May be called off the main thread (analyzer callbacks).
-        postInvalidateOnAnimation()
+        state.set(next)
+        // May be called off the main thread (analyzer callbacks); the renderer setter is atomic and
+        // the GL surface renders continuously.
+        renderer.setCoverageGlow(FULL_GLOW_ALPHA, holes(next))
+    }
+
+    /** Current tiles as normalized top-left-origin `[left, top, right, bottom]` quadruples. */
+    private fun holes(snapshot: MaskState): FloatArray {
+        if (snapshot.currentDirections.isEmpty()) return FloatArray(0)
+        val marks = CoverageGlowProjection.project(
+            directions = snapshot.currentDirections,
+            cameraHeadingDeg = snapshot.cameraHeadingDeg,
+            cameraElevationDeg = snapshot.cameraElevationDeg,
+            horizontalFovDeg = snapshot.horizontalFovDeg,
+            verticalFovDeg = snapshot.verticalFovDeg,
+        )
+
+        val tileWidthDeg =
+            (SphereCoverage.DEFAULT_VIEWABLE_HALF_ANGLE_DEG * 2f) /
+                SphereCoverage.DEFAULT_SECTORS.toFloat()
+        val tileHeightDeg =
+            (SphereCoverage.DEFAULT_VIEWABLE_ELEVATION_HALF_ANGLE_DEG * 2f) /
+                TILE_ELEVATION_BANDS.toFloat()
+        val halfWidth =
+            0.5f *
+                (kotlin.math.tan(Math.toRadians(tileWidthDeg / 2.0)).toFloat() /
+                    kotlin.math.tan(
+                        Math.toRadians(snapshot.horizontalFovDeg / 2.0)
+                    ).toFloat())
+        val halfHeight =
+            0.5f *
+                (kotlin.math.tan(Math.toRadians(tileHeightDeg / 2.0)).toFloat() /
+                    kotlin.math.tan(
+                        Math.toRadians(snapshot.verticalFovDeg / 2.0)
+                    ).toFloat())
+
+        // Current tiles are cut out of the wash, leaving literal transparent holes.
+        val out = ArrayList<Float>(marks.size * 4)
+        for (mark in marks) {
+            if (!mark.onScreen) continue
+            val cx = (mark.ndcX + 1f) * 0.5f
+            val cyTop = (1f - mark.ndcY) * 0.5f
+            out += cx - halfWidth
+            out += cyTop - halfHeight
+            out += cx + halfWidth
+            out += cyTop + halfHeight
+        }
+        return out.toFloatArray()
     }
 
     private companion object {
         const val FULL_GLOW_ALPHA = 0.14f
-        val FULL_GLOW_COLOR = android.graphics.Color.argb(FULL_GLOW_ALPHA, 1f, 1f, 1f)
         const val TILE_ELEVATION_BANDS = 3
     }
 }
@@ -675,7 +666,9 @@ fun SphereSlamStandaloneOverlay(
         glRenderer.setMapFromFingerprint(mapAnchor)
     }
     // Full-view freshness mask: glow everywhere, then punch out only current photosphere tiles.
-    val coverageGlowMaskView = remember(context) { SphereTileGlowMaskView(context) }
+    // Seeded immediately so the whole view glows before the first keyframe, as every tile starts stale.
+    val coverageGlowMask =
+        remember(glRenderer) { SphereTileGlowMask(glRenderer).also { it.update(emptyList()) } }
 
     LaunchedEffect(glRenderer, designBitmap) {
         if (designBitmap == null) {
@@ -863,7 +856,7 @@ fun SphereSlamStandaloneOverlay(
                 if (px > 1e-4f && py > 1e-4f) {
                     val hFovDeg = Math.toDegrees(2.0 * kotlin.math.atan(1.0 / px)).toFloat()
                     val vFovDeg = Math.toDegrees(2.0 * kotlin.math.atan(1.0 / py)).toFloat()
-                    coverageGlowMaskView.update(
+                    coverageGlowMask.update(
                         currentDirections = currentDirections,
                         cameraHeadingDeg = attitude.first,
                         cameraElevationDeg = attitude.second,
@@ -872,7 +865,7 @@ fun SphereSlamStandaloneOverlay(
                     )
                 }
             } else {
-                coverageGlowMaskView.update(currentDirections = emptyList())
+                coverageGlowMask.update(currentDirections = emptyList())
             }
         }
         val screenUnitsPerPixel = frame?.let {
@@ -1077,7 +1070,7 @@ fun SphereSlamStandaloneOverlay(
                         val vFovDeg = Math.toDegrees(
                             2.0 * kotlin.math.atan(keyframe.height.toDouble() / (2.0 * fy))
                         ).toFloat()
-                        coverageGlowMaskView.update(
+                        coverageGlowMask.update(
                             currentDirections = coverageCurrentDirections(),
                             cameraHeadingDeg = keyframe.headingDeg,
                             cameraElevationDeg = keyframe.elevationDeg,
@@ -1176,8 +1169,9 @@ fun SphereSlamStandaloneOverlay(
                 // format to RGBX, overriding the TRANSLUCENT holder format below. This media-overlay
                 // surface sits ABOVE CameraPreview's SurfaceView, so its transparent glClear
                 // composited as opaque black and hid the whole camera feed (dark grey once the
-                // 14% glow mask washed over it). ARCore mode can get away with the default because
-                // its renderer draws the camera background itself; CameraX here cannot.
+                // 14% glow mask, which glRenderer draws first, washed over it). ARCore mode can get
+                // away with the default because its renderer draws the camera background itself;
+                // CameraX here cannot.
                 setEGLConfigChooser(8, 8, 8, 8, 16, 0)
                 setZOrderMediaOverlay(true)
                 holder.setFormat(PixelFormat.TRANSLUCENT)
@@ -1189,14 +1183,6 @@ fun SphereSlamStandaloneOverlay(
         modifier = modifier
             .fillMaxSize()
             .onSizeChanged { surfaceSize.set(it) },
-    )
-
-    // Full-screen freshness mask, above the camera preview and beneath the media-overlay artwork.
-    // It starts fully glowing and clears only the screen regions occupied by current
-    // (needsUpdate=false) tiles.
-    AndroidView(
-        factory = { coverageGlowMaskView },
-        modifier = Modifier.fillMaxSize(),
     )
 
     if (!referenceReady || trackingState == StandaloneTrackingState.INITIALIZING) {

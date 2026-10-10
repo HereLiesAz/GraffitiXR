@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.data.ProjectManager
+import com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricMarks
 import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder
@@ -421,28 +422,35 @@ class MainViewModel @Inject constructor(
                 return@launch
             }
 
-            val display = (context.getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager).defaultDisplay
-            val isPortrait = display.rotation == android.view.Surface.ROTATION_0 || display.rotation == android.view.Surface.ROTATION_180
-            val isRotatedForUi = isPortrait && bitmap.height > bitmap.width
-
-            val sensorBmp = if (isRotatedForUi) {
-                val matrix = android.graphics.Matrix().apply { postRotate(-90f) }
-                Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+            // The confirmed bitmap AND [intrinsics] were both rotated by rotationDeg into display
+            // orientation, but the depth buffer is in the raw sensor frame and generateFingerprint
+            // indexes it by scaling image pixels, then back-projects with the intrinsics. Undo the
+            // SAME recorded rotation on image, mask and intrinsics so all three share the sensor
+            // frame. (This used to un-rotate the bitmap by a hardcoded -90 gated on display rotation
+            // while passing the display-rotated intrinsics, so cx/cy and fx/fy were swapped against
+            // the image and every back-projected point was off — and reverse portrait/landscape
+            // got the wrong un-rotation entirely.)
+            val unrotateDeg = ((rotationDeg % 360) + 360) % 360
+            fun toSensorFrame(b: Bitmap): Bitmap =
+                if (unrotateDeg == 0) b else Bitmap.createBitmap(
+                    b, 0, 0, b.width, b.height,
+                    android.graphics.Matrix().apply { postRotate(-unrotateDeg.toFloat()) }, true,
+                )
+            val sensorBmp = toSensorFrame(bitmap)
+            val sensorMask = selectionMask?.let { toSensorFrame(it) }
+            val sensorIntr = if (safeIntr.size >= 4) {
+                CaptureRotation.unrotateIntrinsics(
+                    safeIntr[0], safeIntr[1], safeIntr[2], safeIntr[3],
+                    bitmap.width.toFloat(), bitmap.height.toFloat(), unrotateDeg,
+                )
             } else {
-                bitmap
-            }
-
-            val sensorMask = if (isRotatedForUi && selectionMask != null) {
-                val matrix = android.graphics.Matrix().apply { postRotate(-90f) }
-                Bitmap.createBitmap(selectionMask, 0, 0, selectionMask.width, selectionMask.height, matrix, true)
-            } else {
-                selectionMask
+                safeIntr // native rejects < 4; nothing to un-rotate
             }
 
             val fp = slamManager.setWallFingerprint(
                 sensorBmp, sensorMask, safeDepth,
                 depthW, depthH, depthStride,
-                safeIntr, safeView
+                sensorIntr, safeView
             )
 
             if (fp == null) {

@@ -1239,7 +1239,19 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallFingerprint
     cv::Mat maskMat;
     if (mask) bitmapToMat(env, mask, maskMat);
 
-    auto* depthData = static_cast<const uint8_t*>(env->GetDirectBufferAddress(depthBuffer));
+    auto* depthData = static_cast<const uint8_t*>(
+            depthBuffer ? env->GetDirectBufferAddress(depthBuffer) : nullptr);
+    // generateFingerprint indexes depthData as depthH rows of depthW uint16 samples, depthStride
+    // bytes apart, trusting the caller's dimensions. Same guard as the Y/U/V/luma planes: a short
+    // buffer is an OOB read. Only checked when generateFingerprint would actually read it.
+    if (depthData && depthW > 0 && depthH > 0 && depthStride > 0) {
+        jlong depthCap = env->GetDirectBufferCapacity(depthBuffer);
+        if (!graffitixr::plane16Fits(depthCap, depthW, depthH, depthStride)) {
+            LOGE("nativeSetWallFingerprint: depth rejected (cap=%lld, %dx%d stride=%d)",
+                 (long long)depthCap, depthW, depthH, depthStride);
+            return nullptr;
+        }
+    }
     jfloat* intr = env->GetFloatArrayElements(intrArray, nullptr);
     jfloat* view = env->GetFloatArrayElements(viewMatArray, nullptr);
 
@@ -1269,7 +1281,19 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArtworkFingerpr
     if (gSlamEngine) {
         cv::Mat composite;
         bitmapToMat(env, bitmap, composite);
-        auto* depthData = static_cast<const uint8_t*>(env->GetDirectBufferAddress(depthBuffer));
+        auto* depthData = static_cast<const uint8_t*>(
+                depthBuffer ? env->GetDirectBufferAddress(depthBuffer) : nullptr);
+        // Same DEPTH16 bounds check as nativeSetWallFingerprint. Depth is optional here
+        // (setArtworkFingerprint stores descriptors-only without it), so a short buffer degrades
+        // to that path rather than refusing the registration.
+        if (depthData && depthW > 0 && depthH > 0 && depthStride > 0) {
+            jlong depthCap = env->GetDirectBufferCapacity(depthBuffer);
+            if (!graffitixr::plane16Fits(depthCap, depthW, depthH, depthStride)) {
+                LOGE("nativeSetArtworkFingerprint: depth rejected (cap=%lld, %dx%d stride=%d)",
+                     (long long)depthCap, depthW, depthH, depthStride);
+                depthData = nullptr;
+            }
+        }
         jfloat* intr = env->GetFloatArrayElements(intrArray, nullptr);
         jfloat* view = env->GetFloatArrayElements(viewMatArray, nullptr);
         try {

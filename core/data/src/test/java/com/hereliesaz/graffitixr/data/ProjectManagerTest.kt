@@ -381,6 +381,52 @@ class ProjectManagerTest {
         assertNull(manager.loadProjectMetadata(mockContext, "ww_clear")?.wallWidthMeters)
     }
 
+    private fun fingerprint(rows: Int) = com.hereliesaz.graffitixr.common.model.Fingerprint(
+        keypoints = emptyList(), points3d = emptyList(), descriptorsData = ByteArray(rows),
+        descriptorsRows = rows, descriptorsCols = 1, descriptorsType = 0,
+    )
+
+    @Test
+    fun `stale save carrying the saved fingerprint still preserves the other fields`() = runTest {
+        val reference = Uri.fromFile(File(tempFilesDir, "projects/fp_stale/sphereslam_reference_a.png"))
+        manager.saveProjectExact(
+            mockContext,
+            GraffitiProject(
+                id = "fp_stale", name = "Wall", fingerprint = fingerprint(2),
+                wallWidthMeters = 4.2f, cloudAnchorId = "anchor-1", sphereSlamReferenceUri = reference,
+            ),
+        )
+        // A snapshot holding the target but taken before the other fields were written.
+        manager.saveProject(mockContext, GraffitiProject(id = "fp_stale", name = "Renamed", fingerprint = fingerprint(2)))
+        val loaded = manager.loadProjectMetadata(mockContext, "fp_stale")
+        assertEquals(4.2f, loaded?.wallWidthMeters ?: 0f, 0f)
+        assertEquals("anchor-1", loaded?.cloudAnchorId)
+        assertEquals(reference, loaded?.sphereSlamReferenceUri)
+        assertEquals("Renamed", loaded?.name)
+    }
+
+    @Test
+    fun `a new fingerprint replaces the old target's frame state but keeps frame-independent fields`() = runTest {
+        val reference = Uri.fromFile(File(tempFilesDir, "projects/fp_new/sphereslam_reference_a.png"))
+        manager.saveProjectExact(
+            mockContext,
+            GraffitiProject(
+                id = "fp_new", name = "Wall", fingerprint = fingerprint(2),
+                fingerprintIntrinsics = listOf(1f, 2f, 3f, 4f),
+                wallWidthMeters = 4.2f, cloudAnchorId = "anchor-1", sphereSlamReferenceUri = reference,
+            ),
+        )
+        manager.saveProject(mockContext, GraffitiProject(id = "fp_new", name = "Wall", fingerprint = fingerprint(3)))
+        val loaded = manager.loadProjectMetadata(mockContext, "fp_new")
+        assertEquals(fingerprint(3), loaded?.fingerprint)
+        // State expressed in the old target's frame must not be grafted onto the new one.
+        assertTrue(loaded?.fingerprintIntrinsics.isNullOrEmpty())
+        assertNull(loaded?.cloudAnchorId)
+        // The wall width and SphereSLAM's own page are not tied to the AR target.
+        assertEquals(4.2f, loaded?.wallWidthMeters ?: 0f, 0f)
+        assertEquals(reference, loaded?.sphereSlamReferenceUri)
+    }
+
     @Test
     fun `legacy project has no wall width`() = runTest {
         val projectDir = File(tempFilesDir, "projects/pre_ww").also { it.mkdirs() }
@@ -458,7 +504,9 @@ class ProjectManagerTest {
     @Test
     fun `import rebases the hybrid KPM page URI`() = runTest {
         val manifest =
-            """{"id":"hyb_import","name":"Wall","hybridKpmPageUri":"file:///sender/files/projects/hyb_import/hybrid_kpm_page_x.y8.gz","hybridKpmPageWidthPx":2,"hybridKpmPageHeightPx":2,"hybridKpmPageWidthMeters":1.0}"""
+            ("""{"id":"hyb_import","name":"Wall","hybridKpmPageUri":"file:///sender/files/projects/hyb_import/""" +
+                """hybrid_kpm_page_x.y8.gz","hybridKpmPageWidthPx":2,"hybridKpmPageHeightPx":""" +
+                """2,"hybridKpmPageWidthMeters":1.0}""")
                 .toByteArray()
         val imported = importZip(zipOf("project.json" to manifest, "hybrid_kpm_page_x.y8.gz" to byteArrayOf(9)))
         assertEquals(
@@ -470,7 +518,9 @@ class ProjectManagerTest {
     @Test
     fun `import without the hybrid page file drops the page instead of failing`() = runTest {
         val manifest =
-            """{"id":"hyb_missing","name":"Wall","hybridKpmPageUri":"file:///sender/files/projects/hyb_missing/hybrid_kpm_page_gone.y8.gz","hybridKpmPageWidthPx":2,"hybridKpmPageHeightPx":2,"hybridKpmPageWidthMeters":1.0,"hybridKpmFingerprintKey":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]}"""
+            ("""{"id":"hyb_missing","name":"Wall","hybridKpmPageUri":"file:///sender/files/projects/hyb_missing/""" +
+                """hybrid_kpm_page_gone.y8.gz","hybridKpmPageWidthPx":2,"hybridKpmPageHeightPx":""" +
+                """2,"hybridKpmPageWidthMeters":1.0,"hybridKpmFingerprintKey":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]}""")
                 .toByteArray()
         val imported = importZip(zipOf("project.json" to manifest))
         assertNotNull(imported)
@@ -512,7 +562,9 @@ class ProjectManagerTest {
     @Test
     fun `import rebases versioned SphereSLAM reference URI`() = runTest {
         val manifest =
-            """{"id":"slam_import","name":"Wall","sphereSlamReferenceUri":"file:///sender/files/projects/slam_import/sphereslam_reference_abc.png","sphereSlamReferenceWidthMeters":2.5,"sphereSlamReferencePhysicallyMetric":true}"""
+            ("""{"id":"slam_import","name":"Wall","sphereSlamReferenceUri":"file:///sender/files/projects/""" +
+                """slam_import/sphereslam_reference_abc.png","sphereSlamReferenceWidthMeters":""" +
+                """2.5,"sphereSlamReferencePhysicallyMetric":true}""")
                 .toByteArray()
         val imported = importZip(
             zipOf(
@@ -588,7 +640,9 @@ class ProjectManagerTest {
             GraffitiProject(id = "same_slam", name = "Existing"),
         )
         val manifest =
-            """{"id":"same_slam","name":"Imported","sphereSlamReferenceUri":"file:///sender/files/projects/same_slam/sphereslam_reference_abc.png","sphereSlamReferenceWidthMeters":2.0,"sphereSlamReferencePhysicallyMetric":true}"""
+            ("""{"id":"same_slam","name":"Imported","sphereSlamReferenceUri":"file:///sender/files/projects/""" +
+                """same_slam/sphereslam_reference_abc.png","sphereSlamReferenceWidthMeters":""" +
+                """2.0,"sphereSlamReferencePhysicallyMetric":true}""")
                 .toByteArray()
 
         val imported = importZip(
@@ -620,7 +674,7 @@ class ProjectManagerTest {
             val captured = mutableListOf<GraffitiProject>()
             val repo =
                 mockk<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>(relaxed = true)
-            coEvery { repo.createProject(any<GraffitiProject>()) } coAnswers {
+            coEvery { repo.replaceProject(any<GraffitiProject>()) } coAnswers {
                 captured += firstArg<GraffitiProject>()
             }
             val provider =
@@ -629,7 +683,9 @@ class ProjectManagerTest {
             val coopManager = ProjectManager(mockContext, uriProvider, provider)
 
             val manifest =
-                """{"id":"host_slam","name":"Host","sphereSlamReferenceUri":"file:///host/files/projects/host_slam/sphereslam_reference_abc.png","sphereSlamReferenceWidthMeters":1.75,"sphereSlamReferencePhysicallyMetric":true}"""
+                ("""{"id":"host_slam","name":"Host","sphereSlamReferenceUri":"file:///host/files/projects/host_slam/""" +
+                    """sphereslam_reference_abc.png","sphereSlamReferenceWidthMeters":""" +
+                    """1.75,"sphereSlamReferencePhysicallyMetric":true}""")
                     .toByteArray()
 
             val loaded = coopManager.loadAsSpectator(
@@ -655,6 +711,92 @@ class ProjectManagerTest {
         } finally {
             Dispatchers.resetMain()
         }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `rejoining replaces the spectator copy instead of merging the previous join into it`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        try {
+            // A real repository so the spectator save goes through the same persistence path as
+            // the app (a mock would hide a preserve-merge against the previous join's project.json).
+            lateinit var repo: com.hereliesaz.graffitixr.data.repository.ProjectRepositoryImpl
+            val provider =
+                mockk<javax.inject.Provider<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>>()
+            every { provider.get() } answers { repo }
+            val coopManager = ProjectManager(mockContext, uriProvider, provider)
+            repo = com.hereliesaz.graffitixr.data.repository.ProjectRepositoryImpl(mockContext, coopManager)
+
+            val firstJoin =
+                """{"id":"host_wall","name":"Host","wallWidthMeters":6.5,"design":{"uri":"file:///host/files/projects/host_wall/design_old.png"}}"""
+                    .toByteArray()
+            assertTrue(
+                coopManager.loadAsSpectator(
+                    zipOf("project.json" to firstJoin, "design_old.png" to byteArrayOf(1)),
+                ),
+            )
+            val dir = File(tempFilesDir, "projects/coop_host_wall")
+            assertTrue(File(dir, "design_old.png").exists())
+
+            // The host has since cleared its wall width and swapped its design file.
+            val secondJoin =
+                """{"id":"host_wall","name":"Host","design":{"uri":"file:///host/files/projects/host_wall/design_new.png"}}"""
+                    .toByteArray()
+            assertTrue(
+                coopManager.loadAsSpectator(
+                    zipOf("project.json" to secondJoin, "design_new.png" to byteArrayOf(2)),
+                ),
+            )
+            assertFalse("previous join's file survived", File(dir, "design_old.png").exists())
+            assertTrue(File(dir, "design_new.png").exists())
+            val saved = coopManager.loadProjectMetadata(mockContext, "coop_host_wall")
+            assertNull("previous join's wall width was resurrected", saved?.wallWidthMeters)
+            assertNull(repo.currentProject.value?.wallWidthMeters)
+
+            // A third join referencing a file only the FIRST join had must fail rather than be
+            // satisfied by a leftover, and must leave the second join's copy intact.
+            val thirdJoin =
+                """{"id":"host_wall","name":"Host","design":{"uri":"file:///host/files/projects/host_wall/design_old.png"}}"""
+                    .toByteArray()
+            assertFalse(coopManager.loadAsSpectator(zipOf("project.json" to thirdJoin)))
+            assertTrue(File(dir, "design_new.png").exists())
+            assertFalse(
+                "staging leftovers",
+                File(tempFilesDir, "coop_staging").listFiles()?.isNotEmpty() == true,
+            )
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `export leaves out superseded design files but keeps every referenced one`() = runTest {
+        val root = File(tempFilesDir, "projects/designs").also { it.mkdirs() }
+        File(root, "design_old.png").writeBytes(byteArrayOf(1))
+        File(root, "design_live.png").writeBytes(byteArrayOf(2))
+        File(root, "design_overlay.png").writeBytes(byteArrayOf(3))
+        File(root, "target_1.png").writeBytes(byteArrayOf(4))
+        File(root, "project.json").writeText(
+            """{"id":"designs","name":"Wall","design":{"uri":"${Uri.fromFile(File(root, "design_live.png"))}"},""" +
+                """"overlayImageUri":"${Uri.fromFile(File(root, "design_overlay.png"))}"}""",
+        )
+        val out = java.io.ByteArrayOutputStream()
+        val resolver = mockk<android.content.ContentResolver>()
+        every { mockContext.contentResolver } returns resolver
+        every { resolver.openOutputStream(any()) } returns out
+
+        assertTrue(manager.exportProjectToUri(mockContext, "designs", Uri.parse("content://test/out.gxr")))
+
+        val names = mutableSetOf<String>()
+        java.util.zip.ZipInputStream(out.toByteArray().inputStream()).use { zis ->
+            while (true) names += (zis.nextEntry ?: break).name
+        }
+        assertEquals(
+            setOf("project.json", "design_live.png", "design_overlay.png", "target_1.png"),
+            names,
+        )
+        // Left out of the archive only; the file itself is untouched (undo may still need it).
+        assertTrue(File(root, "design_old.png").exists())
     }
 
     // --- Zip extraction temp-file cleanup (duplicate entry names) ---

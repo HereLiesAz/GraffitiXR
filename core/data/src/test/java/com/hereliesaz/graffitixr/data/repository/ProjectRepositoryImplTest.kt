@@ -106,9 +106,28 @@ class ProjectRepositoryImplTest {
 
     // --- updateProject(transform): the atomic read-modify-write ---
 
+    /** A manager whose exact save returns its input, like the real one minus the timestamp. */
+    private fun echoingManager(): ProjectManager = mockk<ProjectManager>(relaxed = true).also { m ->
+        coEvery { m.saveProjectExact(any(), any()) } coAnswers { secondArg<GraffitiProject>() }
+    }
+
+    @Test
+    fun `transform update publishes the project the exact save returned`() = runTest {
+        val manager = mockk<ProjectManager>(relaxed = true)
+        val context = mockk<Context>(relaxed = true)
+        val repo = ProjectRepositoryImpl(context, manager)
+        repo.createProject(GraffitiProject(id = "stamped", name = "Wall"))
+        coEvery { manager.saveProjectExact(context, any()) } coAnswers {
+            secondArg<GraffitiProject>().copy(lastModified = 42L)
+        }
+        repo.updateProject { it.copy(name = "Renamed") }
+        assertEquals("Renamed", repo.currentProject.value?.name)
+        assertEquals(42L, repo.currentProject.value?.lastModified)
+    }
+
     @Test
     fun `updateProject transform applies to and persists the current project`() = runTest(testDispatcher) {
-        val mockManager = mockk<ProjectManager>(relaxed = true)
+        val mockManager = echoingManager()
         val context = mockk<Context>(relaxed = true)
         val repo = ProjectRepositoryImpl(context, mockManager)
         repo.createProject(GraffitiProject(id = "p1", name = "Base"))
@@ -154,7 +173,7 @@ class ProjectRepositoryImplTest {
      */
     @Test
     fun `updateProject transform merges concurrent non-overlapping writes without losing either`() {
-        val mockManager = mockk<ProjectManager>(relaxed = true)
+        val mockManager = echoingManager()
         val context = mockk<Context>(relaxed = true)
         val repo = ProjectRepositoryImpl(context, mockManager)
         runBlocking { repo.createProject(GraffitiProject(id = "race", name = "Base")) }
@@ -185,7 +204,7 @@ class ProjectRepositoryImplTest {
      */
     @Test
     fun `updateProject transform under heavy concurrency loses no writes`() {
-        val mockManager = mockk<ProjectManager>(relaxed = true)
+        val mockManager = echoingManager()
         val context = mockk<Context>(relaxed = true)
         val repo = ProjectRepositoryImpl(context, mockManager)
         runBlocking { repo.createProject(GraffitiProject(id = "race-many", name = "Base")) }

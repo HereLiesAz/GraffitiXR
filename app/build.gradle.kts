@@ -28,8 +28,8 @@ val localProperties = Properties().apply {
     }
 }
 
-// Version resolution. On EVERY compile (any build type, any machine, any Gradle task that will
-// actually compile bytecode) both the build number and the patch are incremented:
+// Version resolution. On EVERY local compile (any build type, any Gradle task that will
+// actually compile bytecode; CI is handled below) both the build number and the patch are incremented:
 //   - versionBuild  -> the Android versionCode. Monotonic; NEVER resets.
 //   - versionPatch  -> the patch segment of the versionName. Increments each compile, but resets to
 //                      0 when versionMinor was bumped since the last build (a new minor starts at .0).
@@ -66,13 +66,20 @@ var currentPatch = if (isMinorBumped) 0 else versionProps.getProperty("versionPa
 // CI supplies its own versionCode (derived from the run number) and never rewrites the tracked
 // version.properties: the same commit then builds the same code however many compiles ran first,
 // and two branches' CI builds can't publish identical codes. Local builds keep auto-incrementing.
+//
+// versionName scheme for CI builds: "$major.$minor.$CI_VERSION_PATCH", where the publishing workflows
+// set CI_VERSION_PATCH to the commit count of the built commit (`git rev-list --count HEAD`, full
+// clone). That is stable per commit — release.yml, android-ci.yml and merged-build.yml all name the
+// same commit identically — and monotonic along main, so it never goes backwards across a minor bump
+// either. It is deliberately NOT the CI versionCode: those differ per workflow (1_000_000+run*10+attempt
+// in release.yml, 20000+run in android-ci/merged-build) and made the same commit read 1.43.1000010 in
+// one place and 1.43.20123 in another. Play ordering is governed solely by versionCode, which stays
+// CI_VERSION_CODE. Without CI_VERSION_PATCH (CI jobs that don't publish) the tracked patch is kept.
 val ciVersionCode = System.getenv("CI_VERSION_CODE")?.toIntOrNull()?.takeIf { it > 0 }
+val ciVersionPatch = System.getenv("CI_VERSION_PATCH")?.toIntOrNull()?.takeIf { it >= 0 }
 if (ciVersionCode != null) {
     currentVersionCode = ciVersionCode
-    // Keep versionName distinct per CI build too: without this the patch stays frozen at the tracked
-    // value and every Play release reports the same human-readable version across many versionCodes.
-    // The CI code is monotonic (1_000_000 + run_number*10 + attempt), so it makes a unique patch.
-    currentPatch = ciVersionCode
+    if (ciVersionPatch != null) currentPatch = ciVersionPatch
 } else if (isBuilding) {
     currentVersionCode++ // build never resets
     // A minor bump makes this build the new minor's .0; otherwise advance the patch.
@@ -135,7 +142,7 @@ android {
     // Release signing is a property of the project, not of each CI invocation. The keystore and
     // credentials come from the environment: CI decodes the base64 `KEYSTORE_RAW` secret to
     // app/keystore.jks and exports KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD (see
-    // .github/workflows/android-ci.yml). KEYSTORE_FILE may override the path.
+    // .github/workflows/release.yml, the only workflow that signs). KEYSTORE_FILE may override the path.
     //
     // When no keystore is present (local dev without the secrets) the "release" config is simply
     // not created — `findByName` then returns null below, so release builds stay unsigned and debug

@@ -165,4 +165,43 @@ class CaptureRotationTest {
         assertEquals(700f, u, EPS)
         assertEquals(300f, v, EPS)
     }
+
+    /**
+     * The depth-fallback target path un-rotates the display bitmap to the sensor frame to index the
+     * depth buffer; its intrinsics must come back to EXACTLY the raw sensor values at every quadrant,
+     * not stay display-rotated (which swapped fx/fy and cx/cy against the image).
+     */
+    @Test
+    fun `unrotateIntrinsics inverts rotateIntrinsics at every quadrant`() {
+        for (deg in intArrayOf(0, 90, 180, 270)) {
+            val r = CaptureRotation.rotateIntrinsics(FX, FY, CX, CY, RAW_W, RAW_H, deg)
+            val quarter = deg == 90 || deg == 270
+            val rotW = if (quarter) RAW_H else RAW_W
+            val rotH = if (quarter) RAW_W else RAW_H
+            val back = CaptureRotation.unrotateIntrinsics(r[0], r[1], r[2], r[3], rotW, rotH, deg)
+            assertEquals("deg=$deg fx", FX, back[0], EPS)
+            assertEquals("deg=$deg fy", FY, back[1], EPS)
+            assertEquals("deg=$deg cx", CX, back[2], EPS)
+            assertEquals("deg=$deg cy", CY, back[3], EPS)
+        }
+    }
+
+    /** A sensor pixel projected with sensor intrinsics survives rotate-then-unrotate as the same ray. */
+    @Test
+    fun `unrotated intrinsics back-project an un-rotated pixel to the sensor ray`() {
+        val p = floatArrayOf(0.4f, 0.25f, 2f)
+        for (deg in intArrayOf(90, 180, 270)) {
+            val r = CaptureRotation.rotateIntrinsics(FX, FY, CX, CY, RAW_W, RAW_H, deg)
+            val quarter = deg == 90 || deg == 270
+            val rotW = if (quarter) RAW_H else RAW_W
+            val rotH = if (quarter) RAW_W else RAW_H
+            val px = projectSensor(p[0], p[1], p[2])
+            val rot = CaptureRotation.rotatePixel(px[0], px[1], RAW_W, RAW_H, deg)
+            // postRotate(-deg) == postRotate(360 - deg) on the rotated bitmap.
+            val un = CaptureRotation.rotatePixel(rot[0], rot[1], rotW, rotH, 360 - deg)
+            val k = CaptureRotation.unrotateIntrinsics(r[0], r[1], r[2], r[3], rotW, rotH, deg)
+            assertEquals("deg=$deg x", p[0] / p[2], (un[0] - k[2]) / k[0], EPS)
+            assertEquals("deg=$deg y", p[1] / p[2], (un[1] - k[3]) / k[1], EPS)
+        }
+    }
 }
