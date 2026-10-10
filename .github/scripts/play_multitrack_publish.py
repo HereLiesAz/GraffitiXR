@@ -12,9 +12,10 @@ Env inputs (all required):
     AAB_GLOB                   glob resolving to exactly one .aab
     PLAY_SERVICE_ACCOUNT_JSON  raw JSON contents of the service-account key
 
-Non-zero exit on any failure — release-aab.yml's `steps.play-upload.outcome`
-gate reads that as "don't advance versionBuild in main" and the fail-loudly
-step re-annotates the run.
+Non-zero exit on any failure. In .github/workflows/release.yml that fails the
+"Publish AAB to Google Play" step (id play-upload), which skips the GitHub
+release publish and lets the fail-loudly step re-annotate the run. Nothing is
+persisted back to the repo: the versionCode comes from CI_VERSION_CODE.
 """
 import glob
 import json
