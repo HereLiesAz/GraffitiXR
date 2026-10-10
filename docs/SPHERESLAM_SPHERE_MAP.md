@@ -115,6 +115,12 @@ scan" rule remains correct there and is retained.
    Every tile begins `needsUpdate=true`, so the whole view has the hazy guidance glow. As usable
    tiles are captured and kept current, only those tile regions become clear; missing/stale tiles
    remain glowing.
+   Attitude sampling (`CameraAttitudeProvider`, via `ArViewModel.startStandaloneCameraAttitude`) is
+   owned by the standalone AR composition in `MainScreen`: started on entry/resume, stopped on
+   pause/exit. It is a hard prerequisite of the keyframe loop — the analyzer records no photosphere
+   keyframe without an attitude, so no `wallHeading` is set and no fingerprint can bind. (A device
+   regression where it was never started produced exactly that: `mapping=false` forever and every
+   capture logged "has no photosphere transform".)
 2. **The photosphere continuously grows/refreshes.** This is the base spatial layer and exists
    whether or not the artist ever creates a fingerprint. Visual keyframes are indexed into the
    photosphere from normal camera motion/pivoting; depth/reloc enrichment may improve those tiles,
@@ -123,6 +129,10 @@ scan" rule remains correct there and is retained.
    the precision target is, freezes that frame, singles out the marks with the shared ARCore/
    SphereSLAM curation flow, and confirms it. That fingerprint is attached to the already-existing
    photosphere tile/frame; it does not start or reset SphereSLAM.
+   The capture binds through the current tile's keyframe when one exists; if the artist aimed at a
+   tile the keyframe cadence has not recorded yet, it binds through the CURRENT attitude plus the
+   session's camera intrinsics (`StandalonePhotosphereCapture`). With no attitude, or no keyframe at
+   all, capture still fails closed, but the artist is told why and what to do at capture time.
 4. **Place the artwork on the fingerprint.** The selected wall marks provide the precision content
    anchor. The artwork is placed relative to that anchor while SphereSLAM continues maintaining the
    surrounding photosphere underneath it.

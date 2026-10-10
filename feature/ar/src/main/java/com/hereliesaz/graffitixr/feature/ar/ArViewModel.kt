@@ -990,8 +990,10 @@ class ArViewModel @Inject constructor(
 
     /**
      * Absolute camera attitude source (heading + elevation) for the sweep coverage, from SphereSLAM.
-     * Lazily created; sampling runs only while standalone tracking with the feature-map flag on, and
-     * stops on reset/exit. Magnetometer-fused (`TYPE_ROTATION_VECTOR`), so both axes are drift-free.
+     * Lazily created; sampling runs while the standalone AR composition is resumed
+     * ([startStandaloneCameraAttitude]) and stops on pause/exit. It is base-photosphere input, not
+     * gated by the feature-map flag. Magnetometer-fused (`TYPE_ROTATION_VECTOR`), so both axes are
+     * drift-free.
      */
     private val cameraAttitudeProvider by lazy {
         com.hereliesaz.sphereslam.CameraAttitudeProvider(appContext)
@@ -1028,6 +1030,8 @@ class ArViewModel @Inject constructor(
 
     private val spherePhotosphereFrames =
         LinkedHashMap<com.hereliesaz.sphereslam.TileId, SphereSlamPhotosphereKeyframe>()
+    /** Most recent accepted keyframe of any tile; supplies session intrinsics for a fresh tile. */
+    private var spherePhotosphereLatestFrame: SphereSlamPhotosphereKeyframe? = null
     @Volatile private var standalonePhotosphereActive: Boolean = false
     @Volatile private var sphereFingerprintAnchorTile: com.hereliesaz.sphereslam.TileId? = null
 
@@ -1037,6 +1041,26 @@ class ArViewModel @Inject constructor(
             val h = cameraAttitudeProvider.latestHeadingDegrees() ?: return null
             return h to (cameraAttitudeProvider.latestElevationDegrees() ?: 0f)
         }
+
+    /**
+     * Start compass/elevation sampling for the standalone base photosphere. The analyzer captures a
+     * photosphere keyframe only when [latestCameraAttitude] is non-null, so without this the map never
+     * receives a keyframe, `wallHeading` is never set, and every fingerprint capture fails closed.
+     * Owned by the standalone AR composition (started on entry/resume, stopped on pause/exit).
+     */
+    fun startStandaloneCameraAttitude() {
+        if (!cameraAttitudeProvider.isAvailable) {
+            appendDiag("SphereSLAM camera attitude unavailable: no rotation-vector sensor")
+            return
+        }
+        cameraAttitudeProvider.start()
+        appendDiag("SphereSLAM camera attitude sampling started")
+    }
+
+    /** Release the compass sensor; idempotent. */
+    fun stopStandaloneCameraAttitude() {
+        cameraAttitudeProvider.stop()
+    }
 
     /** Persist optional atlas-growth orientation diagnostics; base photosphere mapping is separate. */
     fun recordStandaloneKeyframeOrientation(timestampNs: Long, quaternion: FloatArray) {
@@ -1080,7 +1104,10 @@ class ArViewModel @Inject constructor(
                 nowMs = android.os.SystemClock.elapsedRealtime(),
                 representativeOrientation = keyframe.orientationQuaternion,
             )
-            tile?.let { spherePhotosphereFrames[it] = keyframe }
+            tile?.let {
+                spherePhotosphereFrames[it] = keyframe
+                spherePhotosphereLatestFrame = keyframe
+            }
             refreshSphereTileGlowLocked()
         }
 
@@ -2179,7 +2206,7 @@ class ArViewModel @Inject constructor(
                     it.copy(active = false, referenceReady = false, trackingData = false)
                 )
             }
-        // Release the compass sensor (Phase 3 sweep coverage); re-armed on the next standalone record.
+        // Release the compass sensor; re-armed when the standalone AR composition next resumes.
         cameraAttitudeProvider.stop()
         // Stop the GL thread FIRST, before any of the state below is cleared.
         //
@@ -4626,22 +4653,23 @@ class ArViewModel @Inject constructor(
         val attitude = latestCameraAttitude ?: return null
         return synchronized(spherePhotosphereLock) {
             val tileId = spherePhotosphere.tileAt(attitude.first, attitude.second) ?: return@synchronized null
-            val keyframe = spherePhotosphereFrames[tileId] ?: return@synchronized null
+            // A fresh tile (no keyframe yet) still binds: current attitude + session intrinsics.
+            val view = StandalonePhotosphereCapture.view(
+                attitude = attitude,
+                currentTileKeyframe = spherePhotosphereFrames[tileId],
+                latestKeyframe = spherePhotosphereLatestFrame,
+            ) ?: return@synchronized null
             val tile = spherePhotosphere.tile(tileId) ?: return@synchronized null
             val wallHeading = spherePhotosphere.snapshot().wallHeadingDeg ?: return@synchronized null
-
-            val fx = keyframe.intrinsics.getOrNull(0) ?: return@synchronized null
-            val fy = keyframe.intrinsics.getOrNull(1) ?: return@synchronized null
-            val cx = keyframe.intrinsics.getOrNull(2) ?: return@synchronized null
-            val cy = keyframe.intrinsics.getOrNull(3) ?: return@synchronized null
-            if (fx <= 0f || fy <= 0f || keyframe.width <= 0 || keyframe.height <= 0) {
-                return@synchronized null
-            }
+            val fx = view.fx
+            val fy = view.fy
+            val cx = view.cx
+            val cy = view.cy
 
             val nx = (tap?.first ?: 0.5f).coerceIn(0f, 1f)
             val ny = (tap?.second ?: 0.5f).coerceIn(0f, 1f)
-            val u = nx * keyframe.width.toFloat()
-            val v = ny * keyframe.height.toFloat()
+            val u = nx * view.width.toFloat()
+            val v = ny * view.height.toFloat()
             val azimuthOffsetDeg = Math.toDegrees(
                 kotlin.math.atan(((u - cx) / fx).toDouble())
             ).toFloat()
@@ -4649,8 +4677,8 @@ class ArViewModel @Inject constructor(
                 kotlin.math.atan(((v - cy) / fy).toDouble())
             ).toFloat()
 
-            val targetAzimuth = keyframe.headingDeg + azimuthOffsetDeg
-            val targetElevation = (keyframe.elevationDeg + elevationOffsetDeg).coerceIn(-89f, 89f)
+            val targetAzimuth = view.headingDeg + azimuthOffsetDeg
+            val targetElevation = (view.elevationDeg + elevationOffsetDeg).coerceIn(-89f, 89f)
             val azimuthDelta = signedAngleDegrees(targetAzimuth, wallHeading)
 
             // PhotosphereMap is allowed to be normalized. A missing range does NOT mean zero metres:
@@ -4659,7 +4687,7 @@ class ArViewModel @Inject constructor(
             val metricRange = tile.rangeMeters?.takeIf { it.isFinite() && it > 0f }
             val rangeUnits = metricRange ?: 1f
             val widthUnits =
-                (rangeUnits * keyframe.width.toFloat() / fx).coerceAtLeast(1e-4f)
+                (rangeUnits * view.width.toFloat() / fx).coerceAtLeast(1e-4f)
 
             StandaloneFingerprintPlacement(
                 mapFromFingerprint = StandaloneFingerprintFrame.mapFromFingerprint(
@@ -4673,6 +4701,16 @@ class ArViewModel @Inject constructor(
             )
         }
     }
+
+    private fun standalonePlacementBlocker(): StandalonePhotosphereCapture.Blocker? =
+        StandalonePhotosphereCapture.blocker(
+            attitudeSensorAvailable = cameraAttitudeProvider.isAvailable,
+            attitude = latestCameraAttitude,
+            hasAnyKeyframe = synchronized(spherePhotosphereLock) {
+                spherePhotosphereLatestFrame != null &&
+                    spherePhotosphere.snapshot().wallHeadingDeg != null
+            },
+        )
 
     private fun signedAngleDegrees(value: Float, origin: Float): Float {
         var d = (value - origin) % 360f
@@ -4700,9 +4738,22 @@ class ArViewModel @Inject constructor(
                     "widthUnits=${"%.4f".format(placement.referenceWidthUnits)} " +
                     "metric=${placement.physicallyMetric}"
             )
-        } ?: appendDiag(
-            "SphereSLAM fingerprint capture has no photosphere transform; confirmation will fail closed"
-        )
+        } ?: run {
+            val blocker = standalonePlacementBlocker()
+            appendDiag(
+                "SphereSLAM fingerprint capture has no photosphere transform" +
+                    (blocker?.let { " reason=$it" } ?: "") +
+                    "; confirmation will fail closed"
+            )
+            // Fail closed, but tell the artist what to do instead of failing silently at Confirm.
+            _feedback.tryEmit(
+                com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                    StandalonePhotosphereCapture.userMessage(
+                        blocker ?: StandalonePhotosphereCapture.Blocker.PHOTOSPHERE_EMPTY
+                    )
+                )
+            )
+        }
         // Stop the capture request immediately so CameraX cannot hand us a second full-resolution
         // still while the first one is being prepared for review.
         _uiState.update { it.copy(isCaptureRequested = false) }
