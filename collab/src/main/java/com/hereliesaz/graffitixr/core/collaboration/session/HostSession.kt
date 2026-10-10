@@ -760,11 +760,6 @@ internal class HostSession(
         // How long close() waits for the write lock before giving up on the best-effort BYE.
         private const val BYE_LOCK_TIMEOUT_MS = 1_000L
 
-        /**
-         * Minimum spacing of guest pixel replacements. A guest applies effects at human speed (a
-         * few per second at most); a burst faster than this is either a bug or abuse, and each one
-         * costs the host a multi-MB PNG decode.
-         */
         private const val TAG = "HostSession"
 
         // Guests ack every 1s and answer 5s PINGs, so 15s of read silence means a dead or

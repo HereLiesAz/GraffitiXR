@@ -201,7 +201,8 @@ class ArViewModel @Inject constructor(
     // Collected HERE, for the ViewModel's lifetime, rather than in an Activity-scoped effect: the
     // host session acknowledges a guest edit on arrival, so one that reached a collector that was
     // being torn down (Activity recreation) would be acked and never applied. Unbounded on purpose
-    // for the same reason; HostSession rate-limits the only large op (DesignBitmapReplace).
+    // for the same reason. Nothing here is large: GuestOpPolicy refuses the only bitmap-carrying
+    // guest ops (DesignReplace, DesignBitmapReplace) in HostSession before they reach this queue.
     private val pendingGuestOps = ArrayDeque<com.hereliesaz.graffitixr.common.model.Op>()
     @Volatile private var guestOpHandler: ((com.hereliesaz.graffitixr.common.model.Op) -> Unit)? = null
 
