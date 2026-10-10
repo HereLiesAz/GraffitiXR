@@ -19,6 +19,7 @@ step re-annotates the run.
 import glob
 import json
 import os
+import signal
 import sys
 
 import httplib2
@@ -58,7 +59,14 @@ PLAY_API_RETRIES = 5
 UPLOAD_CHUNK_SIZE = 4 * 1024 * 1024
 
 
+def _raise_on_sigterm(signum, _frame):
+    # A cancelled Actions job gets SIGTERM before SIGKILL. Turn it into an exception so the cleanup
+    # in main() runs and deletes the uncommitted edit instead of leaving it on Play's edit quota.
+    raise SystemExit(128 + signum)
+
+
 def main() -> None:
+    signal.signal(signal.SIGTERM, _raise_on_sigterm)
     pkg = os.environ["PACKAGE_NAME"]
     aab_glob = os.environ["AAB_GLOB"]
     creds_json = os.environ["PLAY_SERVICE_ACCOUNT_JSON"]
@@ -122,7 +130,9 @@ def main() -> None:
         ).execute(num_retries=PLAY_API_RETRIES)
         committed = True
         print(f"::notice::Committed edit {edit_id} — versionCode={version_code} live on internal, draft on the rest")
-    except Exception:
+    except BaseException:
+        # BaseException, not Exception: KeyboardInterrupt and the SystemExit raised by the SIGTERM
+        # handler must also delete the open edit.
         # Once commit().execute() has returned, the release is live. An exception after that point (e.g.
         # a later line, or a transient error raised while handling the already-successful commit response)
         # must NOT delete the committed edit or report the run as failed — the artifact already shipped.
@@ -130,6 +140,8 @@ def main() -> None:
             print("::warning::Post-commit error after a successful Play commit; the release is live, treating as success", file=sys.stderr)
             return
         if edit_id is not None:
+            # Don't let a repeated SIGTERM interrupt the cleanup itself.
+            signal.signal(signal.SIGTERM, signal.SIG_IGN)
             try:
                 svc.edits().delete(
                     packageName=pkg,

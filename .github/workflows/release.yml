@@ -28,7 +28,10 @@ permissions:
 
 concurrency:
   group: release-publish
-  cancel-in-progress: true
+  # Queue, never cancel: a newer push cancelling this run mid Play upload/commit could leave an open
+  # Play edit or a half-published release. GitHub keeps at most one pending run per group, so a burst
+  # of pushes still collapses to the newest one waiting behind the run in progress.
+  cancel-in-progress: false
 
 jobs:
   unit-tests:
