@@ -57,6 +57,9 @@ class ProjectManager @Inject constructor(
 
     companion object {
         private const val SPECTATOR_PREFIX = "coop_"
+
+        /** Under filesDir, outside projects/: where a spectator archive is built before swap-in. */
+        private const val SPECTATOR_STAGING_DIR = "coop_staging"
         /** Filename shape of [saveHybridKpmPage] output; [deleteHybridKpmPage] refuses anything else. */
         private const val HYBRID_KPM_PAGE_PREFIX = "hybrid_kpm_page_"
         private const val HYBRID_KPM_PAGE_SUFFIX = ".y8.gz"
@@ -973,7 +976,10 @@ class ProjectManager @Inject constructor(
      *
      * The copy lives under [spectatorId], never the host's id: a guest who imported the host's .gxr
      * and edited it locally holds a project with that same id, and joining the session must not
-     * overwrite their work. Repeated bulks (reconnects) replace the spectator copy, as they should.
+     * overwrite their work. Repeated bulks (reconnects) replace the spectator copy, as they should:
+     * the archive is extracted into a fresh staging directory that is swapped in for the old copy
+     * whole, and the project is saved exactly, so nothing from a previous join (files, or fields the
+     * host has since cleared) survives into this one.
      */
     suspend fun loadAsSpectator(
         bytes: ByteArray,
@@ -989,6 +995,7 @@ class ProjectManager @Inject constructor(
         var loaded = false
 
         val extractedFiles = mutableMapOf<String, File>()
+        var stagingDir: File? = null
         try {
             ZipInputStream(bytes.inputStream()).use { zis ->
                 var projectData: GraffitiProject? = null
@@ -1023,10 +1030,14 @@ class ProjectManager @Inject constructor(
                     return@use
                 }
                 val localId = spectatorId(project.id)
-                val destDir = File(appContext.filesDir, "projects/$localId").also { it.mkdirs() }
+                val destDir = File(appContext.filesDir, "projects/$localId")
+                // Staged outside projects/ so a half-built copy is never listed as a project.
+                val staging = File(appContext.filesDir, "$SPECTATOR_STAGING_DIR/${UUID.randomUUID()}")
+                    .also { it.mkdirs() }
+                stagingDir = staging
 
                 for ((name, tmpFile) in extractedFiles) {
-                    val dest = resolveInside(destDir, name)
+                    val dest = resolveInside(staging, name)
                     if (dest == null) {
                         Log.w("ProjectManager", "Skipping zip entry escaping project dir: $name")
                         tmpFile.delete()
@@ -1040,14 +1051,21 @@ class ProjectManager @Inject constructor(
                     }
                 }
 
+                // Validate against the staged copy first: every referenced asset must be in THIS
+                // archive. Only then retire the previous join's copy, whose leftover files could
+                // otherwise satisfy a reference the new archive no longer carries.
+                relocateProjectFiles(project, staging)
+                replaceDirectory(staging, destDir)
                 // Relocate against the HOST's id (the archive's paths carry it), then re-key.
                 val relocated = relocateProjectFiles(project, destDir).copy(id = localId)
                 val normalized = transform(relocated)
                 require(normalized.id == localId) {
                     "spectator transform must preserve isolated project id"
                 }
+                // Exact save: createProject's stale-writer merge would read the previous join's
+                // project.json and resurrect fields this snapshot deliberately lacks.
                 withContext(Dispatchers.Main) {
-                    projectRepositoryProvider.get().createProject(normalized)
+                    projectRepositoryProvider.get().replaceProject(normalized)
                 }
                 loaded = true
             }
@@ -1057,8 +1075,28 @@ class ProjectManager @Inject constructor(
         } finally {
             // Temp files are only renamed away on the success path; clear any stragglers.
             extractedFiles.values.forEach { if (it.exists()) it.delete() }
+            // Renamed into place on success; anything still here is a failed load's leftovers.
+            stagingDir?.let { if (it.exists()) it.deleteRecursively() }
         }
         loaded
+    }
+
+    /**
+     * Swaps [staging] in for [dest] as a whole. The old copy is renamed aside first and restored if
+     * the swap fails, so [dest] is either entirely the old copy or entirely the new one.
+     */
+    private fun replaceDirectory(staging: File, dest: File) {
+        dest.parentFile?.mkdirs()
+        val retired = File(staging.parentFile, "${staging.name}.old")
+        if (dest.exists() && !dest.renameTo(retired)) {
+            // Could not move it aside (unusual on one filesystem): fall back to deleting in place.
+            check(dest.deleteRecursively()) { "Could not clear previous spectator copy" }
+        }
+        if (!staging.renameTo(dest)) {
+            if (retired.exists()) retired.renameTo(dest)
+            error("Could not install spectator copy")
+        }
+        retired.deleteRecursively()
     }
 
     /** Local id for a spectated host project; distinct from the host id so it never collides. */

@@ -620,7 +620,7 @@ class ProjectManagerTest {
             val captured = mutableListOf<GraffitiProject>()
             val repo =
                 mockk<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>(relaxed = true)
-            coEvery { repo.createProject(any<GraffitiProject>()) } coAnswers {
+            coEvery { repo.replaceProject(any<GraffitiProject>()) } coAnswers {
                 captured += firstArg<GraffitiProject>()
             }
             val provider =
@@ -652,6 +652,62 @@ class ProjectManagerTest {
             )
             assertEquals(1.75f, spectator.sphereSlamReferenceWidthMeters, 0f)
             assertTrue(spectator.sphereSlamReferencePhysicallyMetric)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `rejoining replaces the spectator copy instead of merging the previous join into it`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        try {
+            // A real repository so the spectator save goes through the same persistence path as
+            // the app (a mock would hide a preserve-merge against the previous join's project.json).
+            lateinit var repo: com.hereliesaz.graffitixr.data.repository.ProjectRepositoryImpl
+            val provider =
+                mockk<javax.inject.Provider<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>>()
+            every { provider.get() } answers { repo }
+            val coopManager = ProjectManager(mockContext, uriProvider, provider)
+            repo = com.hereliesaz.graffitixr.data.repository.ProjectRepositoryImpl(mockContext, coopManager)
+
+            val firstJoin =
+                """{"id":"host_wall","name":"Host","wallWidthMeters":6.5,"design":{"uri":"file:///host/files/projects/host_wall/design_old.png"}}"""
+                    .toByteArray()
+            assertTrue(
+                coopManager.loadAsSpectator(
+                    zipOf("project.json" to firstJoin, "design_old.png" to byteArrayOf(1)),
+                ),
+            )
+            val dir = File(tempFilesDir, "projects/coop_host_wall")
+            assertTrue(File(dir, "design_old.png").exists())
+
+            // The host has since cleared its wall width and swapped its design file.
+            val secondJoin =
+                """{"id":"host_wall","name":"Host","design":{"uri":"file:///host/files/projects/host_wall/design_new.png"}}"""
+                    .toByteArray()
+            assertTrue(
+                coopManager.loadAsSpectator(
+                    zipOf("project.json" to secondJoin, "design_new.png" to byteArrayOf(2)),
+                ),
+            )
+            assertFalse("previous join's file survived", File(dir, "design_old.png").exists())
+            assertTrue(File(dir, "design_new.png").exists())
+            val saved = coopManager.loadProjectMetadata(mockContext, "coop_host_wall")
+            assertNull("previous join's wall width was resurrected", saved?.wallWidthMeters)
+            assertNull(repo.currentProject.value?.wallWidthMeters)
+
+            // A third join referencing a file only the FIRST join had must fail rather than be
+            // satisfied by a leftover, and must leave the second join's copy intact.
+            val thirdJoin =
+                """{"id":"host_wall","name":"Host","design":{"uri":"file:///host/files/projects/host_wall/design_old.png"}}"""
+                    .toByteArray()
+            assertFalse(coopManager.loadAsSpectator(zipOf("project.json" to thirdJoin)))
+            assertTrue(File(dir, "design_new.png").exists())
+            assertFalse(
+                "staging leftovers",
+                File(tempFilesDir, "coop_staging").listFiles()?.isNotEmpty() == true,
+            )
         } finally {
             Dispatchers.resetMain()
         }

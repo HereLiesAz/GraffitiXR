@@ -53,6 +53,11 @@ class ProjectRepositoryImpl @Inject constructor(
         refreshProjects()
     }
 
+    override suspend fun replaceProject(project: GraffitiProject) = saveMutex.withLock {
+        _currentProject.value = projectManager.saveProjectExact(context, project)
+        refreshProjects()
+    }
+
     override suspend fun getProject(id: String): GraffitiProject? = withContext(Dispatchers.IO) {
         projectManager.loadProjectMetadata(context, id)
     }
