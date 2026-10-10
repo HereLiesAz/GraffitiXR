@@ -262,7 +262,7 @@ class ArRenderer(
             } else {
                 try {
                     val wm = com.hereliesaz.graffitixr.feature.ar.anchor.WallMeasure
-                    val pm = com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
+                    val pm = com.hereliesaz.sphereslam.math.RigidMath
                     // The plane: the first tap's, carried through the unfused backbone, or the drawn
                     // wall frame expressed anchor-locally.
                     val planeLocal = req.planeLocal
@@ -833,7 +833,7 @@ class ArRenderer(
     // KPM is asynchronous; this ring pairs each observation with the ARCore view + consensus anchor
     // from the SAME sensor timestamp before any correction enters PoseFusion.
     private val hybridPoseHistory =
-        com.hereliesaz.graffitixr.feature.ar.anchor.HybridPoseHistory()
+        com.hereliesaz.sphereslam.sidecar.HybridPoseHistory()
     @Volatile private var hybridReferenceGeometry:
         com.hereliesaz.sphereslam.SphereSlamPoseMath.PageGeometry? = null
     @Volatile private var hybridReferencePhysicallyMetric: Boolean = false
@@ -1067,7 +1067,7 @@ class ArRenderer(
         session: Session,
         worldFromLocal: FloatArray,
     ): com.google.ar.core.Anchor {
-        val q = com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
+        val q = com.hereliesaz.sphereslam.math.RigidMath
             .matrixToQuaternion(worldFromLocal)
         return session.createAnchor(
             com.google.ar.core.Pose(
@@ -1726,7 +1726,7 @@ class ArRenderer(
                         // identity rotation and faced the camera. Take +Y when it plausibly faces the
                         // camera (|cos| > 0.5), else the anchor→camera direction, matching both origins.
                         anchorModelMatrix = relocPose.copyOf()
-                        val q = com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath.matrixToQuaternion(relocPose)
+                        val q = com.hereliesaz.sphereslam.math.RigidMath.matrixToQuaternion(relocPose)
                         anchor = activeSession.createAnchor(
                             com.google.ar.core.Pose(
                                 floatArrayOf(relocPose[12], relocPose[13], relocPose[14]),
@@ -2027,7 +2027,7 @@ class ArRenderer(
                     val worldFromPage = FloatArray(16)
                     pageAnchor.pose.toMatrix(worldFromPage, 0)
                     val relation =
-                        com.hereliesaz.graffitixr.feature.ar.anchor.HybridPageFrame
+                        com.hereliesaz.sphereslam.sidecar.HybridPageFrame
                             .pageFromArtwork(worldFromPage, backbone)
                     hybridPageFromArtworkAnchor = relation
                     Timber.i("ARDIAG hybrid KPM page↔artwork frame frozen")
@@ -2057,7 +2057,7 @@ class ArRenderer(
                     hybridObservation != null &&
                     hybridObservation.timestampNs > hybridEligibleAfterNs
                 ) {
-                    com.hereliesaz.graffitixr.feature.ar.anchor.HybridKpmCorrection.solve(
+                    com.hereliesaz.sphereslam.sidecar.HybridKpmCorrection.solve(
                         observation = hybridObservation,
                         pageGeometry = sphereSlamTracker.currentReferenceGeometry()
                             ?: hybridReferenceGeometry,
@@ -2144,8 +2144,8 @@ class ArRenderer(
                                 outcome = com.hereliesaz.graffitixr.common.model.HybridKpmOutcome
                                     .AWAITING_AGREEMENT,
                                 agreeingObservations = agreeing,
-                                requiredAgreement = com.hereliesaz.graffitixr.feature.ar.anchor
-                                    .PoseFusion.HYBRID_REQUIRED_AGREEMENT,
+                                requiredAgreement = com.hereliesaz.sphereslam.sidecar
+                                    .HybridAnchorFusion.HYBRID_REQUIRED_AGREEMENT,
                             )
                         }
                         if (logHybridAcceptedPending) {
@@ -2596,7 +2596,7 @@ class ArRenderer(
                         // bitmap rotation, turns a sensor ray into R_z(+rotationNeeded) * itself —
                         // and while it lived inline here nothing could drive a pixel through it, so
                         // the derivation and the tests both rested on one reading of these lines.
-                        val intrArr = com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation
+                        val intrArr = com.hereliesaz.sphereslam.camera.CaptureRotation
                             .rotateIntrinsics(fx, fy, cx, cy, rawW, rawH, rotationNeeded)
 
                         // Camera→point distance at the tapped pixel (Sub-project C). Map the tap from
@@ -2673,7 +2673,7 @@ class ArRenderer(
                         // and register THAT image at a DPI whose KPM units are metres.
                         wallPlane?.let { metricPlane ->
                             val geometry =
-                                com.hereliesaz.graffitixr.feature.ar.HybridMetricKpmReference
+                                com.hereliesaz.sphereslam.sidecar.MetricPageRectification
                                     .deriveGeometry(
                                         imageWidth = image.width,
                                         imageHeight = image.height,
@@ -2687,8 +2687,17 @@ class ArRenderer(
                                         wallPlane = metricPlane,
                                     )
                             val reference = geometry?.let {
-                                com.hereliesaz.graffitixr.feature.ar.HybridMetricKpmReference
-                                    .rectify(bitmap, it)
+                                // Luma of the same sensor-oriented capture the geometry was
+                                // derived in; the library resamples the page quad from it.
+                                val argb = IntArray(bitmap.width * bitmap.height)
+                                bitmap.getPixels(argb, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+                                com.hereliesaz.sphereslam.sidecar.MetricPageRectification.rectify(
+                                    luma = com.hereliesaz.sphereslam.sidecar.MetricPageRectification
+                                        .lumaFromArgb(argb),
+                                    width = bitmap.width,
+                                    height = bitmap.height,
+                                    geometry = it,
+                                )
                             }
                             if (geometry != null && reference != null) {
                                 sphereSlamTracker.reset(
@@ -2723,7 +2732,7 @@ class ArRenderer(
                                 // page origin beside the artwork anchor. No world origin is shared
                                 // with KPM and no raw KPM pose ever becomes the renderer camera pose.
                                 val worldFromPage =
-                                    com.hereliesaz.graffitixr.feature.ar.anchor.HybridPageFrame
+                                    com.hereliesaz.sphereslam.sidecar.HybridPageFrame
                                         .worldFromPage(
                                             sensorView = mappingViewMatrix,
                                             cameraFromPage = geometry.cameraFromPageGl,
@@ -2836,7 +2845,7 @@ class ArRenderer(
                 // and moves the principal point.
                 run {
                     val dims = intrinsics.imageDimensions
-                    val live = com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation.rotateIntrinsics(
+                    val live = com.hereliesaz.sphereslam.camera.CaptureRotation.rotateIntrinsics(
                         intrinsics.focalLength[0], intrinsics.focalLength[1],
                         intrinsics.principalPoint[0], intrinsics.principalPoint[1],
                         dims[0].toFloat(), dims[1].toFloat(),

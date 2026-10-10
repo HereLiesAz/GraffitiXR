@@ -14,9 +14,9 @@ import org.junit.Test
  * The parts of [HomographyTrackingAnalyzer] testable without a device: the underlying-`Image`-is-
  * null bail-out and the [ImageProxy.close] resource-safety guarantee. The happy path — real YUV
  * decode via the native `YuvConverter`, `Bitmap` rotation, an actual [BridgedHomographyTracker]
- * call — needs the compiled `.so` and isn't reachable from a plain JVM unit test; see the sibling
- * pure-math tests ([com.hereliesaz.graffitixr.feature.ar.util.RotationDeltaMathTest],
- * [com.hereliesaz.graffitixr.feature.ar.rendering.ProjectionMatrixTest]) for what IS covered here.
+ * call — needs the compiled `.so` and isn't reachable from a plain JVM unit test. The rotation and
+ * projection math it relies on is SphereSLAM's (`RotationMath`, `camera.ProjectionMatrix`) and is
+ * unit-tested in that library.
  */
 class HomographyTrackingAnalyzerTest {
 

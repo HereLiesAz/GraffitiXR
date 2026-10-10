@@ -1,5 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
+import com.hereliesaz.sphereslam.math.RigidMath
+
 /**
  * Assembles metric 3D marks from a SINGLE camera view by back-projecting detected feature pixels
  * onto a known wall plane — the depth-off, single-capture path. No triangulation and no second view:
@@ -21,7 +23,7 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
  * the pixel list and the native ingest of the result live in [MetricFingerprintBuilder].
  *
  * Conventions: the view matrix is a column-major 4x4 **CV-convention** world→camera transform (camera
- * looks +Z); ARCore/OpenGL views look −Z, so convert them with [MetricMarks.glViewToCv] first. The
+ * looks +Z); ARCore/OpenGL views look −Z, so convert them with [RigidMath.glViewToCv] first. The
  * plane point and normal are in ARCore **world** space (e.g. `plane.centerPose` translation and its
  * local +Y axis); they are moved into the camera frame here.
  *
@@ -29,7 +31,7 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
  * from [pixels] and the intrinsics, so [cvView] MUST be in the same frame those are in. The capture
  * path works in DISPLAY orientation — it rotates both the bitmap and the intrinsics by
  * `rotationNeeded` — so its callers must convert with [MetricMarks.glViewToCvDisplay], NOT
- * [MetricMarks.glViewToCv]. Passing the unrotated view alongside rotated pixels is the defect
+ * [RigidMath.glViewToCv]. Passing the unrotated view alongside rotated pixels is the defect
  * PAPER.md §8 describes: display-frame rays intersected with a sensor-frame plane, which skews every
  * recovered depth for anything but a head-on wall (a normal of (0,0,±1) is invariant under a rotation
  * about the optical axis, which is why it survived so long).

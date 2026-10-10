@@ -140,10 +140,14 @@ if unexpected:
         f"({', '.join(unexpected)}); preserve the explicit hybrid fusion seam."
     )
 
+# The sidecar math (metric page rectification, timestamp pairing, gates/solve, page frames,
+# agreement-gated anchor-local fusion) is SphereSLAM's com.hereliesaz.sphereslam.sidecar package;
+# ArRenderer stays the only place it is wired to ARCore, and the correction still lands only in
+# PoseFusion (which delegates its hybrid path to sidecar.HybridAnchorFusion).
 required_hybrid_literals = (
-    "HybridMetricKpmReference",
+    "sidecar.MetricPageRectification",
     "hybridPoseHistory.add(frame.timestamp, mappingViewMatrix, backbone)",
-    "HybridKpmCorrection.solve(",
+    "sidecar.HybridKpmCorrection.solve(",
     "poseFusion.currentAnchorFromHybridObservation(",
 )
 for token in required_hybrid_literals:
@@ -154,6 +158,15 @@ for token in required_hybrid_literals:
 # order while tolerating whitespace/newlines instead of making source formatting a CI invariant.
 if not re.search(r"HybridPageFrame\s*\.\s*worldFromPage\s*\(", ar_renderer):
     fail("Hybrid KPM correction seam is incomplete: missing HybridPageFrame.worldFromPage call.")
+
+pose_fusion = read(
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/anchor/PoseFusion.kt"
+)
+if "HybridAnchorFusion()" not in pose_fusion or "hybrid.currentAnchor(" not in pose_fusion:
+    fail(
+        "PoseFusion's hybrid path no longer delegates to SphereSLAM sidecar.HybridAnchorFusion; "
+        "the repeated-observation agreement gate before a large KPM correction must stay."
+    )
 
 for raw_kpm_pose_name in ("cameraFromPage3x4", "pageToCamera3x4"):
     if raw_kpm_pose_name in ar_renderer:

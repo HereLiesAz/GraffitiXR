@@ -24,9 +24,12 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsicsEstimator
-import com.hereliesaz.graffitixr.feature.ar.depth.DepthEstimator
-import com.hereliesaz.graffitixr.feature.ar.util.OverlayGyroCompensationMath
+import com.hereliesaz.sphereslam.camera.CameraIntrinsicsEstimator
+import com.hereliesaz.sphereslam.models.DepthEstimator
+import com.hereliesaz.sphereslam.attitude.GameRotationAttitudeSource
+import com.hereliesaz.sphereslam.camera.ScreenIntrinsics
+import com.hereliesaz.sphereslam.gyro.GyroCompensationMath
+import com.hereliesaz.sphereslam.math.RotationMath
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
@@ -42,7 +45,7 @@ import timber.log.Timber
 
 /** Why Overlay's Gyro toggle let go on its own (the caller turns the toggle off and says so). */
 enum class OverlayGyroRelease {
-    /** Rotation since the reference passed [OverlayGyroCompensationMath.DEFAULT_RELEASE_DEGREES]. */
+    /** Rotation since the reference passed [GyroCompensationMath.DEFAULT_RELEASE_DEGREES]. */
     MOVED,
 
     /** No game-rotation-vector sensor, or it never delivered a sample. */
@@ -53,9 +56,10 @@ enum class OverlayGyroRelease {
  * Overlay ▸ Gyro: holds the drawn design still on the wall against tiny tripod vibrations, from
  * sensor data alone.
  *
- * While [active], this captures the device orientation once as the reference, then every frame reads
- * how far the phone has turned since ([GyroOrientationBridge.cameraRotationDelta]) and publishes the
- * screen homography ([OverlayGyroCompensationMath]) that carries the design along with the wall.
+ * While [active], this captures the device orientation once as the reference (SphereSLAM's
+ * [GameRotationAttitudeSource]), then every frame reads how far the phone has turned since
+ * ([RotationMath.cameraRotationDelta], in body axes) and publishes the screen homography
+ * ([GyroCompensationMath]) that carries the design along with the wall.
  * MainScreen applies it as an extra transform OUTSIDE Overlay's own ModeAdjustment, so the user's
  * edits and adjustments are untouched — turn Gyro off and the returned state goes back to null, i.e.
  * the design's normal Overlay placement.
@@ -68,12 +72,12 @@ enum class OverlayGyroRelease {
  * **MiDaS.** [DepthEstimator] runs on a background dispatcher once right after the reference and then
  * at most every [DEPTH_INTERVAL_MS], on a downsampled ImageCapture still — never per frame, never on
  * the main thread. It samples the wall under the design's centre as a RELATIVE inverse depth
- * ([OverlayGyroCompensationMath.relativeInverseDepthAt]). That is the `d` of the parallax term, kept
+ * ([GyroCompensationMath.relativeInverseDepthAt]). That is the `d` of the parallax term, kept
  * ready for when translation exists; with translation off it changes nothing on screen, and MiDaS is
  * unitless anyway, so it could never stand in for a metric distance. Its estimator is this toggle's
  * own instance, closed when the toggle releases — ArViewModel's shared one is untouched.
  *
- * **Release.** Rotating past [OverlayGyroCompensationMath.DEFAULT_RELEASE_DEGREES] (the tripod was
+ * **Release.** Rotating past [GyroCompensationMath.DEFAULT_RELEASE_DEGREES] (the tripod was
  * bumped or the phone picked up) calls [onRelease] with [OverlayGyroRelease.MOVED] instead of
  * dragging the design several degrees on an unverifiable reading. A display-rotation change restarts
  * the effect with a fresh reference. When [active] goes false — the toggle, or leaving Overlay — the
@@ -114,27 +118,25 @@ fun rememberOverlayGyroCompensation(
         homography.value = null
         if (!active || viewWidth <= 0 || viewHeight <= 0) return@LaunchedEffect
         val appContext = context.applicationContext
-        val bridge = GyroOrientationBridge(appContext)
-        if (!bridge.isAvailable) {
+        val attitude = GameRotationAttitudeSource(appContext)
+        if (!attitude.isAvailable) {
             currentOnRelease(OverlayGyroRelease.SENSOR_UNAVAILABLE)
             return@LaunchedEffect
         }
         var depthJob: Job? = null
         try {
-            bridge.start()
-            // The reference is committed at rotationDeg = 0 so cameraRotationDelta() stays in pure
-            // BODY axes (its A = identity); OverlayGyroCompensationMath does the display remap
+            attitude.start()
+            // The reference stays in pure BODY axes; GyroCompensationMath does the display remap
             // itself, tested per Surface.ROTATION_*. The first sample lands ~20 ms after start().
-            val committed = withTimeoutOrNull(REFERENCE_TIMEOUT_MS) {
-                var candidate = bridge.captureReferenceCandidate(0)
-                while (candidate == null) {
+            val reference = withTimeoutOrNull(REFERENCE_TIMEOUT_MS) {
+                var sample = attitude.latestSample()
+                while (sample == null) {
                     delay(SAMPLE_POLL_MS)
-                    candidate = bridge.captureReferenceCandidate(0)
+                    sample = attitude.latestSample()
                 }
-                bridge.commitReference(candidate)
-                true
+                sample.quaternion
             }
-            if (committed == null) {
+            if (reference == null) {
                 currentOnRelease(OverlayGyroRelease.SENSOR_UNAVAILABLE)
                 return@LaunchedEffect
             }
@@ -151,9 +153,10 @@ fun rememberOverlayGyroCompensation(
 
             while (isActive) {
                 withFrameNanos { }
-                val deltaBody = bridge.cameraRotationDelta() ?: continue
+                val now = attitude.latestSample() ?: continue
+                val deltaBody = RotationMath.cameraRotationDelta(reference, now.quaternion)
                 when (
-                    val result = OverlayGyroCompensationMath.compensate(
+                    val result = GyroCompensationMath.compensate(
                         deltaBody = deltaBody,
                         displayRotationDeg = displayRotationDeg,
                         screenIntrinsics = intrinsics,
@@ -161,8 +164,8 @@ fun rememberOverlayGyroCompensation(
                         translationOverDepth = null,
                     )
                 ) {
-                    is OverlayGyroCompensationMath.Result.Within -> homography.value = result.homography
-                    is OverlayGyroCompensationMath.Result.Exceeded -> {
+                    is GyroCompensationMath.Result.Within -> homography.value = result.homography
+                    is GyroCompensationMath.Result.Exceeded -> {
                         Timber.i("OverlayGyro: released, rotated %.2f°", result.angleDegrees)
                         homography.value = null
                         currentOnRelease(OverlayGyroRelease.MOVED)
@@ -172,8 +175,7 @@ fun rememberOverlayGyroCompensation(
             }
         } finally {
             depthJob?.cancel()
-            bridge.stop()
-            bridge.clearReference()
+            attitude.stop()
             homography.value = null
         }
     }
@@ -209,12 +211,10 @@ private suspend fun screenIntrinsicsFor(
         CameraIntrinsicsEstimator.estimate(context, it, NOMINAL_FRAME_W, NOMINAL_FRAME_H)
     }
     return if (estimated != null) {
-        OverlayGyroCompensationMath.screenIntrinsics(
-            estimated.fx, estimated.fy, estimated.width, estimated.height, viewWidth, viewHeight,
-        )
+        ScreenIntrinsics.fitCenter(estimated, viewWidth, viewHeight)
     } else {
         Timber.w("OverlayGyro: no camera intrinsics; using a nominal field of view")
-        OverlayGyroCompensationMath.fallbackScreenIntrinsics(viewWidth, viewHeight)
+        ScreenIntrinsics.fallback(viewWidth, viewHeight)
     }
 }
 
@@ -243,7 +243,7 @@ private suspend fun runDepthLoop(
                 val map = try { estimator.estimate(still) } finally { still.recycle() }
                 if (map != null) {
                     val (nx, ny) = designCenter()
-                    val rel = OverlayGyroCompensationMath.relativeInverseDepthAt(
+                    val rel = GyroCompensationMath.relativeInverseDepthAt(
                         map.data, map.width, map.height, nx, ny,
                     )
                     // Logged, not applied: it would scale a translation term that is off (class doc).

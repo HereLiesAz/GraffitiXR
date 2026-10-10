@@ -3,128 +3,149 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.os.SystemClock
 import com.hereliesaz.graffitixr.feature.ar.HomographyArTracker.HomographyPose
-import com.hereliesaz.graffitixr.feature.ar.util.RotationDeltaMath
+import com.hereliesaz.sphereslam.attitude.AttitudeRotationBridge
+import com.hereliesaz.sphereslam.attitude.AttitudeSample
+import com.hereliesaz.sphereslam.attitude.DeviceCameraRotation
+import com.hereliesaz.sphereslam.attitude.GameRotationAttitudeSource
+import com.hereliesaz.sphereslam.math.RotationMath
 
 /**
- * [HomographyArTracker] plus [GyroOrientationBridge]: tracks each frame with vision when it can,
- * and for a short window after the last good lock, holds the pose steady by rotating it with the
- * gyroscope instead of dropping tracking outright — see [GyroOrientationBridge]'s doc for what
- * that bridge does and does not cover (no accelerometer, no estimated displacement — only ever the
- * algebraically correct carry of a fixed camera centre through a known rotation; its Z-axis
- * alignment is platform-guaranteed, its `rotationDeg` quarter-turn sign is asserted but not yet
- * device-verified).
+ * [HomographyArTracker] plus a short gyro bridge: tracks each frame with vision when it can, and for
+ * a short window after the last good lock, holds the pose steady by rotating it with the device
+ * attitude instead of dropping tracking outright.
  *
- * Composes the tracker and the gyro bridge into the one call a live-tracking loop actually wants
- * (`trackFrame`). [HomographyFallbackOverlay] is what wires this to CameraX, the camera pipeline,
- * and [com.hereliesaz.graffitixr.feature.ar.rendering.OverlayRenderer] — that wiring exists and is
- * live, despite an earlier version of this comment (and [HomographyArTracker]'s) describing it as
- * a future "Phase 2."
+ * The attitude and the bridge math are SphereSLAM's: [GameRotationAttitudeSource]
+ * (`TYPE_GAME_ROTATION_VECTOR`, the platform's own gyro fusion — no magnetometer, no hand-rolled
+ * integrator) and [AttitudeRotationBridge], which rotates the held pose about its camera CENTRE
+ * (`[ΔR·R | ΔR·t]`). The bridge never estimates displacement (no accelerometer double integration),
+ * so it stays short ([maxBridgeMs]).
+ *
+ * **Device → camera rotation.** The tracked frame is the raw buffer rotated clockwise by CameraX
+ * `rotationDegrees`, so the body→GL-camera rotation is
+ * [DeviceCameraRotation.cameraFromDevice]`(sensorOrientation, rotationDegrees)` = `R_z(s − k)` (the
+ * display rotation for a rear camera). It is fixed for the life of each reference: the reference
+ * attitude and the held pose were both captured under that frame's orientation. (This replaced
+ * `GyroOrientationBridge`, which conjugated by `R_z(rotationDegrees)` — the open question its own
+ * doc flagged. For a typical 90° rear sensor held in natural portrait that passed 90° where the
+ * correct angle is 0°, so an off-axis bridged turn rotated about the wrong axis.)
+ *
+ * [HomographyFallbackOverlay] wires this to CameraX through [HomographyTrackingAnalyzer].
  */
-class BridgedHomographyTracker(
-    context: Context,
-    private val tracker: HomographyArTracker = HomographyArTracker(),
-    private val bridge: GyroOrientationBridge = GyroOrientationBridge(context),
+class BridgedHomographyTracker internal constructor(
+    private val tracker: HomographyArTracker,
+    private val attitudeSource: GameRotationAttitudeSource?,
+    private val latestAttitude: () -> AttitudeSample?,
     /**
      * How long a lost vision lock stays bridged by gyro rotation before this gives up and reports
-     * true loss. Kept short deliberately — see [GyroOrientationBridge]'s doc on why gyro-only
-     * drift is small over a few hundred ms and not meant to stand in for vision indefinitely.
-     * Not yet tuned against real device/tracking-loss behavior — a future on-device pass should
-     * treat this as a starting point, not a settled constant.
+     * true loss. Kept short deliberately — gyro-only drift is small over a few hundred ms and is not
+     * meant to stand in for vision indefinitely. Not yet tuned against real device behaviour.
      */
-    private val maxBridgeMs: Long = 400L,
+    private val maxBridgeMs: Long = DEFAULT_MAX_BRIDGE_MS,
+    private val nowMs: () -> Long = SystemClock::elapsedRealtime,
 ) {
+    constructor(
+        context: Context,
+        tracker: HomographyArTracker = HomographyArTracker(),
+        maxBridgeMs: Long = DEFAULT_MAX_BRIDGE_MS,
+    ) : this(tracker, GameRotationAttitudeSource(context), maxBridgeMs = maxBridgeMs)
+
+    private constructor(
+        tracker: HomographyArTracker,
+        source: GameRotationAttitudeSource,
+        maxBridgeMs: Long,
+    ) : this(tracker, source, source::latestSample, maxBridgeMs)
+
     private var lastGoodPose: HomographyPose? = null
+    private var bridge: AttitudeRotationBridge? = null
+    private var referenceAtMs: Long = -1L
 
-    /** Starts the gyro sensor. Call from the same lifecycle scope that will call [trackFrame]. */
-    fun start() = bridge.start()
+    /** Starts the attitude sensor. Call from the same lifecycle scope that will call [trackFrame]. */
+    fun start() {
+        attitudeSource?.start()
+    }
 
-    /** Stops the gyro sensor. Call when the fallback tracking session ends. */
-    fun stop() = bridge.stop()
+    /** Stops the attitude sensor. Call when the fallback tracking session ends. */
+    fun stop() {
+        attitudeSource?.stop()
+    }
 
     /** Delegates to [HomographyArTracker.setReference], and drops any prior bridge state. */
     fun setReference(referenceBitmap: Bitmap, objectHalfW: Float, objectHalfH: Float): Boolean {
-        lastGoodPose = null
-        bridge.clearReference()
+        clearBridge()
         return tracker.setReference(referenceBitmap, objectHalfW, objectHalfH)
     }
 
     fun hasReference(): Boolean = tracker.hasReference()
 
     fun reset() {
-        lastGoodPose = null
-        bridge.clearReference()
+        clearBridge()
         tracker.reset()
     }
 
     /**
      * Track one live camera frame, bridging through a brief vision failure with gyro rotation.
      *
-     * @param rotationDeg the sensor-to-display quarter-turn in effect for THIS frame — captured
-     *   alongside the gyro reference candidate and only committed if this frame's tracking locks,
-     *   so a later [GyroOrientationBridge.cameraRotationDelta] uses the rotation at reference time.
+     * @param rotationDeg CameraX `rotationDegrees` for THIS frame — the clockwise rotation applied to
+     *   the buffer to produce [frameBitmap].
+     * @param sensorOrientationDeg the camera's `SENSOR_ORIENTATION`.
      * @return a fresh vision-tracked pose, a gyro-bridged hold of the last one, or null once both
-     *   vision has failed AND the bridge window has elapsed (or gyro isn't available at all).
+     *   vision has failed AND the bridge window has elapsed (or no attitude is available at all).
      */
-    fun trackFrame(frameBitmap: Bitmap, fx: Float, fy: Float, cx: Float, cy: Float, rotationDeg: Int): HomographyPose? {
-        // Snapshot a candidate reference BEFORE the synchronous vision solve below, not after —
-        // so its timestamp sits at this frame's capture time and any rotation that happens while
-        // track() is running isn't silently dropped from the first bridged pose that follows a
-        // fresh lock. Only committed if this frame's tracking actually succeeds.
-        val pendingReference = bridge.captureReferenceCandidate(rotationDeg)
+    fun trackFrame(
+        frameBitmap: Bitmap,
+        fx: Float,
+        fy: Float,
+        cx: Float,
+        cy: Float,
+        rotationDeg: Int,
+        sensorOrientationDeg: Int,
+    ): HomographyPose? {
+        // Snapshot the reference candidate BEFORE the synchronous vision solve, so its time sits at
+        // this frame's capture and any rotation during track() is not dropped from the first bridged
+        // pose after a fresh lock. Only committed if this frame's tracking actually succeeds.
+        val pendingSample = latestAttitude()
+        val pendingAtMs = nowMs()
         val visionPose = tracker.track(frameBitmap, fx, fy, cx, cy)
         if (visionPose != null) {
             lastGoodPose = visionPose
-            pendingReference?.let(bridge::commitReference)
+            if (pendingSample != null) {
+                bridge = AttitudeRotationBridge(
+                    DeviceCameraRotation.cameraFromDevice(sensorOrientationDeg, rotationDeg),
+                ).also { it.markReference(pendingSample) }
+                referenceAtMs = pendingAtMs
+            }
             return visionPose
         }
 
         val held = lastGoodPose ?: return null
-        val elapsed = bridge.msSinceReference()
+        val activeBridge = bridge
+        val elapsed = if (activeBridge == null || referenceAtMs < 0L) -1L else nowMs() - referenceAtMs
         if (elapsed < 0 || elapsed > maxBridgeMs) {
             lastGoodPose = null
             return null
         }
 
-        // Apply the SAME rotation delta to both the rotation block and the translation column —
-        // holding translation fixed while only rotating moves the camera centre even when the
-        // phone hasn't actually moved (see GyroOrientationBridge's class doc). `t' = ΔR · t` is
-        // the correct way to carry the (unmoved) camera centre through a known rotation; it is
-        // still not a translation ESTIMATE — no accelerometer, no new displacement assumed.
-        val deltaCamera = bridge.cameraRotationDelta()
+        val deltaCamera = activeBridge?.cameraRotationDelta(latestAttitude()?.quaternion)
             ?: return null // no sensor sample yet — nothing to bridge with.
-        val heldRotation = rowMajorRotationOf(held.viewMatrix)
-        val heldTranslation = translationOf(held.viewMatrix)
-        val bridgedRotation = RotationDeltaMath.multiplyMat3(deltaCamera, heldRotation)
-        val bridgedTranslation = RotationDeltaMath.multiplyMat3Vec3(deltaCamera, heldTranslation)
 
         // Confidence decays linearly across the bridge window so a caller/UI can visibly distinguish
         // "just locked" from "about to lose it entirely", the same role ARCore's TrackingState plays.
         val decayedConfidence = held.confidence * (1f - elapsed.toFloat() / maxBridgeMs.toFloat())
         return HomographyPose(
-            viewMatrix = viewMatrixOf(bridgedRotation, bridgedTranslation),
+            viewMatrix = RotationMath.rotateAboutCameraCentre(held.viewMatrix, deltaCamera),
             confidence = decayedConfidence.coerceAtLeast(0f),
         )
     }
 
-    private companion object {
-        /** Column-major 4x4 (GL convention) -> row-major 3x3 rotation block. */
-        fun rowMajorRotationOf(viewMatrix: FloatArray): FloatArray {
-            val out = FloatArray(9)
-            for (row in 0..2) for (col in 0..2) out[row * 3 + col] = viewMatrix[col * 4 + row]
-            return out
-        }
+    private fun clearBridge() {
+        lastGoodPose = null
+        bridge = null
+        referenceAtMs = -1L
+    }
 
-        fun translationOf(viewMatrix: FloatArray): FloatArray =
-            floatArrayOf(viewMatrix[12], viewMatrix[13], viewMatrix[14])
-
-        /** Row-major 3x3 rotation + translation -> a fresh column-major 4x4 (GL convention). */
-        fun viewMatrixOf(rowMajorRotation: FloatArray, translation: FloatArray): FloatArray {
-            val m = FloatArray(16)
-            for (row in 0..2) for (col in 0..2) m[col * 4 + row] = rowMajorRotation[row * 3 + col]
-            m[12] = translation[0]; m[13] = translation[1]; m[14] = translation[2]
-            m[15] = 1f
-            return m
-        }
+    companion object {
+        const val DEFAULT_MAX_BRIDGE_MS = 400L
     }
 }

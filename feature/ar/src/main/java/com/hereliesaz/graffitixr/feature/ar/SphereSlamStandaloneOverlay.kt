@@ -57,7 +57,9 @@ import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import com.hereliesaz.graffitixr.design.theme.rememberAppStrings
 import com.hereliesaz.graffitixr.feature.ar.rendering.HomographyOverlayRenderer
 import com.hereliesaz.sphereslam.CoverageGlowProjection
+import com.hereliesaz.sphereslam.PhotosphereKeyframe
 import com.hereliesaz.sphereslam.SphereCoverage
+import com.hereliesaz.sphereslam.overlay.CoverageGlowRenderer
 import com.hereliesaz.sphereslam.SphereSlamStandaloneSession
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
@@ -79,17 +81,20 @@ private val SPHERESLAM_DEFAULT_UNWARP_POINTS = listOf(
  * photosphere tiles that are current are cut transparent. Missing and stale tiles therefore glow by
  * default, exactly matching PhotosphereMap.needsUpdate semantics.
  *
- * Holds the mask state only; [HomographyOverlayRenderer] draws the wash inside the artwork GL
- * surface, before the design quad. That is the one place that is both above the camera preview and
- * beneath the artwork: the artwork surface is `setZOrderMediaOverlay`, which sits behind the app
- * window, so a window-level View (the earlier implementation) washed over the artwork as well. A
- * separate top-ordered SurfaceView was worse still — it sat above all app UI.
+ * The wash is SphereSLAM's `:overlay` [CoverageGlowRenderer] in [CoverageGlowRenderer.FillMode.COMPLEMENT]
+ * with the current tiles' full angular extents ([com.hereliesaz.sphereslam.PhotosphereMap.currentRegions],
+ * projected by [CoverageGlowProjection.projectRegions]) as the holes. This holds only the projection
+ * state; [HomographyOverlayRenderer] draws the wash embedded in the artwork GL surface, before the
+ * design quad. That is the one place that is both above the camera preview and beneath the artwork:
+ * the artwork surface is `setZOrderMediaOverlay`, which sits behind the app window, so a window-level
+ * View (an earlier implementation) washed over the artwork as well. A separate top-ordered
+ * SurfaceView was worse still — it sat above all app UI.
  */
 private class SphereTileGlowMask(
-    private val renderer: HomographyOverlayRenderer,
+    private val glow: CoverageGlowRenderer,
 ) {
     private data class MaskState(
-        val currentDirections: List<SphereCoverage.Direction> = emptyList(),
+        val currentRegions: List<SphereCoverage.TileRegion> = emptyList(),
         val cameraHeadingDeg: Float = 0f,
         val cameraElevationDeg: Float = 0f,
         val horizontalFovDeg: Float = 60f,
@@ -99,7 +104,7 @@ private class SphereTileGlowMask(
     private val state = AtomicReference(MaskState())
 
     fun update(
-        currentDirections: List<SphereCoverage.Direction>,
+        currentRegions: List<SphereCoverage.TileRegion>,
         cameraHeadingDeg: Float? = null,
         cameraElevationDeg: Float? = null,
         horizontalFovDeg: Float? = null,
@@ -107,65 +112,41 @@ private class SphereTileGlowMask(
     ) {
         val previous = state.get()
         val next = previous.copy(
-            currentDirections = currentDirections.toList(),
+            currentRegions = currentRegions.toList(),
             cameraHeadingDeg = cameraHeadingDeg ?: previous.cameraHeadingDeg,
             cameraElevationDeg = cameraElevationDeg ?: previous.cameraElevationDeg,
             horizontalFovDeg = horizontalFovDeg ?: previous.horizontalFovDeg,
             verticalFovDeg = verticalFovDeg ?: previous.verticalFovDeg,
         )
         state.set(next)
-        // May be called off the main thread (analyzer callbacks); the renderer setter is atomic and
+        // May be called off the main thread (analyzer callbacks); setTriangles is thread-safe and
         // the GL surface renders continuously.
-        renderer.setCoverageGlow(FULL_GLOW_ALPHA, holes(next))
+        glow.setTriangles(holes(next))
     }
 
-    /** Current tiles as normalized top-left-origin `[left, top, right, bottom]` quadruples. */
+    /** Current tiles as NDC `GL_TRIANGLES`; empty (a full wash) when none is current yet. */
     private fun holes(snapshot: MaskState): FloatArray {
-        if (snapshot.currentDirections.isEmpty()) return FloatArray(0)
-        val marks = CoverageGlowProjection.project(
-            directions = snapshot.currentDirections,
-            cameraHeadingDeg = snapshot.cameraHeadingDeg,
-            cameraElevationDeg = snapshot.cameraElevationDeg,
-            horizontalFovDeg = snapshot.horizontalFovDeg,
-            verticalFovDeg = snapshot.verticalFovDeg,
-        )
-
-        val tileWidthDeg =
-            (SphereCoverage.DEFAULT_VIEWABLE_HALF_ANGLE_DEG * 2f) /
-                SphereCoverage.DEFAULT_SECTORS.toFloat()
-        val tileHeightDeg =
-            (SphereCoverage.DEFAULT_VIEWABLE_ELEVATION_HALF_ANGLE_DEG * 2f) /
-                TILE_ELEVATION_BANDS.toFloat()
-        val halfWidth =
-            0.5f *
-                (kotlin.math.tan(Math.toRadians(tileWidthDeg / 2.0)).toFloat() /
-                    kotlin.math.tan(
-                        Math.toRadians(snapshot.horizontalFovDeg / 2.0)
-                    ).toFloat())
-        val halfHeight =
-            0.5f *
-                (kotlin.math.tan(Math.toRadians(tileHeightDeg / 2.0)).toFloat() /
-                    kotlin.math.tan(
-                        Math.toRadians(snapshot.verticalFovDeg / 2.0)
-                    ).toFloat())
-
-        // Current tiles are cut out of the wash, leaving literal transparent holes.
-        val out = ArrayList<Float>(marks.size * 4)
-        for (mark in marks) {
-            if (!mark.onScreen) continue
-            val cx = (mark.ndcX + 1f) * 0.5f
-            val cyTop = (1f - mark.ndcY) * 0.5f
-            out += cx - halfWidth
-            out += cyTop - halfHeight
-            out += cx + halfWidth
-            out += cyTop + halfHeight
-        }
-        return out.toFloatArray()
+        if (snapshot.currentRegions.isEmpty()) return FloatArray(0)
+        return runCatching {
+            CoverageGlowProjection.projectRegions(
+                regions = snapshot.currentRegions,
+                cameraHeadingDeg = snapshot.cameraHeadingDeg,
+                cameraElevationDeg = snapshot.cameraElevationDeg,
+                horizontalFovDeg = snapshot.horizontalFovDeg,
+                verticalFovDeg = snapshot.verticalFovDeg,
+            )
+        }.getOrDefault(FloatArray(0))
     }
 
-    private companion object {
+    companion object {
         const val FULL_GLOW_ALPHA = 0.14f
-        const val TILE_ELEVATION_BANDS = 3
+
+        /** The embedded white wash with holes, as the standalone artwork renderer draws it. */
+        fun newRenderer(): CoverageGlowRenderer =
+            CoverageGlowRenderer(
+                hazeColor = CoverageGlowRenderer.WHITE,
+                hazeAlpha = FULL_GLOW_ALPHA,
+            ).apply { fillMode = CoverageGlowRenderer.FillMode.COMPLEMENT }
     }
 }
 
@@ -243,7 +224,12 @@ fun SphereSlamStandaloneOverlay(
      * Base SphereSLAM photosphere keyframes. These begin before any fingerprint exists and continue
      * independently of the fingerprint/teleological layer.
      */
-    onPhotosphereKeyframe: (SphereSlamPhotosphereKeyframe) -> Unit = {},
+    onPhotosphereKeyframe: (PhotosphereKeyframe) -> Unit = {},
+    /**
+     * Roll of the tracked image for a body->camera rotation (see
+     * `ArViewModel.latestCameraRollDegrees`), stamped on photosphere keyframes; null when unknown.
+     */
+    cameraRollDegrees: (cameraFromDevice: FloatArray) -> Float? = { null },
     /** Same-frame base-map to precision-target transform, solved only after a real KPM lock. */
     onMapFromFingerprintSolved: (FloatArray) -> Unit = {},
     /**
@@ -251,7 +237,7 @@ fun SphereSlamStandaloneOverlay(
      * depth-calibrated radial map-point placement; null is the classic wall-plane path. Owned by the
      * view model — the analyzer uses it but never closes it.
      */
-    depthEstimator: com.hereliesaz.graffitixr.feature.ar.depth.DepthEstimator? = null,
+    depthEstimator: com.hereliesaz.sphereslam.models.DepthEstimator? = null,
     /**
      * Phase 3 guided-sweep coverage over the wall's viewable arc, in `[0, 1]`, or null to hide the
      * hint (classic path / flag off). Shown while locked and still incomplete, to nudge the artist to
@@ -265,8 +251,11 @@ fun SphereSlamStandaloneOverlay(
      * [com.hereliesaz.sphereslam.SphereCoverage.thinDirections].
      */
     coverageGlowDirections: () -> List<com.hereliesaz.sphereslam.SphereCoverage.Direction> = { emptyList() },
-    /** Current tiles are the ONLY regions cut out of the otherwise full-screen glow. */
-    coverageCurrentDirections: () -> List<com.hereliesaz.sphereslam.SphereCoverage.Direction> = { emptyList() },
+    /**
+     * Current tiles' angular extents — the ONLY regions cut out of the otherwise full-screen glow
+     * (`PhotosphereMap.currentRegions`).
+     */
+    coverageCurrentRegions: () -> List<SphereCoverage.TileRegion> = { emptyList() },
     /** Latest camera attitude `(headingDeg, elevationDeg)` for projecting the glow, or null. */
     cameraAttitude: () -> Pair<Float, Float>? = { null },
     modifier: Modifier = Modifier,
@@ -642,7 +631,9 @@ fun SphereSlamStandaloneOverlay(
         }
         value = loaded.first
     }
-    val glRenderer = remember(context) { HomographyOverlayRenderer(context) }
+    // The coverage wash is embedded in the artwork renderer (drawn before the design).
+    val coverageGlow = remember(context) { SphereTileGlowMask.newRenderer() }
+    val glRenderer = remember(context) { HomographyOverlayRenderer(context, coverageGlow) }
     LaunchedEffect(
         glRenderer,
         peerOnlyTracking,
@@ -668,7 +659,7 @@ fun SphereSlamStandaloneOverlay(
     // Full-view freshness mask: glow everywhere, then punch out only current photosphere tiles.
     // Seeded immediately so the whole view glows before the first keyframe, as every tile starts stale.
     val coverageGlowMask =
-        remember(glRenderer) { SphereTileGlowMask(glRenderer).also { it.update(emptyList()) } }
+        remember(coverageGlow) { SphereTileGlowMask(coverageGlow).also { it.update(emptyList()) } }
 
     LaunchedEffect(glRenderer, designBitmap) {
         if (designBitmap == null) {
@@ -848,7 +839,7 @@ fun SphereSlamStandaloneOverlay(
             // The glow is the complement of tile freshness: the entire view glows, and only
             // photosphere tiles whose needsUpdate=false state is current are punched clear.
             val attitude = cameraAttitude()
-            val currentDirections = coverageCurrentDirections()
+            val currentRegions = coverageCurrentRegions()
             coverageGlowDirections() // keep the update-side signal hot/read alongside its complement
             if (attitude != null) {
                 val px = frame.projMatrix[0]
@@ -857,7 +848,7 @@ fun SphereSlamStandaloneOverlay(
                     val hFovDeg = Math.toDegrees(2.0 * kotlin.math.atan(1.0 / px)).toFloat()
                     val vFovDeg = Math.toDegrees(2.0 * kotlin.math.atan(1.0 / py)).toFloat()
                     coverageGlowMask.update(
-                        currentDirections = currentDirections,
+                        currentRegions = currentRegions,
                         cameraHeadingDeg = attitude.first,
                         cameraElevationDeg = attitude.second,
                         horizontalFovDeg = hFovDeg,
@@ -865,7 +856,7 @@ fun SphereSlamStandaloneOverlay(
                     )
                 }
             } else {
-                coverageGlowMask.update(currentDirections = emptyList())
+                coverageGlowMask.update(currentRegions = emptyList())
             }
         }
         val screenUnitsPerPixel = frame?.let {
@@ -1056,13 +1047,15 @@ fun SphereSlamStandaloneOverlay(
                 },
                 onFrameTracked = ::consumeTrackedFrame,
                 cameraAttitude = cameraAttitude,
+                cameraRollDegrees = cameraRollDegrees,
                 onMapFromFingerprintSolved = onMapFromFingerprintSolved,
                 onPhotosphereKeyframe = { keyframe ->
                     // Base-map update first so the current-tile read below observes the newly captured
                     // tile. This path works before a fingerprint/KPM pose exists.
                     onPhotosphereKeyframe(keyframe)
-                    val fx = keyframe.intrinsics[0]
-                    val fy = keyframe.intrinsics[1]
+                    val k = keyframe.intrinsics
+                    val fx = k[0]
+                    val fy = k[1]
                     if (fx > 1e-4f && fy > 1e-4f) {
                         val hFovDeg = Math.toDegrees(
                             2.0 * kotlin.math.atan(keyframe.width.toDouble() / (2.0 * fx))
@@ -1071,7 +1064,7 @@ fun SphereSlamStandaloneOverlay(
                             2.0 * kotlin.math.atan(keyframe.height.toDouble() / (2.0 * fy))
                         ).toFloat()
                         coverageGlowMask.update(
-                            currentDirections = coverageCurrentDirections(),
+                            currentRegions = coverageCurrentRegions(),
                             cameraHeadingDeg = keyframe.headingDeg,
                             cameraElevationDeg = keyframe.elevationDeg,
                             horizontalFovDeg = hFovDeg,

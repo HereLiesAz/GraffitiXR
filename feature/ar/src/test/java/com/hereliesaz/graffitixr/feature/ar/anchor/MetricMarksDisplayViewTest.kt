@@ -5,6 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.hereliesaz.sphereslam.math.RigidMath
 
 /**
  * IMPLEMENTATION.md **0.3** — `MetricMarks.glViewToCvDisplay` at 0/90/180/270°.
@@ -56,7 +57,7 @@ class MetricMarksDisplayViewTest {
     fun `zero degrees is exactly glViewToCv`() {
         assertArrayEquals(CV, MetricMarks.glViewToCvDisplay(GL_VIEW, 0), EPS)
         assertArrayEquals(
-            MetricMarks.glViewToCv(GL_VIEW), MetricMarks.glViewToCvDisplay(GL_VIEW, 0), EPS,
+            RigidMath.glViewToCv(GL_VIEW), MetricMarks.glViewToCvDisplay(GL_VIEW, 0), EPS,
         )
     }
 
@@ -128,12 +129,12 @@ class MetricMarksDisplayViewTest {
      */
     @Test
     fun `four quarter turns compose back to identity`() {
-        var m = MetricMarks.glViewToCv(GL_VIEW)
+        var m = RigidMath.glViewToCv(GL_VIEW)
         repeat(4) { m = MetricMarks.glViewToCvDisplay(cvToGl(m), 90) }
         assertArrayEquals(CV, m, 1e-5f)
     }
 
-    /** Undo [MetricMarks.glViewToCv] so the round trip above can re-enter the public API. */
+    /** Undo [RigidMath.glViewToCv] so the round trip above can re-enter the public API. */
     private fun cvToGl(cv: FloatArray): FloatArray {
         val v = cv.copyOf()
         for (col in 0 until 4) {
@@ -195,7 +196,7 @@ class MetricMarksDisplayViewTest {
     @Test
     fun `the GL-oriented view converts to exactly the CV-oriented one`() {
         for (deg in intArrayOf(0, 90, 180, 270)) {
-            val viaGl = MetricMarks.glViewToCv(MetricMarks.glViewDisplayOriented(GL_VIEW, deg))
+            val viaGl = RigidMath.glViewToCv(MetricMarks.glViewDisplayOriented(GL_VIEW, deg))
             val direct = MetricMarks.glViewToCvDisplay(GL_VIEW, deg)
             assertArrayEquals("mismatch at ${deg}deg", direct, viaGl, EPS)
         }
@@ -211,7 +212,7 @@ class MetricMarksDisplayViewTest {
         val gl90 = MetricMarks.glViewDisplayOriented(GL_VIEW, 90)
         val gl270 = MetricMarks.glViewDisplayOriented(GL_VIEW, 270)
         // R_z(-90) == R_z(270): rotating the GL view by "90" must equal rotating a CV view by 270.
-        val cvOf90 = MetricMarks.glViewToCv(gl90)
+        val cvOf90 = RigidMath.glViewToCv(gl90)
         val cv270Direct = MetricMarks.glViewToCvDisplay(GL_VIEW, 90)
         assertArrayEquals(cv270Direct, cvOf90, EPS)
         assertTrue(

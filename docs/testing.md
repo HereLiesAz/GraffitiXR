@@ -94,9 +94,11 @@ Still uncovered: reloc match quality, PnP accuracy and drift-correction behaviou
 `docs/research/EVALUATION.md`. There is no on-device visual debug pipeline either (see
 `NATIVE_ENGINE.md`).
 
-**Robolectric** — `:core:data` (persistence) and `:core:common` (`CameraIntrinsicsEstimatorCameraIdTest`:
-the Camera2 id → `CameraManager` → intrinsics seam every CameraX tracking path uses) run framework
-classes the stub `android.jar` cannot.
+**Robolectric** — `:core:data` (persistence) runs framework classes the stub `android.jar` cannot.
+The Camera2 id → `CameraManager` → intrinsics seam every CameraX tracking path uses is SphereSLAM's
+`camera.CameraIntrinsicsEstimator` since 0.24.0 and is tested in that library, together with the
+other generic SLAM math the app now consumes (rigid/rotation math, attitude bridge, sidecar gates,
+photosphere placement, gyro compensation).
 
 ## 3. UI / Instrumented Tests
 There are currently **no `src/androidTest/` directories anywhere in this repository** — no

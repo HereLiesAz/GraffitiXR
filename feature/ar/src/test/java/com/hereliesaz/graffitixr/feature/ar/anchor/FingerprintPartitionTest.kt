@@ -9,6 +9,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.opencv.core.KeyPoint
+import com.hereliesaz.sphereslam.math.RigidMath
 
 /**
  * `IMPLEMENTATION.md` **2.5** — the partition, on a synthetic straddling point set.
@@ -239,10 +240,10 @@ class FingerprintPartitionTest {
         val design = designPose()
         val pts = floatArrayOf(0f, 0f, 0f, 1.5f, 0.2f, 0f, 3f, 0f, 0f)
         val right = FingerprintPartition.classify(
-            pts, PoseMath.multiply(anchorCam, design), HALF_W, HALF_H,
+            pts, RigidMath.multiply(anchorCam, design), HALF_W, HALF_H,
         )
         val wrong = FingerprintPartition.classify(
-            pts, PoseMath.multiply(design, anchorCam), HALF_W, HALF_H,
+            pts, RigidMath.multiply(design, anchorCam), HALF_W, HALF_H,
         )
         assertFalse(
             "the fixture must distinguish the operand order, or the test above is blind to it",

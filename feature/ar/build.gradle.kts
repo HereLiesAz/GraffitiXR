@@ -38,6 +38,10 @@ android {
             freeCompilerArgs.add(
                 "-opt-in=com.hereliesaz.sphereslam.reloc.ExperimentalSphereSlamRelocApi"
             )
+            // MiDaS monocular depth comes from SphereSLAM's experimental :models wrapper.
+            freeCompilerArgs.add(
+                "-opt-in=com.hereliesaz.sphereslam.models.ExperimentalSphereSlamModelsApi"
+            )
         }
     }
 
@@ -83,6 +87,10 @@ dependencies {
     // Public Standalone* typealiases expand to :reloc types, so this must remain on the consumer
     // compile classpath. Keeping those aliases preserves GraffitiXR's existing public vocabulary.
     api(libs.sphereslam.reloc)
+    // Monocular depth (MiDaS v2.1 Small, ONNX Runtime) for the standalone map and Overlay > Gyro.
+    // The :models AAR bundles its own midas/superpoint/zerodce assets. `api`: the public
+    // SphereSlamStandaloneOverlay / ArViewModel.standaloneDepthEstimatorOrNull expose DepthEstimator.
+    api(libs.sphereslam.models)
     implementation(project(":android_collaboration_module"))
 
     // Compose
@@ -98,9 +106,9 @@ dependencies {
     implementation(libs.arcore.client)
     implementation(libs.opencv)
 
-    // ONNX Runtime (Kotlin) for monocular depth (MiDaS Small) on the non-ARCore path.
-    // OpenCV DNN (the native engine's ONNX runtime) can't reliably import the ViT depth model,
-    // so depth runs here, where its consumer (SphereSlamStandaloneTrackingAnalyzer) lives.
+    // ONNX Runtime for monocular depth (MiDaS Small) via SphereSLAM :models. Declared here too so
+    // the app's catalog pins the ORT version that ends up in the APK. OpenCV DNN (the native
+    // engine's ONNX runtime) can't reliably import the depth model, so depth runs in Kotlin.
     implementation(libs.onnxruntime.android)
 
     implementation(libs.az.nav.rail)

@@ -71,13 +71,15 @@ job ARCore's VIO does on the hybrid path (triangulate map points from a metric b
 Standalone has no VIO. Two capabilities that did not exist when `RELOC_MAP_DESIGN.md` was
 written now supply that geometry:
 
-- **Recorded gyro orientation — the angular glue.** `GyroOrientationBridge.cameraRotationDelta`
-  already yields the camera-space rotation between frames (`GyroOrientationBridge.kt`). Today
+- **Recorded gyro orientation — the angular glue.** SphereSLAM's `GameRotationAttitudeSource` +
+  `AttitudeRotationBridge.cameraRotationDelta` (formerly the app's `GyroOrientationBridge`)
+  already yield the camera-space rotation between frames. Today
   it is a transient ≤ 400 ms bridge across vision dropouts and is **discarded**
   (`SphereSlamStandaloneTrackingAnalyzer.kt` bridge expiry; orientation cleared on stop). Here
   it is instead **recorded per keyframe**, giving each keyframe's pointing direction on the
   sphere. This is the "sensors recorded for reloc" the standalone path has never kept.
-- **MiDaS monocular depth — the radial distance.** `DepthEstimator` (MiDaS Small, ONNX) is
+- **MiDaS monocular depth — the radial distance.** `DepthEstimator` (MiDaS Small, ONNX; SphereSLAM
+  `:models` since 0.24.0) is
   loaded and self-tested but not yet wired into any geometry path (`ArViewModel.selfTestDepth`;
   "Step 2" comment). It supplies per-keyframe **relative depth**, so surrounding features get a
   radius, not just a bearing — a coarse 3D shell rather than a pure-rotation panorama. This is
@@ -88,7 +90,7 @@ written now supply that geometry:
 
 Gyro (bearing) + MiDaS (radius) are, together, the standalone substitute for the VIO baseline
 the feature map normally triangulates from. MiDaS is affine-ambiguous, so absolute metric
-scale is still governed by the fingerprint's asserted reference width (`StandaloneFingerprintFrame`);
+scale is still governed by the fingerprint's asserted reference width (`PhotosphereFingerprintFrame`);
 the sphere is self-consistent and metric only to the degree the fingerprint is. That is
 acceptable: the sphere's job is fast re-lock bearing-and-coverage, not real-world sizing.
 
@@ -150,7 +152,7 @@ and target-quality gates, the fingerprint precision anchor and coarse-to-fine fu
 
 Net-new:
 
-- **Persisted per-keyframe orientation** from `GyroOrientationBridge` (today transient/discarded).
+- **Persisted per-keyframe orientation** from the game-rotation attitude (today transient/discarded).
 - **MiDaS depth wired into geometry** — per-keyframe radial depth for map-point placement and
   for the fingerprint's own 3D points (the dormant "Step 2").
 - **A guided-sweep capture loop + coverage UX** (the reversed "no scan" decision), standalone only.

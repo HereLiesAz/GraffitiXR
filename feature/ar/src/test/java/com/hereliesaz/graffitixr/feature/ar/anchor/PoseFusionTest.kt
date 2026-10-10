@@ -5,6 +5,7 @@ import kotlin.math.sin
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.hereliesaz.sphereslam.math.RigidMath
 
 class PoseFusionTest {
     private fun identity() = floatArrayOf(1f,0f,0f,0f, 0f,1f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
@@ -139,7 +140,7 @@ class PoseFusionTest {
      *  - an inverse taken by negating rather than transposing → mirrored, not rotated.
      *
      * The expected entries below are written out from the symbolic product of the three axis
-     * rotations, NOT by calling [PoseMath.multiply] — deriving them the way the code derives them
+     * rotations, NOT by calling [RigidMath.multiply] — deriving them the way the code derives them
      * would make this an identity rather than a check. Nothing here touches `android.opengl.Matrix`,
      * which is a return-default stub in this source set and would make any assertion built on it
      * pass against an array of zeros.
@@ -162,7 +163,7 @@ class PoseFusionTest {
         val g = Math.toRadians(50.0).toFloat(); val cg = cos(g); val sg = sin(g)
         val tx = 1f; val ty = 2f; val tz = 3f
 
-        // Column-major (element [col*4+row]), same layout PoseMath and ARCore use. Right-handed,
+        // Column-major (element [col*4+row]), same layout RigidMath and ARCore use. Right-handed,
         // matching the existing rotZ fixture above: column 0 of Rz(90) is (0,1,0), i.e. +X → +Y.
         val vCurrent = floatArrayOf(1f,0f,0f,0f, 0f,ca,sa,0f, 0f,-sa,ca,0f, 0f,0f,0f,1f)   // Rx(30)
         val pnpMat = floatArrayOf(cb,0f,-sb,0f, 0f,1f,0f,0f, sb,0f,cb,0f, 0f,0f,0f,1f)     // Ry(40)

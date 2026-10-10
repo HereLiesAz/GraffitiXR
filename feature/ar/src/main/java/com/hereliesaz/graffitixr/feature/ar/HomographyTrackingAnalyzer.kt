@@ -4,13 +4,15 @@ package com.hereliesaz.graffitixr.feature.ar
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
-import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsics
-import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsicsEstimator
+import com.hereliesaz.sphereslam.camera.CameraIntrinsics
+import com.hereliesaz.sphereslam.camera.CameraIntrinsicsEstimator
 import com.hereliesaz.graffitixr.feature.ar.HomographyArTracker.HomographyPose
-import com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation
-import com.hereliesaz.graffitixr.feature.ar.rendering.ProjectionMatrix
+import com.hereliesaz.sphereslam.camera.CaptureRotation
+import com.hereliesaz.sphereslam.camera.ProjectionMatrix
 import com.hereliesaz.graffitixr.nativebridge.YuvConverter
 
 /**
@@ -39,7 +41,7 @@ data class HomographyTrackedFrame(val pose: HomographyPose, val projMatrix: Floa
  * [BridgedHomographyTracker.trackFrame].
  *
  * Not itself lifecycle-aware: the caller attaches/detaches this alongside whatever owns the
- * fallback-tracking session (matching [GyroOrientationBridge]'s own start()/stop() shape).
+ * fallback-tracking session (matching [BridgedHomographyTracker]'s own start()/stop() shape).
  */
 class HomographyTrackingAnalyzer(
     private val context: Context,
@@ -54,6 +56,14 @@ class HomographyTrackingAnalyzer(
     private var cachedRawWidth = -1
     private var cachedRawHeight = -1
     private var cachedIntrinsics: CameraIntrinsics? = null
+
+    // The gyro bridge needs the sensor mounting to map device attitude into the tracked frame.
+    private val sensorOrientationDeg: Int = runCatching {
+        val raw = context.getSystemService(CameraManager::class.java)
+            .getCameraCharacteristics(cameraId)
+            .get(CameraCharacteristics.SENSOR_ORIENTATION) ?: DEFAULT_SENSOR_ORIENTATION_DEG
+        if (raw % 90 == 0) raw else DEFAULT_SENSOR_ORIENTATION_DEG
+    }.getOrDefault(DEFAULT_SENSOR_ORIENTATION_DEG)
 
     override fun analyze(image: ImageProxy) {
         try {
@@ -82,6 +92,7 @@ class HomographyTrackingAnalyzer(
                 rotated,
                 rotatedIntrinsics[0], rotatedIntrinsics[1], rotatedIntrinsics[2], rotatedIntrinsics[3],
                 rotationDeg,
+                sensorOrientationDeg,
             )
             if (pose != null) {
                 // rotated.width/height, not rawW/rawH: a 90/270 rotation swaps them, and
@@ -121,5 +132,10 @@ class HomographyTrackingAnalyzer(
         val estimated = CameraIntrinsicsEstimator.estimate(context, cameraId, rawWidth, rawHeight)
         cachedIntrinsics = estimated
         return estimated
+    }
+
+    private companion object {
+        /** Typical rear-camera mounting, used only when Camera2 cannot report SENSOR_ORIENTATION. */
+        const val DEFAULT_SENSOR_ORIENTATION_DEG = 90
     }
 }

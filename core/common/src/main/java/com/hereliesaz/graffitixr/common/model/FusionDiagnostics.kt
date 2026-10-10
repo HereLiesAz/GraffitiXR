@@ -137,7 +137,7 @@ enum class FusionState {
 
     /**
      * A hybrid KPM observation passed every quality gate but implies a move beyond the cold-snap
-     * thresholds, and is being held until `PoseFusion.HYBRID_REQUIRED_AGREEMENT` consistent
+     * thresholds, and is being held until SphereSLAM `HybridAnchorFusion.HYBRID_REQUIRED_AGREEMENT` consistent
      * observations agree. The overlay stays where it is meanwhile. Appended, not inserted, for the
      * ordinal reason given on [NO_FINGERPRINT].
      */

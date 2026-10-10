@@ -2,7 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
-import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsics
+import com.hereliesaz.sphereslam.camera.CameraIntrinsics
 import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import kotlin.math.hypot
 import kotlin.math.roundToInt

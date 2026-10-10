@@ -11,6 +11,7 @@ import org.opencv.core.MatOfKeyPoint
 import org.opencv.features.DescriptorMatcher
 import org.opencv.features.ORB
 import org.opencv.imgproc.Imgproc
+import com.hereliesaz.sphereslam.math.RigidMath
 
 /**
  * Builds a wall fingerprint from two camera keyframes by triangulation — the depth-off path. Detects
@@ -61,8 +62,8 @@ object MetricFingerprintBuilder {
         anchorModel: FloatArray, minPoints: Int,
     ): Fingerprint? {
         try {
-            val cv0 = MetricMarks.glViewToCv(glView0)
-            val cv1 = MetricMarks.glViewToCv(glView1)
+            val cv0 = RigidMath.glViewToCv(glView0)
+            val cv1 = RigidMath.glViewToCv(glView1)
             val tri = MetricMarks.triangulate(matched.corrs, cv0, cv1, intr0[0], intr0[1], intr0[2], intr0[3])
             if (tri.count < minPoints) return null
 
@@ -346,7 +347,7 @@ object MetricFingerprintBuilder {
         // `cvView · anchorModel` is the bridge between them — see Fingerprint.captureAnchorCam.
         // Recorded unconditionally, including on a capture that establishes the anchor and therefore
         // has no design to partition against yet.
-        val anchorCam = PoseMath.multiply(cvView, anchorModel)
+        val anchorCam = RigidMath.multiply(cvView, anchorModel)
 
         // Center the AR overlay on the marks (their centroid), not the screen-center anchor.
         val markCenterLocal = marksCentroidLocal(res.pointsCam, cvView, anchorModel)
@@ -457,8 +458,8 @@ object MetricFingerprintBuilder {
      * no points or either matrix is degenerate.
      *
      * Both operands are rigid — [cvView] is a world→camera view and [anchorModel] comes from
-     * `SlamManager.getAnchorTransform()` — so [PoseMath.rigidInverse] is the correct inverse; the
-     * overlay's scaled model matrix (see [PoseMath.similarityInverse]) never reaches here.
+     * `SlamManager.getAnchorTransform()` — so [RigidMath.rigidInverse] is the correct inverse; the
+     * overlay's scaled model matrix (see [RigidMath.similarityInverse]) never reaches here.
      *
      * `internal` rather than private only so a unit test can reach it: the public entry points all
      * run OpenCV detection and a native `SlamManager`, so there is no unit test seam onto this
@@ -475,8 +476,8 @@ object MetricFingerprintBuilder {
         if (!isRigid(cvView) || !isRigid(anchorModel)) return null
         var sx = 0f; var sy = 0f; var sz = 0f
         for (i in 0 until n) { sx += pointsCam[i * 3]; sy += pointsCam[i * 3 + 1]; sz += pointsCam[i * 3 + 2] }
-        val world = transformPoint(PoseMath.rigidInverse(cvView), sx / n, sy / n, sz / n)
-        return transformPoint(PoseMath.rigidInverse(anchorModel), world[0], world[1], world[2])
+        val world = transformPoint(RigidMath.rigidInverse(cvView), sx / n, sy / n, sz / n)
+        return transformPoint(RigidMath.rigidInverse(anchorModel), world[0], world[1], world[2])
     }
 
     /** Apply a column-major 4x4 to a point (w=1). */
@@ -488,8 +489,8 @@ object MetricFingerprintBuilder {
 
     /**
      * True if [m] is finite and its linear part is a pure rotation — the precondition
-     * [PoseMath.rigidInverse] silently assumes. All three columns are checked, not just
-     * [PoseMath.scaleOf]'s first, because a half-written pose (say a zeroed third column) is
+     * [RigidMath.rigidInverse] silently assumes. All three columns are checked, not just
+     * [RigidMath.scaleOf]'s first, because a half-written pose (say a zeroed third column) is
      * exactly the singular input the old `Matrix.invertM` guard caught.
      */
     private fun isRigid(m: FloatArray): Boolean {

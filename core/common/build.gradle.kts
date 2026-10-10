@@ -63,6 +63,11 @@ dependencies {
     // AzNavRail (Fixes NoClassDefFoundError for AzOrientation)
     api(libs.az.nav.rail)
 
+    // SphereSLAM's pure value types shared with the SLAM layer: `sensor/CameraIntrinsics` and the
+    // hybrid-KPM diagnostics records are typealiases of the library's own classes. `api` so every
+    // consumer of those aliases sees the expanded types.
+    api(libs.sphereslam.core)
+
     // Serialization (Fixes Unresolved reference 'serializer')
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.serialization.cbor)

@@ -60,6 +60,8 @@ catalog_aliases = {
     "sphereslam-core": ("sphereslam", "api(libs.sphereslam.core)"),
     "sphereslam-overlay": ("overlay", "implementation(libs.sphereslam.overlay)"),
     "sphereslam-reloc": ("reloc", "api(libs.sphereslam.reloc)"),
+    # MiDaS DepthEstimator (and its bundled ONNX assets) — exposed by the public standalone overlay.
+    "sphereslam-models": ("models", "api(libs.sphereslam.models)"),
 }
 for alias, (artifact, gradle_use) in catalog_aliases.items():
     alias_pattern = re.compile(
@@ -82,6 +84,20 @@ feature_ar_gradle = read("feature/ar/build.gradle.kts")
 required_opt_in = "-opt-in=com.hereliesaz.sphereslam.reloc.ExperimentalSphereSlamRelocApi"
 if required_opt_in not in feature_ar_gradle:
     fail("feature/ar must explicitly opt into SphereSLAM's experimental :reloc API.")
+
+required_models_opt_in = "-opt-in=com.hereliesaz.sphereslam.models.ExperimentalSphereSlamModelsApi"
+if required_models_opt_in not in feature_ar_gradle:
+    fail("feature/ar must explicitly opt into SphereSLAM's experimental :models API.")
+
+# The app's own MiDaS copy is gone; the model ships in the :models AAR. Native code still loads
+# superpoint.onnx / zerodce.onnx / distortion_head.onnx from core/nativebridge assets, so only the
+# MiDaS graph (Kotlin-only consumer) may be absent there.
+for path in (
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/depth/DepthEstimator.kt",
+    "core/nativebridge/src/main/assets/midas_v21_small_256_int8.onnx",
+):
+    if (ROOT / path).exists():
+        fail(f"{path} was reintroduced; MiDaS depth comes from SphereSLAM :models.")
 
 reloc_dep = "api(libs.sphereslam.reloc)"
 if reloc_dep not in feature_ar_gradle:
@@ -113,19 +129,36 @@ standalone_analyzer = read(
 if "cameraFromCanonical" not in standalone_analyzer:
     fail("Standalone analyzer is not consuming SphereSLAM Pose.cameraFromCanonical.")
 
-hybrid_correction = read(
-    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/anchor/HybridKpmCorrection.kt"
+# The hybrid gates/solve are SphereSLAM's sidecar.HybridKpmCorrection, which reads the public
+# Observation.cameraFromPage3x4 itself. GraffitiXR hands it the tracker's published observation
+# (never a hand-built one; tests use Observation.forTesting) and must not keep a private copy.
+ar_renderer = read(
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/rendering/ArRenderer.kt"
 )
-if "observation.cameraFromPage3x4" not in hybrid_correction:
-    fail("Hybrid correction is not consuming SphereSLAM Observation.cameraFromPage3x4.")
+if "com.hereliesaz.sphereslam.sidecar.HybridKpmCorrection.solve(" not in ar_renderer:
+    fail("ArRenderer no longer gates KPM observations through SphereSLAM sidecar.HybridKpmCorrection.solve.")
+if "observation = hybridObservation" not in ar_renderer:
+    fail("ArRenderer no longer passes the tracker's published Observation to HybridKpmCorrection.solve.")
+for moved in (
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/anchor/HybridKpmCorrection.kt",
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/anchor/HybridPoseHistory.kt",
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/anchor/HybridPageFrame.kt",
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/HybridMetricKpmReference.kt",
+):
+    if (ROOT / moved).exists():
+        fail(f"{moved} was reintroduced; use SphereSLAM's com.hereliesaz.sphereslam.sidecar package.")
 
-runtime_probe = read(
-    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/pose/"
-    "SphereSlamRuntimeProbe.kt"
+# The fail-closed runtime capability probe is the library's SphereSlam.isOperational() (native
+# entry points linked AND a calibrated KPM session creatable/ready/closable). GraffitiXR must gate
+# standalone availability on it rather than on the weaker isAvailable() alone, and must not
+# reintroduce a private copy of the probe.
+ar_view_model = read(
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/ArViewModel.kt"
 )
-for required in ("SphereSlam.isAvailable", "SphereSlam.create", "engine.isReady", "engine.close()"):
-    if required not in runtime_probe:
-        fail(f"Supported SphereSLAM runtime probe lost required public-API step {required!r}.")
+if "SphereSlam.isOperational()" not in ar_view_model:
+    fail("ArViewModel no longer resolves SphereSLAM availability through SphereSlam.isOperational().")
+if (ROOT / "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/pose/SphereSlamRuntimeProbe.kt").exists():
+    fail("SphereSlamRuntimeProbe was reintroduced; use the library's SphereSlam.isOperational().")
 
 # 3. Both supported ARM ABIs stay built/packaged so every APK split has a libsphereslam.so slot.
 expected_abi_expr = 'abiFilters += listOf("arm64-v8a", "armeabi-v7a")'

@@ -5,9 +5,10 @@ package com.hereliesaz.graffitixr.feature.ar
  * photosphere (docs/SPHERESLAM_SPHERE_MAP.md §5.3).
  *
  * A fingerprint is bound to the photosphere through the camera view it was captured from: the
- * pointing direction (compass heading/elevation from `CameraAttitudeProvider`) plus pinhole
- * intrinsics. This object picks that view and, when it cannot, names the reason so the artist gets
- * an actionable message instead of a silent fail-closed confirmation.
+ * pointing direction (compass heading/elevation/roll from `CameraAttitudeProvider`) plus pinhole
+ * intrinsics. SphereSLAM picks that view (`PhotosphereKeyframeStore.view`) and places the
+ * fingerprint (`PhotosphereFingerprintFrame.placement`); this object names the reason when it
+ * cannot, so the artist gets an actionable message instead of a silent fail-closed confirmation.
  *
  * It never invents a direction: no attitude means no placement.
  */
@@ -25,48 +26,7 @@ internal object StandalonePhotosphereCapture {
         PHOTOSPHERE_EMPTY,
     }
 
-    /** Camera view a capture is projected through; intrinsics are in [width]x[height] pixels. */
-    data class View(
-        val headingDeg: Float,
-        val elevationDeg: Float,
-        val width: Int,
-        val height: Int,
-        val fx: Float,
-        val fy: Float,
-        val cx: Float,
-        val cy: Float,
-    )
-
-    /**
-     * The capture view for the current camera direction.
-     *
-     * Prefers the keyframe already recorded for the current tile (unchanged behavior). When that tile
-     * has no keyframe yet — the artist aimed at a fresh direction and captured before the 250 ms
-     * keyframe cadence / quality gate recorded it — the capture still knows exactly where the camera
-     * points ([attitude]) and the session's intrinsics are constant, so the most recent keyframe's
-     * intrinsics are paired with the CURRENT attitude. The fallback never borrows another tile's
-     * direction.
-     *
-     * @return null when there is no attitude, no keyframe at all, or the intrinsics are unusable.
-     */
-    fun view(
-        attitude: Pair<Float, Float>?,
-        currentTileKeyframe: SphereSlamPhotosphereKeyframe?,
-        latestKeyframe: SphereSlamPhotosphereKeyframe?,
-    ): View? {
-        if (attitude == null || !attitude.first.isFinite() || !attitude.second.isFinite()) return null
-        val source = currentTileKeyframe ?: latestKeyframe ?: return null
-        val headingDeg = if (currentTileKeyframe != null) source.headingDeg else attitude.first
-        val elevationDeg = if (currentTileKeyframe != null) source.elevationDeg else attitude.second
-        val fx = source.intrinsics.getOrNull(0) ?: return null
-        val fy = source.intrinsics.getOrNull(1) ?: return null
-        val cx = source.intrinsics.getOrNull(2) ?: return null
-        val cy = source.intrinsics.getOrNull(3) ?: return null
-        if (fx <= 0f || fy <= 0f || source.width <= 0 || source.height <= 0) return null
-        return View(headingDeg, elevationDeg, source.width, source.height, fx, fy, cx, cy)
-    }
-
-    /** First reason [view] would fail, or null when a capture can be bound. */
+    /** First reason a capture cannot be bound to the photosphere, or null when it can. */
     fun blocker(
         attitudeSensorAvailable: Boolean,
         attitude: Pair<Float, Float>?,

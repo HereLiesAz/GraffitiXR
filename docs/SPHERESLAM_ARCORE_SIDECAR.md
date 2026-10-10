@@ -1,6 +1,10 @@
 # SphereSLAM Hybrid + Standalone Integration
 
-Library API baseline: **SphereSLAM 0.23.5**. The migration preserves both hybrid and standalone behavior; only the published API-facing names/visibility seams change.
+Library API baseline: **SphereSLAM 0.24.0**. Since 0.24.0 the hybrid sidecar math is the library's
+`com.hereliesaz.sphereslam.sidecar` package (`MetricPageRectification`, `HybridPoseHistory`,
+`HybridKpmCorrection`, `HybridPageFrame`, `HybridAnchorFusion`); `ArRenderer` wires it to ARCore and
+`PoseFusion` delegates its hybrid path to `HybridAnchorFusion`. The seam and its invariants below are
+unchanged.
 
 Status: dual-backend foundation is on `main`; co-op protocol-v3 calibration is merged through
 PR #1968; metric hybrid KPM→PoseFusion correction is implemented on
@@ -312,7 +316,7 @@ image geometry itself corresponds to a measured physical wall rectangle.
 Hybrid mode now satisfies that condition explicitly:
 
 - ARCore supplies a metric wall plane;
-- `HybridMetricKpmReference` rectifies a physical rectangle on that plane;
+- `sidecar.MetricPageRectification` rectifies a physical rectangle on that plane;
 - `SphereSlamPoseMath.dpiForReferenceWidth` chooses DPI so KPM millimetres equal wall metres;
 - the hybrid path passes that DPI explicitly and never relies on `SphereSlamTracker`'s generic
   `72f` default.
@@ -338,7 +342,9 @@ serialized to one source per render frame.
    - age ≤ 500 ms, ≥ 12 inliers, reprojection error ≤ 4 px;
    - explicit page→artwork transform;
    - `HybridKpmCorrection` produces the corrected artwork anchor at the observation timestamp;
-   - `PoseFusion.currentAnchorFromHybridObservation` stores only the anchor-local correction.
+   - `PoseFusion.currentAnchorFromHybridObservation` (via `sidecar.HybridAnchorFusion`, which
+     requires three agreeing observations before a large move) stores only the anchor-local
+     correction.
 
 2. **MobileGS fallback:**
    - existing wall fingerprint;
