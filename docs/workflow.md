@@ -18,10 +18,8 @@ The actual workflow files present in this repository are `android-ci.yml`, `merg
 -   **Steps (common to both):**
     1.  Checkout code.
     2.  Set up JDK 21 (Temurin).
-    3.  Decode the base64 `KEYSTORE_RAW` secret to `app/keystore.jks` (falls back to the debug key if
-        the secret is empty).
-    4.  **Test:** `./gradlew test` (unit tests, in a separate job).
-    5.  **Build:** `./gradlew assembleDebug`.
+    3.  **Test:** `./gradlew test` (unit tests, in a separate job).
+    4.  **Build:** `./gradlew assembleDebug` (always the default debug key; no keystore is decoded).
 
 `android-ci.yml` is the canonical publisher: on a push, it creates/updates the shared GitHub Release
 tagged `latest-debug-v<major>.<minor>` with the built debug APK. The two workflows previously raced

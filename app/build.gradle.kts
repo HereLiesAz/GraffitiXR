@@ -135,7 +135,7 @@ android {
     // Release signing is a property of the project, not of each CI invocation. The keystore and
     // credentials come from the environment: CI decodes the base64 `KEYSTORE_RAW` secret to
     // app/keystore.jks and exports KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD (see
-    // .github/workflows/android-ci.yml). KEYSTORE_FILE may override the path.
+    // .github/workflows/release.yml, the only workflow that signs). KEYSTORE_FILE may override the path.
     //
     // When no keystore is present (local dev without the secrets) the "release" config is simply
     // not created — `findByName` then returns null below, so release builds stay unsigned and debug
