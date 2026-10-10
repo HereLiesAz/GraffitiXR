@@ -315,21 +315,29 @@ class EditorViewModelTest {
     @Test
     fun `sharing persists the editor's current state before exporting`() = runTest {
         addDesign()
-        every { Uri.fromFile(any()) } returns mockk(relaxed = true)
-        io.mockk.clearMocks(projectRepository, projectManager, answers = false)
-        var stored = GraffitiProject(id = "test-project")
-        coEvery { projectRepository.updateProject(any<(GraffitiProject) -> GraffitiProject>()) } coAnswers {
-            stored = firstArg<(GraffitiProject) -> GraffitiProject>()(stored)
-        }
+        // The share archive is written under cacheDir. A relaxed Context hands back a mock File
+        // whose internal path is null, so File(cacheDir, "share") would throw before the export.
+        val cacheDir = kotlin.io.path.createTempDirectory("gxr_share_cache").toFile()
+        try {
+            every { context.cacheDir } returns cacheDir
+            every { Uri.fromFile(any()) } returns mockk(relaxed = true)
+            io.mockk.clearMocks(projectRepository, projectManager, answers = false)
+            var stored = GraffitiProject(id = "test-project")
+            coEvery { projectRepository.updateProject(any<(GraffitiProject) -> GraffitiProject>()) } coAnswers {
+                stored = firstArg<(GraffitiProject) -> GraffitiProject>()(stored)
+            }
 
-        viewModel.shareProject()
-        testDispatcher.scheduler.advanceUntilIdle()
+            viewModel.shareProject()
+            testDispatcher.scheduler.advanceUntilIdle()
 
-        // The archive reads project.json off disk, so the in-memory design must be written first.
-        assertNotNull(stored.design)
-        coVerifyOrder {
-            projectRepository.updateProject(any<(GraffitiProject) -> GraffitiProject>())
-            projectManager.exportProjectToUri(any(), "test-project", any())
+            // The archive reads project.json off disk, so the in-memory design must be written first.
+            assertNotNull(stored.design)
+            coVerifyOrder {
+                projectRepository.updateProject(any<(GraffitiProject) -> GraffitiProject>())
+                projectManager.exportProjectToUri(any(), "test-project", any())
+            }
+        } finally {
+            cacheDir.deleteRecursively()
         }
     }
 
