@@ -94,8 +94,9 @@ class ProjectRepositoryImpl @Inject constructor(
         // This is an authoritative snapshot derived from CURRENT state under saveMutex, so persist
         // it exactly. ProjectManager.saveProject's preserve-on-null compatibility path is for stale
         // whole-object writers; using it here resurrects fields a transform intentionally cleared.
-        projectManager.saveProjectExact(context, updated)
-        _currentProject.value = updated
+        // Publish what was written, not `updated`: the save stamps lastModified and may fill in
+        // thumbnailUri, and memory must match project.json.
+        _currentProject.value = projectManager.saveProjectExact(context, updated)
         // A metadata-affecting transform (e.g. a rename) changes the list projection, so republish.
         refreshProjects()
     }
