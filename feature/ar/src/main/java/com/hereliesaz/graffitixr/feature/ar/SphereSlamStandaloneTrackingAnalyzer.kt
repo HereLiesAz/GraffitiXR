@@ -20,8 +20,9 @@ import com.hereliesaz.sphereslam.attitude.GameRotationAttitudeSource
 import com.hereliesaz.sphereslam.math.RigidMath
 import com.hereliesaz.sphereslam.camera.ProjectionMatrix
 import com.hereliesaz.sphereslam.math.RotationMath
-import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintFrame
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import com.hereliesaz.sphereslam.PhotosphereFingerprintFrame
+import com.hereliesaz.sphereslam.PhotosphereKeyframe
 import com.hereliesaz.sphereslam.SphereSlamCalibration
 import com.hereliesaz.sphereslam.SphereSlamStandaloneSession
 import com.hereliesaz.sphereslam.reloc.PoseBlend
@@ -99,27 +100,6 @@ data class SphereSlamStandaloneFrame(
     }
 }
 
-data class SphereSlamPhotosphereKeyframe(
-    val timestampNs: Long,
-    val luma: ByteArray,
-    val width: Int,
-    val height: Int,
-    val intrinsics: FloatArray,
-    val headingDeg: Float,
-    val elevationDeg: Float,
-    val orientationQuaternion: FloatArray?,
-    /** Rotation-only GL camera_from_map for the base photosphere at this frame. */
-    val cameraFromMap: FloatArray,
-) {
-    init {
-        require(width > 0 && height > 0 && luma.size == width * height)
-        require(intrinsics.size == 4 && intrinsics.all { it.isFinite() })
-        require(headingDeg.isFinite() && elevationDeg.isFinite())
-        require(orientationQuaternion == null || orientationQuaternion.size == 4)
-        require(cameraFromMap.size == 16 && cameraFromMap.all { it.isFinite() })
-    }
-}
-
 /**
  * CameraX ImageAnalysis -> calibrated KPM wall pose for phones that cannot run ARCore.
  *
@@ -150,7 +130,17 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     private val onFrameTracked: (SphereSlamStandaloneFrame?) -> Unit,
     private val cameraAttitude: () -> Pair<Float, Float>? = { null },
-    private val onPhotosphereKeyframe: (SphereSlamPhotosphereKeyframe) -> Unit = {},
+    /**
+     * Base photosphere keyframes (SphereSLAM [PhotosphereKeyframe]: display-upright luma, its
+     * intrinsics, heading/elevation/roll and the rotation-only GL camera_from_map at capture).
+     */
+    private val onPhotosphereKeyframe: (PhotosphereKeyframe) -> Unit = {},
+    /**
+     * Roll of the tracked image's right axis above the horizon for a given body->camera rotation
+     * (`CameraAttitudeProvider.cameraRollDegrees`), or null when unknown. Stamped on each keyframe so
+     * a later fingerprint placement can rotate pixel rays correctly in any device orientation.
+     */
+    private val cameraRollDegrees: (cameraFromDevice: FloatArray) -> Float? = { null },
     /**
      * Solved on a frame where both base-map pose and KPM precision pose are known:
      * map_from_fingerprint = inverse(camera_from_map) * camera_from_fingerprint.
@@ -434,7 +424,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             // translation this pose is intentionally rotation-only: zero translation is the
             // fixed-standpoint photosphere model, not an invented motion estimate.
             val cameraFromMap = photosphereCameraFromMap(cameraFromDevice)
-            capturePhotosphereKeyframe(rotated, intrinsics, timestampNs, cameraFromMap)
+            capturePhotosphereKeyframe(rotated, intrinsics, timestampNs, cameraFromMap, cameraFromDevice)
             if (referenceImage == null) {
                 slamManager?.setTrackingPoseValid(false)
                 onFrameTracked(null)
@@ -492,7 +482,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 val mapFromFingerprint = mobileGsMapFromFingerprint
                     ?.takeIf { it.size == 16 && it.all(Float::isFinite) }
                 val acceptedRawMapView = mapFromFingerprint?.let {
-                    StandaloneFingerprintFrame.cameraFromMap(
+                    PhotosphereFingerprintFrame.cameraFromMap(
                         cameraFromFingerprint = lockedPose.cameraFromCanonical,
                         mapFromFingerprint = it,
                     )
@@ -518,7 +508,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
 
                 val precisionRenderView = outcome.renderPose!!
                 val renderView = mapFromFingerprint?.let {
-                    StandaloneFingerprintFrame.cameraFromMap(
+                    PhotosphereFingerprintFrame.cameraFromMap(
                         cameraFromFingerprint = precisionRenderView,
                         mapFromFingerprint = it,
                     )
@@ -834,6 +824,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         intrinsics: CameraIntrinsics,
         timestampNs: Long,
         cameraFromMap: FloatArray?,
+        cameraFromDevice: FloatArray,
     ) {
         val attitude = cameraAttitude() ?: return
         val mapPose = cameraFromMap ?: return
@@ -850,9 +841,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         }
 
         onPhotosphereKeyframe(
-            SphereSlamPhotosphereKeyframe(
+            PhotosphereKeyframe(
                 timestampNs = timestampNs,
-                luma = frame.bytes.copyOf(),
+                luma = frame.bytes,
                 width = frame.width,
                 height = frame.height,
                 intrinsics = floatArrayOf(
@@ -864,7 +855,8 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 headingDeg = attitude.first,
                 elevationDeg = attitude.second,
                 orientationQuaternion = attitudeSource.latestSample()?.quaternion,
-                cameraFromMap = mapPose.copyOf(),
+                cameraFromMap = mapPose,
+                rollDeg = cameraRollDegrees(cameraFromDevice)?.takeIf { it.isFinite() } ?: 0f,
             )
         )
     }
@@ -1232,7 +1224,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                     "SphereSLAM MobileGS map refused backend=standalone-kpm frame=centered-page " +
                         "version=" + mobileGsWallFeatureMapFrameVersion +
                         " expected=" + expectedFrameVersion +
-                        " anchorIdentity=" + StandaloneFingerprintFrame.isCenteredPageAnchor(map.anchor),
+                        " anchorIdentity=" + isIdentityAnchor(map.anchor),
                 )
             }
         }
@@ -1375,6 +1367,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         // SENSOR_ORIENTATION is a multiple of 90 by contract; DeviceCameraRotation requires that.
         if (raw % 90 == 0) raw else DEFAULT_SENSOR_ORIENTATION_DEG
     }.getOrDefault(DEFAULT_SENSOR_ORIENTATION_DEG)
+
+    /** Diagnostic only: whether a persisted map anchor is the legacy centred-page identity frame. */
+    private fun isIdentityAnchor(anchor: FloatArray, epsilon: Float = 1e-5f): Boolean =
+        sameTransform(anchor, identityView(), epsilon)
 
     private fun sameTransform(
         a: FloatArray?,

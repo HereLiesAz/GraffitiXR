@@ -7,6 +7,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 import org.opencv.core.CvType
+import com.hereliesaz.sphereslam.PhotosphereFingerprintFrame
 
 class StandaloneFingerprintBuilderTest {
 
@@ -50,7 +51,7 @@ class StandaloneFingerprintBuilderTest {
         assertArrayEquals(descriptors, fp.descriptorsData)
 
         for (i in 0 until rows) {
-            val expected = StandaloneFingerprintFrame.referencePixelToWall(
+            val expected = PhotosphereFingerprintFrame.referencePixelToWall(
                 positions[i * 2],
                 positions[i * 2 + 1],
                 width,

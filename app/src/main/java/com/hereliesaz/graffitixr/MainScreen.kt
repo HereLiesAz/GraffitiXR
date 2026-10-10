@@ -405,10 +405,13 @@ fun MainScreen(
                             coverageGlowDirections = {
                                 arViewModel.sphereThinDirections.value
                             },
-                            coverageCurrentDirections = {
-                                arViewModel.sphereCurrentDirections.value
+                            coverageCurrentRegions = {
+                                arViewModel.sphereCurrentRegions.value
                             },
                             cameraAttitude = { arViewModel.latestCameraAttitude },
+                            cameraRollDegrees = { cameraFromDevice ->
+                                arViewModel.latestCameraRollDegrees(cameraFromDevice)
+                            },
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {

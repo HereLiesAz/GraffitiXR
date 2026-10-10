@@ -26,7 +26,6 @@ import com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
 import com.hereliesaz.sphereslam.math.RigidMath
 import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder
-import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintFrame
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
@@ -1020,17 +1019,23 @@ class ArViewModel @Inject constructor(
     val sphereThinDirections: StateFlow<List<com.hereliesaz.sphereslam.SphereCoverage.Direction>> =
         _sphereThinDirections.asStateFlow()
 
-    private val _sphereCurrentDirections =
-        MutableStateFlow<List<com.hereliesaz.sphereslam.SphereCoverage.Direction>>(emptyList())
+    private val _sphereCurrentRegions =
+        MutableStateFlow<List<com.hereliesaz.sphereslam.SphereCoverage.TileRegion>>(emptyList())
 
-    /** Directions whose photosphere tiles are current and therefore must be cut out of the glow. */
-    val sphereCurrentDirections: StateFlow<List<com.hereliesaz.sphereslam.SphereCoverage.Direction>> =
-        _sphereCurrentDirections.asStateFlow()
+    /**
+     * Angular extents of the photosphere tiles that are current — the holes cut out of the coverage
+     * wash ([com.hereliesaz.sphereslam.PhotosphereMap.currentRegions]).
+     */
+    val sphereCurrentRegions: StateFlow<List<com.hereliesaz.sphereslam.SphereCoverage.TileRegion>> =
+        _sphereCurrentRegions.asStateFlow()
 
-    private val spherePhotosphereFrames =
-        LinkedHashMap<com.hereliesaz.sphereslam.TileId, SphereSlamPhotosphereKeyframe>()
-    /** Most recent accepted keyframe of any tile; supplies session intrinsics for a fresh tile. */
-    private var spherePhotosphereLatestFrame: SphereSlamPhotosphereKeyframe? = null
+    /**
+     * Latest keyframe per photosphere tile (SphereSLAM [com.hereliesaz.sphereslam.PhotosphereKeyframeStore]);
+     * feeds [spherePhotosphere], anchors its wall heading on the first keyframe, and supplies the
+     * capture view for fingerprint placement. Guarded by [spherePhotosphereLock] with the map.
+     */
+    private val spherePhotosphereKeyframes =
+        com.hereliesaz.sphereslam.PhotosphereKeyframeStore(spherePhotosphere)
     @Volatile private var standalonePhotosphereActive: Boolean = false
     @Volatile private var sphereFingerprintAnchorTile: com.hereliesaz.sphereslam.TileId? = null
 
@@ -1040,6 +1045,24 @@ class ArViewModel @Inject constructor(
             val h = cameraAttitudeProvider.latestHeadingDegrees() ?: return null
             return h to (cameraAttitudeProvider.latestElevationDegrees() ?: 0f)
         }
+
+    /**
+     * Roll of an image's right axis above the horizon, degrees, for the image frame [cameraFromDevice]
+     * maps the device body into (SphereSLAM `DeviceCameraRotation`), or null without a sample. Pairs
+     * with [latestCameraAttitude] for `PhotosphereMap.directionOfPixel`.
+     */
+    fun latestCameraRollDegrees(cameraFromDevice: FloatArray): Float? {
+        val deviceToWorld = cameraAttitudeProvider.latestDeviceToWorldMatrix() ?: return null
+        return com.hereliesaz.sphereslam.CameraAttitudeProvider
+            .cameraRollDegrees(deviceToWorld, cameraFromDevice)
+    }
+
+    /** Current display rotation in degrees (0/90/180/270); 0 when the display is unavailable. */
+    private fun displayRotationDegrees(): Int = runCatching {
+        val display = appContext.getSystemService(android.hardware.display.DisplayManager::class.java)
+            ?.getDisplay(android.view.Display.DEFAULT_DISPLAY)
+        (display?.rotation ?: android.view.Surface.ROTATION_0) * 90
+    }.getOrDefault(0)
 
     /**
      * Start compass/elevation sampling for the standalone base photosphere. The analyzer captures a
@@ -1071,42 +1094,22 @@ class ArViewModel @Inject constructor(
     private fun refreshSphereTileGlowLocked() {
         _sphereCoverageFraction.value = spherePhotosphere.coverageFraction()
         _sphereThinDirections.value = spherePhotosphere.directionsNeedingUpdate()
-
-        val snapshot = spherePhotosphere.snapshot()
-        val current = ArrayList<com.hereliesaz.sphereslam.SphereCoverage.Direction>()
-        for (sector in 0 until snapshot.sectorCount) {
-            for (band in 0 until snapshot.elevationBandCount) {
-                val id = com.hereliesaz.sphereslam.TileId(sector, band)
-                if (spherePhotosphere.hasBeenScanned(id) && !spherePhotosphere.needsUpdate(id)) {
-                    spherePhotosphere.tile(id)?.center?.let(current::add)
-                }
-            }
-        }
-        _sphereCurrentDirections.value = current
+        _sphereCurrentRegions.value = spherePhotosphere.currentRegions()
     }
 
-    fun onStandalonePhotosphereKeyframe(keyframe: SphereSlamPhotosphereKeyframe) {
+    fun onStandalonePhotosphereKeyframe(keyframe: com.hereliesaz.sphereslam.PhotosphereKeyframe) {
         var tile: com.hereliesaz.sphereslam.TileId? = null
         var firstCaptureForTile = false
         synchronized(spherePhotosphereLock) {
-            if (!spherePhotosphere.hasWallHeading()) {
-                // The photosphere owns its coordinate frame from startup. This is NOT a fingerprint
-                // anchor; it is simply the initial camera-facing bearing for the base map.
-                spherePhotosphere.setWallHeading(keyframe.headingDeg)
-            }
-            val candidate = spherePhotosphere.tileAt(keyframe.headingDeg, keyframe.elevationDeg)
-            firstCaptureForTile =
-                candidate != null && !spherePhotosphere.hasBeenScanned(candidate)
-            tile = spherePhotosphere.markUpdated(
-                headingDeg = keyframe.headingDeg,
-                elevationDeg = keyframe.elevationDeg,
-                nowMs = android.os.SystemClock.elapsedRealtime(),
-                representativeOrientation = keyframe.orientationQuaternion,
-            )
-            tile?.let {
-                spherePhotosphereFrames[it] = keyframe
-                spherePhotosphereLatestFrame = keyframe
-            }
+            // The store anchors the map's wall heading on the first keyframe: the photosphere owns
+            // its coordinate frame from startup. That is NOT a fingerprint anchor; it is simply the
+            // initial camera-facing bearing for the base map.
+            spherePhotosphereKeyframes
+                .record(keyframe, nowMs = android.os.SystemClock.elapsedRealtime())
+                ?.let {
+                    tile = it.tile
+                    firstCaptureForTile = it.firstCaptureForTile
+                }
             refreshSphereTileGlowLocked()
         }
 
@@ -4650,53 +4653,30 @@ class ArViewModel @Inject constructor(
         tap: Pair<Float, Float>?,
     ): StandaloneFingerprintPlacement? {
         val attitude = latestCameraAttitude ?: return null
+        // Roll of the display-upright frame the keyframes and the capture tap live in.
+        val rollDeg = latestCameraRollDegrees(
+            com.hereliesaz.sphereslam.attitude.DeviceCameraRotation
+                .bodyToDisplay(displayRotationDegrees()),
+        ) ?: 0f
         return synchronized(spherePhotosphereLock) {
-            val tileId = spherePhotosphere.tileAt(attitude.first, attitude.second) ?: return@synchronized null
-            // A fresh tile (no keyframe yet) still binds: current attitude + session intrinsics.
-            val view = StandalonePhotosphereCapture.view(
-                attitude = attitude,
-                currentTileKeyframe = spherePhotosphereFrames[tileId],
-                latestKeyframe = spherePhotosphereLatestFrame,
+            // The current tile's own keyframe, or (fresh tile) the session intrinsics paired with the
+            // CURRENT attitude — never another tile's direction.
+            val view = spherePhotosphereKeyframes.view(attitude.first, attitude.second, rollDeg)
+                ?: return@synchronized null
+            // The tapped pixel's direction is rotated through heading, elevation AND roll
+            // (PhotosphereMap.directionOfPixel). A missing tile range means the map is still the
+            // normalized unit-radius, non-metric frame, not zero metres.
+            val placement = com.hereliesaz.sphereslam.PhotosphereFingerprintFrame.placement(
+                map = spherePhotosphere,
+                view = view,
+                nx = tap?.first ?: 0.5f,
+                ny = tap?.second ?: 0.5f,
             ) ?: return@synchronized null
-            val tile = spherePhotosphere.tile(tileId) ?: return@synchronized null
-            val wallHeading = spherePhotosphere.snapshot().wallHeadingDeg ?: return@synchronized null
-            val fx = view.fx
-            val fy = view.fy
-            val cx = view.cx
-            val cy = view.cy
-
-            val nx = (tap?.first ?: 0.5f).coerceIn(0f, 1f)
-            val ny = (tap?.second ?: 0.5f).coerceIn(0f, 1f)
-            val u = nx * view.width.toFloat()
-            val v = ny * view.height.toFloat()
-            val azimuthOffsetDeg = Math.toDegrees(
-                kotlin.math.atan(((u - cx) / fx).toDouble())
-            ).toFloat()
-            val elevationOffsetDeg = -Math.toDegrees(
-                kotlin.math.atan(((v - cy) / fy).toDouble())
-            ).toFloat()
-
-            val targetAzimuth = view.headingDeg + azimuthOffsetDeg
-            val targetElevation = (view.elevationDeg + elevationOffsetDeg).coerceIn(-89f, 89f)
-            val azimuthDelta = signedAngleDegrees(targetAzimuth, wallHeading)
-
-            // PhotosphereMap is allowed to be normalized. A missing range does NOT mean zero metres:
-            // it means the map currently uses a unit-radius coordinate system and is explicitly
-            // non-metric until depth/other scale evidence upgrades it.
-            val metricRange = tile.rangeMeters?.takeIf { it.isFinite() && it > 0f }
-            val rangeUnits = metricRange ?: 1f
-            val widthUnits =
-                (rangeUnits * view.width.toFloat() / fx).coerceAtLeast(1e-4f)
-
             StandaloneFingerprintPlacement(
-                mapFromFingerprint = StandaloneFingerprintFrame.mapFromFingerprint(
-                    azimuthDeltaDeg = azimuthDelta,
-                    elevationDeg = targetElevation,
-                    rangeUnits = rangeUnits,
-                ),
-                referenceWidthUnits = widthUnits,
-                physicallyMetric = metricRange != null,
-                tileId = tileId,
+                mapFromFingerprint = placement.mapFromFingerprint,
+                referenceWidthUnits = placement.referenceWidthUnits,
+                physicallyMetric = placement.physicallyMetric,
+                tileId = placement.tileId,
             )
         }
     }
@@ -4706,17 +4686,10 @@ class ArViewModel @Inject constructor(
             attitudeSensorAvailable = cameraAttitudeProvider.isAvailable,
             attitude = latestCameraAttitude,
             hasAnyKeyframe = synchronized(spherePhotosphereLock) {
-                spherePhotosphereLatestFrame != null &&
+                spherePhotosphereKeyframes.latest != null &&
                     spherePhotosphere.snapshot().wallHeadingDeg != null
             },
         )
-
-    private fun signedAngleDegrees(value: Float, origin: Float): Float {
-        var d = (value - origin) % 360f
-        if (d > 180f) d -= 360f
-        if (d < -180f) d += 360f
-        return d
-    }
 
     /**
      * CameraX/SphereSLAM counterpart to [onTargetCaptured].

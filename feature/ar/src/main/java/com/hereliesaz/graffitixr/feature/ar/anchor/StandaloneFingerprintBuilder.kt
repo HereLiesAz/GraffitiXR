@@ -13,12 +13,13 @@ import org.opencv.core.Mat
 import org.opencv.core.MatOfKeyPoint
 import org.opencv.features.ORB
 import org.opencv.imgproc.Imgproc
+import com.hereliesaz.sphereslam.PhotosphereFingerprintFrame
 
 /**
  * Builds the standalone MobileGS fingerprint directly from the rectified SphereSLAM wall page.
  *
  * Unlike [MetricFingerprintBuilder], no ARCore world/capture-camera frame is involved. Every
- * descriptor row is paired with a point on z=0 in [StandaloneFingerprintFrame], which is the same
+ * descriptor row is paired with a point on z=0 in [PhotosphereFingerprintFrame], which is the same
  * centered wall frame KPM and the standalone renderer use.
  *
  * SuperPoint is preferred when the native model is loaded because the live MobileGS relocalizer
@@ -107,7 +108,7 @@ object StandaloneFingerprintBuilder {
             if (u < 0f || u >= widthPixels.toFloat() || v < 0f || v >= heightPixels.toFloat()) {
                 continue
             }
-            val p = StandaloneFingerprintFrame.referencePixelToWall(
+            val p = PhotosphereFingerprintFrame.referencePixelToWall(
                 u = u,
                 v = v,
                 widthPixels = widthPixels,
