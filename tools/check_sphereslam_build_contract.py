@@ -119,13 +119,17 @@ hybrid_correction = read(
 if "observation.cameraFromPage3x4" not in hybrid_correction:
     fail("Hybrid correction is not consuming SphereSLAM Observation.cameraFromPage3x4.")
 
-runtime_probe = read(
-    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/pose/"
-    "SphereSlamRuntimeProbe.kt"
+# The fail-closed runtime capability probe is the library's SphereSlam.isOperational() (native
+# entry points linked AND a calibrated KPM session creatable/ready/closable). GraffitiXR must gate
+# standalone availability on it rather than on the weaker isAvailable() alone, and must not
+# reintroduce a private copy of the probe.
+ar_view_model = read(
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/ArViewModel.kt"
 )
-for required in ("SphereSlam.isAvailable", "SphereSlam.create", "engine.isReady", "engine.close()"):
-    if required not in runtime_probe:
-        fail(f"Supported SphereSLAM runtime probe lost required public-API step {required!r}.")
+if "SphereSlam.isOperational()" not in ar_view_model:
+    fail("ArViewModel no longer resolves SphereSLAM availability through SphereSlam.isOperational().")
+if (ROOT / "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/pose/SphereSlamRuntimeProbe.kt").exists():
+    fail("SphereSlamRuntimeProbe was reintroduced; use the library's SphereSlam.isOperational().")
 
 # 3. Both supported ARM ABIs stay built/packaged so every APK split has a libsphereslam.so slot.
 expected_abi_expr = 'abiFilters += listOf("arm64-v8a", "armeabi-v7a")'

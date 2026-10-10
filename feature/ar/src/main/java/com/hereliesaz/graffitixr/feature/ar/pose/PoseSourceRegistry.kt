@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar.pose
 
 import android.util.Log
+import com.hereliesaz.sphereslam.SphereSlam
 
 /**
  * Registry/bring-up entry point for pose producers.
@@ -21,13 +22,13 @@ object PoseSourceRegistry {
     private const val TAG = "POSEPROBE"
 
     /**
-     * Opt-in native runtime probe invoked by -PposeProbe=true. This verifies the published
-     * SphereSLAM API can create and destroy a calibrated KPM session. A passing probe does not mean
+     * Opt-in native runtime probe invoked by -PposeProbe=true. [SphereSlam.isOperational] verifies
+     * the published SphereSLAM API can create and destroy a calibrated KPM session. A passing probe does not mean
      * the standalone SphereSLAM pose backend is complete or safe to select.
      */
     fun probe() {
         Thread({
-            val ok = SphereSlamRuntimeProbe.isOperational()
+            val ok = SphereSlam.isOperational()
             Log.i(
                 TAG,
                 "probe: SphereSLAM/KPM calibrated-session probe " +

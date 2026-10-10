@@ -1,7 +1,6 @@
 // FILE: feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/ArViewModel.kt
 package com.hereliesaz.graffitixr.feature.ar
 
-import com.hereliesaz.graffitixr.feature.ar.pose.SphereSlamRuntimeProbe
 
 import android.content.ComponentName
 import android.content.Context
@@ -1724,7 +1723,7 @@ class ArViewModel @Inject constructor(
             // The public runtime probe verifies both native availability and calibrated KPM session
             // creation/destruction. A partially packaged binary therefore still fails closed without
             // reaching SphereSLAM's internal diagnostic/test hooks.
-            val available = SphereSlamRuntimeProbe.isOperational()
+            val available = com.hereliesaz.sphereslam.SphereSlam.isOperational()
 
             _uiState.update {
                 it.copy(
