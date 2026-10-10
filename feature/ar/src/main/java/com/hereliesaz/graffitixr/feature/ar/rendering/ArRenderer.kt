@@ -3454,7 +3454,10 @@ class ArRenderer(
     fun releaseGlResources() {
         backgroundRenderer.release()
         overlayRenderer.release()
-        try { cloudAnchor?.detach() } catch (_: Exception) { /* session already gone */ }
+        // Drop the reference only. This runs from queueEvent concurrently with [destroy] and the
+        // owner's Session.close on other threads, with no sessionLock held: a native Anchor.detach
+        // here could race either one. As [destroy] documents for the page anchor, an unserialized
+        // best-effort detach is worse than leaving the anchor to Session.close.
         cloudAnchor = null
         pointCloudRenderer.release()
         planeRenderer.release()
