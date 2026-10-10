@@ -313,6 +313,14 @@ internal class GuestSession(
         val end = readSecure(input, crypto) ?: error("EOF before BULK_END")
         require(end.type == FrameType.BULK_END)
 
+        // The snapshot is the new baseline, so the seq this guest had applied before it no longer
+        // describes its state. BULK_* carries no base seq; the host treats a bulk receiver like a
+        // fresh join (it drops queued deltas the snapshot covers and expects the guest to take every
+        // DELTA after it). Keeping an old, possibly higher lastAppliedSeq would make the `seq >
+        // lastAppliedSeq` filter silently drop those. Any delta at or below the snapshot that still
+        // arrives is absolute state, so re-applying it converges.
+        lastAppliedSeq = 0L
+
         writeSecure(output, crypto, FrameType.BULK_ACK, OpCodec.encode(BulkAckPayload(0L)))
 
         onBulkReceived(fingerprint, project, beginPayload.spatialFrame)
