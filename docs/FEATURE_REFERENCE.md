@@ -49,6 +49,7 @@ adjustment/anchoring lens is active.
 | Capability | ARCore-supported AR | ARCore-unavailable standalone AR |
 |---|---|---|
 | Camera owner | ARCore `Session` / `ArRenderer` | CameraX |
+| Camera view | full screen: ARCore's background quad is centre-cropped to the view by `Frame.transformCoordinates2d`, and its projection/hit tests share that display geometry | full screen: `PreviewView` `FILL_CENTER` (as in Overlay); the artwork projection, target-capture taps and coverage-glow field of view apply the same centre crop (`CameraFillCenter`), while tracking keeps the full analysis frame |
 | Continuous pose | ARCore | calibrated SphereSLAM/KPM page match |
 | Short visual miss | ARCore tracking/fusion | rotation-only IMU bridge, max 400 ms |
 | Persisted wall target | ARCore target/fingerprint data | versioned rectified SphereSLAM reference PNG + width/metric metadata |
@@ -150,8 +151,9 @@ design, and Gyro moves the drawn design with the wall instead.
 - **On:** captures the current device orientation (`TYPE_GAME_ROTATION_VECTOR`, via SphereSLAM's
   `GameRotationAttitudeSource`) as the reference. Every frame the orientation delta since then becomes
   the pure-rotation screen homography `H = K·R·K⁻¹` (SphereSLAM `GyroCompensationMath`), with K from
-  `CameraIntrinsicsEstimator` scaled to the FIT_CENTER preview (`ScreenIntrinsics`; a nominal 68°
-  field of view if Camera2 reports nothing). `H` is drawn as an extra screen-space transform around Overlay's whole-design
+  `CameraIntrinsicsEstimator` scaled to the full-screen `FILL_CENTER` preview
+  (`CameraFillCenter.screenIntrinsics`, the fill counterpart of SphereSLAM `ScreenIntrinsics`; a
+  nominal 68° field of view if Camera2 reports nothing). `H` is drawn as an extra screen-space transform around Overlay's whole-design
   draw, so the design's edits and Overlay's `ModeAdjustment` are unchanged.
 - **Release:** rotation beyond **3°** since the reference (tripod bumped, phone picked up)
   releases Gyro with a short toast; so does a device with no rotation-vector sensor. Turning it off,

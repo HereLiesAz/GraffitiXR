@@ -24,10 +24,10 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import com.hereliesaz.graffitixr.feature.ar.rendering.CameraFillCenter
 import com.hereliesaz.sphereslam.camera.CameraIntrinsicsEstimator
 import com.hereliesaz.sphereslam.models.DepthEstimator
 import com.hereliesaz.sphereslam.attitude.GameRotationAttitudeSource
-import com.hereliesaz.sphereslam.camera.ScreenIntrinsics
 import com.hereliesaz.sphereslam.gyro.GyroCompensationMath
 import com.hereliesaz.sphereslam.math.RotationMath
 import java.util.concurrent.Executor
@@ -148,7 +148,7 @@ fun rememberOverlayGyroCompensation(
             // MiDaS, very slowly, off the main thread. Child of this effect: cancelled with it, and
             // explicitly in `finally` so an auto-release stops it at once.
             depthJob = launch(Dispatchers.Default) {
-                runDepthLoop(appContext, cameraController) { currentDesignCenter() }
+                runDepthLoop(appContext, cameraController, viewWidth, viewHeight) { currentDesignCenter() }
             }
 
             while (isActive) {
@@ -210,11 +210,13 @@ private suspend fun screenIntrinsicsFor(
     val estimated = cameraId?.let {
         CameraIntrinsicsEstimator.estimate(context, it, NOMINAL_FRAME_W, NOMINAL_FRAME_H)
     }
+    // CameraPreview shows the frame FILL_CENTER, so a screen pixel is the covering scale's worth of
+    // frame — the fit scale would under-state the focal length and under-compensate.
     return if (estimated != null) {
-        ScreenIntrinsics.fitCenter(estimated, viewWidth, viewHeight)
+        CameraFillCenter.screenIntrinsics(estimated, viewWidth, viewHeight)
     } else {
         Timber.w("OverlayGyro: no camera intrinsics; using a nominal field of view")
-        ScreenIntrinsics.fallback(viewWidth, viewHeight)
+        CameraFillCenter.screenIntrinsicsFallback(viewWidth, viewHeight)
     }
 }
 
@@ -227,6 +229,8 @@ private suspend fun screenIntrinsicsFor(
 private suspend fun runDepthLoop(
     context: Context,
     cameraController: LifecycleCameraController,
+    viewWidth: Int,
+    viewHeight: Int,
     designCenter: () -> Pair<Float, Float>,
 ) = kotlinx.coroutines.coroutineScope {
     val estimator = DepthEstimator(context)
@@ -240,11 +244,19 @@ private suspend fun runDepthLoop(
                 cameraController.takeDownsampledStill(depthStillExecutor, DEPTH_STILL_MAX_DIM)
             }
             if (still != null) {
+                // The depth map may be resampled to the model's own size; the crop is the still's.
+                val stillWidth = still.width
+                val stillHeight = still.height
                 val map = try { estimator.estimate(still) } finally { still.recycle() }
                 if (map != null) {
-                    val (nx, ny) = designCenter()
+                    // The design centre is a fraction of the screen; the still is the whole
+                    // frame, of which the FILL_CENTER preview shows a centre crop.
+                    val (vx, vy) = designCenter()
+                    val inFrame = CameraFillCenter.viewToFrameNormalized(
+                        vx, vy, stillWidth, stillHeight, viewWidth, viewHeight,
+                    ) ?: floatArrayOf(vx, vy)
                     val rel = GyroCompensationMath.relativeInverseDepthAt(
-                        map.data, map.width, map.height, nx, ny,
+                        map.data, map.width, map.height, inFrame[0], inFrame[1],
                     )
                     // Logged, not applied: it would scale a translation term that is off (class doc).
                     Timber.d("OverlayGyro: surface relative inverse depth %.3f", rel ?: Float.NaN)

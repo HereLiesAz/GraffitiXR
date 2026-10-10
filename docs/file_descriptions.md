@@ -130,12 +130,16 @@ the real (non-stub) tracker is packaged.
     tracking-state hysteresis, and the short rotation-only IMU bridge (SphereSLAM
     `GameRotationAttitudeSource` + `AttitudeRotationBridge`, body→camera
     `DeviceCameraRotation.cameraFromDevice(SENSOR_ORIENTATION, rotationDegrees)`). Emits SphereSLAM
-    `PhotosphereKeyframe`s; corroborates MobileGS reloc with `:reloc` `PoseBlend`.
+    `PhotosphereKeyframe`s; corroborates MobileGS reloc with `:reloc` `PoseBlend`. Tracks the full
+    luma buffer (not the preview viewport's cropRect) and publishes each frame's display-upright
+    intrinsics for the renderer's `FILL_CENTER` projection.
 *   `StandaloneWallHitTest.kt`: ARCore-independent screen-pixel → canonical wall intersection.
 *   `StandalonePhotosphereCapture.kt`: names why a standalone fingerprint cannot be bound to the
     base photosphere (no rotation sensor / attitude not ready / no keyframe yet) and the
     artist-facing message. The capture view and placement are SphereSLAM's
-    (`PhotosphereKeyframeStore.view`, `PhotosphereFingerprintFrame.placement`, roll-aware).
+    (`PhotosphereKeyframeStore.view`, `PhotosphereFingerprintFrame.placement`, roll-aware); the
+    screen tap reaches the placement through `ArViewModel`'s `standaloneTapInFrame`, which undoes the
+    preview's `FILL_CENTER` crop.
     Back-projects calibrated CameraX rays onto SphereSLAM z=0 and accepts only visually locked,
     registered page/atlas coverage; no synthetic depth or ARCore `Frame.hitTest`.
 *   `StandaloneAtlasGrowth.kt`: chooses/rectifies additional KPM wall pages and registers each into
@@ -143,16 +147,28 @@ the real (non-stub) tracker is packaged.
 *   `StandaloneFailure.kt` / `StandaloneDiagnostics.kt`: typed standalone failure taxonomy and the
     compact diagnostic dump contract.
 *   `rendering/HomographyOverlayRenderer.kt`: transparent CameraX GL overlay renderer shared by
-    standalone SphereSLAM AR and the legacy homography Overlay tracker. In standalone it embeds
-    SphereSLAM `:overlay` `CoverageGlowRenderer` (complement wash, holes =
-    `PhotosphereMap.currentRegions()`) before the design.
+    standalone SphereSLAM AR and the legacy homography Overlay tracker. Takes each pose with the
+    full tracked frame's intrinsics and draws on the full surface with the `FILL_CENTER`
+    projection (`CameraFillCenter.projection`, cached per intrinsics/surface size). In standalone
+    it embeds SphereSLAM `:overlay` `CoverageGlowRenderer` (complement wash, holes =
+    `PhotosphereMap.currentRegions()`, projected through the cropped field of view) before the design.
+*   `rendering/CameraFillCenter.kt`: pure `PreviewView.ScaleType.FILL_CENTER` math shared by
+    everything registered to the CameraX preview — frame intrinsics → on-screen intrinsics/projection
+    (SphereSLAM `CameraIntrinsicsTransforms.rescale` then `.crop`, `ProjectionMatrix.buildFrom`;
+    whole-pixel rounding kept under ½ view px), screen tap → full-frame point, shown field of view,
+    and Gyro screen intrinsics. Library candidate: SphereSLAM has only the `FIT_CENTER`
+    `ScreenIntrinsics`.
 *   `rendering/BackgroundRenderer.kt`: OpenGL ES shader that renders ARCore's `EXTERNAL_OES`
     camera texture full-screen.
-*   `CameraPreview.kt`: shared CameraX preview for Overlay and standalone SphereSLAM AR.
+*   `CameraPreview.kt`: shared CameraX preview for Overlay and standalone SphereSLAM AR, full
+    screen (`FILL_CENTER`). CameraController hands that viewport to ImageAnalysis as a cropRect; the
+    tracking analyzers ignore it and solve on the full frame, applying the crop only where the frame
+    meets the screen (`rendering/CameraFillCenter.kt`).
 *   `OverlayGyroStabilizer.kt`: Overlay ▸ Gyro (tripod stabilisation) Compose wiring.
     `rememberOverlayGyroCompensation` captures a game-rotation reference (SphereSLAM
     `GameRotationAttitudeSource`), publishes the per-frame pure-rotation screen homography
-    (SphereSLAM `gyro.GyroCompensationMath`, `camera.ScreenIntrinsics`) MainScreen draws the Overlay
+    (SphereSLAM `gyro.GyroCompensationMath`; screen intrinsics for the `FILL_CENTER` preview from
+    `rendering/CameraFillCenter`) MainScreen draws the Overlay
     design through, auto-releases past 3°, and runs a slow (15 s) background MiDaS sample (`:models`
     `DepthEstimator`) of the surface under the design.
 *   `HomographyFallbackOverlay.kt` / `HomographyArTracker.kt` / `BridgedHomographyTracker.kt`: legacy

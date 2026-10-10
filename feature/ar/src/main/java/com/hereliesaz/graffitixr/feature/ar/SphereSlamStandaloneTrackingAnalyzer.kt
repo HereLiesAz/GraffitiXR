@@ -81,7 +81,14 @@ enum class SphereSlamStandalonePoseSource {
 
 data class SphereSlamStandaloneFrame(
     val viewMatrix: FloatArray,
+    /** Projection of the full tracked frame (tracking-side metrics; not what the screen shows). */
     val projMatrix: FloatArray,
+    /**
+     * Intrinsics of the full display-upright tracked frame [projMatrix] was built from. The artwork
+     * renderer re-derives its on-screen projection from these through the preview's `FILL_CENTER`
+     * crop ([com.hereliesaz.graffitixr.feature.ar.rendering.CameraFillCenter]).
+     */
+    val frameIntrinsics: CameraIntrinsics,
     val frameAspect: Float,
     val frameHeightPixels: Int,
     val timestampNs: Long,
@@ -336,7 +343,12 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             val rawWidth = image.width
             val rawHeight = image.height
             val rotationDeg = image.imageInfo.rotationDegrees
-            val crop = image.cropRect
+            // The full buffer, not image.cropRect. CameraController applies PreviewView's viewport
+            // to every bound use case, so under CameraPreview's FILL_CENTER the analysis cropRect is
+            // the on-screen crop — tracking on it would throw away the off-screen sides of the frame
+            // (two fifths of a 3:4 frame's width on a 9:20 phone). The crop is a display concern only;
+            // rendering.CameraFillCenter applies it where the frame meets the screen.
+            val crop = android.graphics.Rect(0, 0, rawWidth, rawHeight)
             if (crop.width() <= 0 || crop.height() <= 0) return
 
             val rotated = LumaFrameTransform.packCropAndRotate(
@@ -524,6 +536,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 val tracked = SphereSlamStandaloneFrame(
                     viewMatrix = renderView,
                     projMatrix = projection,
+                    frameIntrinsics = intrinsics,
                     frameAspect = rotated.width.toFloat() / rotated.height.toFloat(),
                     frameHeightPixels = rotated.height,
                     timestampNs = timestampNs,
@@ -583,7 +596,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                     )
                 }
             }
-            publishVisualMiss(outcome.state, projection, rotated, timestampNs)
+            publishVisualMiss(outcome.state, projection, intrinsics, rotated, timestampNs)
         } catch (t: Throwable) {
             if (!closed) {
                 fatal = true
@@ -605,12 +618,13 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private fun publishVisualMiss(
         state: StandaloneTrackingState,
         projection: FloatArray,
+        intrinsics: CameraIntrinsics,
         frame: RotatedLuma,
         timestampNs: Long,
     ) {
         reportTrackingState(state)
         if (state == StandaloneTrackingState.IMU_BRIDGE) {
-            onFrameTracked(bridgeLastGood(projection, frame, timestampNs))
+            onFrameTracked(bridgeLastGood(projection, intrinsics, frame, timestampNs))
         } else {
             lastGood = null
             onFrameTracked(null)
@@ -1302,6 +1316,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
 
     private fun bridgeLastGood(
         projection: FloatArray,
+        intrinsics: CameraIntrinsics,
         frame: RotatedLuma,
         timestampNs: Long,
     ): SphereSlamStandaloneFrame? {
@@ -1313,6 +1328,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         return held.copy(
             viewMatrix = RotationMath.rotateAboutCameraCentre(held.viewMatrix, delta),
             projMatrix = projection,
+            frameIntrinsics = intrinsics,
             frameAspect = frame.width.toFloat() / frame.height.toFloat(),
             frameHeightPixels = frame.height,
             timestampNs = timestampNs,

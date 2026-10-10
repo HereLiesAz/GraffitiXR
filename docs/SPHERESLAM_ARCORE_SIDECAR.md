@@ -82,8 +82,9 @@ This branch now has a first functional Mode B path as well as Mode A:
 
 - AR mode stays visible on devices where ARCore resolves unsupported;
 - CameraX owns the standalone camera;
-- the Y plane is cropped by `ImageProxy.cropRect`, packed with its real row/pixel stride, then
-  rotated into display orientation;
+- the full Y plane (not `ImageProxy.cropRect`, which is the full-screen `FILL_CENTER` preview's
+  on-screen crop) is packed with its real row/pixel stride, then rotated into display orientation;
+  the screen crop is a display mapping only (`CameraFillCenter`);
 - Camera2 intrinsics are shifted by the same crop origin and rotated through the same display
   transform as the pixels;
 - CameraController pinch-to-zoom is disabled and camera zoom is reset to 1x while standalone

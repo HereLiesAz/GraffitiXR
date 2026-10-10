@@ -1,9 +1,10 @@
 package com.hereliesaz.graffitixr.feature.ar
 
-import com.hereliesaz.graffitixr.feature.ar.rendering.letterboxViewport
+import com.hereliesaz.graffitixr.feature.ar.rendering.CameraFillCenter
 
 /**
- * Convert wall units / camera-frame pixel into wall units / screen pixel for the FIT_CENTER preview.
+ * Convert wall units / camera-frame pixel into wall units / screen pixel for the FILL_CENTER preview:
+ * one screen pixel spans 1/[CameraFillCenter.scale] frame pixels.
  */
 internal fun standaloneScreenUnitsPerPixel(
     frameUnitsPerPixel: Float,
@@ -15,16 +16,18 @@ internal fun standaloneScreenUnitsPerPixel(
     if (
         !frameUnitsPerPixel.isFinite() ||
         frameUnitsPerPixel <= 0f ||
-        frameHeightPixels <= 0
+        frameHeightPixels <= 0 ||
+        !frameAspect.isFinite() ||
+        frameAspect <= 0f
     ) {
         return 0f
     }
-    val viewport = letterboxViewport(
-        surfaceWidth = surfaceWidthPixels,
-        surfaceHeight = surfaceHeightPixels,
-        frameAspect = frameAspect,
+    val frameWidthPixels = Math.round(frameHeightPixels * frameAspect)
+    val scale = CameraFillCenter.scale(
+        frameWidth = frameWidthPixels,
+        frameHeight = frameHeightPixels,
+        viewWidth = surfaceWidthPixels,
+        viewHeight = surfaceHeightPixels,
     ) ?: return 0f
-    val viewportHeight = viewport[3]
-    if (viewportHeight <= 0) return 0f
-    return frameUnitsPerPixel * frameHeightPixels.toFloat() / viewportHeight.toFloat()
+    return frameUnitsPerPixel / scale
 }

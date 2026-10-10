@@ -915,7 +915,9 @@ fun MainScreen(
                                 detectTapGestures { offset ->
                                     val nx = offset.x / size.width
                                     val ny = offset.y / size.height
-                                    arViewModel.onScreenTap(nx, ny)
+                                    // The pixel size lets standalone undo the FILL_CENTER preview
+                                    // crop; this Box and CameraPreview both fill the same screen.
+                                    arViewModel.onScreenTap(nx, ny, size.width, size.height)
                                 }
                             }
                         } else if (!isTouchLocked && (editingMode || !isImageLocked)) {
