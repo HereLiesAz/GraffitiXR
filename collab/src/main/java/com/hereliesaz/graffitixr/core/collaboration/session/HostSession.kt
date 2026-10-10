@@ -59,6 +59,9 @@ internal class HostSession(
     // applies it to the authoritative project and THEN emits it like a local edit (enqueueOp), so
     // the host's DELTA order is its apply order — see EditorViewModel.applyGuestOp.
     private val onGuestOp: (Op) -> Unit = {},
+    // How long a dropped guest has to complete a reconnect before the session ends NetworkLost.
+    // Injectable so tests can use a short window instead of the production 30s.
+    private val reconnectWindowMs: Long = 30_000L,
 ) : Session() {
 
     /** Spatial identity fixed for the lifetime of this host session. */
@@ -115,6 +118,11 @@ internal class HostSession(
     // Crypto for the current live connection, so close()/BYE can seal on the active channel.
     @Volatile private var activeCrypto: SessionCrypto? = null
     @Volatile private var lastAppliedSeq: Long = 0L
+    // Bumped each time a connection completes handshake + bulk/replay and goes Live. The reconnect
+    // watcher waits for this to change rather than for clientSocket to be set: clientSocket is
+    // adopted before bulk/replay, so a reconnect that failed partway used to satisfy the watcher,
+    // after which acceptLoop reset clientSocket with nothing left to enforce the timeout.
+    @Volatile private var liveGeneration: Long = 0L
     // v4 guest edits: the connected guest's backend (for GuestOpPolicy) and the highest guestSeq
     // already handled, so a resend after a reconnect is acked without being applied twice.
     @Volatile private var guestBackend: com.hereliesaz.graffitixr.common.model.CoopTrackingBackend? = null
@@ -431,6 +439,7 @@ internal class HostSession(
         socket.soTimeout = READ_TIMEOUT_MS
         _state.value = CoopSessionState.Connected(peerName = hello.deviceName)
         phase = Phase.Live
+        liveGeneration++
 
         // Tear down any prior live loops (e.g. from a previous connection before a reconnect)
         // before starting fresh ones, so two outbound loops never drain outQueue concurrently.
@@ -692,10 +701,13 @@ internal class HostSession(
         // during the reconnect window; queued ops wait for the next connection's outbound loop.
         liveJob?.cancel()
         // Wait for the guest to reconnect on the session scope (not liveJob, which we just
-        // cancelled) so this timeout survives the live-loop teardown.
+        // cancelled) so this timeout survives the live-loop teardown. "Reconnected" means a new
+        // connection actually went Live (liveGeneration moved), not merely that one was adopted:
+        // a reconnect that fails during bulk/replay must leave this timeout running.
+        val generationAtDrop = liveGeneration
         scope.launch {
-            val reconnected = withTimeoutOrNull(30_000L) {
-                while (clientSocket == null && isActive) delay(200)
+            val reconnected = withTimeoutOrNull(reconnectWindowMs) {
+                while (liveGeneration == generationAtDrop && isActive) delay(200)
                 true
             } ?: false
             if (!reconnected && phase != Phase.Ended) {
