@@ -97,24 +97,71 @@ class OverlayGyroCompensationMathTest {
 
     @Test
     fun `display rotation remaps body axes so left stays left in landscape`() {
-        // In ROTATION_90 the display's up axis is body -x, so "turning left" is a rotation about
-        // body -x: body delta Rx(+1 deg). It must produce the same rightward slide as the portrait case.
-        val h = within(OverlayGyroCompensationMath.compensate(rx(1.0), 90, k))
+        // ROTATION_90 is the device turned 90 deg counter-clockwise (Display.getRotation's own
+        // example), so its right edge — body +x — is now the display's up axis. "Turning left" is
+        // +1 deg about body +x: body delta Rx(-1 deg). It must produce the same rightward slide as
+        // the portrait case.
+        val h = within(OverlayGyroCompensationMath.compensate(rx(-1.0), 90, k))
         val (u, v) = map(h, cx, cy)
         assertClose(cx + fx * tan(Math.toRadians(1.0)).toFloat(), u, 0.05f)
         assertClose(cy, v, 0.05f)
     }
 
     @Test
-    fun `bodyToDisplay matches remapCoordinateSystem for ROTATION_90 and 270`() {
-        val m90 = OverlayGyroCompensationMath.bodyToDisplay(90)
-        // x' = y, y' = -x
-        val v90 = RotationDeltaMath.multiplyMat3Vec3(m90, floatArrayOf(1f, 2f, 3f))
-        assertClose(2f, v90[0]); assertClose(-1f, v90[1]); assertClose(3f, v90[2])
-        val m270 = OverlayGyroCompensationMath.bodyToDisplay(270)
-        // x' = -y, y' = x
-        val v270 = RotationDeltaMath.multiplyMat3Vec3(m270, floatArrayOf(1f, 2f, 3f))
-        assertClose(-2f, v270[0]); assertClose(1f, v270[1]); assertClose(3f, v270[2])
+    fun `ROTATION_270 turning left is a rotation about body minus x`() {
+        // Device turned clockwise: its LEFT edge (body -x) is now up.
+        val h = within(OverlayGyroCompensationMath.compensate(rx(1.0), 270, k))
+        val (u, v) = map(h, cx, cy)
+        assertClose(cx + fx * tan(Math.toRadians(1.0)).toFloat(), u, 0.05f)
+        assertClose(cy, v, 0.05f)
+    }
+
+    /**
+     * Independent model of `SensorManager.remapCoordinateSystem(inR, X, Y, outR)` as AOSP implements
+     * it (`outR = inR · r`): argument X names the NEW axis (and sign) the device x axis lands on, Y the
+     * same for device y, and device z completes the right-handed frame. Returned as the row-major
+     * `v_new = M · v_device` component map. Written from that rule, not from RotationDeltaMath.
+     */
+    private fun remapLikeSensorManager(axisX: Int, axisY: Int): FloatArray {
+        val m = FloatArray(9)
+        fun place(axis: Int, deviceCol: Int) {
+            val sign = if ((axis and 0x80) != 0) -1f else 1f
+            val newRow = (axis and 0x3) - 1
+            m[newRow * 3 + deviceCol] = sign
+        }
+        place(axisX, 0)
+        place(axisY, 1)
+        // Column 2 (device z in new coords) = column 0 × column 1.
+        val c0 = floatArrayOf(m[0], m[3], m[6])
+        val c1 = floatArrayOf(m[1], m[4], m[7])
+        m[2] = c0[1] * c1[2] - c0[2] * c1[1]
+        m[5] = c0[2] * c1[0] - c0[0] * c1[2]
+        m[8] = c0[0] * c1[1] - c0[1] * c1[0]
+        return m
+    }
+
+    @Test
+    fun `bodyToDisplay matches remapCoordinateSystem for every Surface rotation`() {
+        // SensorManager.AXIS_X/Y = 1/2, AXIS_MINUS_* = 0x80 | axis; the standard per-rotation table.
+        val axisX = 1; val axisY = 2; val minusX = 0x81; val minusY = 0x82
+        val table = mapOf(
+            0 to remapLikeSensorManager(axisX, axisY),
+            90 to remapLikeSensorManager(axisY, minusX),
+            180 to remapLikeSensorManager(minusX, minusY),
+            270 to remapLikeSensorManager(minusY, axisX),
+        )
+        for ((deg, expected) in table) {
+            val actual = OverlayGyroCompensationMath.bodyToDisplay(deg)
+            for (i in 0..8) assertClose(expected[i], actual[i])
+        }
+        // Spelled out for 90: screen x = -body y, screen y = body x.
+        val v90 = RotationDeltaMath.multiplyMat3Vec3(
+            OverlayGyroCompensationMath.bodyToDisplay(90), floatArrayOf(1f, 2f, 3f),
+        )
+        assertClose(-2f, v90[0]); assertClose(1f, v90[1]); assertClose(3f, v90[2])
+        // ...and it is RotationDeltaMath.rotationAboutZ(+90), not the negated angle.
+        val rz90 = RotationDeltaMath.rotationAboutZ(90)
+        for (i in 0..8) assertClose(rz90[i], table.getValue(90)[i])
     }
 
     @Test

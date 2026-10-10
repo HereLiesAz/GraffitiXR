@@ -59,11 +59,19 @@ object OverlayGyroCompensationMath {
 
     /**
      * Body-to-display axis remap for a `Surface.ROTATION_*` expressed in degrees (0/90/180/270):
-     * `v_display = M · v_body`. For 90 that is `x' = y, y' = −x` (`remapCoordinateSystem(AXIS_Y,
-     * AXIS_MINUS_X)`), i.e. a rotation about z by −rotationDeg.
+     * `v_display = M · v_body`, i.e. a rotation about z by +rotationDeg.
+     *
+     * For 90 that is `x' = −y, y' = x`. `ROTATION_90` means the device was turned 90° COUNTER-
+     * clockwise (`Display.getRotation`'s documented example), so its top edge points left — screen
+     * right is body −y — and its right edge points up — screen up is body +x. That is exactly what
+     * `remapCoordinateSystem(inR, AXIS_Y, AXIS_MINUS_X, outR)` computes (its arguments name where
+     * each DEVICE axis lands: device x → new +y, device y → new −x).
+     *
+     * This used to negate the angle, reading those arguments the other way round (`x' = y, y' = −x`),
+     * which reversed every pan/tilt compensation in landscape.
      */
     fun bodyToDisplay(displayRotationDeg: Int): FloatArray =
-        RotationDeltaMath.rotationAboutZ(-normalizeQuarterTurn(displayRotationDeg))
+        RotationDeltaMath.rotationAboutZ(normalizeQuarterTurn(displayRotationDeg))
 
     /** Re-express a body-axes rotation delta in the display's axes: `M · ΔR · Mᵀ`. */
     fun displayDelta(deltaBody: FloatArray, displayRotationDeg: Int): FloatArray {

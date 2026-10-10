@@ -60,7 +60,15 @@ object RotationDeltaMath {
         )
     }
 
-    /** Row-major 3x3 rotation about the shared camera/sensor optical (Z) axis, by `degrees`. */
+    /**
+     * Row-major 3x3 rotation about the shared camera/sensor optical (Z) axis, by `degrees`
+     * (counter-clockwise, `v' = R · v`).
+     *
+     * `rotationAboutZ(displayDeg)` for a `Surface.ROTATION_*` angle is exactly Android's body-to-
+     * display remap (`SensorManager.remapCoordinateSystem` per rotation; for 90: `x' = −y, y' = x`)
+     * — see [OverlayGyroCompensationMath.bodyToDisplay], which pins that against an independent
+     * model of the remap.
+     */
     fun rotationAboutZ(degrees: Int): FloatArray {
         val rad = Math.toRadians(degrees.toDouble())
         val c = cos(rad).toFloat()

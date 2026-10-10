@@ -52,6 +52,15 @@ import timber.log.Timber
  * Verify by starting a bridge (or forcing one) and rotating the phone one way; the bridged overlay
  * should turn the same way it would under live vision tracking, not the opposite.
  *
+ * `R_z` itself is not the open question: [RotationDeltaMath.rotationAboutZ] of a `Surface.ROTATION_*`
+ * angle is exactly `SensorManager.remapCoordinateSystem`'s body-to-display remap (pinned in
+ * `OverlayGyroCompensationMathTest`). What is unverified is the ANGLE fed to it here — callers pass
+ * CameraX `imageInfo.rotationDegrees` (`sensorOrientation − displayRotation` for a rear camera),
+ * whereas the body axes map onto an upright (display-oriented) frame's GL camera axes by the display
+ * rotation itself. Those generally disagree: a typical sensorOrientation-90 rear camera held in
+ * natural portrait passes 90 where the display rotation is 0. Confirm on hardware before relying on
+ * an off-axis bridged turn.
+ *
  * `A` is fixed for the life of a reference, not re-derived per call: [commitReference] tags it
  * with the `rotationDeg` in effect when the reference sample was captured, and
  * [cameraRotationDelta] uses that stored value rather than the display rotation current at call
