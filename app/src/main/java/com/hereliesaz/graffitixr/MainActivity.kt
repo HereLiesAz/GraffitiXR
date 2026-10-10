@@ -1595,9 +1595,17 @@ class MainActivity : ComponentActivity() {
                             // *inside* the capture modal, exactly when it applies. The guidance overlay
                             // is suppressed here by anyModalActive, so this line would otherwise never
                             // reach the user at the moment they need it. Dismissed when the anchor lands.
+                            // Not on the standalone SphereSLAM backend (ARCore resolved unavailable):
+                            // there TargetCreationUi's own "Target Creation" card is the instruction,
+                            // drawn at the same TopCenter spot, and the two texts stacked illegibly.
+                            // The card wins; ARCore's path is unchanged.
+                            val isStandaloneArBackend = editorUiState.editorMode == EditorMode.AR
+                                && arUiState.isArCoreAvailabilityResolved
+                                && !arUiState.isArCoreAvailable
                             val showCaptureHint = mainUiState.isCapturingTarget
                                 && mainUiState.isWaitingForTap
                                 && !arUiState.isAnchorEstablished
+                                && !isStandaloneArBackend
                             if (showCaptureHint) {
                                 val captureHintText = remember {
                                     context.resources.getStringArray(DesignR.array.onboarding_ar)

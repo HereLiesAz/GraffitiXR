@@ -1171,6 +1171,14 @@ fun SphereSlamStandaloneOverlay(
         factory = { ctx ->
             GLSurfaceView(ctx).apply {
                 setEGLContextClientVersion(3)
+                // RGBA8888 with an alpha channel, before setRenderer. GLSurfaceView's default
+                // chooser picks RGB888 with NO alpha; eglCreateWindowSurface then sets the buffer
+                // format to RGBX, overriding the TRANSLUCENT holder format below. This media-overlay
+                // surface sits ABOVE CameraPreview's SurfaceView, so its transparent glClear
+                // composited as opaque black and hid the whole camera feed (dark grey once the
+                // 14% glow mask washed over it). ARCore mode can get away with the default because
+                // its renderer draws the camera background itself; CameraX here cannot.
+                setEGLConfigChooser(8, 8, 8, 8, 16, 0)
                 setZOrderMediaOverlay(true)
                 holder.setFormat(PixelFormat.TRANSLUCENT)
                 setRenderer(glRenderer)
