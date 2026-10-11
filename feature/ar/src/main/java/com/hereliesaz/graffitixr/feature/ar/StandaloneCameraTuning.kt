@@ -47,7 +47,7 @@ internal object StandaloneCameraTuning {
      * none are reported, or when the setting is [CameraTargetFps.DEVICE_DEFAULT].
      *
      * @param effectiveTargetFps the Settings value after the adaptive-rate cap
-     *   ([effectiveCameraTargetFps]): a real rate, [CameraTargetFps.DEVICE_DEFAULT] (unpinned) or
+     *   ([standaloneEffectiveCameraTargetFps], which never pins DEVICE_DEFAULT): a real rate, [CameraTargetFps.DEVICE_DEFAULT] (unpinned) or
      *   [CameraTargetFps.DEVICE_MAX].
      */
     fun chooseAeTargetFpsRange(available: List<IntArray>, effectiveTargetFps: Int): IntArray? {

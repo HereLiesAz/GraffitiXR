@@ -158,8 +158,9 @@ the real (non-stub) tracker is packaged.
 *   `StandaloneFailure.kt` / `StandaloneTargetQuality.kt`: aliases of SphereSLAM's failure taxonomy
     and target-quality gate, plus the artist-facing messages for them (the library has no UI text).
 *   `StandaloneDiagnostics.kt`: the compact diagnostic dump contract.
-*   `rendering/HomographyOverlayRenderer.kt`: transparent CameraX GL overlay renderer shared by
-    standalone SphereSLAM AR and the legacy homography Overlay tracker. Takes each pose with the
+*   `rendering/HomographyOverlayRenderer.kt`: transparent CameraX GL overlay renderer for
+    standalone SphereSLAM AR (the name predates the removed homography Overlay tracker); its
+    attitude wiring is the GL-free `rendering/StandaloneAttitudeWiring.kt` (+ `GlowLensCache`). Takes each pose with the
     full tracked frame's intrinsics and draws on the full surface with the `FILL_CENTER`
     projection (SphereSLAM `camera.CameraFillCenter.projection`, cached per intrinsics/surface size). In standalone
     it embeds SphereSLAM `:overlay` `CoverageGlowRenderer` (wash / missing tiles / edge glow / wash +
@@ -182,11 +183,9 @@ the real (non-stub) tracker is packaged.
     SphereSLAM `camera.CameraFillCenter`) MainScreen draws the Overlay
     design through, auto-releases past 3°, and runs a slow (15 s) background MiDaS sample (`:models`
     `DepthEstimator`) of the surface under the design.
-*   `HomographyFallbackOverlay.kt` / `HomographyTrackingAnalyzer.kt` / `BridgedHomographyTracker.kt`:
-    legacy planar live tracking on SphereSLAM `:reloc` `PlanarTracker` (vision + short attitude
-    bridge; the adapter supplies CameraX luma, attitude and the reference bitmap's luma), currently
-    unmounted (Overlay draws the edited design over the camera untracked); not the standalone AR
-    backend.
+*   `StandaloneAnalyzerRecovery.kt`: what the standalone overlay does after a fatal analyzer
+    (restore the previous target and recreate the analyzer, or report) and the status-pill text.
+*   `StandaloneFrameAttitude.kt`: the capture-time `Frame.attitude` for the tracking session.
 *   `computervision/DualAnalyzer.kt`: ARCore-side `ImageAnalysis.Analyzer` for relocalization
     callbacks and light estimation.
 *   `src/test/.../ArViewModelTest.kt` plus standalone/hybrid tests: lifecycle/persistence,

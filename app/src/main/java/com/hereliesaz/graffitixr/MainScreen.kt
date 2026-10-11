@@ -410,8 +410,16 @@ fun MainScreen(
                             },
                             coverageGlowAppearance = arUiState.coverageGlow,
                             cameraAttitude = { arViewModel.latestCameraAttitude },
-                            attitudeExtrapolator = arViewModel.standaloneAttitudeExtrapolator,
-                            attitudeSample = arViewModel::latestStandaloneAttitudeSample,
+                            // Only with a rotation-vector sensor: without one these stay empty, and
+                            // null lets the analyzer fall back to its own game-rotation sensor (frame
+                            // attitude + gyro bridge) with no predictor, keeping one sensor per path.
+                            attitudeExtrapolator = arViewModel.standaloneAttitudeExtrapolator
+                                .takeIf { arViewModel.isStandaloneAttitudeSensorAvailable },
+                            attitudeSample = if (arViewModel.isStandaloneAttitudeSensorAvailable) {
+                                arViewModel::latestStandaloneAttitudeSample
+                            } else {
+                                null
+                            },
                             cameraRollDegrees = { cameraFromDevice ->
                                 arViewModel.latestCameraRollDegrees(cameraFromDevice)
                             },

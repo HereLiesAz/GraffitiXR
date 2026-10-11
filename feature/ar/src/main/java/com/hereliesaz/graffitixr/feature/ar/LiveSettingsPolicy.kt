@@ -42,3 +42,21 @@ internal fun effectiveCameraTargetFps(
     adaptiveRateEnabled: Boolean,
     batteryTier: Int,
 ): Int = if (adaptiveRateEnabled && batteryTier >= 1) CameraTargetFps.FPS_30 else targetFps
+
+/**
+ * The rate the standalone (CameraX) AE target FPS range is chosen for. Same battery cap as
+ * [effectiveCameraTargetFps] — it only ever LOWERS an explicit higher rate (60, DEVICE_MAX) to 30 —
+ * except that [CameraTargetFps.DEVICE_DEFAULT] stays DEVICE_DEFAULT (AE range left unpinned) under
+ * battery pressure too: pinning [30, 30] there would RAISE the frame-rate floor above the device's
+ * own default range (often [15, 30] or lower in dim light), the opposite of saving power. The
+ * ARCore session keeps [effectiveCameraTargetFps], where a 30 fps camera config is the intended cap.
+ */
+internal fun standaloneEffectiveCameraTargetFps(
+    targetFps: Int,
+    adaptiveRateEnabled: Boolean,
+    batteryTier: Int,
+): Int = if (targetFps == CameraTargetFps.DEVICE_DEFAULT) {
+    CameraTargetFps.DEVICE_DEFAULT
+} else {
+    effectiveCameraTargetFps(targetFps, adaptiveRateEnabled, batteryTier)
+}

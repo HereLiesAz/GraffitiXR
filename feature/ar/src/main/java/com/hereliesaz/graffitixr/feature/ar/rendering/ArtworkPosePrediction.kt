@@ -14,10 +14,19 @@ import com.hereliesaz.sphereslam.attitude.DisplayPosePredictor
  * follows the device at display rate while translation still updates at vision rate.
  *
  * Falls back to [lastVisionView] (the pose last pushed to the renderer) whenever there is no
- * prediction: no predictor/attitude wired (co-op peer tracking, homography fallback), no held pose
+ * prediction: no predictor/attitude wired (co-op peer tracking, or a phone without a rotation-vector sensor), no held pose
  * (cleared on loss), or no attitude sample yet. Pure and allocation-free, for the GL thread.
  */
 internal object ArtworkPosePrediction {
+
+    /**
+     * How far past the draw's `elapsedRealtimeNanos` the artwork is predicted. Deliberately 0: the
+     * camera preview on screen is itself one or more frames old, so a positive lead would push the
+     * artwork AHEAD of the image it sits on; a negative lead (timing the overlay to the displayed
+     * camera frame) needs the preview's real latency, which is not measured yet. Tune only with an
+     * on-device latency measurement.
+     */
+    const val ARTWORK_DRAW_LEAD_NS: Long = 0L
 
     /**
      * The view to draw at [nowNs] (`SystemClock.elapsedRealtimeNanos()` base): the prediction,

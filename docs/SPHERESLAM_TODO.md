@@ -9,11 +9,18 @@ Adopted:
 
 - [x] **One attitude sensor.** `CameraAttitudeProvider` (`TYPE_ROTATION_VECTOR`, East-North-Up — the
   sensor that already stamped keyframe heading/elevation/roll) now samples at `SENSOR_DELAY_GAME`
-  instead of the ~16 Hz UI default. Its `latestSample()` is the standalone session's `Frame.attitude`
-  (`ArViewModel.latestStandaloneAttitudeSample`) and its `attitudeExtrapolator`
-  (`ArViewModel.standaloneAttitudeExtrapolator`) drives the glow and the artwork prediction. The
-  analyzer's own `GameRotationAttitudeSource` is now only a fallback when the host wires no attitude
-  (then no pose prediction runs: a predictor must read the same sensor as `Frame.attitude`).
+  instead of the ~16 Hz UI default. Its `attitudeExtrapolator`
+  (`ArViewModel.standaloneAttitudeExtrapolator`) drives the glow and the artwork prediction and,
+  with a `REALTIME` camera timestamp source, gives the session each frame's attitude AT its capture
+  time (`StandaloneFrameAttitude.atCapture` → `quaternionAt(frame timestamp)`; the prediction anchor
+  and bridge reference the library asks for). Otherwise `Frame.attitude` is its `latestSample()`
+  (`ArViewModel.latestStandaloneAttitudeSample`). MainScreen wires both only when the device has
+  the rotation-vector sensor (`ArViewModel.isStandaloneAttitudeSensorAvailable`); without it the
+  analyzer's own `GameRotationAttitudeSource` supplies `Frame.attitude` (base pose + gyro bridge)
+  and no pose prediction runs (a predictor must read the same sensor as `Frame.attitude`). The
+  sensor is chosen once per analyzer, never per frame.
+  Atlas-growth keyframe orientations are stamped with the proposing frame's attitude timestamp,
+  not the adoption time.
   **Behaviour change:** the ≤ 400 ms gyro bridge and the rotation-only base photosphere pose now
   integrate the magnetometer-fused rotation vector instead of the game rotation vector.
 - [x] **Display-rate, full-rotation coverage glow.** `HomographyOverlayRenderer` sets the embedded
@@ -24,25 +31,28 @@ Adopted:
   keyframes, tracked frames) or the surface size change; the display rotation follows a
   `DisplayListener`. `SphereTileGlowMask` no longer projects anything: it hands the regions over
   (`setRegions`) only when the map changes (keyframe / entry), so the per-tracked-frame projection in
-  `consumeTrackedFrame` and the deprecated heading/elevation `projectRegions` are gone. Fixes, on
-  device: glow rotating against the preview by the roll angle, vanishing near the poles, lagging
-  10–20° on fast pans, freezing while untracked. Colour, intensity, style and geometry still travel
+  `consumeTrackedFrame` and the deprecated heading/elevation `projectRegions` are gone. Expected to
+  fix (by construction; NOT yet verified on a device — see the device checks below): glow rotating
+  against the preview by the roll angle, vanishing near the poles, lagging 10–20° on fast pans,
+  freezing while untracked. Colour, intensity, style and geometry still travel
   as one `CoverageGlowConfig` applied on the GL thread between draws (settings apply immediately,
   mode and geometry never tear).
 - [x] **Two new glow styles** in Settings ▸ coverage glow: *Edge glow* (`OUTLINE`, storage key
   `outline`) and *Wash + edge* (`COMPLEMENT_OUTLINED`, `wash_outlined`), labels in every locale. The
-  edge alpha is `3.5 × intensity` (14 % wash → 0.49, about the library's 0.5 default; 0 still means
-  off), the edge width 10 dp (`CoverageGlowStyleMapping.outlineAlphaFor` / `outlineWidthPxFor`).
+  edge alpha is `(intensity / 0.6)^0.477`, so the whole 0–60 % slider spans the edge's 0–1 (14 % wash
+  → 0.50, the library's default edge; 0 still means off; a linear `3.5 ×` saturated at ≈ 29 %), the
+  edge width 10 dp (`CoverageGlowStyleMapping.outlineAlphaFor` / `outlineWidthPxFor`).
 - [x] **Display-rate artwork pose.** The standalone session publishes every rendered pose to a
   `DisplayPosePredictor` (`session.displayPosePredictor`); each GL draw re-poses the design quad with
-  `predictInto(attitudeExtrapolator, now, out)` (`rendering/ArtworkPosePrediction`), falling back to
-  the last pushed pose when nothing is held. Cleared on loss (by the session on a pose-less frame,
-  and by `clearPose` / dispose). Co-op peer tracking and the homography fallback keep the
-  analyzer-rate pose.
-- [x] **Pooled luma.** `SphereSlamStandaloneTrackingAnalyzer`, `CoopPeerFingerprintAnalyzer` and
-  `HomographyTrackingAnalyzer` pack the Y plane through `LumaFrameBufferPool(slots = 2)`. Reuse
-  contract checked: the session reads `Frame.luma` without retaining it, MobileGS/peer feeds copy it
-  into a direct buffer, `PlanarTracker` copies it into its `Mat`, depth copies a small grid, and
+  `predictInto(attitudeExtrapolator, now + ARTWORK_DRAW_LEAD_NS, out)` (lead 0 until the preview
+  latency is measured; `rendering/ArtworkPosePrediction`, wired through the GL-free
+  `rendering/StandaloneAttitudeWiring`), falling back to the last pushed pose when nothing is held.
+  Cleared on loss (by the session on a pose-less frame, and by `clearPose` / dispose). Co-op peer
+  tracking and phones without a rotation-vector sensor keep the analyzer-rate pose.
+- [x] **Pooled luma.** `SphereSlamStandaloneTrackingAnalyzer` and `CoopPeerFingerprintAnalyzer`
+  pack the Y plane through `LumaFrameBufferPool(slots = 2)`. Reuse contract checked: the session
+  reads `Frame.luma` without retaining it, MobileGS/peer feeds copy it into a direct buffer, depth
+  copies a small grid, and
   keyframes/atlas pages are library copies. The pack time is reported as `Frame.convertDurationNs`.
 - [x] **Depth on LiteRT.** `:models` `DepthEstimator` runs MiDaS on the LiteRT GPU delegate with an
   XNNPACK CPU fallback. The depth worker now calls `estimateLuma` on its luma grid (no ARGB `Bitmap`
@@ -61,6 +71,21 @@ Adopted:
   UI/MobileGS state; the HUD says "Preparing fingerprint target…" instead of asking for a new target.
   A too-weak reference now fails on the frame after its build — the same `onFatalError` →
   `StandaloneReferenceTooWeakException` path. Atlas growth that throws is a diagnostic now, not fatal.
+  A fatal analyzer never shows "Preparing…": the status pill shows the real failure
+  (`standaloneInitializingStatusText`).
+- [x] **Recovery from a fatal analyzer.** The session's FATAL is terminal, so recovery recreates the
+  analyzer (`analyzerRestartGeneration`, a key of the analyzer effect; decisions in
+  `StandaloneAnalyzerRecovery.kt`): a too-weak REPLACEMENT target restores the previous validated
+  target and restarts at once; "Recapture Target" after any fatal error restarts too. The base
+  photosphere tiles/keyframes live in `ArViewModel` (heading/elevation keyed) and survive; the new
+  session re-seeds its rotation-only map frame from its first attitude and re-solves
+  `map_from_fingerprint` on its first lock, as on any pause/resume.
+- [x] **Battery cap vs. Device default.** Standalone keeps *Device default* unpinned under battery
+  pressure (`standaloneEffectiveCameraTargetFps`); the cap only lowers explicit 60 / max rates to 30.
+  The ARCore camera config keeps `effectiveCameraTargetFps` (30 under pressure).
+- [x] **Dead homography Overlay tracker removed.** `HomographyFallbackOverlay`,
+  `HomographyTrackingAnalyzer` (+ test) and `BridgedHomographyTracker` had no caller (and the shared
+  renderer would never have drawn their pose: it fails closed without `map_from_fingerprint`).
 
 Device checks owed for 0.24.3:
 
@@ -74,7 +99,10 @@ Device checks owed for 0.24.3:
 - [ ] Gyro bridge (hand over the lens for < 0.4 s) near steel/rebar: no visible yaw jump from the
   now magnetometer-fused attitude; re-lock lands where it should.
 - [ ] Target capture / restore: "Preparing fingerprint target…" shows briefly, then lock; a weak
-  target is still rejected with the KPM-feature message.
+  target is still rejected with the KPM-feature message; a weak REPLACEMENT target restores the
+  previous one and tracking resumes (analyzer restart) without leaving the AR screen.
+- [ ] Phone without `TYPE_ROTATION_VECTOR` (or with it disabled): frame attitude and the gyro bridge
+  come from the game rotation vector; no artwork prediction, glow stays an unprojected wash.
 - [ ] Copy Diagnostics: `matchMethod` shows `FLOW` between full solves (proves `opencv_java5` is
   loaded) and `kpmMetrics` carries the timing window; tracking frame rate is visibly higher.
 - [ ] Depth self-test line reports `backend=GPU` on a GPU-capable phone (CPU fallback logged as an
@@ -82,9 +110,6 @@ Device checks owed for 0.24.3:
 - [ ] Release (R8) build: depth self-test runs (LiteRT kept by the `:models` rules) and an ORT
   failure path stays catchable.
 
-Follow-up (not changed here): a `ReferenceTooWeakException` makes the session FATAL; the overlay's
-"restored previous validated target" path swaps the reference back, but the analyzer stays fatal
-until it is recreated (pre-existing since 0.24.1; recreating the analyzer on that path would fix it).
 
 ## SphereSLAM 0.24.1 — second consolidation (app half)
 
@@ -108,10 +133,8 @@ Moved (app copy deleted → library API):
 - [x] Native `HomographyTracker` (C++, its JNI entry points, CMake entries and host test),
   `HomographyTrackerNative`, `HomographyArTracker` → `:reloc` `PlanarTracker` (same ORB / Lowe /
   `solvePnPRansac` + IPPE algorithm and gates, on the OpenCV Java `Relocalizer`).
-  `BridgedHomographyTracker` is now a thin adapter (attitude source, reference `Bitmap` → luma,
-  `NativeLibLoader` for `opencv_java5`); `HomographyTrackingAnalyzer` packs the Y plane with
-  `LumaFrameTransform` instead of the native RGBA decode. Picks up the library fix for a stale bridge
-  reference after a vision lock without an attitude sample.
+  (The `BridgedHomographyTracker` / `HomographyTrackingAnalyzer` adapters that used it were removed
+  with the dead homography Overlay tracker in the 0.24.3 follow-up.)
 - [x] `anchor/PlaneMarks`, `anchor/MetricMarks`, `anchor/Triangulation` → `:reloc` `MetricMarks`
   (`backProjectToPlane`, `triangulateTwoView` through `TileTriangulator`, `glViewToCvDisplay`,
   `glViewDisplayOriented`). The capture-path tests now run against the library.
@@ -155,7 +178,7 @@ Moved (app copy deleted → library API):
   `camera.CameraIntrinsics` (kept for the `SensorSource` vocabulary).
 - [x] `GyroOrientationBridge` + `rotateViewPoseKeepingCameraCenter` → `attitude.GameRotationAttitudeSource`,
   `AttitudeRotationBridge`, `DeviceCameraRotation`, `RotationMath.rotateAboutCameraCentre`
-  (standalone analyzer, base photosphere pose, `BridgedHomographyTracker`, Overlay ▸ Gyro).
+  (standalone analyzer, base photosphere pose, Overlay ▸ Gyro).
 - [x] `pose/SphereSlamRuntimeProbe` → `SphereSlam.isOperational()`.
 - [x] `anchor/HybridPoseHistory`, `HybridKpmCorrection` (incl. its `solveRaw` test seam),
   `HybridPageFrame`, `HybridMetricKpmReference` → `sidecar.*` (`MetricPageRectification`);

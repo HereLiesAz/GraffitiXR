@@ -54,9 +54,8 @@ fun TargetCreationUi(
         // CaptureStep.RECTIFY (a manual 4-corner unwarp step) is never set by any writer of
         // captureStep (MainViewModel only ever sets NONE/CAPTURE/REVIEW) — AR's own target
         // capture went straight from CAPTURE to REVIEW once plane-guided rectification landed.
-        // UnwarpScreen/UnwarpOverlay themselves are NOT dead: both the standalone SphereSLAM AR
-        // target flow and the legacy non-ARCore homography Overlay flow reuse them directly with
-        // local state — only this unreachable branch and the onUnwarpConfirm/isLoading wiring that
+        // UnwarpScreen/UnwarpOverlay themselves are NOT dead: the standalone SphereSLAM AR
+        // target flow reuses them directly with local state — only this unreachable branch and the onUnwarpConfirm/isLoading wiring that
         // existed solely to feed it were removed.
         when (captureStep) {
             CaptureStep.MASK, CaptureStep.REVIEW -> {
@@ -320,9 +319,8 @@ private fun FeatureSelectionReview(
 }
 
 /**
- * Shared 4-corner drag-to-align UI. The standalone SphereSLAM AR target capture and the legacy
- * non-ARCore [HomographyFallbackOverlay] reference capture both reuse this exact interaction rather
- * than maintaining separate corner editors.
+ * Shared 4-corner drag-to-align UI, reused by the standalone SphereSLAM AR target capture rather
+ * than maintaining a separate corner editor.
  */
 @Composable
 internal fun UnwarpScreen(
