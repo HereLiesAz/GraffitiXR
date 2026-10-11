@@ -14,6 +14,7 @@ import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.CameraSelector
 import androidx.camera.view.LifecycleCameraController
+import com.hereliesaz.graffitixr.common.model.CameraTargetFps
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -269,6 +270,14 @@ fun SphereSlamStandaloneOverlay(
     coverageCurrentRegions: () -> List<SphereCoverage.TileRegion> = { emptyList() },
     /** Latest camera attitude `(headingDeg, elevationDeg)` for projecting the glow, or null. */
     cameraAttitude: () -> Pair<Float, Float>? = { null },
+    /**
+     * Settings → Camera target FPS ([CameraTargetFps]) with the adaptive-rate battery cap inputs.
+     * Standalone pins the camera's AE target FPS range from these (Device default → 30); a change
+     * applies immediately.
+     */
+    cameraTargetFps: Int = CameraTargetFps.DEVICE_DEFAULT,
+    adaptiveRateEnabled: Boolean = false,
+    batteryTier: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -925,6 +934,30 @@ fun SphereSlamStandaloneOverlay(
                 cameraController.setPinchToZoomEnabled(previousPinchToZoom)
                 cameraController.cameraControl?.setZoomRatio(previousZoomRatio)
             }
+        }
+    }
+
+    // Tracking capture profile while standalone AR is composed: fixed AE target FPS range (so dim
+    // light cannot halve the analysis rate), EIS off (no preview latency / preview-vs-analysis
+    // desync), OIS kept. Keyed on the effective rate so a Settings change (or the adaptive battery
+    // cap) applies immediately; the shared controller's defaults are restored on exit.
+    // See StandaloneCameraTuning.kt.
+    val standaloneTargetFps = effectiveCameraTargetFps(
+        targetFps = cameraTargetFps,
+        adaptiveRateEnabled = adaptiveRateEnabled,
+        batteryTier = batteryTier,
+    )
+    DisposableEffect(cameraController, cameraId, standaloneTargetFps) {
+        if (cameraId == null) {
+            onDispose {}
+        } else {
+            val applied = applyStandaloneTrackingCaptureOptions(cameraController, standaloneTargetFps)
+            onDiagnostic(
+                "SphereSLAM standalone camera: setting=${CameraTargetFps.label(standaloneTargetFps)} " +
+                    "aeRange=" + (applied?.let { "[${it[0]},${it[1]}]" } ?: "unchanged") +
+                    " eis=off ois=on",
+            )
+            onDispose { applyDefaultCaptureOptions(cameraController) }
         }
     }
 

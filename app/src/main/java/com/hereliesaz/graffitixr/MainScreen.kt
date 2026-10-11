@@ -412,6 +412,9 @@ fun MainScreen(
                             cameraRollDegrees = { cameraFromDevice ->
                                 arViewModel.latestCameraRollDegrees(cameraFromDevice)
                             },
+                            cameraTargetFps = arUiState.cameraTargetFps,
+                            adaptiveRateEnabled = arUiState.adaptiveRateEnabled,
+                            batteryTier = arUiState.batteryTier,
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {
