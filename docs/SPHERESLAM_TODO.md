@@ -1,26 +1,35 @@
 # SphereSLAM Implementation TODO
 
-## SphereSLAM 0.24.4 — audit fixes (adopted, no app code changes)
+## SphereSLAM 0.24.6 — seen tiles persist, KPM gates restored (adopted)
 
-The app consumes SphereSLAM **0.24.4** (tag `0.24.4`). It compiles unchanged; what changed underneath:
+The app consumes SphereSLAM **0.24.6** (tag `0.24.6`; 0.24.4 audit fixes plus HereLiesAz/SphereSLAM#33).
+It compiles unchanged; what changed underneath:
 
+- [x] Every tile a keyframe's frame covers (≥ 60 % in frame) is marked current, not only the tile
+  under the view axis: scanned areas no longer glow again once they leave the screen.
+- [x] KPM reprojection error is back in the matcher's (downscaled) pixels. 0.24.4 had reported it
+  ×factor² against unchanged gates — acceptance and atlas growth 4× stricter, so the atlas barely
+  grew and relocks were rejected.
+- [x] Grown atlas pages are kept by the app when the page set is re-sent
+  (`withGrownAtlasPages`); SphereSLAM rebuilds from exactly the set it is given.
 - [x] `REFERENCE_TOO_WEAK` no longer kills the session (only the precision layer halts;
   `isRecoverable`). The app still stops feeding the analyzer on any fatal and restarts it on
-  restore/recapture (`standaloneFatalRecovery`), which stays correct; resuming in place via
-  `updatePrecisionLayer` is possible but not adopted.
-- [x] libc++ linked statically in the AARs. `app/build.gradle.kts` keeps its
+  restore/recapture (`standaloneFatalRecovery`), which stays correct.
+- [x] libc++ linked statically in the AARs; `app/build.gradle.kts` keeps its
   `pickFirsts += "**/libc++_shared.so"` for the other native dependencies.
-- [x] `superpoint.onnx` in `:models` is the corrected rpautrat export — byte-identical to the
-  app's `core/nativebridge` asset (`docs/models/SUPERPOINT_PROVENANCE.md`).
-- [x] Timing diagnostic `matched` now counts frames with a pose (was attempts); KPM reprojection
-  error is reported in full-frame px².
+- [x] `superpoint.onnx` in `:models` is byte-identical to the app's `core/nativebridge` asset.
 
-Device checks owed for 0.24.4:
+Open:
 
-- [ ] Half-resolution KPM locks still accepted: the full-frame error unit tightens the effective
-  acceptance gate from 40 to 10 px². If locks drop, raise `PoseAcceptanceConfig.maxReprojectionError`.
-- [ ] Swapping the wall target re-confirms before `LOCKED` (no single-frame lock on the new wall).
-- [ ] No overlay swing-back after a gyro bridge.
+- [ ] The artwork is held by the gyro bridge for only 400 ms (`maxBridgeMs`) after the wall leaves
+  view, then hidden until a visual relock, although the base photosphere pose is computed every
+  frame. Holding it on the base pose while off-wall is proposed, not adopted.
+
+Device checks owed for 0.24.6:
+
+- [ ] Pan across the wall and back: the area seen stays clear of the glow (edges aside).
+- [ ] Atlas growth lines (`atlas page persisted`) appear while panning; relock on return is quick.
+- [ ] Swapping the wall target re-confirms before `LOCKED`; no overlay swing-back after a bridge.
 
 ## SphereSLAM 0.24.3 — display-rate glow and artwork, faster tracking, GPU depth (app half)
 
