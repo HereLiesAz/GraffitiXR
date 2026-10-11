@@ -328,8 +328,8 @@ fun SphereSlamStandaloneOverlay(
     cameraAttitude: () -> Pair<Float, Float>? = { null },
     /**
      * Settings → Camera target FPS ([CameraTargetFps]) with the adaptive-rate battery cap inputs.
-     * Standalone pins the camera's AE target FPS range from these (Device default → 30); a change
-     * applies immediately.
+     * Standalone pins the camera's AE target FPS range from these (Device default leaves the
+     * device's own range unpinned); a change applies immediately.
      */
     cameraTargetFps: Int = CameraTargetFps.DEVICE_DEFAULT,
     adaptiveRateEnabled: Boolean = false,

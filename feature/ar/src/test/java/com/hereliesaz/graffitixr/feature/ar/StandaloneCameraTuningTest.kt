@@ -12,15 +12,16 @@ class StandaloneCameraTuningTest {
     private val typical = ranges(15 to 15, 7 to 30, 15 to 30, 30 to 30, 15 to 60, 60 to 60)
 
     @Test
-    fun `30 and device default pin a fixed 30 range`() {
+    fun `30 pins a fixed 30 range`() {
         assertArrayEquals(
             intArrayOf(30, 30),
             StandaloneCameraTuning.chooseAeTargetFpsRange(typical, CameraTargetFps.FPS_30),
         )
-        assertArrayEquals(
-            intArrayOf(30, 30),
-            StandaloneCameraTuning.chooseAeTargetFpsRange(typical, CameraTargetFps.DEVICE_DEFAULT),
-        )
+    }
+
+    @Test
+    fun `device default leaves AE on the device range`() {
+        assertNull(StandaloneCameraTuning.chooseAeTargetFpsRange(typical, CameraTargetFps.DEVICE_DEFAULT))
     }
 
     @Test

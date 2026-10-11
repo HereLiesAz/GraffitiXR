@@ -21,14 +21,14 @@ import timber.log.Timber
  * it is composed and restores the default when it leaves.
  *
  * Standalone tracking profile, and why:
- *  - CONTROL_AE_TARGET_FPS_RANGE pinned (default [30,30]). CameraX leaves ImageAnalysis with no
+ *  - CONTROL_AE_TARGET_FPS_RANGE pinned when Settings names a rate. CameraX leaves ImageAnalysis with no
  *    target frame rate, so the HAL's default AE range (typically [15,30] or wider) lets AE stretch
  *    exposure in dim light and halve the frame rate to ~15 fps — which halves tracking updates, and
  *    the longer exposure adds motion blur that costs KPM matches. A fixed range trades a slightly
  *    darker/noisier frame (AE raises gain instead of exposure time) for a steady rate; KPM is far
  *    more tolerant of noise than of blur. Follows Settings → Camera target FPS (and its adaptive
- *    battery cap) so 60 / Device max apply to standalone too; Device default pins 30, because the
- *    device's own variable range is exactly the problem being fixed.
+ *    battery cap) so 30 / 60 / Device max apply to standalone too. Device default means exactly
+ *    that: AE is left on the device's own range, unpinned.
  *  - Video stabilization (EIS) OFF. EIS warps/crops the preview stream from a buffered look-ahead,
  *    adding preview latency, and on most HALs it applies to the preview but not the YUV analysis
  *    stream — so the artwork, posed from the un-stabilized analysis frame, would be drawn over a
@@ -41,25 +41,24 @@ import timber.log.Timber
 /** Ranges are `[lower, upper]` pairs (Camera2 `Range<Int>` unpacked, so the policy is JVM-testable). */
 internal object StandaloneCameraTuning {
 
-    /** The standalone target when the setting does not name a rate ([CameraTargetFps.DEVICE_DEFAULT]). */
-    const val DEFAULT_STANDALONE_FPS = CameraTargetFps.FPS_30
-
     /**
      * The AE target FPS range for standalone tracking, chosen from the camera's
-     * `CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES`, or null when none are reported (leave AE alone).
+     * `CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES`, or null to leave AE on the device's own range: when
+     * none are reported, or when the setting is [CameraTargetFps.DEVICE_DEFAULT].
      *
      * @param effectiveTargetFps the Settings value after the adaptive-rate cap
-     *   ([effectiveCameraTargetFps]): a real rate, [CameraTargetFps.DEVICE_DEFAULT] (→ 30) or
+     *   ([effectiveCameraTargetFps]): a real rate, [CameraTargetFps.DEVICE_DEFAULT] (unpinned) or
      *   [CameraTargetFps.DEVICE_MAX].
      */
     fun chooseAeTargetFpsRange(available: List<IntArray>, effectiveTargetFps: Int): IntArray? {
+        if (effectiveTargetFps == CameraTargetFps.DEVICE_DEFAULT) return null
         val valid = available.filter { it.size == 2 && it[0] > 0 && it[1] >= it[0] }
         if (valid.isEmpty()) return null
         if (effectiveTargetFps == CameraTargetFps.DEVICE_MAX) {
             // Highest upper bound; among those the highest floor (a fixed range beats a variable one).
             return valid.maxWithOrNull(compareBy<IntArray>({ it[1] }, { it[0] }))
         }
-        val want = if (effectiveTargetFps > 0) effectiveTargetFps else DEFAULT_STANDALONE_FPS
+        val want = effectiveTargetFps
         // Closest upper bound to the target; on a tie in distance the lower upper bound (less power,
         // longer max exposure); then the highest floor, so [30,30] beats [15,30].
         return valid.minWithOrNull(
