@@ -2401,7 +2401,15 @@ class MainActivity : AppCompatActivity() {
             )
             if (editorUiState.editorMode == EditorMode.MOCKUP) {
                 azRailSubHostItem(id = "mockup.wall", hostId = railHostOf("mockup.wall"), text = navStrings.wall, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary)
-                azRailSubItem(id = "wall.photo", hostId = railHostOf("wall.photo"), text = navStrings.photo, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { onWallPhoto() })
+                azRailSubItem(
+                    id = "wall.photo",
+                    hostId = railHostOf("wall.photo"),
+                    text = navStrings.photo,
+                    color = navItemColor,
+                    shape = AzButtonShape.NONE,
+                    disabled = showLibrary,
+                    onClick = { onWallPhoto() },
+                )
                 azRailSubItem(
                     id = "wall.file",
                     hostId = railHostOf("wall.file"),
