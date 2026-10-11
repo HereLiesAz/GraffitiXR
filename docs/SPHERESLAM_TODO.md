@@ -1,8 +1,9 @@
 # SphereSLAM Implementation TODO
 
-## SphereSLAM 0.25.2 — full-sphere photosphere, per-tile scan progress (adopted)
+## SphereSLAM 0.25.3 — full-sphere photosphere, per-tile scan progress (adopted)
 
-The app consumes SphereSLAM **0.25.2** (tag `0.25.2`; the 0.25.1 code, re-tagged for JitPack).
+The app consumes SphereSLAM **0.25.3** (tag `0.25.3`). It is the 0.25.1 code; 0.25.1/0.25.2 never
+published on JitPack (its image dropped Ninja), and 0.25.3 pins Ninja in `jitpack.yml`.
 
 - [x] `PhotosphereMap()` defaults to the whole sphere (24 × 6 tiles of 15° × 30°, every heading,
   zenith to nadir); the app's explicit full-sphere config is gone.
@@ -15,7 +16,7 @@ The app consumes SphereSLAM **0.25.2** (tag `0.25.2`; the 0.25.1 code, re-tagged
 - [x] The default haze colour is hot pink (`CoverageGlowColor.DEFAULT`); a colour already picked in
   Settings is kept.
 
-Device checks owed for 0.25.2:
+Device checks owed for 0.25.3:
 
 - [ ] Sweep slowly: a partly seen tile turns more opaque step by step, then clears once scanned.
 - [ ] Ceiling and floor tiles scan and clear like the rest.
