@@ -396,6 +396,10 @@
     <string name="settings_glow_style_wash_desc">撮影済みタイル以外をすべて光らせる</string>
     <string name="settings_glow_style_missing">未撮影タイルのみ</string>
     <string name="settings_glow_style_missing_desc">これから撮影するタイルだけを光らせる</string>
+    <string name="settings_glow_style_outline">エッジグロー</string>
+    <string name="settings_glow_style_outline_desc">撮影済みタイルの縁に沿って柔らかく光らせる</string>
+    <string name="settings_glow_style_wash_outlined">ウォッシュ + エッジ</string>
+    <string name="settings_glow_style_wash_outlined_desc">撮影済みタイルの周りを明るい縁取りで囲むウォッシュ</string>
     <string name="settings_glow_color_white">白</string>
     <string name="settings_glow_color_light_grey">ライトグレー</string>
     <string name="settings_glow_color_mid_grey">ミッドグレー</string>

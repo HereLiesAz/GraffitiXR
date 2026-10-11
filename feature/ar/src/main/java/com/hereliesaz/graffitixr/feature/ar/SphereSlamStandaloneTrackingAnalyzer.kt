@@ -10,20 +10,24 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import com.hereliesaz.graffitixr.common.model.Fingerprint
 import com.hereliesaz.graffitixr.common.model.WallFeatureMap
+import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.sphereslam.PhotosphereKeyframe
+import com.hereliesaz.sphereslam.attitude.AttitudeSample
 import com.hereliesaz.sphereslam.attitude.DeviceCameraRotation
+import com.hereliesaz.sphereslam.attitude.DisplayPosePredictor
 import com.hereliesaz.sphereslam.attitude.GameRotationAttitudeSource
 import com.hereliesaz.sphereslam.camera.CameraIntrinsics
 import com.hereliesaz.sphereslam.camera.CameraIntrinsicsEstimator
 import com.hereliesaz.sphereslam.camera.CameraIntrinsicsTransforms
 import com.hereliesaz.sphereslam.camera.CaptureRotation
-import com.hereliesaz.sphereslam.camera.LumaFrameTransform
+import com.hereliesaz.sphereslam.camera.LumaFrameBufferPool
 import com.hereliesaz.sphereslam.camera.RotatedLuma
 import com.hereliesaz.sphereslam.math.RigidMath
 import com.hereliesaz.sphereslam.reloc.PhotosphereTrackingSession
 import com.hereliesaz.sphereslam.reloc.PoseBlend
+import com.hereliesaz.sphereslam.reloc.VisualMatchMethod
 import java.nio.ByteBuffer
 import timber.log.Timber
 
@@ -94,6 +98,8 @@ data class SphereSlamStandaloneFrame(
     val observationAgeMs: Float?,
     val matchDurationMs: Float,
     val source: SphereSlamStandalonePoseSource,
+    /** How SphereSLAM solved the visual pose (null for sources without one, e.g. a co-op peer). */
+    val matchMethod: VisualMatchMethod? = null,
 ) {
     init {
         require(viewMatrix.size == 16)
@@ -120,15 +126,26 @@ internal data class StandaloneAtlasGrowthCandidate(
  * bridge, multi-page atlas growth and the failure taxonomy. This class is the Android/app adapter
  * around it: CameraX frames (full Y plane, packed and rotated to display orientation), Camera2
  * characteristics (intrinsics, sensor orientation, timestamp source), the device attitude
- * ([GameRotationAttitudeSource]), the native MobileGS relocalizer (seeded on every planar-session
- * build, fed each frame, and corroborating the accepted KPM pose through the session's
- * `correctAcceptedPose` hook), optional MiDaS depth for MobileGS, and the UI callbacks.
+ * ([attitudeSample]: the host's `CameraAttitudeProvider`, `TYPE_ROTATION_VECTOR` — the same sensor
+ * that stamps keyframes and drives the display-rate glow and [displayPosePredictor]; only when the
+ * host wires none does the analyzer fall back to its own [GameRotationAttitudeSource] and leave the
+ * predictor unwired), the native MobileGS relocalizer (seeded on every planar-session build, fed
+ * each frame, and corroborating the accepted KPM pose through the session's `correctAcceptedPose`
+ * hook), optional MiDaS depth for MobileGS, and the UI callbacks.
  *
  * Deliberately synchronous on the ImageAnalysis executor: each callback either has a KPM pose for
  * THIS frame, a short IMU-bridged hold of the last good pose, or no pose. There is no asynchronous
- * "latest match" that can silently pair an old wall observation with a newer camera frame. The one
- * exception is the optional MiDaS depth, which is not a pose: it runs on its own drop-if-busy thread
- * (see [maybePushDepth]) so its ~300 ms inference never stalls this executor.
+ * "latest match" that can silently pair an old wall observation with a newer camera frame. Since
+ * SphereSLAM 0.24.3 the session builds and grows its KPM matcher on its own background thread and
+ * swaps the result in at the start of a later frame; until the first build lands a frame carries
+ * only the base photosphere pose (`FrameResult.pose == null`) — "no pose yet", not a failure. The
+ * optional MiDaS depth is not a pose: it runs on its own drop-if-busy thread (see [maybePushDepth]) so
+ * its inference (LiteRT GPU, or the slower CPU fallback) never stalls this executor.
+ *
+ * Frames are packed from the Y plane into a [LumaFrameBufferPool] (no ~300 KB allocation per frame).
+ * Reuse contract: a pooled array is overwritten two frames later, and nothing here keeps one past
+ * [analyze] — the session reads it without retaining it, MobileGS copies it into a direct buffer,
+ * depth copies a small grid, and keyframes/atlas pages are the library's own copies.
  *
  * The body->camera rotation is [DeviceCameraRotation.cameraFromDevice] for this camera's sensor
  * orientation and the CameraX rotation applied to the tracked (display-upright) image — not
@@ -184,9 +201,31 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private val onFatalError: (Throwable) -> Unit = {},
     private val targetQualityConfig: StandaloneTargetQualityConfig =
         StandaloneTargetQualityConfig(),
-    private val attitudeSource: GameRotationAttitudeSource = GameRotationAttitudeSource(context),
+    /**
+     * Device attitude for every frame (`Frame.attitude`: base photosphere pose, gyro bridge, pose
+     * prediction): the host's `CameraAttitudeProvider.latestSample()`. Null = the analyzer samples
+     * its own `TYPE_GAME_ROTATION_VECTOR` and [displayPosePredictor] is not wired (a predictor must
+     * read the same sensor as `Frame.attitude`).
+     */
+    attitudeSample: (() -> AttitudeSample?)? = null,
+    /**
+     * Receives every rendered pose from the session for display-rate re-posing on the GL thread
+     * (`HomographyOverlayRenderer`), cleared whenever a frame yields no pose. Ignored without
+     * [attitudeSample].
+     */
+    displayPosePredictor: DisplayPosePredictor? = null,
     private val maxBridgeMs: Long = 400L,
 ) : ImageAnalysis.Analyzer, AutoCloseable {
+
+    // Fallback only: no host attitude wired. Owned (started/stopped) by this analyzer.
+    private val ownAttitudeSource: GameRotationAttitudeSource? =
+        if (attitudeSample == null) GameRotationAttitudeSource(context) else null
+    private val readAttitude: () -> AttitudeSample? =
+        attitudeSample ?: { ownAttitudeSource?.latestSample() }
+
+    // Pooled display-upright luma (SphereSLAM LumaFrameBufferPool); see the class doc for the reuse
+    // contract. Two slots: the frame being analysed plus one of slack.
+    private val lumaPool = LumaFrameBufferPool(slots = 2)
 
     private data class DiagnosticKey(
         val rawWidth: Int,
@@ -228,9 +267,11 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private var convertedReferenceSource: SphereSlamStandaloneReferenceImage? = null
     private var convertedReference: PhotosphereTrackingSession.ReferenceImage? = null
 
-    // Phase 2: MiDaS inference (~300 ms on the ORT CPU backend) never runs on this analysis thread —
-    // inline it stalled tracking for that long and aged the next KPM observation past the session's
-    // observation-age gate (STALE_OBSERVATION flicker). It runs on its own single thread, at most one
+    // Phase 2: MiDaS inference never runs on this analysis thread. Since SphereSLAM 0.24.3 it runs
+    // on LiteRT's GPU delegate (with an XNNPACK CPU fallback that can take hundreds of ms), and
+    // DepthEstimator blocks its caller until its own thread is done; inline, a slow run stalled
+    // tracking and aged the next KPM observation past the session's observation-age gate
+    // (STALE_OBSERVATION flicker). It runs on its own single thread, at most one
     // at a time (a request while one is in flight is dropped, never queued), on a view-tile-change /
     // atlas-growth cadence with a slow periodic refresh; the result is handed back and applied on
     // this thread at the start of the next analyze(). Created only when a depth estimator is wired.
@@ -305,6 +346,14 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     )
 
     init {
+        // The session's frame-to-frame flow tracking (SphereSLAM 0.24.3) needs OpenCV's Java native
+        // library loaded before the first onFrame; without it flow silently switches itself off and
+        // every frame becomes a full KPM solve. GraffitiApplication already loads it; this idempotent
+        // call makes the requirement local and visible. Fail-soft: tracking still works without it.
+        runCatching { NativeLibLoader.loadAll() }
+            .onFailure { Timber.w(it, "OpenCV not loaded; SphereSLAM flow tracking disabled") }
+        // Same sensor as Frame.attitude, or not at all.
+        session.displayPosePredictor = displayPosePredictor.takeIf { attitudeSample != null }
         session.updatePrecisionLayer(
             reference = libraryReference(referenceImage),
             atlasPages = atlasReferenceImages.map(::libraryAtlasPage),
@@ -315,7 +364,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
 
     fun start() {
         if (!closed) {
-            attitudeSource.start()
+            ownAttitudeSource?.start()
             reportTrackingState(session.trackingState)
         }
     }
@@ -384,7 +433,8 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             // The full-frame "crop" is (0, 0, rawWidth, rawHeight); no per-frame Rect is built.
             if (rawWidth <= 0 || rawHeight <= 0) return
 
-            val rotated = LumaFrameTransform.packAndRotate(
+            val convertStartNs = android.os.SystemClock.elapsedRealtimeNanos()
+            val rotated = lumaPool.packAndRotate(
                 source = y.buffer,
                 width = rawWidth,
                 height = rawHeight,
@@ -392,6 +442,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 pixelStride = y.pixelStride,
                 rotationDegrees = rotationDeg,
             )
+            val convertDurationNs = android.os.SystemClock.elapsedRealtimeNanos() - convertStartNs
 
             val rawIntrinsics = CameraIntrinsicsEstimator.estimate(
                 context,
@@ -462,11 +513,12 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                     luma = rotated.bytes,
                     intrinsics = intrinsics,
                     timestampNs = timestampNs,
-                    attitude = attitudeSource.latestSample(),
+                    attitude = readAttitude(),
                     cameraFromDevice = cameraFromDevice,
                     headingDeg = heading?.first,
                     elevationDeg = heading?.second,
                     rollDeg = cameraRollDegrees(cameraFromDevice),
+                    convertDurationNs = convertDurationNs,
                 ),
             )
             currentFrameIntrinsics = null
@@ -495,6 +547,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 else -> {
                     // A visual miss still feeds pixels to the precision relocalizer, but with no
                     // current camera pose. This cannot overwrite the base-map pose with stale state.
+                    // This is also the path while the session's first background matcher build is
+                    // in flight (pose == null, no failure reported): nothing is torn down here, the
+                    // UI keeps its state and only the artwork stays hidden until a pose exists.
                     feedMobileGsFrame(rotated, timestampNs, result.projection, null)
                     onFrameTracked(result.pose?.let { standaloneFrame(it) })
                 }
@@ -530,6 +585,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             source = when (pose.source) {
                 PhotosphereTrackingSession.PoseSource.KPM -> SphereSlamStandalonePoseSource.KPM
                 PhotosphereTrackingSession.PoseSource.IMU_BRIDGE -> SphereSlamStandalonePoseSource.IMU_BRIDGE
+            },
+            matchMethod = pose.matchMethod.takeIf {
+                pose.source == PhotosphereTrackingSession.PoseSource.KPM
             },
         )
 
@@ -676,14 +734,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         frameHeight: Int,
     ): DepthOutcome? {
         if (!estimator.isLoaded && !estimator.load()) return null
-        // MiDaS wants RGB; the live frame is luma. A gray bitmap is coarse but all this path needs —
-        // depth here is downscaled and only calibrates a radius, not a texture.
-        val gray = lumaBitmap(grid.bytes, grid.width, grid.height)
-        val depth = try {
-            estimator.estimate(gray)
-        } finally {
-            gray.recycle()
-        }
+        // The grid is this job's own copy (never a pooled frame), fed straight in as luma: the
+        // estimator resamples it to the model input with grey in all three channels — no ARGB
+        // Bitmap round trip. Depth here is downscaled and only calibrates a radius, not a texture.
+        val depth = estimator.estimateLuma(grid.bytes, grid.width, grid.height)
         // A failed inference is an outcome too: it clears any stale stashed depth so placement falls
         // back to the wall plane. The map is registered to the FULL tracked frame, not the grid.
         return DepthOutcome(
@@ -978,7 +1032,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         if (closed) return
         closed = true
         slamManager?.setTrackingPoseValid(false)
-        attitudeSource.stop()
+        ownAttitudeSource?.stop()
+        session.displayPosePredictor?.clear()
+        session.displayPosePredictor = null
         lastRelocSeq = 0f
         session.close()
         lastDiagnosticKey = null

@@ -49,7 +49,7 @@ adjustment/anchoring lens is active.
 | Capability | ARCore-supported AR | ARCore-unavailable standalone AR |
 |---|---|---|
 | Camera owner | ARCore `Session` / `ArRenderer` | CameraX |
-| Camera view | full screen: ARCore's background quad is centre-cropped to the view by `Frame.transformCoordinates2d`, and its projection/hit tests share that display geometry | full screen: `PreviewView` `FILL_CENTER` (as in Overlay); the artwork projection, target-capture taps and coverage-glow field of view apply the same centre crop (SphereSLAM `camera.CameraFillCenter`), while tracking keeps the full analysis frame |
+| Camera view | full screen: ARCore's background quad is centre-cropped to the view by `Frame.transformCoordinates2d`, and its projection/hit tests share that display geometry | full screen: `PreviewView` `FILL_CENTER` (as in Overlay); the artwork projection, target-capture taps and coverage-glow lens apply the same centre crop (SphereSLAM `camera.CameraFillCenter`), while tracking keeps the full analysis frame |
 | Continuous pose | ARCore | calibrated SphereSLAM/KPM page match |
 | Short visual miss | ARCore tracking/fusion | rotation-only IMU bridge, max 400 ms |
 | Persisted wall target | ARCore target/fingerprint data | versioned rectified SphereSLAM reference PNG + width/metric metadata |

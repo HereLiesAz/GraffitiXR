@@ -95,7 +95,11 @@ and fingerprint placement, the embedded coverage wash (`:overlay`) and MiDaS dep
 Since 0.24.1 the standalone photosphere runtime itself is the library's
 `reloc.PhotosphereTrackingSession` (the app's analyzer is its CameraX/MobileGS/UI adapter), the
 Overlay planar tracker is `reloc.PlanarTracker`, and the `FILL_CENTER` display math and mark
-geometry are `camera.CameraFillCenter` / `reloc.MetricMarks`. The
+geometry are `camera.CameraFillCenter` / `reloc.MetricMarks`. Since 0.24.3 standalone uses one
+attitude sensor (`CameraAttitudeProvider`, `TYPE_ROTATION_VECTOR` at game rate) for keyframes, the
+session's `Frame.attitude`, the display-rate coverage glow (re-projected on every GL draw from its
+`AttitudeExtrapolator`) and the artwork's per-draw `DisplayPosePredictor`; the session matches on a
+background-built matcher with flow tracking between KPM solves, and MiDaS depth runs on LiteRT GPU. The
 app keeps the ARCore wiring, PoseFusion's ARCore backbone, MobileGS, persistence and UI. See
 [`SPHERESLAM_TODO.md`](SPHERESLAM_TODO.md) for the list.
 

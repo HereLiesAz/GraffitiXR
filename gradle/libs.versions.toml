@@ -22,7 +22,6 @@ kotlin = "2.4.20"
 ksp = "2.3.12"
 kotlinxSerialization = "1.11.0"
 lifecycle = "2.11.0"
-litert = "2.2.0"
 mlkitSubjectSegmentation = "16.0.0-beta1" # ACCEPTED RISK: no stable release as of 2026-04-02
 navigation = "2.10.2"
 onnxruntime = "1.30.0"
@@ -30,7 +29,7 @@ opencv = "5.0.0.1"
 playServicesBase = "18.11.0"
 playServicesLocation = "21.4.0"
 segmentationSelfie = "16.0.0-beta6" # ACCEPTED RISK: no stable release as of 2026-04-02
-sphereSlam = "0.24.1" # Current tested release; update this single value when SphereSLAM advances.
+sphereSlam = "0.24.3" # Current tested release; update this single value when SphereSLAM advances.
 timber = "5.0.1"
 robolectric = "4.17"
 uiGeometry = "1.11.4"
@@ -99,7 +98,6 @@ kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-cor
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 kotlinx-serialization-cbor = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-cbor", version.ref = "kotlinxSerialization" }
-litert = { module = "com.google.ai.edge.litert:litert", version.ref = "litert" }
 mlkit-subject-segmentation = { group = "com.google.android.gms", name = "play-services-mlkit-subject-segmentation", version.ref = "mlkitSubjectSegmentation" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }

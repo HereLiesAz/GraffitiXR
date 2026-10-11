@@ -87,8 +87,9 @@ dependencies {
     // Public Standalone* typealiases expand to :reloc types, so this must remain on the consumer
     // compile classpath. Keeping those aliases preserves GraffitiXR's existing public vocabulary.
     api(libs.sphereslam.reloc)
-    // Monocular depth (MiDaS v2.1 Small, ONNX Runtime) for the standalone map and Overlay > Gyro.
-    // The :models AAR bundles its own midas/superpoint/zerodce assets. `api`: the public
+    // Monocular depth (MiDaS v2.1 Small; LiteRT GPU delegate with XNNPACK CPU fallback since
+    // 0.24.3) for the standalone map and Overlay > Gyro. The :models AAR bundles its own
+    // midas/superpoint/zerodce assets and ships the LiteRT/ORT R8 keep rules. `api`: the public
     // SphereSlamStandaloneOverlay / ArViewModel.standaloneDepthEstimatorOrNull expose DepthEstimator.
     api(libs.sphereslam.models)
     implementation(project(":android_collaboration_module"))
@@ -106,9 +107,11 @@ dependencies {
     implementation(libs.arcore.client)
     implementation(libs.opencv)
 
-    // ONNX Runtime for monocular depth (MiDaS Small) via SphereSLAM :models. Declared here too so
-    // the app's catalog pins the ORT version that ends up in the APK. OpenCV DNN (the native
-    // engine's ONNX runtime) can't reliably import the depth model, so depth runs in Kotlin.
+    // ONNX Runtime for SphereSLAM :models' SuperPoint / Zero-DCE wrappers. Declared here too so the
+    // app's catalog pins the ORT version that ends up in the APK. Monocular depth (MiDaS Small) no
+    // longer uses ORT: since SphereSLAM 0.24.3 it runs on LiteRT 1.4.2 (GPU delegate, CPU fallback),
+    // which :models brings itself. Do not add LiteRT 2.x to this app — it drops the classic delegate
+    // API that litert-gpu 1.4.2 needs.
     implementation(libs.onnxruntime.android)
 
     implementation(libs.az.nav.rail)

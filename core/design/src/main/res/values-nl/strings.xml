@@ -378,6 +378,10 @@
     <string name="settings_glow_style_wash_desc">Gloeit overal behalve op vastgelegde tegels</string>
     <string name="settings_glow_style_missing">Alleen ontbrekende tegels</string>
     <string name="settings_glow_style_missing_desc">Gloeit alleen over nog vast te leggen tegels</string>
+    <string name="settings_glow_style_outline">Randgloed</string>
+    <string name="settings_glow_style_outline_desc">Zachte gloed langs de rand van vastgelegde tegels</string>
+    <string name="settings_glow_style_wash_outlined">Waas + rand</string>
+    <string name="settings_glow_style_wash_outlined_desc">Waas met een fellere rand rond vastgelegde tegels</string>
     <string name="settings_glow_color_white">Wit</string>
     <string name="settings_glow_color_light_grey">Lichtgrijs</string>
     <string name="settings_glow_color_mid_grey">Middengrijs</string>

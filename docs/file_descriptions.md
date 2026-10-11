@@ -64,7 +64,7 @@ This document lists key files in the repository and their purposes.
 
 ### SphereSLAM (published dependency)
 
-SphereSLAM 0.24.1 public API baseline: GraffitiXR consumes the supported planar/coverage surface
+SphereSLAM 0.24.3 public API baseline: GraffitiXR consumes the supported planar/coverage surface
 and toolkit packages, and explicitly opts into the experimental `:reloc` and `:models` surfaces while
 preserving its existing `Standalone*` aliases.
 
@@ -98,6 +98,10 @@ the real (non-stub) tracker is packaged.
     `HomographyTracker` + `HomographyTrackerNative` + `HomographyArTracker` stack and
     `BridgedHomographyTracker`'s bridge); `:reloc` `MetricMarks` (was `anchor/PlaneMarks`,
     `anchor/MetricMarks`, `anchor/Triangulation`).
+*   Since 0.24.3 the app uses (no code moved): `attitude.AttitudeExtrapolator` /
+    `DisplayPosePredictor` (display-rate glow rotation and artwork pose), `CoverageGlowRenderer`'s
+    live `setRegions` / `setLens` / `rotationSource` and its `OUTLINE` / `COMPLEMENT_OUTLINED` styles,
+    `camera.LumaFrameBufferPool`, and `DepthEstimator.estimateLuma` (LiteRT GPU).
 *   `core/common` `sensor/CameraIntrinsics` and `model/HybridKpmDiagnostics`/`HybridKpmOutcome` are
     typealiases of the library types (`core/common` depends on `:sphereslam` with `api`).
 
@@ -134,8 +138,10 @@ the real (non-stub) tracker is packaged.
     `PhotosphereTrackingSession`, which runs the synchronous calibrated KPM pose pipeline (quality
     gates, observation-age checks, pose-jump rejection, tracking-state hysteresis, the short
     rotation-only IMU bridge, base photosphere keyframes, `map_from_fingerprint`, atlas growth).
-    The adapter supplies display-upright luma, intrinsics, `GameRotationAttitudeSource` attitude and
-    body→camera `DeviceCameraRotation.cameraFromDevice(SENSOR_ORIENTATION, rotationDegrees)`;
+    The adapter supplies pooled display-upright luma (`LumaFrameBufferPool`), intrinsics, the
+    host's `CameraAttitudeProvider` attitude (own `GameRotationAttitudeSource` only as a fallback)
+    and body→camera `DeviceCameraRotation.cameraFromDevice(SENSOR_ORIENTATION, rotationDegrees)`,
+    wires the session's `displayPosePredictor`, loads OpenCV for flow tracking;
     seeds/feeds native MobileGS and corroborates its reloc with `:reloc` `PoseBlend` (the session's
     `correctAcceptedPose` hook); pushes optional MiDaS depth; maps results to the UI. Tracks the full
     luma buffer (not the preview viewport's cropRect) and publishes each frame's display-upright
@@ -156,8 +162,12 @@ the real (non-stub) tracker is packaged.
     standalone SphereSLAM AR and the legacy homography Overlay tracker. Takes each pose with the
     full tracked frame's intrinsics and draws on the full surface with the `FILL_CENTER`
     projection (SphereSLAM `camera.CameraFillCenter.projection`, cached per intrinsics/surface size). In standalone
-    it embeds SphereSLAM `:overlay` `CoverageGlowRenderer` (complement wash, holes =
-    `PhotosphereMap.currentRegions()`, projected through the cropped field of view) before the design.
+    it embeds SphereSLAM `:overlay` `CoverageGlowRenderer` (wash / missing tiles / edge glow / wash +
+    edge; regions re-projected every draw from the attitude extrapolator through the `FILL_CENTER`
+    lens) before the design, and re-poses the design every draw from the session's
+    `DisplayPosePredictor` (`rendering/ArtworkPosePrediction.kt`).
+*   `CoverageGlowStyleMapping.kt`: persisted glow style → renderer fill mode and region list, and the
+    intensity → edge-glow alpha / density → edge width mapping.
 *   `rendering/BackgroundRenderer.kt`: OpenGL ES shader that renders ARCore's `EXTERNAL_OES`
     camera texture full-screen.
 *   `CameraPreview.kt`: shared CameraX preview for Overlay and standalone SphereSLAM AR, full
@@ -196,7 +206,9 @@ the real (non-stub) tracker is packaged.
 *   `ProjectLibraryScreen.kt`: Full-screen project list UI.
 
 ---
-*Documentation updated on 2026-10-11: SphereSLAM 0.24.1 — `CameraFillCenter`, the standalone
+*Documentation updated on 2026-10-11: SphereSLAM 0.24.3 — display-rate full-rotation glow (two new
+outline styles), display-rate artwork pose prediction, one rotation-vector attitude sensor, pooled
+luma, LiteRT GPU depth. Earlier: SphereSLAM 0.24.1 — `CameraFillCenter`, the standalone
 photosphere runtime, the planar Overlay tracker and the plane/two-view mark math moved into the
 library (see the SphereSLAM section). Earlier 2026-10-10 update: generic SLAM code moved into
 SphereSLAM 0.24.0. Earlier 2026-10-01 update: added the dual ARCore/SphereSLAM backend ownership,

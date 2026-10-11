@@ -60,6 +60,10 @@
     <string name="settings_glow_style_wash_desc">Lueur partout sauf sur les tuiles capturées</string>
     <string name="settings_glow_style_missing">Tuiles manquantes seulement</string>
     <string name="settings_glow_style_missing_desc">Lueur uniquement sur les tuiles à capturer</string>
+    <string name="settings_glow_style_outline">Lueur de bord</string>
+    <string name="settings_glow_style_outline_desc">Lueur douce le long du bord des tuiles capturées</string>
+    <string name="settings_glow_style_wash_outlined">Voile + bord</string>
+    <string name="settings_glow_style_wash_outlined_desc">Voile avec un bord plus lumineux autour des tuiles capturées</string>
     <string name="settings_glow_color_white">Blanc</string>
     <string name="settings_glow_color_light_grey">Gris clair</string>
     <string name="settings_glow_color_mid_grey">Gris moyen</string>

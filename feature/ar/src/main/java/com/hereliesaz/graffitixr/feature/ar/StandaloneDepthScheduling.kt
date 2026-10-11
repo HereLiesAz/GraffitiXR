@@ -9,7 +9,9 @@ import kotlin.math.floor
 
 /*
  * Off-thread scheduling for the standalone analyzer's optional MiDaS depth (Phase 2 of the
- * spherical-coverage map). MiDaS on the ORT CPU backend costs ~300 ms per run; run inline on the
+ * spherical-coverage map). MiDaS runs on LiteRT's GPU delegate since SphereSLAM 0.24.3 (tens of ms)
+ * but falls back to the XNNPACK CPU path (hundreds of ms) where the GPU delegate is unavailable, and
+ * the estimator blocks its caller until its own `SphereSLAM-depth` thread finishes. Run inline on the
  * single CameraX analysis thread it froze tracking for that long every time, and the next frame's
  * KPM observation then aged past the session's observation-age gate (STALE_OBSERVATION flicker).
  * These pieces keep that work off the analysis thread and rare:

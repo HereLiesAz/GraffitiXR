@@ -376,6 +376,10 @@
     <string name="settings_glow_style_wash_desc">Brilha em todo lugar, exceto nos blocos capturados</string>
     <string name="settings_glow_style_missing">Só blocos em falta</string>
     <string name="settings_glow_style_missing_desc">Brilha apenas sobre os blocos a capturar</string>
+    <string name="settings_glow_style_outline">Brilho de contorno</string>
+    <string name="settings_glow_style_outline_desc">Brilho suave ao longo do contorno dos blocos capturados</string>
+    <string name="settings_glow_style_wash_outlined">Véu + contorno</string>
+    <string name="settings_glow_style_wash_outlined_desc">Véu com um contorno mais brilhante à volta dos blocos capturados</string>
     <string name="settings_glow_color_white">Branco</string>
     <string name="settings_glow_color_light_grey">Cinza-claro</string>
     <string name="settings_glow_color_mid_grey">Cinza-médio</string>

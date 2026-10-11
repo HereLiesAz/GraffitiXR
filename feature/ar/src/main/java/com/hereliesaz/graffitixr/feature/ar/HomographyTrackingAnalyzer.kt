@@ -9,7 +9,7 @@ import androidx.camera.core.ImageProxy
 import com.hereliesaz.sphereslam.camera.CameraIntrinsics
 import com.hereliesaz.sphereslam.camera.CameraIntrinsicsEstimator
 import com.hereliesaz.sphereslam.camera.CaptureRotation
-import com.hereliesaz.sphereslam.camera.LumaFrameTransform
+import com.hereliesaz.sphereslam.camera.LumaFrameBufferPool
 import com.hereliesaz.sphereslam.camera.ProjectionMatrix
 import com.hereliesaz.sphereslam.reloc.PlanarTracker
 
@@ -38,7 +38,7 @@ data class HomographyTrackedFrame(
  * work outright.
  *
  * Per frame: pack the full Y plane and rotate it to display orientation with SphereSLAM's
- * [LumaFrameTransform] (the same path the standalone analyzers use), rotate the frame's camera
+ * `LumaFrameBufferPool` (the same pooled path the standalone analyzers use), rotate the frame's camera
  * intrinsics to match via [CaptureRotation] (the SAME sensor-to-display convention, so pixels and
  * intrinsics describe one image), then hand both to [BridgedHomographyTracker.trackFrame].
  *
@@ -62,6 +62,9 @@ class HomographyTrackingAnalyzer(
         if (raw % 90 == 0) raw else DEFAULT_SENSOR_ORIENTATION_DEG
     }.getOrDefault(DEFAULT_SENSOR_ORIENTATION_DEG)
 
+    // SphereSLAM LumaFrameBufferPool: no frame-sized allocation per frame. One stream, one pool.
+    private val lumaPool = LumaFrameBufferPool(slots = 2)
+
     override fun analyze(image: ImageProxy) {
         try {
             val planes = image.planes
@@ -71,7 +74,9 @@ class HomographyTrackingAnalyzer(
             val rawH = image.height
             val rotationDeg = image.imageInfo.rotationDegrees
 
-            val rotated = LumaFrameTransform.packAndRotate(
+            // Pooled: PlanarTracker copies the frame into its own Mat and keeps nothing after
+            // trackFrame returns, so the array may be reused two frames later.
+            val rotated = lumaPool.packAndRotate(
                 source = y.buffer,
                 width = rawW,
                 height = rawH,

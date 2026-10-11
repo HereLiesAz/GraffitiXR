@@ -33,6 +33,7 @@ class StandaloneDiagnosticsTest {
                 observationAgeMs = 41f,
                 matchDurationMs = 12f,
                 source = SphereSlamStandalonePoseSource.KPM,
+                matchMethod = "FLOW",
             ),
             physicallyMetric = true,
             referenceWidthUnits = 2.4f,
@@ -40,6 +41,7 @@ class StandaloneDiagnosticsTest {
                 StandaloneFailureReason.STALE_OBSERVATION,
                 "ageMs=300",
             ),
+            kpmMetrics = "SphereSLAM standalone KPM page=3 method=FLOW timing{frames=30}",
         )
 
         for (expected in listOf(
@@ -53,6 +55,8 @@ class StandaloneDiagnosticsTest {
             "inliers=18",
             "reprojectionError=2.500",
             "observationAgeMs=41.000",
+            "matchMethod=FLOW",
+            "kpmMetrics=SphereSLAM standalone KPM page=3 method=FLOW timing{frames=30}",
             "physicalScale=true",
             "referenceWidthUnits=2.400",
             "failure=STALE_OBSERVATION",
@@ -77,5 +81,7 @@ class StandaloneDiagnosticsTest {
         assertTrue(dump.contains("observationAgeMs=unavailable"))
         assertTrue(dump.contains("physicalScale=false"))
         assertTrue(dump.contains("failure=none"))
+        assertTrue(dump.contains("matchMethod=unavailable"))
+        assertTrue(dump.contains("kpmMetrics=unavailable"))
     }
 }

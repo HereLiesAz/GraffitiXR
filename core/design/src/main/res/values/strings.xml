@@ -428,6 +428,10 @@
     <string name="settings_glow_style_wash_desc">Glow everywhere except captured tiles</string>
     <string name="settings_glow_style_missing">Missing tiles only</string>
     <string name="settings_glow_style_missing_desc">Glow only over tiles still to capture</string>
+    <string name="settings_glow_style_outline">Edge glow</string>
+    <string name="settings_glow_style_outline_desc">Soft glow along the edge of captured tiles</string>
+    <string name="settings_glow_style_wash_outlined">Wash + edge</string>
+    <string name="settings_glow_style_wash_outlined_desc">Wash with a brighter edge around captured tiles</string>
     <string name="settings_glow_color_white">White</string>
     <string name="settings_glow_color_light_grey">Light grey</string>
     <string name="settings_glow_color_mid_grey">Mid grey</string>

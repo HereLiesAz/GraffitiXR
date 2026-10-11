@@ -13,7 +13,7 @@ import java.nio.ByteBuffer
 import kotlin.math.abs
 import timber.log.Timber
 import com.hereliesaz.sphereslam.camera.CameraIntrinsicsTransforms
-import com.hereliesaz.sphereslam.camera.LumaFrameTransform
+import com.hereliesaz.sphereslam.camera.LumaFrameBufferPool
 
 internal fun shouldHoldCoopPeerPose(
     lastFreshSolveMs: Long,
@@ -65,6 +65,9 @@ internal class CoopPeerFingerprintAnalyzer(
         )
     }
 
+    // SphereSLAM LumaFrameBufferPool: no frame-sized allocation per frame. One stream, one pool.
+    private val lumaPool = LumaFrameBufferPool(slots = 2)
+
     override fun analyze(image: ImageProxy) {
         try {
             if (closed) return
@@ -77,7 +80,8 @@ internal class CoopPeerFingerprintAnalyzer(
             if (crop.width() <= 0 || crop.height() <= 0) return
             val rotationDeg = image.imageInfo.rotationDegrees
 
-            val rotated = LumaFrameTransform.packCropAndRotate(
+            // Pooled: the frame is copied into the direct buffer below and never kept past analyze().
+            val rotated = lumaPool.packCropAndRotate(
                 source = y.buffer,
                 sourceWidth = rawWidth,
                 sourceHeight = rawHeight,

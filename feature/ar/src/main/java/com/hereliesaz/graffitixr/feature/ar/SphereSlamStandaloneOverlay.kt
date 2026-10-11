@@ -44,6 +44,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -60,9 +61,12 @@ import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import com.hereliesaz.graffitixr.design.theme.rememberAppStrings
 import com.hereliesaz.sphereslam.camera.CameraFillCenter
 import com.hereliesaz.graffitixr.feature.ar.rendering.HomographyOverlayRenderer
-import com.hereliesaz.sphereslam.CoverageGlowProjection
 import com.hereliesaz.sphereslam.PhotosphereKeyframe
 import com.hereliesaz.sphereslam.SphereCoverage
+import com.hereliesaz.sphereslam.attitude.AttitudeExtrapolator
+import com.hereliesaz.sphereslam.attitude.AttitudeSample
+import com.hereliesaz.sphereslam.attitude.DeviceCameraRotation
+import com.hereliesaz.sphereslam.attitude.DisplayPosePredictor
 import com.hereliesaz.sphereslam.overlay.CoverageGlowRenderer
 import com.hereliesaz.sphereslam.reloc.PhotosphereTrackingSession
 import com.hereliesaz.sphereslam.camera.CameraIntrinsics
@@ -72,6 +76,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** Prefix of PhotosphereTrackingSession's periodic per-window KPM metrics/timing diagnostic. */
+private const val KPM_METRICS_PREFIX = "SphereSLAM standalone KPM "
 
 private val SPHERESLAM_DEFAULT_UNWARP_POINTS = listOf(
     Offset(0.25f, 0.25f),
@@ -87,104 +94,87 @@ private val SPHERESLAM_DEFAULT_UNWARP_POINTS = listOf(
  * default, exactly matching PhotosphereMap.needsUpdate semantics.
  *
  * The wash is SphereSLAM's `:overlay` [CoverageGlowRenderer] in [CoverageGlowRenderer.FillMode.COMPLEMENT]
- * with the current tiles' full angular extents ([com.hereliesaz.sphereslam.PhotosphereMap.currentRegions],
- * projected by [CoverageGlowProjection.projectRegions]) as the holes. This holds only the projection
- * state; [HomographyOverlayRenderer] draws the wash embedded in the artwork GL surface, before the
+ * with the current tiles' full angular extents ([com.hereliesaz.sphereslam.PhotosphereMap.currentRegions])
+ * as the holes. [HomographyOverlayRenderer] draws it embedded in the artwork GL surface, before the
  * design quad. That is the one place that is both above the camera preview and beneath the artwork:
  * the artwork surface is `setZOrderMediaOverlay`, which sits behind the app window, so a window-level
  * View (an earlier implementation) washed over the artwork as well. A separate top-ordered
  * SurfaceView was worse still — it sat above all app UI.
  *
- * The user's glow settings ([CoverageGlowAppearance]) restyle it live via [applyAppearance]: the
- * style decides both the fill mode and which regions are projected (current tiles as holes for the
- * wash, tiles needing an update as the fill for "missing tiles only"), and colour/intensity/mode/
- * geometry are handed to the GL thread together as one [HomographyOverlayRenderer.CoverageGlowConfig].
+ * Since SphereSLAM 0.24.3 nothing is projected here: the regions are handed over only when the map
+ * changes (per keyframe) and the renderer re-projects them on every draw with the full camera
+ * rotation from the attitude extrapolator (roll-correct, defined at the poles) through the preview's
+ * `FILL_CENTER` lens. This holds the user's glow settings ([CoverageGlowAppearance]) and the latest
+ * regions; [applyAppearance] restyles it live. The style decides the fill mode and which regions feed
+ * it (current tiles as holes for the wash and as the edge for the outline styles, tiles needing an
+ * update as the fill for "missing tiles only"), and colour/intensity/edge/mode/geometry are handed to
+ * the GL thread together as one [HomographyOverlayRenderer.CoverageGlowConfig].
+ *
+ * Thread-safe: keyframe callbacks (camera worker) and Settings changes (main) publish under one
+ * lock, in order, so a geometry built for the old style can never land after the new style's.
  */
 private class SphereTileGlowMask(
     private val renderer: HomographyOverlayRenderer,
 ) {
-    private data class MaskState(
-        val currentRegions: List<SphereCoverage.TileRegion> = emptyList(),
-        val regionsNeedingUpdate: List<SphereCoverage.TileRegion> = emptyList(),
-        val cameraHeadingDeg: Float = 0f,
-        val cameraElevationDeg: Float = 0f,
-        val horizontalFovDeg: Float = 60f,
-        val verticalFovDeg: Float = 45f,
-    )
-
-    private val state = AtomicReference(MaskState())
-
-    // Guarded by `this`: the analyzer thread's projections and a main-thread style switch publish
-    // in order, so triangles projected for the old style can never land after the new style's.
+    // All guarded by `this`.
     private var appearance = CoverageGlowAppearance.DEFAULT
+    private var currentRegions: List<SphereCoverage.TileRegion> = emptyList()
+    private var regionsNeedingUpdate: List<SphereCoverage.TileRegion> = emptyList()
+    private var outlineWidthPx = CoverageGlowStyleMapping.outlineWidthPxFor(1f)
 
-    fun update(
-        currentRegions: List<SphereCoverage.TileRegion>,
-        regionsNeedingUpdate: List<SphereCoverage.TileRegion>,
-        cameraHeadingDeg: Float? = null,
-        cameraElevationDeg: Float? = null,
-        horizontalFovDeg: Float? = null,
-        verticalFovDeg: Float? = null,
+    /** New map state (per keyframe / on entry). Any thread; a no-op when nothing changed. */
+    fun updateRegions(
+        current: List<SphereCoverage.TileRegion>,
+        needingUpdate: List<SphereCoverage.TileRegion>,
     ) {
-        val previous = state.get()
-        val next = previous.copy(
-            currentRegions = currentRegions.toList(),
-            regionsNeedingUpdate = regionsNeedingUpdate.toList(),
-            cameraHeadingDeg = cameraHeadingDeg ?: previous.cameraHeadingDeg,
-            cameraElevationDeg = cameraElevationDeg ?: previous.cameraElevationDeg,
-            horizontalFovDeg = horizontalFovDeg ?: previous.horizontalFovDeg,
-            verticalFovDeg = verticalFovDeg ?: previous.verticalFovDeg,
-        )
-        state.set(next)
-        // May be called off the main thread (analyzer callbacks). The geometry travels with the
-        // style it was projected for; the continuously rendering GL surface applies both together.
-        synchronized(this) { publish(next) }
+        synchronized(this) {
+            if (current == currentRegions && needingUpdate == regionsNeedingUpdate) return
+            currentRegions = current.toList()
+            regionsNeedingUpdate = needingUpdate.toList()
+            publish()
+        }
     }
 
-    /**
-     * Restyle the live glow (Settings changes apply immediately, no AR restart). Re-projects the
-     * latest regions for the new style and hands the whole configuration to the GL thread.
-     */
+    /** Restyle the live glow (Settings changes apply immediately, no AR restart). Any thread. */
     fun applyAppearance(newAppearance: CoverageGlowAppearance) {
         synchronized(this) {
             appearance = newAppearance
-            publish(state.get())
+            publish()
+        }
+    }
+
+    /** Display density (px per dp) for the edge-glow width. Any thread. */
+    fun setDensity(density: Float) {
+        synchronized(this) {
+            val width = CoverageGlowStyleMapping.outlineWidthPxFor(density)
+            if (width == outlineWidthPx) return
+            outlineWidthPx = width
+            publish()
         }
     }
 
     /** Caller holds `this`. Only the GL thread touches the glow renderer; it applies this atomically. */
-    private fun publish(snapshot: MaskState) {
-        val style = appearance.style
+    private fun publish() {
+        val style = CoverageGlowStyleMapping.effectiveStyle(appearance.style)
+        val regions = CoverageGlowStyleMapping.regionsFor(
+            style = style,
+            currentRegions = currentRegions,
+            regionsNeedingUpdate = regionsNeedingUpdate,
+        )
         renderer.setCoverageGlowConfig(
             HomographyOverlayRenderer.CoverageGlowConfig(
                 rgb = appearance.rgb(),
                 alpha = appearance.safeIntensity,
+                outlineAlpha = CoverageGlowStyleMapping.outlineAlphaFor(appearance.intensity),
+                outlineWidthPx = outlineWidthPx,
                 fillMode = CoverageGlowStyleMapping.fillModeFor(style),
-                triangles = triangles(snapshot, style),
+                // Null = the whole view (missing-tiles style before the photosphere is anchored).
+                geometry = regions?.let { HomographyOverlayRenderer.CoverageGlowGeometry.Regions(it) }
+                    ?: HomographyOverlayRenderer.CoverageGlowGeometry.Triangles(
+                        CoverageGlowStyleMapping.FULL_VIEW_TRIANGLES,
+                    ),
             )
         )
-    }
-
-    /**
-     * The [style]'s regions as NDC `GL_TRIANGLES`: holes for the wash (empty = a full wash), the
-     * fill for "missing tiles only" (the whole view before the photosphere is anchored).
-     */
-    private fun triangles(snapshot: MaskState, style: CoverageGlowStyle): FloatArray {
-        val regions = CoverageGlowStyleMapping.regionsFor(
-            style = style,
-            currentRegions = snapshot.currentRegions,
-            regionsNeedingUpdate = snapshot.regionsNeedingUpdate,
-        ) ?: return CoverageGlowStyleMapping.FULL_VIEW_TRIANGLES
-        if (regions.isEmpty()) return FloatArray(0)
-        return runCatching {
-            CoverageGlowProjection.projectRegions(
-                regions = regions,
-                cameraHeadingDeg = snapshot.cameraHeadingDeg,
-                cameraElevationDeg = snapshot.cameraElevationDeg,
-                horizontalFovDeg = snapshot.horizontalFovDeg,
-                verticalFovDeg = snapshot.verticalFovDeg,
-            )
-        }.getOrDefault(FloatArray(0))
     }
 
     companion object {
@@ -202,14 +192,12 @@ private class SphereTileGlowMask(
     }
 }
 
-/**
- * `[horizontal, vertical]` field of view, in degrees, of what the screen shows of [frame]: the
- * preview's `FILL_CENTER` crop once the artwork surface has a size, the full frame's own until then
- * (the first frames can arrive before layout). Null for unusable intrinsics.
- */
-private fun shownFieldOfViewDegrees(frame: CameraIntrinsics, surface: IntSize): FloatArray? =
-    CameraFillCenter.fieldOfViewDegrees(frame, surface.width, surface.height)
-        ?: CameraFillCenter.fieldOfViewDegrees(frame, frame.width, frame.height)
+/** Current rotation of the default display in degrees (0/90/180/270); 0 when unavailable. */
+private fun defaultDisplayRotationDegrees(context: android.content.Context): Int = runCatching {
+    val display = context.getSystemService(android.hardware.display.DisplayManager::class.java)
+        ?.getDisplay(android.view.Display.DEFAULT_DISPLAY)
+    DeviceCameraRotation.surfaceRotationToDegrees(display?.rotation ?: android.view.Surface.ROTATION_0)
+}.getOrDefault(0)
 
 internal fun shouldStartStandaloneAnalyzer(
     cameraIdPresent: Boolean,
@@ -307,14 +295,8 @@ fun SphereSlamStandaloneOverlay(
      */
     sweepCoverage: Float? = null,
     /**
-     * Still-unscanned coverage directions for the "map more here" glow, read per tracked frame.
-     * Empty (the default, or once coverage is complete) draws nothing. Fed from the view model's
-     * [com.hereliesaz.sphereslam.SphereCoverage.thinDirections].
-     */
-    coverageGlowDirections: () -> List<com.hereliesaz.sphereslam.SphereCoverage.Direction> = { emptyList() },
-    /**
      * Current tiles' angular extents — the ONLY regions cut out of the otherwise full-screen glow
-     * (`PhotosphereMap.currentRegions`).
+     * (`PhotosphereMap.currentRegions`). Read on entry and after each photosphere keyframe.
      */
     coverageCurrentRegions: () -> List<SphereCoverage.TileRegion> = { emptyList() },
     /**
@@ -324,8 +306,20 @@ fun SphereSlamStandaloneOverlay(
     coverageRegionsNeedingUpdate: () -> List<SphereCoverage.TileRegion> = { emptyList() },
     /** The user's coverage-glow colour/intensity/style; a change restyles the live glow at once. */
     coverageGlowAppearance: CoverageGlowAppearance = CoverageGlowAppearance.DEFAULT,
-    /** Latest camera attitude `(headingDeg, elevationDeg)` for projecting the glow, or null. */
+    /** Latest camera attitude `(headingDeg, elevationDeg)` stamped on photosphere keyframes, or null. */
     cameraAttitude: () -> Pair<Float, Float>? = { null },
+    /**
+     * The host's `CameraAttitudeProvider.attitudeExtrapolator` (`TYPE_ROTATION_VECTOR`, sampled at
+     * `SENSOR_DELAY_GAME`): drives the display-rate glow rotation and the artwork's per-draw pose
+     * prediction. Null: the glow stays an unprojected wash and the artwork moves at analyzer rate.
+     */
+    attitudeExtrapolator: AttitudeExtrapolator? = null,
+    /**
+     * The same provider's `latestSample()`, handed to the tracking session as `Frame.attitude` so the
+     * pose predictor reads one sensor. Null: the analyzer samples its own game-rotation sensor and
+     * no pose prediction runs.
+     */
+    attitudeSample: (() -> AttitudeSample?)? = null,
     /**
      * Settings → Camera target FPS ([CameraTargetFps]) with the adaptive-rate battery cap inputs.
      * Standalone pins the camera's AE target FPS range from these (Device default leaves the
@@ -349,6 +343,8 @@ fun SphereSlamStandaloneOverlay(
     val disposed = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     val standaloneAnalyzerRef =
         remember { AtomicReference<SphereSlamStandaloneTrackingAnalyzer?>(null) }
+    // Latest periodic session metrics line (written on the camera worker, read by the dump).
+    val latestKpmMetrics = remember { AtomicReference<String?>(null) }
     fun postUi(block: () -> Unit) {
         mainHandler.post { if (!disposed.get()) block() }
     }
@@ -733,16 +729,51 @@ fun SphereSlamStandaloneOverlay(
         glRenderer.setMapFromFingerprint(mapAnchor)
     }
     // Full-view freshness mask: glow everywhere, then punch out only current photosphere tiles.
-    // Seeded immediately so the whole view glows before the first keyframe, as every tile starts stale.
+    // Seeded immediately from the map as it stands (all stale on a fresh map, so the whole view glows
+    // before the first keyframe); the renderer re-projects it every draw.
     val coverageGlowMask = remember(glRenderer) {
         SphereTileGlowMask(glRenderer).also {
             it.applyAppearance(coverageGlowAppearance)
-            it.update(currentRegions = emptyList(), regionsNeedingUpdate = emptyList())
+            it.updateRegions(coverageCurrentRegions(), coverageRegionsNeedingUpdate())
         }
     }
     // Settings apply immediately: restyle the live glow on every change, no AR restart.
     LaunchedEffect(coverageGlowMask, coverageGlowAppearance) {
         coverageGlowMask.applyAppearance(coverageGlowAppearance)
+    }
+    val density = LocalDensity.current.density
+    LaunchedEffect(coverageGlowMask, density) { coverageGlowMask.setDensity(density) }
+
+    // Display-rate attitude: the glow's rotation source and the artwork's per-draw pose prediction
+    // read the same TYPE_ROTATION_VECTOR extrapolator the tracking session's Frame.attitude comes
+    // from. The predictor is wired only when that holds (attitudeSample supplied).
+    val displayPosePredictor = remember { DisplayPosePredictor() }
+    val posePredictionWired = attitudeExtrapolator != null && attitudeSample != null
+    LaunchedEffect(glRenderer, attitudeExtrapolator, posePredictionWired) {
+        glRenderer.setAttitude(
+            extrapolator = attitudeExtrapolator,
+            predictor = displayPosePredictor.takeIf { posePredictionWired },
+        )
+    }
+    // The glow's camera frame follows the display rotation (the activity handles orientation
+    // changes itself, so a 180° flip arrives here, not as a recreation).
+    DisposableEffect(glRenderer, context) {
+        glRenderer.setDisplayRotation(defaultDisplayRotationDegrees(context))
+        val displayManager = context.getSystemService(android.hardware.display.DisplayManager::class.java)
+        val listener = object : android.hardware.display.DisplayManager.DisplayListener {
+            override fun onDisplayAdded(displayId: Int) = Unit
+            override fun onDisplayRemoved(displayId: Int) = Unit
+            override fun onDisplayChanged(displayId: Int) {
+                if (displayId == android.view.Display.DEFAULT_DISPLAY) {
+                    glRenderer.setDisplayRotation(defaultDisplayRotationDegrees(context))
+                }
+            }
+        }
+        displayManager?.registerDisplayListener(listener, mainHandler)
+        onDispose {
+            displayManager?.unregisterDisplayListener(listener)
+            displayPosePredictor.clear()
+        }
     }
 
     LaunchedEffect(glRenderer, designBitmap) {
@@ -907,6 +938,7 @@ fun SphereSlamStandaloneOverlay(
                 relocCorr = relocCounts.getOrElse(1) { -1 },
                 sweepCoverage = sweepCoverage ?: 0f,
             ),
+            kpmMetrics = latestKpmMetrics.get(),
         )
         context.getSystemService(ClipboardManager::class.java)
             ?.setPrimaryClip(ClipData.newPlainText("GraffitiXR SphereSLAM diagnostics", dump))
@@ -920,29 +952,10 @@ fun SphereSlamStandaloneOverlay(
             glRenderer.clearPose()
         } else {
             glRenderer.updatePose(frame.viewMatrix, frame.frameIntrinsics)
-            // The glow is the complement of tile freshness: the entire view glows, and only
-            // photosphere tiles whose needsUpdate=false state is current are punched clear.
-            val attitude = cameraAttitude()
-            val currentRegions = coverageCurrentRegions()
-            val regionsNeedingUpdate = coverageRegionsNeedingUpdate()
-            coverageGlowDirections() // keep the update-side signal hot/read alongside its complement
-            if (attitude != null) {
-                // The wash covers the whole surface, i.e. the preview's FILL_CENTER crop — project
-                // the tiles through that cropped field of view, not the full frame's.
-                shownFieldOfViewDegrees(frame.frameIntrinsics, surfaceSize.get())?.let { fov ->
-                    coverageGlowMask.update(
-                        currentRegions = currentRegions,
-                        regionsNeedingUpdate = regionsNeedingUpdate,
-                        cameraHeadingDeg = attitude.first,
-                        cameraElevationDeg = attitude.second,
-                        horizontalFovDeg = fov[0],
-                        verticalFovDeg = fov[1],
-                    )
-                }
-            } else {
-                // No attitude: nothing can be placed, so every style glows over the whole view.
-                coverageGlowMask.update(currentRegions = emptyList(), regionsNeedingUpdate = emptyList())
-            }
+            // The glow is no longer projected per tracked frame: the renderer re-projects the
+            // regions every draw from the attitude extrapolator. Only keep its lens source current
+            // (a value-compared volatile write; the co-op peer path has no calibration callback).
+            glRenderer.setGlowFrameIntrinsics(frame.frameIntrinsics)
         }
         val screenUnitsPerPixel = frame?.let {
             val size = surfaceSize.get()
@@ -968,6 +981,7 @@ fun SphereSlamStandaloneOverlay(
                     observationAgeMs = frame.observationAgeMs,
                     matchDurationMs = frame.matchDurationMs,
                     source = frame.source,
+                    matchMethod = frame.matchMethod?.name,
                 )
             }
             onUnitsPerPixel(screenUnitsPerPixel)
@@ -1135,9 +1149,23 @@ fun SphereSlamStandaloneOverlay(
                     }
                 },
                 onDiagnostic = { text ->
+                    // The session's periodic `KPM ... method= timing{...}` line, kept for the
+                    // diagnostics dump (it is also logged like every other line).
+                    if (text.startsWith(KPM_METRICS_PREFIX)) latestKpmMetrics.set(text)
                     postUi { onDiagnostic(text) }
                 },
                 onCalibrationChanged = { calibration ->
+                    // The glow lens follows the analysis frame from the first frame, tracked or not.
+                    glRenderer.setGlowFrameIntrinsics(
+                        CameraIntrinsics(
+                            fx = calibration.fx,
+                            fy = calibration.fy,
+                            cx = calibration.cx,
+                            cy = calibration.cy,
+                            width = calibration.displayWidth,
+                            height = calibration.displayHeight,
+                        ),
+                    )
                     postUi { calibrationDiagnostics = calibration }
                 },
                 onFailure = { event ->
@@ -1156,6 +1184,8 @@ fun SphereSlamStandaloneOverlay(
                 },
                 onFrameTracked = ::consumeTrackedFrame,
                 cameraAttitude = cameraAttitude,
+                attitudeSample = attitudeSample.takeIf { posePredictionWired },
+                displayPosePredictor = displayPosePredictor.takeIf { posePredictionWired },
                 cameraRollDegrees = cameraRollDegrees,
                 onMapFromFingerprintSolved = onMapFromFingerprintSolved,
                 onPhotosphereKeyframe = { keyframe ->
@@ -1171,18 +1201,14 @@ fun SphereSlamStandaloneOverlay(
                         width = keyframe.width,
                         height = keyframe.height,
                     )
-                    // Keyframes are the full display-upright analysis frame; the glow shows the
-                    // preview's FILL_CENTER crop of it.
-                    shownFieldOfViewDegrees(keyframeIntrinsics, surfaceSize.get())?.let { fov ->
-                        coverageGlowMask.update(
-                            currentRegions = coverageCurrentRegions(),
-                            regionsNeedingUpdate = coverageRegionsNeedingUpdate(),
-                            cameraHeadingDeg = keyframe.headingDeg,
-                            cameraElevationDeg = keyframe.elevationDeg,
-                            horizontalFovDeg = fov[0],
-                            verticalFovDeg = fov[1],
-                        )
-                    }
+                    // Keyframes are the full display-upright analysis frame (the glow lens source);
+                    // the map just changed, so hand the glow its new tiles. Projection happens per
+                    // draw on the GL thread.
+                    glRenderer.setGlowFrameIntrinsics(keyframeIntrinsics)
+                    coverageGlowMask.updateRegions(
+                        coverageCurrentRegions(),
+                        coverageRegionsNeedingUpdate(),
+                    )
                 },
                 onKeyframeOrientation = onKeyframeOrientation,
                 depthEstimator = depthEstimator,
@@ -1297,8 +1323,13 @@ fun SphereSlamStandaloneOverlay(
                     text = currentFailure
                         ?.takeIf { it.severity != StandaloneFailureSeverity.FATAL }
                         ?.userMessage
-                        ?: if (!referenceReady) {
+                        ?: if (!referenceReady && referenceImage == null) {
                             "SphereSLAM mapping • tap Target to add fingerprint"
+                        } else if (!referenceReady) {
+                            // SphereSLAM 0.24.3 builds the KPM matcher on its own background
+                            // thread; until the build lands every frame carries no pose. That is
+                            // not a failure and the target exists, so don't ask for a new one.
+                            "Preparing fingerprint target…"
                         } else {
                             "Finding fingerprint target…"
                         },
