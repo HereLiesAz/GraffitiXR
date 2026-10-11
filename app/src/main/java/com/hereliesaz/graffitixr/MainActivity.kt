@@ -981,7 +981,6 @@ class MainActivity : AppCompatActivity() {
                         isCapturingTarget = mainUiState.isCapturingTarget,
                         isOverlayGyroActive = mainUiState.isOverlayGyroActive,
                         onShowJoinScanner = { showJoinScanner = true },
-                        onStandaloneNewTarget = { standaloneUiHost.requestNewTarget() },
                         onWallPhoto = {
                             if (hasCameraPermission) {
                                 val tmpFile = File(context.cacheDir, "wall_camera_${System.currentTimeMillis()}.jpg")
@@ -2047,7 +2046,6 @@ class MainActivity : AppCompatActivity() {
         isCapturingTarget: Boolean = false,
         isOverlayGyroActive: Boolean = false,
         onShowJoinScanner: () -> Unit = {},
-        onStandaloneNewTarget: () -> Unit = {},
         onWallPhoto: () -> Unit = {},
         onExportRequested: () -> Unit,
     ) {
@@ -2198,11 +2196,14 @@ class MainActivity : AppCompatActivity() {
                 if (editorUiState.editorMode == EditorMode.AR) {
                     // Target button is a toggle: selected (cyan) means screen taps create the target;
                     // tapping it again cancels. After a target is accepted it deselects, so making
-                    // another target requires re-selecting this button. Standalone: one tap starts a
-                    // new target in the overlay's own capture flow.
+                    // another target requires re-selecting this button. Both backends share this
+                    // capture flow; in standalone the current target keeps tracking until the new
+                    // one is saved. A standalone co-op guest keeps the session's frame: no Target.
                     // Omit the Target button entirely when the backend can't support it (don't show a
                     // disabled, reason-labelled button): if it can't act, it isn't on the rail.
-                    if (arRailPolicy.targetRailEnabled) azRailSubItem(
+                    val standaloneGuest =
+                        arRailPolicy.standalone && arUiState.coopRole == CoopRole.GUEST
+                    if (arRailPolicy.targetRailEnabled && !standaloneGuest) azRailSubItem(
                         id = "target.create",
                         hostId = railHostOf("target.create"),
                         text = navStrings.grid,
@@ -2211,11 +2212,7 @@ class MainActivity : AppCompatActivity() {
                         shape = AzButtonShape.NONE,
                         disabled = showLibrary,
                         onClick = {
-                            if (arRailPolicy.standalone) {
-                                // Standalone: the overlay drops its current target, then reports back
-                                // (onNewTargetStarted in MainScreen), which opens the shared capture flow.
-                                if (hasCameraPermission) onStandaloneNewTarget() else requestPermissions()
-                            } else if (isWaitingForTap) {
+                            if (isWaitingForTap) {
                                 mainViewModel.cancelTapMode()
                             } else if (hasCameraPermission) {
                                 // Clear any previous capture (tempCaptureBitmap etc.) BEFORE re-arming.

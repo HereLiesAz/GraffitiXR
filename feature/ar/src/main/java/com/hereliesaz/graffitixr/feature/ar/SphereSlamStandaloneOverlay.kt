@@ -267,11 +267,12 @@ fun SphereSlamStandaloneOverlay(
     /** Normal app path: TargetCreationUi above both AR backends owns capture/review/fingerprint UX. */
     sharedTargetCapture: Boolean = false,
     /**
-     * The current target was dropped for a new one (rail Target, New Target, Recapture). With
-     * [sharedTargetCapture] the host must open its TargetCreationUi here: this overlay draws no
-     * capture UI of its own then.
+     * With [sharedTargetCapture]: New Target / Recapture open the host's TargetCreationUi through
+     * this. The current target keeps tracking until the replacement is persisted (a cancelled capture
+     * changes nothing). Null hides those buttons (e.g. a co-op guest, who must not re-anchor).
+     * Without [sharedTargetCapture] the buttons use this overlay's own capture flow.
      */
-    onNewTargetStarted: () -> Unit = {},
+    onNewTargetRequested: (() -> Unit)? = null,
     onPersistedReferenceInvalid: (Uri) -> Unit = {},
     onPersistedAtlasPageInvalid: (Int, Uri) -> Unit = { _, _ -> },
     onAtlasPageCaptured: (Bitmap, Int, Float, Boolean, FloatArray) -> Unit =
@@ -362,8 +363,8 @@ fun SphereSlamStandaloneOverlay(
     /**
      * The host's onscreen hand-off ([StandaloneOverlayUiHost]): the status, Copy Diagnostics,
      * Recapture / New Target, sweep hint and fatal dialog are published there so the host draws them
-     * in its onscreen layer (AzNavRail safe zones, above the rail's touch layer); its
-     * [StandaloneOverlayUiHost.newTargetRequests] start a new target. Null: drawn inline here.
+     * in its onscreen layer (AzNavRail safe zones, above the rail's touch layer). Null: drawn
+     * inline here.
      */
     uiHost: StandaloneOverlayUiHost? = null,
     modifier: Modifier = Modifier,
@@ -442,8 +443,6 @@ fun SphereSlamStandaloneOverlay(
         }
     }
 
-    val latestOnNewTargetStarted by rememberUpdatedState(onNewTargetStarted)
-
     fun resetCapture() {
         onReferenceRegistrationChanged(false)
         awaitingReferencePersistence = false
@@ -476,19 +475,18 @@ fun SphereSlamStandaloneOverlay(
         calibrationDiagnostics = null
         matchDiagnostics = null
         fatalMessage = null
-        latestOnNewTargetStarted()
     }
 
-    // The rail's Target action (standalone): drop the current target and open capture. Keyed on the
-    // request count, so entering the screen (count unchanged) never discards a target.
-    val newTargetRequests = uiHost?.newTargetRequests ?: 0
-    val handledNewTargetRequests = remember { mutableStateOf(newTargetRequests) }
-    LaunchedEffect(newTargetRequests) {
-        if (newTargetRequests != handledNewTargetRequests.value) {
-            handledNewTargetRequests.value = newTargetRequests
-            resetCapture()
-        }
+    val latestOnNewTargetRequested by rememberUpdatedState(onNewTargetRequested)
+    val newTargetAvailable = !sharedTargetCapture || onNewTargetRequested != null
+
+    /** New Target / Recapture: the host's shared capture flow, or this overlay's own. */
+    fun requestNewTarget() {
+        if (sharedTargetCapture) latestOnNewTargetRequested?.invoke() else resetCapture()
     }
+
+    // The persisted page the current reference was loaded from (shared capture swaps on a new one).
+    var loadedReferenceUri by remember { mutableStateOf<Uri?>(null) }
 
     LaunchedEffect(persistedReferenceUri, awaitingReferencePersistence) {
         if (
@@ -513,13 +511,20 @@ fun SphereSlamStandaloneOverlay(
 
     LaunchedEffect(persistedReferenceUri) {
         val uri = persistedReferenceUri ?: return@LaunchedEffect
-        if (referenceBitmap != null) return@LaunchedEffect
+        // Shared capture keeps the current target until its replacement is persisted, then swaps to
+        // it here. Inline capture persists the page this overlay already holds: nothing to load.
+        val replacing = sharedTargetCapture && referenceBitmap != null && uri != loadedReferenceUri
+        if (referenceBitmap != null && !replacing) return@LaunchedEffect
         val restored = withContext(Dispatchers.IO) {
             runCatching {
                 context.contentResolver.openInputStream(uri)?.use(BitmapFactory::decodeStream)
             }.getOrNull()
         }
         if (restored != null) {
+            // Snapshots a registered page as the rollback for a too-weak replacement, restarts a
+            // fatal analyzer, clears the old target's state.
+            if (replacing) resetCapture()
+            loadedReferenceUri = uri
             activeReferenceWidthMeters = persistedReferenceWidthMeters
             activeReferencePhysicallyMetric = persistedReferencePhysicallyMetric
             referenceNeedsPersistence = false
@@ -1449,9 +1454,9 @@ fun SphereSlamStandaloneOverlay(
                     )
                     // A target that never registers (another wall, a stale page) must not trap the artist:
                     // a new one is always one tap away.
-                    if (referenceImage != null) {
+                    if (referenceImage != null && newTargetAvailable) {
                         Button(
-                            onClick = { resetCapture() },
+                            onClick = { requestNewTarget() },
                             modifier = Modifier.padding(top = 12.dp),
                         ) {
                             Text("New Target")
@@ -1486,9 +1491,9 @@ fun SphereSlamStandaloneOverlay(
                             .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                     )
-                    if (trackingState == StandaloneTrackingState.LOST) {
+                    if (trackingState == StandaloneTrackingState.LOST && newTargetAvailable) {
                         Button(
-                            onClick = { resetCapture() },
+                            onClick = { requestNewTarget() },
                             modifier = Modifier.padding(top = 12.dp),
                         ) {
                             Text("Recapture Target")
@@ -1550,11 +1555,13 @@ fun SphereSlamStandaloneOverlay(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(message, color = Color.White)
-                    Button(
-                        onClick = { resetCapture() },
-                        modifier = Modifier.padding(top = 12.dp),
-                    ) {
-                        Text("Recapture Target")
+                    if (newTargetAvailable) {
+                        Button(
+                            onClick = { requestNewTarget() },
+                            modifier = Modifier.padding(top = 12.dp),
+                        ) {
+                            Text("Recapture Target")
+                        }
                     }
                     TextButton(onClick = { copyDiagnostics() }) {
                         Text("Copy Diagnostics")

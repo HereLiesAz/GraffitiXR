@@ -2,7 +2,6 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
@@ -22,15 +21,6 @@ class StandaloneOverlayUiHost {
     /** The overlay's interactive UI, or null when it has none (e.g. not in standalone AR). */
     var content: (@Composable () -> Unit)? by mutableStateOf(null)
         internal set
-
-    /** Bumped by [requestNewTarget]; the overlay drops its target and opens capture on each change. */
-    var newTargetRequests: Int by mutableIntStateOf(0)
-        private set
-
-    /** Start a new wall target (the rail's Target action in standalone). */
-    fun requestNewTarget() {
-        newTargetRequests++
-    }
 }
 
 /** Render whatever the overlay published (call from the host's onscreen layer). */

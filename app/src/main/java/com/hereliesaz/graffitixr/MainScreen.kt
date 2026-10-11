@@ -360,12 +360,20 @@ fun MainScreen(
                             coopPeerSpatialFrame = arUiState.coopPeerSpatialFrame,
                             coopPeerFingerprint = arUiState.coopPeerFingerprint,
                             sharedTargetCapture = true,
-                            onNewTargetStarted = {
-                                // Same reset as the ARCore Target action: no stale capture, Measure
-                                // off, then the shared capture flow.
-                                arViewModel.clearCaptureForRetry()
-                                arViewModel.cancelMeasure()
-                                mainViewModel.startTargetCapture()
+                            // A co-op guest keeps the session's spatial frame: no re-targeting
+                            // (ArViewModel.onScreenTap ignores its taps).
+                            onNewTargetRequested = if (
+                                arUiState.coopRole ==
+                                com.hereliesaz.graffitixr.common.model.CoopRole.GUEST
+                            ) {
+                                null
+                            } else {
+                                {
+                                    // Same reset as the rail's Target action, then the shared flow.
+                                    arViewModel.clearCaptureForRetry()
+                                    arViewModel.cancelMeasure()
+                                    mainViewModel.startTargetCapture()
+                                }
                             },
                             onReferenceCaptured = { bitmap, widthMeters, physicallyMetric ->
                                 arViewModel.saveSphereSlamReference(
