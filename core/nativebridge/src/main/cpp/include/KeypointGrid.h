@@ -122,6 +122,28 @@ public:
         }
     }
 
+    /**
+     * The exact disc test [candidatesWithin] leaves to its caller: keep only the indices in [cand]
+     * whose keypoint lies within [radius] of (x, y) (inclusive, squared-distance compare, so no
+     * sqrt). Order is preserved. Indices out of range for [kps] are dropped rather than read.
+     */
+    static void keepWithinRadius(const std::vector<cv::KeyPoint>& kps, float x, float y, float radius,
+                                 std::vector<int>& cand) {
+        if (!(radius >= 0.0f) || !std::isfinite(radius) || !std::isfinite(x) || !std::isfinite(y)) {
+            cand.clear();
+            return;
+        }
+        const float r2 = radius * radius;
+        size_t w = 0;
+        for (size_t i = 0; i < cand.size(); ++i) {
+            const int k = cand[i];
+            if (k < 0 || (size_t)k >= kps.size()) continue;
+            const float dx = kps[(size_t)k].pt.x - x, dy = kps[(size_t)k].pt.y - y;
+            if (dx * dx + dy * dy <= r2) cand[w++] = k;
+        }
+        cand.resize(w);
+    }
+
 private:
     /**
      * Unclamped cell index, which may be negative or past the last cell. std::floor, NOT a plain

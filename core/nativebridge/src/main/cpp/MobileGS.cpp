@@ -153,6 +153,81 @@ void MobileGS::getAnchorTransform(float* outMat16) const {
     memcpy(outMat16, mAnchorMatrix, 16 * sizeof(float));
 }
 
+bool MobileGS::relocCameraIntrinsics(const float* live4, const float* fp4, int frameW, int frameH,
+                                     double out4[4]) {
+    if (live4 && live4[0] > 0.0f && live4[1] > 0.0f) {
+        for (int i = 0; i < 4; ++i) out4[i] = live4[i];
+        return true;
+    }
+    if (fp4 && fp4[0] > 0.0f && fp4[1] > 0.0f) {
+        for (int i = 0; i < 4; ++i) out4[i] = fp4[i];
+        return true;
+    }
+    // Coarse default: a ~60 degree horizontal FOV is not knowable here, so keep the historical
+    // 1000 px focal, but put the principal point at THIS frame's centre. The old hard-coded
+    // (960, 540) was the centre of a 1920x1080 frame and sat outside a 640x480 reloc frame.
+    out4[0] = 1000.0; out4[1] = 1000.0;
+    out4[2] = frameW > 0 ? frameW * 0.5 : 960.0;
+    out4[3] = frameH > 0 ? frameH * 0.5 : 540.0;
+    return false;
+}
+
+cv::Matx33d MobileGS::planeHomography(const cv::Matx33d& Kcur, const cv::Matx33d& Kfp,
+                                      const cv::Matx33d& R, const cv::Vec3d& t,
+                                      const cv::Vec3d& n, double d, bool* ok) {
+    if (ok) *ok = false;
+    if (!(std::abs(d) > 1e-9) || !(std::abs(cv::determinant(Kfp)) > 1e-12)) return cv::Matx33d::zeros();
+    const cv::Matx33d M = R + (1.0 / d) * (cv::Matx31d(t[0], t[1], t[2]) * cv::Matx13d(n[0], n[1], n[2]));
+    cv::Matx33d H = Kcur * M * Kfp.inv();
+    if (!(std::abs(H(2, 2)) > 1e-9)) return cv::Matx33d::zeros();
+    H = (1.0 / H(2, 2)) * H;
+    if (ok) *ok = true;
+    return H;
+}
+
+std::vector<MobileGS::RelocScalePass> MobileGS::relocScalePasses(int frameW, int frameH,
+                                                                bool superPoint) {
+    std::vector<RelocScalePass> out;
+    if (frameW <= 0 || frameH <= 0) return out;
+    const cv::Rect full(0, 0, frameW, frameH);
+    if (!superPoint) {
+        out.push_back({full, 0.5});
+        out.push_back({full, 2.0});
+        return out;
+    }
+    const double cap = (double)SuperPointDetector::kMaxInputSide;
+    const double longest = (double)std::max(frameW, frameH);
+    const double plain = std::min(1.0, cap / longest);   // what the plain pass effectively sees
+    out.push_back({full, 0.5 * plain});
+    const double up = 2.0 * plain;
+    const double frac = std::min(1.0, cap / (up * longest));
+    const int cw = std::max(8, std::min(frameW, (int)std::lround(frameW * frac)));
+    const int ch = std::max(8, std::min(frameH, (int)std::lround(frameH * frac)));
+    out.push_back({cv::Rect((frameW - cw) / 2, (frameH - ch) / 2, cw, ch), up});
+    return out;
+}
+
+bool MobileGS::fingerprintFrameIsCaptureCamera(const std::vector<cv::Point3f>& pts) {
+    if (pts.size() < 3) return false;
+    cv::Mat data((int)pts.size(), 3, CV_32F);
+    for (int i = 0; i < (int)pts.size(); ++i) {
+        data.at<float>(i, 0) = pts[i].x; data.at<float>(i, 1) = pts[i].y; data.at<float>(i, 2) = pts[i].z;
+    }
+    cv::PCA pca(data, cv::Mat(), cv::PCA::DATA_AS_ROW);
+    cv::Vec3d n(pca.eigenvectors.at<float>(2, 0), pca.eigenvectors.at<float>(2, 1), pca.eigenvectors.at<float>(2, 2));
+    const cv::Vec3d c(pca.mean.at<float>(0, 0), pca.mean.at<float>(0, 1), pca.mean.at<float>(0, 2));
+    const double nn = cv::norm(n);
+    if (!(nn > 1e-9)) return false;
+    n /= nn;
+    // Scale-free: compare the origin's distance from the plane with the marks' own extent, so the
+    // test reads the same in metres (ARCore) and in normalised photosphere units (standalone). A
+    // camera a wall-distance away gives a ratio well above 1; the page frame gives ~0.
+    double extent = 0.0;
+    for (const auto& p : pts) extent = std::max(extent, cv::norm(cv::Vec3d(p.x, p.y, p.z) - c));
+    if (!(extent > 0.0)) return false;
+    return std::abs(n.dot(c)) > 0.05 * extent;
+}
+
 /**
  * One relocalization attempt over one frame: snapshot the fingerprint, detect, match, solve, publish.
  *
@@ -242,6 +317,12 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
     mLastRelocRectifiedCorr.store(0, std::memory_order_relaxed);
     mLastRelocMatches.store(0, std::memory_order_relaxed);
     mLastRelocInliers.store(0, std::memory_order_relaxed);
+    // ...and the two downstream outcome codes. They are written by tryUpdateFingerprint, which the
+    // early-outs below never reach, so without this a fingerprint-cleared or reloc-disabled tick
+    // kept publishing the PREVIOUS attempt's gate/grow verdict (e.g. "gated" / "promoted" beside a
+    // fresh kRelocNoFingerprint). "Not run" is each enum's own name for exactly this state.
+    mCorrobGate.store(kCorrobNotRun, std::memory_order_relaxed);
+    mGrowOutcome.store(kGrowNotRun, std::memory_order_relaxed);
 
     if (!mRelocEnabled) {
         mLastRelocReject.store(kRelocDisabled, std::memory_order_relaxed);
@@ -284,6 +365,13 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
     cv::Mat gray;
     cv::cvtColor(workFrame, gray, cv::COLOR_RGB2GRAY);
     normalizeForFeatures(gray); // illumination-normalize to match the (also-normalized) fingerprint
+
+    // The camera of THIS frame. The PnP below solves with it, so every projection into this image
+    // through the resulting (or the previous) pose -- the map frustum gate, corroboration, the
+    // self-grow back-projection -- has to use it as well. The fingerprint's capture intrinsics
+    // describe the fingerprint IMAGE only (the rectification homography's K_fp side).
+    double liveK[4];
+    const bool liveKReal = relocCameraIntrinsics(liveIntrinsics, fpIntrinsics, gray.cols, gray.rows, liveK);
 
     // SuperPoint usable when loaded and the wall fingerprint is float-typed (or empty).
     const bool spOk = mSuperPoint.isLoaded() &&
@@ -374,10 +462,26 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
     // passes share the plain pass's camera geometry, so they only add consistent correspondences
     // across distance; PnP RANSAC discards any that don't fit. Covers both ORB and SuperPoint
     // fingerprints, beyond ORB's own pyramid range.
-    for (float s : {0.5f, 2.0f}) {
+    //
+    // SuperPoint caps its input at kMaxInputSide (longest side), so the scales have to be relative
+    // to what the PLAIN pass effectively saw, or they collapse onto it: a full-frame 2x upsample of
+    // a 640x480 frame was resized straight back to 640x480 inside detect() -- the plain pass again
+    // at 4x the resize cost, adding only duplicate correspondences (deduplicated by corrSeen) -- and
+    // on a frame larger than the cap the 0.5x pass collapsed the same way. With SuperPoint each
+    // pass therefore targets half / double the plain pass's effective scale, and the magnifying
+    // pass looks at a centred window small enough that the magnified crop still fits the cap: the
+    // marks are typically centred when the artist aims at them. ORB has no input cap, so its
+    // passes are the plain full-frame 0.5x / 2x they always were.
+    for (const RelocScalePass& pass : relocScalePasses(gray.cols, gray.rows, spOk)) {
+        cv::Mat src = gray(pass.roi);
         cv::Mat scaled;
-        cv::resize(gray, scaled, cv::Size(), s, s, cv::INTER_LINEAR);
-        double hdata[] = {1.0/(double)s, 0.0, 0.0, 0.0, 1.0/(double)s, 0.0, 0.0, 0.0, 1.0};
+        cv::resize(src, scaled, cv::Size(), pass.scale, pass.scale,
+                   pass.scale < 1.0 ? cv::INTER_AREA : cv::INTER_LINEAR);
+        if (scaled.cols < 8 || scaled.rows < 8) continue;
+        // scaled pixel -> full-frame pixel: undo the resize, then the crop offset.
+        double hdata[] = {1.0 / pass.scale, 0.0, (double)pass.roi.x,
+                          0.0, 1.0 / pass.scale, (double)pass.roi.y,
+                          0.0, 0.0, 1.0};
         cv::Mat Hback = cv::Mat(3, 3, CV_64F, hdata).clone();
         buildCorr(scaled, Hback, imgPts, objPts, corrFromBackbone);
     }
@@ -400,7 +504,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
     // the stored capture-view contract exists and is compatible.
     if (hasFpView && mHasTrackingPose.load(std::memory_order_relaxed) && wallKps3d.size() >= 12) {
         cv::Mat Hcur_fp, Hfp_cur; double obliqDeg = 0.0;
-        const bool haveH = computeRectifyHomography(relocView, Hcur_fp, Hfp_cur, obliqDeg);
+        const bool haveH = computeRectifyHomography(relocView, liveK, Hcur_fp, Hfp_cur, obliqDeg);
         if (haveH) mLastRelocObliquityDeg.store((int)(obliqDeg + 0.5), std::memory_order_relaxed);
         if (haveH && obliqDeg > 25.0) {
             cv::Mat grayRect;
@@ -418,16 +522,16 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
     // When the overlay is larger than the marks, the marks leave frame; the map carries features
     // across the whole wall so reloc still locks. Hard constraint: NEVER brute-force the whole map —
     // frustum-gate to the subset the last reloc pose says is in view, then match only those and
-    // APPEND the correspondences (same fingerprint frame + intrinsics) so PnP solves over both.
+    // APPEND the correspondences (same fingerprint object frame, matched in this live image) so PnP
+    // solves over both.
     // Requires a prior pose (mapPriorSeq>0, i.e. the fingerprint has locked at least once) and a
     // matching descriptor type. Default-off, so this is inert until device-validated.
     if (mMapRelocEnabled.load(std::memory_order_relaxed) && !mapDescs.empty() && mapPriorSeq > 0
             && mapDescs.type() == wallDescs.type() && mapKps3d.size() == (size_t)mapDescs.rows) {
         glm::mat4 camFromFp = glm::make_mat4(mapPriorPose);
-        double gfx = (fpIntrinsics[0] > 0.f) ? (double)fpIntrinsics[0] : 1000.0;
-        double gfy = (fpIntrinsics[1] > 0.f) ? (double)fpIntrinsics[1] : 1000.0;
-        double gcx = (fpIntrinsics[0] > 0.f) ? (double)fpIntrinsics[2] : gray.cols * 0.5;
-        double gcy = (fpIntrinsics[1] > 0.f) ? (double)fpIntrinsics[3] : gray.rows * 0.5;
+        // The gate asks "which map points land in THIS frame", so it projects with this frame's
+        // camera -- the same K the prior pose was solved with -- not the fingerprint capture's.
+        const double gfx = liveK[0], gfy = liveK[1], gcx = liveK[2], gcy = liveK[3];
         std::vector<int> visible;
         visible.reserve(mapKps3d.size());
         for (int i = 0; i < (int)mapKps3d.size(); ++i) {
@@ -523,32 +627,6 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
         decayCorroboration();
     }
 
-    // Lowered floors so a close-up PARTIAL view (only a corner of the marks visible) can still
-    // localize: PnP needs only a handful of correspondences. The inlier RATIO (published below) is
-    // the quality gate PoseFusion actually trusts, so being permissive here is safe.
-    mLastRelocMatches.store((int)imgPts.size(), std::memory_order_relaxed);
-    mLastRelocInliers.store(0, std::memory_order_relaxed);
-    // corrFromBackbone is parallel to imgPts by construction, and the inlier attribution below
-    // subscripts it with indices into imgPts. A future pass that appends to one and not the
-    // other would make that read out of bounds, so a length disagreement publishes "not
-    // measured" instead of a wrong number.
-    const bool haveBackboneFlags = corrFromBackbone.size() == imgPts.size();
-    // 2.11: counted SEPARATELY from mLastRelocMatches, never in place of it. The same shortfall
-    // means different things — a low total is "the frame is not looking at the registered wall",
-    // a low backbone under a healthy total is "everything it can see is under the artwork" — and
-    // those call for opposite advice (aim differently vs. shrink the design / step back).
-    mLastRelocBackboneMatches.store(
-        haveBackboneFlags
-            ? (int)std::count(corrFromBackbone.begin(), corrFromBackbone.end(), (uint8_t)1)
-            : -1,
-        std::memory_order_relaxed);
-    if (imgPts.size() < 8) {
-        // Distinguish "the detector found nothing / the descriptors don't even compare" from
-        // "features were found but too few agreed with the fingerprint" — they call for opposite
-        // fixes (light/focus/texture vs. aim at the registered area).
-        mLastRelocReject.store(baseDescs.empty() ? kRelocNoFeatures : kRelocFewMatches,
-                               std::memory_order_relaxed);
-    }
     // Teleological reference set: painted design features (see kMaxPaintMarks). Matched on the plain
     // pass only, with the same ratio test; unlike the backbone they are never partition-filtered,
     // because they ARE the artwork — they only exist once the wall has confirmed them.
@@ -576,22 +654,46 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
         }
     }
 
+    // Published AFTER the paint-mark correspondences are appended, so this is the exact set
+    // solvePnPRansac sees. It used to be published before them, which let a lock carried by paint
+    // marks report more inliers than matches (an inlier ratio over 100%) and fed PoseFusion's ratio
+    // gate a denominator that was not the solve's.
+    //
+    // Lowered floors so a close-up PARTIAL view (only a corner of the marks visible) can still
+    // localize: PnP needs only a handful of correspondences. The inlier RATIO (published below) is
+    // the quality gate PoseFusion actually trusts, so being permissive here is safe.
+    mLastRelocMatches.store((int)imgPts.size(), std::memory_order_relaxed);
+    mLastRelocInliers.store(0, std::memory_order_relaxed);
+    // corrFromBackbone is parallel to imgPts by construction, and the inlier attribution below
+    // subscripts it with indices into imgPts. A future pass that appends to one and not the
+    // other would make that read out of bounds, so a length disagreement publishes "not
+    // measured" instead of a wrong number.
+    const bool haveBackboneFlags = corrFromBackbone.size() == imgPts.size();
+    // 2.11: counted SEPARATELY from mLastRelocMatches, never in place of it. The same shortfall
+    // means different things — a low total is "the frame is not looking at the registered wall",
+    // a low backbone under a healthy total is "everything it can see is under the artwork" — and
+    // those call for opposite advice (aim differently vs. shrink the design / step back).
+    mLastRelocBackboneMatches.store(
+        haveBackboneFlags
+            ? (int)std::count(corrFromBackbone.begin(), corrFromBackbone.end(), (uint8_t)1)
+            : -1,
+        std::memory_order_relaxed);
+    if (imgPts.size() < 8) {
+        // Distinguish "the detector found nothing / the descriptors don't even compare" from
+        // "features were found but too few agreed with the fingerprint" — they call for opposite
+        // fixes (light/focus/texture vs. aim at the registered area).
+        mLastRelocReject.store(baseDescs.empty() ? kRelocNoFeatures : kRelocFewMatches,
+                               std::memory_order_relaxed);
+    }
     if (imgPts.size() >= 8) {
         cv::Mat rvec, tvec;
         std::vector<int> inliers;
-        // Camera matrix: reuse the intrinsics the fingerprint's 3D points were built with (keeps
-        // the 2D<->3D correspondence consistent) when available, else a coarse default. The old
-        // hardcoded init supplied only 6 of the 9 entries, leaving the bottom row uninitialised.
-        // The live frame's intrinsics win: the 3D points are metric and camera-independent, so the
-        // camera matrix must describe THIS frame, whose orientation may differ from the capture's.
-        double fx = 1000.0, fy = 1000.0, cx = 960.0, cy = 540.0;
-        if (liveIntrinsics[0] > 0.0f && liveIntrinsics[1] > 0.0f) {
-            fx = liveIntrinsics[0]; fy = liveIntrinsics[1];
-            cx = liveIntrinsics[2]; cy = liveIntrinsics[3];
-        } else if (fpIntrinsics[0] > 0.0f && fpIntrinsics[1] > 0.0f) {
-            fx = fpIntrinsics[0]; fy = fpIntrinsics[1];
-            cx = fpIntrinsics[2]; cy = fpIntrinsics[3];
-        }
+        // Camera matrix of THIS frame (liveK, see relocCameraIntrinsics): the 3D points are
+        // camera-independent object coordinates, so K must describe the image the 2D points were
+        // detected in, whose orientation and resolution may differ from the capture's. Falls back to
+        // the fingerprint's capture intrinsics only when the live ones were never pushed, and to a
+        // frame-centred default when neither exists.
+        const double fx = liveK[0], fy = liveK[1], cx = liveK[2], cy = liveK[3];
         double idata[] = {fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0};
         cv::Mat intr = cv::Mat(3, 3, CV_64F, idata).clone();
         StageTimer _pnpTimer(&mStageAccumMs[4], &mStageSamples[4]);
@@ -682,6 +784,10 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
                     std::lock_guard<std::mutex> lock(mMutex);
                     memcpy(mPnpCamFromFpWorld, glm::value_ptr(pnpMat), 16 * sizeof(float));
                     memcpy(mPnpSolveView, relocView, 16 * sizeof(float));
+                    // The camera this pose was solved with, published WITH it, so consumers never
+                    // pair this pose with another camera. Zeroed for the coarse default, which they
+                    // treat as "no intrinsics" (the old unset-fingerprint-K behaviour).
+                    for (int i = 0; i < 4; ++i) mPnpIntrinsics[i] = liveKReal ? (float)liveK[i] : 0.0f;
                 }
                 mPnpInlierCount.store((int)inliers.size(), std::memory_order_relaxed);
                 mPnpMatchCount.store((int)imgPts.size(), std::memory_order_relaxed);
@@ -731,7 +837,7 @@ void MobileGS::relocThreadFunc() {
         std::this_thread::sleep_for(std::chrono::milliseconds(locked ? 200 : 60));
     }
 }
-bool MobileGS::computeRectifyHomography(const float* viewCur16, cv::Mat& Hcur_fp,
+bool MobileGS::computeRectifyHomography(const float* viewCur16, const double* liveK4, cv::Mat& Hcur_fp,
                                         cv::Mat& Hfp_cur, double& obliquityDeg) {
     glm::mat4 viewCur = glm::make_mat4(viewCur16);
     glm::mat4 viewFp;
@@ -780,13 +886,16 @@ bool MobileGS::computeRectifyHomography(const float* viewCur16, cv::Mat& Hcur_fp
     double cosA = std::abs(nCur[2]) / (cv::norm(nCur) + 1e-9);
     obliquityDeg = std::acos(std::min(1.0, cosA)) * 180.0 / CV_PI;
 
-    // Plane-induced homography current-image <- fingerprint-image:  H = K (R + t nᵀ / d) K⁻¹.
+    // Plane-induced homography current-image <- fingerprint-image:  H = K_cur (R + t nᵀ / d) K_fp⁻¹.
     // With n·X_fp = d:  X_cur = R X_fp + t = R X_fp + t (nᵀX_fp)/d = (R + t nᵀ/d) X_fp.
-    cv::Matx33d K(fx, 0, cx, 0, fy, cy, 0, 0, 1);
-    cv::Matx33d M = R + (1.0 / d) * (cv::Matx31d(t[0], t[1], t[2]) * cv::Matx13d(n[0], n[1], n[2]));
-    cv::Matx33d Hc = K * M * K.inv();
-    if (std::abs(Hc(2,2)) < 1e-9) return false;
-    Hc = (1.0 / Hc(2,2)) * Hc;
+    // Two cameras: a fingerprint pixel is un-projected with the CAPTURE camera and re-projected
+    // with the LIVE one. A single K (the capture's, as this used to use) is only right when both
+    // frames come from the same camera at the same resolution and rotation.
+    const cv::Matx33d Kfp(fx, 0, cx, 0, fy, cy, 0, 0, 1);
+    const cv::Matx33d Kcur(liveK4[0], 0, liveK4[2], 0, liveK4[1], liveK4[3], 0, 0, 1);
+    bool ok = false;
+    const cv::Matx33d Hc = planeHomography(Kcur, Kfp, R, t, n, d, &ok);
+    if (!ok) return false;
     Hcur_fp = cv::Mat(Hc);
     Hfp_cur = Hcur_fp.inv();
     return true;
@@ -999,7 +1108,9 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
         ++added;
     }
 
-    // Co-register the map to the fingerprint anchor + intrinsics (same frame as the points above).
+    // Co-register the map to the fingerprint anchor (same object frame as the points above) and
+    // record the camera these points were back-projected with -- the live camera of this lock, the
+    // one the PnP solved with, not the fingerprint's capture camera.
     memcpy(mMapAnchorMatrix, mFingerprintAnchorMatrix, 16 * sizeof(float));
     mMapIntrinsics[0]=(float)fx; mMapIntrinsics[1]=(float)fy; mMapIntrinsics[2]=(float)cx; mMapIntrinsics[3]=(float)cy;
     if (mapMutated) mMapRevision.fetch_add(1, std::memory_order_relaxed);
@@ -1013,6 +1124,9 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     // from every real outcome, so a channel reading kCorrobNotRun means the attempt never reached
     // the decision — not that the decision was negative.
     mCorrobGate.store(kCorrobNotRun, std::memory_order_relaxed);
+    // Same rule for the grow verdict: an attempt that returns before the promotion block (no
+    // artwork, empty frame, descriptor mismatch) must not leave the previous attempt's verdict up.
+    mGrowOutcome.store(kGrowNotRun, std::memory_order_relaxed);
     cv::Mat artDescs;
     std::vector<cv::Point2f> artPts2d;
     int artImgW = 0, artImgH = 0;
@@ -1021,7 +1135,10 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     float fpFromDesign[16];
     float designHalfW = 0.0f, designHalfH = 0.0f;
     float camFromFp[16];
-    float fpFx = 0.0f, fpFy = 0.0f, fpCx = 0.0f, fpCy = 0.0f;
+    // The camera camFromFp was solved with (the live frame's), published with the pose. The gated
+    // match projects design features into THIS live frame, so it needs that camera -- the
+    // fingerprint's capture intrinsics describe a different image.
+    float pnpFx = 0.0f, pnpFy = 0.0f, pnpCx = 0.0f, pnpCy = 0.0f;
     {
         std::lock_guard<std::mutex> lock(mMutex);
         if (mArtworkDescriptors.empty()) {
@@ -1039,8 +1156,8 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         designHalfW = mDesignHalfW;
         designHalfH = mDesignHalfH;
         memcpy(camFromFp, mPnpCamFromFpWorld, 16 * sizeof(float));
-        fpFx = mFingerprintIntrinsics[0]; fpFy = mFingerprintIntrinsics[1];
-        fpCx = mFingerprintIntrinsics[2]; fpCy = mFingerprintIntrinsics[3];
+        pnpFx = mPnpIntrinsics[0]; pnpFy = mPnpIntrinsics[1];
+        pnpCx = mPnpIntrinsics[2]; pnpCy = mPnpIntrinsics[3];
     }
     if (grayClean.empty()) return;
 
@@ -1072,7 +1189,8 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     //    warns about, and it fails silently — the search looks in a confidently wrong place;
     //  - the artwork's 2D positions, one per descriptor row. A length mismatch means the two fell
     //    out of step and every prediction after that point would be another feature's;
-    //  - the intrinsics the fingerprint's 3D was built with, which the reloc PnP also uses.
+    //  - the intrinsics the reloc PnP solved this pose with (the live frame's camera; zero when it
+    //    fell back to the coarse default because no real intrinsics were known).
     //
     // When any of them is missing this falls back to the global knnMatch below, which is exactly
     // pre-Phase-4 behaviour.
@@ -1084,7 +1202,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         !havePlacement ? kCorrobNoPlacement
         : (mLastRelocReject.load(std::memory_order_relaxed) != kRelocOk) ? kCorrobNoPose
         : ((int)artPts2d.size() != artDescs.rows || artImgW <= 0 || artImgH <= 0) ? kCorrobBad2d
-        : (!(fpFx > 0.0f) || !(fpFy > 0.0f)) ? kCorrobNoIntrinsics
+        : (!(pnpFx > 0.0f) || !(pnpFy > 0.0f)) ? kCorrobNoIntrinsics
         : kCorrobGated;
     mCorrobGate.store(gateReason, std::memory_order_relaxed);
     const bool gated = gateReason == kCorrobGated;
@@ -1105,7 +1223,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         // Distance to the wall along the view axis: the design origin's depth in the camera frame.
         // OpenCV convention (+Z forward), because that matrix came out of solvePnP.
         const float wallDistM = camFromDesign[3][2];
-        const float focalPx = 0.5f * (fpFx + fpFy);
+        const float focalPx = 0.5f * (pnpFx + pnpFy);
         // poseErrMm is unconditionally "not measured" here and that is not an oversight: the only
         // producer is DriftCostProbe, which needs a ground-truth pose and returns its own -1 sentinel
         // without one. The reprojection residual below is the drift signal that exists on this path.
@@ -1154,8 +1272,8 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
             const float ly = designHalfH * (1.0f - 2.0f * ap.y / (float)artImgH);
             const glm::vec4 pc = camFromDesign * glm::vec4(lx, ly, 0.0f, 1.0f);
             if (!(pc.z > 1e-4f)) continue;                       // behind or on the camera plane
-            const float u = fpFx * pc.x / pc.z + fpCx;
-            const float v = fpFy * pc.y / pc.z + fpCy;
+            const float u = pnpFx * pc.x / pc.z + pnpCx;
+            const float v = pnpFy * pc.y / pc.z + pnpCy;
             if (!std::isfinite(u) || !std::isfinite(v)) continue;
             // Predicted OUTSIDE the frame is not visible, and must not count in the denominator —
             // that is the whole of 5b.1. The radius is allowed as slack on each edge because a
@@ -1164,6 +1282,13 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
             ++predicted;
 
             grid.candidatesWithin(u, v, radiusPx, cand);
+            // The grid returns a SUPERSET (every keypoint in the swept cells: whole cells covering
+            // the query's bounding box, not the r-disc). Its own contract leaves the exact test to
+            // the caller, and without it a candidate in a swept corner cell -- up to ~2.8r away
+            // with cell == r -- could win the ratio test, and a lone
+            // in-radius candidate could be "rescued" into a ratio test by an out-of-radius
+            // neighbour. Apply it before anything counts candidates.
+            KeypointGrid::keepWithinRadius(kps, u, v, radiusPx, cand);
             if (cand.size() < 2) {
                 // Lowe's ratio needs a second-best to divide by. With one candidate there is nothing
                 // to compare against, and accepting it unconditionally would corroborate any
@@ -1379,8 +1504,10 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         const float* M = mPnpCamFromFpWorld;
         R = cv::Matx33d(M[0], M[4], M[8], M[1], M[5], M[9], M[2], M[6], M[10]);
         t = cv::Vec3d(M[12], M[13], M[14]);
-        fx = mFingerprintIntrinsics[0]; fy = mFingerprintIntrinsics[1];
-        cx = mFingerprintIntrinsics[2]; cy = mFingerprintIntrinsics[3];
+        // The validQuery keypoints are pixels of the LIVE frame and the pose is the one the PnP
+        // solved with the live camera, so the back-projection ray uses that same camera.
+        fx = mPnpIntrinsics[0]; fy = mPnpIntrinsics[1];
+        cx = mPnpIntrinsics[2]; cy = mPnpIntrinsics[3];
         wall = mWallKeypoints3D;
         // 3.2 — read ONCE and reuse, rather than evaluating the same predicate on both sides of the
         // lock as this did before. With a third input that moves per attempt, the reloc thread can
@@ -1588,6 +1715,18 @@ void MobileGS::restoreWallFingerprintMetric(const cv::Mat& d, const std::vector<
                                             const float* viewMatrix16,
                                             const std::vector<uint8_t>& regions) {
     std::lock_guard<std::mutex> lock(mMutex);
+    // The canonical patch is a picture of THE wall this fingerprint describes. A different
+    // fingerprint must not inherit the previous one's -- the distortion head would compare this
+    // wall's live frames against another wall's marks and publish its matchability as confidence
+    // -- so it is dropped exactly as restoreWallFingerprint drops it, and the caller re-supplies
+    // the new one (setWallPatch) after the restore. A RE-PUSH of the identical point set (the
+    // Phase-2 repartition path, a standalone session re-seeding the same page) is the same wall,
+    // and dropping its patch there would silently switch the head off for the rest of the
+    // session; only the content decides, not the call.
+    const bool sameFingerprint = p == mWallKeypoints3D && d.rows == mWallDescriptors.rows &&
+        d.cols == mWallDescriptors.cols && d.type() == mWallDescriptors.type() &&
+        (d.empty() || cv::norm(d, mWallDescriptors, cv::NORM_INF) == 0.0);
+    if (!sameFingerprint) mWallPatch.release();
     mWallDescriptors = d.clone();
     mWallKeypoints3D = p;
     // Belt and braces over the JNI-side length check: a partition that does not index the points it
@@ -1652,6 +1791,12 @@ void MobileGS::clearWallFingerprint() {
     mCorrobMatched.store(-1, std::memory_order_relaxed);
     mCorrobLoneSkips.store(-1, std::memory_order_relaxed);
     mCorrobSearchRadiusPx.store(-1.0f, std::memory_order_relaxed);
+    // The outcome codes describe the cleared project's last attempt. With no fingerprint the reloc
+    // pass returns before tryUpdateFingerprint, so nothing else would ever overwrite them.
+    mCorrobGate.store(kCorrobNotRun, std::memory_order_relaxed);
+    mGrowOutcome.store(kGrowNotRun, std::memory_order_relaxed);
+    memset(mCaptureIntr, 0, 4 * sizeof(float));
+    memcpy(mDesignFpFromDesign, kIdentity16, 16 * sizeof(float));
     mLastGrowSeq = 0;
 }
 
@@ -1809,6 +1954,30 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
         // clearWallFingerprint uses.
         static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
         memcpy(mFingerprintAnchorMatrix, kIdentity16, 16 * sizeof(float));
+        // Everything else that is co-registered to the LOCAL fingerprint frame goes too, matching
+        // clearWallFingerprint. Each would otherwise be read against the peer's frame:
+        //  - the canonical patch is a picture of the local wall (distortion-head confidence);
+        //  - the design placement is fingerprint-frame-relative (the gated corroboration would
+        //    predict the design at the local frame's coordinates in the peer's -- confidently,
+        //    precisely in the wrong place -- and self-grow would classify promotions with it);
+        //  - the persistent wall feature map is co-registered to the local anchor, and with a
+        //    prior pose from the peer frame its frustum gate would append wrong-frame
+        //    correspondences to the PnP;
+        //  - the capture photo shot the local fingerprint frame (paint grid / auto-fit).
+        mWallPatch.release();
+        mHasDesignPlacement = false;
+        memcpy(mDesignFpFromDesign, kIdentity16, 16 * sizeof(float));
+        mDesignHalfW = 0.0f;
+        mDesignHalfH = 0.0f;
+        mMapDescriptors.release();
+        mMapPoints3D.clear();
+        mMapConfidence.clear();
+        mMapObs.clear();
+        memcpy(mMapAnchorMatrix, kIdentity16, 16 * sizeof(float));
+        memset(mMapIntrinsics, 0, 4 * sizeof(float));
+        mMapRevision.fetch_add(1, std::memory_order_relaxed);
+        mCaptureRgb.release();
+        memset(mCaptureIntr, 0, 4 * sizeof(float));
     }
     {
         // Trigger the relocalization worker to start searching. mRelocRequested/mRelocCv are paired
@@ -2383,12 +2552,28 @@ bool MobileGS::autoFitDesign(float* out5) {
     {
         std::lock_guard<std::mutex> lock(mMutex);
         if (mCaptureRgb.empty() || mArtworkGray.empty() || !mHasDesignPlacement ||
-            !(mDesignHalfW > 0) || !(mDesignHalfH > 0) || !(mCaptureIntr[0] > 0) || mWallKeypoints3D.size() < 12)
+            !(mDesignHalfW > 0) || !(mDesignHalfH > 0) || !(mCaptureIntr[0] > 0) || mWallKeypoints3D.size() < 12) {
+            mLastAutoFitResult.store(kAutoFitNotReady, std::memory_order_relaxed);
             return false;
+        }
         photoRgb = mCaptureRgb.clone(); designGray = mArtworkGray.clone();
         memcpy(K, mCaptureIntr, sizeof(K)); memcpy(fpFromDesign, mDesignFpFromDesign, sizeof(fpFromDesign));
         halfW = mDesignHalfW; halfH = mDesignHalfH; wall = mWallKeypoints3D;
     }
+    // Everything below casts photo rays from the fingerprint frame's ORIGIN, i.e. assumes the
+    // fingerprint frame is the capture camera's. That holds for ARCore metric/depth fingerprints and
+    // is false for a standalone SphereSLAM fingerprint (the centred page frame: the wall plane
+    // passes through the origin, so every ray/plane intersection is at lambda = 0 and the fit could
+    // only ever fail -- after two detector passes). Today no standalone flow calls setCaptureImage,
+    // but a project that also carries an ARCore capture photo can leave one loaded under a
+    // standalone seed. Refuse up front with a reason instead of failing silently and expensively.
+    if (!fingerprintFrameIsCaptureCamera(wall)) {
+        mLastAutoFitResult.store(kAutoFitPageFrame, std::memory_order_relaxed);
+        LOGI("autoFitDesign: fingerprint frame is a centred page frame (standalone), not a capture "
+             "camera -- auto-fit needs a capture-camera fingerprint; skipped");
+        return false;
+    }
+    mLastAutoFitResult.store(kAutoFitNoFit, std::memory_order_relaxed);
     // Wall plane in the fingerprint (= capture camera) frame, fit to the marks.
     cv::Mat data((int)wall.size(), 3, CV_32F);
     for (int i = 0; i < (int)wall.size(); ++i) {
@@ -2453,6 +2638,7 @@ bool MobileGS::autoFitDesign(float* out5) {
     out5[2] = (float)std::atan2(b, a);
     out5[3] = (float)k;
     out5[4] = (float)bestInl;
+    mLastAutoFitResult.store(kAutoFitOk, std::memory_order_relaxed);
     LOGI("autoFitDesign: %d inliers, t=(%.3f,%.3f) m, rot=%.1f deg, scale x%.3f",
          bestInl, out5[0], out5[1], out5[2] * 57.2958f, out5[3]);
     return true;
@@ -2490,8 +2676,10 @@ void MobileGS::updatePaintGrid(const cv::Mat& colorFrame) {
     PaintGrid& g = mGrid;
     const int n = g.cols * g.rows;
     if (n == 0 || !mHasDesignPlacement || !(mDesignHalfW > 0) || !(mDesignHalfH > 0)) return;
+    // The camera the current PnP pose was solved with (the live frame's) -- the same pairing every
+    // other consumer of mPnpCamFromFpWorld uses. Zero when that solve had no real intrinsics.
     float K[4];
-    memcpy(K, (mLiveIntrinsics[0] > 0) ? mLiveIntrinsics : mFingerprintIntrinsics, sizeof(K));
+    memcpy(K, mPnpIntrinsics, sizeof(K));
     if (!(K[0] > 0) || !(K[1] > 0)) return;
     const glm::mat4 fpFromDesign = glm::make_mat4(mDesignFpFromDesign);
     const glm::mat4 camFromDesign = glm::make_mat4(mPnpCamFromFpWorld) * fpFromDesign;
@@ -2522,9 +2710,18 @@ void MobileGS::updatePaintGrid(const cv::Mat& colorFrame) {
     };
     auto isDesign = [&](int e) { const int d = designIdx(e); return d >= 0 && g.weight[d] > 0; };
 
-    // 1. Bare-wall colours from the capture photo. The fingerprint frame IS the capture camera's
-    //    (metric fingerprints store points in it), so camFromFp at capture is the identity.
-    if (!mCaptureRgb.empty() && mCaptureIntr[0] > 0) {
+    // 1. Bare-wall colours from the capture photo. For a capture-camera fingerprint (ARCore
+    //    metric/depth) the fingerprint frame IS the capture camera's, so camFromFp at capture is the
+    //    identity. A standalone fingerprint's frame is the centred PAGE frame instead: projecting
+    //    through an identity "camera" there puts every sample at depth 0, so it could never
+    //    contribute -- and a capture photo left loaded from an ARCore capture of the same project
+    //    would be sampled through a camera that does not exist. Skipped for that frame; step 3's
+    //    first-unpainted-sighting fallback supplies the bare-wall colours instead.
+    //    (The frame test is a PCA over the wall points, so it runs last and only while some sample
+    //    point still lacks a photo colour -- once every base is latched this block is skipped.)
+    if (!mCaptureRgb.empty() && mCaptureIntr[0] > 0 &&
+        std::any_of(g.hasBase.begin(), g.hasBase.end(), [](uint8_t b) { return b != 1; }) &&
+        fingerprintFrameIsCaptureCamera(mWallKeypoints3D)) {
         std::vector<int> idxs; std::vector<cv::Vec3f> cols;
         for (int e = 0; e < en; ++e) {
             if (g.hasBase[e] == 1) continue;

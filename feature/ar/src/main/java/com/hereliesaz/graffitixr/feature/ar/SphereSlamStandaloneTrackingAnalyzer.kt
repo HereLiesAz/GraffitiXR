@@ -856,6 +856,13 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             viewMatrix = FloatArray(0),
             regions = ByteArray(0),
         )
+        // Native drops the distortion-head patch when the fingerprint CHANGES (a patch belongs to
+        // the wall it pictured), so the seed re-supplies this fingerprint's own -- which also makes
+        // the head work after a standalone reload, not only in the capture session.
+        fp.patchData.takeIf { it.isNotEmpty() }?.let { patch ->
+            val side = kotlin.math.sqrt(patch.size.toDouble()).toInt()
+            if (side * side == patch.size) slam.setWallPatchBytes(patch, side)
+        }
         slam.overlayMarkCenterLocal =
             fp.markCenterLocal.takeIf { it.size == 3 }?.toFloatArray()
         slam.captureAnchorCam = null
