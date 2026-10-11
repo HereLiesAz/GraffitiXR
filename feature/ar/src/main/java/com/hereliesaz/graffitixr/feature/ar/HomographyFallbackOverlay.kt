@@ -35,6 +35,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import com.hereliesaz.graffitixr.design.theme.rememberAppStrings
 import com.hereliesaz.graffitixr.feature.ar.rendering.HomographyOverlayRenderer
+import com.hereliesaz.sphereslam.reloc.PlanarTracker
 import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -81,15 +82,15 @@ private val DEFAULT_UNWARP_POINTS = listOf(
 fun HomographyFallbackOverlay(
     cameraController: LifecycleCameraController,
     designBitmap: Bitmap?,
-    onPoseTracked: (HomographyArTracker.HomographyPose?) -> Unit = {},
+    onPoseTracked: (PlanarTracker.Pose?) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     var rawCaptureBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var unwarpPoints by remember { mutableStateOf(DEFAULT_UNWARP_POINTS) }
     var referenceBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    // Set when a marked patch was rejected (too plain/blurry — HomographyTracker::setReference
-    // needs >= 30 ORB features) so the "Capture Target" screen can say why instead of the user
+    // Set when a marked patch was rejected (too plain/blurry — SphereSLAM's PlanarTracker needs
+    // >= 30 ORB features) so the "Capture Target" screen can say why instead of the user
     // just landing back there with no explanation. Cleared on the next capture attempt.
     var referenceRejected by remember { mutableStateOf(false) }
 
@@ -173,22 +174,26 @@ fun HomographyFallbackOverlay(
     // background executor, but Compose's Snapshot state supports writes from any thread and
     // schedules recomposition correctly, so this needs no dispatcher hop.
     var isTrackingLost by remember { mutableStateOf(false) }
-    // HomographyTracker.h documents outConfidence (the RANSAC inlier ratio) as this fallback's
-    // stand-in for ARCore's TrackingState -- "a low value means about to lose the target" -- but
-    // nothing read it anywhere before this: it was computed, plumbed through 17 floats and a gyro
-    // decay, and then discarded. Surface it as an early warning distinct from full loss below.
+    // PlanarTracker.Pose.confidence (the RANSAC inlier ratio, decayed across a gyro bridge) is this
+    // fallback's stand-in for ARCore's TrackingState -- a low value means about to lose the target.
+    // Surface it as an early warning distinct from full loss below.
     var trackingConfidence by remember { mutableStateOf(1f) }
 
     DisposableEffect(bridgedTracker) {
         bridgedTracker.start()
-        onDispose { bridgedTracker.stop() }
+        onDispose {
+            bridgedTracker.stop()
+            // Releases the OpenCV matcher state. Synchronized with trackFrame, and a closed tracker
+            // simply returns no pose, so a frame still in flight on the analysis worker is safe.
+            bridgedTracker.close()
+        }
     }
 
     LaunchedEffect(bridgedTracker, reference, objectHalfW, objectHalfH) {
-        // setReference runs synchronous native ORB detection over a full photo — off the Main
+        // setReference runs synchronous OpenCV ORB detection over a full photo — off the Main
         // dispatcher LaunchedEffect otherwise runs on, so it doesn't jank composition. Its result
         // was previously discarded: a rejected reference (too plain/blurry — under
-        // HomographyTracker's minimum feature count) left the user reading "Reacquiring target…"
+        // PlanarTracker's minimum feature count) left the user reading "Reacquiring target…"
         // forever, with no control on screen that could get them back to recapture.
         val accepted = withContext(Dispatchers.Default) {
             bridgedTracker.setReference(reference, objectHalfW, objectHalfH)
@@ -272,9 +277,9 @@ fun HomographyFallbackOverlay(
             )
         }
     } else if (trackingConfidence < WEAK_LOCK_CONFIDENCE_THRESHOLD) {
-        // A weaker but still-locked frame — HomographyTracker.h's own doc calls its confidence
-        // output "the caller's stand-in for ARCore's TrackingState; a low value means about to
-        // lose the target". This is that warning, one step before isTrackingLost's hard loss.
+        // A weaker but still-locked frame — the tracker's confidence is the caller's stand-in for
+        // ARCore's TrackingState; a low value means about to lose the target. This is that
+        // warning, one step before isTrackingLost's hard loss.
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Text(
                 text = "Hold steady — weak lock",
@@ -288,6 +293,7 @@ fun HomographyFallbackOverlay(
     }
 }
 
-// track()'s post-gate confidence range is [kMinInlierRatio (0.35), 1.0] -- anything in the lower
+// A vision pose's post-gate confidence range is [PlanarTracker.Config.minInlierRatio (0.35), 1.0]
+// (a gyro-bridged hold decays below it) -- anything in the lower
 // portion of that range is a real "about to lose lock" signal, not just noise near the gate.
 private const val WEAK_LOCK_CONFIDENCE_THRESHOLD = 0.5f

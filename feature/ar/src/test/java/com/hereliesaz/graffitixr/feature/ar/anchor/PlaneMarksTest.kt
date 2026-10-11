@@ -4,6 +4,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * The capture path's plane back-projection — SphereSLAM's `reloc.MetricMarks.backProjectToPlane`,
+ * reached through the test adapter [PlaneBackProjection].
+ */
 class PlaneMarksTest {
     private val fx = 500f; private val fy = 500f; private val cx = 320f; private val cy = 320f
 
@@ -14,12 +18,12 @@ class PlaneMarksTest {
 
     /** Pixel that a CV-frame point (x,y,z) projects to under these intrinsics (camera at origin). */
     private fun pixelOf(x: Float, y: Float, z: Float) =
-        PlaneMarks.Pixel(fx * x / z + cx, fy * y / z + cy)
+        PlaneBackProjection.Pixel(fx * x / z + cx, fy * y / z + cy)
 
     @Test fun `back-projects center pixel onto a fronto-parallel wall at the plane depth`() {
         // Wall at z = 2 m, normal facing the camera. Centre pixel -> ray (0,0,1) -> hit at z = 2.
-        val r = PlaneMarks.backProject(
-            pixels = listOf(PlaneMarks.Pixel(cx, cy)),
+        val r = PlaneBackProjection.backProject(
+            pixels = listOf(PlaneBackProjection.Pixel(cx, cy)),
             cvView = identity(),
             planePointWorld = floatArrayOf(0f, 0f, 2f),
             planeNormalWorld = floatArrayOf(0f, 0f, -1f),
@@ -39,7 +43,7 @@ class PlaneMarksTest {
             floatArrayOf(-0.5f, 0.2f, 2.5f),
         )
         val pixels = gt.map { pixelOf(it[0], it[1], it[2]) }
-        val r = PlaneMarks.backProject(
+        val r = PlaneBackProjection.backProject(
             pixels = pixels,
             cvView = identity(),
             planePointWorld = floatArrayOf(0f, 0f, 2.5f),
@@ -58,8 +62,8 @@ class PlaneMarksTest {
         // Camera stepped 1 m to the side; a wall point sits at world (1, 0, 3). In the camera frame
         // that's (0, 0, 3), so the centre pixel must back-project to depth 3.
         val view = viewWithCenter(1f, 0f, 0f)
-        val r = PlaneMarks.backProject(
-            pixels = listOf(PlaneMarks.Pixel(cx, cy)),
+        val r = PlaneBackProjection.backProject(
+            pixels = listOf(PlaneBackProjection.Pixel(cx, cy)),
             cvView = view,
             planePointWorld = floatArrayOf(1f, 0f, 3f), // a point on the wall, in world
             planeNormalWorld = floatArrayOf(0f, 0f, -1f),
@@ -73,8 +77,8 @@ class PlaneMarksTest {
 
     @Test fun `drops rays parallel to the plane and hits behind the camera`() {
         // Plane parallel to the viewing direction (normal along camera X): the centre ray never hits.
-        val parallel = PlaneMarks.backProject(
-            pixels = listOf(PlaneMarks.Pixel(cx, cy)),
+        val parallel = PlaneBackProjection.backProject(
+            pixels = listOf(PlaneBackProjection.Pixel(cx, cy)),
             cvView = identity(),
             planePointWorld = floatArrayOf(2f, 0f, 0f),
             planeNormalWorld = floatArrayOf(1f, 0f, 0f), // perpendicular to ray (0,0,1)
@@ -83,8 +87,8 @@ class PlaneMarksTest {
         assertEquals(0, parallel.count)
 
         // Plane behind the camera (z = -2): intersection has t < 0 → dropped.
-        val behind = PlaneMarks.backProject(
-            pixels = listOf(PlaneMarks.Pixel(cx, cy)),
+        val behind = PlaneBackProjection.backProject(
+            pixels = listOf(PlaneBackProjection.Pixel(cx, cy)),
             cvView = identity(),
             planePointWorld = floatArrayOf(0f, 0f, -2f),
             planeNormalWorld = floatArrayOf(0f, 0f, -1f),
@@ -94,8 +98,8 @@ class PlaneMarksTest {
     }
 
     @Test fun `enforces the depth window`() {
-        val tooFar = PlaneMarks.backProject(
-            pixels = listOf(PlaneMarks.Pixel(cx, cy)),
+        val tooFar = PlaneBackProjection.backProject(
+            pixels = listOf(PlaneBackProjection.Pixel(cx, cy)),
             cvView = identity(),
             planePointWorld = floatArrayOf(0f, 0f, 50f),
             planeNormalWorld = floatArrayOf(0f, 0f, -1f),
@@ -124,14 +128,14 @@ class PlaneMarksTest {
      */
     @Test
     fun `a degenerate plane normal places no points at all`() {
-        val pixels = (0 until 200).map { PlaneMarks.Pixel(100f + it, 200f + it) }
+        val pixels = (0 until 200).map { PlaneBackProjection.Pixel(100f + it, 200f + it) }
         val identityView = floatArrayOf(
             1f, 0f, 0f, 0f,
             0f, 1f, 0f, 0f,
             0f, 0f, 1f, 0f,
             0f, 0f, 0f, 1f,
         )
-        val res = PlaneMarks.backProject(
+        val res = PlaneBackProjection.backProject(
             pixels, identityView,
             planePointWorld = floatArrayOf(0f, 0f, 2f),
             planeNormalWorld = floatArrayOf(0f, 0f, 0f),   // the defect
@@ -141,7 +145,7 @@ class PlaneMarksTest {
 
         // And the same geometry with a real normal places essentially all of them, so the zero is
         // the cause and not the pixels, the view, or the intrinsics.
-        val ok = PlaneMarks.backProject(
+        val ok = PlaneBackProjection.backProject(
             pixels, identityView,
             planePointWorld = floatArrayOf(0f, 0f, 2f),
             planeNormalWorld = floatArrayOf(0f, 0f, -1f),

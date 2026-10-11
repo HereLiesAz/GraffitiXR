@@ -91,7 +91,11 @@ Since SphereSLAM 0.24.0 the generic pieces of both roles are library code consum
 `:feature:ar`: the sidecar gates/pairing/agreement fusion (`sidecar.HybridKpmCorrection`,
 `HybridPoseHistory`, `HybridAnchorFusion`, `MetricPageRectification`), the attitude bridge
 (`attitude.*`), camera geometry (`camera.*`), rigid/rotation math (`math.*`), photosphere keyframes
-and fingerprint placement, the embedded coverage wash (`:overlay`) and MiDaS depth (`:models`). The
+and fingerprint placement, the embedded coverage wash (`:overlay`) and MiDaS depth (`:models`).
+Since 0.24.1 the standalone photosphere runtime itself is the library's
+`reloc.PhotosphereTrackingSession` (the app's analyzer is its CameraX/MobileGS/UI adapter), the
+Overlay planar tracker is `reloc.PlanarTracker`, and the `FILL_CENTER` display math and mark
+geometry are `camera.CameraFillCenter` / `reloc.MetricMarks`. The
 app keeps the ARCore wiring, PoseFusion's ARCore backbone, MobileGS, persistence and UI. See
 [`SPHERESLAM_TODO.md`](SPHERESLAM_TODO.md) for the list.
 

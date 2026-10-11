@@ -23,10 +23,8 @@ set(SRC ${CMAKE_CURRENT_SOURCE_DIR}/../../main/cpp)
 set(GLM_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../libs/glm)
 
 add_executable(native_host_tests
-    HomographyTrackerTest.cpp
     MobileGSFingerprintStateTest.cpp
     FrameBufferGuardTest.cpp
-    ${SRC}/HomographyTracker.cpp
     ${SRC}/MobileGS.cpp
     ${SRC}/SuperPointDetector.cpp
     ${SRC}/DistortionHead.cpp

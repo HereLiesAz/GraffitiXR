@@ -75,14 +75,13 @@ every { context.getSystemService(Context.CAMERA_SERVICE) } returns cameraManager
 ## 2. Native Tests (C++)
 **Host-native GoogleTest suite** — `core/nativebridge/src/test/cpp/`, run with
 `tools/run_native_host_tests.sh` (CI: Android CI ▸ unit-tests ▸ "Native host unit tests"). It
-compiles the SAME production sources (`HomographyTracker.cpp`, `MobileGS.cpp`, the ONNX wrappers)
+compiles the SAME production sources (`MobileGS.cpp`, the ONNX wrappers)
 for x86-64 against host OpenCV 4 + GoogleTest, with one-file shims in `shim/` for Android/GL/JNI
 headers the tested paths never call. Local setup (Ubuntu): `apt-get install cmake g++ libopencv-dev
 libgtest-dev`.
 
 | Test | Pins |
 |---|---|
-| `HomographyTrackerTest` | Known-answer pose: frames synthesised from a chosen GL pose via the GL pinhole model written out longhand; the tracker must recover it. Mutation-checked: re-introducing the old `C·R·C` flip fails both pose tests. |
 | `MobileGSFingerprintStateTest` | `restoreWallFingerprint` / `alignToFingerprint` clear the previous fingerprint's capture view, anchor, intrinsics (and, for the restore, the canonical patch); malformed peer bytes change nothing. Private state via the `MobileGSTestPeer` friend. Mutation-checked. |
 | `FrameBufferGuardTest` | `include/FrameBufferGuard.h`, the bounds arithmetic of `nativeFeedYuvFrame`, `nativeFeedColorFrame`, `nativeYuvToRgbaBitmap`, incl. 32-bit wrap. |
 
@@ -98,7 +97,12 @@ Still uncovered: reloc match quality, PnP accuracy and drift-correction behaviou
 The Camera2 id → `CameraManager` → intrinsics seam every CameraX tracking path uses is SphereSLAM's
 `camera.CameraIntrinsicsEstimator` since 0.24.0 and is tested in that library, together with the
 other generic SLAM math the app now consumes (rigid/rotation math, attitude bridge, sidecar gates,
-photosphere placement, gyro compensation).
+photosphere placement, gyro compensation). Since 0.24.1 the same holds for the `FILL_CENTER` display
+math (`camera.CameraFillCenter`), the standalone photosphere runtime (`reloc.PhotosphereTrackingSession`,
+atlas growth, target quality, failure taxonomy) and the Overlay planar tracker (`reloc.PlanarTracker`,
+which replaced the native `HomographyTracker` and its `HomographyTrackerTest`); the app keeps tests
+for its adapters, UI messages and the capture-path mark geometry (`PlaneMarksTest`,
+`PlaneMarksObliquityTest`, `MetricMarksTest`, now run against SphereSLAM `reloc.MetricMarks`).
 
 ## 3. UI / Instrumented Tests
 There are currently **no `src/androidTest/` directories anywhere in this repository** — no

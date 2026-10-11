@@ -222,7 +222,7 @@ class EvalSampleLogTest {
     /**
      * The defect this pair of columns was split to fix, pinned as a test.
      *
-     * `PlaneMarks.backProject` runs once per target inside `MetricFingerprintBuilder.build`, so
+     * `MetricMarks.backProjectToPlane` (SphereSLAM) runs once per target inside `MetricFingerprintBuilder.build`, so
      * §8's frame mismatch is baked into the fingerprint's 3D points **at capture**. E0b's
      * independent variable is therefore the capture rotation, and the live rotation is a different
      * quantity that can legitimately differ from it on the very same row.

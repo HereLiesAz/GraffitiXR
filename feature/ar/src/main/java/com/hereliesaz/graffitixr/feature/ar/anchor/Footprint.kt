@@ -22,7 +22,7 @@ import com.hereliesaz.sphereslam.math.RigidMath
  * **Φ discards the plane-normal component deliberately.** A point 0.5 m in front of the wall maps to
  * the same `(u,v)` as its foot on the wall. The partition is about *where on the design* a feature
  * sits, not how far off the surface it is; off-surface points are rejected earlier, by
- * [PlaneMarks.backProject]'s depth range.
+ * SphereSLAM `MetricMarks.backProjectToPlane`'s depth range.
  *
  * ## The scale trap
  *

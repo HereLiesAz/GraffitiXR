@@ -135,7 +135,7 @@ internal fun standaloneTapInFrame(
 ): FloatArray {
     if (tap == null) return floatArrayOf(0.5f, 0.5f)
     if (viewSize == null) return floatArrayOf(tap.first, tap.second)
-    return com.hereliesaz.graffitixr.feature.ar.rendering.CameraFillCenter.viewToFrameNormalized(
+    return com.hereliesaz.sphereslam.camera.CameraFillCenter.viewToFrameNormalized(
         nx = tap.first,
         ny = tap.second,
         frameWidth = frameWidth,
@@ -5445,7 +5445,7 @@ class ArViewModel @Inject constructor(
         // report would still say "no refusal recorded".
         //
         // The normal check is the one that matters. A zero-length normal passes every structural
-        // test — non-null, six floats — and then makes `PlaneMarks.backProject` reject every single
+        // test — non-null, six floats — and then makes `MetricMarks.backProjectToPlane` (SphereSLAM) reject every single
         // ray, because `n·d` is exactly 0 for every pixel. Guarded at the publisher too
         // (`ArRenderer.doodleWallPlane`); repeated here because this is the last place it can be
         // refused with a message attached, and a plane arriving degenerate from anywhere must not

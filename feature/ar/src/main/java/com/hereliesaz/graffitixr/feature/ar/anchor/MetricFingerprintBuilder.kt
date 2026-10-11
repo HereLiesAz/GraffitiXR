@@ -12,11 +12,12 @@ import org.opencv.features.DescriptorMatcher
 import org.opencv.features.ORB
 import org.opencv.imgproc.Imgproc
 import com.hereliesaz.sphereslam.math.RigidMath
+import com.hereliesaz.sphereslam.reloc.MetricMarks
 
 /**
  * Builds a wall fingerprint from two camera keyframes by triangulation — the depth-off path. Detects
  * ORB on both views, matches with a Lowe ratio test, triangulates the matches into metric 3D via
- * [MetricMarks] (which wraps the tested [Triangulation] core), and hands the result to the native
+ * SphereSLAM's [MetricMarks.triangulateTwoView], and hands the result to the native
  * engine through [SlamManager.restoreWallFingerprintMetric].
  *
  * The artist's natural step-in / step-back supplies the baseline; no second lens, no ML depth. Points
@@ -27,6 +28,19 @@ import com.hereliesaz.sphereslam.math.RigidMath
  * path when the stored descriptors are CV_32F, so CV_8U keeps both ends on ORB and consistent.
  */
 object MetricFingerprintBuilder {
+
+    /** A detected feature pixel (u, v) in the captured image. */
+    private data class Pixel(val u: Float, val v: Float)
+
+    /** [pixels] as the flat `[u0, v0, u1, v1, …]` array SphereSLAM's [MetricMarks] takes. */
+    private fun pixelArray(pixels: List<Pixel>): FloatArray {
+        val out = FloatArray(pixels.size * 2)
+        for ((i, p) in pixels.withIndex()) {
+            out[2 * i] = p.u
+            out[2 * i + 1] = p.v
+        }
+        return out
+    }
 
     /** One captured view: grayscale image, its ARCore/GL world→camera view, and pinhole intrinsics. */
     class Keyframe(
@@ -64,11 +78,11 @@ object MetricFingerprintBuilder {
         try {
             val cv0 = RigidMath.glViewToCv(glView0)
             val cv1 = RigidMath.glViewToCv(glView1)
-            val tri = MetricMarks.triangulate(matched.corrs, cv0, cv1, intr0[0], intr0[1], intr0[2], intr0[3])
+            val tri = MetricMarks.triangulateTwoView(matched.corrs, cv0, cv1, intr0[0], intr0[1], intr0[2], intr0[3])
             if (tri.count < minPoints) return null
 
             // Center the AR overlay on the marks (their centroid), not the screen-center anchor.
-            val markCenterLocal = marksCentroidLocal(tri.pointsCam0, cv0, anchorModel)
+            val markCenterLocal = marksCentroidLocal(tri.points, cv0, anchorModel)
             slam.overlayMarkCenterLocal = markCenterLocal
 
             // Keep the rows of frame-0's descriptors (and the frame-0 keypoints) whose match survived.
@@ -96,10 +110,10 @@ object MetricFingerprintBuilder {
 
             slam.clearPaintMarks() // new capture = new fingerprint frame
             slam.restoreWallFingerprintMetric(
-                bytes, rows, cols, type, tri.pointsCam0, anchorModel, intr0,
+                bytes, rows, cols, type, tri.points, anchorModel, intr0,
             )
             return Fingerprint(
-                keypoints, tri.pointsCam0.toList(), bytes, rows, cols, type,
+                keypoints, tri.points.toList(), bytes, rows, cols, type,
                 markCenterLocal = markCenterLocal?.toList() ?: emptyList(),
             )
         } finally {
@@ -245,9 +259,9 @@ object MetricFingerprintBuilder {
         if (sp != null) {
             val (pos, descs) = sp
             try {
-                val pixels = ArrayList<PlaneMarks.Pixel>(pos.size / 2)
+                val pixels = ArrayList<Pixel>(pos.size / 2)
                 var i = 0
-                while (i + 1 < pos.size) { pixels.add(PlaneMarks.Pixel(pos[i], pos[i + 1])); i += 2 }
+                while (i + 1 < pos.size) { pixels.add(Pixel(pos[i], pos[i + 1])); i += 2 }
                 val (mPixels, mDescs) = applyMask(mask, bitmap, pixels, descs)
                 val fp = try {
                     ingestSingle(slam, mDescs, mPixels, cvView, intr,
@@ -276,7 +290,7 @@ object MetricFingerprintBuilder {
                 recordAttemptOutcome(succeeded = false)
                 return null
             }
-            val pixels = kp.toArray().map { PlaneMarks.Pixel(it.pt.x.toFloat(), it.pt.y.toFloat()) }
+            val pixels = kp.toArray().map { Pixel(it.pt.x.toFloat(), it.pt.y.toFloat()) }
             val (mPixels, mDescs) = applyMask(mask, bitmap, pixels, d)
             try {
                 return ingestSingle(slam, mDescs, mPixels, cvView, intr,
@@ -294,8 +308,8 @@ object MetricFingerprintBuilder {
      * mask or every feature is inside it; otherwise a new descriptor Mat the caller must release.
      */
     private fun applyMask(
-        mask: Bitmap?, bitmap: Bitmap, pixels: List<PlaneMarks.Pixel>, descs: Mat,
-    ): Pair<List<PlaneMarks.Pixel>, Mat> {
+        mask: Bitmap?, bitmap: Bitmap, pixels: List<Pixel>, descs: Mat,
+    ): Pair<List<Pixel>, Mat> {
         if (mask == null || pixels.isEmpty() || bitmap.width <= 0 || bitmap.height <= 0) return pixels to descs
         val sx = mask.width.toFloat() / bitmap.width
         val sy = mask.height.toFloat() / bitmap.height
@@ -314,7 +328,7 @@ object MetricFingerprintBuilder {
     private fun ingestSingle(
         slam: SlamManager,
         descAll: Mat,
-        pixels: List<PlaneMarks.Pixel>,
+        pixels: List<Pixel>,
         cvView: FloatArray, intr: FloatArray,
         planePointWorld: FloatArray, planeNormalWorld: FloatArray,
         anchorModel: FloatArray, minPoints: Int,
@@ -324,8 +338,8 @@ object MetricFingerprintBuilder {
         /** rotationNeeded for this capture; rotates [glView] to match the points. See 0.10. */
         rotationDeg: Int = 0,
     ): Fingerprint? {
-        val res = PlaneMarks.backProject(
-            pixels, cvView, planePointWorld, planeNormalWorld,
+        val res = MetricMarks.backProjectToPlane(
+            pixelArray(pixels), cvView, planePointWorld, planeNormalWorld,
             intr[0], intr[1], intr[2], intr[3],
         )
         // Record before the bail so a refusal can report how far short it fell. SuperPoint runs first
@@ -342,7 +356,7 @@ object MetricFingerprintBuilder {
         recordAttemptOutcome(succeeded = true)
 
         // IMPLEMENTATION.md 2.4's capture-time half: the anchor's pose in THIS frame, so the
-        // partition can be composed later without a world frame. `res.pointsCam` is in the capture
+        // partition can be composed later without a world frame. `res.points` is in the capture
         // CV camera frame and the design's pose will be known relative to the anchor, so
         // `cvView · anchorModel` is the bridge between them — see Fingerprint.captureAnchorCam.
         // Recorded unconditionally, including on a capture that establishes the anchor and therefore
@@ -350,7 +364,7 @@ object MetricFingerprintBuilder {
         val anchorCam = RigidMath.multiply(cvView, anchorModel)
 
         // Center the AR overlay on the marks (their centroid), not the screen-center anchor.
-        val markCenterLocal = marksCentroidLocal(res.pointsCam, cvView, anchorModel)
+        val markCenterLocal = marksCentroidLocal(res.points, cvView, anchorModel)
         slam.overlayMarkCenterLocal = markCenterLocal
         // IMPLEMENTATION.md 0.9 — published at capture as well as on reload, or the session that
         // CREATED the target would relocalize without a correction until the project was reopened.
@@ -379,13 +393,13 @@ object MetricFingerprintBuilder {
         keptDesc.release()
 
         // IMPLEMENTATION.md 0.10 — the stored capture view must be in the SAME frame as
-        // res.pointsCam, which glViewToCvDisplay has already moved to display orientation.
+        // res.points, which glViewToCvDisplay has already moved to display orientation.
         // Native pairs the two in computeRectifyHomography (viewFp / mWallKeypoints3D) against a
         // display-oriented viewCur, so handing it the raw sensor-frame view leaves the rectifying
         // homography rotated by R_z. Note the GL sign is NEGATED — see glViewDisplayOriented.
         slam.clearPaintMarks() // new capture = new fingerprint frame
         slam.restoreWallFingerprintMetric(
-            bytes, rows, cols, type, res.pointsCam, anchorModel, intr,
+            bytes, rows, cols, type, res.points, anchorModel, intr,
             viewMatrix = glView?.let { MetricMarks.glViewDisplayOriented(it, rotationDeg) }
                 ?: FloatArray(0),
             // IMPLEMENTATION.md 2.6 — native filters the reloc correspondence build by these, and
@@ -397,7 +411,7 @@ object MetricFingerprintBuilder {
             regions = ByteArray(0),
         )
         return Fingerprint(
-            keypoints, res.pointsCam.toList(), bytes, rows, cols, type,
+            keypoints, res.points.toList(), bytes, rows, cols, type,
             markCenterLocal = markCenterLocal?.toList() ?: emptyList(),
             // IMPLEMENTATION.md 0.7 — record the frame these points were built in, so a reload can
             // tell a Phase-0 fingerprint from a pre-Phase-0 one instead of guessing.

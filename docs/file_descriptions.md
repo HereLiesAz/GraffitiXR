@@ -59,14 +59,12 @@ This document lists key files in the repository and their purposes.
     `docs/DISTORTION_HEAD.md`.
 *   `src/main/cpp/SuperPointDetector.cpp`: ONNX SuperPoint keypoint/descriptor detector, used as an
     alternative to ORB in the relocalization and fingerprint-building paths.
-*   `src/main/cpp/HomographyTracker.cpp`: Planar homography tracker used by Overlay mode on the small
-    number of devices without ARCore (`docs/UI_UX.md`).
 *   `src/main/cpp/LowLightEnhancer.cpp`: Low-light frame enhancement for feature detection.
 *   `src/main/cpp/MlasStub.cpp`: Build-time stub patching a missing ONNX Runtime symbol.
 
 ### SphereSLAM (published dependency)
 
-SphereSLAM 0.24.0 public API baseline: GraffitiXR consumes the supported planar/coverage surface
+SphereSLAM 0.24.1 public API baseline: GraffitiXR consumes the supported planar/coverage surface
 and toolkit packages, and explicitly opts into the experimental `:reloc` and `:models` surfaces while
 preserving its existing `Standalone*` aliases.
 
@@ -93,6 +91,13 @@ the real (non-stub) tracker is packaged.
     `util/OverlayGyroCompensationMath`); `:overlay` `CoverageGlowRenderer` (was the app's scissor
     wash); `:models` `DepthEstimator` (was `depth/DepthEstimator`); `:reloc` `PoseBlend` for the
     standalone reloc corroboration blend.
+*   Since 0.24.1 also: `camera.CameraFillCenter` (was `rendering/CameraFillCenter`); `:reloc`
+    `PhotosphereTrackingSession` + `PhotosphereAtlasGrowth` + `TargetQuality` + `TrackingFailure*`
+    (was the standalone analyzer's runtime, `StandaloneAtlasGrowth`, and the bodies of
+    `StandaloneTargetQuality` / `StandaloneFailure`); `:reloc` `PlanarTracker` (was the native
+    `HomographyTracker` + `HomographyTrackerNative` + `HomographyArTracker` stack and
+    `BridgedHomographyTracker`'s bridge); `:reloc` `MetricMarks` (was `anchor/PlaneMarks`,
+    `anchor/MetricMarks`, `anchor/Triangulation`).
 *   `core/common` `sensor/CameraIntrinsics` and `model/HybridKpmDiagnostics`/`HybridKpmOutcome` are
     typealiases of the library types (`core/common` depends on `:sphereslam` with `api`).
 
@@ -125,12 +130,14 @@ the real (non-stub) tracker is packaged.
 *   `SphereSlamStandaloneOverlay.kt`: non-ARCore AR surface. Owns rectified wall-target capture,
     CameraX analyzer lifecycle, KPM/reacquisition HUD, GL overlay, target restore, and copyable
     diagnostics.
-*   `SphereSlamStandaloneTrackingAnalyzer.kt`: synchronous display-oriented CameraX luma →
-    calibrated KPM pose pipeline with quality gates, observation-age checks, pose-jump rejection,
-    tracking-state hysteresis, and the short rotation-only IMU bridge (SphereSLAM
-    `GameRotationAttitudeSource` + `AttitudeRotationBridge`, body→camera
-    `DeviceCameraRotation.cameraFromDevice(SENSOR_ORIENTATION, rotationDegrees)`). Emits SphereSLAM
-    `PhotosphereKeyframe`s; corroborates MobileGS reloc with `:reloc` `PoseBlend`. Tracks the full
+*   `SphereSlamStandaloneTrackingAnalyzer.kt`: the CameraX adapter around SphereSLAM `:reloc`
+    `PhotosphereTrackingSession`, which runs the synchronous calibrated KPM pose pipeline (quality
+    gates, observation-age checks, pose-jump rejection, tracking-state hysteresis, the short
+    rotation-only IMU bridge, base photosphere keyframes, `map_from_fingerprint`, atlas growth).
+    The adapter supplies display-upright luma, intrinsics, `GameRotationAttitudeSource` attitude and
+    body→camera `DeviceCameraRotation.cameraFromDevice(SENSOR_ORIENTATION, rotationDegrees)`;
+    seeds/feeds native MobileGS and corroborates its reloc with `:reloc` `PoseBlend` (the session's
+    `correctAcceptedPose` hook); pushes optional MiDaS depth; maps results to the UI. Tracks the full
     luma buffer (not the preview viewport's cropRect) and publishes each frame's display-upright
     intrinsics for the renderer's `FILL_CENTER` projection.
 *   `StandaloneWallHitTest.kt`: ARCore-independent screen-pixel → canonical wall intersection.
@@ -142,38 +149,34 @@ the real (non-stub) tracker is packaged.
     preview's `FILL_CENTER` crop.
     Back-projects calibrated CameraX rays onto SphereSLAM z=0 and accepts only visually locked,
     registered page/atlas coverage; no synthetic depth or ARCore `Frame.hitTest`.
-*   `StandaloneAtlasGrowth.kt`: chooses/rectifies additional KPM wall pages and registers each into
-    page 0's immutable canonical frame.
-*   `StandaloneFailure.kt` / `StandaloneDiagnostics.kt`: typed standalone failure taxonomy and the
-    compact diagnostic dump contract.
+*   `StandaloneFailure.kt` / `StandaloneTargetQuality.kt`: aliases of SphereSLAM's failure taxonomy
+    and target-quality gate, plus the artist-facing messages for them (the library has no UI text).
+*   `StandaloneDiagnostics.kt`: the compact diagnostic dump contract.
 *   `rendering/HomographyOverlayRenderer.kt`: transparent CameraX GL overlay renderer shared by
     standalone SphereSLAM AR and the legacy homography Overlay tracker. Takes each pose with the
     full tracked frame's intrinsics and draws on the full surface with the `FILL_CENTER`
-    projection (`CameraFillCenter.projection`, cached per intrinsics/surface size). In standalone
+    projection (SphereSLAM `camera.CameraFillCenter.projection`, cached per intrinsics/surface size). In standalone
     it embeds SphereSLAM `:overlay` `CoverageGlowRenderer` (complement wash, holes =
     `PhotosphereMap.currentRegions()`, projected through the cropped field of view) before the design.
-*   `rendering/CameraFillCenter.kt`: pure `PreviewView.ScaleType.FILL_CENTER` math shared by
-    everything registered to the CameraX preview — frame intrinsics → on-screen intrinsics/projection
-    (SphereSLAM `CameraIntrinsicsTransforms.rescale` then `.crop`, `ProjectionMatrix.buildFrom`;
-    whole-pixel rounding kept under ½ view px), screen tap → full-frame point, shown field of view,
-    and Gyro screen intrinsics. Library candidate: SphereSLAM has only the `FIT_CENTER`
-    `ScreenIntrinsics`.
 *   `rendering/BackgroundRenderer.kt`: OpenGL ES shader that renders ARCore's `EXTERNAL_OES`
     camera texture full-screen.
 *   `CameraPreview.kt`: shared CameraX preview for Overlay and standalone SphereSLAM AR, full
     screen (`FILL_CENTER`). CameraController hands that viewport to ImageAnalysis as a cropRect; the
     tracking analyzers ignore it and solve on the full frame, applying the crop only where the frame
-    meets the screen (`rendering/CameraFillCenter.kt`).
+    meets the screen (SphereSLAM `camera.CameraFillCenter`: on-screen projection, tap → frame
+    point, shown field of view, Gyro screen intrinsics).
 *   `OverlayGyroStabilizer.kt`: Overlay ▸ Gyro (tripod stabilisation) Compose wiring.
     `rememberOverlayGyroCompensation` captures a game-rotation reference (SphereSLAM
     `GameRotationAttitudeSource`), publishes the per-frame pure-rotation screen homography
     (SphereSLAM `gyro.GyroCompensationMath`; screen intrinsics for the `FILL_CENTER` preview from
-    `rendering/CameraFillCenter`) MainScreen draws the Overlay
+    SphereSLAM `camera.CameraFillCenter`) MainScreen draws the Overlay
     design through, auto-releases past 3°, and runs a slow (15 s) background MiDaS sample (`:models`
     `DepthEstimator`) of the surface under the design.
-*   `HomographyFallbackOverlay.kt` / `HomographyArTracker.kt` / `BridgedHomographyTracker.kt`: legacy
-    planar live tracking with a short SphereSLAM attitude bridge, currently unmounted (Overlay draws
-    the edited design over the camera untracked); not the standalone AR backend.
+*   `HomographyFallbackOverlay.kt` / `HomographyTrackingAnalyzer.kt` / `BridgedHomographyTracker.kt`:
+    legacy planar live tracking on SphereSLAM `:reloc` `PlanarTracker` (vision + short attitude
+    bridge; the adapter supplies CameraX luma, attitude and the reference bitmap's luma), currently
+    unmounted (Overlay draws the edited design over the camera untracked); not the standalone AR
+    backend.
 *   `computervision/DualAnalyzer.kt`: ARCore-side `ImageAnalysis.Analyzer` for relocalization
     callbacks and light estimation.
 *   `src/test/.../ArViewModelTest.kt` plus standalone/hybrid tests: lifecycle/persistence,
@@ -193,8 +196,10 @@ the real (non-stub) tracker is packaged.
 *   `ProjectLibraryScreen.kt`: Full-screen project list UI.
 
 ---
-*Documentation updated on 2026-10-10: generic SLAM code moved into SphereSLAM 0.24.0 (see the
-SphereSLAM section). Earlier 2026-10-01 update: added the dual ARCore/SphereSLAM backend ownership,
+*Documentation updated on 2026-10-11: SphereSLAM 0.24.1 — `CameraFillCenter`, the standalone
+photosphere runtime, the planar Overlay tracker and the plane/two-view mark math moved into the
+library (see the SphereSLAM section). Earlier 2026-10-10 update: generic SLAM code moved into
+SphereSLAM 0.24.0. Earlier 2026-10-01 update: added the dual ARCore/SphereSLAM backend ownership,
 standalone CameraX/KPM files, co-op frame calibration, and metric hybrid KPM→PoseFusion files. Earlier 2026-09-04 update removed the Persistent Voxel Memory /
 `slamManager.draw()` /
 `VoxelHash.*` / `StereoProcessor.cpp` claims (none of those files or methods exist), corrected the

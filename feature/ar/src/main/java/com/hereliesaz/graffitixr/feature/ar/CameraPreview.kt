@@ -122,7 +122,7 @@ fun CameraPreview(
                 this.controller = controller
                 // FILL_CENTER (stated, though it is CameraX's default): the camera fills the
                 // screen, centre-cropped. Everything registered to this image applies the SAME
-                // crop through rendering.CameraFillCenter — the CameraX artwork surface's
+                // crop through SphereSLAM camera.CameraFillCenter — the CameraX artwork surface's
                 // projection (HomographyOverlayRenderer), tap → frame mapping, the coverage glow's
                 // field of view and Overlay ▸ Gyro's screen intrinsics. The crop is display-only:
                 // CameraController also hands this view's viewport to ImageAnalysis as a cropRect,

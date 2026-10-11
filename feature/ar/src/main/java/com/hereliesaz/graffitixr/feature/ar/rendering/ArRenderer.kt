@@ -1855,7 +1855,7 @@ class ArRenderer(
                         // nothing.
                         //
                         // A zero normal is not a bad plane, it is a plane that rejects everything:
-                        // `PlaneMarks.backProject` computes `nDotD = n·d`, which is exactly 0 for
+                        // `MetricMarks.backProjectToPlane` (SphereSLAM) computes `nDotD = n·d`, which is exactly 0 for
                         // every pixel, so every ray trips the parallel test and NOT ONE feature is
                         // ever placed. The fingerprint build then fails on every capture, for any
                         // wall, in any lighting, silently — a device run detected a full mark set and

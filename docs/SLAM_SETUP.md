@@ -42,7 +42,7 @@ On devices where ARCore is unavailable, AR mode does **not** construct an ARCore
    on-screen crop), rotates it into display orientation, estimates Camera2 intrinsics for the raw
    CameraX frame, applies the (full-frame) crop through the same transform, and rotates
    `fx/fy/cx/cy` into the same display frame. The screen crop is applied only where the frame meets
-   the display (`CameraFillCenter`: artwork projection, taps, coverage glow);
+   the display (SphereSLAM `camera.CameraFillCenter`: artwork projection, taps, coverage glow);
 6. `SphereSlamStandaloneSession` builds a calibrated artoolkitX KPM page and synchronously matches
    each analyzed frame;
 7. KPM camera-from-page is converted to a centered, right-handed OpenGL wall-relative view matrix;

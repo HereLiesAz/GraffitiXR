@@ -9,7 +9,7 @@ import org.junit.Test
 /**
  * JVM-reachable pieces of [HomographyOverlayRenderer]: its UI→GL texture mailbox. The on-screen
  * projection it draws with (the preview's `FILL_CENTER` crop, which replaced the old letterboxed
- * viewport) is pure math in [CameraFillCenter] and tested in [CameraFillCenterTest];
+ * viewport) is pure math in SphereSLAM's `camera.CameraFillCenter`, tested in that library;
  * `onDrawFrame` itself needs a live EGL context.
  */
 class HomographyOverlayRendererTest {

@@ -126,8 +126,8 @@ standalone_analyzer = read(
     "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/"
     "SphereSlamStandaloneTrackingAnalyzer.kt"
 )
-if "cameraFromCanonical" not in standalone_analyzer:
-    fail("Standalone analyzer is not consuming SphereSLAM Pose.cameraFromCanonical.")
+if "PhotosphereTrackingSession(" not in standalone_analyzer:
+    fail("Standalone analyzer is not driving SphereSLAM reloc.PhotosphereTrackingSession.")
 
 # The hybrid gates/solve are SphereSLAM's sidecar.HybridKpmCorrection, which reads the public
 # Observation.cameraFromPage3x4 itself. GraffitiXR hands it the tracker's published observation

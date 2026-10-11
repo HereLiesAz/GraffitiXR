@@ -133,7 +133,7 @@ data class EvalSample(
      * below).
      *
      * **This is the independent variable of `EVALUATION.md` E0b**, and the distinction from
-     * [liveRotationNeededDeg] is the whole point of having two columns. `PlaneMarks.backProject`
+     * [liveRotationNeededDeg] is the whole point of having two columns. `MetricMarks.backProjectToPlane` (SphereSLAM)
      * runs exactly once per target, inside `MetricFingerprintBuilder.buildSingle`, so whatever frame
      * relationship holds at capture is **baked into the fingerprint's 3D points** and cannot change
      * afterwards, however the device is subsequently held. That is why the capture rotation, not the
