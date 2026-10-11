@@ -12,9 +12,18 @@ Third-party weights keep their upstream license (see `docs/LICENSING.md`, "Bundl
 ## Corrections
 
 - `superpoint.onnx` is **not** Magic Leap's `SuperPointPretrainedNetwork` (`superpoint_v1.pth`, a
-  non-commercial license). Earlier docs and `scripts/convert_superpoint.py` said it was. That script
-  targets the Magic Leap checkpoint and layer layout, cannot load the rpautrat checkpoint, and did not
-  produce the shipped asset; it is disabled until a corrected export script for the rpautrat
-  checkpoint replaces it.
+  non-commercial license). Earlier docs and `scripts/convert_superpoint.py` said it was; that script
+  targets the Magic Leap checkpoint and layer layout and stays disabled (it is kept only because the
+  offline distortion-head training tools import it).
+- The shipped asset is now exported by `scripts/export_superpoint_rpautrat.py`, which reproduces the
+  rpautrat reference forward exactly (conv→ReLU→BN, no ReLU on `semi` or before the descriptor L2
+  norm). The previous asset (sha256 `f78be883…`) folded BN through the ReLU and added two ReLUs; on
+  HPatches it reached 5.6% homography accuracy @3 px against 72.8% for the corrected export. Full
+  provenance, verification and benchmark: `docs/models/SUPERPOINT_PROVENANCE.md`.
+- Bundled file: 5,236,740 B, sha256 `a95d3b7ae1e21833e5eb5cc7e7a99b07b04a9be0ed628f173171d82ec92a7107`.
+- SuperPoint descriptors saved by the previous asset (`fingerprint`, `sphereSlamFingerprint`,
+  `wallFeatureMap`, `sphereSlamWallFeatureMap`, `paintMarks` in `project.json`) no longer match;
+  recapture the target. There is no migration.
+- `distortion_head.onnx` takes raw images and embeds its own backbone, so it is unaffected.
 - When redistributing the app or the asset, keep `superpoint.LICENSE.txt` with it (the MIT notice
   must accompany copies of the weights).

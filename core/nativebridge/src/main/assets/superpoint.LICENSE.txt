@@ -1,3 +1,7 @@
+superpoint.onnx -- SuperPoint network weights and architecture from rpautrat/SuperPoint
+https://github.com/rpautrat/SuperPoint (LICENSE.txt at commit 1411bbd68c50163555d39c1b26e9e046ebd48f27)
+Weights: weights/superpoint_v6_from_tf.pth, sha256 cd5d19a5061848e248c17728878ea166b66512076d43c77dbcf27f4a88a56084
+
 MIT License
 
 Copyright (c) 2018 Paul-Edouard Sarlin & Rémi Pautrat
