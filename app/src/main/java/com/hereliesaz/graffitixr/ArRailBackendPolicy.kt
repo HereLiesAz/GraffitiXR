@@ -14,8 +14,10 @@ internal data class ArRailBackendPolicy(
 /**
  * Capability policy for AR-only rail tools.
  *
- * The standalone backend owns target capture inside SphereSlamStandaloneOverlay, so the legacy
- * ARCore Target rail action must not arm MainViewModel's ARCore tap-to-anchor flow. Co-op uses the
+ * Target uses the shared capture flow (MainViewModel / TargetCreationUi) on both backends; standalone
+ * enables it once its runtime is ready — without it, a stale or wrong target had no way out (the
+ * current target keeps tracking until the replacement is saved). A standalone co-op guest gets no
+ * Target (MainActivity), since it must keep the session's frame. Co-op uses the
  * protocol-v3 explicit host wall-frame descriptor, so standalone Host/Join are available once the
  * backend itself is resolved; incompatible metric/normalized pairings are rejected at handshake.
  */
@@ -54,8 +56,12 @@ internal fun arRailBackendPolicy(
     return ArRailBackendPolicy(
         backendResolved = true,
         standalone = true,
-        targetRailEnabled = false,
-        targetDisabledReason = "Use the on-screen Wall Target capture",
+        targetRailEnabled = standaloneRuntimeReady,
+        targetDisabledReason = when {
+            !sphereSlamAvailabilityResolved -> "Checking standalone wall tracker…"
+            !sphereSlamAvailable -> "Standalone wall tracking is unavailable on this build"
+            else -> null
+        },
         coopCalibrationAvailable = standaloneRuntimeReady,
         coopDisabledReason = when {
             !sphereSlamAvailabilityResolved -> "Checking standalone wall tracker…"

@@ -92,16 +92,16 @@ class SettingsRepositoryImplTest {
     // One test for the whole coverage-glow lifecycle: the DataStore instance can outlive a single
     // test, so the defaults are asserted BEFORE this test writes its own keys, never after.
     @Test
-    fun `coverage glow settings default to a white 14 percent wash and round-trip`() = runTest {
+    fun `coverage glow settings default to a hot pink 14 percent wash and round-trip`() = runTest {
         val repo = newRepository()
-        assertEquals(CoverageGlowColor.WHITE.argb, repo.coverageGlowColor.first())
+        assertEquals(CoverageGlowColor.HOT_PINK.argb, repo.coverageGlowColor.first())
         assertEquals(CoverageGlowIntensity.DEFAULT, repo.coverageGlowIntensity.first(), 0f)
         assertEquals(CoverageGlowStyle.WASH, repo.coverageGlowStyle.first())
 
-        repo.setCoverageGlowColor(CoverageGlowColor.HOT_PINK.argb)
+        repo.setCoverageGlowColor(CoverageGlowColor.CYAN.argb)
         repo.setCoverageGlowIntensity(0.42f)
         repo.setCoverageGlowStyle(CoverageGlowStyle.MISSING_TILES)
-        assertEquals(CoverageGlowColor.HOT_PINK.argb, repo.coverageGlowColor.first())
+        assertEquals(CoverageGlowColor.CYAN.argb, repo.coverageGlowColor.first())
         assertEquals(0.42f, repo.coverageGlowIntensity.first(), 0f)
         assertEquals(CoverageGlowStyle.MISSING_TILES, repo.coverageGlowStyle.first())
 
@@ -116,7 +116,7 @@ class SettingsRepositoryImplTest {
         assertEquals(CoverageGlowIntensity.DEFAULT, repo.coverageGlowIntensity.first(), 0f)
 
         // Restore the defaults so no other test in this process sees this one's writes.
-        repo.setCoverageGlowColor(CoverageGlowColor.WHITE.argb)
+        repo.setCoverageGlowColor(CoverageGlowColor.DEFAULT.argb)
         repo.setCoverageGlowStyle(CoverageGlowStyle.WASH)
         assertEquals(CoverageGlowStyle.WASH, repo.coverageGlowStyle.first())
     }

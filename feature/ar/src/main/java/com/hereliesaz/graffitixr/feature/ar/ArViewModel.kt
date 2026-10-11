@@ -1041,11 +1041,15 @@ class ArViewModel @Inject constructor(
      * Base SphereSLAM photosphere. It exists independently of fingerprints/teleological SLAM.
      *
      * CameraX visual keyframes populate this map from standalone startup. Every tile begins
-     * `needsUpdate=true`; a tile becomes current only when a usable visual keyframe is actually
-     * captured for that direction. The later fingerprint is anchored into this already-running map.
+     * `needsUpdate=true`; keyframes advance each tile's scan progress, and a tile becomes current once
+     * the keyframes' views have covered it (SphereSLAM 0.25.1 `recordView`). The later fingerprint is
+     * anchored into this already-running map.
+     *
+     * The library default since 0.25.1 is the whole sphere — every heading and every elevation to the
+     * zenith and nadir, 24 × 6 tiles of 15° × 30° — so the ceiling, floor and everything behind the
+     * start are scannable.
      */
-    private val spherePhotosphere =
-        com.hereliesaz.sphereslam.PhotosphereMap(elevationBandCount = 3)
+    private val spherePhotosphere = com.hereliesaz.sphereslam.PhotosphereMap()
     private val spherePhotosphereLock = Any()
     private val _sphereCoverageFraction = MutableStateFlow(0f)
 
@@ -1084,6 +1088,18 @@ class ArViewModel @Inject constructor(
     val sphereRegionsNeedingUpdate:
         StateFlow<List<com.hereliesaz.sphereslam.SphereCoverage.TileRegion>> =
         _sphereRegionsNeedingUpdate.asStateFlow()
+
+    private val _sphereRegionsInProgress =
+        MutableStateFlow<List<com.hereliesaz.sphereslam.PhotosphereMap.RegionProgress>>(emptyList())
+
+    /**
+     * Partly scanned photosphere tiles and how far along each is, in `(0, 1)` — drawn more opaque as
+     * they fill, until the tile completes and opens to the camera
+     * ([com.hereliesaz.sphereslam.PhotosphereMap.regionsInProgress]).
+     */
+    val sphereRegionsInProgress:
+        StateFlow<List<com.hereliesaz.sphereslam.PhotosphereMap.RegionProgress>> =
+        _sphereRegionsInProgress.asStateFlow()
 
     /**
      * Latest keyframe per photosphere tile (SphereSLAM [com.hereliesaz.sphereslam.PhotosphereKeyframeStore]);
@@ -1178,6 +1194,7 @@ class ArViewModel @Inject constructor(
         _sphereThinDirections.value = spherePhotosphere.directionsNeedingUpdate()
         _sphereCurrentRegions.value = spherePhotosphere.currentRegions()
         _sphereRegionsNeedingUpdate.value = spherePhotosphere.regionsNeedingUpdate()
+        _sphereRegionsInProgress.value = spherePhotosphere.regionsInProgress()
     }
 
     fun onStandalonePhotosphereKeyframe(keyframe: com.hereliesaz.sphereslam.PhotosphereKeyframe) {
@@ -1219,7 +1236,7 @@ class ArViewModel @Inject constructor(
 
         if (firstCaptureForTile && tile != null) {
             appendDiag(
-                "SphereSLAM photosphere tile captured sector=${tile!!.sector} band=${tile!!.band} " +
+                "SphereSLAM photosphere tile scanned sector=${tile!!.sector} band=${tile!!.band} " +
                     "coverage=${"%.3f".format(_sphereCoverageFraction.value)}"
             )
         }

@@ -77,7 +77,10 @@ fun MainScreen(
     // has a pose to work against while it looks for the marks the user drew. The scribble itself is
     // NOT projected — it was drawn on the wall in the preceding step, so the overlay shows the user's
     // artwork throughout. Defaulted off — no effect on the normal path.
-    doodleDetectActive: Boolean = false
+    doodleDetectActive: Boolean = false,
+    // Hand-off of the standalone overlay's interactive UI to the host's onscreen layer (and of the
+    // rail's Target action to the overlay). Null: the overlay draws its UI inline.
+    standaloneUiHost: com.hereliesaz.graffitixr.feature.ar.StandaloneOverlayUiHost? = null,
 ) {
     val activeLayer = uiState.design
     val isImageLocked = activeLayer?.isImageLocked ?: false
@@ -337,6 +340,7 @@ fun MainScreen(
 
                         val sweepCoverageValue by arViewModel.sphereCoverageFraction.collectAsState()
                         com.hereliesaz.graffitixr.feature.ar.SphereSlamStandaloneOverlay(
+                            uiHost = standaloneUiHost,
                             cameraController = cameraController,
                             designBitmap = standaloneTexture,
                             slamManager = slamManager,
@@ -356,6 +360,21 @@ fun MainScreen(
                             coopPeerSpatialFrame = arUiState.coopPeerSpatialFrame,
                             coopPeerFingerprint = arUiState.coopPeerFingerprint,
                             sharedTargetCapture = true,
+                            // A co-op guest keeps the session's spatial frame: no re-targeting
+                            // (ArViewModel.onScreenTap ignores its taps).
+                            onNewTargetRequested = if (
+                                arUiState.coopRole ==
+                                com.hereliesaz.graffitixr.common.model.CoopRole.GUEST
+                            ) {
+                                null
+                            } else {
+                                {
+                                    // Same reset as the rail's Target action, then the shared flow.
+                                    arViewModel.clearCaptureForRetry()
+                                    arViewModel.cancelMeasure()
+                                    mainViewModel.startTargetCapture()
+                                }
+                            },
                             onReferenceCaptured = { bitmap, widthMeters, physicallyMetric ->
                                 arViewModel.saveSphereSlamReference(
                                     bitmap,
@@ -407,6 +426,9 @@ fun MainScreen(
                             },
                             coverageRegionsNeedingUpdate = {
                                 arViewModel.sphereRegionsNeedingUpdate.value
+                            },
+                            coverageRegionsInProgress = {
+                                arViewModel.sphereRegionsInProgress.value
                             },
                             coverageGlowAppearance = arUiState.coverageGlow,
                             cameraAttitude = { arViewModel.latestCameraAttitude },

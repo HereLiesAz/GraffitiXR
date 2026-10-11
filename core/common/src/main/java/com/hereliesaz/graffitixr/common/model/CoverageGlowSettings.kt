@@ -78,7 +78,8 @@ enum class CoverageGlowColor(val argb: Int) {
     ;
 
     companion object {
-        val DEFAULT: CoverageGlowColor = WHITE
+        /** Hot pink: the haze reads against walls, sky and concrete alike. */
+        val DEFAULT: CoverageGlowColor = HOT_PINK
 
         /** The palette entry for [argb] (alpha ignored), or null for a colour outside the palette. */
         fun fromArgb(argb: Int): CoverageGlowColor? =
