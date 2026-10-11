@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.domain.repository
 
 import com.hereliesaz.graffitixr.common.model.AppLanguage
+import com.hereliesaz.graffitixr.common.model.CoverageGlowStyle
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -223,4 +224,19 @@ interface SettingsRepository {
 
     val showPoints: Flow<Boolean>
     suspend fun setShowPoints(on: Boolean)
+
+    /**
+     * Standalone SphereSLAM photosphere coverage glow. Colour as opaque ARGB (default white),
+     * intensity as opacity in `[CoverageGlowIntensity.MIN, CoverageGlowIntensity.MAX]` (default 14%),
+     * and style (default [CoverageGlowStyle.WASH]). Out-of-range or unknown stored values read back
+     * as the nearest valid value / the default.
+     */
+    val coverageGlowColor: Flow<Int>
+    suspend fun setCoverageGlowColor(argb: Int)
+
+    val coverageGlowIntensity: Flow<Float>
+    suspend fun setCoverageGlowIntensity(intensity: Float)
+
+    val coverageGlowStyle: Flow<CoverageGlowStyle>
+    suspend fun setCoverageGlowStyle(style: CoverageGlowStyle)
 }

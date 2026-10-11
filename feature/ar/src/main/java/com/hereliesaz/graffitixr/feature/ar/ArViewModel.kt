@@ -1053,6 +1053,20 @@ class ArViewModel @Inject constructor(
     val sphereCurrentRegions: StateFlow<List<com.hereliesaz.sphereslam.SphereCoverage.TileRegion>> =
         _sphereCurrentRegions.asStateFlow()
 
+    // Seeded from the fresh map (every tile starts needing an update), so the "missing tiles only"
+    // glow style covers the whole sphere before the first keyframe, matching the wash style.
+    private val _sphereRegionsNeedingUpdate =
+        MutableStateFlow(spherePhotosphere.regionsNeedingUpdate())
+
+    /**
+     * Angular extents of the photosphere tiles that are missing or stale — the glow geometry for
+     * [com.hereliesaz.graffitixr.common.model.CoverageGlowStyle.MISSING_TILES]
+     * ([com.hereliesaz.sphereslam.PhotosphereMap.regionsNeedingUpdate]).
+     */
+    val sphereRegionsNeedingUpdate:
+        StateFlow<List<com.hereliesaz.sphereslam.SphereCoverage.TileRegion>> =
+        _sphereRegionsNeedingUpdate.asStateFlow()
+
     /**
      * Latest keyframe per photosphere tile (SphereSLAM [com.hereliesaz.sphereslam.PhotosphereKeyframeStore]);
      * feeds [spherePhotosphere], anchors its wall heading on the first keyframe, and supplies the
@@ -1119,6 +1133,7 @@ class ArViewModel @Inject constructor(
         _sphereCoverageFraction.value = spherePhotosphere.coverageFraction()
         _sphereThinDirections.value = spherePhotosphere.directionsNeedingUpdate()
         _sphereCurrentRegions.value = spherePhotosphere.currentRegions()
+        _sphereRegionsNeedingUpdate.value = spherePhotosphere.regionsNeedingUpdate()
     }
 
     fun onStandalonePhotosphereKeyframe(keyframe: com.hereliesaz.sphereslam.PhotosphereKeyframe) {
@@ -1906,6 +1921,53 @@ class ArViewModel @Inject constructor(
                 _uiState.update { it.copy(isImperialUnits = imperial) }
             }
         }
+        viewModelScope.launch {
+            settingsRepository.coverageGlowColor.collect { argb ->
+                _uiState.update { it.copy(coverageGlow = it.coverageGlow.copy(colorArgb = argb)) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.coverageGlowIntensity.collect { intensity ->
+                // Skip while a slider drag's debounced write is pending: an older persisted value
+                // would otherwise snap the live glow (and the slider) back mid-drag.
+                if (coverageGlowIntensityPersistJob?.isActive == true) return@collect
+                _uiState.update { it.copy(coverageGlow = it.coverageGlow.copy(intensity = intensity)) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.coverageGlowStyle.collect { style ->
+                _uiState.update { it.copy(coverageGlow = it.coverageGlow.copy(style = style)) }
+            }
+        }
+    }
+
+    // Debounces slider drags into one DataStore write; the live value is published immediately.
+    private var coverageGlowIntensityPersistJob: kotlinx.coroutines.Job? = null
+
+    /** Coverage-glow colour (opaque ARGB). Applied immediately to the live glow, and persisted. */
+    fun setCoverageGlowColor(argb: Int) {
+        _uiState.update { it.copy(coverageGlow = it.coverageGlow.copy(colorArgb = argb or OPAQUE_ALPHA)) }
+        viewModelScope.launch { settingsRepository.setCoverageGlowColor(argb) }
+    }
+
+    /**
+     * Coverage-glow intensity. Called continuously while the Settings slider is dragged: every value
+     * reaches the live glow at once, while only the settled value is written to DataStore.
+     */
+    fun setCoverageGlowIntensity(intensity: Float) {
+        val sanitized = com.hereliesaz.graffitixr.common.model.CoverageGlowIntensity.sanitize(intensity)
+        _uiState.update { it.copy(coverageGlow = it.coverageGlow.copy(intensity = sanitized)) }
+        coverageGlowIntensityPersistJob?.cancel()
+        coverageGlowIntensityPersistJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(COVERAGE_GLOW_PERSIST_DEBOUNCE_MS)
+            settingsRepository.setCoverageGlowIntensity(sanitized)
+        }
+    }
+
+    /** Coverage-glow style. Applied immediately to the live glow, and persisted. */
+    fun setCoverageGlowStyle(style: com.hereliesaz.graffitixr.common.model.CoverageGlowStyle) {
+        _uiState.update { it.copy(coverageGlow = it.coverageGlow.copy(style = style)) }
+        viewModelScope.launch { settingsRepository.setCoverageGlowStyle(style) }
     }
 
     /**
@@ -5563,6 +5625,9 @@ class ArViewModel @Inject constructor(
     internal companion object {
         /** How long a Measure tap waits for the GL thread to resolve it. */
         private const val MEASURE_TAP_TIMEOUT_MS = 1_000L
+        /** Quiet period after the last glow-intensity slider tick before it is written to DataStore. */
+        private const val COVERAGE_GLOW_PERSIST_DEBOUNCE_MS = 250L
+        private const val OPAQUE_ALPHA = 0xFF000000.toInt()
         /** How often the AR session checks whether the map has grown enough to be worth rewriting. */
         const val AUTOSAVE_INTERVAL_MS = 30_000L
 

@@ -408,6 +408,10 @@ fun MainScreen(
                             coverageCurrentRegions = {
                                 arViewModel.sphereCurrentRegions.value
                             },
+                            coverageRegionsNeedingUpdate = {
+                                arViewModel.sphereRegionsNeedingUpdate.value
+                            },
+                            coverageGlowAppearance = arUiState.coverageGlow,
                             cameraAttitude = { arViewModel.latestCameraAttitude },
                             cameraRollDegrees = { cameraFromDevice ->
                                 arViewModel.latestCameraRollDegrees(cameraFromDevice)
