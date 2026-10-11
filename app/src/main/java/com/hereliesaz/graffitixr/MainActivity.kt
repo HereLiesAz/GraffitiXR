@@ -500,10 +500,15 @@ class MainActivity : ComponentActivity() {
                         // tracked surface, discard the frame and let the artist re-aim/re-tap, rather
                         // than letting them erase marks on a capture we'd reject at confirm.
                         // (The plane no longer has to be green — see the hit-test in ArRenderer.)
+                        // STANDALONE has no ARCore planes: its geometry comes from the photosphere
+                        // placement bound at capture, so the wall-plane gate never applies there.
                         val depthOff = arUiState.targetDepthBuffer == null
                         val plane = arUiState.targetWallPlane
                         val onWall = plane != null && plane.size >= 6
-                        if (tapPath && depthOff && !onWall) {
+                        val isStandalone = arUiState.sphereSlamRuntimeStatus.mode ==
+                            com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.STANDALONE
+                        if (tapPath && depthOff && !onWall && !isStandalone) {
+                            arViewModel.appendDiag("Target capture discarded: no ARCore wall plane at tap")
                             arViewModel.clearCaptureForRetry()
                             mainViewModel.notifyTargetNotOnWall()
                         } else if (tapPath) {
