@@ -42,7 +42,8 @@ import javax.microedition.khronos.opengles.GL10
  * its caller projects with [CameraFillCenter.fieldOfViewDegrees]) and BEFORE the design quad, so it
  * composites above the camera preview and beneath the artwork. A window-level View cannot do that:
  * this media-overlay surface sits behind the app window, so any View drawn in the window washes over
- * the artwork too. The legacy homography fallback passes none.
+ * the artwork too. The legacy homography fallback passes none. Its user-set colour, intensity and
+ * style arrive through [setCoverageGlowConfig] and are applied on the GL thread before the next draw.
  */
 internal sealed interface TextureUpdateCommand {
     data class Replace(val bitmap: Bitmap) : TextureUpdateCommand
@@ -122,6 +123,44 @@ class HomographyOverlayRenderer(
         latestFrame.set(null)
     }
 
+    /**
+     * One complete coverage-glow configuration: colour, opacity, fill mode and the geometry drawn
+     * with that mode, applied together so a style switch can never pair the new mode with the old
+     * style's triangles (which would invert the glow for a frame).
+     */
+    class CoverageGlowConfig(
+        /** Haze RGB, each in `[0, 1]`. */
+        val rgb: FloatArray,
+        /** Haze opacity in `[0, 1]`. */
+        val alpha: Float,
+        val fillMode: CoverageGlowRenderer.FillMode,
+        /** `GL_TRIANGLES` NDC geometry for [fillMode] (see `CoverageGlowRenderer.setTriangles`). */
+        val triangles: FloatArray,
+    )
+
+    // Last-wins mailbox; drained on the GL thread right before the glow draws. SphereSLAM 0.24.1's
+    // hazeColor/hazeAlpha are plain (non-volatile) fields, so they are only ever written here, on
+    // the thread that reads them.
+    private val pendingGlowConfig = AtomicReference<CoverageGlowConfig?>(null)
+
+    /**
+     * Restyle the live coverage glow. Any thread; takes effect on the next GL frame, with no
+     * surface or AR restart. No-op when this renderer draws no glow.
+     */
+    fun setCoverageGlowConfig(config: CoverageGlowConfig) {
+        if (coverageGlow != null) pendingGlowConfig.set(config)
+    }
+
+    private fun applyPendingGlowConfig(glow: CoverageGlowRenderer) {
+        val config = pendingGlowConfig.getAndSet(null) ?: return
+        runCatching {
+            glow.hazeColor = config.rgb
+            glow.hazeAlpha = config.alpha
+            glow.setTriangles(config.triangles)
+            glow.fillMode = config.fillMode
+        }.onFailure { timber.log.Timber.w(it, "Rejected coverage glow config") }
+    }
+
     /** Replace the design texture. Uploaded to GL on the next [onDrawFrame]. Any thread. */
     fun updateDesignBitmap(bitmap: Bitmap) {
         textureUpdates.replace(bitmap)
@@ -192,7 +231,10 @@ class HomographyOverlayRenderer(
         GLES30.glViewport(0, 0, surfaceWidth, surfaceHeight)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
         // Full-surface wash under the artwork; it never clears and restores the GL state it touches.
-        coverageGlow?.drawEmbedded()
+        coverageGlow?.let { glow ->
+            applyPendingGlowConfig(glow)
+            glow.drawEmbedded()
+        }
 
         if (extentDirty) {
             overlayRenderer.setExtent(extentHalfW, extentHalfH)

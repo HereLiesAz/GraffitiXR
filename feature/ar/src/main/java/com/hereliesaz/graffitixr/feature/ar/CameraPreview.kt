@@ -44,20 +44,12 @@ fun rememberCameraController(): LifecycleCameraController {
             // tools/check_sphereslam_architecture.py.
             imageAnalysisBackpressureStrategy =
                 androidx.camera.core.ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
+            // General (non-AR) capture options: EIS + OIS on for a steady photo/overlay preview.
+            // ImageAnalysis has no target frame rate of its own here; standalone SphereSLAM AR
+            // overrides these while it is composed — fixed AE target FPS range, EIS off, OIS kept —
+            // and restores them on exit (StandaloneCameraTuning.kt documents why).
             initializationFuture.addListener({
-                cameraControl?.let { control ->
-                    val c2Control = androidx.camera.camera2.interop.Camera2CameraControl.from(control)
-                    val builder = androidx.camera.camera2.interop.CaptureRequestOptions.Builder()
-                    builder.setCaptureRequestOption(
-                        android.hardware.camera2.CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
-                        android.hardware.camera2.CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_ON
-                    )
-                    builder.setCaptureRequestOption(
-                        android.hardware.camera2.CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
-                        android.hardware.camera2.CameraMetadata.LENS_OPTICAL_STABILIZATION_MODE_ON
-                    )
-                    c2Control.setCaptureRequestOptions(builder.build())
-                }
+                applyDefaultCaptureOptions(this)
             }, androidx.core.content.ContextCompat.getMainExecutor(context))
         }
     }

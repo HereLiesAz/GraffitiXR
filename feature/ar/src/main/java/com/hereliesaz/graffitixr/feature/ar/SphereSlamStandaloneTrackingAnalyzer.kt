@@ -126,7 +126,9 @@ internal data class StandaloneAtlasGrowthCandidate(
  *
  * Deliberately synchronous on the ImageAnalysis executor: each callback either has a KPM pose for
  * THIS frame, a short IMU-bridged hold of the last good pose, or no pose. There is no asynchronous
- * "latest match" that can silently pair an old wall observation with a newer camera frame.
+ * "latest match" that can silently pair an old wall observation with a newer camera frame. The one
+ * exception is the optional MiDaS depth, which is not a pose: it runs on its own drop-if-busy thread
+ * (see [maybePushDepth]) so its ~300 ms inference never stalls this executor.
  *
  * The body->camera rotation is [DeviceCameraRotation.cameraFromDevice] for this camera's sensor
  * orientation and the CameraX rotation applied to the tracked (display-upright) image — not
@@ -226,9 +228,17 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private var convertedReferenceSource: SphereSlamStandaloneReferenceImage? = null
     private var convertedReference: PhotosphereTrackingSession.ReferenceImage? = null
 
-    // Phase 2: throttle MiDaS inference to a keyframe cadence (not per-frame — ORT CPU inference is
-    // too expensive for 30fps and the map builds per-keyframe anyway).
-    private var lastDepthMs = Long.MIN_VALUE
+    // Phase 2: MiDaS inference (~300 ms on the ORT CPU backend) never runs on this analysis thread —
+    // inline it stalled tracking for that long and aged the next KPM observation past the session's
+    // observation-age gate (STALE_OBSERVATION flicker). It runs on its own single thread, at most one
+    // at a time (a request while one is in flight is dropped, never queued), on a view-tile-change /
+    // atlas-growth cadence with a slow periodic refresh; the result is handed back and applied on
+    // this thread at the start of the next analyze(). Created only when a depth estimator is wired.
+    private val depthCadence = StandaloneDepthCadence()
+    // Per-frame tracking stays synchronous (tools/check_sphereslam_architecture.py); this worker can
+    // hold at most ONE depth job and never queues, so it adds no backlog behind the analyzer.
+    private val depthWorker: DropIfBusyWorker<DepthOutcome>? =
+        depthEstimator?.let { newStandaloneDepthWorker() }
     @Volatile private var closed = false
     @Volatile private var fatal = false
 
@@ -244,7 +254,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             keyframeIntervalMs = PHOTOSPHERE_KEYFRAME_INTERVAL_MS,
         ),
         callbacks = PhotosphereTrackingSession.Callbacks(
-            onKeyframe = { keyframe -> onPhotosphereKeyframe(keyframe) },
+            onKeyframe = { keyframe ->
+                depthCadence.onViewDirection(keyframe.headingDeg, keyframe.elevationDeg)
+                onPhotosphereKeyframe(keyframe)
+            },
             onMapFromFingerprintSolved = { mapFromFingerprint ->
                 // Keep the MobileGS seed's bridge current at once, so a planar-session rebuild
                 // seeds MobileGS before the asynchronous project write/reload completes.
@@ -257,6 +270,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 onReferenceReady(registered)
             },
             onAtlasPageAdded = { page, attitude ->
+                depthCadence.onAtlasGrowth()
                 onAtlasPageAdded(
                     StandaloneAtlasGrowthCandidate(
                         pageNo = page.pageNo,
@@ -355,6 +369,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     override fun analyze(image: ImageProxy) {
         try {
             if (closed || fatal) return
+            applyFinishedDepth()
             val planes = image.planes
             if (planes.isEmpty()) return
             val y = planes[0]
@@ -366,19 +381,15 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             // the on-screen crop — tracking on it would throw away the off-screen sides of the frame
             // (two fifths of a 3:4 frame's width on a 9:20 phone). The crop is a display concern only;
             // SphereSLAM camera.CameraFillCenter applies it where the frame meets the screen.
-            val crop = android.graphics.Rect(0, 0, rawWidth, rawHeight)
-            if (crop.width() <= 0 || crop.height() <= 0) return
+            // The full-frame "crop" is (0, 0, rawWidth, rawHeight); no per-frame Rect is built.
+            if (rawWidth <= 0 || rawHeight <= 0) return
 
-            val rotated = LumaFrameTransform.packCropAndRotate(
+            val rotated = LumaFrameTransform.packAndRotate(
                 source = y.buffer,
-                sourceWidth = rawWidth,
-                sourceHeight = rawHeight,
+                width = rawWidth,
+                height = rawHeight,
                 rowStride = y.rowStride,
                 pixelStride = y.pixelStride,
-                cropLeft = crop.left,
-                cropTop = crop.top,
-                cropWidth = crop.width(),
-                cropHeight = crop.height(),
                 rotationDegrees = rotationDeg,
             )
 
@@ -398,10 +409,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             }
             val croppedIntrinsics = CameraIntrinsicsTransforms.crop(
                 intrinsics = rawIntrinsics,
-                cropLeft = crop.left,
-                cropTop = crop.top,
-                cropWidth = crop.width(),
-                cropHeight = crop.height(),
+                cropLeft = 0,
+                cropTop = 0,
+                cropWidth = rawWidth,
+                cropHeight = rawHeight,
             )
             val ri = CaptureRotation.rotateIntrinsics(
                 croppedIntrinsics.fx,
@@ -423,10 +434,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             emitCalibrationDiagnosticIfChanged(
                 rawWidth = rawWidth,
                 rawHeight = rawHeight,
-                cropLeft = crop.left,
-                cropTop = crop.top,
-                cropWidth = crop.width(),
-                cropHeight = crop.height(),
+                cropLeft = 0,
+                cropTop = 0,
+                cropWidth = rawWidth,
+                cropHeight = rawHeight,
                 rotationDegrees = rotationDeg,
                 intrinsics = intrinsics,
             )
@@ -555,6 +566,20 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         rotationDegrees: Int,
         intrinsics: CameraIntrinsics,
     ) {
+        // Compared field-by-field first so the steady state (unchanged calibration) allocates no
+        // key object per frame.
+        lastDiagnosticKey?.let { last ->
+            val unchanged =
+                last.rawWidth == rawWidth && last.rawHeight == rawHeight &&
+                    last.cropLeft == cropLeft && last.cropTop == cropTop &&
+                    last.cropWidth == cropWidth && last.cropHeight == cropHeight &&
+                    last.rotationDegrees == rotationDegrees &&
+                    last.displayWidth == intrinsics.width &&
+                    last.displayHeight == intrinsics.height &&
+                    last.fx == intrinsics.fx && last.fy == intrinsics.fy &&
+                    last.cx == intrinsics.cx && last.cy == intrinsics.cy
+            if (unchanged) return
+        }
         val key = DiagnosticKey(
             rawWidth = rawWidth,
             rawHeight = rawHeight,
@@ -616,35 +641,80 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
 
     /**
      * Phase 2 of the spherical-coverage map: estimate monocular depth on the live keyframe and stash
-     * it in the native engine for depth-calibrated radial map-point placement. Throttled to a keyframe
-     * cadence. Entirely optional and fail-soft: with no [depthEstimator] (the classic path), or when
-     * the model is unavailable, nothing is stashed and the native map builds from the wall plane alone.
+     * it in the native engine for depth-calibrated radial map-point placement. Entirely optional and
+     * fail-soft: with no [depthEstimator] (the classic path), or when the model is unavailable,
+     * nothing is stashed and the native map builds from the wall plane alone.
+     *
+     * On this (analysis) thread it only decides ([depthCadence]) and copies a downsampled luma grid;
+     * the inference runs on [depthWorker]'s thread and a request is dropped — not queued — while a
+     * previous one is still in flight. The result is applied by [applyFinishedDepth] on this thread.
      */
     private fun maybePushDepth(frame: RotatedLuma) {
         val estimator = depthEstimator ?: return
-        val slam = slamManager ?: return
+        val worker = depthWorker ?: return
+        if (slamManager == null) return
         val now = android.os.SystemClock.elapsedRealtime()
-        if (lastDepthMs != Long.MIN_VALUE && now - lastDepthMs < DEPTH_MIN_INTERVAL_MS) return
-        lastDepthMs = now
-        if (!estimator.isLoaded && !estimator.load()) return
+        if (worker.isBusy || !depthCadence.isDue(now)) return
 
+        val frameWidth = frame.width
+        val frameHeight = frame.height
+        // Copy only what MiDaS consumes (it squashes its input to 256x256): a small box-averaged grid
+        // instead of the full frame, which also keeps the worker-side bitmap tiny.
+        val grid = DepthLumaDownsampler.downsample(frame.bytes, frameWidth, frameHeight) ?: return
+        val accepted = worker.trySubmit(
+            task = { estimateDepth(estimator, grid, frameWidth, frameHeight) },
+            onError = { t -> Timber.w(t, "Standalone depth inference failed") },
+        )
+        if (accepted) depthCadence.markRun(now)
+    }
+
+    /** Depth worker thread. Null = nothing to apply (model unavailable). */
+    private fun estimateDepth(
+        estimator: com.hereliesaz.sphereslam.models.DepthEstimator,
+        grid: DepthLumaDownsampler.Grid,
+        frameWidth: Int,
+        frameHeight: Int,
+    ): DepthOutcome? {
+        if (!estimator.isLoaded && !estimator.load()) return null
         // MiDaS wants RGB; the live frame is luma. A gray bitmap is coarse but all this path needs —
         // depth here is downscaled and only calibrates a radius, not a texture.
-        val w = frame.width
-        val h = frame.height
-        if (w <= 0 || h <= 0 || frame.bytes.size < w * h) return
-        val gray = lumaBitmap(frame.bytes, w, h)
+        val gray = lumaBitmap(grid.bytes, grid.width, grid.height)
         val depth = try {
             estimator.estimate(gray)
         } finally {
             gray.recycle()
-        } ?: run {
-            // Inference failed: clear any stale stashed depth so placement falls back to the wall plane.
-            slam.setLatestDepthMap(null, 0, 0, 0, 0)
-            return
         }
-        slam.setLatestDepthMap(depth.data, depth.width, depth.height, w, h)
+        // A failed inference is an outcome too: it clears any stale stashed depth so placement falls
+        // back to the wall plane. The map is registered to the FULL tracked frame, not the grid.
+        return DepthOutcome(
+            data = depth?.data,
+            width = depth?.width ?: 0,
+            height = depth?.height ?: 0,
+            frameWidth = frameWidth,
+            frameHeight = frameHeight,
+        )
     }
+
+    /** Analysis thread: push a finished depth result (if any) into the native engine. */
+    private fun applyFinishedDepth() {
+        val outcome = depthWorker?.takeResult() ?: return
+        val slam = slamManager ?: return
+        val data = outcome.data
+        if (data == null) {
+            slam.setLatestDepthMap(null, 0, 0, 0, 0)
+        } else {
+            slam.setLatestDepthMap(data, outcome.width, outcome.height, outcome.frameWidth, outcome.frameHeight)
+        }
+    }
+
+    /** A finished depth inference; [data] null means inference failed (clear the stash). */
+    private class DepthOutcome(
+        val data: FloatArray?,
+        val width: Int,
+        val height: Int,
+        val frameWidth: Int,
+        val frameHeight: Int,
+    )
 
     private fun configureMobileGs(intrinsics: CameraIntrinsics) {
         val slam = slamManager ?: return
@@ -915,6 +985,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         lastFailureReason = null
         lastReportedTrackingState = null
         frameBuffer = null
+        // Shuts the depth thread down; an inference already running finishes and is discarded.
+        depthWorker?.close()
+        depthCadence.reset()
     }
 
     private companion object {
@@ -923,9 +996,6 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
 
         /** Photosphere keyframe cadence; visual mapping runs for the entire standalone session. */
         const val PHOTOSPHERE_KEYFRAME_INTERVAL_MS = 250L
-
-        /** Phase 2: minimum interval between MiDaS depth inferences (keyframe cadence, not per-frame). */
-        const val DEPTH_MIN_INTERVAL_MS = 500L
 
         /**
          * Minimum PnP inliers before a reloc is allowed to correct the pose, on top of the

@@ -1,5 +1,8 @@
 package com.hereliesaz.graffitixr.data.repository
 
+import com.hereliesaz.graffitixr.common.model.CoverageGlowColor
+import com.hereliesaz.graffitixr.common.model.CoverageGlowIntensity
+import com.hereliesaz.graffitixr.common.model.CoverageGlowStyle
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -84,5 +87,37 @@ class SettingsRepositoryImplTest {
         val repo = newRepository()
         repo.setCrashReportToken("  ghp_example\n")
         assertEquals("ghp_example", repo.crashReportToken.first())
+    }
+
+    // One test for the whole coverage-glow lifecycle: the DataStore instance can outlive a single
+    // test, so the defaults are asserted BEFORE this test writes its own keys, never after.
+    @Test
+    fun `coverage glow settings default to a white 14 percent wash and round-trip`() = runTest {
+        val repo = newRepository()
+        assertEquals(CoverageGlowColor.WHITE.argb, repo.coverageGlowColor.first())
+        assertEquals(CoverageGlowIntensity.DEFAULT, repo.coverageGlowIntensity.first(), 0f)
+        assertEquals(CoverageGlowStyle.WASH, repo.coverageGlowStyle.first())
+
+        repo.setCoverageGlowColor(CoverageGlowColor.HOT_PINK.argb)
+        repo.setCoverageGlowIntensity(0.42f)
+        repo.setCoverageGlowStyle(CoverageGlowStyle.MISSING_TILES)
+        assertEquals(CoverageGlowColor.HOT_PINK.argb, repo.coverageGlowColor.first())
+        assertEquals(0.42f, repo.coverageGlowIntensity.first(), 0f)
+        assertEquals(CoverageGlowStyle.MISSING_TILES, repo.coverageGlowStyle.first())
+
+        // Colour is stored opaque (intensity owns opacity); intensity is clamped to the slider range.
+        repo.setCoverageGlowColor(0x00808080)
+        assertEquals(CoverageGlowColor.MID_GREY.argb, repo.coverageGlowColor.first())
+        repo.setCoverageGlowIntensity(5f)
+        assertEquals(CoverageGlowIntensity.MAX, repo.coverageGlowIntensity.first(), 0f)
+        repo.setCoverageGlowIntensity(-1f)
+        assertEquals(CoverageGlowIntensity.MIN, repo.coverageGlowIntensity.first(), 0f)
+        repo.setCoverageGlowIntensity(Float.NaN)
+        assertEquals(CoverageGlowIntensity.DEFAULT, repo.coverageGlowIntensity.first(), 0f)
+
+        // Restore the defaults so no other test in this process sees this one's writes.
+        repo.setCoverageGlowColor(CoverageGlowColor.WHITE.argb)
+        repo.setCoverageGlowStyle(CoverageGlowStyle.WASH)
+        assertEquals(CoverageGlowStyle.WASH, repo.coverageGlowStyle.first())
     }
 }

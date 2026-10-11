@@ -14,6 +14,7 @@ import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.CameraSelector
 import androidx.camera.view.LifecycleCameraController
+import com.hereliesaz.graffitixr.common.model.CameraTargetFps
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +49,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.viewinterop.AndroidView
+import com.hereliesaz.graffitixr.common.model.CoverageGlowAppearance
+import com.hereliesaz.graffitixr.common.model.CoverageGlowStyle
 import com.hereliesaz.graffitixr.common.model.Fingerprint
 import com.hereliesaz.graffitixr.common.model.WallFeatureMap
 import com.hereliesaz.graffitixr.common.model.ModeAdjustment
@@ -91,12 +94,18 @@ private val SPHERESLAM_DEFAULT_UNWARP_POINTS = listOf(
  * the artwork surface is `setZOrderMediaOverlay`, which sits behind the app window, so a window-level
  * View (an earlier implementation) washed over the artwork as well. A separate top-ordered
  * SurfaceView was worse still — it sat above all app UI.
+ *
+ * The user's glow settings ([CoverageGlowAppearance]) restyle it live via [applyAppearance]: the
+ * style decides both the fill mode and which regions are projected (current tiles as holes for the
+ * wash, tiles needing an update as the fill for "missing tiles only"), and colour/intensity/mode/
+ * geometry are handed to the GL thread together as one [HomographyOverlayRenderer.CoverageGlowConfig].
  */
 private class SphereTileGlowMask(
-    private val glow: CoverageGlowRenderer,
+    private val renderer: HomographyOverlayRenderer,
 ) {
     private data class MaskState(
         val currentRegions: List<SphereCoverage.TileRegion> = emptyList(),
+        val regionsNeedingUpdate: List<SphereCoverage.TileRegion> = emptyList(),
         val cameraHeadingDeg: Float = 0f,
         val cameraElevationDeg: Float = 0f,
         val horizontalFovDeg: Float = 60f,
@@ -105,8 +114,13 @@ private class SphereTileGlowMask(
 
     private val state = AtomicReference(MaskState())
 
+    // Guarded by `this`: the analyzer thread's projections and a main-thread style switch publish
+    // in order, so triangles projected for the old style can never land after the new style's.
+    private var appearance = CoverageGlowAppearance.DEFAULT
+
     fun update(
         currentRegions: List<SphereCoverage.TileRegion>,
+        regionsNeedingUpdate: List<SphereCoverage.TileRegion>,
         cameraHeadingDeg: Float? = null,
         cameraElevationDeg: Float? = null,
         horizontalFovDeg: Float? = null,
@@ -115,23 +129,56 @@ private class SphereTileGlowMask(
         val previous = state.get()
         val next = previous.copy(
             currentRegions = currentRegions.toList(),
+            regionsNeedingUpdate = regionsNeedingUpdate.toList(),
             cameraHeadingDeg = cameraHeadingDeg ?: previous.cameraHeadingDeg,
             cameraElevationDeg = cameraElevationDeg ?: previous.cameraElevationDeg,
             horizontalFovDeg = horizontalFovDeg ?: previous.horizontalFovDeg,
             verticalFovDeg = verticalFovDeg ?: previous.verticalFovDeg,
         )
         state.set(next)
-        // May be called off the main thread (analyzer callbacks); setTriangles is thread-safe and
-        // the GL surface renders continuously.
-        glow.setTriangles(holes(next))
+        // May be called off the main thread (analyzer callbacks). The geometry travels with the
+        // style it was projected for; the continuously rendering GL surface applies both together.
+        synchronized(this) { publish(next) }
     }
 
-    /** Current tiles as NDC `GL_TRIANGLES`; empty (a full wash) when none is current yet. */
-    private fun holes(snapshot: MaskState): FloatArray {
-        if (snapshot.currentRegions.isEmpty()) return FloatArray(0)
+    /**
+     * Restyle the live glow (Settings changes apply immediately, no AR restart). Re-projects the
+     * latest regions for the new style and hands the whole configuration to the GL thread.
+     */
+    fun applyAppearance(newAppearance: CoverageGlowAppearance) {
+        synchronized(this) {
+            appearance = newAppearance
+            publish(state.get())
+        }
+    }
+
+    /** Caller holds `this`. Only the GL thread touches the glow renderer; it applies this atomically. */
+    private fun publish(snapshot: MaskState) {
+        val style = appearance.style
+        renderer.setCoverageGlowConfig(
+            HomographyOverlayRenderer.CoverageGlowConfig(
+                rgb = appearance.rgb(),
+                alpha = appearance.safeIntensity,
+                fillMode = CoverageGlowStyleMapping.fillModeFor(style),
+                triangles = triangles(snapshot, style),
+            )
+        )
+    }
+
+    /**
+     * The [style]'s regions as NDC `GL_TRIANGLES`: holes for the wash (empty = a full wash), the
+     * fill for "missing tiles only" (the whole view before the photosphere is anchored).
+     */
+    private fun triangles(snapshot: MaskState, style: CoverageGlowStyle): FloatArray {
+        val regions = CoverageGlowStyleMapping.regionsFor(
+            style = style,
+            currentRegions = snapshot.currentRegions,
+            regionsNeedingUpdate = snapshot.regionsNeedingUpdate,
+        ) ?: return CoverageGlowStyleMapping.FULL_VIEW_TRIANGLES
+        if (regions.isEmpty()) return FloatArray(0)
         return runCatching {
             CoverageGlowProjection.projectRegions(
-                regions = snapshot.currentRegions,
+                regions = regions,
                 cameraHeadingDeg = snapshot.cameraHeadingDeg,
                 cameraElevationDeg = snapshot.cameraElevationDeg,
                 horizontalFovDeg = snapshot.horizontalFovDeg,
@@ -141,14 +188,17 @@ private class SphereTileGlowMask(
     }
 
     companion object {
-        const val FULL_GLOW_ALPHA = 0.14f
-
-        /** The embedded white wash with holes, as the standalone artwork renderer draws it. */
-        fun newRenderer(): CoverageGlowRenderer =
-            CoverageGlowRenderer(
-                hazeColor = CoverageGlowRenderer.WHITE,
-                hazeAlpha = FULL_GLOW_ALPHA,
-            ).apply { fillMode = CoverageGlowRenderer.FillMode.COMPLEMENT }
+        /**
+         * The embedded glow renderer in the default appearance (white 14% wash with holes) until the
+         * first [applyAppearance] reaches the GL thread.
+         */
+        fun newRenderer(): CoverageGlowRenderer {
+            val default = CoverageGlowAppearance.DEFAULT
+            return CoverageGlowRenderer(
+                hazeColor = default.rgb(),
+                hazeAlpha = default.safeIntensity,
+            ).apply { fillMode = CoverageGlowStyleMapping.fillModeFor(default.style) }
+        }
     }
 }
 
@@ -267,8 +317,23 @@ fun SphereSlamStandaloneOverlay(
      * (`PhotosphereMap.currentRegions`).
      */
     coverageCurrentRegions: () -> List<SphereCoverage.TileRegion> = { emptyList() },
+    /**
+     * Missing/stale tiles' angular extents (`PhotosphereMap.regionsNeedingUpdate`) — the glow fill
+     * for [CoverageGlowStyle.MISSING_TILES].
+     */
+    coverageRegionsNeedingUpdate: () -> List<SphereCoverage.TileRegion> = { emptyList() },
+    /** The user's coverage-glow colour/intensity/style; a change restyles the live glow at once. */
+    coverageGlowAppearance: CoverageGlowAppearance = CoverageGlowAppearance.DEFAULT,
     /** Latest camera attitude `(headingDeg, elevationDeg)` for projecting the glow, or null. */
     cameraAttitude: () -> Pair<Float, Float>? = { null },
+    /**
+     * Settings → Camera target FPS ([CameraTargetFps]) with the adaptive-rate battery cap inputs.
+     * Standalone pins the camera's AE target FPS range from these (Device default leaves the
+     * device's own range unpinned); a change applies immediately.
+     */
+    cameraTargetFps: Int = CameraTargetFps.DEVICE_DEFAULT,
+    adaptiveRateEnabled: Boolean = false,
+    batteryTier: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -669,8 +734,16 @@ fun SphereSlamStandaloneOverlay(
     }
     // Full-view freshness mask: glow everywhere, then punch out only current photosphere tiles.
     // Seeded immediately so the whole view glows before the first keyframe, as every tile starts stale.
-    val coverageGlowMask =
-        remember(coverageGlow) { SphereTileGlowMask(coverageGlow).also { it.update(emptyList()) } }
+    val coverageGlowMask = remember(glRenderer) {
+        SphereTileGlowMask(glRenderer).also {
+            it.applyAppearance(coverageGlowAppearance)
+            it.update(currentRegions = emptyList(), regionsNeedingUpdate = emptyList())
+        }
+    }
+    // Settings apply immediately: restyle the live glow on every change, no AR restart.
+    LaunchedEffect(coverageGlowMask, coverageGlowAppearance) {
+        coverageGlowMask.applyAppearance(coverageGlowAppearance)
+    }
 
     LaunchedEffect(glRenderer, designBitmap) {
         if (designBitmap == null) {
@@ -851,6 +924,7 @@ fun SphereSlamStandaloneOverlay(
             // photosphere tiles whose needsUpdate=false state is current are punched clear.
             val attitude = cameraAttitude()
             val currentRegions = coverageCurrentRegions()
+            val regionsNeedingUpdate = coverageRegionsNeedingUpdate()
             coverageGlowDirections() // keep the update-side signal hot/read alongside its complement
             if (attitude != null) {
                 // The wash covers the whole surface, i.e. the preview's FILL_CENTER crop — project
@@ -858,6 +932,7 @@ fun SphereSlamStandaloneOverlay(
                 shownFieldOfViewDegrees(frame.frameIntrinsics, surfaceSize.get())?.let { fov ->
                     coverageGlowMask.update(
                         currentRegions = currentRegions,
+                        regionsNeedingUpdate = regionsNeedingUpdate,
                         cameraHeadingDeg = attitude.first,
                         cameraElevationDeg = attitude.second,
                         horizontalFovDeg = fov[0],
@@ -865,7 +940,8 @@ fun SphereSlamStandaloneOverlay(
                     )
                 }
             } else {
-                coverageGlowMask.update(currentRegions = emptyList())
+                // No attitude: nothing can be placed, so every style glows over the whole view.
+                coverageGlowMask.update(currentRegions = emptyList(), regionsNeedingUpdate = emptyList())
             }
         }
         val screenUnitsPerPixel = frame?.let {
@@ -925,6 +1001,30 @@ fun SphereSlamStandaloneOverlay(
                 cameraController.setPinchToZoomEnabled(previousPinchToZoom)
                 cameraController.cameraControl?.setZoomRatio(previousZoomRatio)
             }
+        }
+    }
+
+    // Tracking capture profile while standalone AR is composed: fixed AE target FPS range (so dim
+    // light cannot halve the analysis rate), EIS off (no preview latency / preview-vs-analysis
+    // desync), OIS kept. Keyed on the effective rate so a Settings change (or the adaptive battery
+    // cap) applies immediately; the shared controller's defaults are restored on exit.
+    // See StandaloneCameraTuning.kt.
+    val standaloneTargetFps = effectiveCameraTargetFps(
+        targetFps = cameraTargetFps,
+        adaptiveRateEnabled = adaptiveRateEnabled,
+        batteryTier = batteryTier,
+    )
+    DisposableEffect(cameraController, cameraId, standaloneTargetFps) {
+        if (cameraId == null) {
+            onDispose {}
+        } else {
+            val applied = applyStandaloneTrackingCaptureOptions(cameraController, standaloneTargetFps)
+            onDiagnostic(
+                "SphereSLAM standalone camera: setting=${CameraTargetFps.label(standaloneTargetFps)} " +
+                    "aeRange=" + (applied?.let { "[${it[0]},${it[1]}]" } ?: "unchanged") +
+                    " eis=off ois=on",
+            )
+            onDispose { applyDefaultCaptureOptions(cameraController) }
         }
     }
 
@@ -1076,6 +1176,7 @@ fun SphereSlamStandaloneOverlay(
                     shownFieldOfViewDegrees(keyframeIntrinsics, surfaceSize.get())?.let { fov ->
                         coverageGlowMask.update(
                             currentRegions = coverageCurrentRegions(),
+                            regionsNeedingUpdate = coverageRegionsNeedingUpdate(),
                             cameraHeadingDeg = keyframe.headingDeg,
                             cameraElevationDeg = keyframe.elevationDeg,
                             horizontalFovDeg = fov[0],

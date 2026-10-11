@@ -8,6 +8,9 @@ import com.google.ar.core.Config
 import com.google.ar.core.Session
 import com.hereliesaz.graffitixr.common.DispatcherProvider
 import com.hereliesaz.graffitixr.common.model.CameraTargetFps
+import com.hereliesaz.graffitixr.common.model.CoverageGlowColor
+import com.hereliesaz.graffitixr.common.model.CoverageGlowIntensity
+import com.hereliesaz.graffitixr.common.model.CoverageGlowStyle
 import com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.common.wearable.WearableManager
@@ -220,6 +223,36 @@ class ArViewModelLiveSettingsTest {
         testDispatcher.scheduler.runCurrent()
         // Nothing to reconfigure; initArSessionLocked reads the new value when AR is entered.
         assertEquals(CameraTargetFps.FPS_60, viewModel!!.uiState.value.cameraTargetFps)
+    }
+
+    @Test
+    fun `coverage glow settings apply to ui state at once and are persisted`() {
+        val vm = newViewModel(ArAvailabilityChecker.Result.Supported)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.setCoverageGlowStyle(CoverageGlowStyle.MISSING_TILES)
+        vm.setCoverageGlowColor(CoverageGlowColor.CYAN.argb)
+        // Immediate, before any coroutine runs: the live glow restyles without waiting on DataStore.
+        assertEquals(CoverageGlowStyle.MISSING_TILES, vm.uiState.value.coverageGlow.style)
+        assertEquals(CoverageGlowColor.CYAN.argb, vm.uiState.value.coverageGlow.colorArgb)
+        testDispatcher.scheduler.advanceUntilIdle()
+        coVerify { settingsRepository.setCoverageGlowStyle(CoverageGlowStyle.MISSING_TILES) }
+        coVerify { settingsRepository.setCoverageGlowColor(CoverageGlowColor.CYAN.argb) }
+    }
+
+    @Test
+    fun `coverage glow intensity drags are live but persisted once, clamped`() {
+        val vm = newViewModel(ArAvailabilityChecker.Result.Supported)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        vm.setCoverageGlowIntensity(0.2f)
+        vm.setCoverageGlowIntensity(0.3f)
+        vm.setCoverageGlowIntensity(0.9f) // past the slider's top
+        assertEquals(CoverageGlowIntensity.MAX, vm.uiState.value.coverageGlow.intensity, 0f)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify(exactly = 1) { settingsRepository.setCoverageGlowIntensity(any()) }
+        coVerify { settingsRepository.setCoverageGlowIntensity(CoverageGlowIntensity.MAX) }
     }
 
     private fun setPrivateField(obj: Any, fieldName: String, value: Any?) {

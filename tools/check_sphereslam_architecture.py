@@ -293,6 +293,13 @@ for token in ("launch(", "launch {", "async {", "async(", "runAsync", ".execute(
             f"Standalone analyzer starts asynchronous work ({token!r}); per-frame work must stay synchronous "
             "so backpressure bounds the queue."
         )
+# The analyzer's one off-thread job (optional MiDaS depth) must stay drop-if-busy: at most one in
+# flight, never a queue that could build a backlog behind the analysis thread.
+standalone_depth = read(
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/StandaloneDepthScheduling.kt"
+)
+if "busy.compareAndSet(false, true)" not in standalone_depth:
+    fail("Standalone depth worker is no longer drop-if-busy; it must never queue depth jobs.")
 
 if FAILURES:
     print("SphereSLAM architecture invariant check FAILED:", file=sys.stderr)

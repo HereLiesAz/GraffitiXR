@@ -408,10 +408,17 @@ fun MainScreen(
                             coverageCurrentRegions = {
                                 arViewModel.sphereCurrentRegions.value
                             },
+                            coverageRegionsNeedingUpdate = {
+                                arViewModel.sphereRegionsNeedingUpdate.value
+                            },
+                            coverageGlowAppearance = arUiState.coverageGlow,
                             cameraAttitude = { arViewModel.latestCameraAttitude },
                             cameraRollDegrees = { cameraFromDevice ->
                                 arViewModel.latestCameraRollDegrees(cameraFromDevice)
                             },
+                            cameraTargetFps = arUiState.cameraTargetFps,
+                            adaptiveRateEnabled = arUiState.adaptiveRateEnabled,
+                            batteryTier = arUiState.batteryTier,
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {

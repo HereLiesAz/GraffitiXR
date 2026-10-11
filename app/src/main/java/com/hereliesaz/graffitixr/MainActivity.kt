@@ -1838,6 +1838,10 @@ class MainActivity : ComponentActivity() {
                                     onImperialUnitsChanged = { arViewModel.setImperialUnits(it) },
                                     backgroundColor = editorUiState.canvasBackground.toArgb(),
                                     onBackgroundColorChanged = { argb -> settingsViewModel.setBackgroundColor(argb) },
+                                    coverageGlow = arUiState.coverageGlow,
+                                    onCoverageGlowColorChanged = { arViewModel.setCoverageGlowColor(it) },
+                                    onCoverageGlowIntensityChanged = { arViewModel.setCoverageGlowIntensity(it) },
+                                    onCoverageGlowStyleChanged = { arViewModel.setCoverageGlowStyle(it) },
                                     onCheckForUpdates = { dashboardViewModel.openUpdatePage(this@MainActivity) },
                                     onOpenUpdatePage = { dashboardViewModel.openUpdatePage(this@MainActivity) },
                                     onResetTutorials = {

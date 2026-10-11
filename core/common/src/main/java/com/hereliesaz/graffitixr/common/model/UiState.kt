@@ -262,6 +262,11 @@ data class ArUiState(
     val isRightHanded: Boolean = true,
     // Whether to display distances in imperial units (feet) rather than metric.
     val isImperialUnits: Boolean = false,
+    /**
+     * Colour, intensity and style of the standalone SphereSLAM photosphere coverage glow. Applied
+     * immediately: the live glow renderer picks up a change on its next GL frame.
+     */
+    val coverageGlow: CoverageGlowAppearance = CoverageGlowAppearance.DEFAULT,
 
     // True once ARCore has been confirmed installed and supported on this device and the artist has
     // "Use ARCore" on (re-derived the moment that setting changes).
