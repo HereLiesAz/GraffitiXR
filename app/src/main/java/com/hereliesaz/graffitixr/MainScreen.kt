@@ -412,6 +412,9 @@ fun MainScreen(
                             coverageRegionsNeedingUpdate = {
                                 arViewModel.sphereRegionsNeedingUpdate.value
                             },
+                            coverageRegionsInProgress = {
+                                arViewModel.sphereRegionsInProgress.value
+                            },
                             coverageGlowAppearance = arUiState.coverageGlow,
                             cameraAttitude = { arViewModel.latestCameraAttitude },
                             // Only with a rotation-vector sensor: without one these stay empty, and

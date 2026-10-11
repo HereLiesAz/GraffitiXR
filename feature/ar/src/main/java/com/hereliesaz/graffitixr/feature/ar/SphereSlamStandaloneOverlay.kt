@@ -63,6 +63,7 @@ import com.hereliesaz.graffitixr.design.theme.rememberAppStrings
 import com.hereliesaz.sphereslam.camera.CameraFillCenter
 import com.hereliesaz.graffitixr.feature.ar.rendering.HomographyOverlayRenderer
 import com.hereliesaz.sphereslam.PhotosphereKeyframe
+import com.hereliesaz.sphereslam.PhotosphereMap
 import com.hereliesaz.sphereslam.SphereCoverage
 import com.hereliesaz.sphereslam.attitude.AttitudeExtrapolator
 import com.hereliesaz.sphereslam.attitude.AttitudeSample
@@ -122,17 +123,26 @@ private class SphereTileGlowMask(
     private var appearance = CoverageGlowAppearance.DEFAULT
     private var currentRegions: List<SphereCoverage.TileRegion> = emptyList()
     private var regionsNeedingUpdate: List<SphereCoverage.TileRegion> = emptyList()
+    private var regionsInProgress: List<PhotosphereMap.RegionProgress> = emptyList()
     private var outlineWidthPx = CoverageGlowStyleMapping.outlineWidthPxFor(1f)
 
     /** New map state (per keyframe / on entry). Any thread; a no-op when nothing changed. */
     fun updateRegions(
         current: List<SphereCoverage.TileRegion>,
         needingUpdate: List<SphereCoverage.TileRegion>,
+        inProgress: List<PhotosphereMap.RegionProgress>,
     ) {
         synchronized(this) {
-            if (current == currentRegions && needingUpdate == regionsNeedingUpdate) return
+            if (
+                current == currentRegions &&
+                needingUpdate == regionsNeedingUpdate &&
+                inProgress == regionsInProgress
+            ) {
+                return
+            }
             currentRegions = current.toList()
             regionsNeedingUpdate = needingUpdate.toList()
+            regionsInProgress = inProgress.toList()
             publish()
         }
     }
@@ -175,13 +185,14 @@ private class SphereTileGlowMask(
                     ?: HomographyOverlayRenderer.CoverageGlowGeometry.Triangles(
                         CoverageGlowStyleMapping.FULL_VIEW_TRIANGLES,
                     ),
+                progress = regionsInProgress,
             )
         )
     }
 
     companion object {
         /**
-         * The embedded glow renderer in the default appearance (white 14% wash with holes) until the
+         * The embedded glow renderer in the default appearance (hot pink 14% wash with holes) until the
          * first [applyAppearance] reaches the GL thread.
          */
         fun newRenderer(): CoverageGlowRenderer {
@@ -310,6 +321,11 @@ fun SphereSlamStandaloneOverlay(
      * for [CoverageGlowStyle.MISSING_TILES].
      */
     coverageRegionsNeedingUpdate: () -> List<SphereCoverage.TileRegion> = { emptyList() },
+    /**
+     * Partly scanned tiles and their progress (`PhotosphereMap.regionsInProgress`): each is drawn more
+     * opaque as it fills, then opens once scanned. Read with the other region lists.
+     */
+    coverageRegionsInProgress: () -> List<PhotosphereMap.RegionProgress> = { emptyList() },
     /** The user's coverage-glow colour/intensity/style; a change restyles the live glow at once. */
     coverageGlowAppearance: CoverageGlowAppearance = CoverageGlowAppearance.DEFAULT,
     /** Latest camera attitude `(headingDeg, elevationDeg)` stamped on photosphere keyframes, or null. */
@@ -783,7 +799,11 @@ fun SphereSlamStandaloneOverlay(
     val coverageGlowMask = remember(glRenderer) {
         SphereTileGlowMask(glRenderer).also {
             it.applyAppearance(coverageGlowAppearance)
-            it.updateRegions(coverageCurrentRegions(), coverageRegionsNeedingUpdate())
+            it.updateRegions(
+                coverageCurrentRegions(),
+                coverageRegionsNeedingUpdate(),
+                coverageRegionsInProgress(),
+            )
         }
     }
     // Settings apply immediately: restyle the live glow on every change, no AR restart.
@@ -1272,6 +1292,7 @@ fun SphereSlamStandaloneOverlay(
                     coverageGlowMask.updateRegions(
                         coverageCurrentRegions(),
                         coverageRegionsNeedingUpdate(),
+                        coverageRegionsInProgress(),
                     )
                 },
                 onKeyframeOrientation = onKeyframeOrientation,

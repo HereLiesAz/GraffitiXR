@@ -1,5 +1,25 @@
 # SphereSLAM Implementation TODO
 
+## SphereSLAM 0.25.2 — full-sphere photosphere, per-tile scan progress (adopted)
+
+The app consumes SphereSLAM **0.25.2** (tag `0.25.2`; the 0.25.1 code, re-tagged for JitPack).
+
+- [x] `PhotosphereMap()` defaults to the whole sphere (24 × 6 tiles of 15° × 30°, every heading,
+  zenith to nadir); the app's explicit full-sphere config is gone.
+- [x] Keyframes advance each tile's scan progress (`recordView`); a tile becomes current at 90 %
+  covered. `ArViewModel.sphereRegionsInProgress` carries `regionsInProgress()` to the glow
+  (`CoverageGlowConfig.progress` → `CoverageGlowRenderer.setRegionProgress`): a tile grows more
+  opaque as it fills, then opens to the camera. Every glow style; library default peak opacity.
+- [x] `firstCaptureForTile` now means "the axis tile's scan completed"; the diagnostic reads
+  `photosphere tile scanned`.
+- [x] The default haze colour is hot pink (`CoverageGlowColor.DEFAULT`); a colour already picked in
+  Settings is kept.
+
+Device checks owed for 0.25.2:
+
+- [ ] Sweep slowly: a partly seen tile turns more opaque step by step, then clears once scanned.
+- [ ] Ceiling and floor tiles scan and clear like the rest.
+
 ## SphereSLAM 0.25.0 — photosphere localization, held pose, stations, tile depth (adopted)
 
 The app consumes SphereSLAM **0.25.0** (tag `0.25.0`).
@@ -580,7 +600,7 @@ Remaining:
 - [x] Provide user-facing reasons when a capture cannot bind to the base photosphere (no rotation
   sensor, attitude not ready, nothing mapped yet) instead of failing silently at Confirm.
 - [ ] Device-check: fresh standalone AR entry logs `camera attitude sampling started`, then
-  `photosphere tile captured`, status `mapping=true`, and a capture logs
+  `photosphere tile scanned`, status `mapping=true`, and a capture logs
   `fingerprint capture bound to photosphere tile=`.
 - [x] Preserve the previous valid target if a replacement fails native KPM feature validation;
   persistence happens only after the replacement page passes native registration.

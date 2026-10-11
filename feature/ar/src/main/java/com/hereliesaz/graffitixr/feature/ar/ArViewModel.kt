@@ -1041,20 +1041,15 @@ class ArViewModel @Inject constructor(
      * Base SphereSLAM photosphere. It exists independently of fingerprints/teleological SLAM.
      *
      * CameraX visual keyframes populate this map from standalone startup. Every tile begins
-     * `needsUpdate=true`; a tile becomes current only when a usable visual keyframe is actually
-     * captured for that direction. The later fingerprint is anchored into this already-running map.
+     * `needsUpdate=true`; keyframes advance each tile's scan progress, and a tile becomes current once
+     * the keyframes' views have covered it (SphereSLAM 0.25.1 `recordView`). The later fingerprint is
+     * anchored into this already-running map.
+     *
+     * The library default since 0.25.1 is the whole sphere — every heading and every elevation to the
+     * zenith and nadir, 24 × 6 tiles of 15° × 30° — so the ceiling, floor and everything behind the
+     * start are scannable.
      */
-    private val spherePhotosphere =
-        com.hereliesaz.sphereslam.PhotosphereMap(
-            // The whole sphere: every heading (±180° around the first keyframe's) and every
-            // elevation up to the zenith and nadir, so the ceiling and floor can be scanned too. The
-            // library default (±85° × ±60°) left the poles and everything behind the start outside
-            // the lattice — never scannable, glowing for good. 24 × 6 tiles of 15° × 30°.
-            sectorCount = PHOTOSPHERE_SECTORS,
-            viewableHalfAngleDeg = 180f,
-            elevationBandCount = PHOTOSPHERE_ELEVATION_BANDS,
-            viewableElevationHalfAngleDeg = 90f,
-        )
+    private val spherePhotosphere = com.hereliesaz.sphereslam.PhotosphereMap()
     private val spherePhotosphereLock = Any()
     private val _sphereCoverageFraction = MutableStateFlow(0f)
 
@@ -1093,6 +1088,18 @@ class ArViewModel @Inject constructor(
     val sphereRegionsNeedingUpdate:
         StateFlow<List<com.hereliesaz.sphereslam.SphereCoverage.TileRegion>> =
         _sphereRegionsNeedingUpdate.asStateFlow()
+
+    private val _sphereRegionsInProgress =
+        MutableStateFlow<List<com.hereliesaz.sphereslam.PhotosphereMap.RegionProgress>>(emptyList())
+
+    /**
+     * Partly scanned photosphere tiles and how far along each is, in `(0, 1)` — drawn more opaque as
+     * they fill, until the tile completes and opens to the camera
+     * ([com.hereliesaz.sphereslam.PhotosphereMap.regionsInProgress]).
+     */
+    val sphereRegionsInProgress:
+        StateFlow<List<com.hereliesaz.sphereslam.PhotosphereMap.RegionProgress>> =
+        _sphereRegionsInProgress.asStateFlow()
 
     /**
      * Latest keyframe per photosphere tile (SphereSLAM [com.hereliesaz.sphereslam.PhotosphereKeyframeStore]);
@@ -1187,6 +1194,7 @@ class ArViewModel @Inject constructor(
         _sphereThinDirections.value = spherePhotosphere.directionsNeedingUpdate()
         _sphereCurrentRegions.value = spherePhotosphere.currentRegions()
         _sphereRegionsNeedingUpdate.value = spherePhotosphere.regionsNeedingUpdate()
+        _sphereRegionsInProgress.value = spherePhotosphere.regionsInProgress()
     }
 
     fun onStandalonePhotosphereKeyframe(keyframe: com.hereliesaz.sphereslam.PhotosphereKeyframe) {
@@ -1228,7 +1236,7 @@ class ArViewModel @Inject constructor(
 
         if (firstCaptureForTile && tile != null) {
             appendDiag(
-                "SphereSLAM photosphere tile captured sector=${tile!!.sector} band=${tile!!.band} " +
+                "SphereSLAM photosphere tile scanned sector=${tile!!.sector} band=${tile!!.band} " +
                     "coverage=${"%.3f".format(_sphereCoverageFraction.value)}"
             )
         }
@@ -5811,12 +5819,6 @@ class ArViewModel @Inject constructor(
 
     // --- Doodle demo: headless fingerprint build ---
     internal companion object {
-        /** Photosphere azimuth sectors around the full 360° (15° each). */
-        const val PHOTOSPHERE_SECTORS = 24
-
-        /** Photosphere elevation bands from nadir to zenith (30° each). */
-        const val PHOTOSPHERE_ELEVATION_BANDS = 6
-
         /** How long a Measure tap waits for the GL thread to resolve it. */
         private const val MEASURE_TAP_TIMEOUT_MS = 1_000L
         /** Quiet period after the last glow-intensity slider tick before it is written to DataStore. */

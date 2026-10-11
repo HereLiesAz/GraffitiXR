@@ -7,6 +7,7 @@ import android.opengl.GLES30
 import android.opengl.Matrix
 import android.os.SystemClock
 import com.hereliesaz.sphereslam.CoverageGlowProjection
+import com.hereliesaz.sphereslam.PhotosphereMap
 import com.hereliesaz.sphereslam.SphereCoverage
 import com.hereliesaz.sphereslam.attitude.AttitudeExtrapolator
 import com.hereliesaz.sphereslam.attitude.DisplayPosePredictor
@@ -222,6 +223,11 @@ class HomographyOverlayRenderer(
         val outlineWidthPx: Float,
         val fillMode: CoverageGlowRenderer.FillMode,
         val geometry: CoverageGlowGeometry,
+        /**
+         * Partly scanned tiles (`PhotosphereMap.regionsInProgress`), drawn over [fillMode] more
+         * opaque as each fills (`CoverageGlowRenderer.setRegionProgress`); empty draws none.
+         */
+        val progress: List<PhotosphereMap.RegionProgress> = emptyList(),
     )
 
     // Last-wins mailbox; drained on the GL thread right before the glow draws. The library's style
@@ -248,6 +254,7 @@ class HomographyOverlayRenderer(
                 is CoverageGlowGeometry.Regions -> glow.setRegions(geometry.regions)
                 is CoverageGlowGeometry.Triangles -> glow.setTriangles(geometry.vertices)
             }
+            glow.setRegionProgress(config.progress)
             glow.fillMode = config.fillMode
         }.onFailure { timber.log.Timber.w(it, "Rejected coverage glow config") }
     }

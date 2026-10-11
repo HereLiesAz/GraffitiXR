@@ -371,7 +371,7 @@ class SettingsRepositoryImpl @Inject constructor(
         context.dataStore.edit { it[SHOW_POINTS] = on }
     }
 
-    // Defaults reproduce the glow as it shipped before these settings: a white 14% wash.
+    // Default: a hot pink 14% wash. A colour the user picked is stored and kept.
     override val coverageGlowColor: Flow<Int> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { preferences -> preferences[COVERAGE_GLOW_COLOR] ?: CoverageGlowColor.DEFAULT.argb }

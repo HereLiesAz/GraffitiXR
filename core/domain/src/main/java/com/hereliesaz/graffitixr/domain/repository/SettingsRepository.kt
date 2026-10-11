@@ -230,7 +230,7 @@ interface SettingsRepository {
     suspend fun setShowPoints(on: Boolean)
 
     /**
-     * Standalone SphereSLAM photosphere coverage glow. Colour as opaque ARGB (default white),
+     * Standalone SphereSLAM photosphere coverage glow. Colour as opaque ARGB (default hot pink),
      * intensity as opacity in `[CoverageGlowIntensity.MIN, CoverageGlowIntensity.MAX]` (default 14%),
      * and style (default [CoverageGlowStyle.WASH]). Out-of-range or unknown stored values read back
      * as the nearest valid value / the default.

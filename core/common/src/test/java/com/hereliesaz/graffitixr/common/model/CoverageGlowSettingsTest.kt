@@ -8,9 +8,9 @@ import org.junit.Test
 class CoverageGlowSettingsTest {
 
     @Test
-    fun `defaults reproduce the shipped white 14 percent wash`() {
+    fun `defaults are a hot pink 14 percent wash`() {
         val d = CoverageGlowAppearance.DEFAULT
-        assertEquals(0xFFFFFFFF.toInt(), d.colorArgb)
+        assertEquals(0xFFFF69B4.toInt(), d.colorArgb)
         assertEquals(0.14f, d.intensity, 0f)
         assertEquals(CoverageGlowStyle.WASH, d.style)
         assertEquals("COMPLEMENT", d.style.rendererFillMode)
@@ -67,9 +67,9 @@ class CoverageGlowSettingsTest {
     }
 
     @Test
-    fun `palette starts with white, is opaque and unique`() {
+    fun `palette starts with white, defaults to hot pink, is opaque and unique`() {
         assertEquals(CoverageGlowColor.WHITE, CoverageGlowColor.entries.first())
-        assertEquals(CoverageGlowColor.WHITE, CoverageGlowColor.DEFAULT)
+        assertEquals(CoverageGlowColor.HOT_PINK, CoverageGlowColor.DEFAULT)
         CoverageGlowColor.entries.forEach { assertEquals(0xFF, (it.argb ushr 24) and 0xFF) }
         assertEquals(CoverageGlowColor.entries.size, CoverageGlowColor.entries.map { it.argb }.toSet().size)
     }
@@ -93,10 +93,14 @@ class CoverageGlowSettingsTest {
 
     @Test
     fun `rgb converts ARGB to unit floats`() {
-        assertArrayEquals(floatArrayOf(1f, 1f, 1f), CoverageGlowAppearance().rgb(), 0f)
+        assertArrayEquals(
+            floatArrayOf(1f, 1f, 1f),
+            CoverageGlowAppearance(colorArgb = CoverageGlowColor.WHITE.argb).rgb(),
+            0f,
+        )
         assertArrayEquals(
             floatArrayOf(1f, 105f / 255f, 180f / 255f),
-            CoverageGlowAppearance(colorArgb = CoverageGlowColor.HOT_PINK.argb).rgb(),
+            CoverageGlowAppearance().rgb(),
             1e-6f,
         )
         assertArrayEquals(
