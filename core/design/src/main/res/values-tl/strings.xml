@@ -175,12 +175,10 @@
     <string name="settings_info_section">Impormasyon ng App</string>
     <string name="settings_version_label">Bersyon</string>
     <string name="settings_updates_section">Mga update</string>
-    <string name="settings_check_updates_label">Tingnan kung may mga pang-eksperimentong update</string>
-    <string name="settings_install_update_label">I-install ang Update</string>
+    <string name="settings_open_releases_label">Buksan ang pahina ng mga release</string>
     <string name="settings_permissions_section">Mga Pahintulot</string>
     <string name="settings_camera_access">Access sa Camera</string>
     <string name="settings_photo_access">Access sa Photo Library</string>
-    <string name="settings_notifications">Mga abiso</string>
     <string name="settings_granted">ipinagkaloob</string>
     <string name="settings_denied">Tinanggihan</string>
     <string name="settings_open_app_settings">Buksan ang Mga Setting ng App</string>

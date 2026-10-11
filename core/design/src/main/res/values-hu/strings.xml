@@ -392,12 +392,10 @@
     <string name="settings_info_section">Alkalmazás Információ</string>
     <string name="settings_version_label">Verzió</string>
     <string name="settings_updates_section">Frissítések</string>
-    <string name="settings_check_updates_label">Kísérleti frissítések keresése</string>
-    <string name="settings_install_update_label">Frissítés telepítése</string>
+    <string name="settings_open_releases_label">Kiadások oldalának megnyitása</string>
     <string name="settings_permissions_section">Engedélyek</string>
     <string name="settings_camera_access">Kamera hozzáférés</string>
     <string name="settings_photo_access">Fotótár hozzáférés</string>
-    <string name="settings_notifications">Értesítések</string>
     <string name="settings_granted">Engedélyezve</string>
     <string name="settings_denied">Megtagadva</string>
     <string name="settings_open_app_settings">Alkalmazásbeállítások megnyitása</string>

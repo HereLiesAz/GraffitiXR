@@ -778,8 +778,11 @@ fun MainScreen(
         // whenever we are not in Overlay with the camera showing, so returning to
         // Overlay never silently re-arms it against a different reference.
         val overlayCameraShowing = uiState.editorMode == EditorMode.OVERLAY && isCameraActive && hasCameraPermission
-        LaunchedEffect(overlayCameraShowing) {
-            if (!overlayCameraShowing) mainViewModel.setOverlayGyroActive(false)
+        // Keyed on the toggle too: keyed on visibility alone, a tap while the camera was already
+        // hidden (no permission) armed Gyro with no effect, and it then started on its own once the
+        // permission arrived. Now any armed-while-hidden state is released at once.
+        LaunchedEffect(overlayCameraShowing, mainUiState.isOverlayGyroActive) {
+            mainViewModel.onOverlayCameraShowingChanged(overlayCameraShowing)
         }
         var overlayViewSize by remember { mutableStateOf(IntSize.Zero) }
         val gyroHomography = com.hereliesaz.graffitixr.feature.ar.rememberOverlayGyroCompensation(

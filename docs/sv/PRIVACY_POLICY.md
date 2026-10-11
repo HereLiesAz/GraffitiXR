@@ -8,8 +8,8 @@ Om du väljer att använda vår tjänst, samtycker du till insamling och använd
 
 För en bättre upplevelse när vi använder vår tjänst kan vi kräva att du förser oss med viss personligt identifierbar information, inklusive men inte begränsat till:
 * **Kameradata:** Appen kräver åtkomst till enhetens kamera för att visa Augmented Reality (AR)-vyn, överlagringsläge och för att ta bilder för projektmål. Kameradata bearbetas lokalt på din enhet och överförs inte till våra servrar om du inte uttryckligen väljer att dela en projektfil.
-* **Lagring/foton:** Vi kräver åtkomst till din enhets lagring (läs/skriv extern lagring eller fotobibliotek) för att ladda bilder för överlägg, spara dina projekt och exportera tagna bilder.
-* **Platsdata (valfritt):** Om du ger platsbehörighet kan appen samla in GPS-data (latitud, longitud, höjd) för att geotagga dina projekt. Dessa data sparas lokalt i dina projektfiler.
+* **Lagring/foton:** Appen begär ingen lagringsbehörighet. Bilder du lägger till kommer via Android-systemets bild- eller filväljare, som bara ger appen åtkomst till filen du väljer. Projekt sparas i appens privata lagring och exporterade bilder i enhetens fotogalleri.
+* **Platsdata (valfritt):** Appen ber om platsbehörighet bara när du börjar fånga ett AR-mål. Om du ger den sparar målets fångstpost var det togs (latitud, longitud, höjd och noggrannhet). Den sparas lokalt i projektfilen och lämnar enheten bara om du själv delar eller exporterar projektfilen.
 ## Kraschrapporter (valbart)
 
 Ingenting som rör en krasch lämnar din enhet som standard. Om appen kraschar eller återhämtar sig från ett internt fel skrivs en rapport till en lokal, tillfällig fil på din enhet så att appen kan visa dig en "senaste körningen kraschade"-notis nästa gång du öppnar den — den filen lämnar aldrig enheten av sig själv.
@@ -32,9 +32,9 @@ Vi kan anställa tredjepartsföretag och individer av följande skäl:
 * Att utföra tjänsterelaterade tjänster; eller
 * För att hjälpa oss att analysera hur vår tjänst används.
 Vi använder **Google ML Kit** för ämnessegmentering (bakgrundsborttagning). Denna bearbetning sker lokalt på din enhet.
-## Uppdateringskontroller
+## Uppdateringar
 
-Inställningsskärmen har en knapp för "Sök efter uppdateringar". Ingenting kontrolleras automatiskt — bara när du trycker på knappen. Ett tryck skickar en förfrågan till **GitHub API** (api.github.com) för att slå upp projektets senaste utgåva. GitHub är en tredje part utanför vår kontroll, och din IP-adress är synlig för GitHub under den enskilda förfrågan, precis som den skulle vara för vilken webbförfrågan som helst du gör till github.com. Ingen annan information skickas som en del av denna förfrågan.
+Appen kontaktar aldrig en server för att söka efter uppdateringar. Inställningsskärmen har ett val "Öppna versionssidan"; ett tryck öppnar projektets GitHub-versionssida (github.com/HereLiesAz/GraffitiXR/releases) i din webbläsare, precis som om du hade följt länken själv. Appen själv skickar ingenting.
 ## Säkerhet
 
 Vi värdesätter ditt förtroende för att tillhandahålla oss din personliga information, därför strävar vi efter att använda kommersiellt acceptabla metoder för att skydda den. Men kom ihåg att ingen metod för överföring över internet, eller metod för elektronisk lagring är 100% säker och pålitlig, och vi kan inte garantera dess absoluta säkerhet.

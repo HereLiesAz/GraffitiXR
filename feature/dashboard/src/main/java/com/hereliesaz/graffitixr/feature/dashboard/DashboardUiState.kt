@@ -11,9 +11,8 @@ data class DashboardUiState(
     // to the id.
     val currentProjectName: String? = null,
     val isLoading: Boolean = false,
-    val updateStatusMessage: String? = null,
-    val isCheckingForUpdate: Boolean = false,
-    val updateUrl: String? = null,
+    // Set when Settings ▸ Updates couldn't open the releases page in a browser; cleared on success.
+    val releasesPageError: String? = null,
     val showNewProjectDialog: Boolean = false,
     // True while onCreateProject's (and createAndOpenProject's) async create+update is in flight.
     // The real duplicate-prevention guard lives here: both functions check this flag at the top and

@@ -13,8 +13,8 @@ Ha úgy döntesz, hogy használod a Szolgáltatásunkat, akkor beleegyezel az in
 A jobb élmény érdekében a Szolgáltatásunk használata során megkövetelhetjük, hogy adj meg nekünk bizonyos személyazonosításra alkalmas információkat, beleértve, de nem kizárólagosan:
 
 *   **Kamera Adatok:** Az alkalmazásnak hozzá kell férnie az eszközöd kamerájához a Kiterjesztett Valóság (AR) nézet, a Rétegzés mód megjelenítéséhez, és a projekt célpontjaihoz szükséges képek rögzítéséhez. A kamera adatai helyileg, az eszközödön kerülnek feldolgozásra, és nem továbbítódnak a szervereinkre, hacsak nem döntesz kifejezetten egy projektfájl megosztása mellett.
-*   **Tárhely / Fotók:** Hozzá kell férnünk az eszközöd tárhelyéhez (Külső Tárhely Olvasása/Írása vagy Fotótár) a rétegekhez szükséges képek betöltéséhez, a projektjeid mentéséhez és a rögzített képek exportálásához.
-*   **Helyadatok (Opcionális):** Ha engedélyezed a helymeghatározást, az alkalmazás GPS-adatokat (szélesség, hosszúság, magasság) gyűjthet a projektjeid geotaggeléséhez. Ezek az adatok helyileg, a projektfájljaidban kerülnek mentésre.
+*   **Tárhely / Fotók:** Az alkalmazás semmilyen tárhely-engedélyt nem kér. A hozzáadott képek az Android rendszer fotó- vagy fájlválasztóján keresztül érkeznek, amelyek csak az általad kiválasztott fájlhoz adnak hozzáférést. A projektek az alkalmazás privát tárhelyére, az exportált képek pedig az eszközöd fotógalériájába kerülnek.
+*   **Helyadatok (Opcionális):** Az alkalmazás csak akkor kér helymeghatározási engedélyt, amikor elkezdesz egy AR-célpontot rögzíteni. Ha megadod, a célpont rögzítési adatai eltárolják, hol készült (szélesség, hosszúság, magasság és pontosság). Ez helyileg, a projektfájlban kerül mentésre, és csak akkor hagyja el az eszközödet, ha te magad osztod meg vagy exportálod a projektfájlt.
 
 ## Hibajelentések (Opt-In)
 
@@ -42,9 +42,9 @@ Az alábbi okokból alkalmazhatunk harmadik fél cégeket és magánszemélyeket
 
 A **Google ML Kit**-et használjuk a téma szegmentálására (háttér eltávolítása). Ez a feldolgozás helyileg, az eszközödön történik.
 
-## Frissítés-ellenőrzések
+## Frissítések
 
-A Beállítások képernyőn van egy "Frissítések ellenőrzése" gomb. Semmi nem történik automatikusan — csak akkor, ha megnyomod. A gomb megnyomása egy kérést küld a **GitHub API**-hoz (api.github.com), hogy lekérdezze a projekt legfrissebb kiadását. A GitHub egy tőlünk független harmadik fél, és az IP-címed látható a GitHub számára a kérés időtartamára, ugyanúgy, mint bármely, a github.com felé küldött webes kérés esetén. A kérés részeként semmilyen más információ nem kerül elküldésre.
+Az alkalmazás soha nem lép kapcsolatba szerverrel frissítések keresése céljából. A Beállítások képernyőn található egy "Kiadások oldalának megnyitása" bejegyzés; megérintésével a böngésződben megnyílik a projekt GitHub kiadási oldala (github.com/HereLiesAz/GraffitiXR/releases), pontosan úgy, mintha magad nyitottad volna meg a hivatkozást. Maga az alkalmazás semmit sem küld.
 
 ## Biztonság
 

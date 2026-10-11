@@ -392,12 +392,10 @@
     <string name="settings_info_section">Appinformation</string>
     <string name="settings_version_label">Version</string>
     <string name="settings_updates_section">Uppdateringar</string>
-    <string name="settings_check_updates_label">Sök efter experimentella uppdateringar</string>
-    <string name="settings_install_update_label">Installera uppdatering</string>
+    <string name="settings_open_releases_label">Öppna versionssidan</string>
     <string name="settings_permissions_section">Behörigheter</string>
     <string name="settings_camera_access">Kameraåtkomst</string>
     <string name="settings_photo_access">Tillgång till fotobibliotek</string>
-    <string name="settings_notifications">Aviseringar</string>
     <string name="settings_granted">Beviljas</string>
     <string name="settings_denied">Nekad</string>
     <string name="settings_open_app_settings">Öppna Appinställningar</string>

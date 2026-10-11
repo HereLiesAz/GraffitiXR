@@ -13,8 +13,8 @@ Si eliges utilizar nuestro Servicio, aceptas la recopilación y el uso de inform
 Para ofrecerte una mejor experiencia al usar nuestro Servicio, es posible que te pidamos que nos proporciones cierta información de identificación personal, incluida, entre otra, la siguiente:
 
 *   **Datos de la cámara:** La app requiere acceso a la cámara de tu dispositivo para mostrar la vista de Realidad Aumentada (RA), el modo Superposición, y para capturar imágenes de referencia de tus proyectos. Los datos de la cámara se procesan localmente en tu dispositivo y no se transmiten a nuestros servidores, a menos que elijas explícitamente compartir un archivo de proyecto.
-*   **Almacenamiento / Fotos:** Necesitamos acceso al almacenamiento de tu dispositivo (lectura/escritura de almacenamiento externo o biblioteca de fotos) para cargar imágenes de superposición, guardar tus proyectos y exportar las imágenes capturadas.
-*   **Datos de ubicación (opcional):** Si concedes permisos de ubicación, la app puede recopilar datos GPS (latitud, longitud, altitud) para geoetiquetar tus proyectos. Estos datos se guardan localmente dentro de los archivos de tu proyecto.
+*   **Almacenamiento / Fotos:** La app no solicita ningún permiso de almacenamiento. Las imágenes que añades llegan a través del selector de fotos o de archivos del sistema Android, que solo dan a la app acceso al archivo que eliges. Los proyectos se guardan en el almacenamiento privado de la app, y las imágenes exportadas se guardan en la galería de fotos de tu dispositivo.
+*   **Datos de ubicación (opcional):** La app solo pide el permiso de ubicación cuando empiezas a capturar un objetivo de RA. Si lo concedes, el registro de captura de ese objetivo guarda dónde se tomó (latitud, longitud, altitud y precisión). Se guarda localmente en el archivo del proyecto y solo sale de tu dispositivo si tú mismo compartes o exportas ese archivo de proyecto.
 
 ## Informes de fallos (opt-in)
 
@@ -42,9 +42,9 @@ Podemos emplear empresas y personas de terceros por los siguientes motivos:
 
 Utilizamos **Google ML Kit** para la segmentación de sujetos (eliminación de fondo). Este procesamiento ocurre localmente en tu dispositivo.
 
-## Comprobaciones de actualizaciones
+## Actualizaciones
 
-La pantalla de Ajustes tiene un botón "Buscar actualizaciones". No se comprueba nada automáticamente — solo cuando lo pulsas. Al pulsarlo se hace una solicitud a la **API de GitHub** (api.github.com) para consultar la última versión publicada de este proyecto. GitHub es un tercero fuera de nuestro control, y tu dirección IP es visible para GitHub durante esa única solicitud, igual que en cualquier solicitud web que hagas a github.com. No se envía ninguna otra información como parte de esta solicitud.
+La app nunca contacta con un servidor para buscar actualizaciones. La pantalla de Ajustes tiene una entrada "Abrir la página de versiones"; al pulsarla se abre en tu navegador la página de versiones de GitHub de este proyecto (github.com/HereLiesAz/GraffitiXR/releases), exactamente como si hubieras seguido el enlace tú mismo. La app en sí no envía nada.
 
 ## Seguridad
 

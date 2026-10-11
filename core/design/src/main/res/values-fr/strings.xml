@@ -77,12 +77,10 @@
     <string name="settings_info_section">Informations sur l\'application</string>
     <string name="settings_version_label">Version</string>
     <string name="settings_updates_section">Mises à jour</string>
-    <string name="settings_check_updates_label">Vérifier les mises à jour expérimentales</string>
-    <string name="settings_install_update_label">Installer la mise à jour</string>
+    <string name="settings_open_releases_label">Ouvrir la page des versions</string>
     <string name="settings_permissions_section">Permissions</string>
     <string name="settings_camera_access">Accès à l\'appareil photo</string>
     <string name="settings_photo_access">Accès à la galerie photo</string>
-    <string name="settings_notifications">Notifications</string>
     <string name="settings_granted">Accordé</string>
     <string name="settings_denied">Refusé</string>
     <string name="settings_open_app_settings">Ouvrir les paramètres de l\'application</string>

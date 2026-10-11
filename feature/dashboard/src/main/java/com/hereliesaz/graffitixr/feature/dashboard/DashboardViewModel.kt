@@ -174,46 +174,24 @@ class DashboardViewModel @Inject constructor(
     }
 
     /**
-     * Opens the releases page in the browser. The app itself never contacts a server to check for
-     * updates: README's promise is that the only thing that ever leaves the device is an opt-in crash
-     * report, and an automatic GitHub API call on opening Settings broke it.
+     * Opens the public releases page in the browser. That is the whole update story: the app never
+     * contacts a server to check for updates (docs/en/PRIVACY_POLICY.md), so there is no "latest
+     * version" to compare against and nothing to poll. Only a failure to open the browser is
+     * reported back, as [DashboardUiState.releasesPageError].
      */
-    fun openUpdatePage(context: Context) {
-        val url = _uiState.value.updateUrl ?: "https://github.com/hereliesaz/GraffitiXR/releases"
+    fun openReleasesPage(context: Context) {
         try {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(RELEASES_URL)).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
             context.startActivity(intent)
-            _uiState.update { it.copy(updateStatusMessage = "Opening browser...") }
+            _uiState.update { it.copy(releasesPageError = null) }
         } catch (e: Exception) {
-            android.util.Log.e("DashboardViewModel", "Failed to open update URL", e)
-            _uiState.update { it.copy(updateStatusMessage = "Couldn't open the browser.") }
+            android.util.Log.e("DashboardViewModel", "Failed to open the releases page", e)
+            _uiState.update { it.copy(releasesPageError = "Couldn't open the browser.") }
         }
     }
-
-    internal fun parseRelease(json: String): GitHubRelease? = try {
-        val tagName = Regex("\"tag_name\"\\s*:\\s*\"([^\"]+)\"").find(json)?.groupValues?.get(1) ?: return null
-        val htmlUrl = Regex("\"html_url\"\\s*:\\s*\"([^\"]*/releases/[^\"]*)\"").find(json)?.groupValues?.get(1)
-            ?: "https://github.com/hereliesaz/GraffitiXR/releases"
-        GitHubRelease(tagName, htmlUrl)
-    } catch (_: Exception) { null }
-
-    internal fun isNewerVersion(latest: String, current: String): Boolean {
-        fun parse(v: String) = v.trim().removePrefix("v").split(".").map { segment ->
-            segment.takeWhile { it.isDigit() }.toIntOrNull() ?: 0
-        }
-        val l = parse(latest)
-        val c = parse(current)
-        for (i in 0 until maxOf(l.size, c.size)) {
-            val lv = l.getOrElse(i) { 0 }
-            val cv = c.getOrElse(i) { 0 }
-            if (lv != cv) return lv > cv
-        }
-        return false
-    }
-
-    internal data class GitHubRelease(val tagName: String, val htmlUrl: String)
 
     companion object {
+        internal const val RELEASES_URL = "https://github.com/HereLiesAz/GraffitiXR/releases"
         const val DESTINATION_EDITOR = "editor"
         internal const val IMPORT_FAILURE_MESSAGE =
             "Couldn't import project — the file may be corrupt or in an unsupported format."

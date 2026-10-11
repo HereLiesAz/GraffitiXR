@@ -387,12 +387,10 @@
     <string name="settings_info_section">Appinformasjon</string>
     <string name="settings_version_label">Versjon</string>
     <string name="settings_updates_section">Oppdateringer</string>
-    <string name="settings_check_updates_label">Se etter eksperimentelle oppdateringer</string>
-    <string name="settings_install_update_label">Installer oppdatering</string>
+    <string name="settings_open_releases_label">Åpne utgivelsessiden</string>
     <string name="settings_permissions_section">Tillatelser</string>
     <string name="settings_camera_access">Kameratilgang</string>
     <string name="settings_photo_access">Tilgang til fotobibliotek</string>
-    <string name="settings_notifications">Varsler</string>
     <string name="settings_granted">Gitt</string>
     <string name="settings_denied">Nektet</string>
     <string name="settings_open_app_settings">Åpne appinnstillinger</string>

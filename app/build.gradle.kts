@@ -28,8 +28,11 @@ val localProperties = Properties().apply {
     }
 }
 
-// Version resolution. On EVERY local compile (any build type, any Gradle task that will
-// actually compile bytecode; CI is handled below) both the build number and the patch are incremented:
+// Version resolution. version.properties is CI-owned (the version bot stamps it and commits it), so a
+// build only ever rewrites it when running in CI ([isCi]) without a CI_VERSION_CODE override. Local
+// builds read it and never write it: they used to auto-increment it on every compile, leaving every
+// developer checkout with a dirty, conflicting copy of a file the bot also commits.
+// When that CI write does happen, both the build number and the patch are incremented:
 //   - versionBuild  -> the Android versionCode. Monotonic; NEVER resets.
 //   - versionPatch  -> the patch segment of the versionName. Increments each compile, but resets to
 //                      0 when versionMinor was bumped since the last build (a new minor starts at .0).
@@ -56,7 +59,7 @@ val verMajor = versionProps.getProperty("versionMajor", "1")
 val verMinor = versionProps.getProperty("versionMinor", "0")
 // Detect a minor bump BEFORE the build-gated block so the reset also applies to CI/override builds
 // (and IDE syncs), where the block is skipped: a new minor always reads as patch 0 even if the file
-// still holds the previous minor's patch (it may not have been rewritten by a local build yet).
+// still holds the previous minor's patch (it may not have been rewritten by a CI build yet).
 val lastMinor = versionProps.getProperty("versionMinorLast", verMinor)
 val isMinorBumped = verMinor != lastMinor
 
@@ -65,7 +68,7 @@ var currentPatch = if (isMinorBumped) 0 else versionProps.getProperty("versionPa
 
 // CI supplies its own versionCode (derived from the run number) and never rewrites the tracked
 // version.properties: the same commit then builds the same code however many compiles ran first,
-// and two branches' CI builds can't publish identical codes. Local builds keep auto-incrementing.
+// and two branches' CI builds can't publish identical codes. Local builds use the tracked values as-is.
 //
 // versionName scheme for CI builds: "$major.$minor.$CI_VERSION_PATCH", where the publishing workflows
 // set CI_VERSION_PATCH to the commit count of the built commit (`git rev-list --count HEAD`, full
@@ -75,12 +78,15 @@ var currentPatch = if (isMinorBumped) 0 else versionProps.getProperty("versionPa
 // in release.yml, 20000+run in android-ci/merged-build) and made the same commit read 1.43.1000010 in
 // one place and 1.43.20123 in another. Play ordering is governed solely by versionCode, which stays
 // CI_VERSION_CODE. Without CI_VERSION_PATCH (CI jobs that don't publish) the tracked patch is kept.
+// GitHub Actions sets both; other CI systems set CI=true.
+val isCi = System.getenv("CI").equals("true", ignoreCase = true) ||
+    System.getenv("GITHUB_ACTIONS").equals("true", ignoreCase = true)
 val ciVersionCode = System.getenv("CI_VERSION_CODE")?.toIntOrNull()?.takeIf { it > 0 }
 val ciVersionPatch = System.getenv("CI_VERSION_PATCH")?.toIntOrNull()?.takeIf { it >= 0 }
 if (ciVersionCode != null) {
     currentVersionCode = ciVersionCode
     if (ciVersionPatch != null) currentPatch = ciVersionPatch
-} else if (isBuilding) {
+} else if (isBuilding && isCi) {
     currentVersionCode++ // build never resets
     // A minor bump makes this build the new minor's .0; otherwise advance the patch.
     if (!isMinorBumped) currentPatch++

@@ -65,7 +65,7 @@ internal fun enumerateRailItemIdRegistrations(mode: EditorMode): List<String> {
     // panels and invert)
     ids += listOf(
         "mode.design", "host.design", "design.adjust", "design.balance", "design.invert",
-        "design.outline", "design.isolate", "design.lock",
+        "design.blend", "design.outline", "design.isolate", "design.lock",
     )
 
     // Project menu
@@ -80,9 +80,13 @@ internal fun enumerateRailItemIdRegistrations(mode: EditorMode): List<String> {
 }
 
 /**
- * The `hostId` every sub-item/sub-host-item in ConfigureRailItems declares, keyed by the child's own
- * id. Mirrors the DSL's `hostId = "..."` argument exactly — a top-level `azRailItem`/`azRailHostItem`
- * (no `hostId`) simply has no entry here. Mode-independent: a child's declared parent doesn't change
+ * The `hostId` of every sub-item/sub-host-item in ConfigureRailItems, keyed by the child's own id —
+ * the single source of truth: ConfigureRailItems does not spell a hostId out, it passes
+ * `hostId = railHostOf(id)`, so what [RailIntegrityCheck] validates is exactly what the rail
+ * registers. (It used to be a hand-written mirror of string literals in the DSL, and the two had
+ * already drifted: `design.blend` was registered but appeared nowhere here.) RailWiringSourceTest
+ * pins that every sub-item call site goes through [railHostOf] with its own id. A top-level
+ * `azRailItem`/`azRailHostItem` (no `hostId`) simply has no entry here. Mode-independent: a child's declared parent doesn't change
  * across modes, only whether the child is registered at all does (see [enumerateRailItemIdRegistrations]).
  *
  * Feeds [RailIntegrityCheck]'s FATAL hostId-validity check: every entry's value must itself be a
@@ -96,6 +100,7 @@ internal val RAIL_ITEM_HOST_ID: Map<String, String> = mapOf(
     "design.adjust" to "host.design",
     "design.balance" to "host.design",
     "design.invert" to "host.design",
+    "design.blend" to "host.design",
     "design.outline" to "host.design",
     "design.isolate" to "host.design",
     "design.lock" to "host.design",
@@ -124,3 +129,11 @@ internal val RAIL_ITEM_HOST_ID: Map<String, String> = mapOf(
     "proj.load" to "host.project",
     "proj.settings" to "host.project",
 )
+
+/**
+ * The host a rail sub-item is registered under — [RAIL_ITEM_HOST_ID]'s entry for [childId]. Every
+ * `hostId` in ConfigureRailItems comes from here. An unmapped id is a wiring bug that
+ * RailWiringSourceTest fails the build on, so it can't reach a device.
+ */
+internal fun railHostOf(childId: String): String =
+    checkNotNull(RAIL_ITEM_HOST_ID[childId]) { "rail item '$childId' has no host in RAIL_ITEM_HOST_ID" }

@@ -126,6 +126,23 @@ class MainViewModel @Inject constructor(
         _uiState.update { it.copy(isOverlayGyroActive = active) }
     }
 
+    /**
+     * The Overlay ▸ Gyro rail toggle. Gyro stabilises the live camera view, so it can only switch
+     * on while that view is showing; otherwise the toggle stays (or goes) off. Arming it without
+     * the camera used to leave the button lit with no effect, then silently start stabilising the
+     * moment the camera permission arrived — against a reference the artist never chose.
+     */
+    fun toggleOverlayGyro(cameraShowing: Boolean) {
+        _uiState.update {
+            it.copy(isOverlayGyroActive = cameraShowing && !it.isOverlayGyroActive)
+        }
+    }
+
+    /** Releases Gyro whenever the Overlay camera view is not showing; never arms it. */
+    fun onOverlayCameraShowingChanged(cameraShowing: Boolean) {
+        if (!cameraShowing) _uiState.update { it.copy(isOverlayGyroActive = false) }
+    }
+
     fun startTargetCapture() {
         _uiState.update {
             it.copy(
@@ -468,7 +485,13 @@ class MainViewModel @Inject constructor(
             // updateProject { } instead, and only copy the fields target-capture owns onto `current`.
             val baseTargetUris = projectRepository.currentProject.value?.targetImageUris ?: currentProject.targetImageUris
             val updatedTargetUris = projectManager.appendTargetImage(context, currentProject.id, baseTargetUris, bitmap)
+            // Guarded on id like the standalone path: this runs on IO well after the tap, and the
+            // artist may have opened another project meanwhile — `current` would then be THAT
+            // project, and the old code wrote this wall's fingerprint into it.
+            var committed = false
             projectRepository.updateProject { current ->
+                if (current.id != currentProject.id) return@updateProject current
+                committed = true
                 current.copy(
                     fingerprint = fp.copy(patchData = patch),
                     // New capture = new fingerprint frame; paint placed in the old one is invalid.
@@ -484,6 +507,10 @@ class MainViewModel @Inject constructor(
                     targetImageUris = updatedTargetUris,
                 )
             }
+            if (!committed) {
+                notifyProjectChangedDuringSave()
+                return@launch
+            }
 
             projectRepository.loadProject(currentProject.id)
             _uiState.update { it.copy(targetCapturedThisSession = true) }
@@ -491,6 +518,12 @@ class MainViewModel @Inject constructor(
             withContext(Dispatchers.Main) {
                 Toast.makeText(context, "Target Saved & Locked", Toast.LENGTH_SHORT).show()
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // An IOException from appendTargetImage / the project write (disk full, project dir
+            // gone) used to escape this viewModelScope coroutine and take the whole app down.
+            onTargetSaveFailed(e)
         } finally {
             _uiState.update { it.copy(isConfirmingTarget = false) }
         } }
@@ -643,7 +676,11 @@ class MainViewModel @Inject constructor(
             val updatedTargetUris = projectManager.appendTargetImage(context, currentProject.id, baseTargetUris, bitmap)
             // Area progress samples each design cell's bare-wall colour from this photo.
             slamManager.setCaptureImage(bitmap, intr)
+            // Guarded on id: see the depth path above.
+            var committed = false
             projectRepository.updateProject { current ->
+                if (current.id != currentProject.id) return@updateProject current
+                committed = true
                 current.copy(
                     fingerprint = fp.copy(patchData = patch),
                     // New capture = new fingerprint frame; paint placed in the old one is invalid.
@@ -669,14 +706,47 @@ class MainViewModel @Inject constructor(
                     targetImageUris = updatedTargetUris,
                 )
             }
+            if (!committed) {
+                notifyProjectChangedDuringSave()
+                return@launch
+            }
             projectRepository.loadProject(currentProject.id)
             _uiState.update { it.copy(targetCapturedThisSession = true) }
             withContext(Dispatchers.Main) {
                 Toast.makeText(context, "Target Saved & Locked", Toast.LENGTH_SHORT).show()
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // An IOException from appendTargetImage / the project write (disk full, project dir
+            // gone) used to escape this viewModelScope coroutine and take the whole app down.
+            onTargetSaveFailed(e)
         } finally {
             _uiState.update { it.copy(isConfirmingTarget = false) }
         } }
+    }
+
+    /** The project was switched between the target tap and the save; nothing was written. */
+    private suspend fun notifyProjectChangedDuringSave() {
+        MetricFingerprintBuilder.recordPreconditionFailure("project changed before the target was saved")
+        withContext(Dispatchers.Main) {
+            Toast.makeText(
+                context,
+                "Another project was opened before the target saved — it was not saved. Capture it again.",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
+
+    /** A target save threw (I/O, native); report it instead of crashing the app. */
+    private suspend fun onTargetSaveFailed(e: Exception) {
+        timber.log.Timber.e(e, "Target save failed")
+        MetricFingerprintBuilder.recordPreconditionFailure(
+            "target save failed: ${e.message ?: e.javaClass.simpleName}",
+        )
+        withContext(Dispatchers.Main) {
+            Toast.makeText(context, "Couldn't save the target. Try again.", Toast.LENGTH_LONG).show()
+        }
     }
 
     // Shared guidance shown when single-capture target creation lands on no tracked wall plane at all

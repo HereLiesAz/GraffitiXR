@@ -404,12 +404,10 @@
     <string name="settings_info_section">应用程序信息</string>
     <string name="settings_version_label">版本</string>
     <string name="settings_updates_section">更新</string>
-    <string name="settings_check_updates_label">检查实验性更新</string>
-    <string name="settings_install_update_label">安装更新</string>
+    <string name="settings_open_releases_label">打开发布页面</string>
     <string name="settings_permissions_section">权限</string>
     <string name="settings_camera_access">相机访问权限</string>
     <string name="settings_photo_access">照片库访问权限</string>
-    <string name="settings_notifications">通知</string>
     <string name="settings_granted">已授予</string>
     <string name="settings_denied">已拒绝</string>
     <string name="settings_open_app_settings">打开应用程序设置</string>

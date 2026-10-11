@@ -27,16 +27,18 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-publish
-  # Queue, never cancel: a newer push cancelling this run mid Play upload/commit could leave an open
-  # Play edit or a half-published release. GitHub keeps at most one pending run per group, so a burst
-  # of pushes still collapses to the newest one waiting behind the run in progress.
-  cancel-in-progress: false
+  # Repo rule: every workflow runs one at a time per workflow, and the newest trigger cancels the run
+  # in progress. A cancel mid Play upload is safe: .github/scripts/play_multitrack_publish.py turns the
+  # cancel's SIGTERM into a cleanup that deletes its still-uncommitted Play edit, and ignores SIGTERM
+  # once the commit has gone through. The newer run then publishes the newer commit.
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
 
 jobs:
   unit-tests:
     # Test gate: nothing is built for publishing, uploaded to Play or attached to the GitHub release
-    # unless the same unit tests android-ci.yml runs (./gradlew test) and the native host tests pass.
+    # unless the same gates android-ci.yml's unit-tests job runs all pass — unit tests, native lock
+    # discipline, native host tests, the SphereSLAM architecture/build-contract checks and detekt.
     # Kept in this workflow (not a cross-workflow dependency) so the gate can't be skipped by run order.
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -70,11 +72,32 @@ jobs:
           chmod +x gradlew
           ./gradlew test --continue --build-cache --no-daemon --stacktrace
 
+      - name: Native lock discipline
+        run: python3 tools/check_native_locking.py
+
       - name: Native host unit tests
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq cmake g++ libopencv-dev libgtest-dev
           tools/run_native_host_tests.sh
+
+      - name: SphereSLAM architecture invariants
+        run: python3 tools/check_sphereslam_architecture.py
+
+      - name: SphereSLAM build contract
+        run: python3 tools/check_sphereslam_build_contract.py
+
+      - name: Run detekt
+        # Enforced: config/detekt/detekt.yml (maxIssues: 0) fails the job on any finding.
+        run: ./gradlew detekt --continue --build-cache --no-daemon --stacktrace
+
+      - name: Upload detekt reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-detekt-reports
+          path: '**/build/reports/detekt/'
+          if-no-files-found: ignore
 
       - name: Upload test reports
         if: always()
@@ -222,7 +245,9 @@ jobs:
           AAB_GLOB: app/build/outputs/bundle/release/*.aab
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
         run: |
-          pip install --quiet google-api-python-client google-auth google-auth-httplib2 httplib2==0.15.0
+          # httplib2 was pinned to 0.15.0, which predates the CVE-2020-11078 fix (0.18.0). The script
+          # only uses httplib2.Http(timeout=...), stable across 0.x; google-auth-httplib2 needs >=0.19.
+          pip install --quiet google-api-python-client google-auth google-auth-httplib2 'httplib2>=0.22.0,<1'
           python .github/scripts/play_multitrack_publish.py
 
       - name: Fail loudly if Play upload didn't succeed

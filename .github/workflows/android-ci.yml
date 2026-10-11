@@ -1,8 +1,9 @@
 name: Android CI
 
-# GraffitiXR's canonical CI/release pipeline: runs unit tests on every push/PR, then builds and
-# publishes the `latest-debug-vX.Y` debug-APK release on push to main only — a feature-branch push
-# must never replace the public build.
+# GraffitiXR's CI: on every PR into main and every push to main it runs the unit tests and native/
+# architecture/detekt gates and proves the minified release variant builds; on push to main only it
+# then publishes the `latest-debug-vX.Y` debug-APK prerelease — a PR must never replace the public
+# build. The signed release AAB/APK and Play publishing are NOT here: they live in release.yml.
 # This is the ONLY workflow that tags/publishes that release — .github/workflows/merged-build.yml
 # builds and tests the same code but deliberately does not touch the shared release tag, so the
 # two workflows never race each other over it (see git history for the incident that caused this
@@ -144,7 +145,8 @@ jobs:
         run: python3 tools/check_sphereslam_manifest.py --variant release
 
   build-and-release:
-    needs: unit-tests
+    # Both gates: a debug APK is only published for a commit whose release variant also builds.
+    needs: [unit-tests, release-build]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -267,26 +269,31 @@ jobs:
         if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Order matters: the tag must never point at this commit while the release still carries the
+        # previous commit's APK. Existing release: upload the new assets FIRST (--clobber replaces in
+        # place), and only then force-move the tag and refresh the notes — a failed upload leaves the
+        # old tag and old APK consistent. New release: the tag is pushed and the release created with
+        # the APK in one call, so there is no earlier APK to disagree with.
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -fa $TAG_NAME -m "Latest Debug Build"
-          git push origin $TAG_NAME --force
           BUILD_TOOLS="build-tools.zip"
-          if gh release view $TAG_NAME > /dev/null 2>&1; then
+          if gh release view "$TAG_NAME" > /dev/null 2>&1; then
             echo "Updating existing release..."
-            gh release delete-asset "$TAG_NAME" "$BUILD_TOOLS" -y || true
-            gh release edit $TAG_NAME --prerelease \
+            gh release upload "$TAG_NAME" "$APK_FILE" --clobber
+            if [ -f "$BUILD_TOOLS" ]; then gh release upload "$TAG_NAME" "$BUILD_TOOLS" --clobber; fi
+            git tag -fa "$TAG_NAME" -m "Latest Debug Build"
+            git push origin "$TAG_NAME" --force
+            gh release edit "$TAG_NAME" --prerelease \
               --title "Latest Debug Build ($TAG_NAME)" \
-              --notes "Auto-build from commit $GITHUB_SHA" \
-              --target $GITHUB_SHA
-            gh release upload $TAG_NAME "$APK_FILE" --clobber
-            [ -f "$BUILD_TOOLS" ] && gh release upload $TAG_NAME "$BUILD_TOOLS" --clobber
+              --notes "Auto-build from commit $GITHUB_SHA"
           else
             echo "Creating new release..."
-            gh release create $TAG_NAME "$APK_FILE" --prerelease \
+            git tag -fa "$TAG_NAME" -m "Latest Debug Build"
+            git push origin "$TAG_NAME" --force
+            gh release create "$TAG_NAME" "$APK_FILE" --prerelease \
               --title "Latest Debug Build ($TAG_NAME)" \
-              --notes "Auto-build from commit $GITHUB_SHA" \
-              --target $GITHUB_SHA
-            [ -f "$BUILD_TOOLS" ] && gh release upload $TAG_NAME "$BUILD_TOOLS" --clobber
+              --notes "Auto-build from commit $GITHUB_SHA"
+            if [ -f "$BUILD_TOOLS" ]; then gh release upload "$TAG_NAME" "$BUILD_TOOLS" --clobber; fi
           fi

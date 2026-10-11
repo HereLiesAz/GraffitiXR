@@ -13,8 +13,8 @@ Hvis du velger å bruke tjenesten vår, godtar du innsamling og bruk av informas
 For en bedre opplevelse, mens du bruker tjenesten vår, kan vi kreve at du gir oss visse personlig identifiserbare opplysninger, inkludert men ikke begrenset til:
 
 * **Kameradata:** Appen krever tilgang til enhetens kamera for å vise Augmented Reality (AR)-visningen, overleggsmodus og for å ta bilder for prosjektmål. Kameradata behandles lokalt på enheten din og overføres ikke til våre servere med mindre du eksplisitt velger å dele en prosjektfil.
-* **Lagring / Bilder:** Vi krever tilgang til enhetens lagring (lese/skrive ekstern lagring eller fotobibliotek) for å laste inn bilder for overlegg, lagre prosjektene dine og eksportere bilder.
-* **Stedsdata (valgfritt):** Hvis du gir plasseringstillatelser, kan appen samle inn GPS-data (breddegrad, lengdegrad, høyde) for å geomerke prosjektene dine. Disse dataene lagres lokalt i prosjektfilene dine.
+* **Lagring / Bilder:** Appen ber ikke om noen lagringstillatelse. Bilder du legger til kommer via Android-systemets bilde- eller filvelger, som bare gir appen tilgang til filen du velger. Prosjekter lagres i appens private lagring, og eksporterte bilder lagres i enhetens bildegalleri.
+* **Stedsdata (valgfritt):** Appen ber om stedstillatelse bare når du begynner å ta opp et AR-mål. Hvis du gir den, lagrer opptaksposten for målet hvor det ble tatt (breddegrad, lengdegrad, høyde og nøyaktighet). Den lagres lokalt i prosjektfilen og forlater enheten bare hvis du selv deler eller eksporterer prosjektfilen.
 
 ## Krasjrapporter (opt-in)
 
@@ -42,9 +42,9 @@ Vi kan ansette tredjepartsselskaper og enkeltpersoner på grunn av følgende år
 
 Vi bruker **Google ML Kit** for emnesegmentering (bakgrunnsfjerning). Denne behandlingen skjer lokalt på enheten din.
 
-## Oppdateringssjekker
+## Oppdateringer
 
-Innstillinger-skjermen har en «Se etter oppdateringer»-knapp. Ingenting sjekkes automatisk — bare når du trykker på den. Å trykke på den sender en forespørsel til **GitHub API** (api.github.com) for å slå opp prosjektets siste utgivelse. GitHub er en tredjepart utenfor vår kontroll, og IP-adressen din er synlig for GitHub i løpet av den ene forespørselen, på samme måte som den ville vært for enhver nettforespørsel du gjør til github.com. Ingen annen informasjon sendes som en del av denne forespørselen.
+Appen kontakter aldri en server for å se etter oppdateringer. Innstillinger-skjermen har et «Åpne utgivelsessiden»-valg; et trykk på det åpner prosjektets GitHub-utgivelsesside (github.com/HereLiesAz/GraffitiXR/releases) i nettleseren din, akkurat som om du hadde fulgt lenken selv. Appen selv sender ingenting.
 
 ## Sikkerhet
 

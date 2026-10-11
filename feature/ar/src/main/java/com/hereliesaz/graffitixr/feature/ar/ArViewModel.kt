@@ -2401,12 +2401,13 @@ class ArViewModel @Inject constructor(
                 locationTracker = com.hereliesaz.graffitixr.common.LocationTracker(context)
             }
             locationTracker?.let { tracker ->
-                if (tracker.hasPermissions()) {
-                    tracker.startLocationUpdates { loc -> lastLocation = loc }
-                } else {
-                    // Not an error: location is optional and a capture must never depend on it.
-                    Timber.i("Location permission not granted; captures will record no location")
+                // Without permission the tracker defers the start and begins once the artist grants
+                // it — location is asked for when target capture begins, after this has run.
+                // Not an error either way: location is optional and a capture never depends on it.
+                if (!tracker.hasPermissions()) {
+                    Timber.i("Location permission not granted yet; captures record no location until it is")
                 }
+                tracker.startLocationUpdates { loc -> lastLocation = loc }
             }
         } catch (t: Throwable) {
             Timber.w(t, "location sampling unavailable; captures will record no location")

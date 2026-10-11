@@ -2,15 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!--
-        The Meta wearables (mwdat-*) libraries declare minSdk 29, but the
-        wearables flow is optional and gated at runtime (see WearableManager
-        and ArViewModel.startGlassesSession). Override the merger so Android
-        8.0+ devices can install the app; on SDK < 29 the wearables init path
-        short-circuits to GlassesSessionState.Fallback.
-    -->
-    <uses-sdk tools:overrideLibrary="com.meta.wearable.dat.camera,com.meta.wearable.dat.mockdevice,com.meta.wearable.dat.core" />
-
     <!-- AR and Hardware Permissions -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="true" />
@@ -24,24 +15,22 @@
          app already has read access to, so neither needs a broad storage grant — and Play policy
          only permits these permissions where a system picker is technically insufficient, which
          here it is not. -->
+    <!-- Location: optional geotag on an AR target capture's record (CaptureEnvironment.location).
+         Requested only when a target capture starts (MainActivity), never at launch. Both are
+         declared because API 31+ ignores a FINE request made without COARSE. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
-    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
-                     android:usesPermissionFlags="neverForLocation"
-                     tools:targetApi="33" />
 
-    <!-- OTA Updater Permissions -->
+    <!-- Network: co-op sessions (plain TCP sockets between devices on the same LAN, paired by QR —
+         no Wi-Fi scanning, Wi-Fi Direct or Nearby, so no Wi-Fi/nearby-device permission), and the
+         opt-in crash-report upload. Nothing else contacts a server. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!--
-        Permissions above (ACCESS_*_LOCATION, ACCESS_WIFI_STATE, etc.) would otherwise
-        imply required hardware features and filter the Play Store listing. Mark them
-        optional explicitly: the location/wifi flows are not core to the app, and core
-        camera is the only required hardware.
+        The location permissions would otherwise imply required location hardware and filter
+        the Play Store listing. Mark it optional explicitly: geotagging is not core to the app,
+        and the camera is the only required hardware.
     -->
-    <uses-feature android:name="android.hardware.wifi" android:required="false" />
     <uses-feature android:name="android.hardware.location" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <uses-feature android:name="android.hardware.location.network" android:required="false" />
@@ -84,18 +73,10 @@
             android:name=".MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize|uiMode"
-            android:theme="@style/Theme.GraffitiXR">
+            android:theme="@style/Theme.GraffitiXR.Main">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-
-            <!-- Callback scheme for Meta AI app redirection -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="graffitixr" />
             </intent-filter>
 
             <!-- Interop: receive an image shared from Graffux (e.g. an edited overlay returning from
@@ -130,7 +111,20 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-        <meta-data android:name="com.meta.wearable.mwdat.APPLICATION_ID" android:value="2122578028305600" />
-        <meta-data android:name="com.meta.wearable.mwdat.CLIENT_TOKEN" android:value="AR|2122578028305600|0de697ded10d5ce4946e23f83a3fae7d" />
+
+        <!--
+            Persists the in-app Language choice (AppCompatDelegate.setApplicationLocales) below
+            API 33, where the platform has no per-app locale store. AppCompat reads it back while
+            MainActivity attaches, so a cold start renders in the chosen language from the first
+            frame. On API 33+ the platform LocaleManager stores it and this is unused.
+        -->
+        <service
+            android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
+            android:enabled="false"
+            android:exported="false">
+            <meta-data
+                android:name="autoStoreLocales"
+                android:value="true" />
+        </service>
     </application>
 </manifest>

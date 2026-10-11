@@ -13,8 +13,8 @@ Als u ervoor kiest om onze Dienst te gebruiken, gaat u akkoord met het verzamele
 Voor een betere ervaring tijdens het gebruik van onze Service kunnen we van u verlangen dat u ons bepaalde persoonlijk identificeerbare informatie verstrekt, inclusief maar niet beperkt tot:
 
 *   **Cameragegevens:** De app heeft toegang tot de camera van uw apparaat nodig om de Augmented Reality (AR)-weergave en de overlay-modus weer te geven en om afbeeldingen vast te leggen voor projectdoelen. Cameragegevens worden lokaal op uw apparaat verwerkt en worden niet naar onze servers verzonden, tenzij u er expliciet voor kiest om een ​​projectbestand te delen.
-*   **Opslag / Foto's:** We hebben toegang nodig tot de opslag van uw apparaat (externe lees-/schrijfopslag of fotobibliotheek) om afbeeldingen voor overlays te laden, uw projecten op te slaan en vastgelegde afbeeldingen te exporteren.
-*   **Locatiegegevens (optioneel):** Als u locatierechten verleent, kan de app GPS-gegevens verzamelen (breedtegraad, lengtegraad, hoogte) om uw projecten te geotaggen. Deze gegevens worden lokaal opgeslagen in uw projectbestanden.
+*   **Opslag / Foto's:** De app vraagt geen opslagrechten. Afbeeldingen die u toevoegt komen via de foto- of bestandskiezer van het Android-systeem, die de app alleen toegang geven tot het bestand dat u kiest. Projecten worden opgeslagen in de privéopslag van de app en geëxporteerde afbeeldingen in de fotogalerij van uw apparaat.
+*   **Locatiegegevens (optioneel):** De app vraagt alleen om locatietoestemming wanneer u begint met het vastleggen van een AR-doel. Als u die geeft, slaat het vastlegrecord van dat doel op waar het is vastgelegd (breedtegraad, lengtegraad, hoogte en nauwkeurigheid). Dit wordt lokaal in het projectbestand opgeslagen en verlaat uw apparaat alleen als u dat projectbestand zelf deelt of exporteert.
 
 ## Crashrapporten (Opt-In)
 
@@ -42,9 +42,9 @@ We kunnen om de volgende redenen externe bedrijven en personen in dienst nemen:
 
 We gebruiken **Google ML Kit** voor onderwerpsegmentatie (achtergrondverwijdering). Deze verwerking gebeurt lokaal op uw apparaat.
 
-## Updatecontroles
+## Updates
 
-Op het instellingenscherm staat een knop "Controleren op updates". Er wordt niets automatisch gecontroleerd — alleen wanneer u erop drukt. Door erop te drukken doet de app een verzoek aan de **GitHub API** (api.github.com) om de laatste release van dit project op te zoeken. GitHub is een derde partij buiten onze controle, en uw IP-adres is voor de duur van dat ene verzoek zichtbaar voor GitHub, net zoals bij elk webverzoek dat u naar github.com doet. Er wordt geen andere informatie met dit verzoek meegestuurd.
+De app neemt nooit contact op met een server om naar updates te zoeken. Het instellingenscherm heeft een item "Open de releasepagina"; als u erop tikt, opent de GitHub-releasepagina van dit project (github.com/HereLiesAz/GraffitiXR/releases) in uw browser, precies alsof u de link zelf had gevolgd. De app zelf verstuurt niets.
 
 ## Beveiliging
 

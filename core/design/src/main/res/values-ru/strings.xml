@@ -392,12 +392,10 @@
     <string name="settings_info_section">Информация о приложении</string>
     <string name="settings_version_label">Версия</string>
     <string name="settings_updates_section">Обновления</string>
-    <string name="settings_check_updates_label">Проверьте наличие экспериментальных обновлений</string>
-    <string name="settings_install_update_label">Установить обновление</string>
+    <string name="settings_open_releases_label">Открыть страницу релизов</string>
     <string name="settings_permissions_section">Разрешения</string>
     <string name="settings_camera_access">Доступ к камере</string>
     <string name="settings_photo_access">Доступ к фотобиблиотеке</string>
-    <string name="settings_notifications">Уведомления</string>
     <string name="settings_granted">Предоставленный</string>
     <string name="settings_denied">Отклонен</string>
     <string name="settings_open_app_settings">Откройте настройки приложения</string>

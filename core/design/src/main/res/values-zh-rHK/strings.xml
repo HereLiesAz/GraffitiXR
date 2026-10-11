@@ -392,12 +392,10 @@
     <string name="settings_info_section">應用程式資訊</string>
     <string name="settings_version_label">版本</string>
     <string name="settings_updates_section">更新</string>
-    <string name="settings_check_updates_label">檢查實驗性更新</string>
-    <string name="settings_install_update_label">安裝更新</string>
+    <string name="settings_open_releases_label">開啟發佈頁面</string>
     <string name="settings_permissions_section">權限</string>
     <string name="settings_camera_access">相機訪問</string>
     <string name="settings_photo_access">照片庫訪問</string>
-    <string name="settings_notifications">通知</string>
     <string name="settings_granted">已允許</string>
     <string name="settings_denied">被拒絕</string>
     <string name="settings_open_app_settings">打開應用程式設定</string>

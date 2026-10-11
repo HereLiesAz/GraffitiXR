@@ -8,6 +8,11 @@ permissions:
   contents: read
   pull-requests: write
 
+# Repo rule: every workflow runs one at a time; the newest trigger cancels the run in progress.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
   label:
     # KNOWN RISK (flagged by infra audit, not resolved here): this is a pull_request_target

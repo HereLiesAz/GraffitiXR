@@ -404,12 +404,10 @@
     <string name="settings_info_section">アプリ情報</string>
     <string name="settings_version_label">バージョン</string>
     <string name="settings_updates_section">アップデート</string>
-    <string name="settings_check_updates_label">試験運用版のアップデートを確認</string>
-    <string name="settings_install_update_label">アップデートをインストール</string>
+    <string name="settings_open_releases_label">リリースページを開く</string>
     <string name="settings_permissions_section">権限</string>
     <string name="settings_camera_access">カメラのアクセス権</string>
     <string name="settings_photo_access">写真ライブラリのアクセス権</string>
-    <string name="settings_notifications">通知</string>
     <string name="settings_granted">許可済み</string>
     <string name="settings_denied">拒否</string>
     <string name="settings_open_app_settings">アプリの設定を開く</string>
