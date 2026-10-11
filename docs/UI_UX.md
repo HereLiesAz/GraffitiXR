@@ -17,6 +17,8 @@ The screen is divided into two layers: The **AR World** (Camera) and the **Overl
 ### AR Mode (Scan & Project)
 * **Move Device:** Translates the camera in 3D space.
 * **Tap Wall:** Places the "Anchor" (Origin point). A plain tap on its own does **not** start target creation anymore — first select **Target** on the Rail (under the AR mode host) to arm tap-to-place, then tap the surface to capture and lock the anchor.
+* **Standalone (no ARCore):** **Target** on the Rail starts a new wall target in the standalone capture flow (Capture Wall Target → mark corners → width), replacing the current one. While a target is loaded but not yet tracking, the status panel also offers **New Target**. The tracking status and its actions (Copy Diagnostics, Recapture / New Target, the sweep hint) render in the rail's onscreen layer — inside its safe zones — never in the camera background.
+* **Photosphere:** the standalone photosphere covers the whole sphere (24 × 6 tiles of 15° × 30°), ceiling and floor included.
 * **Long Press (Rail Item):** Locks the specific tool (e.g., locks the opacity slider so accidental touches don't change it).
 
 ### Edit Mode (Image Manipulation)

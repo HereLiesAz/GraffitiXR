@@ -501,6 +501,9 @@ class MainActivity : AppCompatActivity() {
                 val crashReportToken by settingsViewModel.crashReportToken.collectAsState()
                 val coopState = arUiState.coopSessionState
                 var showJoinScanner by remember { mutableStateOf(false) }
+                // Standalone overlay ↔ host: its status/actions render in onscreen (AzNavRail safe
+                // zones), and the rail's Target action reaches it as a new-target request.
+                val standaloneUiHost = remember { com.hereliesaz.graffitixr.feature.ar.StandaloneOverlayUiHost() }
                 val hostQr by arViewModel.hostQrPayload.collectAsState()
                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
                 val language by settingsViewModel.language.collectAsState()
@@ -978,6 +981,7 @@ class MainActivity : AppCompatActivity() {
                         isCapturingTarget = mainUiState.isCapturingTarget,
                         isOverlayGyroActive = mainUiState.isOverlayGyroActive,
                         onShowJoinScanner = { showJoinScanner = true },
+                        onStandaloneNewTarget = { standaloneUiHost.requestNewTarget() },
                         onWallPhoto = {
                             if (hasCameraPermission) {
                                 val tmpFile = File(context.cacheDir, "wall_camera_${System.currentTimeMillis()}.jpg")
@@ -1098,6 +1102,7 @@ class MainActivity : AppCompatActivity() {
                             // The detect stage still needs the renderer's tap-free auto-anchor, but the
                             // scribble is no longer projected onto the wall — it was drawn there.
                             doodleDetectActive = firstRunStage == FirstRunStage.DETECT,
+                            standaloneUiHost = standaloneUiHost,
                         )
 
                     }
@@ -1114,6 +1119,12 @@ class MainActivity : AppCompatActivity() {
                             dashboardUiState.showNewProjectDialog
 
                         val completedTutorials by mainViewModel.completedTutorials.collectAsState()
+
+                        // Standalone (no-ARCore) tracking status and its actions — Copy Diagnostics,
+                        // Recapture / New Target, the sweep hint — published by the overlay.
+                        if (editorUiState.editorMode == EditorMode.AR && !anyModalActive) {
+                            com.hereliesaz.graffitixr.feature.ar.StandaloneOverlayUi(standaloneUiHost)
+                        }
 
                         // The reactive guidance overlay (statuses, edges, per-mode goals declared in
                         // ConfigureGuidance) is rendered automatically by AzHostActivityLayout; nothing
@@ -2036,6 +2047,7 @@ class MainActivity : AppCompatActivity() {
         isCapturingTarget: Boolean = false,
         isOverlayGyroActive: Boolean = false,
         onShowJoinScanner: () -> Unit = {},
+        onStandaloneNewTarget: () -> Unit = {},
         onWallPhoto: () -> Unit = {},
         onExportRequested: () -> Unit,
     ) {
@@ -2186,7 +2198,8 @@ class MainActivity : AppCompatActivity() {
                 if (editorUiState.editorMode == EditorMode.AR) {
                     // Target button is a toggle: selected (cyan) means screen taps create the target;
                     // tapping it again cancels. After a target is accepted it deselects, so making
-                    // another target requires re-selecting this button.
+                    // another target requires re-selecting this button. Standalone: one tap starts a
+                    // new target in the overlay's own capture flow.
                     // Omit the Target button entirely when the backend can't support it (don't show a
                     // disabled, reason-labelled button): if it can't act, it isn't on the rail.
                     if (arRailPolicy.targetRailEnabled) azRailSubItem(
@@ -2198,7 +2211,11 @@ class MainActivity : AppCompatActivity() {
                         shape = AzButtonShape.NONE,
                         disabled = showLibrary,
                         onClick = {
-                            if (isWaitingForTap) {
+                            if (arRailPolicy.standalone) {
+                                // Standalone captures in SphereSlamStandaloneOverlay: drop the current
+                                // target there and open capture (no ARCore tap-to-anchor flow).
+                                if (hasCameraPermission) onStandaloneNewTarget() else requestPermissions()
+                            } else if (isWaitingForTap) {
                                 mainViewModel.cancelTapMode()
                             } else if (hasCameraPermission) {
                                 // Clear any previous capture (tempCaptureBitmap etc.) BEFORE re-arming.

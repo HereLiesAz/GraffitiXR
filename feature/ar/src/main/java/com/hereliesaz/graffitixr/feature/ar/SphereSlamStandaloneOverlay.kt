@@ -37,6 +37,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -336,6 +337,13 @@ fun SphereSlamStandaloneOverlay(
     cameraTargetFps: Int = CameraTargetFps.DEVICE_DEFAULT,
     adaptiveRateEnabled: Boolean = false,
     batteryTier: Int = 0,
+    /**
+     * The host's onscreen hand-off ([StandaloneOverlayUiHost]): the status, Copy Diagnostics,
+     * Recapture / New Target, sweep hint and fatal dialog are published there so the host draws them
+     * in its onscreen layer (AzNavRail safe zones, above the rail's touch layer); its
+     * [StandaloneOverlayUiHost.newTargetRequests] start a new target. Null: drawn inline here.
+     */
+    uiHost: StandaloneOverlayUiHost? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -446,6 +454,17 @@ fun SphereSlamStandaloneOverlay(
         fatalMessage = null
     }
 
+    // The rail's Target action (standalone): drop the current target and open capture. Keyed on the
+    // request count, so entering the screen (count unchanged) never discards a target.
+    val newTargetRequests = uiHost?.newTargetRequests ?: 0
+    val handledNewTargetRequests = remember { mutableStateOf(newTargetRequests) }
+    LaunchedEffect(newTargetRequests) {
+        if (newTargetRequests != handledNewTargetRequests.value) {
+            handledNewTargetRequests.value = newTargetRequests
+            resetCapture()
+        }
+    }
+
     LaunchedEffect(persistedReferenceUri, awaitingReferencePersistence) {
         if (
             awaitingReferencePersistence &&
@@ -515,60 +534,62 @@ fun SphereSlamStandaloneOverlay(
         val pending = pendingReferenceBitmap
         if (pending != null) {
             val measuredWidth = StandaloneReferenceScale.parseMeters(referenceWidthInput)
-            Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.82f), RoundedCornerShape(16.dp))
-                        .padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(
-                        "Measure the real width between the left and right edges of the target.",
-                        color = Color.White,
-                    )
-                    OutlinedTextField(
-                        value = referenceWidthInput,
-                        onValueChange = { referenceWidthInput = it.take(12) },
-                        label = { Text("Target width (meters)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
-                        isError = referenceWidthInput.isNotBlank() && measuredWidth == null,
-                        modifier = Modifier.padding(top = 12.dp),
-                    )
-                    if (referenceWidthInput.isNotBlank() && measuredWidth == null) {
+            PublishOrDraw(uiHost) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.82f), RoundedCornerShape(16.dp))
+                            .padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
                         Text(
-                            "Enter a width from 0.05 m to 100 m.",
+                            "Measure the real width between the left and right edges of the target.",
                             color = Color.White,
-                            modifier = Modifier.padding(top = 6.dp),
                         )
-                    }
-                    pendingReferenceWarning?.let { warning ->
-                        Text(
-                            warning,
-                            color = Color.White,
-                            modifier = Modifier.padding(top = 8.dp),
+                        OutlinedTextField(
+                            value = referenceWidthInput,
+                            onValueChange = { referenceWidthInput = it.take(12) },
+                            label = { Text("Target width (meters)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            isError = referenceWidthInput.isNotBlank() && measuredWidth == null,
+                            modifier = Modifier.padding(top = 12.dp),
                         )
-                    }
-                    Button(
-                        onClick = { acceptReference(pending, measuredWidth!!, true) },
-                        enabled = measuredWidth != null,
-                        modifier = Modifier.padding(top = 16.dp),
-                    ) {
-                        Text("Use Measured Width")
-                    }
-                    TextButton(
-                        onClick = { acceptReference(pending, 1f, false) },
-                        modifier = Modifier.padding(top = 4.dp),
-                    ) {
-                        Text("Continue Without Physical Scale")
-                    }
-                    TextButton(
-                        onClick = {
-                            pendingReferenceBitmap = null
-                            referenceWidthInput = ""
-                        },
-                    ) {
-                        Text("Recapture")
+                        if (referenceWidthInput.isNotBlank() && measuredWidth == null) {
+                            Text(
+                                "Enter a width from 0.05 m to 100 m.",
+                                color = Color.White,
+                                modifier = Modifier.padding(top = 6.dp),
+                            )
+                        }
+                        pendingReferenceWarning?.let { warning ->
+                            Text(
+                                warning,
+                                color = Color.White,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                        }
+                        Button(
+                            onClick = { acceptReference(pending, measuredWidth!!, true) },
+                            enabled = measuredWidth != null,
+                            modifier = Modifier.padding(top = 16.dp),
+                        ) {
+                            Text("Use Measured Width")
+                        }
+                        TextButton(
+                            onClick = { acceptReference(pending, 1f, false) },
+                            modifier = Modifier.padding(top = 4.dp),
+                        ) {
+                            Text("Continue Without Physical Scale")
+                        }
+                        TextButton(
+                            onClick = {
+                                pendingReferenceBitmap = null
+                                referenceWidthInput = ""
+                            },
+                        ) {
+                            Text("Recapture")
+                        }
                     }
                 }
             }
@@ -577,34 +598,36 @@ fun SphereSlamStandaloneOverlay(
 
         val raw = rawCaptureBitmap
         if (raw == null) {
-            Box(modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    fatalMessage?.let { message ->
-                        Text(
-                            text = message,
-                            color = Color.White,
-                            modifier = Modifier
-                                .padding(bottom = 12.dp)
-                                .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(12.dp))
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                        )
-                    }
-                    Button(
-                        onClick = {
-                            fatalMessage = null
-                            scope.launch {
-                                val result = runCatching {
-                                    cameraController.takePictureAsBitmap(context)
+            PublishOrDraw(uiHost) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        fatalMessage?.let { message ->
+                            Text(
+                                text = message,
+                                color = Color.White,
+                                modifier = Modifier
+                                    .padding(bottom = 12.dp)
+                                    .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(12.dp))
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                            )
+                        }
+                        Button(
+                            onClick = {
+                                fatalMessage = null
+                                scope.launch {
+                                    val result = runCatching {
+                                        cameraController.takePictureAsBitmap(context)
+                                    }
+                                    rawCaptureBitmap = result.getOrElse {
+                                        fatalMessage = "Couldn't capture the wall target — try again."
+                                        null
+                                    }
                                 }
-                                rawCaptureBitmap = result.getOrElse {
-                                    fatalMessage = "Couldn't capture the wall target — try again."
-                                    null
-                                }
-                            }
-                        },
-                        modifier = Modifier.padding(bottom = 32.dp),
-                    ) {
-                        Text("Capture Wall Target")
+                            },
+                            modifier = Modifier.padding(bottom = 32.dp),
+                        ) {
+                            Text("Capture Wall Target")
+                        }
                     }
                 }
             }
@@ -1374,128 +1397,143 @@ fun SphereSlamStandaloneOverlay(
             .onSizeChanged { surfaceSize.set(it) },
     )
 
-    if (!referenceReady || trackingState == StandaloneTrackingState.INITIALIZING) {
-        Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = standaloneInitializingStatusText(
-                        analyzerFatal = analyzerFatal,
-                        fatalMessage = fatalMessage,
-                        currentFailure = currentFailure,
-                        referenceReady = referenceReady,
-                        hasReference = referenceImage != null,
-                    ),
-                    color = Color.White,
-                    modifier = Modifier
-                        .padding(top = 32.dp)
-                        .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-                if (currentFailure != null) {
+    // Status, actions and the sweep hint: interactive UI, so the host draws it in its onscreen layer
+    // (StandaloneOverlayUiHost); inline only without a host.
+    val panel: @Composable () -> Unit = {
+        if (!referenceReady || trackingState == StandaloneTrackingState.INITIALIZING) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = standaloneInitializingStatusText(
+                            analyzerFatal = analyzerFatal,
+                            fatalMessage = fatalMessage,
+                            currentFailure = currentFailure,
+                            referenceReady = referenceReady,
+                            hasReference = referenceImage != null,
+                        ),
+                        color = Color.White,
+                        modifier = Modifier
+                            .padding(top = 32.dp)
+                            .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                    // A target that never registers (another wall, a stale page) must not trap the artist:
+                    // a new one is always one tap away.
+                    if (referenceImage != null) {
+                        Button(
+                            onClick = { resetCapture() },
+                            modifier = Modifier.padding(top = 12.dp),
+                        ) {
+                            Text("New Target")
+                        }
+                    }
+                    if (currentFailure != null) {
+                        TextButton(onClick = { copyDiagnostics() }) {
+                            Text("Copy Diagnostics")
+                        }
+                    }
+                }
+            }
+        } else if (
+            trackingState == StandaloneTrackingState.IMU_BRIDGE ||
+            trackingState == StandaloneTrackingState.REACQUIRING ||
+            trackingState == StandaloneTrackingState.LOST
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = currentFailure
+                            ?.takeIf { it.severity != StandaloneFailureSeverity.FATAL }
+                            ?.userMessage
+                            ?: if (trackingState == StandaloneTrackingState.LOST) {
+                                "Wall target lost"
+                            } else {
+                                strings.ar.reacquiringTarget
+                            },
+                        color = Color.White,
+                        modifier = Modifier
+                            .padding(top = 32.dp)
+                            .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                    if (trackingState == StandaloneTrackingState.LOST) {
+                        Button(
+                            onClick = { resetCapture() },
+                            modifier = Modifier.padding(top = 12.dp),
+                        ) {
+                            Text("Recapture Target")
+                        }
+                    }
                     TextButton(onClick = { copyDiagnostics() }) {
                         Text("Copy Diagnostics")
                     }
                 }
             }
         }
-    } else if (
-        trackingState == StandaloneTrackingState.IMU_BRIDGE ||
-        trackingState == StandaloneTrackingState.REACQUIRING ||
-        trackingState == StandaloneTrackingState.LOST
-    ) {
-        Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = currentFailure
-                        ?.takeIf { it.severity != StandaloneFailureSeverity.FATAL }
-                        ?.userMessage
-                        ?: if (trackingState == StandaloneTrackingState.LOST) {
-                            "Wall target lost"
-                        } else {
-                            strings.ar.reacquiringTarget
-                        },
-                    color = Color.White,
+
+        // Phase 3: guided-sweep coverage hint. Only while actively tracking and still incomplete — it
+        // disappears once the viewable arc is covered, and never blocks interaction.
+        val coverage = sweepCoverage
+        if (
+            coverage != null &&
+            coverage < 1f &&
+            referenceReady &&
+            trackingState == StandaloneTrackingState.LOCKED &&
+            fatalMessage == null
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
-                        .padding(top = 32.dp)
+                        .padding(bottom = 40.dp)
                         .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-                if (trackingState == StandaloneTrackingState.LOST) {
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                ) {
+                    Text(
+                        text = "Turn slowly to map the space — ${(coverage * 100f).toInt()}%",
+                        color = Color.White,
+                    )
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 8.dp)
+                            .width(180.dp)
+                            .height(3.dp)
+                            .background(Color.White.copy(alpha = 0.25f)),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(coverage.coerceIn(0f, 1f))
+                                .background(Color.White),
+                        )
+                    }
+                }
+            }
+        }
+
+        fatalMessage?.let { message ->
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.75f), RoundedCornerShape(16.dp))
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(message, color = Color.White)
                     Button(
                         onClick = { resetCapture() },
                         modifier = Modifier.padding(top = 12.dp),
                     ) {
                         Text("Recapture Target")
                     }
-                }
-                TextButton(onClick = { copyDiagnostics() }) {
-                    Text("Copy Diagnostics")
-                }
-            }
-        }
-    }
-
-    // Phase 3: guided-sweep coverage hint. Only while actively tracking and still incomplete — it
-    // disappears once the viewable arc is covered, and never blocks interaction.
-    val coverage = sweepCoverage
-    if (
-        coverage != null &&
-        coverage < 1f &&
-        referenceReady &&
-        trackingState == StandaloneTrackingState.LOCKED &&
-        fatalMessage == null
-    ) {
-        Box(modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .padding(bottom = 40.dp)
-                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
-                    .padding(horizontal = 20.dp, vertical = 10.dp),
-            ) {
-                Text(
-                    text = "Turn slowly to map the space — ${(coverage * 100f).toInt()}%",
-                    color = Color.White,
-                )
-                Box(
-                    modifier = Modifier
-                        .padding(top = 8.dp)
-                        .width(180.dp)
-                        .height(3.dp)
-                        .background(Color.White.copy(alpha = 0.25f)),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(coverage.coerceIn(0f, 1f))
-                            .background(Color.White),
-                    )
+                    TextButton(onClick = { copyDiagnostics() }) {
+                        Text("Copy Diagnostics")
+                    }
                 }
             }
         }
     }
-
-    fatalMessage?.let { message ->
-        Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(
-                modifier = Modifier
-                    .background(Color.Black.copy(alpha = 0.75f), RoundedCornerShape(16.dp))
-                    .padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(message, color = Color.White)
-                Button(
-                    onClick = { resetCapture() },
-                    modifier = Modifier.padding(top = 12.dp),
-                ) {
-                    Text("Recapture Target")
-                }
-                TextButton(onClick = { copyDiagnostics() }) {
-                    Text("Copy Diagnostics")
-                }
-            }
-        }
-    }
+    PublishOrDraw(uiHost, panel)
 }
 
 private fun bitmapToLuma(bitmap: Bitmap): ByteArray {
@@ -1523,4 +1561,22 @@ internal fun withGrownAtlasPages(
     if (grown.isEmpty()) return persisted
     val known = persisted.mapTo(HashSet()) { it.pageNo }
     return persisted + grown.filter { known.add(it.pageNo) }
+}
+
+/**
+ * Interactive UI goes to the host's onscreen layer ([StandaloneOverlayUiHost]) when there is one —
+ * AzNavRail safe zones, above the rail's touch handling — and is drawn inline otherwise. One call site
+ * is composed at a time; leaving it clears the host.
+ */
+@Composable
+private fun PublishOrDraw(host: StandaloneOverlayUiHost?, panel: @Composable () -> Unit) {
+    if (host == null) {
+        panel()
+        return
+    }
+    val current by rememberUpdatedState(panel)
+    DisposableEffect(host) {
+        host.content = { current() }
+        onDispose { host.content = null }
+    }
 }

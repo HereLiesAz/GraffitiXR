@@ -1045,7 +1045,16 @@ class ArViewModel @Inject constructor(
      * captured for that direction. The later fingerprint is anchored into this already-running map.
      */
     private val spherePhotosphere =
-        com.hereliesaz.sphereslam.PhotosphereMap(elevationBandCount = 3)
+        com.hereliesaz.sphereslam.PhotosphereMap(
+            // The whole sphere: every heading (±180° around the first keyframe's) and every
+            // elevation up to the zenith and nadir, so the ceiling and floor can be scanned too. The
+            // library default (±85° × ±60°) left the poles and everything behind the start outside
+            // the lattice — never scannable, glowing for good. 24 × 6 tiles of 15° × 30°.
+            sectorCount = PHOTOSPHERE_SECTORS,
+            viewableHalfAngleDeg = 180f,
+            elevationBandCount = PHOTOSPHERE_ELEVATION_BANDS,
+            viewableElevationHalfAngleDeg = 90f,
+        )
     private val spherePhotosphereLock = Any()
     private val _sphereCoverageFraction = MutableStateFlow(0f)
 
@@ -5802,6 +5811,12 @@ class ArViewModel @Inject constructor(
 
     // --- Doodle demo: headless fingerprint build ---
     internal companion object {
+        /** Photosphere azimuth sectors around the full 360° (15° each). */
+        const val PHOTOSPHERE_SECTORS = 24
+
+        /** Photosphere elevation bands from nadir to zenith (30° each). */
+        const val PHOTOSPHERE_ELEVATION_BANDS = 6
+
         /** How long a Measure tap waits for the GL thread to resolve it. */
         private const val MEASURE_TAP_TIMEOUT_MS = 1_000L
         /** Quiet period after the last glow-intensity slider tick before it is written to DataStore. */

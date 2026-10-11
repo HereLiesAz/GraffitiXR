@@ -44,7 +44,7 @@ class ArRailBackendPolicyTest {
     }
 
     @Test
-    fun `standalone backend redirects target capture and enables calibrated coop`() {
+    fun `standalone backend routes target capture to the overlay and enables calibrated coop`() {
         val p = arRailBackendPolicy(
             arCoreAvailabilityResolved = true,
             arCoreAvailable = false,
@@ -53,10 +53,11 @@ class ArRailBackendPolicyTest {
         )
         assertTrue(p.backendResolved)
         assertTrue(p.standalone)
-        assertFalse(p.targetRailEnabled)
+        // Target is on the rail in standalone: it starts a new target in the overlay.
+        assertTrue(p.targetRailEnabled)
+        assertNull(p.targetDisabledReason)
         assertTrue(p.coopCalibrationAvailable)
         assertFalse(p.modePreviewExportAvailable)
-        assertTrue(p.targetDisabledReason!!.contains("Wall Target"))
         assertNull(p.coopDisabledReason)
         assertTrue(p.exportDisabledReason!!.contains("not implemented"))
     }
