@@ -59,6 +59,10 @@ This document lists key files in the repository and their purposes.
     `docs/DISTORTION_HEAD.md`.
 *   `src/main/cpp/SuperPointDetector.cpp`: ONNX SuperPoint keypoint/descriptor detector, used as an
     alternative to ORB in the relocalization and fingerprint-building paths.
+*   `src/main/assets/superpoint.onnx` + `superpoint.LICENSE.txt`: SuperPoint weights from
+    rpautrat/SuperPoint (`superpoint_v6_from_tf.pth`, MIT, © 2018 Paul-Edouard Sarlin & Rémi
+    Pautrat) — not Magic Leap's. `src/main/assets/zerodce.onnx`: low-light model trained
+    independently by the project author. Provenance and licenses: `docs/MODELS.md`.
 *   `src/main/cpp/LowLightEnhancer.cpp`: Low-light frame enhancement for feature detection.
 *   `src/main/cpp/MlasStub.cpp`: Build-time stub patching a missing ONNX Runtime symbol.
 
