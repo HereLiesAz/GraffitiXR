@@ -38,4 +38,34 @@ class LiveSettingsPolicyTest {
             effectiveCameraTargetFps(CameraTargetFps.DEVICE_DEFAULT, false, batteryTier = 0),
         )
     }
+
+    @Test
+    fun `standalone keeps device default unpinned under battery pressure`() {
+        for (tier in 0..3) {
+            val fps = standaloneEffectiveCameraTargetFps(CameraTargetFps.DEVICE_DEFAULT, true, batteryTier = tier)
+            assertEquals(CameraTargetFps.DEVICE_DEFAULT, fps)
+            // ...so the AE range is left to the device, never pinned to [30, 30].
+            assertEquals(
+                null,
+                StandaloneCameraTuning.chooseAeTargetFpsRange(
+                    listOf(intArrayOf(15, 30), intArrayOf(30, 30), intArrayOf(60, 60)),
+                    fps,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `standalone battery cap only lowers explicit higher rates`() {
+        assertEquals(CameraTargetFps.FPS_30, standaloneEffectiveCameraTargetFps(CameraTargetFps.FPS_60, true, batteryTier = 1))
+        assertEquals(CameraTargetFps.FPS_30, standaloneEffectiveCameraTargetFps(CameraTargetFps.DEVICE_MAX, true, batteryTier = 2))
+        assertEquals(CameraTargetFps.FPS_30, standaloneEffectiveCameraTargetFps(CameraTargetFps.FPS_30, true, batteryTier = 2))
+        assertEquals(CameraTargetFps.FPS_60, standaloneEffectiveCameraTargetFps(CameraTargetFps.FPS_60, true, batteryTier = 0))
+        assertEquals(CameraTargetFps.FPS_60, standaloneEffectiveCameraTargetFps(CameraTargetFps.FPS_60, false, batteryTier = 3))
+    }
+
+    @Test
+    fun `ARCore cap is unchanged - device default still caps to 30 under pressure`() {
+        assertEquals(CameraTargetFps.FPS_30, effectiveCameraTargetFps(CameraTargetFps.DEVICE_DEFAULT, true, batteryTier = 1))
+    }
 }

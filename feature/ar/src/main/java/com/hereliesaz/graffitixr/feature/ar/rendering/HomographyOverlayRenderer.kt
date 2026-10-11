@@ -9,7 +9,6 @@ import android.os.SystemClock
 import com.hereliesaz.sphereslam.CoverageGlowProjection
 import com.hereliesaz.sphereslam.SphereCoverage
 import com.hereliesaz.sphereslam.attitude.AttitudeExtrapolator
-import com.hereliesaz.sphereslam.attitude.DeviceCameraRotation
 import com.hereliesaz.sphereslam.attitude.DisplayPosePredictor
 import com.hereliesaz.sphereslam.camera.CameraFillCenter
 import com.hereliesaz.sphereslam.camera.CameraIntrinsics
@@ -19,8 +18,8 @@ import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 /**
- * CameraX-backed transparent `GLSurfaceView.Renderer` shared by standalone SphereSLAM AR and the
- * legacy homography Overlay tracker. It draws [OverlayRenderer]'s design quad from the view/projection
+ * CameraX-backed transparent `GLSurfaceView.Renderer` for standalone SphereSLAM AR (the class name
+ * predates the removal of the legacy homography Overlay tracker). It draws [OverlayRenderer]'s design quad from the view/projection
  * pair supplied by the active tracker above [com.hereliesaz.graffitixr.feature.ar.CameraPreview] —
  * the same
  * `setZOrderMediaOverlay(true)` + `PixelFormat.TRANSLUCENT` pattern `MainScreen.kt` already uses
@@ -47,7 +46,7 @@ import javax.microedition.khronos.opengles.GL10
  * ([CoverageGlowRenderer.drawEmbedded]), on the full surface and BEFORE the design quad, so it
  * composites above the camera preview and beneath the artwork. A window-level View cannot do that:
  * this media-overlay surface sits behind the app window, so any View drawn in the window washes over
- * the artwork too. The legacy homography fallback passes none. Since SphereSLAM 0.24.3 the glow is
+ * the artwork too. Since SphereSLAM 0.24.3 the glow is
  * re-projected on every draw (display rate) with the full camera rotation (roll included, defined at
  * the poles) from [setAttitude]'s extrapolator at this draw's `elapsedRealtimeNanos`, through the
  * lens of what the screen shows ([setGlowFrameIntrinsics] → [CameraFillCenter.intrinsics], rebuilt
@@ -108,8 +107,8 @@ class HomographyOverlayRenderer(
 
     // Whole-design transform. All six components move together, so they are bundled into one immutable
     // snapshot behind an AtomicReference: writing six loose @Volatile fields let the GL thread read a
-    // torn set (a new pan with the old scale/rotation) for one frame during a drag. Defaults preserve
-    // the existing homography-fallback behavior.
+    // torn set (a new pan with the old scale/rotation) for one frame during a drag. The default is the
+    // identity transform.
     private val transform = java.util.concurrent.atomic.AtomicReference(
         StandaloneRenderTransform(
             panX = 0f, panY = 0f, scale = 1f, rotationZDeg = 0f, rotationXDeg = 0f, rotationYDeg = 0f,
@@ -139,16 +138,13 @@ class HomographyOverlayRenderer(
      */
     fun clearPose() {
         latestFrame.set(null)
-        posePredictor?.clear()
+        attitude.clearPrediction()
     }
 
     // ---- Attitude: display-rate glow rotation + artwork pose prediction ----------------------
 
-    @Volatile private var attitudeExtrapolator: AttitudeExtrapolator? = null
-    @Volatile private var posePredictor: DisplayPosePredictor? = null
-
-    /** Row-major GL-camera-from-device of the display-upright preview; replaced whole, never mutated. */
-    @Volatile private var cameraFromDisplay: FloatArray = DeviceCameraRotation.cameraFromDeviceForDisplayFrame(0)
+    // GL-free attitude wiring (unit-tested in StandaloneAttitudeWiringTest).
+    private val attitude = StandaloneAttitudeWiring()
 
     // GL-thread scratch for the predicted artwork view.
     private val predictedView = FloatArray(16)
@@ -161,18 +157,19 @@ class HomographyOverlayRenderer(
      * covers the whole view) and disables prediction. Any thread.
      */
     fun setAttitude(extrapolator: AttitudeExtrapolator?, predictor: DisplayPosePredictor?) {
-        attitudeExtrapolator = extrapolator
-        posePredictor = predictor
-        coverageGlow?.rotationSource = extrapolator?.let { source ->
+        attitude.set(extrapolator, predictor)
+        coverageGlow?.rotationSource = if (extrapolator == null) {
+            null
+        } else {
             CoverageGlowRenderer.RotationSource { frameTimeNanos, out ->
-                source.worldFromCameraAt(frameTimeNanos, cameraFromDisplay, out)
+                attitude.worldFromCameraAt(frameTimeNanos, out)
             }
         }
     }
 
     /** The current display rotation in degrees (0/90/180/270); the glow's camera frame. Any thread. */
     fun setDisplayRotation(displayRotationDeg: Int) {
-        cameraFromDisplay = DeviceCameraRotation.cameraFromDeviceForDisplayFrame(displayRotationDeg)
+        attitude.setDisplayRotation(displayRotationDeg)
     }
 
     /**
@@ -188,17 +185,10 @@ class HomographyOverlayRenderer(
     @Volatile private var glowFrameIntrinsics: CameraIntrinsics? = null
 
     // GL-thread cache of the glow lens key.
-    private var glowLensIntrinsics: CameraIntrinsics? = null
-    private var glowLensWidth = 0
-    private var glowLensHeight = 0
+    private val glowLensCache = GlowLensCache()
 
     private fun refreshGlowLens(glow: CoverageGlowRenderer, width: Int, height: Int) {
-        val frame = glowFrameIntrinsics ?: return
-        if (frame == glowLensIntrinsics && width == glowLensWidth && height == glowLensHeight) return
-        glowLensIntrinsics = frame
-        glowLensWidth = width
-        glowLensHeight = height
-        val shown = CameraFillCenter.intrinsics(frame, width, height) ?: return
+        val shown = glowLensCache.lensIntrinsicsIfChanged(glowFrameIntrinsics, width, height) ?: return
         runCatching { glow.setLens(CoverageGlowProjection.Lens.fromIntrinsics(shown)) }
             .onFailure { timber.log.Timber.w(it, "Rejected coverage glow lens") }
     }
@@ -272,7 +262,7 @@ class HomographyOverlayRenderer(
         textureUpdates.clear()
     }
 
-    /** The design quad's half-extents — MUST match what was passed to `BridgedHomographyTracker.setReference`. */
+    /** The design quad's half-extents — in the tracked wall units of the reference page. */
     fun setExtent(halfW: Float, halfH: Float) {
         extentHalfW = halfW
         extentHalfH = halfH
@@ -364,13 +354,7 @@ class HomographyOverlayRenderer(
         Matrix.rotateM(localModel4, 0, t.rotationZDeg, 0f, 0f, 1f)
         Matrix.scaleM(localModel4, 0, t.scale, t.scale, 1f)
         Matrix.multiplyMM(model4, 0, anchor, 0, localModel4, 0)
-        val view = ArtworkPosePrediction.viewForDraw(
-            predictor = posePredictor,
-            attitude = attitudeExtrapolator,
-            nowNs = nowNs,
-            lastVisionView = frame.viewMatrix,
-            scratch = predictedView,
-        )
+        val view = attitude.viewForDraw(nowNs, frame.viewMatrix, predictedView)
         overlayRenderer.draw(
             view,
             projection,

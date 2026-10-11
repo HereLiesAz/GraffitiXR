@@ -5,6 +5,7 @@ import com.hereliesaz.graffitixr.common.model.CoverageGlowIntensity
 import com.hereliesaz.graffitixr.common.model.CoverageGlowStyle
 import com.hereliesaz.sphereslam.SphereCoverage
 import com.hereliesaz.sphereslam.overlay.CoverageGlowRenderer
+import kotlin.math.pow
 
 /**
  * Maps the persisted [CoverageGlowStyle] onto SphereSLAM's `:overlay` renderer: which
@@ -51,12 +52,19 @@ internal object CoverageGlowStyleMapping {
 
     /**
      * Peak opacity of the edge glow ([CoverageGlowRenderer.outlineAlpha]) for the user's glow
-     * [intensity]. The edge is a thin band, so it runs [OUTLINE_ALPHA_GAIN]× brighter than the wash:
-     * the shipped 14% wash gives ≈ 0.49 (the library's own default edge is 0.5), the slider's 60%
-     * maximum saturates at 1, and 0 still means "no glow".
+     * [intensity] (the wash opacity, `0..`[CoverageGlowIntensity.MAX]).
+     *
+     * The slider's full range spans the edge's full range: `edge = (intensity / MAX)^`
+     * [OUTLINE_ALPHA_EXPONENT]. The exponent (`ln 0.5 / ln(0.14 / 0.6)` ≈ 0.477) puts the shipped
+     * 14% wash at ≈ 0.5 — the library's own default edge — while 0 is still "no glow" and only the
+     * slider's 60% maximum reaches 1, so every step of the slider changes the edge. (A linear gain
+     * of 3.5 saturated at ≈ 29%, leaving the top half of the slider dead for the edge styles.)
      */
-    fun outlineAlphaFor(intensity: Float): Float =
-        (CoverageGlowIntensity.sanitize(intensity) * OUTLINE_ALPHA_GAIN).coerceIn(0f, 1f)
+    fun outlineAlphaFor(intensity: Float): Float {
+        val fraction = (CoverageGlowIntensity.sanitize(intensity) / CoverageGlowIntensity.MAX)
+            .coerceIn(0f, 1f)
+        return fraction.toDouble().pow(OUTLINE_ALPHA_EXPONENT).toFloat().coerceIn(0f, 1f)
+    }
 
     /**
      * Edge glow width in framebuffer pixels ([CoverageGlowRenderer.outlineWidthPx]) for a display
@@ -68,8 +76,8 @@ internal object CoverageGlowStyleMapping {
         return (OUTLINE_WIDTH_DP * d).coerceIn(1f, CoverageGlowRenderer.MAX_OUTLINE_WIDTH_PX)
     }
 
-    /** Edge-glow brightness relative to the wash intensity. */
-    const val OUTLINE_ALPHA_GAIN = 3.5f
+    /** Curve of the edge opacity over the slider fraction; 14% of a 60% slider → 0.5. */
+    const val OUTLINE_ALPHA_EXPONENT = 0.4771
 
     /** Edge-glow width: about a fingertip's edge on a phone, wide enough to read at arm's length. */
     const val OUTLINE_WIDTH_DP = 10f

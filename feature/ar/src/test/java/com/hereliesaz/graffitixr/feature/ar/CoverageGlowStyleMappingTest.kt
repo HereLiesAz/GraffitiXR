@@ -88,18 +88,32 @@ class CoverageGlowStyleMappingTest {
     @Test
     fun `edge alpha follows the intensity setting and stays a valid renderer alpha`() {
         // The shipped 14% wash maps to about the library's own 0.5 default edge.
-        assertEquals(0.49f, CoverageGlowStyleMapping.outlineAlphaFor(0.14f), 1e-4f)
+        assertEquals(0.5f, CoverageGlowStyleMapping.outlineAlphaFor(0.14f), 0.005f)
         assertEquals(0f, CoverageGlowStyleMapping.outlineAlphaFor(0f), 0f)
-        assertEquals(1f, CoverageGlowStyleMapping.outlineAlphaFor(0.6f), 0f)
+        assertEquals(1f, CoverageGlowStyleMapping.outlineAlphaFor(0.6f), 1e-6f)
         // Out-of-range / non-finite settings are sanitized like the wash intensity.
-        assertEquals(1f, CoverageGlowStyleMapping.outlineAlphaFor(5f), 0f)
-        assertEquals(0.49f, CoverageGlowStyleMapping.outlineAlphaFor(Float.NaN), 1e-4f)
+        assertEquals(1f, CoverageGlowStyleMapping.outlineAlphaFor(5f), 1e-6f)
+        assertEquals(0.5f, CoverageGlowStyleMapping.outlineAlphaFor(Float.NaN), 0.005f)
         var previous = -1f
         for (step in 0..60) {
             val alpha = CoverageGlowStyleMapping.outlineAlphaFor(step / 100f)
             org.junit.Assert.assertTrue(alpha in 0f..1f && alpha >= previous)
             previous = alpha
         }
+    }
+
+    @Test
+    fun `the whole slider range drives the edge alpha - no dead top half`() {
+        // Strictly increasing over every whole-percent step of 0..60%: the old linear 3.5x gain
+        // saturated at about 29%, so 29..60% all drew the same edge.
+        var previous = CoverageGlowStyleMapping.outlineAlphaFor(0f)
+        for (step in 1..60) {
+            val alpha = CoverageGlowStyleMapping.outlineAlphaFor(step / 100f)
+            org.junit.Assert.assertTrue("step=$step alpha=$alpha previous=$previous", alpha > previous)
+            previous = alpha
+        }
+        org.junit.Assert.assertTrue(CoverageGlowStyleMapping.outlineAlphaFor(0.59f) < 0.995f)
+        org.junit.Assert.assertTrue(CoverageGlowStyleMapping.outlineAlphaFor(0.30f) < 0.8f)
     }
 
     @Test

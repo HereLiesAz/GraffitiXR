@@ -1055,8 +1055,10 @@ class ArViewModel @Inject constructor(
     val sphereCurrentRegions: StateFlow<List<com.hereliesaz.sphereslam.SphereCoverage.TileRegion>> =
         _sphereCurrentRegions.asStateFlow()
 
-    // Seeded from the fresh map (every tile starts needing an update), so the "missing tiles only"
-    // glow style covers the whole sphere before the first keyframe, matching the wash style.
+    // Seeded from the map at construction. Before the first keyframe anchors the map's wall heading,
+    // regionsNeedingUpdate() is EMPTY (every tile needs an update, but none has a direction yet);
+    // CoverageGlowStyleMapping.regionsFor reads "no current and no needing-update regions" as "the
+    // whole view", so the "missing tiles only" style still glows everywhere until then, like the wash.
     private val _sphereRegionsNeedingUpdate =
         MutableStateFlow(spherePhotosphere.regionsNeedingUpdate())
 
@@ -1093,6 +1095,15 @@ class ArViewModel @Inject constructor(
      */
     fun latestStandaloneAttitudeSample(): com.hereliesaz.sphereslam.attitude.AttitudeSample? =
         cameraAttitudeProvider.latestSample()
+
+    /**
+     * Whether the device has the standalone attitude sensor (`TYPE_ROTATION_VECTOR`). When false
+     * ([startStandaloneCameraAttitude] bails), the host must NOT wire [latestStandaloneAttitudeSample]
+     * / [standaloneAttitudeExtrapolator] into the tracking session: they would stay empty forever
+     * and suppress the analyzer's own game-rotation fallback (no frame attitude, no gyro bridge).
+     */
+    val isStandaloneAttitudeSensorAvailable: Boolean
+        get() = cameraAttitudeProvider.isAvailable
 
     /** Latest camera attitude (headingDeg, elevationDeg) stamped on photosphere keyframes, or null. */
     val latestCameraAttitude: Pair<Float, Float>?

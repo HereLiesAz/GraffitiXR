@@ -14,6 +14,7 @@ import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.sphereslam.PhotosphereKeyframe
+import com.hereliesaz.sphereslam.attitude.AttitudeExtrapolator
 import com.hereliesaz.sphereslam.attitude.AttitudeSample
 import com.hereliesaz.sphereslam.attitude.DeviceCameraRotation
 import com.hereliesaz.sphereslam.attitude.DisplayPosePredictor
@@ -126,10 +127,14 @@ internal data class StandaloneAtlasGrowthCandidate(
  * bridge, multi-page atlas growth and the failure taxonomy. This class is the Android/app adapter
  * around it: CameraX frames (full Y plane, packed and rotated to display orientation), Camera2
  * characteristics (intrinsics, sensor orientation, timestamp source), the device attitude
- * ([attitudeSample]: the host's `CameraAttitudeProvider`, `TYPE_ROTATION_VECTOR` — the same sensor
- * that stamps keyframes and drives the display-rate glow and [displayPosePredictor]; only when the
- * host wires none does the analyzer fall back to its own [GameRotationAttitudeSource] and leave the
- * predictor unwired), the native MobileGS relocalizer (seeded on every planar-session build, fed
+ * ([attitudeSample] / [attitudeExtrapolator]: the host's `CameraAttitudeProvider`,
+ * `TYPE_ROTATION_VECTOR` — the same sensor that stamps keyframes and drives the display-rate glow and
+ * [displayPosePredictor]. The host wires it only when the device HAS that sensor; with none wired —
+ * a phone without a rotation vector — the analyzer samples its own [GameRotationAttitudeSource] for
+ * `Frame.attitude` (base photosphere pose and gyro bridge) and leaves the predictor unwired, because
+ * a predictor must read the same sensor as `Frame.attitude`. The choice is made once per analyzer,
+ * never per frame: mixing sensors between a bridge reference and a later frame would rotate the pose
+ * by the yaw offset between two unrelated world frames), the native MobileGS relocalizer (seeded on every planar-session build, fed
  * each frame, and corroborating the accepted KPM pose through the session's `correctAcceptedPose`
  * hook), optional MiDaS depth for MobileGS, and the UI callbacks.
  *
@@ -205,9 +210,16 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
      * Device attitude for every frame (`Frame.attitude`: base photosphere pose, gyro bridge, pose
      * prediction): the host's `CameraAttitudeProvider.latestSample()`. Null = the analyzer samples
      * its own `TYPE_GAME_ROTATION_VECTOR` and [displayPosePredictor] is not wired (a predictor must
-     * read the same sensor as `Frame.attitude`).
+     * read the same sensor as `Frame.attitude`). Pass null on a device without the host's sensor.
      */
     attitudeSample: (() -> AttitudeSample?)? = null,
+    /**
+     * The same host sensor's timestamped history (`CameraAttitudeProvider.attitudeExtrapolator`).
+     * With a `REALTIME` camera timestamp source it supplies the attitude AT each frame's capture time
+     * ([StandaloneFrameAttitude.atCapture]) rather than the latest sample at analyze() time, which is
+     * what the gyro bridge and [DisplayPosePredictor.update] require. Ignored without [attitudeSample].
+     */
+    private val attitudeExtrapolator: AttitudeExtrapolator? = null,
     /**
      * Receives every rendered pose from the session for display-rate re-posing on the GL thread
      * (`HomographyOverlayRenderer`), cleared whenever a frame yields no pose. Ignored without
@@ -222,6 +234,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         if (attitudeSample == null) GameRotationAttitudeSource(context) else null
     private val readAttitude: () -> AttitudeSample? =
         attitudeSample ?: { ownAttitudeSource?.latestSample() }
+    private val captureAttitudeHistory: AttitudeExtrapolator? =
+        attitudeExtrapolator.takeIf { attitudeSample != null }
+    private val captureAttitudeScratch = FloatArray(4)
 
     // Pooled display-upright luma (SphereSLAM LumaFrameBufferPool); see the class doc for the reuse
     // contract. Two slots: the frame being analysed plus one of slack.
@@ -324,9 +339,11 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 )
                 // Record the device bearing at this keyframe (the angular glue for the surrounding
                 // sphere). Best-effort: skip silently when the sensor hasn't produced a sample.
-                attitude?.let {
-                    onKeyframeOrientation(android.os.SystemClock.elapsedRealtimeNanos(), it.quaternion)
-                }
+                // The library hands back the PROPOSING frame's Frame.attitude (growth is adopted
+                // frames later); its timestamp is that frame's capture time when the capture-time
+                // attitude was available (StandaloneFrameAttitude), else that sample's sensor time —
+                // either way the proposing frame's, not this adoption's, elapsedRealtimeNanos base.
+                attitude?.let { onKeyframeOrientation(it.timestampNs, it.quaternion) }
             },
             onFailure = { event -> reportFailure(event) },
             onTrackingStateChanged = { state -> reportTrackingState(state) },
@@ -501,8 +518,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
 
             // The tracked image is the raw buffer rotated CW by rotationDeg, so the device body maps
             // into its GL camera frame by R_z(sensorOrientation - rotationDeg) (== the display
-            // rotation for a rear camera). The attitude is sampled BEFORE the synchronous solve so a
-            // committed bridge reference sits at this frame's capture time.
+            // rotation for a rear camera). The attitude is the one AT this frame's capture time
+            // (interpolated from the host sensor's history on a REALTIME timestamp source), so a
+            // committed bridge reference and the display predictor's anchor both sit at the frame
+            // the pose is solved from, not at analyze() time (a frame can queue for tens of ms).
             val cameraFromDevice =
                 DeviceCameraRotation.cameraFromDevice(sensorOrientationDeg, rotationDeg)
             val timestampNs = image.imageInfo.timestamp
@@ -513,7 +532,14 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                     luma = rotated.bytes,
                     intrinsics = intrinsics,
                     timestampNs = timestampNs,
-                    attitude = readAttitude(),
+                    attitude = StandaloneFrameAttitude.atCapture(
+                        latest = readAttitude(),
+                        history = captureAttitudeHistory,
+                        frameTimestampNs = timestampNs,
+                        frameTimestampIsRealtime =
+                            cameraTimestampSource == StandaloneCameraTimestampSource.REALTIME,
+                        scratch = captureAttitudeScratch,
+                    ),
                     cameraFromDevice = cameraFromDevice,
                     headingDeg = heading?.first,
                     elevationDeg = heading?.second,

@@ -568,7 +568,7 @@ inferred:
   (host-native). Mutation-checked: restoring the old `C·R·C` flip fails it. Was **blocked**: pure native C++ (OpenCV), no host OpenCV
   available (`pkg-config --exists opencv4` fails, no `libopencv_core*` anywhere on this machine)
   and no `androidTest` source set exists anywhere in the repo to run it on-device instead.
-- [~] `HomographyFallbackOverlay`: **`cameraId` half done** — the id → `CameraManager` →
+- [x] ~~`HomographyFallbackOverlay`~~ — **obsolete**: the overlay, `HomographyTrackingAnalyzer` and `BridgedHomographyTracker` were removed as dead code (no caller) in the SphereSLAM 0.24.3 follow-up; the notes below are historical. Was: **`cameraId` half done** — the id → `CameraManager` →
   intrinsics seam the overlay's analyzer feeds is SphereSLAM's `camera.CameraIntrinsicsEstimator`
   since 0.24.0 and is tested there (the app's `CameraIntrinsicsEstimatorCameraIdTest` went with
   the move). **Texture-clear-on-null

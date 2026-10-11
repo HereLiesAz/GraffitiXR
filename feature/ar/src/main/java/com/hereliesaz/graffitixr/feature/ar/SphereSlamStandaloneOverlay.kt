@@ -263,10 +263,14 @@ fun SphereSlamStandaloneOverlay(
     onReferenceRegistrationChanged: (Boolean) -> Unit = {},
     onDiagnostic: (String) -> Unit = {},
     /**
-     * Per-keyframe device orientation `(timestampNs, quaternion[x,y,z,w])` sampled at each atlas-growth
-     * keyframe — Phase 1b of the spherical-coverage map (`docs/SPHERESLAM_SPHERE_MAP.md`). Storage only;
-     * the view model gates recording on the feature-map flag and persists the log. Fired on the camera
-     * worker thread, so the handler must be thread-safe.
+     * Per-keyframe device orientation `(timestampNs, quaternion[x,y,z,w])` of the frame that proposed
+     * each atlas-growth page — Phase 1b of the spherical-coverage map (`docs/SPHERESLAM_SPHERE_MAP.md`).
+     * The quaternion is body→world: East-North-Up (`TYPE_ROTATION_VECTOR`, north-referenced) when the
+     * host attitude ([attitudeSample]) is wired, otherwise the analyzer's own game rotation vector,
+     * whose yaw origin is arbitrary per session (only relative orientations are meaningful then). The
+     * timestamp is that frame's capture time (`elapsedRealtimeNanos` base), not when the growth was
+     * adopted. Storage only; the view model gates recording on the feature-map flag and persists the
+     * log. Fired on the camera worker thread, so the handler must be thread-safe.
      */
     onKeyframeOrientation: (Long, FloatArray) -> Unit = { _, _ -> },
     /**
@@ -311,13 +315,16 @@ fun SphereSlamStandaloneOverlay(
     /**
      * The host's `CameraAttitudeProvider.attitudeExtrapolator` (`TYPE_ROTATION_VECTOR`, sampled at
      * `SENSOR_DELAY_GAME`): drives the display-rate glow rotation and the artwork's per-draw pose
-     * prediction. Null: the glow stays an unprojected wash and the artwork moves at analyzer rate.
+     * prediction, and gives the tracking session each frame's capture-time attitude. Null (pass null
+     * on a device without that sensor): the glow stays an unprojected wash and the artwork moves at
+     * analyzer rate.
      */
     attitudeExtrapolator: AttitudeExtrapolator? = null,
     /**
-     * The same provider's `latestSample()`, handed to the tracking session as `Frame.attitude` so the
-     * pose predictor reads one sensor. Null: the analyzer samples its own game-rotation sensor and
-     * no pose prediction runs.
+     * The same provider's `latestSample()`, the tracking session's `Frame.attitude` fallback when a
+     * frame's capture-time attitude is unavailable, so the pose predictor reads one sensor. Null (the
+     * host passes null without the sensor): the analyzer samples its own game-rotation sensor for
+     * `Frame.attitude` (base photosphere + gyro bridge) and no pose prediction runs.
      */
     attitudeSample: (() -> AttitudeSample?)? = null,
     /**
@@ -378,6 +385,11 @@ fun SphereSlamStandaloneOverlay(
         mutableStateOf(StandaloneTrackingState.INITIALIZING)
     }
     var fatalMessage by remember { mutableStateOf<String?>(null) }
+    // The current analyzer reported a fatal error. Its SphereSLAM session is terminal (it ignores
+    // every later frame and never resets), so tracking resumes only through a NEW analyzer:
+    // bumping analyzerRestartGeneration (a key of the analyzer effect) recreates it.
+    var analyzerFatal by remember { mutableStateOf(false) }
+    var analyzerRestartGeneration by remember { mutableStateOf(0) }
     var currentFailure by remember { mutableStateOf<StandaloneFailureEvent?>(null) }
     var calibrationDiagnostics by remember {
         mutableStateOf<StandaloneCalibrationDiagnostics?>(null)
@@ -411,6 +423,12 @@ fun SphereSlamStandaloneOverlay(
                 previousReferenceWidthMeters = activeReferenceWidthMeters
                 previousReferencePhysicallyMetric = activeReferencePhysicallyMetric
             }
+        }
+        // A fatal analyzer would silently ignore the recaptured target: start a fresh one (base
+        // mapping resumes at once; the new target arrives through updatePrecisionLayer).
+        if (shouldRestartAnalyzerOnRecapture(analyzerFatal)) {
+            analyzerFatal = false
+            analyzerRestartGeneration++
         }
         rawCaptureBitmap = null
         pendingReferenceBitmap = null
@@ -1023,7 +1041,7 @@ fun SphereSlamStandaloneOverlay(
     // desync), OIS kept. Keyed on the effective rate so a Settings change (or the adaptive battery
     // cap) applies immediately; the shared controller's defaults are restored on exit.
     // See StandaloneCameraTuning.kt.
-    val standaloneTargetFps = effectiveCameraTargetFps(
+    val standaloneTargetFps = standaloneEffectiveCameraTargetFps(
         targetFps = cameraTargetFps,
         adaptiveRateEnabled = adaptiveRateEnabled,
         batteryTier = batteryTier,
@@ -1048,6 +1066,7 @@ fun SphereSlamStandaloneOverlay(
         peerOnlyTracking,
         coopPeerSpatialFrame,
         coopPeerFingerprint,
+        analyzerRestartGeneration,
     ) {
         // Re-arm the UI-post gate: a prior disposal set this true, and this fresh analyzer's posts
         // must be delivered again.
@@ -1185,6 +1204,7 @@ fun SphereSlamStandaloneOverlay(
                 onFrameTracked = ::consumeTrackedFrame,
                 cameraAttitude = cameraAttitude,
                 attitudeSample = attitudeSample.takeIf { posePredictionWired },
+                attitudeExtrapolator = attitudeExtrapolator.takeIf { posePredictionWired },
                 displayPosePredictor = displayPosePredictor.takeIf { posePredictionWired },
                 cameraRollDegrees = cameraRollDegrees,
                 onMapFromFingerprintSolved = onMapFromFingerprintSolved,
@@ -1214,9 +1234,16 @@ fun SphereSlamStandaloneOverlay(
                 depthEstimator = depthEstimator,
                 onFatalError = { error ->
                     postUi {
-                        if (error is StandaloneReferenceTooWeakException) {
-                            val old = previousReferenceBitmap
-                            if (old != null) {
+                        analyzerFatal = true
+                        val tooWeak = error as? StandaloneReferenceTooWeakException
+                        val old = previousReferenceBitmap
+                        when (
+                            standaloneFatalRecovery(
+                                referenceTooWeak = tooWeak != null,
+                                hasPreviousValidatedReference = old != null,
+                            )
+                        ) {
+                            StandaloneFatalRecovery.RESTORE_PREVIOUS_AND_RESTART -> {
                                 activeReferenceWidthMeters = previousReferenceWidthMeters
                                 activeReferencePhysicallyMetric =
                                     previousReferencePhysicallyMetric
@@ -1227,22 +1254,32 @@ fun SphereSlamStandaloneOverlay(
                                 currentFailure = null
                                 fatalMessage = null
                                 referenceBitmap = old
+                                // The session that rejected the weak page is terminal: recreate
+                                // the analyzer so it tracks the restored page. The base photosphere
+                                // tiles/keyframes live in the view model (heading/elevation keyed),
+                                // so they survive; the new session re-seeds its rotation-only map
+                                // frame from its first attitude and re-solves map_from_fingerprint
+                                // on its first lock — exactly as on any pause/resume restart.
+                                analyzerFatal = false
+                                analyzerRestartGeneration++
                                 onDiagnostic(
                                     "SphereSLAM replacement target rejected: " +
-                                        "features=${error.featureCount} " +
-                                        "minimum=${error.minimumFeatureCount}; " +
-                                        "restored previous validated target",
+                                        "features=${tooWeak?.featureCount} " +
+                                        "minimum=${tooWeak?.minimumFeatureCount}; " +
+                                        "restored previous validated target, restarting analyzer",
                                 )
-                            } else {
+                            }
+                            StandaloneFatalRecovery.REPORT_TOO_WEAK -> {
                                 fatalMessage =
                                     "That target has too little trackable detail " +
-                                        "(${error.featureCount} KPM features; need " +
-                                        "${error.minimumFeatureCount}). Recapture a richer wall patch."
+                                        "(${tooWeak?.featureCount} KPM features; need " +
+                                        "${tooWeak?.minimumFeatureCount}). Recapture a richer wall patch."
                             }
-                        } else {
-                            val event = StandaloneFailureClassifier.fromThrowable(error)
-                            currentFailure = event
-                            fatalMessage = event.userMessage
+                            StandaloneFatalRecovery.REPORT_FAILURE -> {
+                                val event = StandaloneFailureClassifier.fromThrowable(error)
+                                currentFailure = event
+                                fatalMessage = event.userMessage
+                            }
                         }
                     }
                 },
@@ -1320,19 +1357,13 @@ fun SphereSlamStandaloneOverlay(
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = currentFailure
-                        ?.takeIf { it.severity != StandaloneFailureSeverity.FATAL }
-                        ?.userMessage
-                        ?: if (!referenceReady && referenceImage == null) {
-                            "SphereSLAM mapping • tap Target to add fingerprint"
-                        } else if (!referenceReady) {
-                            // SphereSLAM 0.24.3 builds the KPM matcher on its own background
-                            // thread; until the build lands every frame carries no pose. That is
-                            // not a failure and the target exists, so don't ask for a new one.
-                            "Preparing fingerprint target…"
-                        } else {
-                            "Finding fingerprint target…"
-                        },
+                    text = standaloneInitializingStatusText(
+                        analyzerFatal = analyzerFatal,
+                        fatalMessage = fatalMessage,
+                        currentFailure = currentFailure,
+                        referenceReady = referenceReady,
+                        hasReference = referenceImage != null,
+                    ),
                     color = Color.White,
                     modifier = Modifier
                         .padding(top = 32.dp)
