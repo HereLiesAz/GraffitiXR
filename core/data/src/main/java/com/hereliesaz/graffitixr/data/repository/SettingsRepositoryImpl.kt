@@ -277,7 +277,9 @@ class SettingsRepositoryImpl @Inject constructor(
     // backend, so an ARCore device pays nothing. (Was briefly opt-in after a
     // startup crash: the old Depth Anything model used an 8-bit MatMulNBits op ORT rejects, and R8 had
     // stripped ai.onnxruntime.OrtException so the failure aborted instead of being caught. MiDaS Small
-    // avoids that op and the ORT keep rule makes any load error fail soft, so it is safe on again.)
+    // avoids that op and now runs on LiteRT, not ORT; the SphereSLAM :models AAR ships the consumer R8
+    // keep rules for both runtimes (app/proguard-rules.pro no longer carries its own ORT rule), so a
+    // load error fails soft and it is safe on again.)
     override val monocularDepthEnabled: Flow<Boolean> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { preferences -> preferences[MONOCULAR_DEPTH_ENABLED] ?: true }

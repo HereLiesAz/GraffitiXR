@@ -58,9 +58,13 @@ class EvalRngSeedGuardTest {
 
     @Test
     fun `a release build never reaches the native seeder`() {
-        // If the `if (debuggable)` guard were removed from the real method, this would also throw
-        // UnsatisfiedLinkError instead of returning normally.
-        slamManager.setEvalRngSeedIfDebuggable(20260801L, debuggable = false)
+        // If the `if (debuggable)` guard were removed from the real method, the call would reach
+        // JNI and throw UnsatisfiedLinkError instead of returning normally.
+        try {
+            slamManager.setEvalRngSeedIfDebuggable(20260801L, debuggable = false)
+        } catch (e: UnsatisfiedLinkError) {
+            fail("the release (debuggable=false) branch reached nativeSetEvalRngSeed: $e")
+        }
     }
 
     /**
@@ -115,7 +119,10 @@ class SlamManagerEvalSeedContractTest {
 
     @Test
     fun `the raw seeder and its clear counterpart exist`() {
-        SlamManager::class.java.getMethod("setEvalRngSeed", Long::class.javaPrimitiveType)
-        SlamManager::class.java.getMethod("clearEvalRngSeed")
+        val seed = SlamManager::class.java.getMethod("setEvalRngSeed", Long::class.javaPrimitiveType)
+        assertEquals(Void.TYPE, seed.returnType)
+        val clear = SlamManager::class.java.getMethod("clearEvalRngSeed")
+        assertEquals(0, clear.parameterCount)
+        assertEquals(Void.TYPE, clear.returnType)
     }
 }
