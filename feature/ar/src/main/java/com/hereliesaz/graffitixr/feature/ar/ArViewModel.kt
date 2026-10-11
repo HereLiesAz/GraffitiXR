@@ -4805,7 +4805,7 @@ class ArViewModel @Inject constructor(
                     )
                 }
                 appendDiag(
-                    "SphereSLAM target review source=${sourceWidth}x${sourceHeight} " +
+                    "SphereSLAM target staged for review source=${sourceWidth}x${sourceHeight} " +
                         "working=${reviewBitmap.width}x${reviewBitmap.height}"
                 )
             } catch (e: Exception) {
