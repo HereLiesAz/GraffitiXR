@@ -780,9 +780,10 @@ bool MobileGS::computeRectifyHomography(const float* viewCur16, cv::Mat& Hcur_fp
     double cosA = std::abs(nCur[2]) / (cv::norm(nCur) + 1e-9);
     obliquityDeg = std::acos(std::min(1.0, cosA)) * 180.0 / CV_PI;
 
-    // Plane-induced homography current-image <- fingerprint-image:  H = K (R - t nᵀ / d) K⁻¹.
+    // Plane-induced homography current-image <- fingerprint-image:  H = K (R + t nᵀ / d) K⁻¹.
+    // With n·X_fp = d:  X_cur = R X_fp + t = R X_fp + t (nᵀX_fp)/d = (R + t nᵀ/d) X_fp.
     cv::Matx33d K(fx, 0, cx, 0, fy, cy, 0, 0, 1);
-    cv::Matx33d M = R - (1.0 / d) * (cv::Matx31d(t[0], t[1], t[2]) * cv::Matx13d(n[0], n[1], n[2]));
+    cv::Matx33d M = R + (1.0 / d) * (cv::Matx31d(t[0], t[1], t[2]) * cv::Matx13d(n[0], n[1], n[2]));
     cv::Matx33d Hc = K * M * K.inv();
     if (std::abs(Hc(2,2)) < 1e-9) return false;
     Hc = (1.0 / Hc(2,2)) * Hc;
