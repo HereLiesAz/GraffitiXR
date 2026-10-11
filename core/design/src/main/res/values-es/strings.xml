@@ -376,6 +376,10 @@
     <string name="settings_glow_style_wash_desc">Brilla en todas partes excepto en las teselas capturadas</string>
     <string name="settings_glow_style_missing">Solo teselas faltantes</string>
     <string name="settings_glow_style_missing_desc">Brilla solo sobre las teselas por capturar</string>
+    <string name="settings_glow_style_outline">Brillo de borde</string>
+    <string name="settings_glow_style_outline_desc">Brillo suave a lo largo del borde de las teselas capturadas</string>
+    <string name="settings_glow_style_wash_outlined">Velo + borde</string>
+    <string name="settings_glow_style_wash_outlined_desc">Velo con un borde más brillante alrededor de las teselas capturadas</string>
     <string name="settings_glow_color_white">Blanco</string>
     <string name="settings_glow_color_light_grey">Gris claro</string>
     <string name="settings_glow_color_mid_grey">Gris medio</string>

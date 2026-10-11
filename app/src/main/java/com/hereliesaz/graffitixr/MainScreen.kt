@@ -402,9 +402,6 @@ fun MainScreen(
                             },
                             depthEstimator = arViewModel.standaloneDepthEstimatorOrNull(),
                             sweepCoverage = sweepCoverageValue,
-                            coverageGlowDirections = {
-                                arViewModel.sphereThinDirections.value
-                            },
                             coverageCurrentRegions = {
                                 arViewModel.sphereCurrentRegions.value
                             },
@@ -413,6 +410,8 @@ fun MainScreen(
                             },
                             coverageGlowAppearance = arUiState.coverageGlow,
                             cameraAttitude = { arViewModel.latestCameraAttitude },
+                            attitudeExtrapolator = arViewModel.standaloneAttitudeExtrapolator,
+                            attitudeSample = arViewModel::latestStandaloneAttitudeSample,
                             cameraRollDegrees = { cameraFromDevice ->
                                 arViewModel.latestCameraRollDegrees(cameraFromDevice)
                             },

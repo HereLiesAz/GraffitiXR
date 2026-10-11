@@ -683,11 +683,15 @@ private fun glowColorLabel(color: CoverageGlowColor, strings: AppStrings): Strin
 private fun glowStyleLabel(style: CoverageGlowStyle, strings: AppStrings): String = when (style) {
     CoverageGlowStyle.WASH -> strings.settings.glowStyleWash
     CoverageGlowStyle.MISSING_TILES -> strings.settings.glowStyleMissing
+    CoverageGlowStyle.OUTLINE -> strings.settings.glowStyleOutline
+    CoverageGlowStyle.WASH_OUTLINED -> strings.settings.glowStyleWashOutlined
 }
 
 private fun glowStyleDescription(style: CoverageGlowStyle, strings: AppStrings): String = when (style) {
     CoverageGlowStyle.WASH -> strings.settings.glowStyleWashDesc
     CoverageGlowStyle.MISSING_TILES -> strings.settings.glowStyleMissingDesc
+    CoverageGlowStyle.OUTLINE -> strings.settings.glowStyleOutlineDesc
+    CoverageGlowStyle.WASH_OUTLINED -> strings.settings.glowStyleWashOutlinedDesc
 }
 
 @Composable

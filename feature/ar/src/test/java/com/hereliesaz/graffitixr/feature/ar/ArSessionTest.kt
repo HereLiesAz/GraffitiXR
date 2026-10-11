@@ -59,7 +59,7 @@ class ArSessionTest {
         every { settingsRepository.isRightHanded } returns flowOf(true)
         every { settingsRepository.showAnchorBoundary } returns flowOf(false)
         // Keep the monocular-depth self-test inert (see ArViewModelTest): off here too, so init never
-        // constructs the DepthEstimator and no ONNX Runtime load runs in the test JVM.
+        // constructs the DepthEstimator and no model (LiteRT) load runs in the test JVM.
         every { settingsRepository.monocularDepthEnabled } returns flowOf(false)
         every { settingsRepository.arCoreEnabled } returns flowOf(true)
         every { settingsRepository.arCoreDepthEnabled } returns flowOf(true)

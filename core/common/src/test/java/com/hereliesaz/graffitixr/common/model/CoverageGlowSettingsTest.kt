@@ -24,12 +24,28 @@ class CoverageGlowSettingsTest {
     }
 
     @Test
+    fun `outline styles cut from the current tiles`() {
+        assertEquals("OUTLINE", CoverageGlowStyle.OUTLINE.rendererFillMode)
+        assertEquals(CoverageGlowGeometry.CURRENT_TILES, CoverageGlowStyle.OUTLINE.geometry)
+        assertEquals("outline", CoverageGlowStyle.OUTLINE.storageKey)
+        assertEquals("COMPLEMENT_OUTLINED", CoverageGlowStyle.WASH_OUTLINED.rendererFillMode)
+        assertEquals(CoverageGlowGeometry.CURRENT_TILES, CoverageGlowStyle.WASH_OUTLINED.geometry)
+        assertEquals("wash_outlined", CoverageGlowStyle.WASH_OUTLINED.storageKey)
+    }
+
+    @Test
+    fun `persisted keys of the original styles never change`() {
+        assertEquals("wash", CoverageGlowStyle.WASH.storageKey)
+        assertEquals("missing_tiles", CoverageGlowStyle.MISSING_TILES.storageKey)
+    }
+
+    @Test
     fun `style storage keys round-trip and unknown keys fall back to the default`() {
         CoverageGlowStyle.entries.forEach {
             assertEquals(it, CoverageGlowStyle.fromStorageKey(it.storageKey))
         }
         assertEquals(CoverageGlowStyle.WASH, CoverageGlowStyle.fromStorageKey(null))
-        assertEquals(CoverageGlowStyle.WASH, CoverageGlowStyle.fromStorageKey("outline_from_the_future"))
+        assertEquals(CoverageGlowStyle.WASH, CoverageGlowStyle.fromStorageKey("hatching_from_the_future"))
     }
 
     @Test

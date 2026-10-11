@@ -22,9 +22,9 @@ enum class CoverageGlowGeometry {
  * ([rendererFillMode]) because `:core:common` does not (and should not) depend on the `:overlay`
  * library; `:feature:ar` resolves the name and a unit test there proves every entry resolves.
  *
- * Adding a style is one line here — e.g. once SphereSLAM ships `FillMode.OUTLINE`:
- * `OUTLINE("outline", "OUTLINE", CoverageGlowGeometry.CURRENT_TILES),` — plus its Settings label.
- * Only styles the pinned library can actually draw belong in this list: Settings offers every entry.
+ * Adding a style is one line here plus its Settings label/description in every locale. Only styles
+ * the pinned library can actually draw belong in this list: Settings offers every entry, and
+ * `CoverageGlowStyleMappingTest` proves each name resolves against the pinned `:overlay`.
  *
  * Persisted by [storageKey], never by ordinal or enum name, so reordering or renaming entries can't
  * silently change what a saved preference means.
@@ -39,6 +39,15 @@ enum class CoverageGlowStyle(
 
     /** Glow only over the tiles still missing or stale. */
     MISSING_TILES("missing_tiles", "TRIANGLES", CoverageGlowGeometry.TILES_NEEDING_UPDATE),
+
+    /**
+     * Only a soft glowing edge just outside the captured tiles, on the side that still needs
+     * scanning (SphereSLAM 0.24.3 `FillMode.OUTLINE`). Nothing is drawn before the first keyframe.
+     */
+    OUTLINE("outline", "OUTLINE", CoverageGlowGeometry.CURRENT_TILES),
+
+    /** The [WASH] plus the [OUTLINE] edge on top (SphereSLAM 0.24.3 `FillMode.COMPLEMENT_OUTLINED`). */
+    WASH_OUTLINED("wash_outlined", "COMPLEMENT_OUTLINED", CoverageGlowGeometry.CURRENT_TILES),
     ;
 
     companion object {

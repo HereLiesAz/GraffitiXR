@@ -102,7 +102,7 @@ class ArViewModelTest {
         every { settingsRepository.showAnchorBoundary } returns flowOf(false)
         every { settingsRepository.isImperialUnits } returns flowOf(false)
         // Keep the monocular-depth self-test inert: with it off, ArViewModel.init never constructs the
-        // DepthEstimator, so no ONNX Runtime load runs against the relaxed-mock AssetManager (which would
+        // DepthEstimator, so no model (LiteRT) load runs against the relaxed-mock AssetManager (which would
         // otherwise spin/stall and exhaust the shared test JVM). The ARCore flags default on.
         every { settingsRepository.monocularDepthEnabled } returns flowOf(false)
         every { settingsRepository.arCoreEnabled } returns flowOf(true)

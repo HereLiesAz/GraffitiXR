@@ -161,6 +161,10 @@
     <string name="settings_glow_style_wash_desc">Kumikinang saanman maliban sa mga nakuhang tile</string>
     <string name="settings_glow_style_missing">Kulang na tile lang</string>
     <string name="settings_glow_style_missing_desc">Kumikinang lang sa mga tile na kukunan pa</string>
+    <string name="settings_glow_style_outline">Kinang sa gilid</string>
+    <string name="settings_glow_style_outline_desc">Malambot na kinang sa gilid ng mga nakuhang tile</string>
+    <string name="settings_glow_style_wash_outlined">Wash + gilid</string>
+    <string name="settings_glow_style_wash_outlined_desc">Wash na may mas maliwanag na gilid sa paligid ng mga nakuhang tile</string>
     <string name="settings_glow_color_white">Puti</string>
     <string name="settings_glow_color_light_grey">Mapusyaw na abo</string>
     <string name="settings_glow_color_mid_grey">Katamtamang abo</string>

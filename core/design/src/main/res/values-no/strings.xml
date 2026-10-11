@@ -376,6 +376,10 @@
     <string name="settings_glow_style_wash_desc">Gløder overalt unntatt på registrerte fliser</string>
     <string name="settings_glow_style_missing">Bare manglende fliser</string>
     <string name="settings_glow_style_missing_desc">Gløder bare over fliser som gjenstår</string>
+    <string name="settings_glow_style_outline">Kantglød</string>
+    <string name="settings_glow_style_outline_desc">Mykt skjær langs kanten av fangede fliser</string>
+    <string name="settings_glow_style_wash_outlined">Slør + kant</string>
+    <string name="settings_glow_style_wash_outlined_desc">Slør med en lysere kant rundt fangede fliser</string>
     <string name="settings_glow_color_white">Hvit</string>
     <string name="settings_glow_color_light_grey">Lysegrå</string>
     <string name="settings_glow_color_mid_grey">Mellomgrå</string>

@@ -378,6 +378,10 @@
     <string name="settings_glow_style_wash_desc">Glöder överallt utom på fångade rutor</string>
     <string name="settings_glow_style_missing">Endast saknade rutor</string>
     <string name="settings_glow_style_missing_desc">Glöder bara över rutor som återstår</string>
+    <string name="settings_glow_style_outline">Kantglöd</string>
+    <string name="settings_glow_style_outline_desc">Mjukt sken längs kanten av tagna rutor</string>
+    <string name="settings_glow_style_wash_outlined">Slöja + kant</string>
+    <string name="settings_glow_style_wash_outlined_desc">Slöja med en ljusare kant runt tagna rutor</string>
     <string name="settings_glow_color_white">Vit</string>
     <string name="settings_glow_color_light_grey">Ljusgrå</string>
     <string name="settings_glow_color_mid_grey">Mellangrå</string>

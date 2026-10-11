@@ -1,13 +1,15 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import com.hereliesaz.graffitixr.common.model.CoverageGlowGeometry
+import com.hereliesaz.graffitixr.common.model.CoverageGlowIntensity
 import com.hereliesaz.graffitixr.common.model.CoverageGlowStyle
 import com.hereliesaz.sphereslam.SphereCoverage
 import com.hereliesaz.sphereslam.overlay.CoverageGlowRenderer
 
 /**
  * Maps the persisted [CoverageGlowStyle] onto SphereSLAM's `:overlay` renderer: which
- * [CoverageGlowRenderer.FillMode] to draw with, and which photosphere regions feed it.
+ * [CoverageGlowRenderer.FillMode] to draw with, which photosphere regions feed it, and how the
+ * user's single intensity setting drives the edge glow of the outline styles.
  */
 internal object CoverageGlowStyleMapping {
 
@@ -33,7 +35,9 @@ internal object CoverageGlowStyleMapping {
      *
      * Null only for the needs-update geometry while nothing is known yet: before the photosphere's
      * first keyframe anchors its heading, `regionsNeedingUpdate()` is empty even though every tile
-     * is missing. The whole view glows then, exactly as the wash style does.
+     * is missing. The whole view glows then, exactly as the wash style does. The current-tiles
+     * styles never need it: no current tile means a full wash (no holes) or, for the edge-only
+     * style, no edge yet.
      */
     fun regionsFor(
         style: CoverageGlowStyle,
@@ -44,6 +48,31 @@ internal object CoverageGlowStyleMapping {
         CoverageGlowGeometry.TILES_NEEDING_UPDATE ->
             if (regionsNeedingUpdate.isEmpty() && currentRegions.isEmpty()) null else regionsNeedingUpdate
     }
+
+    /**
+     * Peak opacity of the edge glow ([CoverageGlowRenderer.outlineAlpha]) for the user's glow
+     * [intensity]. The edge is a thin band, so it runs [OUTLINE_ALPHA_GAIN]× brighter than the wash:
+     * the shipped 14% wash gives ≈ 0.49 (the library's own default edge is 0.5), the slider's 60%
+     * maximum saturates at 1, and 0 still means "no glow".
+     */
+    fun outlineAlphaFor(intensity: Float): Float =
+        (CoverageGlowIntensity.sanitize(intensity) * OUTLINE_ALPHA_GAIN).coerceIn(0f, 1f)
+
+    /**
+     * Edge glow width in framebuffer pixels ([CoverageGlowRenderer.outlineWidthPx]) for a display
+     * [density] (px per dp): [OUTLINE_WIDTH_DP] dp, inside the renderer's accepted range. A
+     * non-finite or non-positive density falls back to mdpi.
+     */
+    fun outlineWidthPxFor(density: Float): Float {
+        val d = if (density.isFinite() && density > 0f) density else 1f
+        return (OUTLINE_WIDTH_DP * d).coerceIn(1f, CoverageGlowRenderer.MAX_OUTLINE_WIDTH_PX)
+    }
+
+    /** Edge-glow brightness relative to the wash intensity. */
+    const val OUTLINE_ALPHA_GAIN = 3.5f
+
+    /** Edge-glow width: about a fingertip's edge on a phone, wide enough to read at arm's length. */
+    const val OUTLINE_WIDTH_DP = 10f
 
     /** Two NDC triangles covering the viewport (`GL_TRIANGLES`, x/y per vertex). */
     val FULL_VIEW_TRIANGLES: FloatArray

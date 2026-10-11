@@ -1,5 +1,91 @@
 # SphereSLAM Implementation TODO
 
+## SphereSLAM 0.24.3 — display-rate glow and artwork, faster tracking, GPU depth (app half)
+
+The app now consumes SphereSLAM **0.24.3** (tag `0.24.3`). The app-facing API is additive; the
+wiring follows the library README's *App integration* walkthrough.
+
+Adopted:
+
+- [x] **One attitude sensor.** `CameraAttitudeProvider` (`TYPE_ROTATION_VECTOR`, East-North-Up — the
+  sensor that already stamped keyframe heading/elevation/roll) now samples at `SENSOR_DELAY_GAME`
+  instead of the ~16 Hz UI default. Its `latestSample()` is the standalone session's `Frame.attitude`
+  (`ArViewModel.latestStandaloneAttitudeSample`) and its `attitudeExtrapolator`
+  (`ArViewModel.standaloneAttitudeExtrapolator`) drives the glow and the artwork prediction. The
+  analyzer's own `GameRotationAttitudeSource` is now only a fallback when the host wires no attitude
+  (then no pose prediction runs: a predictor must read the same sensor as `Frame.attitude`).
+  **Behaviour change:** the ≤ 400 ms gyro bridge and the rotation-only base photosphere pose now
+  integrate the magnetometer-fused rotation vector instead of the game rotation vector.
+- [x] **Display-rate, full-rotation coverage glow.** `HomographyOverlayRenderer` sets the embedded
+  `CoverageGlowRenderer.rotationSource` to `attitudeExtrapolator.worldFromCameraAt(t,
+  cameraFromDeviceForDisplayFrame(displayRotation), out)` and draws with
+  `drawEmbedded(elapsedRealtimeNanos)`; the lens is `Lens.fromIntrinsics(CameraFillCenter.intrinsics(frame,
+  viewW, viewH))`, rebuilt on the GL thread when the analysis-frame intrinsics (calibration callback,
+  keyframes, tracked frames) or the surface size change; the display rotation follows a
+  `DisplayListener`. `SphereTileGlowMask` no longer projects anything: it hands the regions over
+  (`setRegions`) only when the map changes (keyframe / entry), so the per-tracked-frame projection in
+  `consumeTrackedFrame` and the deprecated heading/elevation `projectRegions` are gone. Fixes, on
+  device: glow rotating against the preview by the roll angle, vanishing near the poles, lagging
+  10–20° on fast pans, freezing while untracked. Colour, intensity, style and geometry still travel
+  as one `CoverageGlowConfig` applied on the GL thread between draws (settings apply immediately,
+  mode and geometry never tear).
+- [x] **Two new glow styles** in Settings ▸ coverage glow: *Edge glow* (`OUTLINE`, storage key
+  `outline`) and *Wash + edge* (`COMPLEMENT_OUTLINED`, `wash_outlined`), labels in every locale. The
+  edge alpha is `3.5 × intensity` (14 % wash → 0.49, about the library's 0.5 default; 0 still means
+  off), the edge width 10 dp (`CoverageGlowStyleMapping.outlineAlphaFor` / `outlineWidthPxFor`).
+- [x] **Display-rate artwork pose.** The standalone session publishes every rendered pose to a
+  `DisplayPosePredictor` (`session.displayPosePredictor`); each GL draw re-poses the design quad with
+  `predictInto(attitudeExtrapolator, now, out)` (`rendering/ArtworkPosePrediction`), falling back to
+  the last pushed pose when nothing is held. Cleared on loss (by the session on a pose-less frame,
+  and by `clearPose` / dispose). Co-op peer tracking and the homography fallback keep the
+  analyzer-rate pose.
+- [x] **Pooled luma.** `SphereSlamStandaloneTrackingAnalyzer`, `CoopPeerFingerprintAnalyzer` and
+  `HomographyTrackingAnalyzer` pack the Y plane through `LumaFrameBufferPool(slots = 2)`. Reuse
+  contract checked: the session reads `Frame.luma` without retaining it, MobileGS/peer feeds copy it
+  into a direct buffer, `PlanarTracker` copies it into its `Mat`, depth copies a small grid, and
+  keyframes/atlas pages are library copies. The pack time is reported as `Frame.convertDurationNs`.
+- [x] **Depth on LiteRT.** `:models` `DepthEstimator` runs MiDaS on the LiteRT GPU delegate with an
+  XNNPACK CPU fallback. The depth worker now calls `estimateLuma` on its luma grid (no ARGB `Bitmap`
+  round trip); the self-test diagnostic reports `backend=`. The unused `litert = "2.2.0"` catalog
+  entry is removed (LiteRT 2.x drops the delegate API `litert-gpu` 1.4.2 needs). The app's ONNX
+  Runtime keep rules are removed: the `:models` AAR's consumer rules keep `ai.onnxruntime.**` and
+  `org.tensorflow.lite.**` (verified in the 0.24.3 AAR's `proguard.txt`).
+- [x] **OpenCV before the session.** The analyzer calls the idempotent `NativeLibLoader.loadAll()`
+  before constructing the session (the application already loads it); without `opencv_java5` the
+  session's flow tracking silently turns itself off.
+- [x] **Diagnostics.** The dump adds `matchMethod=` (`KPM_FULL` / `KPM_FOCUSED` / `FLOW`, KPM poses
+  only) and `kpmMetrics=` (the session's periodic `KPM ... method= timing{frames matched convertMs
+  setupMs matchMs keyframeMs growthMs}` line, which also lands in the diag log as before).
+- [x] **Behaviour changes handled.** Until the background matcher build lands, frames carry no pose
+  (`FrameResult.pose == null`) and no failure: the analyzer just hides the artwork and keeps every
+  UI/MobileGS state; the HUD says "Preparing fingerprint target…" instead of asking for a new target.
+  A too-weak reference now fails on the frame after its build — the same `onFatalError` →
+  `StandaloneReferenceTooWeakException` path. Atlas growth that throws is a diagnostic now, not fatal.
+
+Device checks owed for 0.24.3:
+
+- [ ] Glow stays glued to the preview while rolling the phone, panning fast (no lag, no 10–20°
+  trail), looking at ceiling/floor (no pole dropout) and while untracked (keeps moving).
+- [ ] Each glow style (Wash, Missing tiles only, Edge glow, Wash + edge) looks right and switches
+  live; colour and intensity sliders apply at once; the edge width reads well on a high-density phone.
+- [ ] Rotate the device (incl. a 180° flip with auto-rotate on): glow and artwork stay registered.
+- [ ] Artwork follows quick rotations at display rate between analyzer frames and does not jitter
+  or drift when held still; on loss it disappears (no artwork re-posed from a stale lock).
+- [ ] Gyro bridge (hand over the lens for < 0.4 s) near steel/rebar: no visible yaw jump from the
+  now magnetometer-fused attitude; re-lock lands where it should.
+- [ ] Target capture / restore: "Preparing fingerprint target…" shows briefly, then lock; a weak
+  target is still rejected with the KPM-feature message.
+- [ ] Copy Diagnostics: `matchMethod` shows `FLOW` between full solves (proves `opencv_java5` is
+  loaded) and `kpmMetrics` carries the timing window; tracking frame rate is visibly higher.
+- [ ] Depth self-test line reports `backend=GPU` on a GPU-capable phone (CPU fallback logged as an
+  error elsewhere); feature-map depth still calibrates radial placement.
+- [ ] Release (R8) build: depth self-test runs (LiteRT kept by the `:models` rules) and an ORT
+  failure path stays catchable.
+
+Follow-up (not changed here): a `ReferenceTooWeakException` makes the session FATAL; the overlay's
+"restored previous validated target" path swaps the reference back, but the analyzer stays fatal
+until it is recreated (pre-existing since 0.24.1; recreating the analyzer on that path would fix it).
+
 ## SphereSLAM 0.24.1 — second consolidation (app half)
 
 The app now consumes SphereSLAM **0.24.1** (tag `0.24.1`, library PR #29). The library absorbed the

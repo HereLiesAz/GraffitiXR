@@ -198,7 +198,8 @@ data class ArUiState(
      */
     val arCoreDepthEnabled: Boolean = true,
     /**
-     * Monocular depth (MiDaS Small via ONNX Runtime), default true. It is the depth source for any
+     * Monocular depth (MiDaS Small via SphereSLAM :models — LiteRT GPU since 0.24.3, CPU fallback),
+     * default true. It is the depth source for any
      * device that can't get ARCore's Depth API — no ARCore, ARCore off, or ARCore depth unsupported/off
      * — forming planes / recovering scale there. It stays dormant when ARCore depth is active, so those
      * devices pay nothing. Applied immediately: the model is loaded + self-tested, or released, as soon
@@ -207,7 +208,8 @@ data class ArUiState(
      * (Back on by default after the startup-crash root cause was fixed: the old Depth Anything model
      * used an 8-bit MatMulNBits op ORT rejects, and R8 had stripped ai.onnxruntime.OrtException so the
      * failure aborted instead of being caught. MiDaS Small avoids that op and the ORT keep rule makes
-     * any load error fail soft.)
+     * any load error fail soft. Since SphereSLAM 0.24.3 depth runs on LiteRT, not ORT; the :models
+     * AAR ships its own keep rules.)
      */
     val monocularDepthEnabled: Boolean = true,
     /**

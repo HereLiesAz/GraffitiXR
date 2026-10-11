@@ -25,6 +25,11 @@ internal data class StandaloneMatchDiagnostics(
     val observationAgeMs: Float?,
     val matchDurationMs: Float,
     val source: SphereSlamStandalonePoseSource,
+    /**
+     * How SphereSLAM solved the visual pose (`VisualMatchMethod`: full / focused KPM or flow
+     * tracking), by name; null when the source has no such notion (bridge, co-op peer).
+     */
+    val matchMethod: String? = null,
 )
 
 /**
@@ -49,6 +54,12 @@ internal fun standaloneDiagnosticDump(
     referenceWidthUnits: Float,
     failure: StandaloneFailureEvent?,
     sphereMap: SphereMapDiagnostics? = null,
+    /**
+     * The session's latest periodic KPM metrics line (`SphereSLAM standalone KPM ... method=...
+     * timing{frames matched convertMs setupMs matchMs keyframeMs growthMs}`), or null before the
+     * first one. Diagnostic text, not a stable format.
+     */
+    kpmMetrics: String? = null,
 ): String {
     fun f(value: Float?): String =
         value?.takeIf { it.isFinite() }
@@ -84,12 +95,14 @@ internal fun standaloneDiagnosticDump(
         appendLine("reprojectionError=${f(match?.reprojectionError)}")
         appendLine("observationAgeMs=${f(match?.observationAgeMs)}")
         appendLine("matchDurationMs=${f(match?.matchDurationMs)}")
+        appendLine("matchMethod=${match?.matchMethod ?: "unavailable"}")
         appendLine("physicalScale=$physicallyMetric")
         appendLine("referenceWidthUnits=${f(referenceWidthUnits)}")
         appendLine("failure=${failure?.reason?.name ?: "none"}")
         if (failure != null && failure.diagnostic.isNotBlank()) {
             appendLine("failureDetail=${failure.diagnostic}")
         }
+        appendLine("kpmMetrics=${kpmMetrics ?: "unavailable"}")
         if (sphereMap != null) {
             appendLine("sphereMap=${if (sphereMap.enabled) "on" else "off"}")
             appendLine("sphereMapPoints=${sphereMap.pointCount}")

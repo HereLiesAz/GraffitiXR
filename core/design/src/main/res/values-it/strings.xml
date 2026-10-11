@@ -376,6 +376,10 @@
     <string name="settings_glow_style_wash_desc">Bagliore ovunque tranne sulle tessere acquisite</string>
     <string name="settings_glow_style_missing">Solo tessere mancanti</string>
     <string name="settings_glow_style_missing_desc">Bagliore solo sulle tessere da acquisire</string>
+    <string name="settings_glow_style_outline">Bagliore sul bordo</string>
+    <string name="settings_glow_style_outline_desc">Bagliore morbido lungo il bordo delle tessere acquisite</string>
+    <string name="settings_glow_style_wash_outlined">Velo + bordo</string>
+    <string name="settings_glow_style_wash_outlined_desc">Velo con un bordo più luminoso intorno alle tessere acquisite</string>
     <string name="settings_glow_color_white">Bianco</string>
     <string name="settings_glow_color_light_grey">Grigio chiaro</string>
     <string name="settings_glow_color_mid_grey">Grigio medio</string>

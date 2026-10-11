@@ -378,6 +378,10 @@
     <string name="settings_glow_style_wash_desc">Подсветка везде, кроме снятых плиток</string>
     <string name="settings_glow_style_missing">Только недостающие плитки</string>
     <string name="settings_glow_style_missing_desc">Подсветка только над плитками, которые ещё нужно снять</string>
+    <string name="settings_glow_style_outline">Свечение края</string>
+    <string name="settings_glow_style_outline_desc">Мягкое свечение по краю снятых плиток</string>
+    <string name="settings_glow_style_wash_outlined">Вуаль + край</string>
+    <string name="settings_glow_style_wash_outlined_desc">Вуаль с более ярким краем вокруг снятых плиток</string>
     <string name="settings_glow_color_white">Белый</string>
     <string name="settings_glow_color_light_grey">Светло-серый</string>
     <string name="settings_glow_color_mid_grey">Средне-серый</string>

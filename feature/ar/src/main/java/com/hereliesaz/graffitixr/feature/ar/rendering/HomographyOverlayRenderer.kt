@@ -5,6 +5,12 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.opengl.GLES30
 import android.opengl.Matrix
+import android.os.SystemClock
+import com.hereliesaz.sphereslam.CoverageGlowProjection
+import com.hereliesaz.sphereslam.SphereCoverage
+import com.hereliesaz.sphereslam.attitude.AttitudeExtrapolator
+import com.hereliesaz.sphereslam.attitude.DeviceCameraRotation
+import com.hereliesaz.sphereslam.attitude.DisplayPosePredictor
 import com.hereliesaz.sphereslam.camera.CameraFillCenter
 import com.hereliesaz.sphereslam.camera.CameraIntrinsics
 import com.hereliesaz.sphereslam.overlay.CoverageGlowRenderer
@@ -38,12 +44,21 @@ import javax.microedition.khronos.opengles.GL10
  *
  * **Optional coverage glow.** Standalone SphereSLAM's freshness wash — SphereSLAM's `:overlay`
  * [CoverageGlowRenderer], passed in as [coverageGlow] — is drawn embedded here
- * ([CoverageGlowRenderer.drawEmbedded]), on the full surface (= the preview's cropped field of view;
- * its caller projects with [CameraFillCenter.fieldOfViewDegrees]) and BEFORE the design quad, so it
+ * ([CoverageGlowRenderer.drawEmbedded]), on the full surface and BEFORE the design quad, so it
  * composites above the camera preview and beneath the artwork. A window-level View cannot do that:
  * this media-overlay surface sits behind the app window, so any View drawn in the window washes over
- * the artwork too. The legacy homography fallback passes none. Its user-set colour, intensity and
- * style arrive through [setCoverageGlowConfig] and are applied on the GL thread before the next draw.
+ * the artwork too. The legacy homography fallback passes none. Since SphereSLAM 0.24.3 the glow is
+ * re-projected on every draw (display rate) with the full camera rotation (roll included, defined at
+ * the poles) from [setAttitude]'s extrapolator at this draw's `elapsedRealtimeNanos`, through the
+ * lens of what the screen shows ([setGlowFrameIntrinsics] → [CameraFillCenter.intrinsics], rebuilt
+ * here whenever the frame intrinsics or the surface size change). Its user-set colour, intensity,
+ * style and the region geometry arrive together through [setCoverageGlowConfig] and are applied on
+ * the GL thread before the next draw.
+ *
+ * **Display-rate artwork pose.** With a [DisplayPosePredictor] attached ([setAttitude]), each draw
+ * re-poses the design quad from the newest vision pose rotated by the attitude change since its
+ * frame ([ArtworkPosePrediction]), so it follows the device between analyzer updates; without a
+ * held prediction it draws the last pushed pose unchanged ([updatePose]).
  */
 internal sealed interface TextureUpdateCommand {
     data class Replace(val bitmap: Bitmap) : TextureUpdateCommand
@@ -118,29 +133,110 @@ class HomographyOverlayRenderer(
         latestFrame.set(Frame(viewMatrix, frameIntrinsics))
     }
 
-    /** Stop drawing until the next [updatePose] — call when tracking is fully lost. */
+    /**
+     * Stop drawing until the next [updatePose] — call when tracking is fully lost. Also drops the
+     * held display-rate prediction, so the artwork can never be re-posed from a lost lock.
+     */
     fun clearPose() {
         latestFrame.set(null)
+        posePredictor?.clear()
+    }
+
+    // ---- Attitude: display-rate glow rotation + artwork pose prediction ----------------------
+
+    @Volatile private var attitudeExtrapolator: AttitudeExtrapolator? = null
+    @Volatile private var posePredictor: DisplayPosePredictor? = null
+
+    /** Row-major GL-camera-from-device of the display-upright preview; replaced whole, never mutated. */
+    @Volatile private var cameraFromDisplay: FloatArray = DeviceCameraRotation.cameraFromDeviceForDisplayFrame(0)
+
+    // GL-thread scratch for the predicted artwork view.
+    private val predictedView = FloatArray(16)
+
+    /**
+     * Attach the attitude source (SphereSLAM `CameraAttitudeProvider.attitudeExtrapolator`, i.e.
+     * `TYPE_ROTATION_VECTOR`, the sensor that also stamps keyframes) and, optionally, the
+     * [DisplayPosePredictor] the tracking session publishes its poses to — which must be fed from
+     * the same sensor. Null [extrapolator] leaves the glow's live geometry unprojected (a wash then
+     * covers the whole view) and disables prediction. Any thread.
+     */
+    fun setAttitude(extrapolator: AttitudeExtrapolator?, predictor: DisplayPosePredictor?) {
+        attitudeExtrapolator = extrapolator
+        posePredictor = predictor
+        coverageGlow?.rotationSource = extrapolator?.let { source ->
+            CoverageGlowRenderer.RotationSource { frameTimeNanos, out ->
+                source.worldFromCameraAt(frameTimeNanos, cameraFromDisplay, out)
+            }
+        }
+    }
+
+    /** The current display rotation in degrees (0/90/180/270); the glow's camera frame. Any thread. */
+    fun setDisplayRotation(displayRotationDeg: Int) {
+        cameraFromDisplay = DeviceCameraRotation.cameraFromDeviceForDisplayFrame(displayRotationDeg)
     }
 
     /**
-     * One complete coverage-glow configuration: colour, opacity, fill mode and the geometry drawn
-     * with that mode, applied together so a style switch can never pair the new mode with the old
-     * style's triangles (which would invert the glow for a frame).
+     * Display-upright intrinsics of the full analysis frame (as tracked), for the glow's lens: the
+     * screen shows its `FILL_CENTER` crop. Called on calibration changes and per tracked frame;
+     * the lens is rebuilt on the GL thread only when these or the surface size actually change.
+     * Any thread.
+     */
+    fun setGlowFrameIntrinsics(frameIntrinsics: CameraIntrinsics) {
+        if (coverageGlow != null && frameIntrinsics.isValid) glowFrameIntrinsics = frameIntrinsics
+    }
+
+    @Volatile private var glowFrameIntrinsics: CameraIntrinsics? = null
+
+    // GL-thread cache of the glow lens key.
+    private var glowLensIntrinsics: CameraIntrinsics? = null
+    private var glowLensWidth = 0
+    private var glowLensHeight = 0
+
+    private fun refreshGlowLens(glow: CoverageGlowRenderer, width: Int, height: Int) {
+        val frame = glowFrameIntrinsics ?: return
+        if (frame == glowLensIntrinsics && width == glowLensWidth && height == glowLensHeight) return
+        glowLensIntrinsics = frame
+        glowLensWidth = width
+        glowLensHeight = height
+        val shown = CameraFillCenter.intrinsics(frame, width, height) ?: return
+        runCatching { glow.setLens(CoverageGlowProjection.Lens.fromIntrinsics(shown)) }
+            .onFailure { timber.log.Timber.w(it, "Rejected coverage glow lens") }
+    }
+
+    /** What the glow draws: live photosphere regions, or static NDC triangles. */
+    sealed interface CoverageGlowGeometry {
+        /**
+         * Regions re-projected every draw with the newest rotation
+         * (`CoverageGlowRenderer.setRegions`): current tiles for the wash/outline styles, tiles
+         * needing an update for "missing tiles only".
+         */
+        class Regions(val regions: List<SphereCoverage.TileRegion>) : CoverageGlowGeometry
+
+        /** Fixed `GL_TRIANGLES` NDC geometry (`CoverageGlowRenderer.setTriangles`), e.g. the full view. */
+        class Triangles(val vertices: FloatArray) : CoverageGlowGeometry
+    }
+
+    /**
+     * One complete coverage-glow configuration: colour, opacities, edge width, fill mode and the
+     * geometry drawn with that mode, applied together on the GL thread so a style switch can never
+     * pair the new mode with the old style's geometry (which would invert the glow for a frame).
      */
     class CoverageGlowConfig(
         /** Haze RGB, each in `[0, 1]`. */
         val rgb: FloatArray,
-        /** Haze opacity in `[0, 1]`. */
+        /** Wash / fill opacity in `[0, 1]`. */
         val alpha: Float,
+        /** Edge-glow peak opacity in `[0, 1]` (OUTLINE / COMPLEMENT_OUTLINED). */
+        val outlineAlpha: Float,
+        /** Edge-glow width in framebuffer pixels (OUTLINE / COMPLEMENT_OUTLINED). */
+        val outlineWidthPx: Float,
         val fillMode: CoverageGlowRenderer.FillMode,
-        /** `GL_TRIANGLES` NDC geometry for [fillMode] (see `CoverageGlowRenderer.setTriangles`). */
-        val triangles: FloatArray,
+        val geometry: CoverageGlowGeometry,
     )
 
-    // Last-wins mailbox; drained on the GL thread right before the glow draws. SphereSLAM 0.24.1's
-    // hazeColor/hazeAlpha are plain (non-volatile) fields, so they are only ever written here, on
-    // the thread that reads them.
+    // Last-wins mailbox; drained on the GL thread right before the glow draws. The library's style
+    // setters are individually thread-safe since 0.24.3, but not atomic as a set; applying them all
+    // here, between two draws, keeps mode and geometry paired.
     private val pendingGlowConfig = AtomicReference<CoverageGlowConfig?>(null)
 
     /**
@@ -156,7 +252,12 @@ class HomographyOverlayRenderer(
         runCatching {
             glow.hazeColor = config.rgb
             glow.hazeAlpha = config.alpha
-            glow.setTriangles(config.triangles)
+            glow.outlineAlpha = config.outlineAlpha
+            glow.outlineWidthPx = config.outlineWidthPx
+            when (val geometry = config.geometry) {
+                is CoverageGlowGeometry.Regions -> glow.setRegions(geometry.regions)
+                is CoverageGlowGeometry.Triangles -> glow.setTriangles(geometry.vertices)
+            }
             glow.fillMode = config.fillMode
         }.onFailure { timber.log.Timber.w(it, "Rejected coverage glow config") }
     }
@@ -230,10 +331,14 @@ class HomographyOverlayRenderer(
         // lives in the projection (displayProjectionFor), not in a sub-rectangle.
         GLES30.glViewport(0, 0, surfaceWidth, surfaceHeight)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
+        // One time base for this draw: the glow rotation and the artwork prediction both read the
+        // attitude at the same instant (elapsedRealtimeNanos, the SensorEvent.timestamp base).
+        val nowNs = SystemClock.elapsedRealtimeNanos()
         // Full-surface wash under the artwork; it never clears and restores the GL state it touches.
         coverageGlow?.let { glow ->
             applyPendingGlowConfig(glow)
-            glow.drawEmbedded()
+            refreshGlowLens(glow, surfaceWidth, surfaceHeight)
+            glow.drawEmbedded(nowNs)
         }
 
         if (extentDirty) {
@@ -259,8 +364,15 @@ class HomographyOverlayRenderer(
         Matrix.rotateM(localModel4, 0, t.rotationZDeg, 0f, 0f, 1f)
         Matrix.scaleM(localModel4, 0, t.scale, t.scale, 1f)
         Matrix.multiplyMM(model4, 0, anchor, 0, localModel4, 0)
+        val view = ArtworkPosePrediction.viewForDraw(
+            predictor = posePredictor,
+            attitude = attitudeExtrapolator,
+            nowNs = nowNs,
+            lastVisionView = frame.viewMatrix,
+            scratch = predictedView,
+        )
         overlayRenderer.draw(
-            frame.viewMatrix,
+            view,
             projection,
             model4,
             contentRotation = buildContentRotation(t.rotationXDeg, t.rotationYDeg),

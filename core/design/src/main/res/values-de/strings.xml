@@ -376,6 +376,10 @@
     <string name="settings_glow_style_wash_desc">Leuchtet überall außer auf erfassten Kacheln</string>
     <string name="settings_glow_style_missing">Nur fehlende Kacheln</string>
     <string name="settings_glow_style_missing_desc">Leuchtet nur über noch zu erfassenden Kacheln</string>
+    <string name="settings_glow_style_outline">Randleuchten</string>
+    <string name="settings_glow_style_outline_desc">Sanftes Leuchten entlang des Rands erfasster Kacheln</string>
+    <string name="settings_glow_style_wash_outlined">Schleier + Rand</string>
+    <string name="settings_glow_style_wash_outlined_desc">Schleier mit hellerem Rand um erfasste Kacheln</string>
     <string name="settings_glow_color_white">Weiß</string>
     <string name="settings_glow_color_light_grey">Hellgrau</string>
     <string name="settings_glow_color_mid_grey">Mittelgrau</string>

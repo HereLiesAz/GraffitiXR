@@ -396,6 +396,10 @@
     <string name="settings_glow_style_wash_desc">除已拍摄图块外全部发光</string>
     <string name="settings_glow_style_missing">仅缺失图块</string>
     <string name="settings_glow_style_missing_desc">仅在尚待拍摄的图块上发光</string>
+    <string name="settings_glow_style_outline">边缘发光</string>
+    <string name="settings_glow_style_outline_desc">沿已拍摄图块的边缘柔和发光</string>
+    <string name="settings_glow_style_wash_outlined">铺满 + 边缘</string>
+    <string name="settings_glow_style_wash_outlined_desc">铺满，并在已拍摄图块周围显示更亮的边缘</string>
     <string name="settings_glow_color_white">白色</string>
     <string name="settings_glow_color_light_grey">浅灰</string>
     <string name="settings_glow_color_mid_grey">中灰</string>

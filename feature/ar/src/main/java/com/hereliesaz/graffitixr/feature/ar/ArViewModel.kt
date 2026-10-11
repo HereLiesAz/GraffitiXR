@@ -1015,7 +1015,9 @@ class ArViewModel @Inject constructor(
      * Lazily created; sampling runs while the standalone AR composition is resumed
      * ([startStandaloneCameraAttitude]) and stops on pause/exit. It is base-photosphere input, not
      * gated by the feature-map flag. Magnetometer-fused (`TYPE_ROTATION_VECTOR`), so both axes are
-     * drift-free.
+     * drift-free. Since SphereSLAM 0.24.3 it is the ONE standalone attitude sensor: keyframe
+     * headings, the tracking session's `Frame.attitude` ([latestStandaloneAttitudeSample]), the
+     * display-rate coverage glow and the artwork pose predictor ([standaloneAttitudeExtrapolator]).
      */
     private val cameraAttitudeProvider by lazy {
         com.hereliesaz.sphereslam.CameraAttitudeProvider(appContext)
@@ -1077,7 +1079,22 @@ class ArViewModel @Inject constructor(
     @Volatile private var standalonePhotosphereActive: Boolean = false
     @Volatile private var sphereFingerprintAnchorTile: com.hereliesaz.sphereslam.TileId? = null
 
-    /** Latest camera attitude (headingDeg, elevationDeg) for projecting the glow, or null. */
+    /**
+     * Timestamped attitude history of the standalone attitude sensor (`elapsedRealtimeNanos` base),
+     * fed by every sample: the display-rate glow's rotation source and the artwork pose predictor
+     * read it on the GL thread. Thread-safe and allocation-free to read.
+     */
+    val standaloneAttitudeExtrapolator: com.hereliesaz.sphereslam.attitude.AttitudeExtrapolator
+        get() = cameraAttitudeProvider.attitudeExtrapolator
+
+    /**
+     * Latest body→world sample of the same sensor (defined at the poles, unlike the heading), for the
+     * standalone tracking session's `Frame.attitude`; null before the first sample.
+     */
+    fun latestStandaloneAttitudeSample(): com.hereliesaz.sphereslam.attitude.AttitudeSample? =
+        cameraAttitudeProvider.latestSample()
+
+    /** Latest camera attitude (headingDeg, elevationDeg) stamped on photosphere keyframes, or null. */
     val latestCameraAttitude: Pair<Float, Float>?
         get() {
             val h = cameraAttitudeProvider.latestHeadingDegrees() ?: return null
@@ -1113,8 +1130,10 @@ class ArViewModel @Inject constructor(
             appendDiag("SphereSLAM camera attitude unavailable: no rotation-vector sensor")
             return
         }
-        cameraAttitudeProvider.start()
-        appendDiag("SphereSLAM camera attitude sampling started")
+        // Game rate (~50-200 Hz), not the provider's UI default (~16 Hz): the glow and the artwork
+        // are re-posed from this sensor on every display frame.
+        cameraAttitudeProvider.start(android.hardware.SensorManager.SENSOR_DELAY_GAME)
+        appendDiag("SphereSLAM camera attitude sampling started rate=GAME")
     }
 
     /** Release the compass sensor; idempotent. */
@@ -1289,7 +1308,8 @@ class ArViewModel @Inject constructor(
         appendDiag("focus: ${if (auto) "AUTO (acquiring)" else "FIXED (locked on anchor)"}")
     }
 
-    // Monocular depth (MiDaS Small, ONNX Runtime). Created lazily; only touched when the beta
+    // Monocular depth (MiDaS Small; SphereSLAM :models on LiteRT, GPU delegate with CPU fallback —
+    // `activeBackend` says which). Created lazily; only touched when the beta
     // toggle is on. Step 1 just proves it loads+runs on-device (selfTestDepth); Step 2 will feed live
     // frames into the standalone plane/scale path.
     private val depthEstimatorLazy = lazy {
@@ -1335,8 +1355,8 @@ class ArViewModel @Inject constructor(
         }
         val ms = android.os.SystemClock.elapsedRealtime() - t0
         appendDiag(
-            "depth self-test: ${map.width}x${map.height} min=%.3f max=%.3f mean=%.3f %dms"
-                .format(mn, mx, sum / map.data.size, ms),
+            "depth self-test: ${map.width}x${map.height} min=%.3f max=%.3f mean=%.3f %dms backend=%s"
+                .format(mn, mx, sum / map.data.size, ms, depthEstimator.activeBackend ?: "unknown"),
         )
     }
 

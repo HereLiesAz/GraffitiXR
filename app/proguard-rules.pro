@@ -33,18 +33,13 @@
     <init>(java.lang.String, int);
 }
 
-# --- ONNX Runtime (monocular depth) ---
-# ORT's JNI resolves ai.onnxruntime.OrtException via FindClass to surface a failed
-# OrtSession.createSession. The generic "native <methods>" rule below keeps OrtSession/
-# OrtEnvironment (they declare natives) but NOT OrtException (it declares none), so R8 stripped it:
-# on a createSession failure the JNI throw hit ClassNotFoundException and ART turned a catchable
-# OrtException into a fatal JniAbort (SIGABRT), bypassing DepthEstimator's try/catch and crashing the
-# app. Keep the whole package so every ORT error stays catchable and depth fails soft instead.
--keep class ai.onnxruntime.** { *; }
--keepclassmembers class ai.onnxruntime.** {
-    native <methods>;
-}
--dontwarn ai.onnxruntime.**
+# --- ONNX Runtime / LiteRT (SphereSLAM :models) ---
+# No app rules needed: since SphereSLAM 0.24.3 the :models AAR ships consumer R8 rules that keep
+# `ai.onnxruntime.**` whole (ORT's JNI FindClass of OrtException, which R8 used to strip, turning a
+# catchable load failure into a fatal JniAbort) and `org.tensorflow.lite.**` (LiteRT's reflective
+# interpreter/GPU-delegate lookup for MiDaS depth). The app's former copy of the ORT rule was removed
+# as redundant; tools/check_sphereslam_apk.py --variant release plus a release-build depth self-test
+# on device cover the regression.
 
 # --- Native Engine (MobileGS & SlamManager) ---
 # Keep the JNI wrapper class and its native methods
