@@ -63,6 +63,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
@@ -1687,24 +1688,8 @@ class ArViewModel @Inject constructor(
             slamManager.loadSuperPoint(appContext.assets)
             slamManager.loadDistortionHead(appContext.assets) // optional; inert if asset absent
             slamManager.loadLowLightEnhancer(appContext.assets)
-            // Monocular depth fills in wherever ARCore's Depth API won't: a device with no ARCore, with
-            // ARCore turned off, or an ARCore device whose depth is off/unsupported (the drift case).
-            // So it loads + self-tests unless ARCore depth will actually be the source, and an ARCore
-            // device that does provide depth pays nothing here. (This setting-level check can't see the
-            // device's isDepthModeSupported, which needs a live session; Step 2's fusion, running in the
-            // AR session, makes the "ARCore depth active" test exact.) The self-test runs one inference
-            // on a synthetic image to confirm the ONNX Runtime int8 model LOADS and EXECUTES on this
-            // hardware before any camera/fusion wiring; results go to the diag overlay.
-            if (settingsRepository.monocularDepthEnabled.firstOrNull() != false) {
-                val arCoreOptIn = settingsRepository.arCoreEnabled.firstOrNull() ?: true
-                val arCoreDepthOptIn = settingsRepository.arCoreDepthEnabled.firstOrNull() ?: true
-                val arCoreDepthActive = arCoreOptIn && arCoreDepthOptIn &&
-                    ArAvailabilityChecker.check(appContext) == ArAvailabilityChecker.Result.Supported
-                if (!arCoreDepthActive) {
-                    runCatching { selfTestDepth() }
-                        .onFailure { Timber.w(it, "depth self-test threw") }
-                }
-            }
+            // Monocular depth is loaded/self-tested by reconcileMonocularDepth() once ARCore
+            // availability resolves below, and again whenever one of its three settings changes.
         }
         viewModelScope.launch {
             // Resolve ARCore availability up front. With com.google.ar.core
@@ -1713,6 +1698,7 @@ class ArViewModel @Inject constructor(
             // support. The result drives mode-chooser visibility and the
             // first-launch "AR unavailable" onboarding step.
             val result = ArAvailabilityChecker.check(appContext)
+            arCoreCheckResult = result
             // Only a fully INSTALLED ARCore routes into the ARCore Session path. A device that is
             // ARCore-capable but has no Google Play Services for AR installed (or too old an APK) reports
             // NeedsInstallOrUpdate — and nothing in this app ever calls ArCoreApk.requestInstall, so
@@ -1724,29 +1710,12 @@ class ArViewModel @Inject constructor(
             // which is acceptable: standalone AR is fully functional without ARCore.
             // The user can force the standalone path even on an ARCore-capable device (Settings →
             // "Use ARCore"). Treat an opt-out exactly like unsupported hardware: same fingerprint
-            // cleanup, same standalone routing. Read once here; it applies on the next AR entry.
-            val arCoreOptIn = settingsRepository.arCoreEnabled.firstOrNull() ?: true
-            val supported = result == ArAvailabilityChecker.Result.Supported && arCoreOptIn
-            if (!supported) {
-                // The native MobileGS instance is process-global. Project loading may have installed
-                // an ARCore/capture-camera fingerprint while ARCore capability was still UNKNOWN.
-                // Clear that frame BEFORE publishing "ARCore unavailable"; the standalone analyzer
-                // starts only after this state update and will then install the centered page-frame
-                // fingerprint deterministically.
-                loadedFingerprint = null
-                slamManager.clearWallFingerprint()
-                slamManager.clearWallFeatureMap()
-                slamManager.overlayMarkCenterLocal = null
-                slamManager.captureAnchorCam = null
+            // cleanup, same standalone routing. The checker result is cached above and the backend is
+            // re-derived on every toggle, so a change switches backends immediately — mid-AR too.
+            Timber.i("ArCore availability resolved: $result")
+            settingsRepository.arCoreEnabled.distinctUntilChanged().collect { arCoreOptIn ->
+                applyArCoreBackendSelection(result, arCoreOptIn)
             }
-            _uiState.update {
-                it.copy(
-                    isArCoreAvailable = supported,
-                    isArCoreAvailabilityResolved = true,
-                )
-            }
-            Timber.i("ArCore availability resolved: $result (supported=$supported)")
-            refreshSphereSlamRuntimeSelection()
         }
         viewModelScope.launch(dispatchers.io) {
             // ARCore and SphereSLAM are independent optional capabilities. In particular, a phone
@@ -1831,24 +1800,7 @@ class ArViewModel @Inject constructor(
                     // on non-ARCore devices; an ARCore co-op GUEST also owns it once protocol-v3 peer
                     // geometry has been installed. Never let a later spectator-project emission run
                     // the ordinary local loader over that peer fingerprint.
-                    if (
-                        shouldRestoreLocalArCoreFingerprint(
-                            isArCoreAvailable = _uiState.value.isArCoreAvailable,
-                            coopRole = _uiState.value.coopRole,
-                            peerSpatialFramePresent = _uiState.value.coopPeerSpatialFrame != null,
-                        )
-                    ) {
-                        loadMapIfExists()
-                        loadFingerprintIfExists()
-                        // A page frozen this session commits once its own fingerprint lands.
-                        tryCommitPendingHybridPage(project)
-                        // Once per project page, not per emission: re-arming KPM resets the sidecar.
-                        // Keyed by URI too, so a page committed after a renderer swap is still offered.
-                        if (hybridRestoreKey(project) != hybridRestoreKey) {
-                            hybridRestoreKey = hybridRestoreKey(project)
-                            pushPersistedHybridPage(project)
-                        }
-                    }
+                    restoreLocalArCoreProjectState(project)
                 }
             }
         }
@@ -1858,28 +1810,33 @@ class ArViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            // Camera target fps (30/60). Stored in state for the session-config selection; a change
-            // takes effect on the next AR entry (the camera config is fixed at session creation).
+            // Camera target fps. Stored in state for the session-config selection; a change while an
+            // ARCore session is live swaps its camera config in place (reconcileLiveSessionSettings).
             settingsRepository.cameraTargetFps.collect { fps ->
                 _uiState.update { it.copy(cameraTargetFps = fps) }
+                reconcileLiveSessionSettings(checkCameraFps = true)
             }
         }
         viewModelScope.launch {
-            // Use-ARCore and ARCore-depth toggles. Mirrored into state for the settings UI and the
-            // session-config selection; both apply on the next AR entry (availability is resolved and
-            // the depth mode is fixed at session creation).
+            // Use-ARCore toggle, mirrored into state for the settings UI. The backend switch itself is
+            // driven by the availability collector above, which re-derives isArCoreAvailable.
             settingsRepository.arCoreEnabled.collect { on ->
                 _uiState.update { it.copy(arCoreEnabled = on) }
             }
         }
         viewModelScope.launch {
+            // ARCore depth: reconfigures a live session's depth mode immediately, and decides whether
+            // monocular depth has to stand in for it.
             settingsRepository.arCoreDepthEnabled.collect { on ->
                 _uiState.update { it.copy(arCoreDepthEnabled = on) }
+                reconcileLiveSessionSettings(checkDepth = true)
+                reconcileMonocularDepth()
             }
         }
         viewModelScope.launch {
             settingsRepository.monocularDepthEnabled.collect { on ->
                 _uiState.update { it.copy(monocularDepthEnabled = on) }
+                reconcileMonocularDepth()
             }
         }
         viewModelScope.launch {
@@ -1910,6 +1867,9 @@ class ArViewModel @Inject constructor(
             // Master adaptive-rate toggle; the renderer reads it to enable/disable idle gating.
             settingsRepository.adaptiveRateEnabled.collect { on ->
                 _uiState.update { it.copy(adaptiveRateEnabled = on) }
+                // It also caps the camera to 30fps under battery pressure, so a toggle can change the
+                // live session's camera config too.
+                reconcileLiveSessionSettings(checkCameraFps = true)
             }
         }
         viewModelScope.launch {
@@ -1944,6 +1904,164 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.isImperialUnits.collect { imperial ->
                 _uiState.update { it.copy(isImperialUnits = imperial) }
+            }
+        }
+    }
+
+    /**
+     * Restores the current project's ARCore-frame state into native — the gated half of the
+     * currentProject collector, and the reverse half of a live "Use ARCore" switch back on (standalone
+     * had its own page-frame fingerprint installed in the process-global MobileGS).
+     */
+    private fun restoreLocalArCoreProjectState(
+        project: com.hereliesaz.graffitixr.common.model.GraffitiProject,
+    ) {
+        if (
+            !shouldRestoreLocalArCoreFingerprint(
+                isArCoreAvailable = _uiState.value.isArCoreAvailable,
+                coopRole = _uiState.value.coopRole,
+                peerSpatialFramePresent = _uiState.value.coopPeerSpatialFrame != null,
+            )
+        ) {
+            return
+        }
+        loadMapIfExists()
+        loadFingerprintIfExists()
+        // A page frozen this session commits once its own fingerprint lands.
+        tryCommitPendingHybridPage(project)
+        // Once per project page, not per emission: re-arming KPM resets the sidecar.
+        // Keyed by URI too, so a page committed after a renderer swap is still offered.
+        if (hybridRestoreKey(project) != hybridRestoreKey) {
+            hybridRestoreKey = hybridRestoreKey(project)
+            pushPersistedHybridPage(project)
+        }
+    }
+
+    // ArAvailabilityChecker's verdict, resolved once per process (a later ARCore install isn't
+    // auto-detected). Cached so a "Use ARCore" toggle re-derives the backend without re-running the
+    // checker, and so monocular depth knows whether ARCore depth can be the source. Null until resolved.
+    @Volatile private var arCoreCheckResult: ArAvailabilityChecker.Result? = null
+
+    /**
+     * Selects the AR backend from the cached checker [result] and the "Use ARCore" setting. Runs at
+     * startup (first resolution) and again on every toggle, so the switch is immediate — including in
+     * the middle of an AR session:
+     *
+     * - **ARCore → standalone.** The ARCore session is torn down exactly as leaving AR does, and the
+     *   teardown is AWAITED before the state flips, so ARCore has released the camera before MainScreen
+     *   binds CameraX for the standalone path (the two racing for the device is the crash described in
+     *   MainScreen's AR-entry effect). Its ARCore-frame wall map is persisted while saves still route to
+     *   the ARCore branch, then the native ARCore frame is cleared — the same cleanup the startup path
+     *   does — so the standalone analyzer installs its page-frame fingerprint deterministically.
+     * - **standalone → ARCore.** Publishing the state is enough for MainScreen: the standalone branch
+     *   leaves composition (its analyzer stops, CameraX unbinds) and the ARCore branch's AR-entry
+     *   effect opens the Session behind the camera-availability gate. The project's ARCore-frame
+     *   fingerprint is restored here the way the currentProject collector does.
+     *
+     * Either way a co-op session ends (its spatial frame belongs to the old backend), and SphereSLAM
+     * runtime selection and monocular depth are re-evaluated.
+     */
+    private suspend fun applyArCoreBackendSelection(
+        result: ArAvailabilityChecker.Result,
+        arCoreOptIn: Boolean,
+    ) {
+        val supported = isArCoreBackendSelected(result, arCoreOptIn)
+        val before = _uiState.value
+        val firstResolution = !before.isArCoreAvailabilityResolved
+        if (!firstResolution && before.isArCoreAvailable == supported) return
+        if (!supported) {
+            if (!firstResolution) stopArCoreForStandaloneSwitch()
+            // The native MobileGS instance is process-global. Project loading may have installed
+            // an ARCore/capture-camera fingerprint while ARCore capability was still UNKNOWN (or, on a
+            // live switch, while ARCore was the backend). Clear that frame BEFORE publishing "ARCore
+            // unavailable"; the standalone analyzer starts only after this state update and will then
+            // install the centered page-frame fingerprint deterministically.
+            loadedFingerprint = null
+            slamManager.clearWallFingerprint()
+            slamManager.clearWallFeatureMap()
+            slamManager.overlayMarkCenterLocal = null
+            slamManager.captureAnchorCam = null
+        }
+        _uiState.update {
+            it.copy(
+                isArCoreAvailable = supported,
+                isArCoreAvailabilityResolved = true,
+            )
+        }
+        Timber.i("ArCore backend selected: result=$result optIn=$arCoreOptIn (supported=$supported)")
+        if (!firstResolution) {
+            appendDiag(
+                "Use ARCore ${if (arCoreOptIn) "on" else "off"} — tracking backend now " +
+                    if (supported) "ARCore" else "standalone SphereSLAM",
+            )
+            if (_uiState.value.coopRole != com.hereliesaz.graffitixr.common.model.CoopRole.NONE) {
+                _feedback.tryEmit(
+                    com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                        "Tracking backend changed — sharing ended. Start sharing again."
+                    )
+                )
+                leaveSession()
+            }
+            if (supported) {
+                loadedFingerprint = null
+                projectRepository.currentProject.value?.let { restoreLocalArCoreProjectState(it) }
+            }
+        }
+        refreshSphereSlamRuntimeSelection()
+        reconcileMonocularDepth()
+    }
+
+    /**
+     * The ARCore half of a live switch to standalone: the same teardown as leaving AR ([exitArMode]),
+     * awaited, then this session's ARCore-frame wall map/paint saved while the state still says ARCore
+     * (saveProjectWallMap routes on it). MainScreen calls exitArMode again when the ARCore branch leaves
+     * composition; on an already-closed session that is a no-op teardown.
+     */
+    private suspend fun stopArCoreForStandaloneSwitch() {
+        if (isInArMode || session != null) {
+            exitArMode().join()
+            try {
+                withContext(dispatchers.io) { saveProjectWallMap() }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                Timber.e(e, "ARCore wall map save before backend switch failed")
+            }
+        }
+        // Wait out any teardown still in flight (e.g. a just-exited AR session) before its native
+        // frame is cleared.
+        sessionMutex.withLock { }
+    }
+
+    // Serializes monocular-depth load/unload so rapid toggles can't interleave a self-test and a close.
+    private val monocularDepthMutex = Mutex()
+
+    /**
+     * Loads + self-tests, or unloads, the monocular depth model to match its settings, immediately.
+     * Monocular depth fills in wherever ARCore's Depth API won't: a device with no ARCore, with ARCore
+     * turned off, or an ARCore device whose depth is off (the drift case) — see [isMonocularDepthWanted].
+     * An ARCore device that does provide depth pays nothing. The self-test runs one inference on a
+     * synthetic image to confirm the ONNX Runtime int8 model LOADS and EXECUTES on this hardware; the
+     * result goes to the diag overlay. Turning it off releases the model unless the feature-map
+     * analyzer is using it. Off the main thread; no-op until ARCore availability has resolved.
+     */
+    private fun reconcileMonocularDepth() {
+        val result = arCoreCheckResult ?: return
+        viewModelScope.launch(dispatchers.io) {
+            monocularDepthMutex.withLock {
+                val wanted = isMonocularDepthWanted(
+                    monocularDepthOptIn = settingsRepository.monocularDepthEnabled.firstOrNull() != false,
+                    arCoreOptIn = settingsRepository.arCoreEnabled.firstOrNull() ?: true,
+                    arCoreDepthOptIn = settingsRepository.arCoreDepthEnabled.firstOrNull() ?: true,
+                    arCoreSupported = result == ArAvailabilityChecker.Result.Supported,
+                )
+                val loaded = depthEstimatorLazy.isInitialized() && depthEstimator.isLoaded
+                if (wanted && !loaded) {
+                    runCatching { selfTestDepth() }
+                        .onFailure { Timber.w(it, "depth self-test threw") }
+                } else if (!wanted && loaded && !_evalFeatureMapEnabled.value) {
+                    depthEstimator.close()
+                    appendDiag("depth: monocular depth not needed — model unloaded")
+                }
             }
         }
     }
@@ -1995,7 +2113,10 @@ class ArViewModel @Inject constructor(
         renderer?.showAnchorBoundary = show
     }
 
-    /** Persist the camera target fps (30/60). Takes effect on the next AR entry. */
+    /**
+     * Persist the camera target fps. Applied immediately: a live ARCore session's camera config is
+     * re-selected by the cameraTargetFps collector (reconcileLiveSessionSettings).
+     */
     fun setCameraTargetFps(fps: Int) {
         viewModelScope.launch { settingsRepository.setCameraTargetFps(fps) }
     }
@@ -2225,7 +2346,7 @@ class ArViewModel @Inject constructor(
      * the camera attached on some devices and produces the "AppOps Operation
      * not started: op=CAMERA" symptom on the next entry.
      */
-    fun exitArMode() {
+    fun exitArMode(): Job {
         isInArMode = false
         isDestroying = true
         _uiState.value.sphereSlamRuntimeStatus
@@ -2288,7 +2409,7 @@ class ArViewModel @Inject constructor(
         // close() BLOCKS until any in-flight session.update() returns. When the GL thread
         // is wedged inside update() (camera never fed ARCore), running this on Main froze
         // the entire app on AR exit — exactly when the diag tells the user to exit.
-        viewModelScope.launch(dispatchers.default) {
+        return viewModelScope.launch(dispatchers.default) {
             performFullCleanupLocked()
         }
     }
@@ -2478,17 +2599,13 @@ class ArViewModel @Inject constructor(
             // VIO hardware above, and depth is the one config knob that otherwise survives the safe-config
             // retry — so leaving it on made the retry stall again (ts stuck at 0, PAUSED) with no way out.
             // Dropping it on retry is the automatic form of the per-device "ARCore depth" opt-out.
-            val useArCoreDepthApi = _uiState.value.arCoreDepthEnabled && !forceSafeCameraConfig
-            if (useArCoreDepthApi && s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
-                config.depthMode = Config.DepthMode.AUTOMATIC
-                _uiState.update { it.copy(isDepthApiSupported = true) }
-            } else {
-                config.depthMode = Config.DepthMode.DISABLED
-                _uiState.update { it.copy(isDepthApiSupported = false) }
-            }
-            renderer?.depthApiEnabled = useArCoreDepthApi
+            // A later toggle of the setting re-applies it to this live session (reconcileLiveSessionSettings).
+            val depthRequested = applyArCoreDepthMode(s, config)
 
             s.configure(config)
+            // ARCore's own pick, before any stereo/fps swap below — what DEVICE_DEFAULT returns to when
+            // the artist changes the fps setting mid-session.
+            val defaultCameraConfig = s.cameraConfig
 
             // Camera config selection. Forcing a hardware-stereo config makes ARCore run motion-stereo
             // (spherical_rectifier); on devices that list a "stereo" config but can't actually compute
@@ -2505,6 +2622,7 @@ class ArViewModel @Inject constructor(
             val isStereoCapable = stereoCapable
             val useStereo = isStereoCapable == true && !stereoUnstable && !safeConfigForced
             var stereoActive = false
+            var appliedFps: Int? = null
             if (useStereo) {
                 val stereoConfigs = try {
                     s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
@@ -2543,54 +2661,17 @@ class ArViewModel @Inject constructor(
                     // Pin the camera frame rate. Four choices, two of them fixed and two resolved
                     // from the device (CameraTargetFps): 30, 60, DEVICE_DEFAULT and DEVICE_MAX.
                     // Under battery pressure (tier ≥ medium) cap to 30 fps whatever was chosen —
-                    // including MAX, which is the one most likely to cook the phone. Done here at
-                    // session build only: a mid-session CameraConfig swap resets tracking.
-                    val chosenFps =
-                        if (_uiState.value.adaptiveRateEnabled && _uiState.value.batteryTier >= 1)
-                            CameraTargetFps.FPS_30
-                        else _uiState.value.cameraTargetFps
-                    val defaultCfg = s.cameraConfig
-                    val fpsConfig = try {
-                        when (chosenFps) {
-                            // DEVICE_DEFAULT: don't filter at all. ARCore's own choice is the
-                            // broadest-compatible config it offers, and asking for it explicitly is
-                            // different from asking for 30 and happening to get it.
-                            CameraTargetFps.DEVICE_DEFAULT -> null
-                            // DEVICE_MAX: every config for this camera, highest frame rate wins.
-                            // Compared on the range's upper bound because a config advertising
-                            // 15-60 outranks a fixed 30 for a user who asked for maximum.
-                            CameraTargetFps.DEVICE_MAX ->
-                                s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
-                                    facingDirection = CameraConfig.FacingDirection.BACK
-                                }).filter { it.cameraId == defaultCfg.cameraId }
-                                    .maxByOrNull { it.fpsRange.upper }
-                            else ->
-                                s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
-                                    facingDirection = CameraConfig.FacingDirection.BACK
-                                    this.targetFps = EnumSet.of(
-                                        if (chosenFps == CameraTargetFps.FPS_60)
-                                            CameraConfig.TargetFps.TARGET_FPS_60
-                                        else CameraConfig.TargetFps.TARGET_FPS_30,
-                                    )
-                                }).firstOrNull { it.cameraId == defaultCfg.cameraId }
-                        }
-                    } catch (e: Exception) {
-                        Timber.w(e, "camera fps config query failed")
-                        null
-                    }
-                    if (fpsConfig != null) {
-                        s.cameraConfig = fpsConfig
-                        appendDiag(
-                            "camera fps: ${CameraTargetFps.label(chosenFps)} -> " +
-                                "${fpsConfig.fpsRange.lower}-${fpsConfig.fpsRange.upper}",
-                        )
-                    } else if (chosenFps == CameraTargetFps.DEVICE_DEFAULT) {
-                        appendDiag("camera fps: device default (${defaultCfg.fpsRange.upper} max) — no swap")
-                    } else {
-                        appendDiag(
-                            "camera fps: no ${CameraTargetFps.label(chosenFps)} match for default cfg — using default",
-                        )
-                    }
+                    // including MAX, which is the one most likely to cook the phone. The battery cap
+                    // is decided here at session build only (a mid-session CameraConfig swap resets
+                    // tracking); an artist's own change to the fps or adaptive-rate setting is applied
+                    // to the live session at once by reconcileLiveSessionSettings.
+                    val chosenFps = effectiveCameraTargetFps(
+                        targetFps = _uiState.value.cameraTargetFps,
+                        adaptiveRateEnabled = _uiState.value.adaptiveRateEnabled,
+                        batteryTier = _uiState.value.batteryTier,
+                    )
+                    applyCameraTargetFps(s, defaultCameraConfig, chosenFps, restoreDefaultWhenUnmatched = false)
+                    appliedFps = chosenFps
                     Timber.i("ARDIAG dual-lens: mono config cam=${s.cameraConfig.cameraId} fps=${_uiState.value.cameraTargetFps} (stereoCapable=$isStereoCapable)")
                 }
             }
@@ -2599,6 +2680,9 @@ class ArViewModel @Inject constructor(
             // scan mode stays available regardless (it works on mono).
             _uiState.update { it.copy(isHardwareStereoActive = stereoActive) }
 
+            appliedDepthRequested = depthRequested
+            appliedCameraFps = appliedFps
+            sessionDefaultCameraConfig = defaultCameraConfig
             session = s
             _isCameraInUseByAr.value = true
             // Surface the camera-config decision ON SCREEN (not just logcat) so a black-camera report
@@ -2616,6 +2700,185 @@ class ArViewModel @Inject constructor(
             _feedback.tryEmit(
                 com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error("Couldn't start AR — your camera may be in use by another app", e)
             )
+        }
+    }
+
+    /**
+     * Sets [config]'s depth mode from the "ARCore depth" setting (dropped in camera safe mode — see
+     * initArSessionLocked), still gated by the device's isDepthModeSupported for the session's current
+     * camera config, and mirrors the result to the UI and the renderer. Returns whether depth was
+     * requested. The caller applies [config] with Session.configure.
+     */
+    private fun applyArCoreDepthMode(s: Session, config: Config): Boolean {
+        val useArCoreDepthApi = _uiState.value.arCoreDepthEnabled && !forceSafeCameraConfig
+        if (useArCoreDepthApi && s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
+            config.depthMode = Config.DepthMode.AUTOMATIC
+            _uiState.update { it.copy(isDepthApiSupported = true) }
+        } else {
+            config.depthMode = Config.DepthMode.DISABLED
+            _uiState.update { it.copy(isDepthApiSupported = false) }
+        }
+        renderer?.depthApiEnabled = useArCoreDepthApi
+        return useArCoreDepthApi
+    }
+
+    /**
+     * Selects the mono camera config for [chosenFps] without repeating the old wedge: keeps ARCore's
+     * default config ([defaultCfg]) — the broadly compatible one — and only swaps to a same-cameraId
+     * variant that differs in fps. The session must not be resumed (a CameraConfig can only change on
+     * a paused or not-yet-started session). [restoreDefaultWhenUnmatched] puts a live session that was
+     * swapped earlier back on [defaultCfg] when the new choice has no variant of its own; at session
+     * build the config already is the default, so there is nothing to restore.
+     */
+    private fun applyCameraTargetFps(
+        s: Session,
+        defaultCfg: CameraConfig,
+        chosenFps: Int,
+        restoreDefaultWhenUnmatched: Boolean,
+    ) {
+        val fpsConfig = try {
+            when (chosenFps) {
+                // DEVICE_DEFAULT: don't filter at all. ARCore's own choice is the
+                // broadest-compatible config it offers, and asking for it explicitly is
+                // different from asking for 30 and happening to get it.
+                CameraTargetFps.DEVICE_DEFAULT -> null
+                // DEVICE_MAX: every config for this camera, highest frame rate wins.
+                // Compared on the range's upper bound because a config advertising
+                // 15-60 outranks a fixed 30 for a user who asked for maximum.
+                CameraTargetFps.DEVICE_MAX ->
+                    s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
+                        facingDirection = CameraConfig.FacingDirection.BACK
+                    }).filter { it.cameraId == defaultCfg.cameraId }
+                        .maxByOrNull { it.fpsRange.upper }
+                else ->
+                    s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
+                        facingDirection = CameraConfig.FacingDirection.BACK
+                        this.targetFps = EnumSet.of(
+                            if (chosenFps == CameraTargetFps.FPS_60)
+                                CameraConfig.TargetFps.TARGET_FPS_60
+                            else CameraConfig.TargetFps.TARGET_FPS_30,
+                        )
+                    }).firstOrNull { it.cameraId == defaultCfg.cameraId }
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "camera fps config query failed")
+            null
+        }
+        if (fpsConfig != null) {
+            s.cameraConfig = fpsConfig
+            appendDiag(
+                "camera fps: ${CameraTargetFps.label(chosenFps)} -> " +
+                    "${fpsConfig.fpsRange.lower}-${fpsConfig.fpsRange.upper}",
+            )
+            return
+        }
+        if (restoreDefaultWhenUnmatched) s.cameraConfig = defaultCfg
+        if (chosenFps == CameraTargetFps.DEVICE_DEFAULT) {
+            appendDiag("camera fps: device default (${defaultCfg.fpsRange.upper} max) — no swap")
+        } else {
+            appendDiag(
+                "camera fps: no ${CameraTargetFps.label(chosenFps)} match for default cfg — using default",
+            )
+        }
+    }
+
+    // What the live ARCore session was last configured with, so a settings change only touches the
+    // session when the effective value actually differs. Guarded by sessionMutex; set at session
+    // build, cleared at teardown. appliedCameraFps is null when no fps selection is in force
+    // (hardware stereo or camera safe mode), and sessionDefaultCameraConfig is ARCore's own pick.
+    private var appliedDepthRequested: Boolean? = null
+    private var appliedCameraFps: Int? = null
+    private var sessionDefaultCameraConfig: CameraConfig? = null
+
+    /**
+     * Applies the session-level AR settings to the LIVE ARCore session the moment they change, instead
+     * of leaving them for the next AR entry: [checkDepth] re-applies "ARCore depth" (Session.configure,
+     * still gated by isDepthModeSupported), [checkCameraFps] re-selects the camera config for the
+     * camera target fps / adaptive-rate cap. Same ownership dance as [recoverFromBrokenStereo]: get the
+     * GL thread out of the frame body first (Session is not thread-safe), pause only when the camera
+     * config has to change, then resume and re-attach. A camera-config swap restarts ARCore tracking;
+     * that is the cost of the artist's own change and the anchor relocalizes as on any resume.
+     *
+     * No-op without a session — the next session is built from the current settings anyway — and in
+     * the two cases that override the setting by design: hardware stereo (fps is the stereo config's)
+     * and camera safe mode after a dead-camera stall (default config, no depth, until next launch).
+     */
+    private fun reconcileLiveSessionSettings(
+        checkDepth: Boolean = false,
+        checkCameraFps: Boolean = false,
+    ) {
+        if (session == null) return
+        viewModelScope.launch(dispatchers.default) {
+            sessionMutex.withLock {
+                val s = session ?: return@withLock
+                if (isDestroying) return@withLock
+                val state = _uiState.value
+                val safeMode = forceSafeCameraConfig
+                val wantDepth = state.arCoreDepthEnabled && !safeMode
+                val wantFps = if (safeMode || state.isHardwareStereoActive) {
+                    null
+                } else {
+                    effectiveCameraTargetFps(
+                        targetFps = state.cameraTargetFps,
+                        adaptiveRateEnabled = state.adaptiveRateEnabled,
+                        batteryTier = state.batteryTier,
+                    )
+                }
+                if (checkDepth && safeMode && state.arCoreDepthEnabled) {
+                    appendDiag("settings: ARCore depth held off by camera safe mode (stream stalled earlier)")
+                }
+                val depthChanged = checkDepth && wantDepth != appliedDepthRequested
+                val fpsChanged = checkCameraFps && wantFps != null && wantFps != appliedCameraFps
+                if (!depthChanged && !fpsChanged) return@withLock
+
+                val handoffSucceeded = renderer?.detachSessionBounded(1500L) ?: true
+                if (
+                    decideSessionOwnership(handoffSucceeded, SessionOwnershipAction.RECONFIGURE) ==
+                    SessionOwnershipDecision.ABORT_RECONFIGURE
+                ) {
+                    appendDiag("settings: GL thread still owns ARCore after 1500ms — live reconfigure aborted")
+                    _feedback.tryEmit(
+                        com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                            "Couldn't apply the camera setting to the running AR session — exit and re-enter AR"
+                        )
+                    )
+                    return@withLock
+                }
+                val wasResumed = isSessionResumed
+                try {
+                    if (fpsChanged && wantFps != null) {
+                        if (wasResumed) pauseArSessionInternal()
+                        applyCameraTargetFps(
+                            s,
+                            sessionDefaultCameraConfig ?: s.cameraConfig,
+                            wantFps,
+                            restoreDefaultWhenUnmatched = true,
+                        )
+                        appliedCameraFps = wantFps
+                    }
+                    // Depth is re-asserted after any camera-config change too: support is per config.
+                    val config = s.config
+                    appliedDepthRequested = applyArCoreDepthMode(s, config)
+                    s.configure(config)
+                    appendDiag(
+                        "settings: live session reconfigured " +
+                            "(depth=${if (appliedDepthRequested == true) "on" else "off"}" +
+                            (if (fpsChanged) ", fps=${CameraTargetFps.label(wantFps ?: 0)}" else "") + ")",
+                    )
+                } catch (e: Exception) {
+                    Timber.e(e, "ARDIAG live settings reconfigure failed")
+                    appendDiag("settings: live reconfigure failed (${e.javaClass.simpleName})")
+                } finally {
+                    // Always resume what was running — a throw mid-swap must not leave a black camera.
+                    if (wasResumed && !isSessionResumed && isActivityResumed && isInArMode && !isDestroying) {
+                        resumeArSessionInternal()
+                    }
+                    // attachSession resets the camera-streaming watchdog, so a new config earns a fresh
+                    // CAMERA STREAMING / STALL verdict.
+                    renderer?.attachSession(session)
+                    lastTrackingTimestampMs = System.currentTimeMillis()
+                }
+            }
         }
     }
 
@@ -3198,6 +3461,9 @@ class ArViewModel @Inject constructor(
             session = null
             renderer = null
             isSessionResumed = false
+            appliedDepthRequested = null
+            appliedCameraFps = null
+            sessionDefaultCameraConfig = null
             _isCameraInUseByAr.value = false
             isDestroying = false
             clearCaptureState()
@@ -4396,7 +4662,11 @@ class ArViewModel @Inject constructor(
                         facingDirection = CameraConfig.FacingDirection.BACK
                         targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
                     })
-                    if (monoConfigs.isNotEmpty()) s.cameraConfig = monoConfigs[0]
+                    if (monoConfigs.isNotEmpty()) {
+                        s.cameraConfig = monoConfigs[0]
+                        // A later fps-setting change reconciles from here (see reconcileLiveSessionSettings).
+                        appliedCameraFps = CameraTargetFps.FPS_30
+                    }
                     _uiState.update { it.copy(isHardwareStereoActive = false) }
                     Timber.w("ARDIAG dual-lens: forced stereo broken -> reconfigured LIVE session to mono")
                 } catch (e: Exception) {

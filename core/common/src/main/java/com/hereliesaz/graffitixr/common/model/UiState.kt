@@ -171,7 +171,8 @@ data class ArUiState(
     /**
      * ARCore camera target frame rate. One of [com.hereliesaz.graffitixr.common.model.CameraTargetFps]'s
      * four values: `DEVICE_DEFAULT` (0, no filtering — the default), 30, 60, or `DEVICE_MAX` (-1, the
-     * device's highest-fps config). Applies on next AR entry.
+     * device's highest-fps config). Applied immediately: a live ARCore session's camera config is
+     * re-selected in place (a camera-config swap restarts ARCore tracking).
      *
      * Defaults to DEVICE_DEFAULT: no filter, so ARCore selects the camera config itself. Per ARCore's
      * docs it "prioritize[s] camera configs that support [60 fps]" on capable devices and lowers the
@@ -184,21 +185,24 @@ data class ArUiState(
     /**
      * Use ARCore when the device supports it (default true). When false, the AR session runs the
      * standalone SphereSLAM/KPM path even on an ARCore-capable device — the same path ARCore-less
-     * phones use. Gates [isArCoreAvailable] at session build; applies on next AR entry.
+     * phones use. Gates [isArCoreAvailable], re-derived on every toggle, so the backend switches
+     * immediately — mid-AR the ARCore session is torn down and CameraX + SphereSLAM takes over, or back.
      */
     val arCoreEnabled: Boolean = true,
     /**
      * Enable ARCore's Depth API (DepthMode.AUTOMATIC) where the device supports it (default true).
      * AUTOMATIC is ARCore's monocular/ML depth — built for single-camera phones with no depth
-     * sensor — and it feeds plane finding and stabilizes the sparse feature cloud. Applies on next
-     * AR entry; off is the escape hatch for hardware whose ML depth graph destabilizes VIO.
+     * sensor — and it feeds plane finding and stabilizes the sparse feature cloud. Applied
+     * immediately (a live session is reconfigured); off is the escape hatch for hardware whose ML
+     * depth graph destabilizes VIO.
      */
     val arCoreDepthEnabled: Boolean = true,
     /**
      * Monocular depth (MiDaS Small via ONNX Runtime), default true. It is the depth source for any
      * device that can't get ARCore's Depth API — no ARCore, ARCore off, or ARCore depth unsupported/off
      * — forming planes / recovering scale there. It stays dormant when ARCore depth is active, so those
-     * devices pay nothing. Applies on next AR entry.
+     * devices pay nothing. Applied immediately: the model is loaded + self-tested, or released, as soon
+     * as this or either ARCore setting changes.
      *
      * (Back on by default after the startup-crash root cause was fixed: the old Depth Anything model
      * used an 8-bit MatMulNBits op ORT rejects, and R8 had stripped ai.onnxruntime.OrtException so the
@@ -259,8 +263,9 @@ data class ArUiState(
     // Whether to display distances in imperial units (feet) rather than metric.
     val isImperialUnits: Boolean = false,
 
-    // True once ARCore has been confirmed installed and supported on this device.
-    // False while unverified or when ARCore is missing / not supported.
+    // True once ARCore has been confirmed installed and supported on this device and the artist has
+    // "Use ARCore" on (re-derived the moment that setting changes).
+    // False while unverified, when ARCore is missing / not supported, or when "Use ARCore" is off.
     val isArCoreAvailable: Boolean = true,
 
     // False until ArAvailabilityChecker.check() returns a final (non-UNKNOWN) result.

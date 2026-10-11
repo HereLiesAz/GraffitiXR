@@ -923,7 +923,11 @@ class ArViewModelTest {
     @Suppress("UNCHECKED_CAST")
     private fun enableArCore() {
         // setArMode(true) early-returns unless ARCore is reported available; flip the flag on the
-        // private state flow so the lifecycle tests can actually enter AR mode.
+        // private state flow so the lifecycle tests can actually enter AR mode. Let init's real
+        // availability resolution (unsupported in the JVM) land first: "Use ARCore" is applied live, so
+        // a resolution arriving after this override would read as a switch to standalone and tear the
+        // session down.
+        testDispatcher.scheduler.advanceUntilIdle()
         val field = viewModel.javaClass.getDeclaredField("_uiState")
         field.isAccessible = true
         val flow = field.get(viewModel) as MutableStateFlow<ArUiState>
