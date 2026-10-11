@@ -118,6 +118,7 @@
     <string name="scan_hint_build_map">Marchez à gauche et à droite pour construire la carte</string>
     <string name="scan_hint_closer">Rapprochez-vous du mur</string>
     <string name="scan_hint_higher_lower">Scannez plus haut et plus bas</string>
+    <string name="reacquiring_target">Recherche de la cible…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Maquette d\'arrière-plan</string>

@@ -428,6 +428,7 @@
     <string name="scan_hint_build_map">Gå til venstre og høyre for å bygge kart</string>
     <string name="scan_hint_closer">Gå nærmere veggen</string>
     <string name="scan_hint_higher_lower">Skann høyere og lavere</string>
+    <string name="reacquiring_target">Finner målet igjen…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Bakgrunn mockup</string>

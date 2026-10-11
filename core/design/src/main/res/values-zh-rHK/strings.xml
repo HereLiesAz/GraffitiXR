@@ -433,6 +433,7 @@
     <string name="scan_hint_build_map">左右行走構建地圖</string>
     <string name="scan_hint_closer">靠近牆壁</string>
     <string name="scan_hint_higher_lower">掃描更高和更低</string>
+    <string name="reacquiring_target">正在重新識別目標…</string>
 
 
     <string name="desc_bg_mockup">背景原型機</string>

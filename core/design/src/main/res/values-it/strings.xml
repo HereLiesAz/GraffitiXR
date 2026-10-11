@@ -428,6 +428,7 @@
     <string name="scan_hint_build_map">Cammina a sinistra e a destra per costruire la mappa</string>
     <string name="scan_hint_closer">Avvicinati al muro</string>
     <string name="scan_hint_higher_lower">Scansiona più in alto e più in basso</string>
+    <string name="reacquiring_target">Riacquisizione del bersaglio…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Mockup di Sfondo</string>

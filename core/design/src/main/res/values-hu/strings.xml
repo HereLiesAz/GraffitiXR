@@ -433,6 +433,7 @@
     <string name="scan_hint_build_map">Sétálj balra és jobbra a térkép felépítéséhez</string>
     <string name="scan_hint_closer">Menj közelebb a falhoz</string>
     <string name="scan_hint_higher_lower">Szkennelj magasabbra és alacsonyabbra</string>
+    <string name="reacquiring_target">Célpont újrakeresése…</string>
 
 
     <string name="desc_bg_mockup">Háttér makett</string>

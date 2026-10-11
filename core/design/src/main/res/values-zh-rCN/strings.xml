@@ -445,6 +445,7 @@
     <string name="scan_hint_build_map">向左和向右走动以构建地图</string>
     <string name="scan_hint_closer">靠近墙壁</string>
     <string name="scan_hint_higher_lower">扫描更高和更低的位置</string>
+    <string name="reacquiring_target">正在重新识别目标…</string>
 
 
     <string name="desc_bg_mockup">背景效果图</string>

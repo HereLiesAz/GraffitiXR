@@ -428,6 +428,7 @@
     <string name="scan_hint_build_map">Camina hacia la izquierda y derecha para construir el mapa</string>
     <string name="scan_hint_closer">Acércate a la pared</string>
     <string name="scan_hint_higher_lower">Escanea más alto y más bajo</string>
+    <string name="reacquiring_target">Recuperando el objetivo…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Fondo de Maqueta</string>

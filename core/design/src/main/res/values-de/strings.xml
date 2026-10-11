@@ -428,6 +428,7 @@
     <string name="scan_hint_build_map">Gehen Sie nach links und rechts, um die Karte zu erstellen</string>
     <string name="scan_hint_closer">Gehen Sie näher an die Wand</string>
     <string name="scan_hint_higher_lower">Scannen Sie höher und niedriger</string>
+    <string name="reacquiring_target">Ziel wird wiedererkannt…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Hintergrund-Mockup</string>

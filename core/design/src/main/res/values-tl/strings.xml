@@ -208,6 +208,7 @@
     <string name="scan_hint_build_map">Maglakad pakaliwa at pakanan upang bumuo ng mapa</string>
     <string name="scan_hint_closer">Lumapit sa pader</string>
     <string name="scan_hint_higher_lower">I-scan ang mas mataas at mas mababa</string>
+    <string name="reacquiring_target">Hinahanap muli ang target…</string>
     <string name="desc_bg_mockup">Background Mockup</string>
     <string name="desc_segmentation_preview">Preview ng Segmentation</string>
     <string name="help_mode_host">Mode Switcher: Lumipat sa pagitan ng mga mode ng app. Mga Tagubilin: I-tap para palawakin, pagkatapos ay piliin ang AR, Overlay, Mockup, o Lightbox.</string>

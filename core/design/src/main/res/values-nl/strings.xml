@@ -433,6 +433,7 @@
     <string name="scan_hint_build_map">Loop naar links en rechts om een ​​kaart te bouwen</string>
     <string name="scan_hint_closer">Ga dichter bij de muur staan</string>
     <string name="scan_hint_higher_lower">Scan hoger en lager</string>
+    <string name="reacquiring_target">Doel opnieuw zoeken…</string>
 
 
     <string name="desc_bg_mockup">Achtergrondmodel</string>

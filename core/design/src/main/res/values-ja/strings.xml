@@ -445,6 +445,7 @@
     <string name="scan_hint_build_map">左右に歩いてマップを構築します</string>
     <string name="scan_hint_closer">壁に近づいてください</string>
     <string name="scan_hint_higher_lower">上下をスキャンします</string>
+    <string name="reacquiring_target">ターゲットを再検出中…</string>
 
 
     <string name="desc_bg_mockup">背景のモックアップ</string>

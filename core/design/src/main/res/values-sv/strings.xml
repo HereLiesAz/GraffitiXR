@@ -433,6 +433,7 @@
     <string name="scan_hint_build_map">Gå åt vänster och höger för att bygga en karta</string>
     <string name="scan_hint_closer">Flytta dig närmare väggen</string>
     <string name="scan_hint_higher_lower">Skanna högre och lägre</string>
+    <string name="reacquiring_target">Hittar målet igen…</string>
 
 
     <string name="desc_bg_mockup">Bakgrundsmockup</string>

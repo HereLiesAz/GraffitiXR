@@ -433,6 +433,7 @@
     <string name="scan_hint_build_map">Идите влево и вправо, чтобы построить карту.</string>
     <string name="scan_hint_closer">Подойдите ближе к стене</string>
     <string name="scan_hint_higher_lower">Сканируйте выше и ниже</string>
+    <string name="reacquiring_target">Повторный поиск цели…</string>
 
 
     <string name="desc_bg_mockup">Фоновый макет</string>
