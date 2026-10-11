@@ -1120,8 +1120,12 @@ class MainActivity : AppCompatActivity() {
                         val completedTutorials by mainViewModel.completedTutorials.collectAsState()
 
                         // Standalone (no-ARCore) tracking status and its actions — Copy Diagnostics,
-                        // Recapture / New Target, the sweep hint — published by the overlay.
-                        if (editorUiState.editorMode == EditorMode.AR && !anyModalActive) {
+                        // Recapture / New Target, the sweep hint — published by the overlay. Hidden
+                        // while a confirmed target is still saving, so no second capture can start.
+                        if (
+                            editorUiState.editorMode == EditorMode.AR && !anyModalActive &&
+                            !mainUiState.isConfirmingTarget
+                        ) {
                             com.hereliesaz.graffitixr.feature.ar.StandaloneOverlayUi(standaloneUiHost)
                         }
 
