@@ -2212,8 +2212,8 @@ class MainActivity : AppCompatActivity() {
                         disabled = showLibrary,
                         onClick = {
                             if (arRailPolicy.standalone) {
-                                // Standalone captures in SphereSlamStandaloneOverlay: drop the current
-                                // target there and open capture (no ARCore tap-to-anchor flow).
+                                // Standalone: the overlay drops its current target, then reports back
+                                // (onNewTargetStarted in MainScreen), which opens the shared capture flow.
                                 if (hasCameraPermission) onStandaloneNewTarget() else requestPermissions()
                             } else if (isWaitingForTap) {
                                 mainViewModel.cancelTapMode()

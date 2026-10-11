@@ -266,6 +266,12 @@ fun SphereSlamStandaloneOverlay(
     onReferenceCaptured: (Bitmap, Float, Boolean) -> Unit = { _, _, _ -> },
     /** Normal app path: TargetCreationUi above both AR backends owns capture/review/fingerprint UX. */
     sharedTargetCapture: Boolean = false,
+    /**
+     * The current target was dropped for a new one (rail Target, New Target, Recapture). With
+     * [sharedTargetCapture] the host must open its TargetCreationUi here: this overlay draws no
+     * capture UI of its own then.
+     */
+    onNewTargetStarted: () -> Unit = {},
     onPersistedReferenceInvalid: (Uri) -> Unit = {},
     onPersistedAtlasPageInvalid: (Int, Uri) -> Unit = { _, _ -> },
     onAtlasPageCaptured: (Bitmap, Int, Float, Boolean, FloatArray) -> Unit =
@@ -436,6 +442,8 @@ fun SphereSlamStandaloneOverlay(
         }
     }
 
+    val latestOnNewTargetStarted by rememberUpdatedState(onNewTargetStarted)
+
     fun resetCapture() {
         onReferenceRegistrationChanged(false)
         awaitingReferencePersistence = false
@@ -468,6 +476,7 @@ fun SphereSlamStandaloneOverlay(
         calibrationDiagnostics = null
         matchDiagnostics = null
         fatalMessage = null
+        latestOnNewTargetStarted()
     }
 
     // The rail's Target action (standalone): drop the current target and open capture. Keyed on the

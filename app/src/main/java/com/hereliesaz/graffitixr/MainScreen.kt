@@ -360,6 +360,13 @@ fun MainScreen(
                             coopPeerSpatialFrame = arUiState.coopPeerSpatialFrame,
                             coopPeerFingerprint = arUiState.coopPeerFingerprint,
                             sharedTargetCapture = true,
+                            onNewTargetStarted = {
+                                // Same reset as the ARCore Target action: no stale capture, Measure
+                                // off, then the shared capture flow.
+                                arViewModel.clearCaptureForRetry()
+                                arViewModel.cancelMeasure()
+                                mainViewModel.startTargetCapture()
+                            },
                             onReferenceCaptured = { bitmap, widthMeters, physicallyMetric ->
                                 arViewModel.saveSphereSlamReference(
                                     bitmap,
