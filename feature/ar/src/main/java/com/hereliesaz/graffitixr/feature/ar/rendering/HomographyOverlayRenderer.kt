@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.opengl.GLES30
 import android.opengl.Matrix
+import com.hereliesaz.sphereslam.camera.CameraFillCenter
 import com.hereliesaz.sphereslam.camera.CameraIntrinsics
 import com.hereliesaz.sphereslam.overlay.CoverageGlowRenderer
 import java.util.concurrent.atomic.AtomicReference
@@ -131,7 +132,7 @@ class HomographyOverlayRenderer(
         textureUpdates.clear()
     }
 
-    /** The design quad's half-extents — MUST match what was passed to `HomographyArTracker.setReference`. */
+    /** The design quad's half-extents — MUST match what was passed to `BridgedHomographyTracker.setReference`. */
     fun setExtent(halfW: Float, halfH: Float) {
         extentHalfW = halfW
         extentHalfH = halfH

@@ -12,7 +12,7 @@ import org.opencv.core.KeyPoint
  * Round-trip coverage for the relocalization fingerprint — the load-bearing payload of a saved
  * `.gxr` (descriptors + 3D points + distortion-head patch). This is the data the PnP relocalizer
  * restores on project open, so it must survive serialization byte-for-byte. The reloc *math*
- * (PoseFusion, MetricMarks/Triangulation) is already covered by their own suites; this fills the
+ * (PoseFusion; SphereSLAM MetricMarks) is already covered by their own suites; this fills the
  * remaining gap and guards the format against the upcoming `.gxr` reshape.
  */
 class FingerprintSerializationTest {

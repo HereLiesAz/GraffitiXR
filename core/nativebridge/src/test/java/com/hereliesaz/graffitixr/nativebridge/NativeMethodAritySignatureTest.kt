@@ -23,10 +23,9 @@ import java.io.File
  * boundary. Types are still the reviewer's job.
  *
  * Covers every `native*`-exporting Kotlin class in this module, not just `SlamManager` — an
- * earlier version of this test covered only `SlamManager`, which meant the 6 natives on
- * `HomographyTrackerNative`, `YuvConverter`, and `NativeCrashHandler` had no cross-file arity
- * check at all (a class-specific reflection test,
- * [HomographyTrackerNativeContractTest], separately pins Kotlin's own descriptors but never opens
+ * earlier version of this test covered only `SlamManager`, which meant the natives on
+ * `YuvConverter` and `NativeCrashHandler` had no cross-file arity check at all (a class-specific
+ * reflection test such as [YuvConverterContractTest] pins Kotlin's own descriptors but never opens
  * `GraffitiJNI.cpp` — it would stay green through exactly the reorder this test exists to catch).
  */
 class NativeMethodAritySignatureTest {
@@ -138,13 +137,12 @@ class NativeMethodAritySignatureTest {
         /** Every Kotlin class in this module that exports `native*` methods. */
         val KOTLIN_SRCS = listOf(
             SLAM_MANAGER_SRC,
-            "$NATIVEBRIDGE_KOTLIN_DIR/HomographyTrackerNative.kt",
             "$NATIVEBRIDGE_KOTLIN_DIR/YuvConverter.kt",
             "$NATIVEBRIDGE_KOTLIN_DIR/NativeCrashHandler.kt",
         )
 
         /** The JNI class-name alternation for [KOTLIN_SRCS] — keep the two lists in sync. */
-        const val JNI_CLASSES = "SlamManager|HomographyTrackerNative|YuvConverter|NativeCrashHandler"
+        const val JNI_CLASSES = "SlamManager|YuvConverter|NativeCrashHandler"
 
         const val CPP_SRC = "core/nativebridge/src/main/cpp/GraffitiJNI.cpp"
 
@@ -155,7 +153,7 @@ class NativeMethodAritySignatureTest {
 
         fun splitTopLevel(params: String): Int {
             // A multi-line Kotlin parameter list conventionally ends with a trailing comma (e.g.
-            // HomographyTrackerNative.nativeHomographyTrack, YuvConverter.nativeYuvToRgbaBitmap) —
+            // YuvConverter.nativeYuvToRgbaBitmap) —
             // without stripping it, that comma counts as one more separator than there are
             // parameters, over-counting by exactly one and false-failing this test against C++
             // declarations (which have no such convention) even when both sides genuinely agree.

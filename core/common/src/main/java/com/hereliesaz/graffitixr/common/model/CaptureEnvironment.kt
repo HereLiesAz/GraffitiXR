@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
  * way the phone was physically pointing, which way was down, or where on earth it was. That is a
  * problem in three separate directions:
  *
- *  - **The capture geometry is frozen at capture.** `PlaneMarks.backProject` runs once per target,
+ *  - **The capture geometry is frozen at capture.** `MetricMarks.backProjectToPlane` (SphereSLAM) runs once per target,
  *    so whatever frame relationship held at that instant is baked into the fingerprint's 3D points
  *    forever (`PAPER.md` §8). If a capture later turns out to be wrong, the only way to attribute it
  *    is to know the conditions it was made under — and those conditions were not recorded.

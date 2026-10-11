@@ -24,7 +24,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import com.hereliesaz.graffitixr.feature.ar.rendering.CameraFillCenter
+import com.hereliesaz.sphereslam.camera.CameraFillCenter
 import com.hereliesaz.sphereslam.camera.CameraIntrinsicsEstimator
 import com.hereliesaz.sphereslam.models.DepthEstimator
 import com.hereliesaz.sphereslam.attitude.GameRotationAttitudeSource

@@ -1,5 +1,56 @@
 # SphereSLAM Implementation TODO
 
+## SphereSLAM 0.24.1 — second consolidation (app half)
+
+The app now consumes SphereSLAM **0.24.1** (tag `0.24.1`, library PR #29). The library absorbed the
+pieces 0.24.0 deferred; the app copies are deleted and the app keeps thin Android/UI adapters.
+
+Moved (app copy deleted → library API):
+
+- [x] `rendering/CameraFillCenter` → `camera.CameraFillCenter` (identical math; the library adds
+  `frameToViewNormalized`). Callers: `HomographyOverlayRenderer`, `OverlayGyroStabilizer`,
+  `SphereSlamStandaloneOverlay`, `StandaloneGestureGeometry`, `ArViewModel`.
+- [x] The standalone analyzer's runtime → `:reloc` `PhotosphereTrackingSession` (base photosphere
+  pose + keyframes, planar KPM layer through `RobustTrackingLoop`, same-frame
+  `map_from_fingerprint`, ≤ 400 ms gyro bridge, intrinsics-change rebuild, `unitsPerPixel`, atlas
+  growth). `StandaloneAtlasGrowth` → `PhotosphereAtlasGrowth` (pure-Kotlin rectification instead of
+  OpenCV/Bitmap); `StandaloneTargetQuality` / `StandaloneFailure` bodies → `TargetQuality` /
+  `TrackingFailure*` (typealiased; the artist-facing messages stay in the app).
+  `SphereSlamStandaloneTrackingAnalyzer` remains as the adapter: CameraX luma/intrinsics, Camera2
+  sensor orientation and timestamp source, attitude, MobileGS seeding/feeding and reloc
+  corroboration (`correctAcceptedPose`), MiDaS depth push, UI callbacks.
+- [x] Native `HomographyTracker` (C++, its JNI entry points, CMake entries and host test),
+  `HomographyTrackerNative`, `HomographyArTracker` → `:reloc` `PlanarTracker` (same ORB / Lowe /
+  `solvePnPRansac` + IPPE algorithm and gates, on the OpenCV Java `Relocalizer`).
+  `BridgedHomographyTracker` is now a thin adapter (attitude source, reference `Bitmap` → luma,
+  `NativeLibLoader` for `opencv_java5`); `HomographyTrackingAnalyzer` packs the Y plane with
+  `LumaFrameTransform` instead of the native RGBA decode. Picks up the library fix for a stale bridge
+  reference after a vision lock without an attitude sample.
+- [x] `anchor/PlaneMarks`, `anchor/MetricMarks`, `anchor/Triangulation` → `:reloc` `MetricMarks`
+  (`backProjectToPlane`, `triangulateTwoView` through `TileTriangulator`, `glViewToCvDisplay`,
+  `glViewDisplayOriented`). The capture-path tests now run against the library.
+
+Left in place, deliberately:
+
+- Native MobileGS `computeRectifyHomography`, `growMapFromReloc` and the depth-calibrated radial
+  placement. The library's `RectifyHomography` / `WallFeatureMap` / `RadialDepthPlacement` are
+  pure-Kotlin JVM objects; MobileGS runs these inside its native reloc pass on the reloc thread, on
+  native map state (`mMapPoints3D`, `mMapDescriptors`, …) under `mMutex`. Switching would mean moving
+  the feature map and the reloc pass out of C++ (or a JNI upcall per reloc attempt), not swapping a
+  call. It would also change behaviour: the library fixes the rectify sign (`R + t·nᵀ/d`; native
+  still uses `R − t·nᵀ/d`, which is wrong whenever the capture and live cameras translate) and
+  calibrates radial depth with the robust `DepthScaleFit` instead of plain least squares.
+- `core/common` `model/WallFeatureMap` (the persisted `@Serializable` project model) and
+  `SlamManager.getWallFeatureMap`'s blob parser: a data model and native-blob reader, not the
+  library's runtime map; `:core:nativebridge` does not depend on SphereSLAM.
+
+Device verification still owed for this move:
+
+- [ ] Standalone (non-ARCore) phone: lock, brief hand-over-lens bridge, re-lock, atlas growth and
+  `map_from_fingerprint` behave as before; diagnostics show the same state/failure lines.
+- [ ] Overlay planar tracker (if remounted): reference capture accepts/rejects as before, lock and
+  gyro bridge hold the design.
+
 ## SphereSLAM 0.24.0 — generic SLAM code moved into the library (app half)
 
 The app now consumes SphereSLAM **0.24.0** (tag `0.24.0`, library PR #28) across `:sphereslam`,
@@ -60,7 +111,8 @@ Fixes picked up with the move:
 
 Deferred (deliberately NOT moved): the standalone photosphere runtime/atlas growth
 (`StandaloneAtlasGrowth`, the analyzer's map-frame bookkeeping), the native MobileGS relocalizer, and
-`HomographyTracker`.
+`HomographyTracker`. (The runtime, atlas growth and `HomographyTracker` moved in 0.24.1,
+above; the native MobileGS relocalizer stays.)
 
 Device verification still owed for this move:
 
@@ -490,8 +542,9 @@ Remaining:
   Overlay ▸ Gyro's screen intrinsics map through the same crop; the analyzers track the full frame
   rather than the viewport cropRect. Unit-tested as pure math; on-device registration check
   pending.
-- [ ] Upstream `CameraFillCenter` to SphereSLAM `camera` beside `ScreenIntrinsics` (fill
-  counterpart of `fitCenter`, plus the crop-aware projection and view→frame mapping).
+- [x] Upstream `CameraFillCenter` to SphereSLAM `camera` beside `ScreenIntrinsics` (fill
+  counterpart of `fitCenter`, plus the crop-aware projection and view→frame mapping). Done in
+  0.24.1 (`camera.CameraFillCenter`); the app copy is gone.
 - [ ] Add GL/instrumentation tests for standalone texture clear/replace if test infrastructure permits.
 - [x] Sanitize and test standalone renderer transforms: non-finite values fall back safely, scale
   uses the shared 0.1–10 editor bounds, rotations normalize, and pathological finite pan values are

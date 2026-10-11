@@ -55,13 +55,13 @@ import com.hereliesaz.graffitixr.common.model.SphereSlamAtlasPage
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import com.hereliesaz.graffitixr.design.theme.rememberAppStrings
-import com.hereliesaz.graffitixr.feature.ar.rendering.CameraFillCenter
+import com.hereliesaz.sphereslam.camera.CameraFillCenter
 import com.hereliesaz.graffitixr.feature.ar.rendering.HomographyOverlayRenderer
 import com.hereliesaz.sphereslam.CoverageGlowProjection
 import com.hereliesaz.sphereslam.PhotosphereKeyframe
 import com.hereliesaz.sphereslam.SphereCoverage
 import com.hereliesaz.sphereslam.overlay.CoverageGlowRenderer
-import com.hereliesaz.sphereslam.SphereSlamStandaloneSession
+import com.hereliesaz.sphereslam.reloc.PhotosphereTrackingSession
 import com.hereliesaz.sphereslam.camera.CameraIntrinsics
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
@@ -998,7 +998,7 @@ fun SphereSlamStandaloneOverlay(
                     mobileGsMapFromFingerprint.takeIf { it.size == 16 }?.toFloatArray(),
                 mobileGsWallFeatureMap = initialMobileGsWallFeatureMap,
                 mobileGsWallFeatureMapFrameVersion = initialMobileGsWallFeatureMapFrameVersion,
-                onReferenceReady = { registered: SphereSlamStandaloneSession.Reference ->
+                onReferenceReady = { registered: PhotosphereTrackingSession.RegisteredPage ->
                     val g = registered.geometry
                     postUi {
                         referenceWidthUnits = g.widthMeters

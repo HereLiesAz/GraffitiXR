@@ -371,7 +371,7 @@ class SlamManager @Inject constructor(
     /**
      * Ingest a fingerprint built from triangulated metric marks (no depth source). Also fixes the
      * fingerprint anchor pose (column-major 4x4) and the camera intrinsics (fx,fy,cx,cy) the reloc
-     * PnP should use. points3d are in keyframe-0's CV camera frame (see [MetricMarks]).
+     * PnP should use. points3d are in keyframe-0's CV camera frame (see SphereSLAM `reloc.MetricMarks`).
      *
      * [viewMatrix] is the GL-convention world->camera view at capture. Supplying it enables the
      * reloc thread's plane-guided rectification: the marks lie on a known plane, so the oblique-

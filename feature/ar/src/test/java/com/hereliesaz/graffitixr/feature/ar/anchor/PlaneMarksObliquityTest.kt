@@ -7,6 +7,7 @@ import kotlin.math.sin
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.hereliesaz.sphereslam.reloc.MetricMarks
 
 /**
  * EVALUATION.md **E0** — the display-rotation convention, characterized.
@@ -15,7 +16,8 @@ import org.junit.Test
  * orientation, the view matrix is not, so the recovered depths skew with obliquity — sat in a
  * comment for several development cycles with no test behind it. `PlaneMarksTest` has only
  * fronto-parallel and world-translated cases, so the defect it warns about has never been exercised
- * once. This file exercises it.
+ * once. This file exercises it. (The back-projection itself is SphereSLAM's
+ * `reloc.MetricMarks.backProjectToPlane` now, reached through the test adapter [PlaneBackProjection].)
  *
  * The geometry, from `backProject`'s own expression `t = (n·p)/(n·d)`: a rotation preserves the dot
  * product, so `n·p` is identical in either frame and the ENTIRE error lives in the denominator —
@@ -85,7 +87,7 @@ class PlaneMarksObliquityTest {
     }
 
     /** A 3D point paired with the pixel it projects to. */
-    private class Sample(val world: FloatArray, val pixel: PlaneMarks.Pixel)
+    private class Sample(val world: FloatArray, val pixel: PlaneBackProjection.Pixel)
 
     /**
      * Ground truth, built **forward**: parameterize the wall by its own two in-plane basis vectors,
@@ -118,7 +120,7 @@ class PlaneMarksObliquityTest {
                 val v = wy / wz * FY + CY
                 if (u < 0.05f * W || u > 0.95f * W) continue             // off-frame
                 if (v < 0.05f * H || v > 0.95f * H) continue
-                out.add(Sample(floatArrayOf(wx, wy, wz), PlaneMarks.Pixel(u, v)))
+                out.add(Sample(floatArrayOf(wx, wy, wz), PlaneBackProjection.Pixel(u, v)))
             }
         }
         return out
@@ -135,7 +137,7 @@ class PlaneMarksObliquityTest {
         val n = wallNormalCam(obliquityDeg)
         val p = floatArrayOf(n[0] * DIST_M, n[1] * DIST_M, n[2] * DIST_M)
 
-        val actual = PlaneMarks.backProject(
+        val actual = PlaneBackProjection.backProject(
             samples.map { it.pixel }, viewForPlane, p, n, FX, FY, CX, CY,
         )
         val out = ArrayList<Float>(actual.count)
@@ -203,8 +205,8 @@ class PlaneMarksObliquityTest {
         val onPlane = n[0] * (truth[0] - p[0]) + n[1] * (truth[1] - p[1]) + n[2] * (truth[2] - p[2])
         assertEquals("fixture must lie on the wall", 0f, onPlane, 1e-5f)
 
-        val pixel = PlaneMarks.Pixel(truth[0] / truth[2] * FX + CX, truth[1] / truth[2] * FY + CY)
-        val r = PlaneMarks.backProject(listOf(pixel), identityView(), p, n, FX, FY, CX, CY)
+        val pixel = PlaneBackProjection.Pixel(truth[0] / truth[2] * FX + CX, truth[1] / truth[2] * FY + CY)
+        val r = PlaneBackProjection.backProject(listOf(pixel), identityView(), p, n, FX, FY, CX, CY)
         assertEquals(1, r.count)
         for (i in 0..2) assertEquals(truth[i], r.pointsCam[i], TOLERANCE_MM / 1000f)
     }
@@ -279,7 +281,7 @@ class PlaneMarksObliquityTest {
         val pWorld = rzTranspose(rotationDeg.toFloat(), pDisplay)
 
         val cvView = MetricMarks.glViewToCvDisplay(glViewForSensorAtOrigin(), rotationDeg)
-        val actual = PlaneMarks.backProject(
+        val actual = PlaneBackProjection.backProject(
             samples.map { it.pixel }, cvView, pWorld, nWorld, FX, FY, CX, CY,
         )
         val out = ArrayList<Float>(actual.count)
@@ -357,7 +359,7 @@ class PlaneMarksObliquityTest {
         val nDisplay = wallNormalCam(60f)
         val pDisplay = floatArrayOf(nDisplay[0] * DIST_M, nDisplay[1] * DIST_M, nDisplay[2] * DIST_M)
         val cvView = MetricMarks.glViewToCvDisplay(glViewForSensorAtOrigin(), 90)
-        val kept = PlaneMarks.backProject(
+        val kept = PlaneBackProjection.backProject(
             samples.map { it.pixel }, cvView,
             rzTranspose(90f, pDisplay), rzTranspose(90f, nDisplay),
             FX, FY, CX, CY,

@@ -11,7 +11,7 @@ import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.sphereslam.camera.CaptureRotation
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
-import com.hereliesaz.graffitixr.feature.ar.anchor.MetricMarks
+import com.hereliesaz.sphereslam.reloc.MetricMarks
 import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
@@ -543,6 +543,7 @@ class MainViewModel @Inject constructor(
      * ([MetricFingerprintBuilder.buildSingle]) instead of triangulating a second view. No tracked
      * plane under the tap → refuse and guide the artist to face a wall.
      */
+    @OptIn(com.hereliesaz.sphereslam.reloc.ExperimentalSphereSlamRelocApi::class)
     private fun handleSingleCapture(
         bitmap: Bitmap, intr: FloatArray, view: FloatArray, wallPlane: FloatArray?, rotationDeg: Int,
         captureEnvironment: com.hereliesaz.graffitixr.common.model.CaptureEnvironment?,

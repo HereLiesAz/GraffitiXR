@@ -72,7 +72,7 @@ jobs:
         run: python3 tools/check_native_locking.py
 
       - name: Native host unit tests
-        # core/nativebridge's production C++ (HomographyTracker, MobileGS, the JNI frame-buffer
+        # core/nativebridge's production C++ (MobileGS, the JNI frame-buffer
         # guards) compiled for the runner against OpenCV 4 + GoogleTest: the known-answer pose and
         # fingerprint-state tests BACKLOG Phase 7 had no way to run. NDK-side, not Kotlin.
         run: |

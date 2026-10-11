@@ -11,17 +11,18 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * The parts of [HomographyTrackingAnalyzer] testable without a device: the underlying-`Image`-is-
- * null bail-out and the [ImageProxy.close] resource-safety guarantee. The happy path — real YUV
- * decode via the native `YuvConverter`, `Bitmap` rotation, an actual [BridgedHomographyTracker]
- * call — needs the compiled `.so` and isn't reachable from a plain JVM unit test. The rotation and
- * projection math it relies on is SphereSLAM's (`RotationMath`, `camera.ProjectionMatrix`) and is
+ * The parts of [HomographyTrackingAnalyzer] testable without a device: the no-Y-plane bail-out and
+ * the [ImageProxy.close] resource-safety guarantee. The happy path — an actual
+ * [BridgedHomographyTracker] call into SphereSLAM's OpenCV-backed `PlanarTracker` — needs the OpenCV
+ * native library and isn't reachable from a plain JVM unit test. The luma packing, rotation,
+ * projection, planar tracking and gyro-bridge logic it relies on are SphereSLAM's
+ * (`camera.LumaFrameTransform`, `camera.ProjectionMatrix`, `reloc.PlanarTracker`) and are
  * unit-tested in that library.
  */
 class HomographyTrackingAnalyzerTest {
 
     @Test
-    fun `a frame with no underlying Image is skipped without crashing, and still closed`() {
+    fun `a frame with no planes is skipped without crashing, and still closed`() {
         var callbackInvocations = 0
         val analyzer = HomographyTrackingAnalyzer(
             context = mockk<Context>(),
@@ -31,7 +32,7 @@ class HomographyTrackingAnalyzerTest {
         )
 
         val imageProxy = mockk<ImageProxy> {
-            every { image } returns null
+            every { planes } returns emptyArray()
             every { close() } just runs
         }
 

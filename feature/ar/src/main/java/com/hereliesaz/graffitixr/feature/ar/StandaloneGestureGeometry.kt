@@ -1,6 +1,6 @@
 package com.hereliesaz.graffitixr.feature.ar
 
-import com.hereliesaz.graffitixr.feature.ar.rendering.CameraFillCenter
+import com.hereliesaz.sphereslam.camera.CameraFillCenter
 
 /**
  * Convert wall units / camera-frame pixel into wall units / screen pixel for the FILL_CENTER preview:

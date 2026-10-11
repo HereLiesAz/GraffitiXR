@@ -6,6 +6,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.hereliesaz.sphereslam.math.RigidMath
+import com.hereliesaz.sphereslam.reloc.MetricMarks
 
 /**
  * IMPLEMENTATION.md **0.3** — `MetricMarks.glViewToCvDisplay` at 0/90/180/270°.
