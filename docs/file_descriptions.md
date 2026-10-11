@@ -68,7 +68,7 @@ This document lists key files in the repository and their purposes.
 
 ### SphereSLAM (published dependency)
 
-SphereSLAM 0.24.3 public API baseline: GraffitiXR consumes the supported planar/coverage surface
+SphereSLAM 0.24.4 public API baseline: GraffitiXR consumes the supported planar/coverage surface
 and toolkit packages, and explicitly opts into the experimental `:reloc` and `:models` surfaces while
 preserving its existing `Standalone*` aliases.
 

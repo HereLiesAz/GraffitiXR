@@ -1,5 +1,27 @@
 # SphereSLAM Implementation TODO
 
+## SphereSLAM 0.24.4 — audit fixes (adopted, no app code changes)
+
+The app consumes SphereSLAM **0.24.4** (tag `0.24.4`). It compiles unchanged; what changed underneath:
+
+- [x] `REFERENCE_TOO_WEAK` no longer kills the session (only the precision layer halts;
+  `isRecoverable`). The app still stops feeding the analyzer on any fatal and restarts it on
+  restore/recapture (`standaloneFatalRecovery`), which stays correct; resuming in place via
+  `updatePrecisionLayer` is possible but not adopted.
+- [x] libc++ linked statically in the AARs. `app/build.gradle.kts` keeps its
+  `pickFirsts += "**/libc++_shared.so"` for the other native dependencies.
+- [x] `superpoint.onnx` in `:models` is the corrected rpautrat export — byte-identical to the
+  app's `core/nativebridge` asset (`docs/models/SUPERPOINT_PROVENANCE.md`).
+- [x] Timing diagnostic `matched` now counts frames with a pose (was attempts); KPM reprojection
+  error is reported in full-frame px².
+
+Device checks owed for 0.24.4:
+
+- [ ] Half-resolution KPM locks still accepted: the full-frame error unit tightens the effective
+  acceptance gate from 40 to 10 px². If locks drop, raise `PoseAcceptanceConfig.maxReprojectionError`.
+- [ ] Swapping the wall target re-confirms before `LOCKED` (no single-frame lock on the new wall).
+- [ ] No overlay swing-back after a gyro bridge.
+
 ## SphereSLAM 0.24.3 — display-rate glow and artwork, faster tracking, GPU depth (app half)
 
 The app now consumes SphereSLAM **0.24.3** (tag `0.24.3`). The app-facing API is additive; the
