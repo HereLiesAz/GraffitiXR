@@ -303,17 +303,8 @@
     <string name="redetect">重新检测</string>
 
 
-    <string name="plane_realignment_title">重新检测墙面</string>
 
-    <string name="plane_realignment_text">锚点位于您拍摄时站立的位置。ARCore 会选择位于该原始位置正前方且被追踪的垂直表面。
 
-1. 回到您在捕获时大致站立的位置
-2. 慢慢地将相机扫过您的壁画墙，以便 ARCore 可以将其注册为平坦的表面
-3. 面对艺术品保持稳定，然后点击下方
-
-橙色边框将跳转到新检测到的表面。</string>
-
-    <string name="use_this_wall">使用这面墙</string>
 
 
     <string name="scanning_dots">正在扫描…</string>

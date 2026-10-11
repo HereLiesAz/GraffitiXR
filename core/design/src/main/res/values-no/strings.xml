@@ -299,12 +299,6 @@
     <!-- Action to redetect the plane. -->
     <string name="redetect">Gjenoppdag</string>
 
-    <!-- Title for plane realignment tool. -->
-    <string name="plane_realignment_title">Gjenoppdag veggoverflaten</string>
-    <!-- Instructions for realigning the plane with the wall. -->
-    <string name="plane_realignment_text">Ankeret er plassert fra der du sto da du fanget. ARCore velger den sporede vertikale overflaten mest direkte foran den opprinnelige posisjonen.\n\n1. Gå tilbake til omtrent der du sto under fangst\n2. Panorer kameraet sakte over veggen slik at ARCore kan registrere det som en flat overflate\n3. Hold stødig vendt mot kunstverket, og trykk deretter nedenfor\n\nDen oransje kanten vil hoppe til den nylig oppdagede overflaten.</string>
-    <!-- Action to use the currently detected wall for realignment. -->
-    <string name="use_this_wall">Bruk denne veggen</string>
 
     <!-- Label shown when scanning for relocation. -->
     <string name="scanning_dots">Skanner …</string>

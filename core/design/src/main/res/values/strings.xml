@@ -329,12 +329,6 @@
     <!-- Action to redetect the plane. -->
     <string name="redetect">Re-detect</string>
 
-    <!-- Title for plane realignment tool. -->
-    <string name="plane_realignment_title">Re-detect Wall Surface</string>
-    <!-- Instructions for realigning the plane with the wall. -->
-    <string name="plane_realignment_text">The anchor is placed from where you stood when you captured. ARCore picks the tracked vertical surface most directly in front of that original position.\n\n1. Return to approximately where you stood during capture\n2. Slowly pan the camera across your mural wall so ARCore can register it as a flat surface\n3. Hold steady facing the artwork, then tap below\n\nThe orange border will jump to the newly detected surface.</string>
-    <!-- Action to use the currently detected wall for realignment. -->
-    <string name="use_this_wall">Use This Wall</string>
 
     <!-- Label shown when scanning for relocation. -->
     <string name="scanning_dots">Scanning\u2026</string>

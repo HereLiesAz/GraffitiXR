@@ -302,11 +302,8 @@
     <string name="redetect">Upptäck igen</string>
 
 
-    <string name="plane_realignment_title">Upptäck väggytan igen</string>
 
-    <string name="plane_realignment_text">Ankaret placeras från där du stod när du fångade. ARCore väljer den spårade vertikala ytan mest direkt framför den ursprungliga positionen.\n\n1. Gå tillbaka till ungefär där du stod under fångsten\n2. Panorera långsamt kameran över väggen så att ARCore kan registrera den som en plan yta\n3. Håll stadigt vänd mot konstverket och tryck sedan på nedan\n\nDen orangea kanten kommer att hoppa till den nyligen upptäckta ytan.</string>
 
-    <string name="use_this_wall">Använd denna vägg</string>
 
 
     <string name="scanning_dots">Skannas\u2026</string>

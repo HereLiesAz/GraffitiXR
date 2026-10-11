@@ -157,13 +157,11 @@ design, and Gyro moves the drawn design with the wall instead.
   draw, so the design's edits and Overlay's `ModeAdjustment` are unchanged.
 - **Release:** rotation beyond **3°** since the reference (tripod bumped, phone picked up)
   releases Gyro with a short toast; so does a device with no rotation-vector sensor. Turning it off,
-  leaving Overlay, or opening the library releases the sensor listener and stops MiDaS; the design
+  leaving Overlay, or opening the library releases the sensor listener; the design
   returns to its normal Overlay placement. A display-rotation change re-captures the reference.
-- **Depth (MiDaS):** `DepthEstimator` runs once when Gyro turns on and then every **15 s**, on a
-  downsampled ImageCapture still on a background dispatcher, sampling the surface under the design
-  as a *relative* inverse depth. That feeds only the plane-induced parallax term `t·nᵀ/d`, and
-  **translation is not measured**, so the term is off and depth does not change the drawn result
-  today. Pure rotation is exact without depth.
+- **No depth:** depth would feed only the plane-induced parallax term `t·nᵀ/d`, and **translation is
+  not measured**, so the term is off. Gyro therefore takes no stills and runs no depth model (an
+  earlier build ran MiDaS every 15 s and discarded the result). Pure rotation is exact without depth.
 - Overlay **Export** composites the design at its uncompensated position (sub-degree difference).
 
 ### 1.3 MOCKUP wall-capture flow (`CaptureStep`)
@@ -383,12 +381,16 @@ Detailed math in `RELOC_MAP_DESIGN.md`, `SELF_GROWING_FINGERPRINT.md`,
   so the map — and the `.gxr` project field for it — could never do anything. Turn all three on
   deliberately if you want them; out of the box, relocalization runs on the raw ARCore anchor without
   drift correction, and the fingerprint does not self-grow.
-- **No dual-lens depth fallback.** `useArCoreDepthApi` is hardcoded `false` in `ArViewModel` — **no**
-  device, stereo-capable or not, gets a depth estimate from the ARCore Depth API. Metric scale for
-  non-stereo devices instead comes from `MetricFingerprintBuilder`'s two-keyframe triangulation, not
-  from a per-pixel motion-based depth map. Devices that expose hardware stereo use it
-  (`isHardwareStereoActive`, tracked for the tap-to-distance gate — §1.2); devices that don't fall back
-  to that triangulated centre depth, not to a "VIO-baseline depth" image.
+- **Depth sources on the ARCore path.** The ARCore Depth API (`DepthMode.AUTOMATIC`) is the
+  Settings **ARCore depth** switch (default on, dropped in camera safe mode, still gated by
+  `isDepthModeSupported`). The hardware-stereo camera config is adopted only after the one-time
+  `StereoProbeService` probe confirms the forced dual-lens config is actually in force
+  (`stereoCameraUsage == REQUIRE_AND_USE`) and, under it, tracks and returns a populated depth map.
+  ARCore exposes no per-frame depth-source signal, so the probe cannot prove the depth was
+  triangulated from disparity rather than inferred; it proves the configuration works. The probe
+  runs after the camera-free gate, and a probe that cannot open the camera persists nothing and
+  retries on the next AR entry. Monocular (MiDaS) depth is never used on the ARCore path. Metric
+  scale for the fingerprint comes from `MetricFingerprintBuilder`'s two-keyframe triangulation.
 - **Thread safety.** `mWallDescriptors` / `mWallKeypoints3D` are mutex-guarded against races between JNI
   updates and the background PnP thread. The JNI ABI is frozen via `Fingerprint.fromNative` and locked by
   `FingerprintJniContractTest`.

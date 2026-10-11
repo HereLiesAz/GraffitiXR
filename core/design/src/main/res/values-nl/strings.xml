@@ -302,11 +302,8 @@
     <string name="redetect">Opnieuw detecteren</string>
 
 
-    <string name="plane_realignment_title">Detecteer het muuroppervlak opnieuw</string>
 
-    <string name="plane_realignment_text">Het anker wordt geplaatst vanaf de plek waar u stond toen u de vangst deed. ARCore kiest het gevolgde verticale oppervlak het meest direct voor die oorspronkelijke positie.\n\n1. Keer terug naar ongeveer waar u stond tijdens het vastleggen\n2. Draai de camera langzaam over uw muurschildering zodat ARCore deze als een vlak oppervlak kan registreren\n3. Blijf stabiel met je gezicht naar het kunstwerk gericht en tik vervolgens hieronder\n\nDe oranje rand springt naar het nieuw gedetecteerde oppervlak.</string>
 
-    <string name="use_this_wall">Gebruik deze muur</string>
 
 
     <string name="scanning_dots">Scannen\u2026</string>

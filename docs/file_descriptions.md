@@ -181,8 +181,8 @@ the real (non-stub) tracker is packaged.
     `GameRotationAttitudeSource`), publishes the per-frame pure-rotation screen homography
     (SphereSLAM `gyro.GyroCompensationMath`; screen intrinsics for the `FILL_CENTER` preview from
     SphereSLAM `camera.CameraFillCenter`) MainScreen draws the Overlay
-    design through, auto-releases past 3°, and runs a slow (15 s) background MiDaS sample (`:models`
-    `DepthEstimator`) of the surface under the design.
+    design through, and auto-releases past 3°. No depth model runs (translation is not measured, so
+    depth would change nothing on screen).
 *   `StandaloneAnalyzerRecovery.kt`: what the standalone overlay does after a fatal analyzer
     (restore the previous target and recreate the analyzer, or report) and the status-pill text.
 *   `StandaloneFrameAttitude.kt`: the capture-time `Frame.attitude` for the tracking session.

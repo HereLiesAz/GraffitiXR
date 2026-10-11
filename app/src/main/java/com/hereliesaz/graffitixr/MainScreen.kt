@@ -492,9 +492,16 @@ fun MainScreen(
                         // is cancelled the moment we leave AR.
                         LaunchedEffect(rendererRef.value) {
                             val r = rendererRef.value ?: return@LaunchedEffect
-                            val startMs = android.os.SystemClock.elapsedRealtime()
+                            var startMs = android.os.SystemClock.elapsedRealtime()
                             while (true) {
                                 kotlinx.coroutines.delay(1000)
+                                // Only time spent with a session attached counts: AR entry (probe,
+                                // camera gate) legitimately runs for seconds with no session.
+                                startMs = com.hereliesaz.graffitixr.feature.ar.ArCameraHealth.watchStartMs(
+                                    startMs,
+                                    android.os.SystemClock.elapsedRealtime(),
+                                    com.hereliesaz.graffitixr.feature.ar.isArSessionAttached(r),
+                                )
                                 // Read via a :feature:ar helper that returns a Long — :app can't access
                                 // ARCore's Frame type (it's an implementation dep of :feature:ar).
                                 val ts = com.hereliesaz.graffitixr.feature.ar.lastArFrameTimestampNs(r)
@@ -643,6 +650,11 @@ fun MainScreen(
                                 arViewModel.attachSessionToRenderer(renderer)
                                 val view = GLSurfaceView(ctx).apply {
                                     setEGLContextClientVersion(3)
+                                    // Keep the artwork/perception GL objects across background →
+                                    // foreground where the driver allows it. Not guaranteed (the
+                                    // context can still be lost), so ArRenderer.onSurfaceCreated
+                                    // also rebuilds every GL handle and re-uploads the artwork.
+                                    preserveEGLContextOnPause = true
                                     setZOrderMediaOverlay(true)
                                     holder.setFormat(PixelFormat.TRANSLUCENT)
                                     setRenderer(renderer)
@@ -656,9 +668,7 @@ fun MainScreen(
                                     r.ambientScanEnabled = arUiState.ambientScanEnabled
                                     r.captureRequested = arUiState.isCaptureRequested
                                     r.isCapturingTarget = mainUiState.isCapturingTarget
-                                    r.isInPlaneRealignment = mainUiState.isInPlaneRealignment
                                     r.hideVisualization = isExporting
-                                    r.visitedSectorsMask = arUiState.visitedSectorsMask
                                     r.scanPhase = arUiState.scanPhase
                                     r.doodleLockActive = doodleDetectActive
                                     // Independent in-world perception layers (Settings, default on).
@@ -764,8 +774,8 @@ fun MainScreen(
             }
 
 
-        // Overlay ▸ Gyro: tripod stabilisation. Off (and released: sensor listener unregistered,
-        // MiDaS stopped) whenever we are not in Overlay with the camera showing, so returning to
+        // Overlay ▸ Gyro: tripod stabilisation. Off (and released: sensor listener unregistered)
+        // whenever we are not in Overlay with the camera showing, so returning to
         // Overlay never silently re-arms it against a different reference.
         val overlayCameraShowing = uiState.editorMode == EditorMode.OVERLAY && isCameraActive && hasCameraPermission
         LaunchedEffect(overlayCameraShowing) {
@@ -777,12 +787,6 @@ fun MainScreen(
             cameraController = cameraController,
             viewWidth = overlayViewSize.width,
             viewHeight = overlayViewSize.height,
-            designCenter = {
-                val adj = uiState.modeAdjustments[EditorMode.OVERLAY] ?: ModeAdjustment()
-                val w = overlayViewSize.width.coerceAtLeast(1)
-                val h = overlayViewSize.height.coerceAtLeast(1)
-                Pair(0.5f + adj.offsetX / w, 0.5f + adj.offsetY / h)
-            },
             onRelease = { reason ->
                 mainViewModel.setOverlayGyroActive(false)
                 val message = when (reason) {

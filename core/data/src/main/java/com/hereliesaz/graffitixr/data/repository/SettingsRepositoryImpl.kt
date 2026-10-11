@@ -272,9 +272,9 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
-    // Defaults TRUE: monocular depth (MiDaS Small; LiteRT GPU/CPU since SphereSLAM 0.24.3) is the depth source for any device
-    // that can't get ARCore's Depth API, so it is on by default — it loads/runs only when ARCore depth
-    // isn't active, so a device whose ARCore depth works pays nothing. (Was briefly opt-in after a
+    // Defaults TRUE: monocular depth (MiDaS Small; LiteRT GPU/CPU since SphereSLAM 0.24.3) feeds the
+    // standalone (non-ARCore) sphere map's radial placement. It loads/runs only on the standalone
+    // backend, so an ARCore device pays nothing. (Was briefly opt-in after a
     // startup crash: the old Depth Anything model used an 8-bit MatMulNBits op ORT rejects, and R8 had
     // stripped ai.onnxruntime.OrtException so the failure aborted instead of being caught. MiDaS Small
     // avoids that op and the ORT keep rule makes any load error fail soft, so it is safe on again.)

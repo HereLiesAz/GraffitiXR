@@ -84,7 +84,7 @@ class ArViewModelLiveSettingsTest {
         every { settingsRepository.isRightHanded } returns flowOf(true)
         every { settingsRepository.showAnchorBoundary } returns flowOf(false)
         every { settingsRepository.isImperialUnits } returns flowOf(false)
-        // Off, so no ONNX Runtime load is attempted in the test JVM (see ArViewModelTest).
+        // Off, so no LiteRT model load is attempted in the test JVM (see ArViewModelTest).
         every { settingsRepository.monocularDepthEnabled } returns flowOf(false)
         every { settingsRepository.arCoreEnabled } returns arCoreEnabled
         every { settingsRepository.arCoreDepthEnabled } returns arCoreDepthEnabled

@@ -77,7 +77,12 @@ class PointCloudRenderer : GlReleasable {
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
         GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER, maxPoints * 4 * 4, null, GLES20.GL_DYNAMIC_DRAW)
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
+        // A fresh VBO (new EGL context after a pause) holds nothing; the accumulated cloud survives in
+        // [localBuffer], so re-upload it on the next update even if that frame brings no new points.
+        needsFullUpload = accumulatedPointCount > 0
     }
+
+    private var needsFullUpload = false
 
     /**
      * Fold this frame's ARCore feature points into the accumulated cloud.
@@ -143,7 +148,8 @@ class PointCloudRenderer : GlReleasable {
             hasUpdates = true
         }
 
-        if (hasUpdates) {
+        if (hasUpdates || needsFullUpload) {
+            needsFullUpload = false
             GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
 
             val byteCount = accumulatedPointCount * 4 * 4

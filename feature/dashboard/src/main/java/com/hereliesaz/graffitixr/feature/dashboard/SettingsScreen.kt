@@ -378,10 +378,11 @@ fun SettingsScreen(
                                 value = if (arCoreDepthEnabled) strings.settings.on else strings.settings.off,
                                 modifier = Modifier.clickable { onArCoreDepthEnabledChanged(!arCoreDepthEnabled) }
                             )
-                            // Monocular depth (MiDaS Small) — depth source for any device that
-                            // can't get ARCore's Depth API (no ARCore, ARCore off, or ARCore depth off);
-                            // default on, dormant when ARCore depth is active. Beta: Step 1 runs a
-                            // self-test as soon as it's needed, whose result shows in the diag overlay.
+                            // Monocular depth (MiDaS Small) — standalone (non-ARCore) backend only:
+                            // calibrates the sphere map's point radii while the feature map builds.
+                            // Default on; never loaded on the ARCore backend (MiDaS depth is relative,
+                            // so it can't stand in for ARCore depth). A self-test runs when it loads;
+                            // its result shows in the diag overlay.
                             SettingsItem(
                                 label = "Monocular depth (beta)",
                                 value = if (monocularDepthEnabled) strings.settings.on else strings.settings.off,

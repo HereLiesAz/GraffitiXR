@@ -18,3 +18,6 @@ import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
  * reading it here touches no ARCore native state.
  */
 fun lastArFrameTimestampNs(renderer: ArRenderer): Long = renderer.latestFrameTimestampNs
+
+/** True while the renderer holds an ARCore session (see [ArCameraHealth.watchStartMs]). */
+fun isArSessionAttached(renderer: ArRenderer): Boolean = renderer.session != null

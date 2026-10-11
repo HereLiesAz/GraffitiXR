@@ -48,6 +48,10 @@ class ArDebugRenderer : GlReleasable {
     private var lastCloudTimestampNs = 0L
 
     fun createOnGlThread(context: Context) {
+        // Fresh EGL context (onSurfaceCreated): the new VBO is empty, so force the next cloud upload
+        // even when ARCore hands back the same timestamp as before the context loss.
+        pointCount = 0
+        lastCloudTimestampNs = 0L
         val vertexShaderCode = """
             uniform mat4 u_MvpMatrix;
             uniform float u_PointSize;

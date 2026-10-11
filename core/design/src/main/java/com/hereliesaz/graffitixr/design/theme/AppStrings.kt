@@ -134,9 +134,6 @@ fun rememberAppStrings(): AppStrings {
             planeConfirmQuestion = stringResource(R.string.plane_confirm_question),
             looksCorrect = stringResource(R.string.looks_correct),
             redetect = stringResource(R.string.redetect),
-            planeRealignmentTitle = stringResource(R.string.plane_realignment_title),
-            planeRealignmentText = stringResource(R.string.plane_realignment_text),
-            useThisWall = stringResource(R.string.use_this_wall),
             scanning = stringResource(R.string.scanning_dots),
             anchorLocked = stringResource(R.string.anchor_locked),
             matchedPercent = { pct -> context.getString(R.string.matched_percent, pct) },
@@ -359,9 +356,6 @@ data class AppStrings(
         val planeConfirmQuestion: String,
         val looksCorrect: String,
         val redetect: String,
-        val planeRealignmentTitle: String,
-        val planeRealignmentText: String,
-        val useThisWall: String,
         val scanning: String,
         val anchorLocked: String,
         val matchedPercent: (Int) -> String,
@@ -396,9 +390,6 @@ data class AppStrings(
                 planeConfirmQuestion == other.planeConfirmQuestion &&
                 looksCorrect == other.looksCorrect &&
                 redetect == other.redetect &&
-                planeRealignmentTitle == other.planeRealignmentTitle &&
-                planeRealignmentText == other.planeRealignmentText &&
-                useThisWall == other.useThisWall &&
                 scanning == other.scanning &&
                 anchorLocked == other.anchorLocked &&
                 scanHintRecover == other.scanHintRecover &&
@@ -430,9 +421,6 @@ data class AppStrings(
             result = 31 * result + planeConfirmQuestion.hashCode()
             result = 31 * result + looksCorrect.hashCode()
             result = 31 * result + redetect.hashCode()
-            result = 31 * result + planeRealignmentTitle.hashCode()
-            result = 31 * result + planeRealignmentText.hashCode()
-            result = 31 * result + useThisWall.hashCode()
             result = 31 * result + scanning.hashCode()
             result = 31 * result + anchorLocked.hashCode()
             result = 31 * result + scanHintRecover.hashCode()

@@ -303,17 +303,8 @@
     <string name="redetect">再検出</string>
 
 
-    <string name="plane_realignment_title">壁の表面を再検出</string>
 
-    <string name="plane_realignment_text">アンカーは撮影時の立ち位置から配置されます。ARCoreは元の位置の真正面に追跡された垂直面を選択します。
 
-1. 撮影時のおおよその位置に戻ります
-2. カメラを壁画の壁に沿ってゆっくりとパンし、ARCoreが平らな表面として認識できるようにします
-3. アートワークに向かってしっかりと持ち、下をタップします
-
-オレンジ色の境界線が新しく検出された表面にジャンプします。</string>
-
-    <string name="use_this_wall">この壁を使用</string>
 
 
     <string name="scanning_dots">スキャン中…</string>

@@ -78,10 +78,10 @@ written now supply that geometry:
   (`SphereSlamStandaloneTrackingAnalyzer.kt` bridge expiry; orientation cleared on stop). Here
   it is instead **recorded per keyframe**, giving each keyframe's pointing direction on the
   sphere. This is the "sensors recorded for reloc" the standalone path has never kept.
-- **MiDaS monocular depth — the radial distance.** `DepthEstimator` (MiDaS Small, ONNX; SphereSLAM
-  `:models` since 0.24.0) is
-  loaded and self-tested but not yet wired into any geometry path (`ArViewModel.selfTestDepth`;
-  "Step 2" comment). It supplies per-keyframe **relative depth**, so surrounding features get a
+- **MiDaS monocular depth — the radial distance.** `DepthEstimator` (MiDaS Small; SphereSLAM
+  `:models`, on LiteRT since 0.24.3) feeds the standalone analyzer's depth-calibrated radial
+  placement while the feature map is building, gated by the **Monocular depth** setting
+  (`ArViewModel.standaloneDepthEstimatorOrNull` / `setDepthPlacementEnabled`). It supplies per-keyframe **relative depth**, so surrounding features get a
   radius, not just a bearing — a coarse 3D shell rather than a pure-rotation panorama. This is
   exactly the **"triangulate via VIO baseline (or depth when available)"** branch
   `RELOC_MAP_DESIGN.md` §5 was written for and standalone could never take, because — per

@@ -21,16 +21,15 @@ internal fun isArCoreBackendSelected(
 ): Boolean = checkResult == ArAvailabilityChecker.Result.Supported && arCoreOptIn
 
 /**
- * Whether the monocular depth model should be loaded: the setting is on and ARCore's own Depth API
- * will not be the depth source (no ARCore, ARCore off, or ARCore depth off). This setting-level
- * check can't see the device's isDepthModeSupported, which needs a live session.
+ * Whether the monocular depth model should be loaded: the setting is on and the standalone
+ * (non-ARCore) backend is selected. The standalone sphere map is its only consumer; the ARCore path
+ * has none, with ARCore depth on or off — MiDaS depth is relative (affine-ambiguous) and cannot stand
+ * in for ARCore's metric Depth API, so loading it there would only cost memory and a self-test.
  */
 internal fun isMonocularDepthWanted(
     monocularDepthOptIn: Boolean,
-    arCoreOptIn: Boolean,
-    arCoreDepthOptIn: Boolean,
-    arCoreSupported: Boolean,
-): Boolean = monocularDepthOptIn && !(arCoreOptIn && arCoreDepthOptIn && arCoreSupported)
+    arCoreBackendSelected: Boolean,
+): Boolean = monocularDepthOptIn && !arCoreBackendSelected
 
 /**
  * The camera frame rate the ARCore session should run at: the artist's [targetFps], except that

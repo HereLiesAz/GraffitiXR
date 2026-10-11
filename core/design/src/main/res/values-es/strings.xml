@@ -299,12 +299,6 @@
     <!-- Action to redetect the plane. -->
     <string name="redetect">Redetectar</string>
 
-    <!-- Title for plane realignment tool. -->
-    <string name="plane_realignment_title">Redetectar Superficie de Pared</string>
-    <!-- Instructions for realigning the plane with the wall. -->
-    <string name="plane_realignment_text">El anclaje se coloca desde donde estabas parado cuando capturaste. ARCore elige la superficie vertical rastreada más directamente frente a esa posición original.\n\n1. Regresa aproximadamente a donde estabas parado durante la captura\n2. Realiza un paneo lento con la cámara sobre la pared de tu mural para que ARCore pueda registrarla como una superficie plana\n3. Mantente firme frente a la obra de arte, luego toca a continuación\n\nEl borde naranja saltará a la superficie recién detectada.</string>
-    <!-- Action to use the currently detected wall for realignment. -->
-    <string name="use_this_wall">Usar Esta Pared</string>
 
     <!-- Label shown when scanning for relocation. -->
     <string name="scanning_dots">Escaneando…</string>

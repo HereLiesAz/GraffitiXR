@@ -302,11 +302,8 @@
     <string name="redetect">Повторное обнаружение</string>
 
 
-    <string name="plane_realignment_title">Повторное определение поверхности стены</string>
 
-    <string name="plane_realignment_text">Якорь устанавливается с того места, где вы стояли во время захвата. </string>
 
-    <string name="use_this_wall">Используйте эту стену</string>
 
 
     <string name="scanning_dots">Сканирование\u2026</string>

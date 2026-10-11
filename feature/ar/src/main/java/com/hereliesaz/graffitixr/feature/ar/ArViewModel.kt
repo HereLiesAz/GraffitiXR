@@ -941,7 +941,8 @@ class ArViewModel @Inject constructor(
             // Defaults TRUE (AUTO) — the shipped behaviour — so a store that has never been written
             // does not silently change the focus mode.
             _evalAutoFocusEnabled.value = settingsRepository.autoFocusEnabled.firstOrNull() ?: true
-            renderer?.updateAutoFocus(_evalAutoFocusEnabled.value)
+            effectiveAutoFocus = _evalAutoFocusEnabled.value
+            renderer?.updateAutoFocus(effectiveAutoFocus)
         }
     }
 
@@ -952,10 +953,21 @@ class ArViewModel @Inject constructor(
     private fun applyFeatureMapSwitch(on: Boolean) {
         slamManager.setMapBuildEnabled(on)
         slamManager.setMapRelocEnabled(on)
-        // Sphere map Phase 2: allow depth-calibrated radial placement while the map is building. Inert
-        // unless the standalone analyzer also stashes per-keyframe depth, so this is a no-op on the
-        // ARCore path and when depth is unavailable.
-        slamManager.setDepthPlacementEnabled(on)
+        applyDepthPlacementSwitch()
+    }
+
+    /**
+     * Sphere map Phase 2: depth-calibrated radial placement runs only while the map is building AND
+     * the "Monocular depth" setting is on — that setting is what decides whether MiDaS depth is used.
+     * Pushed to native on either change, so turning the setting off stops depth placement at once
+     * even in a standalone analyzer that was started with an estimator (which stops inferring from
+     * its next start; see [standaloneDepthEstimatorOrNull]). Inert on the ARCore path, where nothing
+     * stashes monocular depth.
+     */
+    private fun applyDepthPlacementSwitch() {
+        slamManager.setDepthPlacementEnabled(
+            _evalFeatureMapEnabled.value && _uiState.value.monocularDepthEnabled,
+        )
     }
 
     private val _evalFusionEnabled = MutableStateFlow(false)
@@ -969,8 +981,10 @@ class ArViewModel @Inject constructor(
      * `remember` is dropped on configuration change while `ArRenderer.fusionEnabled` is not.
      *
      * A switch that can disagree with the thing it switches invalidates the comparison it exists to
-     * run, so it does not get to hold its own copy. Seeded from the renderer's shipped default and
-     * written only through [evalSetFusionEnabled], which reads the value back after setting it.
+     * run, so it does not get to hold its own copy. This flow is the INTENT: seeded from the persisted
+     * setting (renderer's shipped default, off, when never written), written only through
+     * [evalSetFusionEnabled], and pushed onto every renderer that attaches (attachSessionToRenderer),
+     * so the renderer is made to match it rather than read back from.
      */
     val evalFusionEnabled: StateFlow<Boolean> = _evalFusionEnabled.asStateFlow()
 
@@ -1296,8 +1310,17 @@ class ArViewModel @Inject constructor(
 
     private val _evalAutoFocusEnabled = MutableStateFlow(true)
 
-    /** ARCore autofocus: ON is `FocusMode.AUTO`, OFF is `FocusMode.FIXED`. */
+    /**
+     * The artist's persisted focus choice (Settings / eval panel): ON is `FocusMode.AUTO`, OFF is
+     * `FocusMode.FIXED`. Always equal to what DataStore holds — the automatic acquire-then-lock below
+     * changes only [effectiveAutoFocus], never this, so a saved FIXED is not shown as AUTO after an
+     * AR exit (nor a saved AUTO as FIXED while an anchor is locked).
+     */
     val evalAutoFocusEnabled: StateFlow<Boolean> = _evalAutoFocusEnabled.asStateFlow()
+
+    // The focus mode actually applied to the live session: the preference above, except while the
+    // acquire-then-lock has parked an AUTO preference on FIXED for a placed anchor.
+    @Volatile private var effectiveAutoFocus = true
 
     // Once the artist toggles focus by hand, the automatic acquire-then-lock below steps aside for the
     // rest of the session. Reset on AR exit so each session starts with the automatic behavior again.
@@ -1308,34 +1331,37 @@ class ArViewModel @Inject constructor(
      * ARCore/KPM the features to acquire — then FIXED once the anchor is placed, so the focal length
      * stops sweeping during tracking. ARCore documents fixed focus as better for tracking and uses it as
      * its own default; AUTO's focal sweeps are a known tracking-instability source. This gets both: a
-     * sharp acquisition and stable optics after. A manual focus toggle disables it for the session.
+     * sharp acquisition and stable optics after. A manual focus toggle disables it for the session, and
+     * a saved FIXED preference never acquires in AUTO at all. Changes only [effectiveAutoFocus].
      */
     private fun applyAnchorFocusLock(anchorEstablished: Boolean) {
         if (focusManuallyOverridden) return
+        if (!_evalAutoFocusEnabled.value) return
         val auto = !anchorEstablished
-        if (_evalAutoFocusEnabled.value == auto) return
-        _evalAutoFocusEnabled.value = auto
+        if (effectiveAutoFocus == auto) return
+        effectiveAutoFocus = auto
         renderer?.updateAutoFocus(auto)
         appendDiag("focus: ${if (auto) "AUTO (acquiring)" else "FIXED (locked on anchor)"}")
     }
 
     // Monocular depth (MiDaS Small; SphereSLAM :models on LiteRT, GPU delegate with CPU fallback —
-    // `activeBackend` says which). Created lazily; only touched when the beta
-    // toggle is on. Step 1 just proves it loads+runs on-device (selfTestDepth); Step 2 will feed live
-    // frames into the standalone plane/scale path.
+    // `activeBackend` says which). Created lazily; only touched when the "Monocular depth" setting is
+    // on. Its one consumer is the standalone analyzer's sphere-map radial placement
+    // ([standaloneDepthEstimatorOrNull]); selfTestDepth proves it loads and runs on-device.
     private val depthEstimatorLazy = lazy {
         com.hereliesaz.sphereslam.models.DepthEstimator(appContext)
     }
     private val depthEstimator get() = depthEstimatorLazy.value
 
     /**
-     * The shared depth estimator for the standalone analyzer, or null when the feature-map flag is
-     * off (Phase 2). Returning null keeps the analyzer on the pure wall-plane path; a non-null
-     * estimator opts that session into depth-calibrated radial map-point placement. Single instance,
-     * closed in [onCleared], so the analyzer must not close it.
+     * The shared depth estimator for the standalone analyzer, or null unless BOTH the feature map is
+     * building (Phase 2 — depth only calibrates map-point radii, so it has no use without the map)
+     * AND the "Monocular depth" setting is on. Returning null keeps the analyzer on the pure
+     * wall-plane path; a non-null estimator opts that session into depth-calibrated radial map-point
+     * placement. Single instance, closed in [onCleared], so the analyzer must not close it.
      */
     fun standaloneDepthEstimatorOrNull(): com.hereliesaz.sphereslam.models.DepthEstimator? =
-        if (_evalFeatureMapEnabled.value) depthEstimator else null
+        if (_evalFeatureMapEnabled.value && _uiState.value.monocularDepthEnabled) depthEstimator else null
 
     /** One synthetic-image inference to confirm the depth model loads AND executes on this device. */
     private fun selfTestDepth() {
@@ -1382,6 +1408,7 @@ class ArViewModel @Inject constructor(
      */
     fun evalSetAutoFocusEnabled(on: Boolean) {
         focusManuallyOverridden = true
+        effectiveAutoFocus = on
         renderer?.updateAutoFocus(on)
         _evalAutoFocusEnabled.value = on
         viewModelScope.launch { settingsRepository.setAutoFocusEnabled(on) }
@@ -1690,6 +1717,21 @@ class ArViewModel @Inject constructor(
     @Volatile private var isDestroying = false
     private val sessionMutex = Mutex()
 
+    /**
+     * Where ARCore teardown runs. NOT viewModelScope: onCleared (and MainActivity.onDestroy on a
+     * finishing activity) run after that scope is cancelled, so a teardown launched there never
+     * executed and Session.close() was silently skipped — leaking the camera into the next launch.
+     * A SupervisorJob that nothing cancels lets the close finish after the ViewModel is gone; the work
+     * runs on the default dispatcher because Session.close() blocks until an in-flight update() returns.
+     */
+    private val teardownScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + dispatchers.default +
+            kotlinx.coroutines.CoroutineName("ArSessionTeardown"),
+    )
+
+    // Set in onCleared: no teardown may schedule a fresh session for a dead ViewModel.
+    @Volatile private var isCleared = false
+
     // Timestamps used to flip `trackingFailed` when ARCore never reaches a
     // TRACKING state within the grace window after entering AR mode. Reset on
     // every AR-mode entry; updated each time setTrackingState reports tracking.
@@ -1701,10 +1743,12 @@ class ArViewModel @Inject constructor(
     private val STEREO_STUCK_GRACE_MS: Long = 3_000L
 
     private val isSaving = AtomicBoolean(false)
-    // Point count of the accumulated ARCore cloud as of the last successful save. The autosave
-    // compares against this so it only rewrites when the map has actually grown. It used to hold
-    // slamManager.getSplatCount(), which has been a hardcoded 0 since the voxel/splat map was
-    // deleted — so the delta was permanently 0 and the autosave never fired once.
+    // Point count of the MobileGS wall feature map (slamManager.getMapPointCount) as of the last
+    // successful save — the map saveMapBlocking actually persists. The autosave compares the SAME
+    // counter against this, so it only rewrites when that map has grown. (It once held the deleted
+    // splat count — a hardcoded 0, so autosave never fired — and later was compared against the
+    // ARCore point cloud, a different, unpersisted, much larger number, so the delta was always over
+    // the threshold and the project was rewritten every 30 s for the whole session.)
     private val lastSavedMapPointCount = AtomicInteger(0)
     private val lastSavedPaintCount = AtomicInteger(0)
     @Volatile private var lastSavedProgress = 0f
@@ -1840,7 +1884,11 @@ class ArViewModel @Inject constructor(
                 if (project != null) {
                     // A restored hybrid page belongs to its project; drop it on a switch (including
                     // to a co-op spectator project, which never offers a replacement).
-                    if (project.id != loadedProjectId) renderer?.restoreHybridPage(null)
+                    if (project.id != loadedProjectId) {
+                        renderer?.restoreHybridPage(null)
+                        // The yaw sweep and the COMPLETE latch describe the previous project's wall.
+                        if (loadedProjectId != null) resetScanProgress()
+                    }
                     loadedProjectId = project.id
                     // Native MobileGS has exactly one active fingerprint frame. Standalone owns it
                     // on non-ARCore devices; an ARCore co-op GUEST also owns it once protocol-v3 peer
@@ -1852,7 +1900,7 @@ class ArViewModel @Inject constructor(
         }
         viewModelScope.launch {
             settingsRepository.ambientScanEnabled.collect { enabled ->
-                _uiState.update { it.copy(ambientScanEnabled = enabled) }
+                applyAmbientScanEnabled(enabled)
             }
         }
         viewModelScope.launch {
@@ -1882,6 +1930,7 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.monocularDepthEnabled.collect { on ->
                 _uiState.update { it.copy(monocularDepthEnabled = on) }
+                applyDepthPlacementSwitch()
                 reconcileMonocularDepth()
             }
         }
@@ -1945,6 +1994,7 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.showAnchorBoundary.collect { show ->
                 _uiState.update { it.copy(showAnchorBoundary = show) }
+                renderer?.showAnchorBoundary = show
             }
         }
         viewModelScope.launch {
@@ -2130,10 +2180,11 @@ class ArViewModel @Inject constructor(
 
     /**
      * Loads + self-tests, or unloads, the monocular depth model to match its settings, immediately.
-     * Monocular depth fills in wherever ARCore's Depth API won't: a device with no ARCore, with ARCore
-     * turned off, or an ARCore device whose depth is off (the drift case) — see [isMonocularDepthWanted].
-     * An ARCore device that does provide depth pays nothing. The self-test runs one inference on a
-     * synthetic image to confirm the ONNX Runtime int8 model LOADS and EXECUTES on this hardware; the
+     * Wanted only when the setting is on AND the standalone (non-ARCore) backend is selected: the
+     * standalone sphere map is its only consumer. The ARCore path has none — MiDaS depth is relative
+     * (affine-ambiguous), so it cannot stand in for ARCore's metric Depth API in hit-tests or plane
+     * finding — so an ARCore device, with its depth on or off, never loads it. The self-test runs one inference on a
+     * synthetic image to confirm the LiteRT model (SphereSLAM :models) LOADS and EXECUTES on this hardware; the
      * result goes to the diag overlay. Turning it off releases the model unless the feature-map
      * analyzer is using it. Off the main thread; no-op until ARCore availability has resolved.
      */
@@ -2143,9 +2194,10 @@ class ArViewModel @Inject constructor(
             monocularDepthMutex.withLock {
                 val wanted = isMonocularDepthWanted(
                     monocularDepthOptIn = settingsRepository.monocularDepthEnabled.firstOrNull() != false,
-                    arCoreOptIn = settingsRepository.arCoreEnabled.firstOrNull() ?: true,
-                    arCoreDepthOptIn = settingsRepository.arCoreDepthEnabled.firstOrNull() ?: true,
-                    arCoreSupported = result == ArAvailabilityChecker.Result.Supported,
+                    arCoreBackendSelected = isArCoreBackendSelected(
+                        result,
+                        arCoreOptIn = settingsRepository.arCoreEnabled.firstOrNull() ?: true,
+                    ),
                 )
                 val loaded = depthEstimatorLazy.isInitialized() && depthEstimator.isLoaded
                 if (wanted && !loaded) {
@@ -2171,9 +2223,9 @@ class ArViewModel @Inject constructor(
     // that may not work either.
     @Volatile private var forceSafeCameraConfig: Boolean = false
 
-    // One-time dual-lens depth-triangulation probe result: null = not yet probed, true = the lenses
-    // produce a real depth map (adopt the stereo config), false = no usable depth / thrashes / never
-    // tracks (stay mono). Persisted via SettingsRepository.stereoCapability so it runs once per install.
+    // One-time dual-lens probe result: null = not yet probed (or the last probe could not open the
+    // camera), true = the forced stereo config is in force, tracks and yields depth (adopt it),
+    // false = no usable depth / thrashes / never tracks (stay mono). Persisted via SettingsRepository.stereoCapability so it runs once per install.
     @Volatile private var stereoCapable: Boolean? = null
     private val stereoProbeInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
     // The in-flight session-state update (probe + init/resume/pause). Cancelled on the next update so
@@ -2197,13 +2249,43 @@ class ArViewModel @Inject constructor(
         // Persist so it survives restarts (the flow re-emits it; the direct update below just makes
         // the UI reflect it immediately).
         viewModelScope.launch { settingsRepository.setAmbientScanEnabled(enabled) }
+        applyAmbientScanEnabled(enabled)
+    }
+
+    /**
+     * Publishes the ambient-sweep setting and, when it turns ON, restarts the scan progression.
+     * scanPhase latches COMPLETE and the yaw sectors only ever fill, so without the reset a sweep
+     * switched back on after a scan (or after any earlier session) never ran again.
+     */
+    private fun applyAmbientScanEnabled(enabled: Boolean) {
+        val wasEnabled = _uiState.value.ambientScanEnabled
         _uiState.update { it.copy(ambientScanEnabled = enabled) }
+        if (enabled && !wasEnabled) resetScanProgress()
+    }
+
+    /**
+     * Back to the start of the scan progression: no yaw sectors visited, phase AMBIENT (which falls
+     * straight through to WALL on the next tracking tick when the sweep is off). Called on AR exit, on
+     * a project switch, and when the ambient sweep is switched on.
+     */
+    private fun resetScanProgress() {
+        synchronized(visitedSectors) { java.util.Arrays.fill(visitedSectors, false) }
+        _uiState.update {
+            it.copy(
+                scanPhase = ScanPhase.AMBIENT,
+                ambientSectorsCovered = 0,
+                worldMappingProgress = 0f,
+                visitedSectorsMask = 0L,
+            )
+        }
     }
 
 
+    /** Applied to the live renderer at once and persisted; restored on launch by its collector. */
     fun setShowAnchorBoundary(show: Boolean) {
         _uiState.update { it.copy(showAnchorBoundary = show) }
         renderer?.showAnchorBoundary = show
+        viewModelScope.launch { settingsRepository.setShowAnchorBoundary(show) }
     }
 
     /**
@@ -2487,27 +2569,42 @@ class ArViewModel @Inject constructor(
         _uiState.update {
             it.copy(isAnchorEstablished = false, backboneTooSmall = false, measure = MeasureUi())
         }
-        // Anchor gone — re-arm acquire-then-lock so the next session frames in AUTO, and clear any
-        // manual focus override so the automatic behavior applies again.
+        // The scan progression (visited yaw sectors, the COMPLETE latch) belongs to this session too.
+        resetScanProgress()
+        // Anchor gone — clear any manual override and return the live mode to the artist's saved
+        // preference, which re-arms acquire-then-lock for an AUTO preference. The preference itself
+        // (UI state and DataStore) is untouched.
         focusManuallyOverridden = false
-        applyAnchorFocusLock(anchorEstablished = false)
+        effectiveAutoFocus = _evalAutoFocusEnabled.value
         // Cancel any in-flight session update (including a running stereo probe) so it stops pumping
         // the camera and releases the session mutex before cleanup tries to acquire it.
         sessionUpdateJob?.cancel()
         if (_uiState.value.trackingFailed) {
             _uiState.update { it.copy(trackingFailed = false) }
         }
-        // Dispatchers.Default, NOT viewModelScope's Main: performFullCleanupLocked calls
-        // saveMapBlocking (native SLAM save), session.pause(), and session.close() — and
-        // close() BLOCKS until any in-flight session.update() returns. When the GL thread
-        // is wedged inside update() (camera never fed ARCore), running this on Main froze
-        // the entire app on AR exit — exactly when the diag tells the user to exit.
-        return viewModelScope.launch(dispatchers.default) {
-            performFullCleanupLocked()
+        // teardownScope (default dispatcher), NOT viewModelScope's Main: performFullCleanupLocked
+        // awaits saveMapBlocking, then session.pause() and session.close() — and close() BLOCKS
+        // until any in-flight session.update() returns. When the GL thread is wedged inside
+        // update() (camera never fed ARCore), running this on Main froze the entire app on AR
+        // exit — exactly when the diag tells the user to exit. teardownScope also survives
+        // ViewModel clearing, so an exit racing onCleared still closes the session.
+        //
+        // The renderer is captured NOW, on the caller's thread: by the time the teardown holds the
+        // session mutex, MainScreen may already have attached the NEXT AR entry's renderer, which this
+        // teardown must neither detach nor null (see performFullCleanupLocked).
+        val ownedRenderer = renderer
+        return teardownScope.launch {
+            performFullCleanupLocked(ownedRenderer)
         }
     }
 
-    private fun updateSessionStateLocked(context: Context? = null) {
+    private fun updateSessionStateLocked(callerContext: Context? = null) {
+        // Lifecycle callers (onActivityResumed/onActivityPaused) have no Context to hand. A pause/resume
+        // that lands while AR entry is still probing or waiting on the camera gate cancels the only job
+        // that was going to create the Session, so the resume must be able to create it itself — fall
+        // back to the application Context rather than skipping creation (ARCore's Session accepts any
+        // Context; the probe already binds through the application context).
+        val context: Context = callerContext ?: appContext
         sessionUpdateJob?.cancel()
         // Dispatchers.Default, NOT the main thread: initArSessionLocked creates/configures the ARCore
         // Session and resumeArSessionInternal calls session.resume() — which OPENS THE CAMERA and can
@@ -2517,30 +2614,16 @@ class ArViewModel @Inject constructor(
         // are thread-safe.
         sessionUpdateJob = viewModelScope.launch(dispatchers.default) {
             sessionMutex.withLock {
-                // First-ever AR entry on an unprobed device: while the camera is still free (no live
-                // session yet), run a short throwaway stereo session in an isolated process to see
-                // whether the dual lenses actually triangulate depth. Done inside the session mutex so no concurrent state
-                // update can open the live session while the probe still holds the camera. Capped at a
-                // few seconds and off the main thread, so a device whose motion-stereo thrashes can't
-                // ANR — and we only adopt stereo if it works. Cancelling this job (AR exit / pause)
-                // cancels the probe too.
                 val capability = _uiState.value
                 val arCoreReady =
                     capability.isArCoreAvailabilityResolved && capability.isArCoreAvailable
+                // Only while the activity is in the foreground: a backgrounded app cannot open the
+                // camera, and a probe run then would only lose that race. onActivityResumed re-runs
+                // this (with the application context) and creates the session.
                 if (
-                    context != null &&
+                    isActivityResumed &&
                     isInArMode &&
                     session == null &&
-                    !isDestroying &&
-                    stereoCapable == null &&
-                    arCoreReady
-                ) {
-                    probeStereoCapability(context)
-                }
-                if (
-                    isInArMode &&
-                    session == null &&
-                    context != null &&
                     !isDestroying &&
                     arCoreReady
                 ) {
@@ -2554,7 +2637,21 @@ class ArViewModel @Inject constructor(
                     // The gate's verdict is now LOAD-BEARING: a session opened on a camera the gate
                     // couldn't confirm free is doomed to ts=0 frames and a wedged update(), so on
                     // timeout/failure we refuse to open the session and tell the user instead.
-                    if (awaitCameraAvailable(context, 3000L)) {
+                    //
+                    // First-ever AR entry on an unprobed device: once the gate has confirmed the camera
+                    // is free (no live session yet), run a short throwaway stereo session in an
+                    // isolated process (see StereoProbeService for what its verdict proves). AFTER the
+                    // gate, never before: probing a camera CameraX is still releasing loses the race
+                    // and used to be persisted as a permanent mono verdict. Inside the session mutex
+                    // so no concurrent update can open the live session while the probe holds the
+                    // camera; capped and off the main thread so a thrashing device can't ANR.
+                    // Cancelling this job (AR exit / pause) cancels the probe too. The probe process
+                    // releases the camera asynchronously, so the gate runs again before the session.
+                    var cameraFree = awaitCameraAvailable(context, 3000L)
+                    if (cameraFree && stereoCapable == null && probeStereoCapability(context)) {
+                        cameraFree = awaitCameraAvailable(context, 3000L)
+                    }
+                    if (cameraFree) {
                         initArSessionLocked(context)
                     } else {
                         appendDiag("camera gate FAILED — refusing to open AR session on an unconfirmed camera")
@@ -2633,6 +2730,10 @@ class ArViewModel @Inject constructor(
             } finally {
                 cm.unregisterAvailabilityCallback(cb)
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // A cancelled entry (activity pause, AR exit, a newer state update) is not a camera fault:
+            // no "camera busy" toast, no diag line blaming the camera service.
+            throw e
         } catch (e: Exception) {
             Timber.w(e, "ARDIAG awaitCameraAvailable failed")
             appendDiag("camera gate: threw ${e.javaClass.simpleName} — camera service unhealthy")
@@ -2665,7 +2766,7 @@ class ArViewModel @Inject constructor(
             // defaults to AUTO, which is what this line used to hardcode.
             config.focusMode = when {
                 forceSafeCameraConfig -> Config.FocusMode.FIXED
-                _evalAutoFocusEnabled.value -> Config.FocusMode.AUTO
+                effectiveAutoFocus -> Config.FocusMode.AUTO
                 else -> Config.FocusMode.FIXED
             }
             // LATEST_CAMERA_IMAGE so session.update() never blocks the GL render thread. On this
@@ -2976,15 +3077,18 @@ class ArViewModel @Inject constructor(
     }
 
     /**
-     * One-time dual-lens depth-triangulation probe. Runs a short throwaway ARCore session configured
-     * for forced hardware stereo with the Depth API enabled, in an isolated ":probe" process, and
-     * adopts dual-lens only if it both reaches TRACKING and hands back a populated depth image — proof
-     * the two lenses actually triangulate depth. A device that merely lists a stereo config but can't
-     * compute disparity returns an empty depth map (or thrashes and never tracks), so we cap the probe
-     * and treat any failure as "mono". The result is cached in settings so this only runs once per
-     * install. Must be called while no live session holds the camera.
+     * One-time dual-lens capability probe. Runs a short throwaway ARCore session configured for forced
+     * hardware stereo with the Depth API enabled, in an isolated ":probe" process, and adopts dual-lens
+     * only if the session confirms the stereo stream is in force AND, under it, reaches TRACKING and
+     * hands back a populated depth image (see StereoProbeService for why that cannot prove the depth
+     * came from disparity rather than ML). A device that merely lists a stereo config but stalls under
+     * it (or thrashes and never tracks) is cached as "mono". A probe that could not open the camera is
+     * NOT a verdict: nothing is persisted and the next AR entry probes again. Must be called while no
+     * live session holds the camera (after the camera gate).
+     *
+     * Returns true when the probe actually ran (and so may still be releasing the camera).
      */
-    private suspend fun probeStereoCapability(context: Context) {
+    private suspend fun probeStereoCapability(context: Context): Boolean {
         val capability = _uiState.value
         if (
             !capability.isArCoreAvailabilityResolved ||
@@ -2993,17 +3097,26 @@ class ArViewModel @Inject constructor(
             appendDiag(
                 "probe: skipped; ARCore-only depth probe requires positively resolved ARCore capability",
             )
-            return
+            return false
         }
-        if (stereoCapable != null) return
-        if (!stereoProbeInFlight.compareAndSet(false, true)) return
+        if (stereoCapable != null) return false
+        if (!stereoProbeInFlight.compareAndSet(false, true)) return false
         try {
             // On-screen so the black "session null" startup window is explained: the probe holds the
             // camera exclusively while it runs, delaying the live session by up to its timeout.
             appendDiag("probe: start (camera held ~${StereoProbeService.PROBE_TIMEOUT_MS / 1000}s max)")
-            val capable = runProbeViaService(context)
+            val result = runProbeViaService(context)
+            val persisted = StereoProbeService.persistedCapabilityFor(result)
+            if (persisted == null) {
+                // The probe could not open the camera: that says nothing about the lenses. Leave the
+                // device unprobed (mono for this entry) and probe again on the next AR entry.
+                appendDiag("probe: camera unavailable — no verdict, will retry next AR entry")
+                Timber.i("ARDIAG depth-triangulation probe inconclusive: camera unavailable")
+                return true
+            }
+            val capable = persisted == 1
             stereoCapable = capable
-            settingsRepository.setStereoCapability(if (capable) 1 else 0)
+            settingsRepository.setStereoCapability(persisted)
             appendDiag("probe: done capable=$capable")
             Timber.i("ARDIAG depth-triangulation probe complete: capable=$capable")
         } catch (e: Exception) {
@@ -3016,6 +3129,7 @@ class ArViewModel @Inject constructor(
         } finally {
             stereoProbeInFlight.set(false)
         }
+        return true
     }
 
     /**
@@ -3024,11 +3138,12 @@ class ArViewModel @Inject constructor(
      * never starve this UI process into an ANR. If the probe process dies, the binding can't be made,
      * or no reply arrives within the timeout, we conservatively return false (stay on mono).
      */
-    private suspend fun runProbeViaService(context: Context): Boolean {
+    private suspend fun runProbeViaService(context: Context): Int {
         val appCtx = context.applicationContext
-        val result = kotlinx.coroutines.CompletableDeferred<Boolean>()
+        val incapable = StereoProbeService.RESULT_INCAPABLE
+        val result = kotlinx.coroutines.CompletableDeferred<Int>()
         val replyMessenger = Messenger(Handler(Looper.getMainLooper()) { msg ->
-            if (msg.what == StereoProbeService.MSG_RESULT) result.complete(msg.arg1 == 1)
+            if (msg.what == StereoProbeService.MSG_RESULT) result.complete(msg.arg1)
             true
         })
         val conn = object : ServiceConnection {
@@ -3039,13 +3154,13 @@ class ArViewModel @Inject constructor(
                     }
                     Messenger(binder).send(m)
                 } catch (_: Exception) {
-                    result.complete(false)
+                    result.complete(incapable)
                 }
             }
 
             override fun onServiceDisconnected(name: ComponentName?) {
                 // The :probe process died (e.g. killed after a hang) -> treat the device as mono.
-                result.complete(false)
+                result.complete(incapable)
             }
         }
         val bound = try {
@@ -3059,13 +3174,13 @@ class ArViewModel @Inject constructor(
         }
         if (!bound) {
             try { appCtx.unbindService(conn) } catch (_: Exception) {}
-            return false
+            return incapable
         }
         return try {
             // Bound process startup + the probe's own timeout, with headroom; never block forever.
             kotlinx.coroutines.withTimeoutOrNull(StereoProbeService.PROBE_TIMEOUT_MS + 4_000L) {
                 result.await()
-            } ?: false
+            } ?: incapable
         } finally {
             try { appCtx.unbindService(conn) } catch (_: Exception) {}
         }
@@ -3518,7 +3633,14 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    private suspend fun performFullCleanupLocked() {
+    /**
+     * Pause/close the current session and drop the renderer this teardown OWNS ([ownedRenderer], read
+     * when the teardown was requested). Only what it owns is cleared: a renderer attached for the next
+     * AR entry while this ran is left attached (it was handed no session — attachSessionToRenderer
+     * withholds the closing one while [isDestroying]), and if AR mode was re-entered meanwhile a fresh
+     * session is scheduled once the old one is gone.
+     */
+    private suspend fun performFullCleanupLocked(ownedRenderer: ArRenderer?) {
         isDestroying = true
         sessionMutex.withLock {
             stopAutoSave()
@@ -3530,7 +3652,7 @@ class ArViewModel @Inject constructor(
             // the GL thread is out of the frame; timeout means it still owns the Session and native
             // teardown must be deferred. Saves still work: they read the renderer's sub-renderers,
             // not the ARCore session.
-            val r = renderer
+            val r = ownedRenderer
             val s = session
             val wasResumed = isSessionResumed
             r?.isDestroying = true
@@ -3551,8 +3673,11 @@ class ArViewModel @Inject constructor(
                     appendDiag("cleanup: ownership policy aborted native teardown")
                 }
             }
-            session = null
-            renderer = null
+            if (session === s) session = null
+            // Only the renderer this teardown owns. A newer one belongs to the next AR entry; nulling
+            // it here left that entry rendering with no ViewModel link (and, before the attach guard,
+            // holding this closing session).
+            if (renderer === r) renderer = null
             isSessionResumed = false
             appliedDepthRequested = null
             appliedCameraFps = null
@@ -3561,6 +3686,9 @@ class ArViewModel @Inject constructor(
             isDestroying = false
             clearCaptureState()
         }
+        // AR was re-entered (or the activity recreated, e.g. rotation) while this teardown held the
+        // mutex: that entry's session update saw isDestroying and skipped creation. Schedule it now.
+        if (isInArMode && !isCleared) updateSessionStateLocked()
     }
 
     /**
@@ -3587,7 +3715,12 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    fun saveMapBlocking() {
+    /**
+     * Persists the wall feature map and SUSPENDS until it is written (it used to fire a coroutine and
+     * return at once, so teardown closed the session — and a backend switch cleared the native map —
+     * before the save had read anything).
+     */
+    private suspend fun saveMapBlocking() {
         val projectId = loadedProjectId ?: return
         // The wall feature map is the only thing here that survives a session meaningfully: it is
         // re-registered on load through the fingerprint + PnP relocalization, so its coordinates are
@@ -3599,7 +3732,14 @@ class ArViewModel @Inject constructor(
         // rigid offset from the wall it was scanned off — and then appeared to drift as the artist
         // moved, because nothing re-registered it. It is a scan VISUALISATION (relocalization rides
         // the fingerprint, not the cloud), so the honest fix is not to persist it at all.
-        saveWallFeatureMap()
+        try {
+            withContext(dispatchers.io) { saveProjectWallMap() }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.e(e, "Wall feature map save failed")
+            return
+        }
 
         lastSavedMapPointCount.set(slamManager.getMapPointCount())
         Timber.d("Atomic persistence complete: saved the wall feature map for $projectId")
@@ -3613,6 +3753,8 @@ class ArViewModel @Inject constructor(
             isSaving.set(true)
             try {
                 saveMapBlocking()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Timber.e(e, "Background map save failed")
             } finally {
@@ -3696,17 +3838,6 @@ class ArViewModel @Inject constructor(
         }
         paint?.let { lastSavedPaintCount.set(it.pointCount) }
         lastSavedProgress = slamManager.getPaintingProgress()
-    }
-
-    private fun saveWallFeatureMap() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                saveProjectWallMap()
-            } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
-                Timber.e(e, "Wall feature map save failed")
-            }
-        }
     }
 
     /**
@@ -4256,17 +4387,18 @@ class ArViewModel @Inject constructor(
         autoSaveJob = viewModelScope.launch(Dispatchers.IO) {
             while (true) {
                 delay(AUTOSAVE_INTERVAL_MS)
-                // The accumulated ARCore cloud, not the deleted splat map. The old reading was a
-                // hardcoded 0, so `current > 0` was never true and this loop woke every 30s to do
-                // nothing for the whole session — the wall feature map and the cloud were persisted
-                // only by the explicit saves on AR exit and app background. A crash or a kill in
-                // between lost everything scanned since.
-                val current = renderer?.mappedPointCount ?: 0
-                val paint = slamManager.getPaintMarkCount()
-                val progress = slamManager.getPaintingProgress()
-                if ((current > 0 && current - lastSavedMapPointCount.get() >= AUTOSAVE_POINT_DELTA) ||
-                    paint - lastSavedPaintCount.get() >= AUTOSAVE_PAINT_DELTA ||
-                    progress - lastSavedProgress >= AUTOSAVE_PROGRESS_DELTA
+                // Like with like: the wall feature map's live count against its count at the last save
+                // (see lastSavedMapPointCount). The ARCore cloud is never persisted, so it can't say
+                // whether anything persistable changed.
+                if (
+                    shouldAutosaveWallMap(
+                        mapPoints = slamManager.getMapPointCount(),
+                        savedMapPoints = lastSavedMapPointCount.get(),
+                        paintMarks = slamManager.getPaintMarkCount(),
+                        savedPaintMarks = lastSavedPaintCount.get(),
+                        progress = slamManager.getPaintingProgress(),
+                        savedProgress = lastSavedProgress,
+                    )
                 ) {
                     saveMapNow()
                 }
@@ -4279,12 +4411,19 @@ class ArViewModel @Inject constructor(
         autoSaveJob = null
     }
 
-    fun destroyArSession() {
+    fun destroyArSession(): Job {
         // Off-main for the same reason as exitArMode: session.close() blocks until any
         // in-flight session.update() returns, which never happens when the GL thread is
-        // wedged on a camera that isn't feeding ARCore.
-        viewModelScope.launch(dispatchers.default) {
-            performFullCleanupLocked()
+        // wedged on a camera that isn't feeding ARCore. On teardownScope, not viewModelScope:
+        // this is called from onCleared and from a finishing activity's onDestroy, when
+        // viewModelScope is already cancelled and a launch there never runs.
+        //
+        // Latch isDestroying synchronously so a renderer created before the teardown takes the
+        // mutex (activity recreation) is never handed the session that is about to close.
+        isDestroying = true
+        val ownedRenderer = renderer
+        return teardownScope.launch {
+            performFullCleanupLocked(ownedRenderer)
         }
     }
 
@@ -4490,13 +4629,17 @@ class ArViewModel @Inject constructor(
         //
         // The view model holds the INTENT; the renderer is made to match it, never the reverse.
         renderer?.fusionEnabled = _evalFusionEnabled.value
+        // Same for the anchor-boundary setting: a fresh renderer starts at its default (off).
+        renderer?.showAnchorBoundary = _uiState.value.showAnchorBoundary
         // Self-grow lives in the native engine rather than the renderer, so it does not reset with
         // a new ArRenderer — but re-asserting it is idempotent and costs one atomic store, and it
         // means one place re-establishes every experiment switch instead of two rules to remember.
         slamManager.setSelfGrowEnabled(_evalSelfGrowEnabled.value)
         applyFeatureMapSwitch(_evalFeatureMapEnabled.value)
-        renderer?.updateAutoFocus(_evalAutoFocusEnabled.value)
-        renderer?.attachSession(session)
+        renderer?.updateAutoFocus(effectiveAutoFocus)
+        // A renderer attached while a teardown is in flight must not receive the session being
+        // closed; the teardown schedules a fresh session for it once the old one is gone.
+        renderer?.attachSession(if (isDestroying) null else session)
     }
 
     fun setTrackingState(
@@ -4574,10 +4717,14 @@ class ArViewModel @Inject constructor(
                 (nowMs - lastTrackingTimestampMs) > trackingFailureGraceMs
 
         val sector = (((cameraYaw % 360f) + 360f) % 360f / 10f).toInt().coerceIn(0, 35)
-        visitedSectors[sector] = true
-        val sectorsCovered = visitedSectors.count { it }
+        val sectorMask: Long
+        val sectorsCovered: Int
+        synchronized(visitedSectors) {
+            visitedSectors[sector] = true
+            sectorsCovered = visitedSectors.count { it }
+            sectorMask = (0..35).fold(0L) { acc, i -> if (visitedSectors[i]) acc or (1L shl i) else acc }
+        }
         val mappingProgress = sectorsCovered / 36f
-        val sectorMask = (0..35).fold(0L) { acc, i -> if (visitedSectors[i]) acc or (1L shl i) else acc }
 
         _uiState.update { state ->
             val newPhase = when (state.scanPhase) {
@@ -5919,10 +6066,6 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    fun retriggerPlaneDetection() {
-        renderer?.isInPlaneRealignment = true
-    }
-
     fun setVisualizationHidden(hidden: Boolean) {
         renderer?.hideVisualization = hidden
     }
@@ -6047,6 +6190,7 @@ class ArViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        isCleared = true
         super.onCleared()
         stopSystemThrottleMonitoring()
         cameraAttitudeProvider.stop()
@@ -6066,3 +6210,20 @@ class ArViewModel @Inject constructor(
         destroyArSession()
     }
 }
+
+/**
+ * Autosave decision. Each persisted quantity is compared with its own value at the last save — never
+ * against a different counter (the ARCore cloud vs the wall feature map once made this true every
+ * tick, rewriting the project every 30 s).
+ */
+internal fun shouldAutosaveWallMap(
+    mapPoints: Int,
+    savedMapPoints: Int,
+    paintMarks: Int,
+    savedPaintMarks: Int,
+    progress: Float,
+    savedProgress: Float,
+): Boolean =
+    (mapPoints > 0 && mapPoints - savedMapPoints >= ArViewModel.AUTOSAVE_POINT_DELTA) ||
+        paintMarks - savedPaintMarks >= ArViewModel.AUTOSAVE_PAINT_DELTA ||
+        progress - savedProgress >= ArViewModel.AUTOSAVE_PROGRESS_DELTA

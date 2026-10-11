@@ -607,16 +607,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                LaunchedEffect(arUiState.isAnchorEstablished) {
-                    if (!arUiState.isAnchorEstablished && mainViewModel.uiState.value.isInPlaneRealignment) {
-                        mainViewModel.endPlaneRealignment()
-                    }
-                }
-
                 BackHandler(enabled = showSettings) { showSettings = false }
-                BackHandler(enabled = mainUiState.isInPlaneRealignment) {
-                    mainViewModel.endPlaneRealignment()
-                }
                 BackHandler(enabled = mainUiState.isCapturingTarget) {
                     mainViewModel.cancelTapMode()
                     arViewModel.clearTapHighlights()
@@ -634,7 +625,7 @@ class MainActivity : ComponentActivity() {
                 // to pop to and fell through to finishing the Activity, quitting the app with no
                 // confirmation. Route back to the Library instead, matching "proj.load"'s handler.
                 BackHandler(
-                    enabled = !showLibrary && !showSettings && !mainUiState.isInPlaneRealignment &&
+                    enabled = !showLibrary && !showSettings &&
                         !mainUiState.isCapturingTarget && !mainUiState.isTouchLocked
                 ) {
                     // Pop the editor route being left, not just push Library on top of it — a plain
@@ -1317,21 +1308,6 @@ class MainActivity : ComponentActivity() {
                             if (basePostTargetVisible && hasWallFingerprint) {
                                 PostTargetInstructionOverlay(
                                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp)
-                                )
-                            }
-
-                            val showRealignment = mainUiState.isInPlaneRealignment
-                                    && editorUiState.editorMode == EditorMode.AR
-                                    && !showLibrary && !showSettings
-                            if (showRealignment) {
-                                PlaneRealignmentOverlay(
-                                    onTryThisPlane = {
-                                        arViewModel.retriggerPlaneDetection()
-                                        mainViewModel.endPlaneRealignment()
-                                    },
-                                    onCancel = { mainViewModel.endPlaneRealignment() },
-                                    modifier = Modifier.align(Alignment.BottomCenter),
-                                    strings = strings
                                 )
                             }
 
@@ -3401,55 +3377,6 @@ private fun PostTargetInstructionOverlay(modifier: Modifier = Modifier) {
                 fontSize = 15.sp,
                 lineHeight = 22.sp
             )
-        }
-    }
-}
-
-@Composable
-private fun PlaneRealignmentOverlay(
-    onTryThisPlane: () -> Unit,
-    onCancel: () -> Unit,
-    modifier: Modifier = Modifier,
-    strings: AppStrings
-) {
-    Column(
-        modifier = modifier.padding(bottom = 96.dp).padding(horizontal = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .background(Color(0xEE000000), RoundedCornerShape(16.dp))
-                .border(2.dp, Color(0xFFFF8C00), RoundedCornerShape(16.dp))
-                .padding(20.dp)
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = strings.ar.planeRealignmentTitle,
-                    color = Color.White,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = strings.ar.planeRealignmentText,
-                    color = Color.White.copy(alpha = 0.85f),
-                    textAlign = TextAlign.Start
-                )
-                Spacer(Modifier.height(16.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    AzButton(
-                        text = strings.ar.useThisWall,
-                        onClick = onTryThisPlane,
-                        color = Color(0xFF2E7D32),
-                        shape = AzButtonShape.RECTANGLE
-                    )
-                    AzButton(
-                        text = strings.common.cancel,
-                        onClick = onCancel,
-                        color = Color(0xFFFF8C00),
-                        shape = AzButtonShape.RECTANGLE
-                    )
-                }
-            }
         }
     }
 }

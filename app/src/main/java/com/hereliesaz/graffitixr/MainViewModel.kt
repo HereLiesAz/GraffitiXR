@@ -44,8 +44,6 @@ data class MainUiState(
     val captureStep: CaptureStep = CaptureStep.NONE,
     // Phase 4: True while the user is in "tap your painted marks" mode.
     val isWaitingForTap: Boolean = false,
-    // True when the user tapped "Re-detect" and is being walked through realignment.
-    val isInPlaneRealignment: Boolean = false,
     // True when the current capture was initiated via the tap-to-target path (Phase 4).
     val captureOriginatedFromTap: Boolean = false,
     // True from the moment the artist confirms a target capture until the async
@@ -165,14 +163,6 @@ class MainViewModel @Inject constructor(
                 isWaitingForTap = fromTap
             )
         }
-    }
-
-    fun beginPlaneRealignment() {
-        _uiState.update { it.copy(isInPlaneRealignment = true) }
-    }
-
-    fun endPlaneRealignment() {
-        _uiState.update { it.copy(isInPlaneRealignment = false) }
     }
 
     /**

@@ -27,26 +27,59 @@ import java.util.EnumSet
  * here can never ANR the app — at worst Android kills this process and the client falls back to mono.
  *
  * Protocol: bind, then send [MSG_RUN_PROBE] with `replyTo` set. The service runs a short forced-stereo
- * session on a worker thread and replies with [MSG_RESULT] whose `arg1` is 1 (the dual lenses actually
- * triangulate depth) or 0 (they don't / setup failed).
+ * session on a worker thread and replies with [MSG_RESULT] whose `arg1` is [RESULT_CAPABLE],
+ * [RESULT_INCAPABLE], or [RESULT_CAMERA_UNAVAILABLE] (the camera could not be opened — no verdict;
+ * the client must not persist anything and retries on the next AR entry).
  *
- * The verdict deliberately tests *depth triangulation*, not just dual-lens presence or tracking: a
- * device can expose a hardware-stereo camera config and even reach VIO TRACKING while its two lenses
- * never produce a usable depth map. Adopting stereo on such a device buys nothing (and historically
- * pegged the CPU into an ANR). So we only call a device stereo-capable once it has handed us a real,
- * populated depth image with the Depth API enabled under the forced-stereo config.
+ * What the verdict does and does not prove. ARCore exposes no per-frame "this depth came from the
+ * second lens" signal: `DepthMode.AUTOMATIC` fuses whatever sources the session has, and on a mono
+ * stream it still produces ML/motion depth. A populated depth map alone therefore cannot tell stereo
+ * from ML depth. The probe instead checks the two things that ARE observable:
+ *
+ * 1. **The dual-lens stream is really in force.** After selecting a `REQUIRE_AND_USE` stereo config,
+ *    it re-reads `session.cameraConfig.stereoCameraUsage` and refuses unless the session reports it
+ *    is using the stereo camera ([isDualLensStreamInForce]).
+ * 2. **That stream works end to end.** Under it, the session must reach TRACKING and hand back a
+ *    populated depth map within the timeout — a device that lists a stereo config but whose
+ *    motion-stereo thrashes (the historical ANR) never gets there.
+ *
+ * "Capable" thus means "the forced dual-lens configuration opens, tracks and produces depth on this
+ * device", which is exactly the risk the live session takes when it adopts that config. It does not
+ * claim the depth was triangulated from disparity rather than inferred.
  */
 class StereoProbeService : Service() {
 
     companion object {
         const val MSG_RUN_PROBE = 1
         const val MSG_RESULT = 2
+        /** `arg1` of [MSG_RESULT]: the forced dual-lens config is in force, tracks, and yields depth. */
+        const val RESULT_INCAPABLE = 0
+        const val RESULT_CAPABLE = 1
+        /** The camera could not be opened (another client held it). Not a verdict — do not persist. */
+        const val RESULT_CAMERA_UNAVAILABLE = 2
+
+        /**
+         * True only when the session's ACTIVE camera config reports it is using the stereo camera.
+         * Pure so the decision is unit-testable without a device.
+         */
+        /**
+         * The `stereoCapability` value to persist for a probe [result], or null for "no verdict —
+         * persist nothing and probe again on the next AR entry" (camera could not be opened).
+         */
+        internal fun persistedCapabilityFor(result: Int): Int? = when (result) {
+            RESULT_CAPABLE -> 1
+            RESULT_CAMERA_UNAVAILABLE -> null
+            else -> 0
+        }
+
+        internal fun isDualLensStreamInForce(usage: CameraConfig.StereoCameraUsage?): Boolean =
+            usage == CameraConfig.StereoCameraUsage.REQUIRE_AND_USE
         /**
          * Total window to reach TRACKING *and* hand back a valid depth image. Depth needs a second or
          * two to converge after tracking starts, so this is larger than a tracking-only probe.
          */
         const val PROBE_TIMEOUT_MS = 6_000L
-        /** Fraction of a sampled grid that must carry valid metric depth to count as triangulation. */
+        /** Fraction of a sampled grid that must carry valid metric depth to count as populated. */
         private const val MIN_VALID_DEPTH_FRACTION = 0.25f
     }
 
@@ -58,9 +91,9 @@ class StereoProbeService : Service() {
             val reply = msg.replyTo
             // Run the probe off this process's main thread so even this sacrificial process can't ANR.
             workerHandler.post {
-                val capable = runStereoProbe()
+                val result = runStereoProbe()
                 try {
-                    reply?.send(Message.obtain(null, MSG_RESULT, if (capable) 1 else 0, 0))
+                    reply?.send(Message.obtain(null, MSG_RESULT, result, 0))
                 } catch (_: RemoteException) {
                     // Client already gone (timed out / unbound). Nothing to do.
                 }
@@ -85,12 +118,12 @@ class StereoProbeService : Service() {
     }
 
     /**
-     * Blocking probe. Returns true iff a forced-stereo session both reaches TRACKING *and* produces a
-     * populated depth image within the timeout — i.e. the dual lenses actually triangulate depth.
-     * Tracking alone is the weak signal we used to trust; it let through devices that list a stereo
-     * config but never compute disparity.
+     * Blocking probe. Returns [RESULT_CAPABLE] iff the session confirms the dual-lens stream is in
+     * force AND, under it, reaches TRACKING and produces a populated depth image within the timeout
+     * (see the class doc for what that does and does not prove). [RESULT_CAMERA_UNAVAILABLE] when the
+     * camera could not be opened at all; [RESULT_INCAPABLE] otherwise.
      */
-    private fun runStereoProbe(): Boolean {
+    private fun runStereoProbe(): Int {
         var egl: ProbeEgl? = null
         var probe: Session? = null
         try {
@@ -98,13 +131,14 @@ class StereoProbeService : Service() {
             // No Depth API support means there is no depth to triangulate from the lenses, period.
             if (!probe.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                 Timber.i("ARDIAG depth-triangulation probe: Depth API unsupported -> incapable")
-                return false
+                return RESULT_INCAPABLE
             }
             val cfg = Config(probe).apply {
                 focusMode = Config.FocusMode.AUTO
-                // BLOCKING, matching the live session: LATEST_CAMERA_IMAGE drops frames the init-time
-                // depth provider needs, which jams VIO into kNotTracking. With it, the probe would
-                // never reach TRACKING and would falsely classify every device as incapable.
+                // BLOCKING — deliberately NOT the live session's LATEST_CAMERA_IMAGE. The live session
+                // must never block its GL render thread; this probe has no render loop to starve, and
+                // BLOCKING hands the init-time depth provider every camera frame (LATEST drops frames,
+                // which jammed VIO into kNotTracking here and misclassified every device as incapable).
                 updateMode = Config.UpdateMode.BLOCKING
                 // Enable depth: this is the capability under test. The probe lives in a throwaway
                 // ":probe" process, so even if AUTOMATIC depth thrashes here it can't starve the UI.
@@ -118,13 +152,28 @@ class StereoProbeService : Service() {
             })
             if (stereoConfigs.isEmpty()) {
                 Timber.i("ARDIAG depth-triangulation probe: no hardware-stereo config -> incapable")
-                return false
+                return RESULT_INCAPABLE
             }
             probe.cameraConfig = stereoConfigs[0]
+            // Re-read what the session actually adopted: a filter match is a request, not proof that
+            // the second lens is streaming.
+            if (!isDualLensStreamInForce(probe.cameraConfig.stereoCameraUsage)) {
+                Timber.i("ARDIAG depth-triangulation probe: stereo config not in force -> incapable")
+                return RESULT_INCAPABLE
+            }
 
             egl = ProbeEgl()
             probe.setCameraTextureName(egl.cameraTextureId)
-            probe.resume()
+            try {
+                probe.resume()
+            } catch (e: com.google.ar.core.exceptions.CameraNotAvailableException) {
+                // Lost the race for the camera (CameraX still releasing, another app): no verdict.
+                Timber.w(e, "ARDIAG depth-triangulation probe: camera unavailable -> inconclusive")
+                return RESULT_CAMERA_UNAVAILABLE
+            } catch (e: SecurityException) {
+                Timber.w(e, "ARDIAG depth-triangulation probe: camera access refused -> inconclusive")
+                return RESULT_CAMERA_UNAVAILABLE
+            }
 
             // Monotonic clock: a wall-clock jump (NTP sync) must not extend or truncate the window.
             val deadline = android.os.SystemClock.elapsedRealtime() + PROBE_TIMEOUT_MS
@@ -134,7 +183,7 @@ class StereoProbeService : Service() {
                     probe.update()
                 } catch (e: Exception) {
                     Timber.w(e, "ARDIAG depth-triangulation probe: update() failed")
-                    return false
+                    return RESULT_INCAPABLE
                 }
                 // No Thread.sleep here: UpdateMode.BLOCKING already paces update() to the camera frame
                 // rate, so the loop runs at full ~30fps. An explicit sleep would halve that and shrink
@@ -149,7 +198,7 @@ class StereoProbeService : Service() {
                     frame.acquireDepthImage16Bits().use { depth ->
                         if (depthMapHasValidTriangulation(depth)) {
                             Timber.i("ARDIAG depth-triangulation probe: valid depth map -> capable")
-                            return true
+                            return RESULT_CAPABLE
                         }
                     }
                 } catch (_: NotYetAvailableException) {
@@ -162,10 +211,10 @@ class StereoProbeService : Service() {
                 "ARDIAG depth-triangulation probe: tracking=$reachedTracking but no valid depth map " +
                     "within ${PROBE_TIMEOUT_MS}ms -> incapable"
             )
-            return false
+            return RESULT_INCAPABLE
         } catch (e: Exception) {
             Timber.w(e, "ARDIAG depth-triangulation probe: setup failed -> incapable")
-            return false
+            return RESULT_INCAPABLE
         } finally {
             try { probe?.pause() } catch (_: Exception) {}
             try { probe?.close() } catch (_: Exception) {}
@@ -174,9 +223,10 @@ class StereoProbeService : Service() {
     }
 
     /**
-     * True if [depth] carries enough valid metric samples to count as real dual-lens triangulation. A
-     * device that lists a stereo config but can't compute disparity hands back an empty/all-zero map,
-     * so we sample an 11x11 grid across the frame and require at least [MIN_VALID_DEPTH_FRACTION] of
+     * True if [depth] carries enough valid metric samples to count as a populated depth map. This
+     * alone cannot attribute the depth to the second lens (see the class doc); it proves the forced
+     * dual-lens configuration delivers depth at all. A device whose stereo pipeline stalls hands back
+     * an empty/all-zero map, so we sample an 11x11 grid across the frame and require at least [MIN_VALID_DEPTH_FRACTION] of
      * the cells to read back a plausible distance (the per-cell patch median rejects stray pixels).
      */
     private fun depthMapHasValidTriangulation(depth: android.media.Image): Boolean {

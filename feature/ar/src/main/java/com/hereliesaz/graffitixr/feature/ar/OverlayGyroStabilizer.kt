@@ -2,16 +2,10 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Matrix
 import android.view.Surface
 import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
-import androidx.camera.core.ImageCapture
-import androidx.camera.core.ImageCaptureException
-import androidx.camera.core.ImageProxy
 import androidx.camera.view.LifecycleCameraController
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,19 +20,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import com.hereliesaz.sphereslam.camera.CameraFillCenter
 import com.hereliesaz.sphereslam.camera.CameraIntrinsicsEstimator
-import com.hereliesaz.sphereslam.models.DepthEstimator
 import com.hereliesaz.sphereslam.attitude.GameRotationAttitudeSource
 import com.hereliesaz.sphereslam.gyro.GyroCompensationMath
 import com.hereliesaz.sphereslam.math.RotationMath
-import java.util.concurrent.Executor
-import java.util.concurrent.Executors
-import kotlin.coroutines.resume
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
@@ -69,22 +56,18 @@ enum class OverlayGyroRelease {
  * sensor here gives it without accelerometer double integration), so the parallax term
  * `t·nᵀ/d` is passed as null.
  *
- * **MiDaS.** [DepthEstimator] runs on a background dispatcher once right after the reference and then
- * at most every [DEPTH_INTERVAL_MS], on a downsampled ImageCapture still — never per frame, never on
- * the main thread. It samples the wall under the design's centre as a RELATIVE inverse depth
- * ([GyroCompensationMath.relativeInverseDepthAt]). That is the `d` of the parallax term, kept
- * ready for when translation exists; with translation off it changes nothing on screen, and MiDaS is
- * unitless anyway, so it could never stand in for a metric distance. Its estimator is this toggle's
- * own instance, closed when the toggle releases — ArViewModel's shared one is untouched.
+ * **No depth.** Depth (`d` of the parallax term) matters only once translation is measured. An
+ * earlier version ran MiDaS on an ImageCapture still every 15 s and logged the result without using
+ * it — a still capture plus an inference per interval for nothing on screen, and MiDaS's relative
+ * inverse depth could never stand in for a metric `d` anyway. It was removed; when translation is
+ * added, depth (metric, not MiDaS) belongs with it.
  *
  * **Release.** Rotating past [GyroCompensationMath.DEFAULT_RELEASE_DEGREES] (the tripod was
  * bumped or the phone picked up) calls [onRelease] with [OverlayGyroRelease.MOVED] instead of
  * dragging the design several degrees on an unverifiable reading. A display-rotation change restarts
  * the effect with a fresh reference. When [active] goes false — the toggle, or leaving Overlay — the
- * effect is cancelled: the sensor listener is unregistered, the MiDaS loop stops and its ORT session
- * is closed.
+ * effect is cancelled and the sensor listener is unregistered.
  *
- * @param designCenter the design's centre on screen, as fractions of the view (for the MiDaS sample).
  * @return the row-major 3x3 homography to draw the design through, or null for "no compensation".
  */
 @OptIn(ExperimentalCamera2Interop::class)
@@ -94,7 +77,6 @@ fun rememberOverlayGyroCompensation(
     cameraController: LifecycleCameraController,
     viewWidth: Int,
     viewHeight: Int,
-    designCenter: () -> Pair<Float, Float>,
     onRelease: (OverlayGyroRelease) -> Unit,
 ): State<FloatArray?> {
     val context = LocalContext.current
@@ -112,7 +94,6 @@ fun rememberOverlayGyroCompensation(
     }
     val homography = remember { mutableStateOf<FloatArray?>(null) }
     val currentOnRelease by rememberUpdatedState(onRelease)
-    val currentDesignCenter by rememberUpdatedState(designCenter)
 
     LaunchedEffect(active, displayRotationDeg, viewWidth, viewHeight) {
         homography.value = null
@@ -123,7 +104,6 @@ fun rememberOverlayGyroCompensation(
             currentOnRelease(OverlayGyroRelease.SENSOR_UNAVAILABLE)
             return@LaunchedEffect
         }
-        var depthJob: Job? = null
         try {
             attitude.start()
             // The reference stays in pure BODY axes; GyroCompensationMath does the display remap
@@ -143,12 +123,6 @@ fun rememberOverlayGyroCompensation(
 
             val intrinsics = withContext(Dispatchers.Default) {
                 screenIntrinsicsFor(appContext, cameraController, viewWidth, viewHeight)
-            }
-
-            // MiDaS, very slowly, off the main thread. Child of this effect: cancelled with it, and
-            // explicitly in `finally` so an auto-release stops it at once.
-            depthJob = launch(Dispatchers.Default) {
-                runDepthLoop(appContext, cameraController, viewWidth, viewHeight) { currentDesignCenter() }
             }
 
             while (isActive) {
@@ -174,7 +148,6 @@ fun rememberOverlayGyroCompensation(
                 }
             }
         } finally {
-            depthJob?.cancel()
             attitude.stop()
             homography.value = null
         }
@@ -182,15 +155,9 @@ fun rememberOverlayGyroCompensation(
     return homography
 }
 
-/** Interval between MiDaS runs while Gyro is on — the surface in front of a tripod does not move. */
-private const val DEPTH_INTERVAL_MS = 15_000L
-
 /** How long to wait for the rotation sensor's first sample before giving up. */
 private const val REFERENCE_TIMEOUT_MS = 1_000L
 private const val SAMPLE_POLL_MS = 16L
-
-/** Long side of the still handed to MiDaS (which resizes to 256 anyway). */
-private const val DEPTH_STILL_MAX_DIM = 512
 
 /** A nominal 4:3 frame in sensor orientation; only the f/width ratio survives into screen pixels. */
 private const val NOMINAL_FRAME_W = 4000
@@ -218,113 +185,4 @@ private suspend fun screenIntrinsicsFor(
         Timber.w("OverlayGyro: no camera intrinsics; using a nominal field of view")
         CameraFillCenter.screenIntrinsicsFallback(viewWidth, viewHeight)
     }
-}
-
-/**
- * Once now, then every [DEPTH_INTERVAL_MS]: grab a small still, run MiDaS, sample the surface under
- * the design. Runs on Dispatchers.Default; the estimator is closed in `finally` on this same
- * background thread, after any in-flight (synchronized, uninterruptible) inference returns — so a
- * release never blocks the main thread on ORT.
- */
-private suspend fun runDepthLoop(
-    context: Context,
-    cameraController: LifecycleCameraController,
-    viewWidth: Int,
-    viewHeight: Int,
-    designCenter: () -> Pair<Float, Float>,
-) = kotlinx.coroutines.coroutineScope {
-    val estimator = DepthEstimator(context)
-    try {
-        if (!estimator.load()) {
-            Timber.w("OverlayGyro: depth unavailable (%s)", estimator.lastError)
-            return@coroutineScope
-        }
-        while (isActive) {
-            val still = withContext(Dispatchers.Main) {
-                cameraController.takeDownsampledStill(depthStillExecutor, DEPTH_STILL_MAX_DIM)
-            }
-            if (still != null) {
-                // The depth map may be resampled to the model's own size; the crop is the still's.
-                val stillWidth = still.width
-                val stillHeight = still.height
-                val map = try { estimator.estimate(still) } finally { still.recycle() }
-                if (map != null) {
-                    // The design centre is a fraction of the screen; the still is the whole
-                    // frame, of which the FILL_CENTER preview shows a centre crop.
-                    val (vx, vy) = designCenter()
-                    val inFrame = CameraFillCenter.viewToFrameNormalized(
-                        vx, vy, stillWidth, stillHeight, viewWidth, viewHeight,
-                    ) ?: floatArrayOf(vx, vy)
-                    val rel = GyroCompensationMath.relativeInverseDepthAt(
-                        map.data, map.width, map.height, inFrame[0], inFrame[1],
-                    )
-                    // Logged, not applied: it would scale a translation term that is off (class doc).
-                    Timber.d("OverlayGyro: surface relative inverse depth %.3f", rel ?: Float.NaN)
-                }
-            }
-            delay(DEPTH_INTERVAL_MS)
-        }
-    } finally {
-        estimator.close()
-    }
-}
-
-/**
- * One idle background thread for the still's JPEG decode, shared for the process. Not shut down per
- * toggle: a capture cancelled mid-flight still delivers its callback later, and a shut-down executor
- * would reject it inside CameraX.
- */
-private val depthStillExecutor: Executor by lazy { Executors.newSingleThreadExecutor() }
-
-/**
- * Like [takePictureAsBitmap], but decodes on [executor] with power-of-two subsampling down to about
- * [maxDim] on the long side — MiDaS needs 256², and a full-resolution decode on the main executor
- * every few seconds would be a needless ~50 MB allocation and a dropped frame. Null on any capture
- * or decode failure (depth is best-effort). Must be called on the main thread (CameraX).
- */
-private suspend fun LifecycleCameraController.takeDownsampledStill(
-    executor: Executor,
-    maxDim: Int,
-): Bitmap? = suspendCancellableCoroutine { cont ->
-    takePicture(
-        executor,
-        object : ImageCapture.OnImageCapturedCallback() {
-            override fun onCaptureSuccess(image: ImageProxy) {
-                try {
-                    val buf = image.planes[0].buffer
-                    val bytes = ByteArray(buf.remaining())
-                    buf.get(bytes)
-                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-                    var sample = 1
-                    while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxDim) sample *= 2
-                    val raw = BitmapFactory.decodeByteArray(
-                        bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample },
-                    )
-                    if (raw == null) {
-                        if (cont.isActive) cont.resume(null)
-                        return
-                    }
-                    val rotationDeg = image.imageInfo.rotationDegrees
-                    val out = if (rotationDeg != 0) {
-                        val m = Matrix().apply { postRotate(rotationDeg.toFloat()) }
-                        Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, m, true).also {
-                            if (it !== raw) raw.recycle()
-                        }
-                    } else raw
-                    if (cont.isActive) cont.resume(out) else out.recycle()
-                } catch (t: Throwable) {
-                    Timber.w(t, "OverlayGyro: still decode failed")
-                    if (cont.isActive) cont.resume(null)
-                } finally {
-                    image.close()
-                }
-            }
-
-            override fun onError(exception: ImageCaptureException) {
-                Timber.w(exception, "OverlayGyro: still capture failed")
-                if (cont.isActive) cont.resume(null)
-            }
-        },
-    )
 }

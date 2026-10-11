@@ -302,11 +302,8 @@
     <string name="redetect">Újraészlelés</string>
 
 
-    <string name="plane_realignment_title">Falfelület újraészlelése</string>
 
-    <string name="plane_realignment_text">A horgony onnan van elhelyezve, ahol a rögzítéskor álltál. Az ARCore azt a nyomon követett függőleges felületet választja, amely a leginkább közvetlenül az eredeti pozíció előtt van.\n\n1. Térj vissza körülbelül arra a helyre, ahol a rögzítés során álltál\n2. Lassan pásztázd a kamerát a falfestményed felett, hogy az ARCore sík felületként regisztrálhassa\n3. Tartsd stabilan a műalkotással szemben, majd koppints alább\n\nA narancssárga szegély az újonnan észlelt felületre ugrik.</string>
 
-    <string name="use_this_wall">Ezt a falat használd</string>
 
 
     <string name="scanning_dots">Szkennelés\u2026</string>

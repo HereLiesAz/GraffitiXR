@@ -299,12 +299,6 @@
     <!-- Action to redetect the plane. -->
     <string name="redetect">Neu erkennen</string>
 
-    <!-- Title for plane realignment tool. -->
-    <string name="plane_realignment_title">Wandoberfläche neu erkennen</string>
-    <!-- Instructions for realigning the plane with the wall. -->
-    <string name="plane_realignment_text">Der Anker wird dort platziert, wo Sie bei der Aufnahme standen. ARCore wählt die verfolgte vertikale Oberfläche aus, die sich am direktesten vor dieser ursprünglichen Position befindet.\n\n1. Kehren Sie ungefähr dorthin zurück, wo Sie während der Aufnahme standen.\n2. Schwenken Sie die Kamera langsam über Ihre Wand, damit ARCore sie als flache Oberfläche registrieren kann.\n3. Halten Sie die Kamera ruhig auf das Kunstwerk gerichtet und tippen Sie dann unten.\n\nDer orangefarbene Rand springt auf die neu erkannte Oberfläche.</string>
-    <!-- Action to use the currently detected wall for realignment. -->
-    <string name="use_this_wall">Diese Wand verwenden</string>
 
     <!-- Label shown when scanning for relocation. -->
     <string name="scanning_dots">Scannen\u2026</string>
