@@ -411,7 +411,7 @@ Every persisted key, its default, and effect. Adaptive-throttle keys default **o
 | Throttle on power-save | `throttle_on_power_save` | on | Floor to 15 fps in power-save mode |
 | Throttle on low battery | `throttle_on_low_battery` | on | Floor to 15 fps on low battery |
 | Throttle on lag | `throttle_on_lag` | on | Floor to 15 fps when frame lag is detected |
-| Camera target FPS | `camera_target_fps` | `60` | ARCore camera capture target |
+| Camera target FPS | `camera_target_fps` | `60` | ARCore camera capture target; a change re-selects the live session's camera config immediately |
 
 **Perception model:** world-locked perception layers render into an offscreen FBO that refreshes only on
 meaningful camera-pose change or SLAM-map growth, and is composited every frame while camera passthrough,

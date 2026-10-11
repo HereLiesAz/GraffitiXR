@@ -357,7 +357,7 @@ fun SettingsScreen(
                             // standalone SphereSLAM/KPM path even on an ARCore-capable device. ARCore
                             // depth is AUTOMATIC (monocular/ML) depth, which feeds plane finding and
                             // stabilizes the feature cloud; off is the escape hatch for hardware whose
-                            // ML depth graph destabilizes VIO. Both apply on the next AR entry.
+                            // ML depth graph destabilizes VIO. Both apply immediately, mid-AR included.
                             SettingsItem(
                                 label = "Use ARCore",
                                 value = if (arCoreEnabled) strings.settings.on else strings.settings.off,
@@ -371,7 +371,7 @@ fun SettingsScreen(
                             // Monocular depth (MiDaS Small) — depth source for any device that
                             // can't get ARCore's Depth API (no ARCore, ARCore off, or ARCore depth off);
                             // default on, dormant when ARCore depth is active. Beta: Step 1 runs a
-                            // self-test on next AR entry whose result shows in the diag overlay.
+                            // self-test as soon as it's needed, whose result shows in the diag overlay.
                             SettingsItem(
                                 label = "Monocular depth (beta)",
                                 value = if (monocularDepthEnabled) strings.settings.on else strings.settings.off,
