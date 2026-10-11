@@ -1,5 +1,29 @@
 # SphereSLAM Implementation TODO
 
+## SphereSLAM 0.25.0 — photosphere localization, held pose, stations, tile depth (adopted)
+
+The app consumes SphereSLAM **0.25.0** (tag `0.25.0`).
+
+- [x] The artwork no longer vanishes when the wall leaves view: past the 400 ms bridge SphereSLAM
+  returns `PoseSource.PHOTOSPHERE` (gyro rotation corrected by recognised photosphere tiles, at the
+  latest camera centre) or `HELD` (gyro-carried last lock); the app maps them to
+  `SphereSlamStandalonePoseSource.PHOTOSPHERE` / `HELD` and renders them, also while a relock is
+  confirming.
+- [x] Stations: stepping more than 0.3 m (metric reference) / 0.3 reference widths from every
+  standpoint opens a new photosphere; earlier ones are kept and cross-station tiles are triangulated
+  for 6-DoF fixes. All library-side; nothing in the app.
+- [x] MiDaS per new tile: the analyzer passes its `DepthEstimator` as the session's
+  `TileDepthSource` (synchronized; shared with the existing depth worker).
+- [x] Tile localization needs OpenCV, which the analyzer already loads (flow tracking).
+
+Device checks owed for 0.25.0:
+
+- [ ] Turn away from the wall and back: the artwork stays where the wall is (diagnostics:
+  `poseSource=PHOTOSPHERE`, `tiles{… rotFixes>0}` in the periodic KPM line) and relocks without a jump.
+- [ ] Step sideways 0.5 m and look around: `SphereSLAM station 1 opened`; with the wall out of view the
+  artwork stays placed (`poseFixes>0` once tiles from two stations overlap, or with MiDaS depth).
+- [ ] Analyzer frame rate unchanged with tile localization running (it is a 4 Hz background job).
+
 ## SphereSLAM 0.24.6 — seen tiles persist, KPM gates restored (adopted)
 
 The app consumes SphereSLAM **0.24.6** (tag `0.24.6`; 0.24.4 audit fixes plus HereLiesAz/SphereSLAM#33).
