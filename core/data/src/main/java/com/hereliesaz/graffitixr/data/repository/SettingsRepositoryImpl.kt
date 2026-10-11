@@ -11,6 +11,9 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.hereliesaz.graffitixr.common.model.AppLanguage
 import com.hereliesaz.graffitixr.common.model.CameraTargetFps
+import com.hereliesaz.graffitixr.common.model.CoverageGlowColor
+import com.hereliesaz.graffitixr.common.model.CoverageGlowIntensity
+import com.hereliesaz.graffitixr.common.model.CoverageGlowStyle
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -67,6 +70,9 @@ class SettingsRepositoryImpl @Inject constructor(
     private val SHOW_FEATURE_POINTS = booleanPreferencesKey("show_feature_points")
     private val SHOW_PLANE_GRIDS = booleanPreferencesKey("show_plane_grids")
     private val SHOW_POINTS = booleanPreferencesKey("show_points")
+    private val COVERAGE_GLOW_COLOR = intPreferencesKey("coverage_glow_color")
+    private val COVERAGE_GLOW_INTENSITY = floatPreferencesKey("coverage_glow_intensity")
+    private val COVERAGE_GLOW_STYLE = stringPreferencesKey("coverage_glow_style")
 
     override val language: Flow<AppLanguage> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
@@ -361,5 +367,39 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setShowPoints(on: Boolean) {
         context.dataStore.edit { it[SHOW_POINTS] = on }
+    }
+
+    // Defaults reproduce the glow as it shipped before these settings: a white 14% wash.
+    override val coverageGlowColor: Flow<Int> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[COVERAGE_GLOW_COLOR] ?: CoverageGlowColor.DEFAULT.argb }
+
+    override suspend fun setCoverageGlowColor(argb: Int) {
+        // Opacity is the intensity setting; store the colour opaque so equality checks are stable.
+        context.dataStore.edit { it[COVERAGE_GLOW_COLOR] = argb or OPAQUE_ALPHA }
+    }
+
+    override val coverageGlowIntensity: Flow<Float> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences ->
+            CoverageGlowIntensity.sanitize(
+                preferences[COVERAGE_GLOW_INTENSITY] ?: CoverageGlowIntensity.DEFAULT
+            )
+        }
+
+    override suspend fun setCoverageGlowIntensity(intensity: Float) {
+        context.dataStore.edit { it[COVERAGE_GLOW_INTENSITY] = CoverageGlowIntensity.sanitize(intensity) }
+    }
+
+    override val coverageGlowStyle: Flow<CoverageGlowStyle> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> CoverageGlowStyle.fromStorageKey(preferences[COVERAGE_GLOW_STYLE]) }
+
+    override suspend fun setCoverageGlowStyle(style: CoverageGlowStyle) {
+        context.dataStore.edit { it[COVERAGE_GLOW_STYLE] = style.storageKey }
+    }
+
+    private companion object {
+        const val OPAQUE_ALPHA = 0xFF000000.toInt()
     }
 }

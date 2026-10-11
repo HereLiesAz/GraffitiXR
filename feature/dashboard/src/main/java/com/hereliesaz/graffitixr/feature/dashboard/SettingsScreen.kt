@@ -56,6 +56,12 @@ import androidx.core.content.ContextCompat
 import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.AzLoad
 import com.hereliesaz.graffitixr.common.model.AppLanguage
+import com.hereliesaz.graffitixr.common.model.CoverageGlowAppearance
+import com.hereliesaz.graffitixr.common.model.CoverageGlowColor
+import com.hereliesaz.graffitixr.common.model.CoverageGlowIntensity
+import com.hereliesaz.graffitixr.common.model.CoverageGlowStyle
+import androidx.compose.material3.Slider
+import kotlin.math.roundToInt
 import com.hereliesaz.graffitixr.design.theme.AppStrings
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -113,6 +119,10 @@ fun SettingsScreen(
     onImperialUnitsChanged: (Boolean) -> Unit,
     backgroundColor: Int,
     onBackgroundColorChanged: (Int) -> Unit,
+    coverageGlow: CoverageGlowAppearance,
+    onCoverageGlowColorChanged: (Int) -> Unit,
+    onCoverageGlowIntensityChanged: (Float) -> Unit,
+    onCoverageGlowStyleChanged: (CoverageGlowStyle) -> Unit,
     onCheckForUpdates: () -> Unit,
     onOpenUpdatePage: () -> Unit,
     onResetTutorials: () -> Unit,
@@ -485,6 +495,14 @@ fun SettingsScreen(
                                     )
                                 }
                             }
+
+                            CoverageGlowSettings(
+                                appearance = coverageGlow,
+                                onColorChanged = onCoverageGlowColorChanged,
+                                onIntensityChanged = onCoverageGlowIntensityChanged,
+                                onStyleChanged = onCoverageGlowStyleChanged,
+                                strings = strings,
+                            )
                         }
 
                         // Version Section
@@ -556,6 +574,120 @@ fun SettingsScreen(
             }
         }
     }
+}
+
+/**
+ * Colour, intensity and style of the standalone SphereSLAM photosphere coverage glow. Every control
+ * applies immediately: the live glow restyles on its next frame, no AR restart.
+ */
+@Composable
+private fun CoverageGlowSettings(
+    appearance: CoverageGlowAppearance,
+    onColorChanged: (Int) -> Unit,
+    onIntensityChanged: (Float) -> Unit,
+    onStyleChanged: (CoverageGlowStyle) -> Unit,
+    strings: AppStrings,
+) {
+    val selectedColor = CoverageGlowColor.fromArgb(appearance.colorArgb)
+    // Same layout as the canvas swatches above: label on its own line, scrollable 48dp targets.
+    Text(
+        strings.settings.glowColor,
+        fontWeight = FontWeight.Medium,
+        modifier = Modifier.padding(top = 8.dp)
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        CoverageGlowColor.entries.forEach { swatch ->
+            GlowColorSwatch(
+                label = glowColorLabel(swatch, strings),
+                argb = swatch.argb,
+                isSelected = swatch == selectedColor,
+                onClick = { onColorChanged(swatch.argb) },
+            )
+        }
+    }
+
+    val percent = (appearance.safeIntensity * 100f).roundToInt()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = strings.settings.glowIntensity, fontWeight = FontWeight.Medium)
+        Text(text = "$percent%", color = Color.Gray)
+    }
+    Slider(
+        value = appearance.safeIntensity,
+        onValueChange = onIntensityChanged,
+        valueRange = CoverageGlowIntensity.MIN..CoverageGlowIntensity.MAX,
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { stateDescription = "$percent%" },
+    )
+
+    SettingsItem(
+        label = strings.settings.glowStyle,
+        value = glowStyleLabel(appearance.style, strings),
+        modifier = Modifier.clickable { onStyleChanged(CoverageGlowStyle.next(appearance.style)) }
+    )
+    Text(
+        text = glowStyleDescription(appearance.style, strings),
+        color = Color.Gray,
+        fontSize = 12.sp,
+    )
+}
+
+/**
+ * A 48dp-target colour swatch whose selection ring sits in the gap AROUND the colour, so it reads
+ * on every swatch colour (a coloured border vanishes on a swatch of the same colour).
+ */
+@Composable
+private fun GlowColorSwatch(label: String, argb: Int, isSelected: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .clickable(role = Role.Button, onClickLabel = label, onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                contentDescription = label
+                stateDescription = if (isSelected) "Selected" else ""
+            }
+            .padding(2.dp)
+            .border(
+                width = 2.dp,
+                color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent,
+                shape = CircleShape
+            )
+            .padding(6.dp)
+            .background(Color(argb.toLong() and 0xFFFFFFFFL), CircleShape)
+            .border(width = 0.5.dp, color = Color.Gray, shape = CircleShape)
+    )
+}
+
+private fun glowColorLabel(color: CoverageGlowColor, strings: AppStrings): String = when (color) {
+    CoverageGlowColor.WHITE -> strings.settings.glowColorWhite
+    CoverageGlowColor.LIGHT_GREY -> strings.settings.glowColorLightGrey
+    CoverageGlowColor.MID_GREY -> strings.settings.glowColorMidGrey
+    CoverageGlowColor.BLACK -> strings.settings.glowColorBlack
+    CoverageGlowColor.HOT_PINK -> strings.settings.glowColorPink
+    CoverageGlowColor.CYAN -> strings.settings.glowColorCyan
+}
+
+// Exhaustive on purpose: a new CoverageGlowStyle entry won't compile until it has a label here.
+private fun glowStyleLabel(style: CoverageGlowStyle, strings: AppStrings): String = when (style) {
+    CoverageGlowStyle.WASH -> strings.settings.glowStyleWash
+    CoverageGlowStyle.MISSING_TILES -> strings.settings.glowStyleMissing
+}
+
+private fun glowStyleDescription(style: CoverageGlowStyle, strings: AppStrings): String = when (style) {
+    CoverageGlowStyle.WASH -> strings.settings.glowStyleWashDesc
+    CoverageGlowStyle.MISSING_TILES -> strings.settings.glowStyleMissingDesc
 }
 
 @Composable
