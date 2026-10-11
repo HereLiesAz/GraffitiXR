@@ -82,12 +82,10 @@ fun rememberAppStrings(): AppStrings {
             appInfo = stringResource(R.string.settings_info_section),
             version = stringResource(R.string.settings_version_label),
             updates = stringResource(R.string.settings_updates_section),
-            checkUpdates = stringResource(R.string.settings_check_updates_label),
-            getUpdate = stringResource(R.string.settings_install_update_label),
+            openReleases = stringResource(R.string.settings_open_releases_label),
             permissions = stringResource(R.string.settings_permissions_section),
             cameraAccess = stringResource(R.string.settings_camera_access),
             photoAccess = stringResource(R.string.settings_photo_access),
-            notifications = stringResource(R.string.settings_notifications),
             granted = stringResource(R.string.settings_granted),
             denied = stringResource(R.string.settings_denied),
             openAppSettings = stringResource(R.string.settings_open_app_settings),
@@ -134,9 +132,6 @@ fun rememberAppStrings(): AppStrings {
             planeConfirmQuestion = stringResource(R.string.plane_confirm_question),
             looksCorrect = stringResource(R.string.looks_correct),
             redetect = stringResource(R.string.redetect),
-            planeRealignmentTitle = stringResource(R.string.plane_realignment_title),
-            planeRealignmentText = stringResource(R.string.plane_realignment_text),
-            useThisWall = stringResource(R.string.use_this_wall),
             scanning = stringResource(R.string.scanning_dots),
             anchorLocked = stringResource(R.string.anchor_locked),
             matchedPercent = { pct -> context.getString(R.string.matched_percent, pct) },
@@ -300,12 +295,10 @@ data class AppStrings(
         val appInfo: String,
         val version: String,
         val updates: String,
-        val checkUpdates: String,
-        val getUpdate: String,
+        val openReleases: String,
         val permissions: String,
         val cameraAccess: String,
         val photoAccess: String,
-        val notifications: String,
         val granted: String,
         val denied: String,
         val openAppSettings: String,
@@ -359,9 +352,6 @@ data class AppStrings(
         val planeConfirmQuestion: String,
         val looksCorrect: String,
         val redetect: String,
-        val planeRealignmentTitle: String,
-        val planeRealignmentText: String,
-        val useThisWall: String,
         val scanning: String,
         val anchorLocked: String,
         val matchedPercent: (Int) -> String,
@@ -396,9 +386,6 @@ data class AppStrings(
                 planeConfirmQuestion == other.planeConfirmQuestion &&
                 looksCorrect == other.looksCorrect &&
                 redetect == other.redetect &&
-                planeRealignmentTitle == other.planeRealignmentTitle &&
-                planeRealignmentText == other.planeRealignmentText &&
-                useThisWall == other.useThisWall &&
                 scanning == other.scanning &&
                 anchorLocked == other.anchorLocked &&
                 scanHintRecover == other.scanHintRecover &&
@@ -430,9 +417,6 @@ data class AppStrings(
             result = 31 * result + planeConfirmQuestion.hashCode()
             result = 31 * result + looksCorrect.hashCode()
             result = 31 * result + redetect.hashCode()
-            result = 31 * result + planeRealignmentTitle.hashCode()
-            result = 31 * result + planeRealignmentText.hashCode()
-            result = 31 * result + useThisWall.hashCode()
             result = 31 * result + scanning.hashCode()
             result = 31 * result + anchorLocked.hashCode()
             result = 31 * result + scanHintRecover.hashCode()

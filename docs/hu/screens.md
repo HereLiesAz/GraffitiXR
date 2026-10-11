@@ -50,7 +50,7 @@ Teljes képernyős alsó lap (bottom sheet) a fő nézet felett. Felsorolja a me
 ### Beállítások (Kinyíló menü)
 *   Kezesség (bal/jobb sín dokkolás).
 *   Verzióinformáció.
-*   Frissítések keresése.
+*   Hivatkozás a GitHub kiadási oldalára (a böngészőben nyílik meg; az alkalmazás maga soha nem keres frissítéseket).
 
 ---
 

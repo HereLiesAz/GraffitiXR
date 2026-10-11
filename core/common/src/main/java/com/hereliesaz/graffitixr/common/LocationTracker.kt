@@ -26,6 +26,15 @@ class LocationTracker(private val context: Context) {
     private var locationCallback: LocationCallback? = null
 
     /**
+     * A start requested while location permission was missing. Location is asked for at the moment
+     * a capture needs it (MainActivity, when target capture begins) — usually AFTER the AR session,
+     * and with it this tracker, has already started. Remembering the request lets
+     * [onPermissionsChanged] begin updates the moment the artist grants it, instead of the session
+     * recording no location until AR is restarted.
+     */
+    @Volatile private var pendingUpdate: ((Location) -> Unit)? = null
+
+    /**
      * Starts receiving location updates.
      *
      * @param onLocationUpdate A callback function that is invoked with the new [Location].
@@ -33,9 +42,13 @@ class LocationTracker(private val context: Context) {
     @SuppressLint("MissingPermission")
     fun startLocationUpdates(onLocationUpdate: (Location) -> Unit) {
         if (!hasPermissions()) {
-            Log.w("LocationTracker", "Missing location permissions")
+            Log.i("LocationTracker", "Location permission not granted yet; updates start when it is")
+            pendingUpdate = onLocationUpdate
+            synchronized(awaitingPermission) { awaitingPermission.add(this) }
             return
         }
+        pendingUpdate = null
+        synchronized(awaitingPermission) { awaitingPermission.remove(this) }
 
         val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 10000)
             .setWaitForAccurateLocation(false)
@@ -66,6 +79,8 @@ class LocationTracker(private val context: Context) {
      * Stops receiving location updates.
      */
     fun stopLocationUpdates() {
+        pendingUpdate = null
+        synchronized(awaitingPermission) { awaitingPermission.remove(this) }
         locationCallback?.let {
             fusedLocationClient.removeLocationUpdates(it)
         }
@@ -77,6 +92,12 @@ class LocationTracker(private val context: Context) {
      *
      * @return True if ACCESS_FINE_LOCATION and ACCESS_COARSE_LOCATION are granted, false otherwise.
      */
+    /** Starts the updates a permission-less [startLocationUpdates] deferred, if permission is now held. */
+    private fun retryPendingStart() {
+        val pending = pendingUpdate ?: return
+        if (hasPermissions()) startLocationUpdates(pending)
+    }
+
     fun hasPermissions(): Boolean {
         return ActivityCompat.checkSelfPermission(
             context,
@@ -85,5 +106,21 @@ class LocationTracker(private val context: Context) {
             context,
             Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    companion object {
+        /** Trackers holding a deferred start. Weak: a tracker dropped without stop must not leak. */
+        private val awaitingPermission: MutableSet<LocationTracker> =
+            java.util.Collections.newSetFromMap(java.util.WeakHashMap())
+
+        /**
+         * Call after a location-permission request returns. Every tracker whose start was deferred
+         * for lack of permission begins its updates now if the grant came through.
+         */
+        @JvmStatic
+        fun onPermissionsChanged() {
+            val waiting = synchronized(awaitingPermission) { awaitingPermission.toList() }
+            waiting.forEach { it.retryPendingStart() }
+        }
     }
 }

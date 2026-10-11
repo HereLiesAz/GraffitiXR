@@ -302,11 +302,8 @@
     <string name="redetect">重新偵測</string>
 
 
-    <string name="plane_realignment_title">重新偵測牆面</string>
 
-    <string name="plane_realignment_text">錨點是從您捕獲時站立的位置放置的。ARCore 選擇最直接位於原始位置前方的追蹤垂直表面。\n\n1.返回捕獲期間您站立的位置\n2.緩慢地將相機平移到壁畫上，以便 ARCore 可以將其記錄為平坦的表面\n3.面向圖稿保持穩定，然後點擊下方\n\n橙色邊框將跳到新檢測到的表面。</string>
 
-    <string name="use_this_wall">使用這堵牆</string>
 
 
     <string name="scanning_dots">掃描\u2026</string>
@@ -395,12 +392,10 @@
     <string name="settings_info_section">應用程式資訊</string>
     <string name="settings_version_label">版本</string>
     <string name="settings_updates_section">更新</string>
-    <string name="settings_check_updates_label">檢查實驗性更新</string>
-    <string name="settings_install_update_label">安裝更新</string>
+    <string name="settings_open_releases_label">開啟發佈頁面</string>
     <string name="settings_permissions_section">權限</string>
     <string name="settings_camera_access">相機訪問</string>
     <string name="settings_photo_access">照片庫訪問</string>
-    <string name="settings_notifications">通知</string>
     <string name="settings_granted">已允許</string>
     <string name="settings_denied">被拒絕</string>
     <string name="settings_open_app_settings">打開應用程式設定</string>
@@ -436,6 +431,7 @@
     <string name="scan_hint_build_map">左右行走構建地圖</string>
     <string name="scan_hint_closer">靠近牆壁</string>
     <string name="scan_hint_higher_lower">掃描更高和更低</string>
+    <string name="reacquiring_target">正在重新識別目標…</string>
 
 
     <string name="desc_bg_mockup">背景原型機</string>

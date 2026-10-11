@@ -76,6 +76,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 
 /** Prefix of PhotosphereTrackingSession's periodic per-window KPM metrics/timing diagnostic. */
 private const val KPM_METRICS_PREFIX = "SphereSLAM standalone KPM "
@@ -678,6 +679,13 @@ fun SphereSlamStandaloneOverlay(
     val initialPersistedAtlasPages = remember(reference, candidateUncommitted) {
         if (candidateUncommitted) emptyList() else persistedAtlasPages
     }
+    // Pages the live session grew for this canonical page. The persisted snapshot above is fixed per
+    // page (re-keying it on every commit would tear tracking down), so without this a later
+    // updatePrecisionLayer or analyzer restart would hand the session a page set missing them, and
+    // SphereSLAM rebuilds the matcher from exactly the set it is given: every grown page dropped.
+    val grownAtlasPages = remember(reference, candidateUncommitted) {
+        java.util.concurrent.CopyOnWriteArrayList<SphereSlamStandaloneAtlasReferenceImage>()
+    }
     val atlasReferenceImages by produceState<List<SphereSlamStandaloneAtlasReferenceImage>?>(
         initialValue = null,
         initialPersistedAtlasPages,
@@ -1088,7 +1096,8 @@ fun SphereSlamStandaloneOverlay(
         } else {
             // Stable non-null locals keep Kotlin's smart casts valid throughout DisposableEffect.
             val activeCameraId: String = id
-            val activeAtlas: List<SphereSlamStandaloneAtlasReferenceImage> = restoredAtlas
+            val activeAtlas: List<SphereSlamStandaloneAtlasReferenceImage> =
+                withGrownAtlasPages(restoredAtlas, grownAtlasPages)
             val executor = Executors.newSingleThreadExecutor { runnable ->
                 Thread(runnable, "sphereslam-standalone-camera").apply { isDaemon = true }
             }
@@ -1157,6 +1166,18 @@ fun SphereSlamStandaloneOverlay(
                     }
                 },
                 onAtlasPageAdded = { candidate ->
+                    runCatching {
+                        SphereSlamStandaloneAtlasReferenceImage(
+                            pageNo = candidate.pageNo,
+                            luma = candidate.luma,
+                            width = candidate.bitmap.width,
+                            height = candidate.bitmap.height,
+                            referenceWidthMeters = candidate.referenceWidthUnits,
+                            physicallyMetric = candidate.physicallyMetric,
+                            canonicalFromPage = candidate.canonicalFromPage.copyOf(),
+                        )
+                    }.onSuccess { grownAtlasPages += it }
+                        .onFailure { Timber.w(it, "Grown atlas page %d not retained", candidate.pageNo) }
                     postUi {
                         onAtlasPageCaptured(
                             candidate.bitmap,
@@ -1318,7 +1339,7 @@ fun SphereSlamStandaloneOverlay(
             val loadedAtlas = atlasReferenceImages ?: return@LaunchedEffect
             standaloneAnalyzerRef.get()?.updatePrecisionLayer(
                 reference = referenceImage,
-                atlasPages = loadedAtlas,
+                atlasPages = withGrownAtlasPages(loadedAtlas, grownAtlasPages),
                 fingerprint = runtimeMobileGsFingerprint,
                 fingerprintFrameVersion = mobileGsFingerprintFrameVersion,
                 mapFromFingerprint =
@@ -1489,4 +1510,17 @@ private fun bitmapToLuma(bitmap: Bitmap): ByteArray {
         val b = c and 0xff
         ((77 * r + 150 * g + 29 * b) shr 8).toByte()
     }
+}
+
+/**
+ * The analyzer's complete atlas: the pages persisted when this canonical page was loaded plus those
+ * the live session grew since (a persisted page wins a page-number clash).
+ */
+internal fun withGrownAtlasPages(
+    persisted: List<SphereSlamStandaloneAtlasReferenceImage>,
+    grown: List<SphereSlamStandaloneAtlasReferenceImage>,
+): List<SphereSlamStandaloneAtlasReferenceImage> {
+    if (grown.isEmpty()) return persisted
+    val known = persisted.mapTo(HashSet()) { it.pageNo }
+    return persisted + grown.filter { known.add(it.pageNo) }
 }

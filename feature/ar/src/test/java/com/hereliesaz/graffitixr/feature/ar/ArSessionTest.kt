@@ -13,7 +13,9 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
 import io.mockk.verify
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -26,6 +28,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -147,16 +150,34 @@ class ArSessionTest {
     }
 
     @Test
-    fun `destroyArSession should not crash if session is null`() = runTest {
-        // session is null by default
+    fun `destroyArSession with no session completes and releases the destroying latch`() = runTest {
+        // session is null by default. destroyArSession latches isDestroying synchronously (so a
+        // renderer attached meanwhile is never handed a closing session); the teardown must run to
+        // completion and release it, or every future onDrawFrame would early-return forever.
+        val job = viewModel.destroyArSession()
+        assertTrue(getPrivateField(viewModel, "isDestroying") as Boolean)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(job.isCompleted)
+        assertFalse(getPrivateField(viewModel, "isDestroying") as Boolean)
+    }
+
+    @Test
+    fun `destroyArSession actually pauses and closes a live session`() = runTest {
+        val mockSession: Session = mockk(relaxed = true)
+        setPrivateField(viewModel, "session", mockSession)
+        setPrivateField(viewModel, "isSessionResumed", true)
+
+        // MainActivity.onDestroy on a finishing activity: viewModelScope is already cancelled, which
+        // used to swallow this teardown entirely (Session.close never ran).
+        viewModel.viewModelScope.cancel()
         viewModel.destroyArSession()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        // The only observable effect of a no-session cleanup: the destroying latch
-        // (performFullCleanupLocked's own `isDestroying = true` at its top) must be released again,
-        // not left stuck true — which would otherwise wedge every future onDrawFrame's isDestroying
-        // check into early-returning forever.
-        assertFalse(getPrivateField(viewModel, "isDestroying") as Boolean)
+        verify(exactly = 1) { mockSession.pause() }
+        verify(exactly = 1) { mockSession.close() }
+        assertNull(getPrivateField(viewModel, "session"))
+        assertFalse(getPrivateField(viewModel, "isSessionResumed") as Boolean)
     }
 
     // --- retryOnLockTimeout (finding #2 / #8) ---

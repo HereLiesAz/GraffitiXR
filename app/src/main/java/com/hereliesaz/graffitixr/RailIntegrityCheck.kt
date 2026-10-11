@@ -8,7 +8,9 @@ import com.hereliesaz.graffitixr.common.model.EditorMode
  * by call-site BuildConfig.DEBUG gate (see MainActivity).
  *
  * (1) All registered IDs are unique.
- * (2) Every sub-item's hostId matches a registered host (FATAL).
+ * (2) Every sub-item's hostId matches a registered host (FATAL). The hostIds checked are the ones
+ *     the rail actually registers: ConfigureRailItems takes each from [RAIL_ITEM_HOST_ID] through
+ *     [railHostOf] rather than restating it as a literal.
  * (3) Every helpList key matches a registered rail-item ID (WARN).
  * (4) Every static guidance highlight id matches a registered rail-item ID (WARN) — catches the
  *     class of bug where an edge points at a renamed/removed item (e.g. the old `mode.mockup.wall`,
@@ -53,8 +55,8 @@ internal object RailIntegrityCheck {
                 error(
                     "Rail wiring error: '$childId' declares hostId=\"$hostId\", but no item with " +
                         "that id is registered for mode $mode. The sub-item would silently fail to " +
-                        "render. Fix the hostId in ConfigureRailItems (MainActivity.kt) or its " +
-                        "mirror in RAIL_ITEM_HOST_ID (RailIdEnumerator.kt)."
+                        "render. Fix its entry in RAIL_ITEM_HOST_ID (RailIdEnumerator.kt), which " +
+                        "ConfigureRailItems reads every hostId from via railHostOf()."
                 )
             }
         }

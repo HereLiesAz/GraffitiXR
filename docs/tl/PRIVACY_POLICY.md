@@ -13,8 +13,8 @@ Kung pipiliin mong gamitin ang aming Serbisyo, sumasang-ayon ka sa pangongolekta
 Para sa isang mas mahusay na karanasan, habang ginagamit ang aming Serbisyo, maaari naming hilingin sa iyo na magbigay sa amin ng ilang personal na nakakapagpakilalang impormasyon, kabilang ngunit hindi limitado sa:
 
 * **Data ng Camera:** Nangangailangan ang app ng access sa camera ng iyong device upang ipakita ang view ng Augmented Reality (AR), Overlay mode, at para kumuha ng mga larawan para sa mga target ng proyekto. Lokal na pinoproseso ang data ng camera sa iyong device at hindi ipinapadala sa aming mga server maliban kung tahasan mong pipiliin na magbahagi ng project file.
-* **Storage / Mga Larawan:** Nangangailangan kami ng access sa storage ng iyong device (Basahin/Isulat ang External Storage o Photo Library) para mag-load ng mga larawan para sa mga overlay, i-save ang iyong mga proyekto, at i-export ang mga nakunan na larawan.
-* **Data ng Lokasyon (Opsyonal):** Kung magbibigay ka ng mga pahintulot sa lokasyon, maaaring mangolekta ang app ng data ng GPS (latitude, longitude, altitude) upang i-geotag ang iyong mga proyekto. Ang data na ito ay lokal na nai-save sa loob ng iyong mga file ng proyekto.
+* **Storage / Mga Larawan:** Walang hinihinging pahintulot sa storage ang app. Ang mga larawang idinadagdag mo ay dumarating sa pamamagitan ng photo picker o file picker ng Android system, na nagbibigay sa app ng access lamang sa file na pinili mo. Ang mga proyekto ay sine-save sa pribadong storage ng app, at ang mga na-export na larawan ay sine-save sa photo gallery ng iyong device.
+* **Data ng Lokasyon (Opsyonal):** Humihingi lamang ang app ng pahintulot sa lokasyon kapag sinimulan mong kumuha ng AR target. Kung ibibigay mo ito, itinatala ng capture record ng target na iyon kung saan ito kinuha (latitude, longitude, altitude at katumpakan). Lokal itong sine-save sa project file at aalis lamang sa iyong device kung ikaw mismo ang magbabahagi o mag-e-export ng project file na iyon.
 
 ## Mga Ulat ng Pag-crash (Opt-In)
 
@@ -42,9 +42,9 @@ Maaari kaming gumamit ng mga third-party na kumpanya at indibidwal dahil sa mga 
 
 Ginagamit namin ang **Google ML Kit** para sa pagse-segment ng paksa (pag-alis ng background). Nangyayari ang pagproseso na ito nang lokal sa iyong device.
 
-## Pagsusuri ng mga Update
+## Mga Update
 
-May "Suriin ang mga update" na button sa Settings screen. Walang awtomatikong sinusuri — tanging kapag pinindot mo ito. Ang pagpindot dito ay gumagawa ng kahilingan sa **GitHub API** (api.github.com) para tingnan ang pinakabagong release ng proyektong ito. Ang GitHub ay isang third party na nasa labas ng aming kontrol, at makikita ng GitHub ang iyong IP address sa buong tagal ng isang kahilingang iyon, kagaya lang ng anumang web request na gagawin mo sa github.com. Walang ibang impormasyon ang ipinapadala bilang bahagi ng kahilingang ito.
+Hindi kailanman kumokonekta ang app sa isang server para tumingin ng mga update. May "Buksan ang pahina ng mga release" sa Settings screen; ang pagpindot dito ay nagbubukas ng pahina ng mga release ng proyektong ito sa GitHub (github.com/HereLiesAz/GraffitiXR/releases) sa iyong browser, na para bang ikaw mismo ang sumunod sa link. Walang ipinapadala ang app mismo.
 
 ## Seguridad
 

@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -29,7 +28,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -38,7 +36,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,7 +51,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.hereliesaz.aznavrail.AzButton
-import com.hereliesaz.aznavrail.AzLoad
 import com.hereliesaz.graffitixr.common.model.AppLanguage
 import com.hereliesaz.graffitixr.common.model.CoverageGlowAppearance
 import com.hereliesaz.graffitixr.common.model.CoverageGlowColor
@@ -74,9 +70,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 @Composable
 fun SettingsScreen(
     currentVersion: String,
-    updateStatus: String?,
-    updateUrl: String?,
-    isCheckingForUpdate: Boolean,
+    releasesPageError: String?,
     currentLanguage: AppLanguage,
     onLanguageChanged: (AppLanguage) -> Unit,
     isRightHanded: Boolean,
@@ -123,8 +117,7 @@ fun SettingsScreen(
     onCoverageGlowColorChanged: (Int) -> Unit,
     onCoverageGlowIntensityChanged: (Float) -> Unit,
     onCoverageGlowStyleChanged: (CoverageGlowStyle) -> Unit,
-    onCheckForUpdates: () -> Unit,
-    onOpenUpdatePage: () -> Unit,
+    onOpenReleasesPage: () -> Unit,
     onResetTutorials: () -> Unit,
     onClose: () -> Unit,
     strings: AppStrings
@@ -138,23 +131,10 @@ fun SettingsScreen(
     var cameraPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
-    // Same stale-value bug as camera above: POST_NOTIFICATIONS was computed as a bare `val` at render
-    // time, so it never refreshed after the user granted/revoked it in App Settings and returned here
-    // without some unrelated recomposition also happening to fire. Give it the same remembered state +
-    // ON_RESUME refresh as camera.
-    var notificationPermission by remember {
-        mutableStateOf(
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        )
-    }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 cameraPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    notificationPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -309,11 +289,10 @@ fun SettingsScreen(
                             )
                             // Off by default and must ask, not assume. On a crash, the report (device
                             // model + recent logcat) goes to this project's PUBLIC GitHub issue
-                            // tracker — never silently, and never anywhere else. This is the only
-                            // *consent-gated* network call the app makes; separately, and without a
-                            // toggle, opening Settings also fires an unconditional update check
-                            // against api.github.com (see the LaunchedEffect above) — that one isn't
-                            // covered by this setting.
+                            // tracker — never silently, and never anywhere else. Apart from co-op
+                            // sessions the artist starts, this is the only network call the app
+                            // makes: there is no update check (Updates below just opens the
+                            // releases page in the browser when tapped).
                             Text(
                                 text = "On a crash, send the device model and recent logs to a public bug report? Off by default.",
                                 color = Color.Gray,
@@ -378,10 +357,11 @@ fun SettingsScreen(
                                 value = if (arCoreDepthEnabled) strings.settings.on else strings.settings.off,
                                 modifier = Modifier.clickable { onArCoreDepthEnabledChanged(!arCoreDepthEnabled) }
                             )
-                            // Monocular depth (MiDaS Small) — depth source for any device that
-                            // can't get ARCore's Depth API (no ARCore, ARCore off, or ARCore depth off);
-                            // default on, dormant when ARCore depth is active. Beta: Step 1 runs a
-                            // self-test as soon as it's needed, whose result shows in the diag overlay.
+                            // Monocular depth (MiDaS Small) — standalone (non-ARCore) backend only:
+                            // calibrates the sphere map's point radii while the feature map builds.
+                            // Default on; never loaded on the ARCore backend (MiDaS depth is relative,
+                            // so it can't stand in for ARCore depth). A self-test runs when it loads;
+                            // its result shows in the diag overlay.
                             SettingsItem(
                                 label = "Monocular depth (beta)",
                                 value = if (monocularDepthEnabled) strings.settings.on else strings.settings.off,
@@ -514,51 +494,36 @@ fun SettingsScreen(
                             )
                         }
 
-                        // Updates Section
+                        // Updates Section. The app never contacts a server to look for updates
+                        // (docs/en/PRIVACY_POLICY.md); this only opens the public releases page in the
+                        // browser, on tap.
                         item {
                             SettingsSectionTitle(strings.settings.updates)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(
+                                        onClick = onOpenReleasesPage,
+                                        role = Role.Button,
+                                        onClickLabel = strings.settings.openReleases,
+                                    )
                             ) {
-                                val isUpdateAvailable = updateUrl != null
-                                Column(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clickable(
-                                            enabled = isUpdateAvailable,
-                                            onClick = onOpenUpdatePage,
-                                            role = Role.Button,
-                                            onClickLabel = strings.settings.getUpdate
-                                        )
-                                ) {
-                                    Text(text = strings.settings.checkUpdates, fontWeight = FontWeight.Medium)
-                                    if (updateStatus != null) {
-                                        Text(
-                                            text = updateStatus,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = if(isUpdateAvailable) MaterialTheme.colorScheme.primary else Color.Gray
-                                        )
-                                    }
-                                }
-                                IconButton(onClick = onCheckForUpdates, enabled = !isCheckingForUpdate) {
-                                    if (isCheckingForUpdate) {
-                                        AzLoad()
-                                    } else {
-                                        Icon(Icons.Default.Refresh, contentDescription = strings.settings.checkUpdates)
-                                    }
-                                }
+                                Text(text = strings.settings.openReleases, fontWeight = FontWeight.Medium)
+                                Text(
+                                    text = releasesPageError ?: RELEASES_PAGE_DISPLAY,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.Gray,
+                                )
                             }
                         }
 
-                        // Permissions Section (User can accept/revoke via App Settings)
+                        // Permissions Section (User can accept/revoke via App Settings). Only
+                        // permissions the app actually declares: there is no notification row
+                        // because the merged manifest has no POST_NOTIFICATIONS — the app posts no
+                        // notifications, so the row could only ever read "not granted".
                         item {
                             SettingsSectionTitle(strings.settings.permissions)
                             PermissionItem(name = strings.settings.cameraAccess, isGranted = cameraPermission, onClick = openAppSettings, strings = strings)
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                PermissionItem(name = strings.settings.notifications, isGranted = notificationPermission, onClick = openAppSettings, strings = strings)
-                            }
                         }
                     }
 
@@ -749,3 +714,6 @@ fun PermissionItem(name: String, isGranted: Boolean, onClick: () -> Unit, string
         )
     }
 }
+
+/** Where Updates ▸ releases page goes, shown under the row (not translated: it is a URL). */
+private const val RELEASES_PAGE_DISPLAY = "github.com/HereLiesAz/GraffitiXR/releases"

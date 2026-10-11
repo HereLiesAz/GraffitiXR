@@ -805,4 +805,139 @@ class EditorViewModelTest {
         assertEquals(!before, viewModel.uiState.value.isRightHanded)
         coVerify { settingsRepository.setRightHanded(!before) }
     }
+
+    // ==================== Magic in AR / per-mode co-op ops ====================
+
+    private fun modeOp(mode: EditorMode) =
+        com.hereliesaz.graffitixr.common.model.Op.ModeTransform(
+            mode.name,
+            viewModel.uiState.value.modeAdjustments[mode] ?: ModeAdjustment(),
+        )
+
+    @Test
+    fun `Magic in AR fits only the AR adjustment to the anchor and emits it`() = runTest {
+        // Quad half-width 0.5 m at scale 1; the 100x100 test bitmap makes the quad 0.5 x 0.5 m.
+        currentProjectFlow.value = GraffitiProject(id = "test-project", arDesignHalfWidthM = 0.5f)
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.setEditorMode(EditorMode.AR)
+        addDesign()
+        val designBefore = viewModel.uiState.value.design!!
+        viewModel.setAnchorExtent(1.0f, 0.25f)
+        io.mockk.clearMocks(opEmitter, answers = false)
+
+        viewModel.onMagicClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val ar = viewModel.uiState.value.modeAdjustments[EditorMode.AR]!!
+        // 80% of the tighter axis: 0.8 * min(1.0 / 0.5, 0.25 / 0.5) = 0.4
+        assertEquals(0.4f, ar.scale, 1e-4f)
+        assertEquals(0f, ar.offsetX, 0f)
+        assertEquals(0f, ar.offsetY, 0f)
+        val designAfter = viewModel.uiState.value.design!!
+        assertEquals("the global design transform must not move", designBefore.scale, designAfter.scale, 0f)
+        assertEquals(designBefore.offset, designAfter.offset)
+        io.mockk.verify(exactly = 1) { opEmitter.emit(modeOp(EditorMode.AR)) }
+
+        viewModel.onUndoClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(1f, viewModel.uiState.value.modeAdjustments[EditorMode.AR]?.scale ?: 1f, 1e-4f)
+    }
+
+    @Test
+    fun `Magic outside AR ignores the anchor extent and tones the active mode`() = runTest {
+        currentProjectFlow.value = GraffitiProject(id = "test-project", arDesignHalfWidthM = 0.5f)
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.setEditorMode(EditorMode.OVERLAY)
+        addDesign()
+        viewModel.setAnchorExtent(1.0f, 1.0f)
+        val designScale = viewModel.uiState.value.design!!.scale
+        io.mockk.clearMocks(opEmitter, answers = false)
+
+        viewModel.onMagicClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val overlay = viewModel.uiState.value.modeAdjustments[EditorMode.OVERLAY]!!
+        assertEquals(1.2f, overlay.contrast, 1e-4f)
+        assertEquals(1f, overlay.scale, 0f)
+        assertEquals(designScale, viewModel.uiState.value.design!!.scale, 0f)
+        io.mockk.verify(exactly = 1) { opEmitter.emit(modeOp(EditorMode.OVERLAY)) }
+    }
+
+    @Test
+    fun `a mode knob edit emits the mode adjustment to peers`() = runTest {
+        viewModel.setEditorMode(EditorMode.TRACE)
+        addDesign()
+        io.mockk.clearMocks(opEmitter, answers = false)
+        viewModel.onAdjustmentStart()
+        viewModel.onOpacityChanged(0.3f)
+        viewModel.onAdjustmentEnd()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(0.3f, viewModel.uiState.value.modeAdjustments[EditorMode.TRACE]!!.opacity, 0f)
+        io.mockk.verify(exactly = 1) {
+            opEmitter.emit(com.hereliesaz.graffitixr.common.model.Op.ModeTransform("TRACE", ModeAdjustment(opacity = 0.3f)))
+        }
+    }
+
+    @Test
+    fun `mode reset and mode lock emit the mode adjustment to peers`() = runTest {
+        viewModel.setEditorMode(EditorMode.MOCKUP)
+        addDesign()
+        viewModel.onGestureStart()
+        viewModel.onModeTransformGesture(EditorMode.MOCKUP, Offset(10f, 0f), 2f, 0f)
+        viewModel.onGestureEnd()
+        testDispatcher.scheduler.advanceUntilIdle()
+        io.mockk.clearMocks(opEmitter, answers = false)
+
+        viewModel.onResetClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        io.mockk.verify(exactly = 1) {
+            opEmitter.emit(com.hereliesaz.graffitixr.common.model.Op.ModeTransform("MOCKUP", ModeAdjustment()))
+        }
+
+        viewModel.onToggleModeTransformLocked(EditorMode.MOCKUP)
+        testDispatcher.scheduler.advanceUntilIdle()
+        io.mockk.verify(exactly = 1) {
+            opEmitter.emit(
+                com.hereliesaz.graffitixr.common.model.Op.ModeTransform("MOCKUP", ModeAdjustment(isTransformLocked = true)),
+            )
+        }
+    }
+
+    @Test
+    fun `applyArFit emits the fitted AR adjustment`() = runTest {
+        viewModel.setEditorMode(EditorMode.AR)
+        addDesign()
+        io.mockk.clearMocks(opEmitter, answers = false)
+        viewModel.applyArFit(dx = 0.1f, dy = 0f, dThetaRad = 0f, scaleRatio = 2f)
+        testDispatcher.scheduler.advanceUntilIdle()
+        io.mockk.verify(exactly = 1) { opEmitter.emit(modeOp(EditorMode.AR)) }
+        assertEquals(2f, viewModel.uiState.value.modeAdjustments[EditorMode.AR]!!.scale, 1e-4f)
+    }
+
+    @Test
+    fun `autoTuneActiveLayer is one undoable, saved, emitted step`() = runTest {
+        viewModel.setEditorMode(EditorMode.AR)
+        addDesign()
+        val scaled = mockk<Bitmap>(relaxed = true)
+        every { scaled.width } returns 64
+        every { scaled.height } returns 64
+        every { Bitmap.createScaledBitmap(any(), any(), any(), any()) } returns scaled
+        val undoBefore = viewModel.uiState.value.undoCount
+        io.mockk.clearMocks(opEmitter, projectRepository, answers = false)
+
+        val wall = com.hereliesaz.graffitixr.common.util.ImageStats(200f, 120f, 80f, 140f, 50f)
+        viewModel.autoTuneActiveLayer(wall)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(undoBefore + 1, viewModel.uiState.value.undoCount)
+        val ar = viewModel.uiState.value.modeAdjustments[EditorMode.AR]!!
+        assertTrue("auto-tune sets a sub-1 opacity", ar.opacity < 1f)
+        coVerify { projectRepository.updateProject(any<(GraffitiProject) -> GraffitiProject>()) }
+        io.mockk.verify(exactly = 1) { opEmitter.emit(modeOp(EditorMode.AR)) }
+        io.mockk.verify { opEmitter.emit(ofType<com.hereliesaz.graffitixr.common.model.Op.DesignProps>()) }
+
+        viewModel.onUndoClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(1f, viewModel.uiState.value.modeAdjustments[EditorMode.AR]?.opacity ?: 1f, 0f)
+    }
 }

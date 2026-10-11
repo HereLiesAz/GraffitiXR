@@ -1,5 +1,60 @@
 # SphereSLAM Implementation TODO
 
+## SphereSLAM 0.25.0 — photosphere localization, held pose, stations, tile depth (adopted)
+
+The app consumes SphereSLAM **0.25.0** (tag `0.25.0`).
+
+- [x] The artwork no longer vanishes when the wall leaves view: past the 400 ms bridge SphereSLAM
+  returns `PoseSource.PHOTOSPHERE` (gyro rotation corrected by recognised photosphere tiles, at the
+  latest camera centre) or `HELD` (gyro-carried last lock); the app maps them to
+  `SphereSlamStandalonePoseSource.PHOTOSPHERE` / `HELD` and renders them, also while a relock is
+  confirming.
+- [x] Stations: stepping more than 0.3 m (metric reference) / 0.3 reference widths from every
+  standpoint opens a new photosphere; earlier ones are kept and cross-station tiles are triangulated
+  for 6-DoF fixes. All library-side; nothing in the app.
+- [x] MiDaS per new tile: the analyzer passes its `DepthEstimator` as the session's
+  `TileDepthSource` (synchronized; shared with the existing depth worker).
+- [x] Tile localization needs OpenCV, which the analyzer already loads (flow tracking).
+
+Device checks owed for 0.25.0:
+
+- [ ] Turn away from the wall and back: the artwork stays where the wall is (diagnostics:
+  `poseSource=PHOTOSPHERE`, `tiles{… rotFixes>0}` in the periodic KPM line) and relocks without a jump.
+- [ ] Step sideways 0.5 m and look around: `SphereSLAM station 1 opened`; with the wall out of view the
+  artwork stays placed (`poseFixes>0` once tiles from two stations overlap, or with MiDaS depth).
+- [ ] Analyzer frame rate unchanged with tile localization running (it is a 4 Hz background job).
+
+## SphereSLAM 0.24.6 — seen tiles persist, KPM gates restored (adopted)
+
+The app consumes SphereSLAM **0.24.6** (tag `0.24.6`; 0.24.4 audit fixes plus HereLiesAz/SphereSLAM#33).
+It compiles unchanged; what changed underneath:
+
+- [x] Every tile a keyframe's frame covers (≥ 60 % in frame) is marked current, not only the tile
+  under the view axis: scanned areas no longer glow again once they leave the screen.
+- [x] KPM reprojection error is back in the matcher's (downscaled) pixels. 0.24.4 had reported it
+  ×factor² against unchanged gates — acceptance and atlas growth 4× stricter, so the atlas barely
+  grew and relocks were rejected.
+- [x] Grown atlas pages are kept by the app when the page set is re-sent
+  (`withGrownAtlasPages`); SphereSLAM rebuilds from exactly the set it is given.
+- [x] `REFERENCE_TOO_WEAK` no longer kills the session (only the precision layer halts;
+  `isRecoverable`). The app still stops feeding the analyzer on any fatal and restarts it on
+  restore/recapture (`standaloneFatalRecovery`), which stays correct.
+- [x] libc++ linked statically in the AARs; `app/build.gradle.kts` keeps its
+  `pickFirsts += "**/libc++_shared.so"` for the other native dependencies.
+- [x] `superpoint.onnx` in `:models` is byte-identical to the app's `core/nativebridge` asset.
+
+Open:
+
+- [ ] The artwork is held by the gyro bridge for only 400 ms (`maxBridgeMs`) after the wall leaves
+  view, then hidden until a visual relock, although the base photosphere pose is computed every
+  frame. Holding it on the base pose while off-wall is proposed, not adopted.
+
+Device checks owed for 0.24.6:
+
+- [ ] Pan across the wall and back: the area seen stays clear of the glow (edges aside).
+- [ ] Atlas growth lines (`atlas page persisted`) appear while panning; relock on return is quick.
+- [ ] Swapping the wall target re-confirms before `LOCKED`; no overlay swing-back after a bridge.
+
 ## SphereSLAM 0.24.3 — display-rate glow and artwork, faster tracking, GPU depth (app half)
 
 The app now consumes SphereSLAM **0.24.3** (tag `0.24.3`). The app-facing API is additive; the

@@ -77,12 +77,10 @@
     <string name="settings_info_section">Informations sur l\'application</string>
     <string name="settings_version_label">Version</string>
     <string name="settings_updates_section">Mises à jour</string>
-    <string name="settings_check_updates_label">Vérifier les mises à jour expérimentales</string>
-    <string name="settings_install_update_label">Installer la mise à jour</string>
+    <string name="settings_open_releases_label">Ouvrir la page des versions</string>
     <string name="settings_permissions_section">Permissions</string>
     <string name="settings_camera_access">Accès à l\'appareil photo</string>
     <string name="settings_photo_access">Accès à la galerie photo</string>
-    <string name="settings_notifications">Notifications</string>
     <string name="settings_granted">Accordé</string>
     <string name="settings_denied">Refusé</string>
     <string name="settings_open_app_settings">Ouvrir les paramètres de l\'application</string>
@@ -118,6 +116,7 @@
     <string name="scan_hint_build_map">Marchez à gauche et à droite pour construire la carte</string>
     <string name="scan_hint_closer">Rapprochez-vous du mur</string>
     <string name="scan_hint_higher_lower">Scannez plus haut et plus bas</string>
+    <string name="reacquiring_target">Recherche de la cible…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Maquette d\'arrière-plan</string>
@@ -230,9 +229,6 @@
     <string name="plane_confirm_question">L\'œuvre est-elle sur le bon mur ?</string>
     <string name="looks_correct">Semble correct</string>
     <string name="redetect">Redétecter</string>
-    <string name="plane_realignment_title">Redétecter la surface du mur</string>
-    <string name="plane_realignment_text">L\'ancre est placée à partir de là où vous étiez lors de la capture. ARCore choisit la surface verticale suivie la plus directement devant cette position d\'origine.\n\n1. Retournez approximativement là où vous étiez lors de la capture\n2. Faites un panoramique lent de la caméra sur le mur de votre fresque pour qu\'ARCore puisse l\'enregistrer comme une surface plane\n3. Restez stable face à l\'œuvre, puis appuyez ci-dessous\n\nLa bordure orange sautera vers la surface nouvellement détectée.</string>
-    <string name="use_this_wall">Utiliser ce mur</string>
     <string name="scanning_dots">Analyse en cours\u2026</string>
     <string name="matched_percent">%1$d%% peint</string>
     <string name="anchor_locked">Ancre verrouillée</string>

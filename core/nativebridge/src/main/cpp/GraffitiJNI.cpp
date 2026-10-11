@@ -1417,7 +1417,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDetectSuperPoint(
     if (image.empty()) return nullptr;
     std::vector<cv::KeyPoint> kps; cv::Mat descs;
     {
-        std::lock_guard<std::mutex> lock(gSlamEngine->getMutex());
+        // NOT under the engine's mMutex. getSuperPointFeatures reads no mMutex-guarded state: it
+        // touches only mSuperPoint / mEnhancer (each serialized by its OWN internal mutex, which is
+        // also what protects them against the reloc worker, a thread that never takes mMutex for
+        // them) and the atomic mLightLevel. Holding mMutex here only stalled every mMutex user --
+        // the reloc pass's snapshots, updateCamera on the render thread -- for the length of an
+        // ONNX forward pass (two, with the low-light enhancer), protecting nothing.
+        // tools/check_native_locking.py keeps that claim honest for the MobileGS:: side.
         bool ok = false;
         try {
             ok = gSlamEngine->getSuperPointFeatures(image, kps, descs);
@@ -1455,7 +1461,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintKeyp
     if (mask) bitmapToMat(env, mask, maskMat);
     std::vector<cv::Point2f> pts;
     {
-        std::lock_guard<std::mutex> lock(gSlamEngine->getMutex());
+        // Not under mMutex, for the same reason as nativeDetectSuperPoint above:
+        // getFingerprintKeypoints touches only the self-locking mSuperPoint/mEnhancer and atomics.
         try {
             gSlamEngine->getFingerprintKeypoints(image, maskMat, pts);
         } catch (const std::exception& e) {

@@ -103,9 +103,6 @@
     <string name="plane_confirm_question">Nasa dingding ba ang likhang sining?</string>
     <string name="looks_correct">Mukhang tama</string>
     <string name="redetect">Re-detect</string>
-    <string name="plane_realignment_title">Muling i-detect ang Wall Surface</string>
-    <string name="plane_realignment_text">Ang anchor ay inilagay mula sa kung saan ka nakatayo noong nakunan mo. Pinipili ng ARCore ang sinusubaybayang patayong ibabaw nang direkta sa harap ng orihinal na posisyong iyon.\n\n1.Bumalik sa humigit-kumulang kung saan ka nakatayo habang kumukuha\n2.Dahan-dahang i-pan ang camera sa iyong mural wall para mairehistro ito ng ARCore bilang flat surface\n3.Manatiling nakaharap sa likhang sining, pagkatapos ay mag-tap sa ibaba\n\nTalon ang orange na hangganan sa bagong nakitang ibabaw.</string>
-    <string name="use_this_wall">Gamitin ang Pader na Ito</string>
     <string name="scanning_dots">Nag-ii-scan\u2026</string>
     <string name="matched_percent">%1$d%% napintahan</string>
     <string name="anchor_locked">Naka-lock ang anchor</string>
@@ -178,12 +175,10 @@
     <string name="settings_info_section">Impormasyon ng App</string>
     <string name="settings_version_label">Bersyon</string>
     <string name="settings_updates_section">Mga update</string>
-    <string name="settings_check_updates_label">Tingnan kung may mga pang-eksperimentong update</string>
-    <string name="settings_install_update_label">I-install ang Update</string>
+    <string name="settings_open_releases_label">Buksan ang pahina ng mga release</string>
     <string name="settings_permissions_section">Mga Pahintulot</string>
     <string name="settings_camera_access">Access sa Camera</string>
     <string name="settings_photo_access">Access sa Photo Library</string>
-    <string name="settings_notifications">Mga abiso</string>
     <string name="settings_granted">ipinagkaloob</string>
     <string name="settings_denied">Tinanggihan</string>
     <string name="settings_open_app_settings">Buksan ang Mga Setting ng App</string>
@@ -211,6 +206,7 @@
     <string name="scan_hint_build_map">Maglakad pakaliwa at pakanan upang bumuo ng mapa</string>
     <string name="scan_hint_closer">Lumapit sa pader</string>
     <string name="scan_hint_higher_lower">I-scan ang mas mataas at mas mababa</string>
+    <string name="reacquiring_target">Hinahanap muli ang target…</string>
     <string name="desc_bg_mockup">Background Mockup</string>
     <string name="desc_segmentation_preview">Preview ng Segmentation</string>
     <string name="help_mode_host">Mode Switcher: Lumipat sa pagitan ng mga mode ng app. Mga Tagubilin: I-tap para palawakin, pagkatapos ay piliin ang AR, Overlay, Mockup, o Lightbox.</string>

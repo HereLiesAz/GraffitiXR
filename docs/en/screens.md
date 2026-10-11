@@ -57,7 +57,7 @@ Full-screen bottom sheet over the main viewport. Lists saved `.gxr` projects; su
 *   Diagnostic overlay, feature points, plane grids, points perception toggles.
 *   Drift correction, self-grow, and feature-map relocalization diagnostics toggles (all off by default).
 *   Crash reporting consent (opt-in, off by default).
-*   Version info and update check (user-triggered GitHub API call).
+*   Version info, and a link that opens the GitHub releases page in the browser (the app itself never checks for updates).
 
 ---
 

@@ -61,7 +61,7 @@ class CrashUploadWorker {
             }
             val issue = GitHubIssue(
                 title = title,
-                body = "$intro\n\n```\n$report\n```"
+                body = buildIssueBody(intro, report),
             )
 
             val response = service.createIssue(
@@ -81,6 +81,64 @@ class CrashUploadWorker {
         } catch (e: Exception) {
             Log.e("CrashUploadWorker", "Failed to upload to GitHub", e)
             false
+        }
+    }
+
+    companion object {
+        /**
+         * GitHub's maximum issue body length, in characters. A longer body is refused with HTTP 422
+         * ("body is too long"), and a JVM report carries up to 1000 lines of logcat, which routinely
+         * exceeds it.
+         */
+        const val GITHUB_BODY_LIMIT = 65_536
+
+        // Headroom for the intro and code fence, and for the limit being counted in a unit other
+        // than UTF-16 chars: anything non-BMP in the logcat is two chars here and may count once
+        // or twice there.
+        private const val BODY_HEADROOM = 1_024
+        private const val LOGCAT_MARKER = "\nLOGCAT:\n"
+
+        /** The issue body: [intro] plus [report] in a code block, fitted under [limit]. */
+        fun buildIssueBody(intro: String, report: String, limit: Int = GITHUB_BODY_LIMIT): String {
+            val open = "$intro\n\n```\n"
+            val close = "\n```"
+            val budget = (limit - BODY_HEADROOM - open.length - close.length).coerceAtLeast(0)
+            return open + fitReport(report, budget) + close
+        }
+
+        /**
+         * Shorten [report] to at most [maxChars] while keeping what diagnoses a crash: the header
+         * (FATAL / device / version) and the stack trace in full when they fit in three quarters of
+         * the budget, then the TAIL of the logcat — the lines nearest the crash — with a note of
+         * how much was cut. A report with no logcat section (the native backtrace) keeps its head
+         * and tail. Unchanged when it already fits.
+         */
+        fun fitReport(report: String, maxChars: Int): String {
+            if (report.length <= maxChars) return report
+            if (maxChars <= 0) return ""
+            val headCap = maxChars * 3 / 4
+            val split = report.indexOf(LOGCAT_MARKER)
+            // Head = header + stack trace up to and including the LOGCAT: line; for a report with
+            // no logcat section, simply its first three quarters.
+            val headEnd = if (split >= 0) split + LOGCAT_MARKER.length else headCap
+            var head = report.substring(0, headEnd)
+            if (head.length > headCap) {
+                // A pathological trace (deep recursion): keep its top, which names the crash site.
+                val suffix = if (split >= 0) LOGCAT_MARKER.trimStart('\n') else ""
+                val note = "\n[... ${head.length - headCap} characters of the trace omitted ...]\n"
+                head = head.substring(0, (headCap - note.length - suffix.length).coerceAtLeast(0)) +
+                    note + suffix
+            }
+            val rest = report.substring(headEnd)
+            val room = maxChars - head.length
+            if (rest.length <= room) return head + rest
+            // Keep the END of the rest (the log lines nearest the crash), starting on a whole line.
+            val note = "[... ${rest.length} characters before this point omitted to fit GitHub's limit ...]\n"
+            var start = rest.length - (room - note.length).coerceAtLeast(0)
+            val nl = rest.indexOf('\n', start)
+            if (nl in start until rest.length - 1) start = nl + 1
+            val omitted = "[... $start characters before this point omitted to fit GitHub's limit ...]\n"
+            return (head + omitted + rest.substring(start)).take(maxChars)
         }
     }
 }

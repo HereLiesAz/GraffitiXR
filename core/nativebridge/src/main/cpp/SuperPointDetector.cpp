@@ -9,6 +9,24 @@
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "SuperPoint", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "SuperPoint", __VA_ARGS__)
 
+SuperPointDetector::InputGeometry SuperPointDetector::inputGeometry(int w, int h, int maxSide) {
+    InputGeometry g;
+    if (w <= 0 || h <= 0) return g;
+    if (maxSide < 8) maxSide = 8;
+    const int longest = std::max(w, h);
+    const double s = longest > maxSide ? (double)maxSide / (double)longest : 1.0;
+    g.resized = s < 1.0;
+    g.scaledW = g.resized ? std::max(8, (int)std::lround(w * s)) : w;
+    g.scaledH = g.resized ? std::max(8, (int)std::lround(h * s)) : h;
+    g.netW = (g.scaledW + 7) / 8 * 8;
+    g.netH = (g.scaledH + 7) / 8 * 8;
+    // Per-axis only because rounding to whole pixels perturbs each axis by < 0.5 px; both equal
+    // 1/s to within that rounding, i.e. the mapping back is uniform.
+    g.scaleX = (float)w / (float)g.scaledW;
+    g.scaleY = (float)h / (float)g.scaledH;
+    return g;
+}
+
 bool SuperPointDetector::load(const std::vector<uchar>& onnxBytes) {
     std::lock_guard<std::mutex> lock(mMutex);
     mLoaded = false;
@@ -45,42 +63,40 @@ bool SuperPointDetector::detect(const cv::Mat& gray,
                                 float scoreThresh,
                                 int   maxKps) {
     if (!mLoaded) return false;
-    // A sub-8-pixel-wide/tall input floors (cols/8)*8 to 0 below, which makes cv::resize throw
-    // (Size(0,0), fx=fy=0) from outside the try block a few lines down -- on the reloc worker
-    // thread specifically, nothing catches that and the worker dies silently for the session.
-    // Reject degenerate input up front instead.
+    // Degenerate input: below one 8x8 network cell there is nothing to detect, and the 4-pixel
+    // NMS border in extractKeypoints would leave no interior anyway. Rejected up front (before the
+    // try block) so no OpenCV call is ever handed a zero-sized target.
     if (gray.empty() || gray.cols < 8 || gray.rows < 8) return false;
     std::lock_guard<std::mutex> lock(mMutex);
     if (mNet.empty()) return false;
 
     cv::Mat input;
     cv::Mat resizedMask;
-    float scaleX = 1.0f, scaleY = 1.0f;
+    const InputGeometry geo = inputGeometry(gray.cols, gray.rows);
+    const float scaleX = geo.scaleX, scaleY = geo.scaleY;
 
     try {
-        if (gray.cols > 640 || gray.rows > 480) {
-            int targetW = 640;
-            int targetH = 480;
-            cv::resize(gray, input, cv::Size(targetW, targetH), 0, 0, cv::INTER_AREA);
-            if (!mask.empty()) {
-                cv::resize(mask, resizedMask, cv::Size(targetW, targetH), 0, 0, cv::INTER_NEAREST);
-            }
-            scaleX = (float)gray.cols / (float)targetW;
-            scaleY = (float)gray.rows / (float)targetH;
+        // Aspect-preserving: ONE scale factor for both axes (the old path squashed every input
+        // larger than 640x480 to exactly 640x480, so a portrait 480x640 frame was compressed 1.78x
+        // horizontally and its descriptors were computed on a distorted wall). Then pad, rather
+        // than resize, up to the network stride.
+        cv::Mat content = gray;
+        cv::Mat contentMask = mask;
+        if (geo.resized) {
+            cv::resize(gray, content, cv::Size(geo.scaledW, geo.scaledH), 0, 0, cv::INTER_AREA);
+            if (!mask.empty())
+                cv::resize(mask, contentMask, cv::Size(geo.scaledW, geo.scaledH), 0, 0, cv::INTER_NEAREST);
+        }
+        const int padR = geo.netW - geo.scaledW, padB = geo.netH - geo.scaledH;
+        if (padR > 0 || padB > 0) {
+            // Replicated, not black: a hard black edge is itself a strong corner the network would
+            // fire on. Anything detected in the pad is dropped below regardless.
+            cv::copyMakeBorder(content, input, 0, padB, 0, padR, cv::BORDER_REPLICATE);
+            if (!contentMask.empty())
+                cv::copyMakeBorder(contentMask, resizedMask, 0, padB, 0, padR, cv::BORDER_CONSTANT, cv::Scalar(0));
         } else {
-            int targetW = (gray.cols / 8) * 8;
-            int targetH = (gray.rows / 8) * 8;
-            if (targetW != gray.cols || targetH != gray.rows) {
-                cv::resize(gray, input, cv::Size(targetW, targetH), 0, 0, cv::INTER_AREA);
-                if (!mask.empty()) {
-                    cv::resize(mask, resizedMask, cv::Size(targetW, targetH), 0, 0, cv::INTER_NEAREST);
-                }
-                scaleX = (float)gray.cols / (float)targetW;
-                scaleY = (float)gray.rows / (float)targetH;
-            } else {
-                input = gray;
-                resizedMask = mask;
-            }
+            input = content;
+            resizedMask = contentMask;
         }
 
         cv::Mat f;
@@ -121,7 +137,19 @@ bool SuperPointDetector::detect(const cv::Mat& gray,
         // so the mask filters the FULL detected set and the true top-K is chosen from what
         // actually survives inside the mask.
         const int extractCap = resizedMask.empty() ? maxKps : std::numeric_limits<int>::max();
-        extractKeypoints(*semiPtr, kps, scoreThresh, extractCap);
+        // Padding pixels are not part of the image. Uncapped when padding exists so the cap below
+        // picks the top-K from real pixels only (same reasoning as the mask above).
+        const bool padded = geo.netW != geo.scaledW || geo.netH != geo.scaledH;
+        extractKeypoints(*semiPtr, kps, scoreThresh,
+                         padded ? std::numeric_limits<int>::max() : extractCap);
+        if (padded) {
+            std::vector<cv::KeyPoint> inside;
+            inside.reserve(kps.size());
+            for (const auto& kp : kps)
+                if (kp.pt.x < (float)geo.scaledW && kp.pt.y < (float)geo.scaledH) inside.push_back(kp);
+            if (resizedMask.empty() && (int)inside.size() > maxKps) inside.resize(maxKps);
+            kps = std::move(inside);
+        }
 
         if (!resizedMask.empty()) {
             std::vector<cv::KeyPoint> filtered;

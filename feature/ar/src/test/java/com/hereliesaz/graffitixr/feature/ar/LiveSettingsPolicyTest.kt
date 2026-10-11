@@ -19,12 +19,12 @@ class LiveSettingsPolicyTest {
     }
 
     @Test
-    fun `monocular depth stays dormant only while ARCore depth is the source`() {
-        assertFalse(isMonocularDepthWanted(true, arCoreOptIn = true, arCoreDepthOptIn = true, arCoreSupported = true))
-        assertTrue(isMonocularDepthWanted(true, arCoreOptIn = false, arCoreDepthOptIn = true, arCoreSupported = true))
-        assertTrue(isMonocularDepthWanted(true, arCoreOptIn = true, arCoreDepthOptIn = false, arCoreSupported = true))
-        assertTrue(isMonocularDepthWanted(true, arCoreOptIn = true, arCoreDepthOptIn = true, arCoreSupported = false))
-        assertFalse(isMonocularDepthWanted(false, arCoreOptIn = false, arCoreDepthOptIn = false, arCoreSupported = false))
+    fun `monocular depth loads only for the standalone backend and only when opted in`() {
+        // ARCore backend: no monocular consumer, whatever ARCore depth is set to.
+        assertFalse(isMonocularDepthWanted(true, arCoreBackendSelected = true))
+        assertTrue(isMonocularDepthWanted(true, arCoreBackendSelected = false))
+        assertFalse(isMonocularDepthWanted(false, arCoreBackendSelected = false))
+        assertFalse(isMonocularDepthWanted(false, arCoreBackendSelected = true))
     }
 
     @Test

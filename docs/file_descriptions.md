@@ -59,12 +59,16 @@ This document lists key files in the repository and their purposes.
     `docs/DISTORTION_HEAD.md`.
 *   `src/main/cpp/SuperPointDetector.cpp`: ONNX SuperPoint keypoint/descriptor detector, used as an
     alternative to ORB in the relocalization and fingerprint-building paths.
+*   `src/main/assets/superpoint.onnx` + `superpoint.LICENSE.txt`: SuperPoint weights from
+    rpautrat/SuperPoint (`superpoint_v6_from_tf.pth`, MIT, © 2018 Paul-Edouard Sarlin & Rémi
+    Pautrat) — not Magic Leap's. `src/main/assets/zerodce.onnx`: low-light model trained
+    independently by the project author. Provenance and licenses: `docs/MODELS.md`.
 *   `src/main/cpp/LowLightEnhancer.cpp`: Low-light frame enhancement for feature detection.
 *   `src/main/cpp/MlasStub.cpp`: Build-time stub patching a missing ONNX Runtime symbol.
 
 ### SphereSLAM (published dependency)
 
-SphereSLAM 0.24.3 public API baseline: GraffitiXR consumes the supported planar/coverage surface
+SphereSLAM 0.25.0 public API baseline: GraffitiXR consumes the supported planar/coverage surface
 and toolkit packages, and explicitly opts into the experimental `:reloc` and `:models` surfaces while
 preserving its existing `Standalone*` aliases.
 
@@ -181,8 +185,8 @@ the real (non-stub) tracker is packaged.
     `GameRotationAttitudeSource`), publishes the per-frame pure-rotation screen homography
     (SphereSLAM `gyro.GyroCompensationMath`; screen intrinsics for the `FILL_CENTER` preview from
     SphereSLAM `camera.CameraFillCenter`) MainScreen draws the Overlay
-    design through, auto-releases past 3°, and runs a slow (15 s) background MiDaS sample (`:models`
-    `DepthEstimator`) of the surface under the design.
+    design through, and auto-releases past 3°. No depth model runs (translation is not measured, so
+    depth would change nothing on screen).
 *   `StandaloneAnalyzerRecovery.kt`: what the standalone overlay does after a fatal analyzer
     (restore the previous target and recreate the analyzer, or report) and the status-pill text.
 *   `StandaloneFrameAttitude.kt`: the capture-time `Frame.attitude` for the tracking session.

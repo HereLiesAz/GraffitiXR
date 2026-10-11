@@ -299,12 +299,6 @@
     <!-- Action to redetect the plane. -->
     <string name="redetect">Neu erkennen</string>
 
-    <!-- Title for plane realignment tool. -->
-    <string name="plane_realignment_title">Wandoberfläche neu erkennen</string>
-    <!-- Instructions for realigning the plane with the wall. -->
-    <string name="plane_realignment_text">Der Anker wird dort platziert, wo Sie bei der Aufnahme standen. ARCore wählt die verfolgte vertikale Oberfläche aus, die sich am direktesten vor dieser ursprünglichen Position befindet.\n\n1. Kehren Sie ungefähr dorthin zurück, wo Sie während der Aufnahme standen.\n2. Schwenken Sie die Kamera langsam über Ihre Wand, damit ARCore sie als flache Oberfläche registrieren kann.\n3. Halten Sie die Kamera ruhig auf das Kunstwerk gerichtet und tippen Sie dann unten.\n\nDer orangefarbene Rand springt auf die neu erkannte Oberfläche.</string>
-    <!-- Action to use the currently detected wall for realignment. -->
-    <string name="use_this_wall">Diese Wand verwenden</string>
 
     <!-- Label shown when scanning for relocation. -->
     <string name="scanning_dots">Scannen\u2026</string>
@@ -393,12 +387,10 @@
     <string name="settings_info_section">App-Informationen</string>
     <string name="settings_version_label">Version</string>
     <string name="settings_updates_section">Updates</string>
-    <string name="settings_check_updates_label">Nach experimentellen Updates suchen</string>
-    <string name="settings_install_update_label">Update installieren</string>
+    <string name="settings_open_releases_label">Release-Seite öffnen</string>
     <string name="settings_permissions_section">Berechtigungen</string>
     <string name="settings_camera_access">Kamerazugriff</string>
     <string name="settings_photo_access">Zugriff auf Fotobibliothek</string>
-    <string name="settings_notifications">Benachrichtigungen</string>
     <string name="settings_granted">Gewährt</string>
     <string name="settings_denied">Verweigert</string>
     <string name="settings_open_app_settings">App-Einstellungen öffnen</string>
@@ -434,6 +426,7 @@
     <string name="scan_hint_build_map">Gehen Sie nach links und rechts, um die Karte zu erstellen</string>
     <string name="scan_hint_closer">Gehen Sie näher an die Wand</string>
     <string name="scan_hint_higher_lower">Scannen Sie höher und niedriger</string>
+    <string name="reacquiring_target">Ziel wird wiedererkannt…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Hintergrund-Mockup</string>

@@ -8,7 +8,6 @@ import io.mockk.mockkObject
 import io.mockk.unmockkObject
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
@@ -61,9 +60,13 @@ class EvalSyncRelocGuardTest {
 
     @Test
     fun `a release build never reaches the native inline-reloc setter`() {
-        // If the `if (debuggable)` guard were removed from the real method, this would also throw
-        // UnsatisfiedLinkError instead of returning normally.
-        slamManager.setEvalSyncRelocIfDebuggable(enabled = true, everyN = 5, debuggable = false)
+        // If the `if (debuggable)` guard were removed from the real method, the call would reach
+        // JNI and throw UnsatisfiedLinkError instead of returning normally.
+        try {
+            slamManager.setEvalSyncRelocIfDebuggable(enabled = true, everyN = 5, debuggable = false)
+        } catch (e: UnsatisfiedLinkError) {
+            fail("the release (debuggable=false) branch reached nativeSetEvalSyncReloc: $e")
+        }
     }
 
     /**
@@ -83,52 +86,12 @@ class EvalSyncRelocGuardTest {
         }
     }
 
-    /**
-     * The cadence arithmetic the native side performs, restated here because getting it wrong is
-     * silent in the worst way.
-     *
-     * `everyN` is floored at 1 natively. Zero divides by zero; negative makes `n % everyN` never
-     * zero, so the mode reports itself ON and never relocalizes — which on a replay looks exactly
-     * like relocalization being broken and gets blamed on whatever parameter the run was varying.
-     * That is the failure this floor exists to prevent, and it is the reason the floor is not merely
-     * defensive tidiness.
-     */
-    @Test
-    fun `the cadence floor turns a nonsense N into every frame, never into no frames`() {
-        for (n in intArrayOf(0, -1, Int.MIN_VALUE)) {
-            val floored = maxOf(1, n)
-            assertEquals("N=$n must floor to 1", 1, floored)
-            // The thing that actually matters: some frame must pass the test.
-            val passes = (1..10).count { it % floored == 0 }
-            assertTrue("N=$n produced a mode that never relocalizes", passes > 0)
-        }
-    }
-
-    @Test
-    fun `every Nth frame means exactly one pass in N`() {
-        for (everyN in intArrayOf(1, 2, 5, 30)) {
-            val frames = 1..600
-            val passes = frames.count { it % everyN == 0 }
-            assertEquals("cadence $everyN over ${frames.count()} frames", frames.count() / everyN, passes)
-        }
-    }
-
-    /**
-     * `evalSyncRelocEveryN()` reports **0** when sync mode is off, so one int carries both the flag
-     * and the cadence — and 0 can be the "off" marker here precisely because the native floor above
-     * makes a REAL cadence of 0 unreachable (`maxOf(1, everyN)` never produces it), unlike the RNG
-     * seed where 0 is a perfectly valid seed and that sentinel had to be negative instead. Tied to
-     * the actual floor arithmetic, not to two hardcoded literals, so a change to the floor is what
-     * would break this rather than a copy of the reasoning going stale on its own.
-     */
-    @Test
-    fun `zero is a valid off marker for the cadence, unlike the seed`() {
-        val everyReachableCadence = intArrayOf(0, -1, 1, 2, 30, Int.MIN_VALUE).map { maxOf(1, it) }
-        assertTrue(
-            "a cadence of 0 is unreachable through the real floor, so 0 can mean 'off'",
-            everyReachableCadence.none { it == 0 },
-        )
-    }
+    // The cadence floor / every-Nth / zero-means-off behaviour lives in native code and is tested
+    // there, against the real MobileGS::setEvalSyncReloc / evalSyncEveryN / scheduleRelocCheck:
+    // core/nativebridge/src/test/cpp/MobileGSRelocTest.cpp (MobileGSEvalSync.*, run by
+    // tools/run_native_host_tests.sh). The JVM restatements that used to sit here re-derived
+    // `maxOf(1, n)` and `n % everyN` in Kotlin and asserted the arithmetic against itself, so they
+    // could not fail whatever the native side did.
 }
 
 /**
@@ -155,7 +118,9 @@ class SlamManagerEvalSyncRelocContractTest {
 
     @Test
     fun `the clear counterpart exists`() {
-        SlamManager::class.java.getMethod("clearEvalSyncReloc")
+        val m = SlamManager::class.java.getMethod("clearEvalSyncReloc")
+        assertEquals(0, m.parameterCount)
+        assertEquals(Void.TYPE, m.returnType)
     }
 
     /**

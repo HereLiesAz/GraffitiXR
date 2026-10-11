@@ -303,17 +303,8 @@
     <string name="redetect">重新检测</string>
 
 
-    <string name="plane_realignment_title">重新检测墙面</string>
 
-    <string name="plane_realignment_text">锚点位于您拍摄时站立的位置。ARCore 会选择位于该原始位置正前方且被追踪的垂直表面。
 
-1. 回到您在捕获时大致站立的位置
-2. 慢慢地将相机扫过您的壁画墙，以便 ARCore 可以将其注册为平坦的表面
-3. 面对艺术品保持稳定，然后点击下方
-
-橙色边框将跳转到新检测到的表面。</string>
-
-    <string name="use_this_wall">使用这面墙</string>
 
 
     <string name="scanning_dots">正在扫描…</string>
@@ -413,12 +404,10 @@
     <string name="settings_info_section">应用程序信息</string>
     <string name="settings_version_label">版本</string>
     <string name="settings_updates_section">更新</string>
-    <string name="settings_check_updates_label">检查实验性更新</string>
-    <string name="settings_install_update_label">安装更新</string>
+    <string name="settings_open_releases_label">打开发布页面</string>
     <string name="settings_permissions_section">权限</string>
     <string name="settings_camera_access">相机访问权限</string>
     <string name="settings_photo_access">照片库访问权限</string>
-    <string name="settings_notifications">通知</string>
     <string name="settings_granted">已授予</string>
     <string name="settings_denied">已拒绝</string>
     <string name="settings_open_app_settings">打开应用程序设置</string>
@@ -454,6 +443,7 @@
     <string name="scan_hint_build_map">向左和向右走动以构建地图</string>
     <string name="scan_hint_closer">靠近墙壁</string>
     <string name="scan_hint_higher_lower">扫描更高和更低的位置</string>
+    <string name="reacquiring_target">正在重新识别目标…</string>
 
 
     <string name="desc_bg_mockup">背景效果图</string>

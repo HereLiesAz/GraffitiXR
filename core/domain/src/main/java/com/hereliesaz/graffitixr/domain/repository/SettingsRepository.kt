@@ -163,7 +163,11 @@ interface SettingsRepository {
     val backgroundColor: Flow<Int>
     suspend fun setBackgroundColor(argb: Int)
 
-    /** ARCore camera target frame rate: 60 (default) or 30. Lower = less power/heat. */
+    /**
+     * ARCore camera frame-rate choice (see `CameraTargetFps`). Default `DEVICE_DEFAULT` (0): no
+     * filter, ARCore picks its own camera config. 30 / 60 / `DEVICE_MAX` are opt-in; lower = less
+     * power/heat.
+     */
     val cameraTargetFps: Flow<Int>
     suspend fun setCameraTargetFps(fps: Int)
 
@@ -175,7 +179,7 @@ interface SettingsRepository {
     val arCoreDepthEnabled: Flow<Boolean>
     suspend fun setArCoreDepthEnabled(on: Boolean)
 
-    /** Monocular depth (MiDaS Small) for the non-ARCore path. Beta; default off. */
+    /** Monocular depth (MiDaS Small) for the standalone (non-ARCore) path. Beta; default on. */
     val monocularDepthEnabled: Flow<Boolean>
     suspend fun setMonocularDepthEnabled(on: Boolean)
 

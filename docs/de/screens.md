@@ -50,7 +50,7 @@ Vollbild-Bottom-Sheet über dem Haupt-Viewport. Listet gespeicherte `.gxr`-Proje
 ### Einstellungen (Flyout)
 *   Händigkeit (Andocken der Leiste links/rechts).
 *   Versionsinfo.
-*   Update-Prüfung.
+*   Link zur GitHub-Release-Seite (öffnet den Browser; die App selbst sucht nie nach Updates).
 
 ---
 

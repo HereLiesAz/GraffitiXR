@@ -299,12 +299,6 @@
     <!-- Action to redetect the plane. -->
     <string name="redetect">Redetectar</string>
 
-    <!-- Title for plane realignment tool. -->
-    <string name="plane_realignment_title">Redetectar Superficie de Pared</string>
-    <!-- Instructions for realigning the plane with the wall. -->
-    <string name="plane_realignment_text">El anclaje se coloca desde donde estabas parado cuando capturaste. ARCore elige la superficie vertical rastreada más directamente frente a esa posición original.\n\n1. Regresa aproximadamente a donde estabas parado durante la captura\n2. Realiza un paneo lento con la cámara sobre la pared de tu mural para que ARCore pueda registrarla como una superficie plana\n3. Mantente firme frente a la obra de arte, luego toca a continuación\n\nEl borde naranja saltará a la superficie recién detectada.</string>
-    <!-- Action to use the currently detected wall for realignment. -->
-    <string name="use_this_wall">Usar Esta Pared</string>
 
     <!-- Label shown when scanning for relocation. -->
     <string name="scanning_dots">Escaneando…</string>
@@ -393,12 +387,10 @@
     <string name="settings_info_section">Información de la Aplicación</string>
     <string name="settings_version_label">Versión</string>
     <string name="settings_updates_section">Actualizaciones</string>
-    <string name="settings_check_updates_label">Buscar actualizaciones experimentales</string>
-    <string name="settings_install_update_label">Instalar Actualización</string>
+    <string name="settings_open_releases_label">Abrir la página de versiones</string>
     <string name="settings_permissions_section">Permisos</string>
     <string name="settings_camera_access">Acceso a la Cámara</string>
     <string name="settings_photo_access">Acceso a la Biblioteca de Fotos</string>
-    <string name="settings_notifications">Notificaciones</string>
     <string name="settings_granted">Concedido</string>
     <string name="settings_denied">Denegado</string>
     <string name="settings_open_app_settings">Abrir Ajustes de la Aplicación</string>
@@ -434,6 +426,7 @@
     <string name="scan_hint_build_map">Camina hacia la izquierda y derecha para construir el mapa</string>
     <string name="scan_hint_closer">Acércate a la pared</string>
     <string name="scan_hint_higher_lower">Escanea más alto y más bajo</string>
+    <string name="reacquiring_target">Recuperando el objetivo…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Fondo de Maqueta</string>

@@ -7,15 +7,9 @@
 #include <cstring>
 #include <jni.h>
 #include "MobileGS.h"
+#include "MobileGSTestPeer.h"
 
 JavaVM* gJvm = nullptr; // defined in GraffitiJNI.cpp on device; never attached in host tests
-
-struct MobileGSTestPeer {
-    static bool hasView(MobileGS& g) { return g.mHasFingerprintView; }
-    static bool hasPatch(MobileGS& g) { return !g.mWallPatch.empty(); }
-    static const float* anchor(MobileGS& g) { return g.mFingerprintAnchorMatrix; }
-    static const float* intrinsics(MobileGS& g) { return g.mFingerprintIntrinsics; }
-};
 
 namespace {
 
@@ -68,10 +62,65 @@ TEST(MobileGSFingerprintState, PeerFingerprintDoesNotInheritLocalAnchorOrView) {
 
     MobileGS guest;
     seedMetric(guest);
+    // State co-registered to the LOCAL frame that a peer's fingerprint must not inherit.
+    {
+        const float fpFromDesign[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0,0,1.5f,1};
+        guest.setDesignPlacement(fpFromDesign, 0.4f, 0.3f);
+        ASSERT_TRUE(MobileGSTestPeer::hasDesignPlacement(guest));
+        cv::Mat mapDescs(10, 32, CV_8U, cv::Scalar(5));
+        std::vector<cv::Point3f> mapPts(10, cv::Point3f(0.1f, 0.2f, 1.5f));
+        guest.restoreWallFeatureMap(mapDescs, mapPts, {}, {}, kAnchor, kIntr);
+        ASSERT_EQ(10, guest.getMapPointCount());
+        const float capIntr[4] = {500.f, 500.f, 32.f, 24.f};
+        guest.setCaptureImage(cv::Mat(48, 64, CV_8UC3, cv::Scalar(10, 20, 30)), capIntr);
+        ASSERT_TRUE(MobileGSTestPeer::hasCapturePhoto(guest));
+    }
+    const uint64_t mapRevBefore = guest.getWallFeatureMapRevision();
+
     guest.alignToFingerprint(wire.data(), wire.size());
     EXPECT_FALSE(MobileGSTestPeer::hasView(guest));
     expectIdentityAnchor(guest);
     expectZeroIntrinsics(guest);
+    // ...and everything else clearWallFingerprint drops for the same reason.
+    EXPECT_FALSE(MobileGSTestPeer::hasPatch(guest)) << "local canonical patch survived a peer fingerprint";
+    EXPECT_FALSE(MobileGSTestPeer::hasDesignPlacement(guest)) << "design placement is local-frame-relative";
+    EXPECT_FLOAT_EQ(0.f, MobileGSTestPeer::designHalfW(guest));
+    EXPECT_EQ(0, guest.getMapPointCount()) << "wall feature map is co-registered to the local anchor";
+    EXPECT_GT(guest.getWallFeatureMapRevision(), mapRevBefore) << "map clear must be visible to the saver";
+    EXPECT_FALSE(MobileGSTestPeer::hasCapturePhoto(guest)) << "capture photo shot the local frame";
+    EXPECT_EQ(3, guest.getWallKeypointCount());
+}
+
+TEST(MobileGSFingerprintState, MetricRestoreOfADifferentFingerprintDropsThePatch) {
+    MobileGS g;
+    seedMetric(g);
+    cv::Mat descs(4, 32, CV_8U, cv::Scalar(8));   // different content
+    std::vector<cv::Point3f> pts = {{0,0,1}, {0.2f,0,1}, {0,0.2f,1}, {0.2f,0.2f,1}};
+    g.restoreWallFingerprintMetric(descs, pts, kAnchor, kIntr, kView);
+    EXPECT_FALSE(MobileGSTestPeer::hasPatch(g)) << "previous wall's patch survived onto a new wall";
+    EXPECT_TRUE(MobileGSTestPeer::hasView(g));
+}
+
+TEST(MobileGSFingerprintState, MetricRePushOfTheSameFingerprintKeepsThePatch) {
+    // The Phase-2 repartition path and a standalone re-seed push the identical point set again
+    // (only the partition differs). That is the same wall, so its patch must survive.
+    MobileGS g;
+    seedMetric(g);
+    cv::Mat descs(4, 32, CV_8U, cv::Scalar(7));
+    std::vector<cv::Point3f> pts = {{0,0,0}, {0.1f,0,0}, {0,0.1f,0}, {0.1f,0.1f,0}};
+    g.restoreWallFingerprintMetric(descs, pts, kAnchor, kIntr, kView, {0, 1, 2, 0});
+    EXPECT_TRUE(MobileGSTestPeer::hasPatch(g));
+}
+
+TEST(MobileGSFingerprintState, ClearResetsTheOutcomeCodes) {
+    MobileGS g;
+    seedMetric(g);
+    MobileGSTestPeer::setCorrobGate(g, MobileGS::kCorrobGated);
+    MobileGSTestPeer::setGrowOutcome(g, MobileGS::kGrowPromoted);
+    g.clearWallFingerprint();
+    EXPECT_EQ(MobileGS::kCorrobNotRun, g.corrobGateReason());
+    EXPECT_EQ(MobileGS::kGrowNotRun, g.growOutcome());
+    EXPECT_FALSE(MobileGSTestPeer::hasPatch(g));
 }
 
 TEST(MobileGSFingerprintState, MalformedPeerBytesChangeNothing) {

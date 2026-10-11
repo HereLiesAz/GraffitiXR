@@ -13,8 +13,8 @@ Si vous choisissez d'utiliser notre Service, vous acceptez la collecte et l'util
 Pour une meilleure expérience lors de l'utilisation de notre Service, nous pouvons vous demander de nous fournir certaines informations personnellement identifiables, y compris, mais sans s'y limiter :
 
 *   **Données de la Caméra :** L'application nécessite l'accès à la caméra de votre appareil pour afficher la vue de Réalité Augmentée (AR), le mode Superposition, et pour capturer des images pour les cibles de projet. Les données de la caméra sont traitées localement sur votre appareil et ne sont pas transmises à nos serveurs, sauf si vous choisissez explicitement de partager un fichier de projet.
-*   **Stockage / Photos :** Nous avons besoin d'accéder au stockage de votre appareil (Lecture/Écriture sur le Stockage Externe ou la Photothèque) pour charger des images pour les superpositions, sauvegarder vos projets et exporter les images capturées.
-*   **Données de Localisation (Optionnel) :** Si vous accordez les autorisations de localisation, l'application peut collecter des données GPS (latitude, longitude, altitude) pour géolocaliser vos projets. Ces données sont enregistrées localement dans vos fichiers de projet.
+*   **Stockage / Photos :** L'application ne demande aucune autorisation de stockage. Les images que vous ajoutez passent par le sélecteur de photos ou de fichiers du système Android, qui ne donne à l'application accès qu'au fichier que vous choisissez. Les projets sont enregistrés dans le stockage privé de l'application, et les images exportées dans la galerie photo de votre appareil.
+*   **Données de Localisation (Optionnel) :** L'application ne demande l'autorisation de localisation que lorsque vous commencez à capturer une cible AR. Si vous l'accordez, l'enregistrement de capture de cette cible conserve l'endroit où elle a été prise (latitude, longitude, altitude et précision). Il est enregistré localement dans le fichier du projet et ne quitte votre appareil que si vous partagez ou exportez vous-même ce fichier de projet.
 
 ## Rapports de Plantage (Opt-In)
 
@@ -42,9 +42,9 @@ Nous pouvons employer des sociétés tierces et des personnes pour les raisons s
 
 Nous utilisons **Google ML Kit** pour la segmentation des sujets (suppression de l'arrière-plan). Ce traitement s'effectue localement sur votre appareil.
 
-## Vérifications de Mise à Jour
+## Mises à Jour
 
-L'écran Paramètres comporte un bouton « Vérifier les mises à jour ». Rien n'est vérifié automatiquement — uniquement lorsque vous appuyez dessus. Appuyer dessus effectue une requête vers l'**API GitHub** (api.github.com) pour consulter la dernière version de ce projet. GitHub est un tiers hors de notre contrôle, et votre adresse IP est visible par GitHub pendant la durée de cette unique requête, tout comme elle le serait pour n'importe quelle requête web que vous adressez à github.com. Aucune autre information n'est envoyée dans le cadre de cette requête.
+L'application ne contacte jamais un serveur pour rechercher des mises à jour. L'écran Paramètres comporte une entrée « Ouvrir la page des versions » ; la toucher ouvre dans votre navigateur la page des versions GitHub de ce projet (github.com/HereLiesAz/GraffitiXR/releases), exactement comme si vous aviez suivi le lien vous-même. L'application elle-même n'envoie rien.
 
 ## Sécurité
 

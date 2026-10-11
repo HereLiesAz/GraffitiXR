@@ -572,6 +572,61 @@ public:
     // Declaration only: no production code defines it, so it has no effect on the shipped library.
     friend struct MobileGSTestPeer;
 
+    /**
+     * The camera matrix a relocalization attempt on a [frameW]x[frameH] live frame solves with:
+     * the LIVE intrinsics when set (they describe the frame being solved), else the fingerprint's
+     * capture intrinsics, else a coarse default centred on the frame. Returns true when out4 came
+     * from real intrinsics (live or fingerprint), false for the default.
+     *
+     * One function so the PnP and every consumer of its pose agree on K by construction; they did
+     * not, and the disagreement put every live-image projection off by the ratio between the two
+     * cameras (a rotated or differently-sized capture made that ratio large).
+     */
+    static bool relocCameraIntrinsics(const float* live4, const float* fp4, int frameW, int frameH,
+                                      double out4[4]);
+
+    /**
+     * Plane-induced homography current-image <- fingerprint-image for a plane n.X = d in the
+     * fingerprint camera frame and a relative pose X_cur = R X_fp + t (both OpenCV convention):
+     *   H = K_cur (R + t n^T / d) K_fp^-1
+     * Two cameras, not one: the live frame and the capture can differ in resolution and rotation,
+     * so mapping a fingerprint pixel needs K_fp's inverse and landing it in the live image needs
+     * K_cur. Normalised so H(2,2) == 1; returns an empty matrix when degenerate. Pure, for tests.
+     */
+    static cv::Matx33d planeHomography(const cv::Matx33d& Kcur, const cv::Matx33d& Kfp,
+                                       const cv::Matx33d& R, const cv::Vec3d& t,
+                                       const cv::Vec3d& n, double d, bool* ok = nullptr);
+
+    /**
+     * True when the fingerprint's 3D points can be in a CAMERA frame, i.e. the wall plane they fit
+     * does not pass through the frame's origin. A capture-camera frame (ARCore metric/depth
+     * fingerprints) has its origin at the camera centre, a wall-distance away from the wall; the
+     * standalone SphereSLAM fingerprint is the CENTRED PAGE frame, whose points all lie on z = 0,
+     * so the plane passes through the origin. Anything that treats the fingerprint frame as the
+     * capture camera's (autoFitDesign, the paint grid's capture-photo sampling) must refuse the
+     * second kind rather than project through a camera that is not there. Pure, for tests.
+     */
+    static bool fingerprintFrameIsCaptureCamera(const std::vector<cv::Point3f>& pts);
+
+    /** One extra multi-scale reloc matching pass: crop [roi] of the frame, resize by [scale]. */
+    struct RelocScalePass { cv::Rect roi; double scale; };
+    /**
+     * The extra scale passes runRelocPass matches besides the plain one (see the comment there).
+     * With SuperPoint ([superPoint] true) they are relative to the plain pass's EFFECTIVE scale
+     * min(1, kMaxInputSide / longest side), and the magnifying pass is a centred crop sized so it
+     * still fits the network's input cap after magnification. Pure, for tests.
+     */
+    static std::vector<RelocScalePass> relocScalePasses(int frameW, int frameH, bool superPoint);
+
+    /** Why the last autoFitDesign() returned false (or kAutoFitOk). Diagnostic only. */
+    enum AutoFitResult {
+        kAutoFitOk = 0,
+        kAutoFitNotReady = 1,        //!< no capture photo / design / placement / enough wall points
+        kAutoFitPageFrame = 2,       //!< fingerprint is a centred page frame, not a capture camera
+        kAutoFitNoFit = 3,           //!< ran, but no confident similarity was found
+    };
+    int lastAutoFitResult() const { return mLastAutoFitResult.load(std::memory_order_relaxed); }
+
 private:
     void relocThreadFunc();
     /**
@@ -599,7 +654,9 @@ private:
     // Plane-guided rectification: homography (current-image <-> fingerprint-image) from the wall plane
     // and the VIO baseline between the current and fingerprint-capture views, plus the viewing
     // obliquity in degrees. False if no fingerprint view is stored or the geometry is degenerate.
-    bool computeRectifyHomography(const float* viewCur16, cv::Mat& Hcur_fp, cv::Mat& Hfp_cur, double& obliquityDeg);
+    // liveK4 = fx,fy,cx,cy of the CURRENT frame; the fingerprint side uses mFingerprintIntrinsics.
+    bool computeRectifyHomography(const float* viewCur16, const double* liveK4, cv::Mat& Hcur_fp,
+                                  cv::Mat& Hfp_cur, double& obliquityDeg);
     // Phase 3 passive builder: on a reloc lock, back-project the frame's features onto the wall plane
     // (fit from the fingerprint points) to get 3D points in the fingerprint frame, associate to the map
     // by descriptor (bump confidence) or add new (capped). Co-registers the map to the fingerprint anchor.
@@ -767,6 +824,13 @@ private:
     // the render thread; composing the PnP with a later frame's view bakes camera motion into the
     // correction, so consumers compose with this instead.
     float mPnpSolveView[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    // fx,fy,cx,cy of the camera mPnpCamFromFpWorld was SOLVED with -- the live frame's intrinsics
+    // (see relocCameraIntrinsics). Published with the pose under mMutex, because every consumer
+    // that projects into or back-projects out of the live image through that pose (corroboration,
+    // self-grow, map frustum gate) must use the camera the pose describes, not the fingerprint's
+    // capture camera. {0,..} = the solve used the coarse default (no real intrinsics known), which
+    // the consumers treat as "no intrinsics" exactly as they used to treat an unset fingerprint K.
+    float mPnpIntrinsics[4] = {0,0,0,0};
     std::atomic<int> mPnpInlierCount{0};
     std::atomic<int> mPnpMatchCount{0};
     std::atomic<long> mPnpResultSeq{0};
@@ -902,5 +966,6 @@ private:
     // real outcome — the same rule the -1 counters follow, in enum form.
     std::atomic<int>        mCorrobGate{kCorrobNotRun};
     std::atomic<int>        mGrowOutcome{kGrowNotRun};
+    std::atomic<int>        mLastAutoFitResult{kAutoFitNotReady};
     cv::Mat                 mRelocColorFrame;
 };

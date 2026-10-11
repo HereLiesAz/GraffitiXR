@@ -1080,28 +1080,68 @@ class EditorViewModel @Inject constructor(
         anchorHalfExtentMeters = Pair(halfW, halfH)
     }
 
-    private fun fitDesignToAnchor(halfW: Float, halfH: Float) {
-        val bmp = _uiState.value.design?.bitmap ?: return
-        // QUAD_HALF_EXTENT = 5.0f (matches OverlayRenderer.QUAD_HALF_EXTENT)
-        // The composite canvas is 2048×2048. Scale to fill 80% of the anchor extent.
-        val scaleW = halfW * 0.8f * 2048f / (bmp.width * 5.0f)
-        val scaleH = halfH * 0.8f * 2048f / (bmp.height * 5.0f)
-        val scale = minOf(scaleW, scaleH).coerceIn(0.05f, 20f)
-        updateDesign { it.copy(scale = scale, offset = Offset.Zero, rotationX = 0f, rotationY = 0f, rotationZ = 0f) }
+    /**
+     * The AR mode adjustment that fits the design to 80% of the captured anchor region, centred and
+     * square-on — or null when the fit can't be computed (no design bitmap, or the AR quad's
+     * real-world size has not been established yet).
+     *
+     * Only the AR [ModeAdjustment] changes (FEATURE_REFERENCE.md §1.1: design edits are global,
+     * mode adjustments are per-mode). This used to rewrite the design layer's own scale, which
+     * moved the artwork in every mode and shrank the composite the AR texture is sampled from.
+     *
+     * Geometry: at `ModeAdjustment.scale == 1` the AR quad is `arDesignHalfWidthM` wide (half-width,
+     * metres — the ArRenderer screen-fit, persisted on the project) with the design bitmap's aspect;
+     * the renderer multiplies that by the AR adjustment's scale. So the scale that makes the quad
+     * span 80% of the anchor's half-extents is `0.8 · min(anchorW / quadW, anchorH / quadH)`.
+     * The old formula assumed a 2048² composite canvas and the 5 m placeholder quad
+     * (`OverlayRenderer.QUAD_HALF_EXTENT`), neither of which is what the renderer draws.
+     */
+    private fun anchorFitAdjustment(anchorHalfW: Float, anchorHalfH: Float): ModeAdjustment? {
+        val bmp = _uiState.value.design?.bitmap ?: return null
+        if (bmp.width <= 0 || bmp.height <= 0) return null
+        if (!(anchorHalfW > 0f && anchorHalfH > 0f && anchorHalfW.isFinite() && anchorHalfH.isFinite())) return null
+        val quadHalfW = projectRepository.currentProject.value?.arDesignHalfWidthM ?: return null
+        if (!(quadHalfW > 0f && quadHalfW.isFinite())) return null
+        val quadHalfH = quadHalfW * bmp.height / bmp.width
+        val scale = (ANCHOR_FIT_FRACTION * minOf(anchorHalfW / quadHalfW, anchorHalfH / quadHalfH))
+            .coerceIn(0.1f, 10f) // the same range every AR pinch/fit is clamped to
+        val cur = _uiState.value.modeAdjustments[EditorMode.AR] ?: ModeAdjustment()
+        return cur.copy(offsetX = 0f, offsetY = 0f, scale = scale, rotation = 0f, rotationX = 0f, rotationY = 0f)
     }
 
     override fun onMagicClicked() {
+        val mode = _uiState.value.editorMode
+        val extent = anchorHalfExtentMeters
+        if (mode == EditorMode.AR && extent != null) {
+            prepareArPlacementEdit()
+            val cur = _uiState.value.modeAdjustments[EditorMode.AR] ?: ModeAdjustment()
+            if (cur.isTransformLocked) {
+                _uiState.update { it.copy(showLockedFeedback = true) }
+                return
+            }
+            val fitted = anchorFitAdjustment(extent.first, extent.second)
+            if (fitted != null) {
+                pushHistory()
+                clearTransformStash()
+                dispatch(EditorIntent.SetModeAdjustment(EditorMode.AR, fitted))
+                saveProject()
+                emitModeTransform(EditorMode.AR)
+                return
+            }
+            // No quad size yet (the renderer hasn't fitted the design): fall through to the tone lift.
+        }
         pushHistory()
         clearTransformStash()
-        val extent = anchorHalfExtentMeters
-        if (extent != null) {
-            fitDesignToAnchor(extent.first, extent.second)
-        } else if (!dispatchModeAdjustIfInMode { it.copy(brightness = 0.1f, contrast = 1.2f, saturation = 1.1f) }) {
-            // Outside DESIGN the tone lift is a per-mode overlay like every other tone control; only
-            // in DESIGN does it edit the design itself.
+        if (dispatchModeAdjustIfInMode { it.copy(brightness = 0.1f, contrast = 1.2f, saturation = 1.1f) }) {
+            // Outside DESIGN the tone lift is a per-mode overlay like every other tone control.
+            saveProject()
+            emitModeTransform(mode)
+        } else {
+            // Only in DESIGN does it edit the design itself.
             updateDesign { it.copy(brightness = 0.1f, contrast = 1.2f, saturation = 1.1f) }
+            saveProject()
+            emitActiveLayerProps()
         }
-        saveProject()
     }
 
     override fun onAdjustClicked() = dispatch(EditorIntent.ToggleAdjustPanel)
@@ -1119,7 +1159,10 @@ class EditorViewModel @Inject constructor(
         pushHistory()
         dispatch(EditorIntent.ToggleTransformReset)
         saveProject()
+        // The reset flattens (or restores) the design transform AND the active mode's placement;
+        // a guest needs both, or its copy keeps the old per-mode pan/scale/rotation.
         _uiState.value.design?.let { opEmitter.emit(Op.DesignTransform(it.encodeTransform())) }
+        emitModeTransform(_uiState.value.editorMode)
     }
 
     fun onTransformGesture(pan: Offset, zoom: Float, rotationDelta: Float) {
@@ -1149,6 +1192,7 @@ class EditorViewModel @Inject constructor(
         if (mode == EditorMode.AR) prepareArPlacementEdit()
         dispatch(EditorIntent.ToggleModeTransformLocked(mode))
         saveProject()
+        emitModeTransform(mode)
     }
 
     override fun onGestureStart() {
@@ -1217,6 +1261,7 @@ class EditorViewModel @Inject constructor(
         )
         dispatch(EditorIntent.SetModeAdjustment(EditorMode.AR, next))
         saveProject()
+        emitModeTransform(EditorMode.AR)
     }
 
     /**
@@ -1242,6 +1287,10 @@ class EditorViewModel @Inject constructor(
     override fun onAdjustmentEnd() {
         dispatch(EditorIntent.SetAdjustmentInProgress(false))
         saveProject()
+        // Outside DESIGN the opacity/brightness/contrast/saturation knobs wrote the mode's
+        // ModeAdjustment, not the design, so DesignProps alone never carried them to a guest.
+        // Colour balance always edits the design, so its props go out in every mode.
+        emitModeTransform(_uiState.value.editorMode)
         emitActiveLayerProps()
     }
 
@@ -1289,6 +1338,10 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.default) {
             val t = computeAutoTune(wall, bitmap.imageStats())
             withContext(dispatchers.main) {
+                // One undoable step, persisted and sent to co-op peers like any knob edit — the
+                // knob setters below only dispatch; the knob UI's start/end hooks are what normally
+                // record, save and emit, and they never run for this programmatic tune.
+                pushHistory()
                 onOpacityChanged(t.opacity)
                 onBrightnessChanged(t.brightness)
                 onContrastChanged(t.contrast)
@@ -1296,6 +1349,9 @@ class EditorViewModel @Inject constructor(
                 onColorBalanceRChanged(t.colorBalanceR)
                 onColorBalanceGChanged(t.colorBalanceG)
                 onColorBalanceBChanged(t.colorBalanceB)
+                saveProject()
+                emitModeTransform(_uiState.value.editorMode)
+                emitActiveLayerProps()
             }
         }
     }
@@ -1310,6 +1366,13 @@ class EditorViewModel @Inject constructor(
         design ?: return
         opEmitter.emit(Op.DesignProps(design.toLayerProps()))
         opEmitter.emit(Op.DesignTransform(design.encodeTransform()))
+    }
+
+    /** Emits [mode]'s whole-design adjustment to co-op peers; a no-op for DESIGN, which has none. */
+    private fun emitModeTransform(mode: EditorMode) {
+        if (mode == EditorMode.DESIGN) return
+        val adjustment = _uiState.value.modeAdjustments[mode] ?: ModeAdjustment()
+        opEmitter.emit(Op.ModeTransform(mode.name, adjustment))
     }
 
     /** Emits a co-op props change for the design, if there is one. */
@@ -1594,6 +1657,9 @@ class EditorViewModel @Inject constructor(
     }
 
 }
+
+/** Magic's AR fit makes the design span this fraction of the captured anchor region. */
+private const val ANCHOR_FIT_FRACTION = 0.8f
 
 /** Blend modes offered by [EditorViewModel.onCycleBlendMode], Normal first. */
 private val BLEND_CYCLE = listOf(

@@ -199,11 +199,11 @@ data class ArUiState(
     val arCoreDepthEnabled: Boolean = true,
     /**
      * Monocular depth (MiDaS Small via SphereSLAM :models — LiteRT GPU since 0.24.3, CPU fallback),
-     * default true. It is the depth source for any
-     * device that can't get ARCore's Depth API — no ARCore, ARCore off, or ARCore depth unsupported/off
-     * — forming planes / recovering scale there. It stays dormant when ARCore depth is active, so those
-     * devices pay nothing. Applied immediately: the model is loaded + self-tested, or released, as soon
-     * as this or either ARCore setting changes.
+     * default true. Used only on the standalone (non-ARCore) backend, where it calibrates the sphere
+     * map's map-point radii while the feature map is building. The ARCore path has no monocular
+     * consumer — MiDaS depth is relative, not metric — so with ARCore selected (its depth on or off)
+     * the model is never loaded. Applied immediately: the model is loaded + self-tested, or released,
+     * and native depth placement switched, as soon as this or "Use ARCore" changes.
      *
      * (Back on by default after the startup-crash root cause was fixed: the old Depth Anything model
      * used an 8-bit MatMulNBits op ORT rejects, and R8 had stripped ai.onnxruntime.OrtException so the

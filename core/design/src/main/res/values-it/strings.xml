@@ -299,12 +299,6 @@
     <!-- Action to redetect the plane. -->
     <string name="redetect">Rileva di nuovo</string>
 
-    <!-- Title for plane realignment tool. -->
-    <string name="plane_realignment_title">Rileva di nuovo la Superficie del Muro</string>
-    <!-- Instructions for realigning the plane with the wall. -->
-    <string name="plane_realignment_text">L\'ancora è posizionata da dove ti trovavi quando hai catturato. ARCore sceglie la superficie verticale tracciata più direttamente di fronte a quella posizione originale.\n\n1. Torna approssimativamente dove ti trovavi durante la cattura\n2. Scorri lentamente la telecamera sul tuo muro murale in modo che ARCore possa registrarlo come una superficie piana\n3. Resta fermo guardando l\'opera d\'arte, poi tocca sotto\n\nIl bordo arancione salterà alla superficie appena rilevata.</string>
-    <!-- Action to use the currently detected wall for realignment. -->
-    <string name="use_this_wall">Usa Questo Muro</string>
 
     <!-- Label shown when scanning for relocation. -->
     <string name="scanning_dots">Scansione…</string>
@@ -393,12 +387,10 @@
     <string name="settings_info_section">Informazioni sull\'App</string>
     <string name="settings_version_label">Versione</string>
     <string name="settings_updates_section">Aggiornamenti</string>
-    <string name="settings_check_updates_label">Controlla aggiornamenti sperimentali</string>
-    <string name="settings_install_update_label">Installa Aggiornamento</string>
+    <string name="settings_open_releases_label">Apri la pagina delle release</string>
     <string name="settings_permissions_section">Autorizzazioni</string>
     <string name="settings_camera_access">Accesso alla Telecamera</string>
     <string name="settings_photo_access">Accesso alla Libreria Foto</string>
-    <string name="settings_notifications">Notifiche</string>
     <string name="settings_granted">Concesso</string>
     <string name="settings_denied">Negato</string>
     <string name="settings_open_app_settings">Apri Impostazioni App</string>
@@ -434,6 +426,7 @@
     <string name="scan_hint_build_map">Cammina a sinistra e a destra per costruire la mappa</string>
     <string name="scan_hint_closer">Avvicinati al muro</string>
     <string name="scan_hint_higher_lower">Scansiona più in alto e più in basso</string>
+    <string name="reacquiring_target">Riacquisizione del bersaglio…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Mockup di Sfondo</string>

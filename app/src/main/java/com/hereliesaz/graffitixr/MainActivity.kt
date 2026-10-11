@@ -9,7 +9,6 @@ import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -142,6 +141,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -174,6 +174,9 @@ private val VOLUME_UNLOCK_SEQUENCE = intArrayOf(
 )
 private const val VOLUME_UNLOCK_WINDOW_MS = 1500L
 
+/** Saved-state key for a shared-in image still waiting for a project to land in. */
+private const val STATE_PENDING_SHARED_IMAGE = "pending_shared_image"
+
 /**
  * Stages of the first-run "drawing in 60 seconds" flow. Split because the two halves need different
  * things from the device: DRAW is a plain screen (no camera), DETECT needs AR.
@@ -181,7 +184,15 @@ private const val VOLUME_UNLOCK_WINDOW_MS = 1500L
 private enum class FirstRunStage { NONE, DRAW, DETECT }
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+/**
+ * An [AppCompatActivity], not a plain ComponentActivity, because of the Language setting:
+ * `AppCompatDelegate.setApplicationLocales` only reaches AppCompat activities below API 33 (on 33+
+ * the platform LocaleManager applies it to any activity). As a ComponentActivity the setting did
+ * nothing on API 26–32. AppCompat recreates this activity with the new locale immediately, and the
+ * manifest's `autoStoreLocales` service persists the choice so a cold start comes up in it before
+ * the first frame (no flash of the system language, no extra recreate).
+ */
+class MainActivity : AppCompatActivity() {
 
     @Inject lateinit var slamManager: SlamManager
     @Inject lateinit var projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository
@@ -266,20 +277,52 @@ class MainActivity : ComponentActivity() {
     }
 
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p ->
-        hasCameraPermission = p[Manifest.permission.CAMERA] ?: false
+        hasCameraPermission = p[Manifest.permission.CAMERA] ?: isGranted(Manifest.permission.CAMERA)
     }
+
+    // Location is asked for separately, only when a capture is about to be geotagged (target
+    // capture in AR), never bundled into the camera request. The AR session's tracker deferred its
+    // start for lack of permission; a grant here starts it (LocationTracker.onPermissionsChanged).
+    private val locationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            com.hereliesaz.graffitixr.common.LocationTracker.onPermissionsChanged()
+        }
+
+    private fun isGranted(permission: String): Boolean =
+        ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        incomingImageUri(intent)?.let { incomingSharedImage = it }
+        if (SharedImageIntentPolicy.shouldConsume(isRestoredInstance = false, launchFlags = intent.flags)) {
+            incomingImageUri(intent)?.let { incomingSharedImage = it }
+        }
+        markShareHandled(intent)
+    }
+
+    /**
+     * Strips the share payload from [intent] once it has been read, so nothing that re-reads
+     * `getIntent()` later can apply the same image a second time.
+     */
+    private fun markShareHandled(intent: Intent?) {
+        if (intent == null || incomingImageUri(intent) == null) return
+        intent.removeExtra(Intent.EXTRA_STREAM)
+        intent.data = null
+        intent.action = null
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        // A share still waiting for a project survives recreation (locale switch, process death)
+        // through saved state — the launch intent is NOT re-read on restore (see onCreate).
+        incomingSharedImage?.let { outState.putParcelable(STATE_PENDING_SHARED_IMAGE, it) }
     }
 
     /**
      * Extracts a single image [Uri] from an inbound share intent, or null if this launch isn't one.
-     * Handles ACTION_SEND (EXTRA_STREAM) and an image-typed ACTION_VIEW; the graffitixr VIEW callback
-     * (Meta AI redirect) is ignored via the image MIME guard. The sender grants read permission on
-     * the Uri, so the editor's ContentResolver load succeeds.
+     * Handles ACTION_SEND (EXTRA_STREAM) and an image-typed ACTION_VIEW; anything without an image
+     * MIME type is ignored. The sender grants read permission on the Uri, so the editor's
+     * ContentResolver load succeeds.
      */
     private fun incomingImageUri(intent: Intent?): Uri? {
         if (intent == null || intent.type?.startsWith("image/") != true) return null
@@ -339,7 +382,20 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         // Interop: capture an image handed in by ACTION_SEND on this cold start (consumed in setContent).
-        incomingSharedImage = incomingImageUri(intent)
+        // Only on a genuinely new launch: on recreation (rotation is handled in place, but a locale
+        // switch or process restore recreates) and on a relaunch from Recents the intent is the SAME
+        // one already applied, and reading it again added the shared image as a second layer. A
+        // share still pending at recreation comes back from saved state instead.
+        incomingSharedImage = if (
+            SharedImageIntentPolicy.shouldConsume(savedInstanceState != null, intent?.flags ?: 0)
+        ) {
+            incomingImageUri(intent)
+        } else {
+            savedInstanceState?.let {
+                androidx.core.os.BundleCompat.getParcelable(it, STATE_PENDING_SHARED_IMAGE, Uri::class.java)
+            }
+        }
+        markShareHandled(intent)
 
         hasCameraPermission = ContextCompat.checkSelfPermission(
             this, Manifest.permission.CAMERA
@@ -607,16 +663,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                LaunchedEffect(arUiState.isAnchorEstablished) {
-                    if (!arUiState.isAnchorEstablished && mainViewModel.uiState.value.isInPlaneRealignment) {
-                        mainViewModel.endPlaneRealignment()
-                    }
-                }
-
                 BackHandler(enabled = showSettings) { showSettings = false }
-                BackHandler(enabled = mainUiState.isInPlaneRealignment) {
-                    mainViewModel.endPlaneRealignment()
-                }
                 BackHandler(enabled = mainUiState.isCapturingTarget) {
                     mainViewModel.cancelTapMode()
                     arViewModel.clearTapHighlights()
@@ -634,7 +681,7 @@ class MainActivity : ComponentActivity() {
                 // to pop to and fell through to finishing the Activity, quitting the app with no
                 // confirmation. Route back to the Library instead, matching "proj.load"'s handler.
                 BackHandler(
-                    enabled = !showLibrary && !showSettings && !mainUiState.isInPlaneRealignment &&
+                    enabled = !showLibrary && !showSettings &&
                         !mainUiState.isCapturingTarget && !mainUiState.isTouchLocked
                 ) {
                     // Pop the editor route being left, not just push Library on top of it — a plain
@@ -652,15 +699,31 @@ class MainActivity : ComponentActivity() {
 
                 LaunchedEffect(Unit) {
                     if (!hasCameraPermission) {
-                        val permissions = mutableListOf(Manifest.permission.CAMERA)
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
-                        } else {
-                            permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
-                        }
-                        permissionLauncher.launch(permissions.toTypedArray())
+                        permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
                     }
                     permissionRequestedAtLeastOnce = true
+                }
+
+                // Geotagging: a target capture records where it was taken (CaptureEnvironment.location)
+                // when location is granted. Ask at that moment — once per launch, so a refusal isn't
+                // re-asked on every capture — rather than at startup or for unrelated camera use.
+                var locationAskedThisLaunch by rememberSaveable { mutableStateOf(false) }
+                LaunchedEffect(mainUiState.isCapturingTarget, editorUiState.editorMode) {
+                    if (mainUiState.isCapturingTarget &&
+                        editorUiState.editorMode == EditorMode.AR &&
+                        !locationAskedThisLaunch &&
+                        !(isGranted(Manifest.permission.ACCESS_FINE_LOCATION) &&
+                            isGranted(Manifest.permission.ACCESS_COARSE_LOCATION))
+                    ) {
+                        locationAskedThisLaunch = true
+                        // Both: on API 31+ a FINE request without COARSE is ignored outright.
+                        locationPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                            ),
+                        )
+                    }
                 }
 
                 LaunchedEffect(hasCameraPermission) {
@@ -922,7 +985,7 @@ class MainActivity : ComponentActivity() {
                                 cameraUri = uri.toString()
                                 takePictureLauncher.launch(uri)
                             } else {
-                                permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
+                                permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
                             }
                         },
                         onExportRequested = {
@@ -1317,21 +1380,6 @@ class MainActivity : ComponentActivity() {
                             if (basePostTargetVisible && hasWallFingerprint) {
                                 PostTargetInstructionOverlay(
                                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp)
-                                )
-                            }
-
-                            val showRealignment = mainUiState.isInPlaneRealignment
-                                    && editorUiState.editorMode == EditorMode.AR
-                                    && !showLibrary && !showSettings
-                            if (showRealignment) {
-                                PlaneRealignmentOverlay(
-                                    onTryThisPlane = {
-                                        arViewModel.retriggerPlaneDetection()
-                                        mainViewModel.endPlaneRealignment()
-                                    },
-                                    onCancel = { mainViewModel.endPlaneRealignment() },
-                                    modifier = Modifier.align(Alignment.BottomCenter),
-                                    strings = strings
                                 )
                             }
 
@@ -1793,9 +1841,7 @@ class MainActivity : ComponentActivity() {
                                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
                                 SettingsScreen(
                                     currentVersion = BuildConfig.VERSION_NAME,
-                                    updateStatus = dashboardUiState.updateStatusMessage,
-                                    updateUrl = dashboardUiState.updateUrl,
-                                    isCheckingForUpdate = dashboardUiState.isCheckingForUpdate,
+                                    releasesPageError = dashboardUiState.releasesPageError,
                                     currentLanguage = language,
                                     onLanguageChanged = { settingsViewModel.setLanguage(it) },
                                     isRightHanded = editorUiState.isRightHanded,
@@ -1842,8 +1888,7 @@ class MainActivity : ComponentActivity() {
                                     onCoverageGlowColorChanged = { arViewModel.setCoverageGlowColor(it) },
                                     onCoverageGlowIntensityChanged = { arViewModel.setCoverageGlowIntensity(it) },
                                     onCoverageGlowStyleChanged = { arViewModel.setCoverageGlowStyle(it) },
-                                    onCheckForUpdates = { dashboardViewModel.openUpdatePage(this@MainActivity) },
-                                    onOpenUpdatePage = { dashboardViewModel.openUpdatePage(this@MainActivity) },
+                                    onOpenReleasesPage = { dashboardViewModel.openReleasesPage(this@MainActivity) },
                                     onResetTutorials = {
                                         settingsViewModel.resetCompletedTutorials()
                                         // The reactive per-mode guidance tours (ConfigureGuidance)
@@ -2002,8 +2047,7 @@ class MainActivity : ComponentActivity() {
             sphereSlamAvailable = arUiState.isSphereSlamAvailable,
         )
         val requestPermissions = {
-            val perms = mutableListOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
-            permissionLauncher.launch(perms.toTypedArray())
+            permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
         }
 
         val isDesignMode = editorUiState.editorMode == EditorMode.DESIGN
@@ -2043,7 +2087,7 @@ class MainActivity : ComponentActivity() {
             // first, since onAddLayer silently no-ops without one.
             azRailSubItem(
                 id = "item.open",
-                hostId = "mode.design",
+                hostId = railHostOf("item.open"),
                 text = navStrings.open,
                 color = navItemColor,
                 classifiers = setOf("toggle"),
@@ -2061,7 +2105,7 @@ class MainActivity : ComponentActivity() {
             // invert had no control at all.
             azRailSubHostItem(
                 id = "host.design",
-                hostId = "mode.design",
+                hostId = railHostOf("host.design"),
                 text = navStrings.adjust,
                 color = navItemColor,
                 shape = AzButtonShape.NONE,
@@ -2070,37 +2114,37 @@ class MainActivity : ComponentActivity() {
                 onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.design", it) },
             )
             azRailSubItem(
-                id = "design.adjust", hostId = "host.design", text = navStrings.adjust,
+                id = "design.adjust", hostId = railHostOf("design.adjust"), text = navStrings.adjust,
                 color = navItemColor, classifiers = setOf("toggle", "panel"),
                 shape = AzButtonShape.NONE, disabled = showLibrary,
                 onClick = { editorViewModel.onAdjustClicked() },
             )
             azRailSubItem(
-                id = "design.balance", hostId = "host.design", text = navStrings.balance,
+                id = "design.balance", hostId = railHostOf("design.balance"), text = navStrings.balance,
                 color = navItemColor, classifiers = setOf("toggle", "panel"),
                 shape = AzButtonShape.NONE, disabled = showLibrary,
                 onClick = { editorViewModel.onBalanceClicked() },
             )
             azRailSubItem(
-                id = "design.invert", hostId = "host.design", text = navStrings.invert,
+                id = "design.invert", hostId = railHostOf("design.invert"), text = navStrings.invert,
                 color = navItemColor, classifiers = setOf("toggle", "effect"),
                 shape = AzButtonShape.NONE, disabled = showLibrary,
                 onClick = { editorViewModel.onToggleInvert() },
             )
             azRailSubItem(
-                id = "design.blend", hostId = "host.design", text = navStrings.blend,
+                id = "design.blend", hostId = railHostOf("design.blend"), text = navStrings.blend,
                 color = navItemColor, classifiers = setOf("effect"),
                 shape = AzButtonShape.NONE, disabled = showLibrary,
                 onClick = { editorViewModel.onCycleBlendMode() },
             )
             azRailSubItem(
-                id = "design.outline", hostId = "host.design", text = navStrings.outline,
+                id = "design.outline", hostId = railHostOf("design.outline"), text = navStrings.outline,
                 color = navItemColor, classifiers = setOf("toggle", "effect"),
                 shape = AzButtonShape.NONE, disabled = showLibrary,
                 onClick = { editorViewModel.onToggleOutline() },
             )
             azRailSubItem(
-                id = "design.isolate", hostId = "host.design", text = navStrings.isolate,
+                id = "design.isolate", hostId = railHostOf("design.isolate"), text = navStrings.isolate,
                 color = navItemColor, classifiers = setOf("toggle", "effect"),
                 shape = AzButtonShape.NONE, disabled = showLibrary,
                 onClick = { editorViewModel.onToggleSubjectIsolation() },
@@ -2110,7 +2154,7 @@ class MainActivity : ComponentActivity() {
             // only blocks pan/zoom/rotate. toggleImageLock() was implemented and tested but had no
             // rail entry, so it could never actually be reached from the UI.
             azRailSubItem(
-                id = "design.lock", hostId = "host.design", text = "Lock",
+                id = "design.lock", hostId = railHostOf("design.lock"), text = "Lock",
                 color = navItemColor, classifiers = setOf("toggle", "lock"),
                 shape = AzButtonShape.NONE, disabled = showLibrary,
                 onClick = { editorViewModel.toggleImageLock() },
@@ -2147,7 +2191,7 @@ class MainActivity : ComponentActivity() {
                     // disabled, reason-labelled button): if it can't act, it isn't on the rail.
                     if (arRailPolicy.targetRailEnabled) azRailSubItem(
                         id = "target.create",
-                        hostId = "mode.ar",
+                        hostId = railHostOf("target.create"),
                         text = navStrings.grid,
                         color = navItemColor,
                         classifiers = setOf("toggle"),
@@ -2175,7 +2219,7 @@ class MainActivity : ComponentActivity() {
                     // Flashlight — illuminate the wall in low light while tracking.
                     azRailSubItem(
                         id = "mode.ar.light",
-                        hostId = "mode.ar",
+                        hostId = railHostOf("mode.ar.light"),
                         text = navStrings.light,
                         color = navItemColor,
                         classifiers = setOf("toggle"),
@@ -2185,7 +2229,7 @@ class MainActivity : ComponentActivity() {
                     )
                     azRailSubItem(
                         id = "mode.ar.lock",
-                        hostId = "mode.ar",
+                        hostId = railHostOf("mode.ar.lock"),
                         text = "Lock",
                         color = navItemColor,
                         classifiers = setOf("toggle", "lock"),
@@ -2202,7 +2246,7 @@ class MainActivity : ComponentActivity() {
                         !arRailPolicy.standalone && !isCapturingTarget
                     ) azRailSubItem(
                         id = "mode.ar.measure",
-                        hostId = "mode.ar",
+                        hostId = railHostOf("mode.ar.measure"),
                         text = navStrings.measure,
                         color = navItemColor,
                         classifiers = setOf("toggle"),
@@ -2219,7 +2263,7 @@ class MainActivity : ComponentActivity() {
                     // still described had been removed from that panel's action row.
                     azRailSubItem(
                         id = "mode.ar.magic",
-                        hostId = "mode.ar",
+                        hostId = railHostOf("mode.ar.magic"),
                         text = navStrings.magic,
                         color = navItemColor,
                         shape = AzButtonShape.NONE,
@@ -2246,14 +2290,14 @@ class MainActivity : ComponentActivity() {
                     if (!coopContainerBlocked) {
                         azRailSubHostItem(
                             id = "coop",
-                            hostId = "mode.ar",
+                            hostId = railHostOf("coop"),
                             text = navStrings.coop,
                             color = navItemColor,
                             shape = AzButtonShape.NONE,
                             disabled = showLibrary,
                         )
                         azRailSubItem(
-                            id = "coop.host", hostId = "coop", text = navStrings.hostCoop,
+                            id = "coop.host", hostId = railHostOf("coop.host"), text = navStrings.hostCoop,
                             color = navItemColor,
                             classifiers = setOf("toggle"),
                             shape = AzButtonShape.NONE,
@@ -2262,7 +2306,7 @@ class MainActivity : ComponentActivity() {
                             onClick = { if (arUiState.coopRole != CoopRole.HOST) arViewModel.startHosting() },
                         )
                         azRailSubItem(
-                            id = "coop.join", hostId = "coop", text = navStrings.joinCoop,
+                            id = "coop.join", hostId = railHostOf("coop.join"), text = navStrings.joinCoop,
                             color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE,
                             disabled = showLibrary || coopBackendBlocked,
                             onClick = {
@@ -2275,7 +2319,7 @@ class MainActivity : ComponentActivity() {
                     if (arUiState.coopRole != CoopRole.NONE) {
                         azRailSubItem(
                             id = "coop.leave",
-                            hostId = "coop",
+                            hostId = railHostOf("coop.leave"),
                             text = navStrings.leaveCoop,
                             color = HotPink,
                             shape = AzButtonShape.NONE,
@@ -2300,7 +2344,7 @@ class MainActivity : ComponentActivity() {
             if (editorUiState.editorMode == EditorMode.OVERLAY) {
                 azRailSubItem(
                     id = "mode.overlay.light",
-                    hostId = "mode.overlay",
+                    hostId = railHostOf("mode.overlay.light"),
                     text = navStrings.light,
                     color = navItemColor,
                     classifiers = setOf("toggle"),
@@ -2310,7 +2354,7 @@ class MainActivity : ComponentActivity() {
                 )
                 azRailSubItem(
                     id = "mode.overlay.lock",
-                    hostId = "mode.overlay",
+                    hostId = railHostOf("mode.overlay.lock"),
                     text = "Lock",
                     color = navItemColor,
                     classifiers = setOf("toggle", "lock"),
@@ -2323,13 +2367,19 @@ class MainActivity : ComponentActivity() {
                 // Toggling on captures the current orientation as the reference; off releases it.
                 azRailSubItem(
                     id = "mode.overlay.gyro",
-                    hostId = "mode.overlay",
+                    hostId = railHostOf("mode.overlay.gyro"),
                     text = navStrings.gyro,
                     color = navItemColor,
                     classifiers = setOf("toggle"),
                     shape = AzButtonShape.NONE,
                     disabled = showLibrary,
-                    onClick = { mainViewModel.setOverlayGyroActive(!isOverlayGyroActive) },
+                    // Gyro stabilises the camera view, so without the camera there is nothing to
+                    // stabilise: ask for the permission instead of lighting a toggle that does nothing
+                    // (and that used to start by itself the moment the permission was granted).
+                    onClick = {
+                        if (hasCameraPermission) mainViewModel.toggleOverlayGyro(cameraShowing = true)
+                        else requestPermissions()
+                    },
                 )
             }
 
@@ -2350,11 +2400,19 @@ class MainActivity : ComponentActivity() {
                 onExpandedChange = { editorViewModel.onRailHostExpansionChanged("mode.mockup", it) },
             )
             if (editorUiState.editorMode == EditorMode.MOCKUP) {
-                azRailSubHostItem(id = "mockup.wall", hostId = "mode.mockup", text = navStrings.wall, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary)
-                azRailSubItem(id = "wall.photo", hostId = "mockup.wall", text = navStrings.photo, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { onWallPhoto() })
+                azRailSubHostItem(id = "mockup.wall", hostId = railHostOf("mockup.wall"), text = navStrings.wall, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary)
+                azRailSubItem(
+                    id = "wall.photo",
+                    hostId = railHostOf("wall.photo"),
+                    text = navStrings.photo,
+                    color = navItemColor,
+                    shape = AzButtonShape.NONE,
+                    disabled = showLibrary,
+                    onClick = { onWallPhoto() },
+                )
                 azRailSubItem(
                     id = "wall.file",
-                    hostId = "mockup.wall",
+                    hostId = railHostOf("wall.file"),
                     text = navStrings.file,
                     color = navItemColor,
                     shape = AzButtonShape.NONE,
@@ -2365,7 +2423,7 @@ class MainActivity : ComponentActivity() {
                 if (editorUiState.backgroundBitmap != null) {
                     azRailSubItem(
                         id = "wall.clear",
-                        hostId = "mockup.wall",
+                        hostId = railHostOf("wall.clear"),
                         text = navStrings.wallClear,
                         color = navItemColor,
                         shape = AzButtonShape.NONE,
@@ -2375,7 +2433,7 @@ class MainActivity : ComponentActivity() {
                 }
                 azRailSubItem(
                     id = "mode.mockup.lock",
-                    hostId = "mode.mockup",
+                    hostId = railHostOf("mode.mockup.lock"),
                     text = "Lock",
                     color = navItemColor,
                     classifiers = setOf("toggle", "lock"),
@@ -2402,7 +2460,7 @@ class MainActivity : ComponentActivity() {
             if (editorUiState.editorMode == EditorMode.TRACE) {
                 azRailSubItem(
                     id = "mode.trace.freeze",
-                    hostId = "mode.trace",
+                    hostId = railHostOf("mode.trace.freeze"),
                     text = "Freeze",
                     color = navItemColor,
                     classifiers = setOf("toggle"),
@@ -2427,7 +2485,7 @@ class MainActivity : ComponentActivity() {
             )
             azRailSubItem(
                 id = "proj.new",
-                hostId = "host.project",
+                hostId = railHostOf("proj.new"),
                 text = navStrings.new,
                 color = navItemColor,
                 shape = AzButtonShape.NONE,
@@ -2436,7 +2494,7 @@ class MainActivity : ComponentActivity() {
             )
             azRailSubItem(
                 id = "proj.save",
-                hostId = "host.project",
+                hostId = railHostOf("proj.save"),
                 text = navStrings.save,
                 color = navItemColor,
                 shape = AzButtonShape.NONE,
@@ -2450,7 +2508,7 @@ class MainActivity : ComponentActivity() {
             // reason-labelled button. It stays present in every other mode.
             if (!standaloneArExportBlocked) azRailSubItem(
                 id = "proj.export",
-                hostId = "host.project",
+                hostId = railHostOf("proj.export"),
                 text = navStrings.export,
                 color = navItemColor,
                 shape = AzButtonShape.NONE,
@@ -2466,7 +2524,7 @@ class MainActivity : ComponentActivity() {
             )
             azRailSubItem(
                 id = "proj.load",
-                hostId = "host.project",
+                hostId = railHostOf("proj.load"),
                 text = navStrings.load,
                 color = navItemColor,
                 shape = AzButtonShape.NONE,
@@ -2475,7 +2533,7 @@ class MainActivity : ComponentActivity() {
             )
             azRailSubItem(
                 id = "proj.settings",
-                hostId = "host.project",
+                hostId = railHostOf("proj.settings"),
                 text = navStrings.settings,
                 color = navItemColor,
                 shape = AzButtonShape.NONE,
@@ -2515,7 +2573,7 @@ class MainActivity : ComponentActivity() {
                 if (arUiState.isFlashlightOn) azHighlight("mode.overlay.light", active = Cyan)
                 if (editorUiState.modeAdjustments[EditorMode.OVERLAY]?.isTransformLocked == true)
                     azHighlight("mode.overlay.lock", active = Cyan)
-                if (isOverlayGyroActive) azHighlight("mode.overlay.gyro", active = Cyan)
+                if (isOverlayGyroActive && hasCameraPermission) azHighlight("mode.overlay.gyro", active = Cyan)
             }
             if (editorUiState.editorMode == EditorMode.MOCKUP) {
                 if (editorUiState.modeAdjustments[EditorMode.MOCKUP]?.isTransformLocked == true)
@@ -3401,55 +3459,6 @@ private fun PostTargetInstructionOverlay(modifier: Modifier = Modifier) {
                 fontSize = 15.sp,
                 lineHeight = 22.sp
             )
-        }
-    }
-}
-
-@Composable
-private fun PlaneRealignmentOverlay(
-    onTryThisPlane: () -> Unit,
-    onCancel: () -> Unit,
-    modifier: Modifier = Modifier,
-    strings: AppStrings
-) {
-    Column(
-        modifier = modifier.padding(bottom = 96.dp).padding(horizontal = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .background(Color(0xEE000000), RoundedCornerShape(16.dp))
-                .border(2.dp, Color(0xFFFF8C00), RoundedCornerShape(16.dp))
-                .padding(20.dp)
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = strings.ar.planeRealignmentTitle,
-                    color = Color.White,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = strings.ar.planeRealignmentText,
-                    color = Color.White.copy(alpha = 0.85f),
-                    textAlign = TextAlign.Start
-                )
-                Spacer(Modifier.height(16.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    AzButton(
-                        text = strings.ar.useThisWall,
-                        onClick = onTryThisPlane,
-                        color = Color(0xFF2E7D32),
-                        shape = AzButtonShape.RECTANGLE
-                    )
-                    AzButton(
-                        text = strings.common.cancel,
-                        onClick = onCancel,
-                        color = Color(0xFFFF8C00),
-                        shape = AzButtonShape.RECTANGLE
-                    )
-                }
-            }
         }
     }
 }

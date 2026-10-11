@@ -422,6 +422,7 @@ class ArRenderer(
      *
      * A retained old observation is not evidence of current tracking, so [trackingData] is true only
      * when the latest KPM observation is within one second of the newest ARCore frame timestamp.
+     * [active] means frames are actually being fed: it is false while fusion is off.
      */
     fun sphereSlamRuntimeStatus(): com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeStatus {
         val available = sphereSlamTracker.isNativeAvailable
@@ -441,7 +442,9 @@ class ArRenderer(
             } else {
                 com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.UNAVAILABLE
             },
-            active = available && referenceReady,
+            // Truthful "active": KPM frames are submitted only while drift correction (fusion) is on
+            // — fusion off skips the feed entirely — so a ready reference alone feeds nothing.
+            active = isSphereSlamSidecarActive(available, referenceReady, fusionEnabled),
             referenceReady = referenceReady,
             trackingData = observationFresh,
         )
@@ -499,8 +502,6 @@ class ArRenderer(
         }
     /** When true the SLAM/cloud visualization is suppressed — processing continues but nothing is drawn. */
     @Volatile var hideVisualization: Boolean = false
-    /** 36-bit mask of visited 10° yaw sectors. Pushed from `ArUiState.visitedSectorsMask`. */
-    @Volatile var visitedSectorsMask: Long = 0L
     /** Current scan phase. Fog is rendered only when AMBIENT and not yet anchored. */
     @Volatile var scanPhase: ScanPhase = ScanPhase.AMBIENT
 
@@ -693,7 +694,6 @@ class ArRenderer(
     // EMA-smoothed center depth (meters) for the live reticle; raw per-pixel ARCore depth is too noisy.
     @Volatile private var smoothedCenterDepth: Float = -1f
     @Volatile var isCapturingTarget: Boolean = false
-    @Volatile var isInPlaneRealignment: Boolean = false
     @Volatile var pendingAnchorEstablishment: Boolean = false
     // Return-visit anchoring. A reopened project (or a co-op guest) restores its fingerprint and the
     // native reloc thread solves PnP against it, but nothing used to turn that solve into an anchor:
@@ -1232,7 +1232,13 @@ class ArRenderer(
         backgroundRenderer.invalidateDisplayGeometry()
         onDiag("surface: bg prog=${backgroundRenderer.isProgramReady} shader=${backgroundRenderer.shaderLog} tex=${backgroundRenderer.textureId}")
 
+        // onSurfaceCreated runs on every NEW EGL context — first creation and again after
+        // GLSurfaceView.onPause destroyed the old one (background/foreground). Every sub-renderer
+        // forgets the dead context's GL names in its createOnGlThread; the artwork texture lives
+        // only in GPU memory, so re-upload the retained bitmap into the fresh texture. Without this
+        // the overlay kept `hasTexture == true` over an empty texture and drew black.
         overlayRenderer.createOnGlThread()
+        if (pendingOverlayBitmap != null) overlayBitmapDirty = true
         pointCloudRenderer.createOnGlThread(context)
         planeRenderer.createOnGlThread(context)
         arDebugRenderer.createOnGlThread(context)
@@ -1358,13 +1364,12 @@ class ArRenderer(
         // aren't baked in), so the mask belongs here, not painted onto the frozen target preview.
         // The confidence-tinted voxel cloud must NOT be drawn over the artwork — it would occlude
         // the very thing the artist is here to see. anchorEstablished is the authoritative gate:
-        // once a target exists the map is hidden (the artist is painting), EXCEPT while actively
-        // re-aligning to a plane, when seeing the map helps. We deliberately key off anchorEstablished
+        // once a target exists the map is hidden (the artist is painting). We deliberately key off anchorEstablished
         // rather than the shared hideVisualization flag, which freeze/export/user-settings also toggle
         // and would otherwise flip the cloud back on mid-session. hideVisualization still suppresses it
         // on demand (freeze preview, export capture, manual setting). Processing keeps running
         // regardless; only the draw is gated.
-        if (anyLayerOn && isTracking && (!anchorEstablished || isInPlaneRealignment) && !hideVisualization) {
+        if (anyLayerOn && isTracking && !anchorEstablished && !hideVisualization) {
             if (showFeaturePoints) {
                 try {
                     frame.acquirePointCloud().use { arDebugRenderer.update(it) }
@@ -1474,7 +1479,7 @@ class ArRenderer(
     /**
      * Decides whether to run the heavy native SLAM/VIO work this frame, updating [isIdle]. Returns
      * true on a full (heavy) frame; false on a gated idle frame. The phone is "idle" only when the
-     * anchor is established, no scan/capture/realign/gesture is active, tracking is healthy, and the
+     * anchor is established, no scan/capture/gesture is active, tracking is healthy, and the
      * pose has been still past the enter-debounce. Exit from idle is instant (first motion frame),
      * with a brief full-rate hold so it can't oscillate at the threshold. While idle, heavy work runs
      * at [idleRateCeilingFps]; while active it's uncapped unless [activeRateCeilingFps] > 0.
@@ -1482,7 +1487,7 @@ class ArRenderer(
     private fun shouldRunHeavyThisFrame(view: FloatArray, tracking: Boolean): Boolean {
         val now = android.os.SystemClock.elapsedRealtime()
         val active = !anchorEstablished || captureRequested || isCapturingTarget ||
-            isInPlaneRealignment || scanPhase == ScanPhase.AMBIENT || gestureInProgress || !tracking
+            scanPhase == ScanPhase.AMBIENT || gestureInProgress || !tracking
         val moved = !haveIdlePose || idlePoseChanged(view)
         if (active || moved) {
             isIdle = false
@@ -1589,26 +1594,23 @@ class ArRenderer(
                 // This branch is reached only while !camStreamReported, so no frame ever arrived.
                 reportCameraNotFeeding(cameraEverStreamed = false)
             }
-            // During the AMBIENT scan, the camera background renders as a newspaper halftone with full
-            // colour bleeding in (like ink) as each yaw sector is mapped — the world-mapping indicator.
+            // AMBIENT scan in progress (reported in the heartbeat log; the camera background itself is a
+            // plain pass-through — the screen-space halftone reveal was removed in 425ed4012).
             val scanActive = !anchorEstablished && ambientScanEnabled && scanPhase == ScanPhase.AMBIENT
             // Voxel-method reveal-mask: while scanning in VOXEL_HASH, the camera renders full colour
             // but DIMMED, and the voxel coverage pass (composited below as a mask) reveals the world
             // at full brightness/colour only where it has been mapped — so the user literally sees
-            // what hasn't been scanned yet (it stays dark). Mutually exclusive with the halftone scan
-            // indicator (which stays for the other mural methods).
+            // what hasn't been scanned yet (it stays dark).
             // A1 (voxel-map removal): the dense voxel map is being retired — it never fed pose
             // (relocalization rides the fingerprint + PnP), and was scan-reveal visualization only.
-            // Forcing the reveal mask off disables drawCoverage() and the camera dimming; the halftone
-            // scan indicator takes over for VOXEL_HASH mode (same as the other mural methods). Reversible:
+            // Forcing the reveal mask off disables drawCoverage() and the camera dimming. Reversible:
             // restore the !anchorEstablished/VOXEL_HASH predicate to re-enable. Native map processing is
             // untouched here (A3 removes it).
             val voxelRevealMaskActive = false
-            if (scanActive) backgroundRenderer.updateScanMask(visitedSectorsMask)
             lastStep = "bgDraw"
             // Always draw the camera in full colour (the B&W path is retired); the dimming + reveal
             // for voxel scanning is done by the perception composite (reveal mask), not the camera shader.
-            backgroundRenderer.draw(frame, scanActive && !voxelRevealMaskActive, grayscale = false)
+            backgroundRenderer.draw(frame)
             // Coverage mask is now drawn with the throttled perception layers (see "debugView").
             if (frameCount <= 10 || frameCount % 60 == 0) {
                 Timber.i("ARDIAG drawFrame f=$frameCount tracking=${frame.camera.trackingState} anchor=$anchorEstablished ambientScan=$ambientScanEnabled scanActive=$scanActive")
@@ -1967,9 +1969,6 @@ class ArRenderer(
 
             val yawRad = kotlin.math.atan2(-viewMatrix[2].toDouble(), -viewMatrix[10].toDouble())
             val yawDeg = Math.toDegrees(yawRad).toFloat()
-
-            // (The world-mapping indicator is now the camera-background "ink develop" reveal, applied
-            // in BackgroundRenderer.draw(frame, scanActive) above — no separate overlay here.)
 
             slamManager.setTrackingPoseValid(isTracking)
 
@@ -2924,10 +2923,10 @@ class ArRenderer(
 
             // Continuous wall-depth refinement: keep the overlay flush with the ARCore plane estimate.
             // Runs at ~1 Hz (every 30 frames) to amortise getAllTrackables() overhead.
-            // Only runs BEFORE the anchor is established or during manual realignment to
+            // Only runs BEFORE the anchor is established, to
             // prevent the image from following the camera gaze once locked to a target.
             lastStep = "planeRefine"
-            if ((!anchorEstablished || isInPlaneRealignment) && frameCount % 30 == 0) {
+            if (!anchorEstablished && frameCount % 30 == 0) {
                 try {
                     refineAnchorFromBestPlane(activeSession, viewMatrix)
                 } catch (_: Exception) {
@@ -2937,19 +2936,19 @@ class ArRenderer(
 
             // Depth-based fallback: sample centre-screen depth every 10 frames
             lastStep = "depthFallback"
-            if ((!anchorEstablished || isInPlaneRealignment) && depthSupported && frameCount % 10 == 0) {
+            if (!anchorEstablished && depthSupported && frameCount % 10 == 0) {
                 try {
                     frame.acquireDepthImage16Bits().use { depthImage ->
                         val plane = depthImage.planes[0]
-                        val cx = depthImage.width / 2
-                        val cy = depthImage.height / 2
-                        val stride = plane.rowStride
-                        val byteOffset = cy * stride + cx * 2
-                        if (byteOffset + 2 <= plane.buffer.limit()) {
-                            val rawVal = plane.buffer.getShort(byteOffset).toInt() and 0xFFFF
-                            val depthMm = rawVal and 0x1FFF
-                            if (depthMm in 100..15000) {   // 10 cm – 15 m
-                                val depthM = depthMm / 1000f
+                        // DepthLookup reads DEPTH16 in native (little-endian) order; the plane's
+                        // ByteBuffer defaults to BIG_ENDIAN, and the bare getShort() this replaced
+                        // byte-swapped every sample (1500 mm read back as 7173 mm).
+                        val centreM = com.hereliesaz.graffitixr.feature.ar.eval.DepthLookup.depthMetersAt(
+                            plane.buffer, plane.rowStride, depthImage.width, depthImage.height, 0.5f, 0.5f,
+                        )
+                        run {
+                            if (centreM >= 0.1f) {   // 10 cm – DepthLookup's 7.9 m valid ceiling
+                                val depthM = centreM
                                 val cameraMat = FloatArray(16)
                                 android.opengl.Matrix.invertM(cameraMat, 0, viewMatrix, 0)
                                 val hitX = cameraMat[12] + (-cameraMat[8]) * depthM
@@ -2978,9 +2977,8 @@ class ArRenderer(
                 } catch (_: Exception) { /* Non-fatal */ }
             }
 
-            // During scanning we no longer draw the splat cloud / point cloud / plane grid — the
-            // newspaper-halftone "ink develop" reveal on the camera background is the mapping indicator.
-            // (Mapping/localization still runs; this only suppressed the busy 3D overlays.)
+            // During scanning we no longer draw the splat cloud / point cloud / plane grid. (Mapping/
+            // localization still runs; this only suppressed the busy 3D overlays.)
 
             lastStep = "overlayTex"
             if (overlayBitmapDirty) {
@@ -3611,6 +3609,10 @@ class ArRenderer(
         isDestroying = true
         watchdog?.interrupt()
         watchdog = null
+        // attachSession registered a DisplayListener (displayRotationHelper.onResume); only a later
+        // attachSession(null) unregistered it, which teardown does not always reach. Unregister here
+        // so a destroyed renderer is not kept alive by the DisplayManager. Idempotent.
+        displayRotationHelper.onPause()
         backgroundScope.cancel("Renderer detached and destroyed.")
         // Clear all non-ARCore hybrid state immediately, but do NOT call Anchor.detach() here: destroy
         // runs off the GL thread and onDrawFrame may currently hold sessionLock inside a native ARCore
@@ -3732,3 +3734,13 @@ private fun angularVelocity(prev: FloatArray, cur: FloatArray, dt: Float): Float
     val k = angle / (s * dt)
     return floatArrayOf(rx * k, ry * k, rz * k)
 }
+
+/**
+ * Whether the ARCore-sidecar SphereSLAM is actually being fed frames: native available, a reference
+ * registered, AND fusion on (the only consumer — with fusion off the renderer submits no KPM frames).
+ */
+internal fun isSphereSlamSidecarActive(
+    available: Boolean,
+    referenceReady: Boolean,
+    fusionEnabled: Boolean,
+): Boolean = available && referenceReady && fusionEnabled

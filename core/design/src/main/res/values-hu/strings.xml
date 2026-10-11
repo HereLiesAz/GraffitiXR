@@ -302,11 +302,8 @@
     <string name="redetect">Újraészlelés</string>
 
 
-    <string name="plane_realignment_title">Falfelület újraészlelése</string>
 
-    <string name="plane_realignment_text">A horgony onnan van elhelyezve, ahol a rögzítéskor álltál. Az ARCore azt a nyomon követett függőleges felületet választja, amely a leginkább közvetlenül az eredeti pozíció előtt van.\n\n1. Térj vissza körülbelül arra a helyre, ahol a rögzítés során álltál\n2. Lassan pásztázd a kamerát a falfestményed felett, hogy az ARCore sík felületként regisztrálhassa\n3. Tartsd stabilan a műalkotással szemben, majd koppints alább\n\nA narancssárga szegély az újonnan észlelt felületre ugrik.</string>
 
-    <string name="use_this_wall">Ezt a falat használd</string>
 
 
     <string name="scanning_dots">Szkennelés\u2026</string>
@@ -395,12 +392,10 @@
     <string name="settings_info_section">Alkalmazás Információ</string>
     <string name="settings_version_label">Verzió</string>
     <string name="settings_updates_section">Frissítések</string>
-    <string name="settings_check_updates_label">Kísérleti frissítések keresése</string>
-    <string name="settings_install_update_label">Frissítés telepítése</string>
+    <string name="settings_open_releases_label">Kiadások oldalának megnyitása</string>
     <string name="settings_permissions_section">Engedélyek</string>
     <string name="settings_camera_access">Kamera hozzáférés</string>
     <string name="settings_photo_access">Fotótár hozzáférés</string>
-    <string name="settings_notifications">Értesítések</string>
     <string name="settings_granted">Engedélyezve</string>
     <string name="settings_denied">Megtagadva</string>
     <string name="settings_open_app_settings">Alkalmazásbeállítások megnyitása</string>
@@ -436,6 +431,7 @@
     <string name="scan_hint_build_map">Sétálj balra és jobbra a térkép felépítéséhez</string>
     <string name="scan_hint_closer">Menj közelebb a falhoz</string>
     <string name="scan_hint_higher_lower">Szkennelj magasabbra és alacsonyabbra</string>
+    <string name="reacquiring_target">Célpont újrakeresése…</string>
 
 
     <string name="desc_bg_mockup">Háttér makett</string>

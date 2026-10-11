@@ -32,12 +32,6 @@ class BackgroundRenderer : GlReleasable {
     private var quadPositionParam: Int = 0
     private var quadTexCoordParam: Int = 0
     private var uTextureParam: Int = 0
-    private var uScanActive: Int = 0
-    private var uYaw: Int = 0
-    private var uHalfFov: Int = 0
-    private var uMask: Int = 0
-    private var uDotSize: Int = 0
-    private var uGrayscale: Int = 0
     /** @Volatile: cleared off the GL thread by [invalidateDisplayGeometry] when a new session is
      *  attached; read and written on the GL thread by [draw]. */
     @Volatile private var hasTransformed = false
@@ -46,12 +40,6 @@ class BackgroundRenderer : GlReleasable {
     /** Last UV set that passed [transformedTexCoordsAreSane], restored whenever a fresh transform is
      *  rejected. Starts as the identity mapping so the very first rejection still shows the frame. */
     private val lastGoodTexCoords = QUAD_TEXCOORDS.copyOf()
-
-    // 36-sector scan-coverage mask (for the world-mapping "ink develop" reveal).
-    private var maskTextureId = 0
-    private val maskBytes = ByteBuffer.allocateDirect(SECTOR_COUNT).order(ByteOrder.nativeOrder())
-    private val viewMatrix = FloatArray(16)
-    private val projMatrix = FloatArray(16)
 
     fun createOnGlThread(context: Context) {
         val textures = IntArray(1)
@@ -63,21 +51,6 @@ class BackgroundRenderer : GlReleasable {
         GLES30.glTexParameteri(textureTarget, GLES30.GL_TEXTURE_WRAP_T, GLES30.GL_CLAMP_TO_EDGE)
         GLES30.glTexParameteri(textureTarget, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
         GLES30.glTexParameteri(textureTarget, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR)
-
-        // Scan-coverage mask texture (1D, 36 sectors), linear so coverage is smooth across sectors.
-        val maskTex = IntArray(1)
-        GLES30.glGenTextures(1, maskTex, 0)
-        maskTextureId = maskTex[0]
-        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, maskTextureId)
-        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_S, GLES30.GL_REPEAT)
-        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_T, GLES30.GL_CLAMP_TO_EDGE)
-        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
-        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR)
-        GLES30.glPixelStorei(GLES30.GL_UNPACK_ALIGNMENT, 1)
-        GLES30.glTexImage2D(
-            GLES30.GL_TEXTURE_2D, 0, GLES30.GL_R8, SECTOR_COUNT, 1, 0,
-            GLES30.GL_RED, GLES30.GL_UNSIGNED_BYTE, maskBytes
-        )
 
         val numVertices = 4
         if (!::quadVertices.isInitialized) {
@@ -113,12 +86,6 @@ class BackgroundRenderer : GlReleasable {
         quadPositionParam = GLES30.glGetAttribLocation(backgroundProgram, "a_Position")
         quadTexCoordParam = GLES30.glGetAttribLocation(backgroundProgram, "a_TexCoord")
         uTextureParam = GLES30.glGetUniformLocation(backgroundProgram, "u_Texture")
-        uScanActive = GLES30.glGetUniformLocation(backgroundProgram, "u_ScanActive")
-        uYaw = GLES30.glGetUniformLocation(backgroundProgram, "u_CameraYawRad")
-        uHalfFov = GLES30.glGetUniformLocation(backgroundProgram, "u_HalfFovHRad")
-        uMask = GLES30.glGetUniformLocation(backgroundProgram, "u_MaskTex")
-        uDotSize = GLES30.glGetUniformLocation(backgroundProgram, "u_DotSizePx")
-        uGrayscale = GLES30.glGetUniformLocation(backgroundProgram, "u_Grayscale")
     }
 
     /**
@@ -156,32 +123,18 @@ class BackgroundRenderer : GlReleasable {
         return (maxU - minU) >= MIN_UV_SPAN && (maxV - minV) >= MIN_UV_SPAN
     }
 
-    /** Push the 36-sector visited bitmask that drives the ink-develop reveal. */
-    fun updateScanMask(visitedSectorsMask: Long) {
-        if (maskTextureId == 0) return
-        for (i in 0 until SECTOR_COUNT) {
-            val visited = (visitedSectorsMask ushr i) and 1L
-            maskBytes.put(i, if (visited == 1L) 255.toByte() else 0)
-        }
-        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, maskTextureId)
-        GLES30.glTexSubImage2D(
-            GLES30.GL_TEXTURE_2D, 0, 0, 0, SECTOR_COUNT, 1,
-            GLES30.GL_RED, GLES30.GL_UNSIGNED_BYTE, maskBytes
-        )
-    }
-
     /**
-     * Draws the camera background. When [scanActive], the unmapped parts of the view are rendered as a
-     * gritty black-and-white newspaper halftone of the camera, and full colour/tone bleeds in
-     * organically (like spreading ink) as each yaw sector is mapped. Otherwise it's a plain pass-through.
+     * Draws the camera background as a plain pass-through. (A screen-space halftone "ink develop" scan
+     * reveal used to live here; it was removed in 425ed4012 as a flat 2D effect — a real scan
+     * indicator has to spread on the mapped 3D surfaces — so there is no scan uniform or mask texture.)
      */
-    fun draw(frame: Frame, scanActive: Boolean = false, grayscale: Boolean = false) {
+    fun draw(frame: Frame) {
         diagFrame++
         if (backgroundProgram == 0) {
             if (diagFrame % 120 == 0) Log.w("ARDIAG", "BackgroundRenderer.draw: shader not ready -> camera black")
             return
         }
-        if (diagFrame % 120 == 0) Log.i("ARDIAG", "BackgroundRenderer.draw: drawing camera quad (scanActive=$scanActive)")
+        if (diagFrame % 120 == 0) Log.i("ARDIAG", "BackgroundRenderer.draw: drawing camera quad")
 
         if (frame.hasDisplayGeometryChanged() || !hasTransformed) {
             // Rewind both buffers first: transformCoordinates2d reads/writes from the current position,
@@ -232,24 +185,6 @@ class BackgroundRenderer : GlReleasable {
         GLES30.glBindTexture(textureTarget, textureId)
         GLES30.glUniform1i(uTextureParam, 0)
 
-        var yaw = 0f
-        var halfFov = 0.5f
-        if (scanActive) {
-            val cam = frame.camera
-            cam.getViewMatrix(viewMatrix, 0)
-            cam.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
-            yaw = kotlin.math.atan2(-viewMatrix[2], -viewMatrix[10])
-            halfFov = kotlin.math.atan(1.0 / projMatrix[0].toDouble()).toFloat()
-        }
-        GLES30.glUniform1f(uScanActive, if (scanActive) 1.0f else 0.0f)
-        GLES30.glUniform1f(uGrayscale, if (grayscale) 1.0f else 0.0f)
-        GLES30.glUniform1f(uYaw, yaw)
-        GLES30.glUniform1f(uHalfFov, halfFov)
-        GLES30.glUniform1f(uDotSize, DOT_SIZE_PX)
-        GLES30.glActiveTexture(GLES30.GL_TEXTURE1)
-        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, maskTextureId)
-        GLES30.glUniform1i(uMask, 1)
-
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, 0)
         quadVertices.position(0)
         GLES30.glVertexAttribPointer(quadPositionParam, 2, GLES30.GL_FLOAT, false, 0, quadVertices)
@@ -275,7 +210,6 @@ class BackgroundRenderer : GlReleasable {
     override fun release() {
         if (backgroundProgram != 0) { GLES30.glDeleteProgram(backgroundProgram); backgroundProgram = 0 }
         if (textureId > 0) { GLES30.glDeleteTextures(1, intArrayOf(textureId), 0); textureId = -1 }
-        if (maskTextureId != 0) { GLES30.glDeleteTextures(1, intArrayOf(maskTextureId), 0); maskTextureId = 0 }
     }
 
     private fun buildProgram(vsSrc: String, fsSrc: String): Int {
@@ -332,9 +266,6 @@ class BackgroundRenderer : GlReleasable {
     }
 
     companion object {
-        private const val SECTOR_COUNT = 36
-        private const val DOT_SIZE_PX = 6.0f // halftone cell size in screen pixels (newspaper grain)
-
         /** Minimum span, per axis, a valid camera UV transform must cover. A real one covers ~0.5–1.0;
          *  this floor only catches collapsed transforms, never a legitimate crop. */
         private const val MIN_UV_SPAN = 0.1f
@@ -357,58 +288,26 @@ class BackgroundRenderer : GlReleasable {
             layout(location = 0) in vec4 a_Position;
             layout(location = 1) in vec2 a_TexCoord;
             out vec2 v_TexCoord;
-            out vec2 v_NdcXy;
             void main() {
                gl_Position = a_Position;
                v_TexCoord = a_TexCoord;
-               v_NdcXy = a_Position.xy;
             }
         """.trimIndent()
 
-        // Camera pass-through, except during the AMBIENT scan: unmapped yaw sectors are shown as a
-        // black-and-white newspaper halftone of the live camera, and the real full-colour frame bleeds
-        // in organically (a value-noise threshold driven by per-sector coverage) so it reads as ink/tone
-        // spreading into the photo — not an ink overlay. Mapped sectors are the untouched camera.
+        // Plain camera pass-through (see draw()).
         private val FRAGMENT_SHADER = """#version 300 es
             #extension GL_OES_EGL_image_external_essl3 : require
             precision mediump float;
             in vec2 v_TexCoord;
-            in vec2 v_NdcXy;
             uniform samplerExternalOES u_Texture;
-            uniform float u_ScanActive;
-            uniform float u_CameraYawRad;
-            uniform float u_HalfFovHRad;
-            uniform sampler2D u_MaskTex;
-            uniform float u_DotSizePx;
-            uniform float u_Grayscale;
             out vec4 FragColor;
-
-            const float TWO_PI = 6.28318530718;
-            float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
-            float vnoise(vec2 p) {
-                vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
-                float a = hash(i), b = hash(i + vec2(1.0, 0.0));
-                float c = hash(i + vec2(0.0, 1.0)), d = hash(i + vec2(1.0, 1.0));
-                return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-            }
-
             void main() {
-                vec4 cam = texture(u_Texture, v_TexCoord);
-                // In voxel-method scanning the camera is desaturated to luminance; the voxel
-                // coverage pass (drawn after, alpha=confidence) bleeds colour back in over scanned
-                // regions, so the grayscale areas are precisely what hasn't been mapped yet.
-                if (u_Grayscale > 0.5) {
-                    float l = dot(cam.rgb, vec3(0.299, 0.587, 0.114));
-                    FragColor = vec4(vec3(l), cam.a);
-                } else {
-                    FragColor = cam;
-                }
+                FragColor = texture(u_Texture, v_TexCoord);
             }
         """.trimIndent()
 
-        // ESSL1 (#version 100) fallback for drivers without GL_OES_EGL_image_external_essl3. Plain
-        // camera pass-through; the unused scan uniforms are simply absent (their locations resolve to
-        // -1, so the draw()-side glUniform calls are silent no-ops).
+        // ESSL1 (#version 100) fallback for drivers without GL_OES_EGL_image_external_essl3. Same
+        // plain camera pass-through.
         private val VERTEX_SHADER_ES1 = """
             attribute vec4 a_Position;
             attribute vec2 a_TexCoord;

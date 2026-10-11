@@ -49,7 +49,26 @@ class PerceptionFbo : GlReleasable {
     var ready = false
         private set
 
+    /**
+     * Forget every GL name without deleting it — the EGL context that owned them is gone. Without
+     * this, [resize] sees `fbo != 0` at an unchanged size and early-returns, so the perception pass
+     * binds a framebuffer name that does not exist in the new context and composites black.
+     */
+    fun onGlContextLost() {
+        fbo = 0
+        colorTex = 0
+        depthRbo = 0
+        width = 0
+        height = 0
+        complete = false
+        program = 0
+        quadVbo = 0
+        ready = false
+    }
+
     fun createOnGlThread(context: Context) {
+        // Called from onSurfaceCreated, i.e. on a fresh EGL context: drop the dead context's names.
+        onGlContextLost()
         val vs = """
             attribute vec2 a_Pos;
             attribute vec2 a_Uv;

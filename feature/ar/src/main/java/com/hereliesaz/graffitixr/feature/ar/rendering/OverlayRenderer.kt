@@ -52,7 +52,29 @@ class OverlayRenderer(private val context: Context) : GlReleasable {
     // Reusable buffers for dynamic mesh updates
     private var vertexBuffer: FloatBuffer? = null
 
+    /**
+     * Forget every GL object name WITHOUT deleting it. Called when the EGL context that owned them is
+     * gone (GLSurfaceView recreates the context after `onPause`): the old names are meaningless in the
+     * new context — deleting them could delete an unrelated object that reused the name — and
+     * [hasTexture] must drop so [draw] does not sample an empty texture as "the artwork" (black quad).
+     * The owner re-uploads the bitmap after [createOnGlThread].
+     */
+    fun onGlContextLost() {
+        program = 0
+        borderProgram = 0
+        textureIds[0] = 0
+        vboId = 0
+        iboId = 0
+        borderVboId = 0
+        vertexBuffer = null
+        hasTexture = false
+        meshDirty = true
+        borderDirty = true
+    }
+
     fun createOnGlThread() {
+        // A (re)created surface means a fresh EGL context; any names still held belong to a dead one.
+        onGlContextLost()
         val vs = ShaderUtil.loadGLShader(TAG, context, GLES30.GL_VERTEX_SHADER, VERTEX_SHADER)
         val fs = ShaderUtil.loadGLShader(TAG, context, GLES30.GL_FRAGMENT_SHADER, FRAGMENT_SHADER)
 

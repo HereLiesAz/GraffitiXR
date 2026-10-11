@@ -13,8 +13,8 @@ If you choose to use our Service, then you agree to the collection and use of in
 For a better experience, while using our Service, we may require you to provide us with certain personally identifiable information, including but not limited to:
 
 *   **Camera Data:** The app requires access to your device's camera to display the Augmented Reality (AR) view, Overlay mode, and to capture images for project targets. Camera data is processed locally on your device and is not transmitted to our servers unless you explicitly choose to share a project file.
-*   **Storage / Photos:** We require access to your device's storage (Read/Write External Storage or Photo Library) to load images for overlays, save your projects, and export captured images.
-*   **Location Data (Optional):** If you grant location permissions, the app may collect GPS data (latitude, longitude, altitude) to geotag your projects. This data is saved locally within your project files.
+*   **Storage / Photos:** The app requests no storage permission. Images you add come through Android's system photo picker or file picker, which give the app access only to the file you pick. Projects are saved in the app's private storage, and exported images are saved to your device's photo gallery.
+*   **Location Data (Optional):** The app asks for location permission only when you start capturing an AR target. If you grant it, that target's capture record stores where it was taken (latitude, longitude, altitude and accuracy). It is saved locally in the project file and leaves your device only if you share or export that project file yourself.
 
 ## Crash Reports (Opt-In)
 
@@ -42,9 +42,9 @@ We may employ third-party companies and individuals due to the following reasons
 
 We use **Google ML Kit** for subject segmentation (background removal). This processing happens locally on your device.
 
-## Update Checks
+## Updates
 
-The Settings screen has a "Check for updates" button. Nothing is checked automatically — only when you press it. Pressing it makes a request to the **GitHub API** (api.github.com) to look up this project's latest release. GitHub is a third party outside our control, and your IP address is visible to GitHub for the duration of that one request, the same as it would be for any web request you make to github.com. No other information is sent as part of this request.
+The app never contacts a server to check for updates. The Settings screen has an "Open releases page" entry; tapping it opens this project's GitHub releases page (github.com/HereLiesAz/GraffitiXR/releases) in your browser, exactly as if you had followed the link yourself. The app itself sends nothing.
 
 ## Security
 

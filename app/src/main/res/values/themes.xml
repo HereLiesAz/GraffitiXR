@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        MainActivity is an AppCompatActivity (so the in-app Language setting applies on API 26-32,
+        where only AppCompat activities honour AppCompatDelegate.setApplicationLocales), and
+        AppCompatActivity requires a Theme.AppCompat descendant. Same look as Theme.GraffitiXR
+        (dark, no action bar, black window); every pixel above the window is Compose.
+    -->
+    <style name="Theme.GraffitiXR.Main" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+</resources>

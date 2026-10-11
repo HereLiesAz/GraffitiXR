@@ -22,6 +22,15 @@
     public static ** fromNative(...);
 }
 
+# CrashUploadWorker posts GitHubIssue through Retrofit's Gson converter, which reads the fields
+# reflectively and names JSON keys after them. Renamed by R8, the request body became {"a":…} and
+# GitHub refused every issue. Keep the fields with their names (the @SerializedName annotations
+# pin the wire names too; this also stops R8 dropping fields it sees no Kotlin reads of).
+-keepclassmembers class com.hereliesaz.graffitixr.common.crash.GitHubIssue {
+    <fields>;
+}
+-keepattributes Signature,RuntimeVisibleAnnotations
+
 # If your project uses WebView with JS, uncomment the following
 # and specify the fully qualified class name to the JavaScript interface
 # class:

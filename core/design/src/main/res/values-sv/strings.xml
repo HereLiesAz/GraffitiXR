@@ -302,11 +302,8 @@
     <string name="redetect">Upptäck igen</string>
 
 
-    <string name="plane_realignment_title">Upptäck väggytan igen</string>
 
-    <string name="plane_realignment_text">Ankaret placeras från där du stod när du fångade. ARCore väljer den spårade vertikala ytan mest direkt framför den ursprungliga positionen.\n\n1. Gå tillbaka till ungefär där du stod under fångsten\n2. Panorera långsamt kameran över väggen så att ARCore kan registrera den som en plan yta\n3. Håll stadigt vänd mot konstverket och tryck sedan på nedan\n\nDen orangea kanten kommer att hoppa till den nyligen upptäckta ytan.</string>
 
-    <string name="use_this_wall">Använd denna vägg</string>
 
 
     <string name="scanning_dots">Skannas\u2026</string>
@@ -395,12 +392,10 @@
     <string name="settings_info_section">Appinformation</string>
     <string name="settings_version_label">Version</string>
     <string name="settings_updates_section">Uppdateringar</string>
-    <string name="settings_check_updates_label">Sök efter experimentella uppdateringar</string>
-    <string name="settings_install_update_label">Installera uppdatering</string>
+    <string name="settings_open_releases_label">Öppna versionssidan</string>
     <string name="settings_permissions_section">Behörigheter</string>
     <string name="settings_camera_access">Kameraåtkomst</string>
     <string name="settings_photo_access">Tillgång till fotobibliotek</string>
-    <string name="settings_notifications">Aviseringar</string>
     <string name="settings_granted">Beviljas</string>
     <string name="settings_denied">Nekad</string>
     <string name="settings_open_app_settings">Öppna Appinställningar</string>
@@ -436,6 +431,7 @@
     <string name="scan_hint_build_map">Gå åt vänster och höger för att bygga en karta</string>
     <string name="scan_hint_closer">Flytta dig närmare väggen</string>
     <string name="scan_hint_higher_lower">Skanna högre och lägre</string>
+    <string name="reacquiring_target">Hittar målet igen…</string>
 
 
     <string name="desc_bg_mockup">Bakgrundsmockup</string>

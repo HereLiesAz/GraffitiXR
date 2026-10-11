@@ -13,8 +13,8 @@ Wenn Sie sich entscheiden, unseren Dienst zu nutzen, stimmen Sie der Erfassung u
 Für ein besseres Erlebnis können wir bei der Nutzung unseres Dienstes verlangen, dass Sie uns bestimmte personenbezogene Daten zur Verfügung stellen, einschließlich, aber nicht beschränkt auf:
 
 *   **Kameradaten:** Die App benötigt Zugriff auf die Kamera Ihres Geräts, um die Augmented-Reality-Ansicht (AR), den Overlay-Modus und die Aufnahme von Bildern für Projektziele anzuzeigen. Kameradaten werden lokal auf Ihrem Gerät verarbeitet und nicht an unsere Server übertragen, es sei denn, Sie entscheiden sich ausdrücklich dafür, eine Projektdatei zu teilen.
-*   **Speicher / Fotos:** Wir benötigen Zugriff auf den Speicher Ihres Geräts (Lese-/Schreibzugriff auf externen Speicher oder Fotobibliothek), um Bilder für Overlays zu laden, Ihre Projekte zu speichern und aufgenommene Bilder zu exportieren.
-*   **Standortdaten (Optional):** Wenn Sie Standortberechtigungen erteilen, kann die App GPS-Daten (Breitengrad, Längengrad, Höhe) erfassen, um Ihre Projekte mit Geotags zu versehen. Diese Daten werden lokal in Ihren Projektdateien gespeichert.
+*   **Speicher / Fotos:** Die App fordert keine Speicherberechtigung an. Bilder, die Sie hinzufügen, kommen über die Fotoauswahl oder Dateiauswahl des Android-Systems, die der App nur Zugriff auf die von Ihnen gewählte Datei geben. Projekte werden im privaten Speicher der App gespeichert, exportierte Bilder in der Fotogalerie Ihres Geräts.
+*   **Standortdaten (Optional):** Die App fragt nur dann nach der Standortberechtigung, wenn Sie mit der Aufnahme eines AR-Ziels beginnen. Wenn Sie sie erteilen, speichert der Aufnahmedatensatz dieses Ziels, wo es aufgenommen wurde (Breitengrad, Längengrad, Höhe und Genauigkeit). Er wird lokal in der Projektdatei gespeichert und verlässt Ihr Gerät nur, wenn Sie diese Projektdatei selbst teilen oder exportieren.
 
 ## Absturzberichte (Opt-In)
 
@@ -42,9 +42,9 @@ Wir können Drittunternehmen und -personen aus folgenden Gründen beschäftigen:
 
 Wir verwenden **Google ML Kit** für die Motivsegmentierung (Hintergrundentfernung). Diese Verarbeitung erfolgt lokal auf Ihrem Gerät.
 
-## Update-Prüfungen
+## Updates
 
-Der Einstellungsbildschirm enthält eine Schaltfläche „Nach Updates suchen". Es wird nichts automatisch geprüft — nur wenn Sie darauf tippen. Ein Tippen darauf löst eine Anfrage an die **GitHub-API** (api.github.com) aus, um die neueste Version dieses Projekts nachzuschlagen. GitHub ist ein Drittanbieter außerhalb unserer Kontrolle, und Ihre IP-Adresse ist für die Dauer dieser einen Anfrage für GitHub sichtbar — genau wie bei jeder Webanfrage, die Sie an github.com richten. Es werden im Rahmen dieser Anfrage keine weiteren Informationen gesendet.
+Die App kontaktiert nie einen Server, um nach Updates zu suchen. Der Einstellungsbildschirm hat einen Eintrag „Release-Seite öffnen“; ein Tippen darauf öffnet die GitHub-Release-Seite dieses Projekts (github.com/HereLiesAz/GraffitiXR/releases) in Ihrem Browser, genau so, als hätten Sie den Link selbst aufgerufen. Die App selbst sendet nichts.
 
 ## Sicherheit
 

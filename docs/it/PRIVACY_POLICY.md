@@ -13,8 +13,8 @@ Se scegli di utilizzare il nostro Servizio, acconsenti alla raccolta e all'uso d
 Per una migliore esperienza, durante l'utilizzo del nostro Servizio, potremmo richiederti di fornirci alcune informazioni di identificazione personale, inclusi ma non limitati a:
 
 *   **Dati della Telecamera:** L'app richiede l'accesso alla telecamera del tuo dispositivo per visualizzare la vista in Realtà Aumentata (AR), la modalità Sovrapposizione e per catturare immagini per i bersagli del progetto. I dati della telecamera vengono elaborati localmente sul tuo dispositivo e non vengono trasmessi ai nostri server, a meno che tu non scelga esplicitamente di condividere un file di progetto.
-*   **Archiviazione / Foto:** Richiediamo l'accesso all'archiviazione del tuo dispositivo (Lettura/Scrittura Archiviazione Esterna o Libreria Foto) per caricare immagini per sovrapposizioni, salvare i tuoi progetti ed esportare immagini catturate.
-*   **Dati sulla Posizione (Opzionale):** Se concedi le autorizzazioni per la posizione, l'app potrebbe raccogliere i dati GPS (latitudine, longitudine, altitudine) per geotaggare i tuoi progetti. Questi dati vengono salvati localmente all'interno dei file del tuo progetto.
+*   **Archiviazione / Foto:** L'app non richiede alcuna autorizzazione di archiviazione. Le immagini che aggiungi arrivano tramite il selettore di foto o di file del sistema Android, che concedono all'app l'accesso solo al file che scegli. I progetti vengono salvati nella memoria privata dell'app e le immagini esportate nella galleria foto del tuo dispositivo.
+*   **Dati sulla Posizione (Opzionale):** L'app chiede l'autorizzazione alla posizione solo quando inizi a catturare un bersaglio AR. Se la concedi, il record di cattura di quel bersaglio memorizza dove è stato catturato (latitudine, longitudine, altitudine e precisione). Viene salvato localmente nel file del progetto e lascia il tuo dispositivo solo se condividi o esporti tu stesso quel file di progetto.
 
 ## Report di Crash (Opzionali)
 
@@ -42,9 +42,9 @@ Potremmo impiegare società e individui di terze parti per i seguenti motivi:
 
 Utilizziamo **Google ML Kit** per la segmentazione del soggetto (rimozione dello sfondo). Questa elaborazione avviene localmente sul tuo dispositivo.
 
-## Controlli degli Aggiornamenti
+## Aggiornamenti
 
-La schermata Impostazioni ha un pulsante "Controlla aggiornamenti". Nulla viene controllato automaticamente — solo quando lo premi. Premerlo effettua una richiesta alla **API di GitHub** (api.github.com) per verificare l'ultima release di questo progetto. GitHub è una terza parte al di fuori del nostro controllo, e il tuo indirizzo IP è visibile a GitHub per la durata di quella singola richiesta, esattamente come avverrebbe per qualsiasi richiesta web che fai verso github.com. Nessun'altra informazione viene inviata come parte di questa richiesta.
+L'app non contatta mai un server per cercare aggiornamenti. La schermata Impostazioni ha una voce "Apri la pagina delle release"; toccandola si apre nel browser la pagina delle release GitHub di questo progetto (github.com/HereLiesAz/GraffitiXR/releases), esattamente come se avessi seguito il link tu stesso. L'app di per sé non invia nulla.
 
 ## Sicurezza
 

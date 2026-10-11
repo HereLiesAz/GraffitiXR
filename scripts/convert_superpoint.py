@@ -2,8 +2,20 @@
 """
 convert_superpoint.py — Export SuperPoint weights → ONNX for GraffitiXR.
 
-SuperPoint is the self-supervised feature detector from Magic Leap:
-  https://github.com/magicleap/SuperPointPretrainedNetwork
+PROVENANCE — READ FIRST. The superpoint.onnx that ships in
+core/nativebridge/src/main/assets/ was NOT produced by this script and does NOT
+contain Magic Leap's weights. It carries the MIT-licensed weights of
+rpautrat/SuperPoint (`weights/superpoint_v6_from_tf.pth`, © 2018 Paul-Edouard
+Sarlin & Rémi Pautrat; license next to the asset as superpoint.LICENSE.txt):
+  https://github.com/rpautrat/SuperPoint/blob/master/weights/superpoint_v6_from_tf.pth
+
+An earlier version of this docstring said the asset was Magic Leap's
+SuperPointPretrainedNetwork. That was false. The code below still targets Magic
+Leap's `superpoint_v1.pth` and the Magic Leap layer layout, which cannot load the
+rpautrat checkpoint (different architecture), and Magic Leap's weights are under
+a non-commercial license this app must not ship. So the export is DISABLED until a
+corrected script for the rpautrat checkpoint lands (in progress); running it exits
+with this explanation instead of silently producing a differently-licensed model.
 
 Outputs:
   core/nativebridge/src/main/assets/superpoint.onnx
@@ -35,7 +47,11 @@ import torch
 import torch.nn as nn
 
 
-# Official Magic Leap pre-trained weights
+# Magic Leap weights (NON-COMMERCIAL license) -- NOT what ships; kept only until the corrected
+# rpautrat export replaces this script. See the module docstring.
+SHIPPED_WEIGHTS_URL = (
+    "https://github.com/rpautrat/SuperPoint/raw/master/weights/superpoint_v6_from_tf.pth"
+)
 WEIGHTS_URL = (
     "https://github.com/magicleap/SuperPointPretrainedNetwork"
     "/raw/master/superpoint_v1.pth"
@@ -122,6 +138,16 @@ def main():
                         default="core/nativebridge/src/main/assets/superpoint.onnx",
                         help="Output ONNX path")
     args = parser.parse_args()
+
+    print(
+        "convert_superpoint.py is disabled: the shipped superpoint.onnx uses the MIT-licensed\n"
+        f"rpautrat/SuperPoint v6 weights ({SHIPPED_WEIGHTS_URL}),\n"
+        "which this Magic-Leap-layout exporter cannot load, and Magic Leap's own weights are\n"
+        "non-commercial. A corrected export script for the rpautrat checkpoint is coming;\n"
+        "do not regenerate the asset with this one.",
+        file=sys.stderr,
+    )
+    sys.exit(2)
 
     if args.height % 8 or args.width % 8:
         print("Error: height and width must be multiples of 8", file=sys.stderr)

@@ -29,4 +29,13 @@ object ArCameraHealth {
         lastFrameTimestampNs: Long,
         timeoutMs: Long = DEAD_CAMERA_TIMEOUT_MS,
     ): Boolean = lastFrameTimestampNs == 0L && elapsedMs >= timeoutMs
+
+    /**
+     * Start of the dead-camera clock for the next poll. The clock only runs while an ARCore session is
+     * attached to the renderer: before that (stereo probe, camera-free gate, a pause/resume that
+     * re-ran AR entry) ARCore has not been asked for a frame yet, so "no frame" proves nothing —
+     * counting that time armed camera safe mode and kicked the artist out of AR on healthy devices.
+     */
+    fun watchStartMs(currentStartMs: Long, nowMs: Long, sessionAttached: Boolean): Long =
+        if (sessionAttached) currentStartMs else nowMs
 }

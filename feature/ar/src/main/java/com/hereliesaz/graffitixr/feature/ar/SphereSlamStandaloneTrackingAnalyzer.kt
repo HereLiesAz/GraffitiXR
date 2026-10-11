@@ -28,6 +28,8 @@ import com.hereliesaz.sphereslam.camera.RotatedLuma
 import com.hereliesaz.sphereslam.math.RigidMath
 import com.hereliesaz.sphereslam.reloc.PhotosphereTrackingSession
 import com.hereliesaz.sphereslam.reloc.PoseBlend
+import com.hereliesaz.sphereslam.reloc.TileDepthMap
+import com.hereliesaz.sphereslam.reloc.TileDepthSource
 import com.hereliesaz.sphereslam.reloc.VisualMatchMethod
 import java.nio.ByteBuffer
 import timber.log.Timber
@@ -74,6 +76,10 @@ data class SphereSlamStandaloneAtlasReferenceImage(
 enum class SphereSlamStandalonePoseSource {
     KPM,
     IMU_BRIDGE,
+    /** The last lock carried through the gyro (SphereSLAM without tile localization). */
+    HELD,
+    /** Placed from the photosphere: wall out of view, camera located from recognised tiles. */
+    PHOTOSPHERE,
     /** MobileGS PnP against a protocol-v3 co-op peer fingerprint. */
     PEER_FINGERPRINT,
 }
@@ -309,6 +315,18 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             maxBridgeMs = maxBridgeMs,
             keyframeIntervalMs = PHOTOSPHERE_KEYFRAME_INTERVAL_MS,
         ),
+        // MiDaS per new photosphere tile (on SphereSLAM's tile worker): tiles get 3D points from the
+        // first standpoint, so the artwork stays placed when the artist steps away from the wall.
+        // DepthEstimator calls are synchronized, so sharing it with the depth worker below is safe.
+        tileDepthSource = depthEstimator?.let { estimator ->
+            TileDepthSource { luma, width, height ->
+                if (!estimator.isLoaded && !estimator.load()) {
+                    null
+                } else {
+                    estimator.estimateLuma(luma, width, height)?.let { TileDepthMap(it.width, it.height, it.data) }
+                }
+            }
+        },
         callbacks = PhotosphereTrackingSession.Callbacks(
             onKeyframe = { keyframe ->
                 depthCadence.onViewDirection(keyframe.headingDeg, keyframe.elevationDeg)
@@ -560,8 +578,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
 
             val acceptedCameraFromFingerprint = result.acceptedCameraFromFingerprint
             when {
-                // Accepted, but the lock is still being confirmed: nothing to render or feed yet.
-                result.visualAccepted && acceptedCameraFromFingerprint == null -> onFrameTracked(null)
+                // Accepted, but the lock is still being confirmed: nothing to feed yet; keep showing the
+                // photosphere/held pose SphereSLAM returns meanwhile (null before any lock).
+                result.visualAccepted && acceptedCameraFromFingerprint == null ->
+                    onFrameTracked(result.pose?.let { standaloneFrame(it) })
                 result.visualAccepted -> {
                     // KPM and MobileGS are precision/enrichment estimators in fingerprint-local space;
                     // MobileGS is handed the accepted pose already rebased into the base SphereSLAM
@@ -611,6 +631,8 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             source = when (pose.source) {
                 PhotosphereTrackingSession.PoseSource.KPM -> SphereSlamStandalonePoseSource.KPM
                 PhotosphereTrackingSession.PoseSource.IMU_BRIDGE -> SphereSlamStandalonePoseSource.IMU_BRIDGE
+                PhotosphereTrackingSession.PoseSource.HELD -> SphereSlamStandalonePoseSource.HELD
+                PhotosphereTrackingSession.PoseSource.PHOTOSPHERE -> SphereSlamStandalonePoseSource.PHOTOSPHERE
             },
             matchMethod = pose.matchMethod.takeIf {
                 pose.source == PhotosphereTrackingSession.PoseSource.KPM
@@ -856,6 +878,13 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             viewMatrix = FloatArray(0),
             regions = ByteArray(0),
         )
+        // Native drops the distortion-head patch when the fingerprint CHANGES (a patch belongs to
+        // the wall it pictured), so the seed re-supplies this fingerprint's own -- which also makes
+        // the head work after a standalone reload, not only in the capture session.
+        fp.patchData.takeIf { it.isNotEmpty() }?.let { patch ->
+            val side = kotlin.math.sqrt(patch.size.toDouble()).toInt()
+            if (side * side == patch.size) slam.setWallPatchBytes(patch, side)
+        }
         slam.overlayMarkCenterLocal =
             fp.markCenterLocal.takeIf { it.size == 3 }?.toFloatArray()
         slam.captureAnchorCam = null

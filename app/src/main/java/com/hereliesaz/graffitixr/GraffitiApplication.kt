@@ -5,12 +5,14 @@ import android.app.Application
 import android.util.Log
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.google.android.gms.security.ProviderInstaller
+import com.hereliesaz.graffitixr.common.crash.CrashReportQueue
 import com.hereliesaz.graffitixr.common.crash.CrashReporter
 import com.hereliesaz.graffitixr.common.crash.CrashUploadWorker
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -64,10 +66,10 @@ class GraffitiApplication : Application() {
         // without asking is exactly the silent collection that pitch promises doesn't happen.
         // The crash FILES themselves are still written and still read by MainActivity for its
         // on-screen "last run crashed" dialog regardless of this setting — only the network upload
-        // is gated. CAPTURE the file contents NOW, synchronously, before MainActivity.onCreate reads
-        // + deletes them for that dialog (same startup transaction) — otherwise the async upload
-        // races that delete and finds nothing. Then upload off the main thread and delete each file
-        // on success. Covers both the JVM crash dump and the native (SIGSEGV/SIGABRT) backtrace. The
+        // is gated. The contents are staged into an upload queue before MainActivity.onCreate reads
+        // + deletes the files for that dialog (same startup transaction) — otherwise the async upload
+        // races that delete and finds nothing. Then upload off the main thread and drop each queued
+        // copy only on success. Covers both the JVM crash dump and the native (SIGSEGV/SIGABRT) backtrace. The
         // benign isolated ":probe" native crash is intentionally NOT reported. The token is the
         // artist's own, entered in Settings and read from the repository below (NEVER compiled into
         // the APK — a build-time token shipped a live credential inside every published binary); a
@@ -76,33 +78,36 @@ class GraffitiApplication : Application() {
         val crashUploadErrorHandler = CoroutineExceptionHandler { _, e ->
             Log.e("GraffitiApplication", "Crash upload failed at startup; ignored", e)
         }
-        // Capture the crash file CONTENTS now, synchronously, before MainActivity reads + deletes them
-        // for its dialog. The consent check and the token both come from the repository (async), so
-        // capture unconditionally and gate the actual upload inside the coroutine.
-        val capturedCrashes = listOf(
-            "last_crash.txt" to "Auto-Report: App Crash",
-            "last_native_crash.txt" to "Auto-Report: Native Crash"
-        ).mapNotNull { (name, title) ->
-            runCatching {
-                val f = java.io.File(cacheDir, name)
-                if (f.exists()) Triple(f, title, f.readText()) else null
-            }.getOrNull()
-        }
-        if (capturedCrashes.isNotEmpty()) {
-            MainScope().launch(crashUploadErrorHandler) {
-                if (!settingsRepository.crashReportingConsent.first()) {
-                    Log.i("GraffitiApplication", "Crash reporting not opted in; not uploading.")
-                    return@launch
-                }
-                val crashToken = settingsRepository.crashReportToken.first()
-                if (crashToken.isBlank()) {
-                    Log.i("GraffitiApplication", "No crash-report token set; not uploading.")
-                    return@launch
-                }
-                val worker = CrashUploadWorker()
-                capturedCrashes.forEach { (file, title, report) ->
-                    if (worker.uploadCaptured(crashToken, title, report)) {
-                        runCatching { file.delete() }
+        // Stage the crash files into a durable upload queue NOW, synchronously, before
+        // MainActivity reads + deletes them for its dialog. The queued copy is deleted only after a
+        // successful upload, so a failed one (offline, GitHub 5xx) is retried on the next launch
+        // instead of being lost with the dialog's copy. Without consent nothing is kept. Main
+        // process only: the isolated ":probe" process runs this onCreate too and must not upload.
+        if (!currentProcessName().endsWith(":probe")) {
+            val crashQueue = CrashReportQueue(java.io.File(cacheDir, "crash-upload-queue"))
+            crashQueue.stage(
+                listOf(
+                    java.io.File(cacheDir, "last_crash.txt") to "Auto-Report: App Crash",
+                    java.io.File(cacheDir, "last_native_crash.txt") to "Auto-Report: Native Crash",
+                ),
+            )
+            if (crashQueue.pending().isNotEmpty()) {
+                MainScope().launch(Dispatchers.IO + crashUploadErrorHandler) {
+                    if (!settingsRepository.crashReportingConsent.first()) {
+                        Log.i("GraffitiApplication", "Crash reporting not opted in; not uploading.")
+                        crashQueue.clear()
+                        return@launch
+                    }
+                    val crashToken = settingsRepository.crashReportToken.first()
+                    if (crashToken.isBlank()) {
+                        Log.i("GraffitiApplication", "No crash-report token set; not uploading.")
+                        return@launch
+                    }
+                    val worker = CrashUploadWorker()
+                    crashQueue.pending().forEach { entry ->
+                        if (worker.uploadCaptured(crashToken, entry.title, entry.report)) {
+                            crashQueue.remove(entry)
+                        }
                     }
                 }
             }

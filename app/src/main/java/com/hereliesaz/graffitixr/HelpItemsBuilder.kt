@@ -60,6 +60,7 @@ internal fun buildHelpItems(strings: AppStrings): Map<String, Any> = mapOf(
     "design.adjust" to strings.nav.adjustInfo,
     "design.balance" to strings.nav.balanceInfo,
     "design.invert" to strings.nav.invertInfo,
+    "design.blend" to strings.nav.blendingInfo,
     "design.outline" to strings.nav.outlineInfo,
     "design.isolate" to strings.nav.isolateInfo,
     "design.lock" to strings.nav.lockInfo,

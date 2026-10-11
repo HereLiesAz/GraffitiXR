@@ -80,4 +80,24 @@ class MainViewModelTest {
         viewModel.setCaptureStep(CaptureStep.REVIEW)
         assertEquals(CaptureStep.REVIEW, viewModel.uiState.value.captureStep)
     }
+
+    @Test
+    fun `gyro cannot be armed while the overlay camera is not showing`() = runTest {
+        viewModel.toggleOverlayGyro(cameraShowing = false)
+        assertEquals(false, viewModel.uiState.value.isOverlayGyroActive)
+        // The camera appearing later (permission granted) must not start it by itself.
+        viewModel.onOverlayCameraShowingChanged(cameraShowing = true)
+        assertEquals(false, viewModel.uiState.value.isOverlayGyroActive)
+    }
+
+    @Test
+    fun `gyro toggles while the camera shows and is released when it hides`() = runTest {
+        viewModel.toggleOverlayGyro(cameraShowing = true)
+        assertEquals(true, viewModel.uiState.value.isOverlayGyroActive)
+        viewModel.onOverlayCameraShowingChanged(cameraShowing = false)
+        assertEquals(false, viewModel.uiState.value.isOverlayGyroActive)
+        viewModel.toggleOverlayGyro(cameraShowing = true)
+        viewModel.toggleOverlayGyro(cameraShowing = true)
+        assertEquals(false, viewModel.uiState.value.isOverlayGyroActive)
+    }
 }

@@ -303,17 +303,8 @@
     <string name="redetect">再検出</string>
 
 
-    <string name="plane_realignment_title">壁の表面を再検出</string>
 
-    <string name="plane_realignment_text">アンカーは撮影時の立ち位置から配置されます。ARCoreは元の位置の真正面に追跡された垂直面を選択します。
 
-1. 撮影時のおおよその位置に戻ります
-2. カメラを壁画の壁に沿ってゆっくりとパンし、ARCoreが平らな表面として認識できるようにします
-3. アートワークに向かってしっかりと持ち、下をタップします
-
-オレンジ色の境界線が新しく検出された表面にジャンプします。</string>
-
-    <string name="use_this_wall">この壁を使用</string>
 
 
     <string name="scanning_dots">スキャン中…</string>
@@ -413,12 +404,10 @@
     <string name="settings_info_section">アプリ情報</string>
     <string name="settings_version_label">バージョン</string>
     <string name="settings_updates_section">アップデート</string>
-    <string name="settings_check_updates_label">試験運用版のアップデートを確認</string>
-    <string name="settings_install_update_label">アップデートをインストール</string>
+    <string name="settings_open_releases_label">リリースページを開く</string>
     <string name="settings_permissions_section">権限</string>
     <string name="settings_camera_access">カメラのアクセス権</string>
     <string name="settings_photo_access">写真ライブラリのアクセス権</string>
-    <string name="settings_notifications">通知</string>
     <string name="settings_granted">許可済み</string>
     <string name="settings_denied">拒否</string>
     <string name="settings_open_app_settings">アプリの設定を開く</string>
@@ -454,6 +443,7 @@
     <string name="scan_hint_build_map">左右に歩いてマップを構築します</string>
     <string name="scan_hint_closer">壁に近づいてください</string>
     <string name="scan_hint_higher_lower">上下をスキャンします</string>
+    <string name="reacquiring_target">ターゲットを再検出中…</string>
 
 
     <string name="desc_bg_mockup">背景のモックアップ</string>

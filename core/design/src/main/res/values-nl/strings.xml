@@ -302,11 +302,8 @@
     <string name="redetect">Opnieuw detecteren</string>
 
 
-    <string name="plane_realignment_title">Detecteer het muuroppervlak opnieuw</string>
 
-    <string name="plane_realignment_text">Het anker wordt geplaatst vanaf de plek waar u stond toen u de vangst deed. ARCore kiest het gevolgde verticale oppervlak het meest direct voor die oorspronkelijke positie.\n\n1. Keer terug naar ongeveer waar u stond tijdens het vastleggen\n2. Draai de camera langzaam over uw muurschildering zodat ARCore deze als een vlak oppervlak kan registreren\n3. Blijf stabiel met je gezicht naar het kunstwerk gericht en tik vervolgens hieronder\n\nDe oranje rand springt naar het nieuw gedetecteerde oppervlak.</string>
 
-    <string name="use_this_wall">Gebruik deze muur</string>
 
 
     <string name="scanning_dots">Scannen\u2026</string>
@@ -395,12 +392,10 @@
     <string name="settings_info_section">App-informatie</string>
     <string name="settings_version_label">Versie</string>
     <string name="settings_updates_section">Updates</string>
-    <string name="settings_check_updates_label">Controleer op experimentele updates</string>
-    <string name="settings_install_update_label">Update installeren</string>
+    <string name="settings_open_releases_label">Open de releasepagina</string>
     <string name="settings_permissions_section">Machtigingen</string>
     <string name="settings_camera_access">Cameratoegang</string>
     <string name="settings_photo_access">Toegang tot fotobibliotheek</string>
-    <string name="settings_notifications">Meldingen</string>
     <string name="settings_granted">Toegekend</string>
     <string name="settings_denied">Geweigerd</string>
     <string name="settings_open_app_settings">Open App-instellingen</string>
@@ -436,6 +431,7 @@
     <string name="scan_hint_build_map">Loop naar links en rechts om een ​​kaart te bouwen</string>
     <string name="scan_hint_closer">Ga dichter bij de muur staan</string>
     <string name="scan_hint_higher_lower">Scan hoger en lager</string>
+    <string name="reacquiring_target">Doel opnieuw zoeken…</string>
 
 
     <string name="desc_bg_mockup">Achtergrondmodel</string>

@@ -302,11 +302,8 @@
     <string name="redetect">Повторное обнаружение</string>
 
 
-    <string name="plane_realignment_title">Повторное определение поверхности стены</string>
 
-    <string name="plane_realignment_text">Якорь устанавливается с того места, где вы стояли во время захвата. </string>
 
-    <string name="use_this_wall">Используйте эту стену</string>
 
 
     <string name="scanning_dots">Сканирование\u2026</string>
@@ -395,12 +392,10 @@
     <string name="settings_info_section">Информация о приложении</string>
     <string name="settings_version_label">Версия</string>
     <string name="settings_updates_section">Обновления</string>
-    <string name="settings_check_updates_label">Проверьте наличие экспериментальных обновлений</string>
-    <string name="settings_install_update_label">Установить обновление</string>
+    <string name="settings_open_releases_label">Открыть страницу релизов</string>
     <string name="settings_permissions_section">Разрешения</string>
     <string name="settings_camera_access">Доступ к камере</string>
     <string name="settings_photo_access">Доступ к фотобиблиотеке</string>
-    <string name="settings_notifications">Уведомления</string>
     <string name="settings_granted">Предоставленный</string>
     <string name="settings_denied">Отклонен</string>
     <string name="settings_open_app_settings">Откройте настройки приложения</string>
@@ -436,6 +431,7 @@
     <string name="scan_hint_build_map">Идите влево и вправо, чтобы построить карту.</string>
     <string name="scan_hint_closer">Подойдите ближе к стене</string>
     <string name="scan_hint_higher_lower">Сканируйте выше и ниже</string>
+    <string name="reacquiring_target">Повторный поиск цели…</string>
 
 
     <string name="desc_bg_mockup">Фоновый макет</string>
