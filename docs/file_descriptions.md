@@ -9,7 +9,7 @@ This document lists key files in the repository and their purposes.
 *   `build.gradle.kts`: Root build configuration.
 *   `settings.gradle.kts`: Module inclusion settings.
 *   `gradle/libs.versions.toml`: Version catalog — all dependency versions are defined here.
-*   `version.properties`: App Major/Minor version; build number auto-increments from git commit count.
+*   `version.properties`: The app version (major.minor.patch.build), owned by the shared version contract; read verbatim as the versionName.
 *   OpenCV (Java + native C++) is imported from Maven Central (`org.opencv:opencv`, native via its Prefab part); GLM headers are committed under `core/nativebridge/libs/glm`.
 
 ## Application (`:app`)

@@ -42,27 +42,20 @@ The `release` signing config is only created when the keystore file exists
 
 ### versionCode and versionName
 
-`app/build.gradle.kts` resolves the version from two sources:
+`app/build.gradle.kts` only reads `version.properties`; nothing in the build increments or rewrites it.
 
-- **CI builds** set `CI_VERSION_CODE`, which becomes the `versionCode` verbatim, and
-  `version.properties` is never rewritten. The value is per workflow:
+- **versionName** is `versionMajor.versionMinor.versionPatch.versionBuild`, verbatim. Those fields
+  belong to the shared version contract (HereLiesAz/workflows `version-contract`), whose bot commits
+  `chore(version): M.m.p.b` after each merge, so releases read 1.48.18.1, 1.48.19.1, …
+- **versionCode** is `CI_VERSION_CODE` when set, else 1 (local builds):
 
   | Workflow | `CI_VERSION_CODE` | Published to |
   |----------|-------------------|--------------|
-  | `release.yml` | `1,000,000 + run_number × 10 + (run_attempt − 1)` | Google Play + GitHub release |
+  | `release.yml` | one above the highest code Play holds (`play_multitrack_publish.py --next-version-code`) | Google Play + GitHub release |
   | `android-ci.yml` | `20,000 + run_number` | `latest-debug-v<maj>.<min>` debug prerelease |
   | `merged-build.yml` | `20,000 + run_number` | nothing (build/test only) |
 
-  Only `release.yml` codes reach Play. They are monotonic across runs and distinct per re-run
-  attempt, and the 1,000,000 floor clears every code published before the switch (~14,731).
-  The publishing jobs also set `CI_VERSION_PATCH` to the commit count of the built commit
-  (`git rev-list --count HEAD`), so `versionName` is `major.minor.<commit count>`: the same commit
-  gets the same `versionName` from every workflow, and it only grows along `main`. CI jobs that
-  don't publish leave it unset and keep the tracked `versionPatch`.
-- **Local builds** (no `CI_VERSION_CODE`) auto‑increment `versionBuild` (the `versionCode`) and
-  `versionPatch` in `version.properties` on every compiling Gradle invocation; a `versionMinor`
-  bump resets the patch to 0 (see the comments in `app/build.gradle.kts`). There is no
-  `-PversionBuild` override and no git-commit-count `versionCode` formula.
+  Only `release.yml` codes reach Play, and each release advances the code by exactly 1.
 
 ---
 
@@ -91,7 +84,7 @@ Jobs:
       `app/keystore.jks` and fails if it or any of `KEYSTORE_PASSWORD` / `KEY_ALIAS` /
       `KEY_PASSWORD` is missing, so an unsigned build is never published.
    2. Sets up JDK 21 (Temurin) + Gradle, reads `applicationId` from `app/build.gradle.kts`, and
-      derives `CI_VERSION_CODE` / `CI_VERSION_PATCH` (see [versionCode](#versioncode-and-versionname)).
+      reads `CI_VERSION_CODE` from Play (see [versionCode](#versioncode-and-versionname)).
    3. Runs `./gradlew bundleRelease assembleRelease` with the signing env vars, uploads the AAB and
       APK as the `graffitixr-release` artifact, and runs the SphereSLAM packaging/manifest checks
       against the release variant.

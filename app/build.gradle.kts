@@ -28,78 +28,19 @@ val localProperties = Properties().apply {
     }
 }
 
-// Version resolution. version.properties is CI-owned (the version bot stamps it and commits it), so a
-// build only ever rewrites it when running in CI ([isCi]) without a CI_VERSION_CODE override. Local
-// builds read it and never write it: they used to auto-increment it on every compile, leaving every
-// developer checkout with a dirty, conflicting copy of a file the bot also commits.
-// When that CI write does happen, both the build number and the patch are incremented:
-//   - versionBuild  -> the Android versionCode. Monotonic; NEVER resets.
-//   - versionPatch  -> the patch segment of the versionName. Increments each compile, but resets to
-//                      0 when versionMinor was bumped since the last build (a new minor starts at .0).
-//                      versionMinorLast tracks the minor we last built so that reset is automatic.
-// True when the requested tasks will trigger real compilation — not a sync, `tasks`, `clean`,
-// a `--dry-run`, or a diagnostic like `buildEnvironment`/`buildHealth`. Build verbs cover every
-// entry point that transitively invokes a KotlinCompile / JavaCompile task on this project: the
-// full android build lifecycle (assemble/bundle/install/package), explicit compile invocations,
-// unit-test / instrumented-test / verification tasks (test/check/lint/verify/connectedTest — all
-// depend on compileDebugKotlin / compileReleaseKotlin), and `run` for library modules. Verbs are
-// matched as a prefix on the leaf task name and the `build` lifecycle task is matched exactly, so
-// diagnostics that merely contain "build" don't trip it.
-val startParameter = gradle.startParameter
-val buildVerbs = listOf(
-    "assemble", "bundle", "install", "package", "compile",
-    "test", "check", "lint", "verify", "connected", "run",
-)
-val isBuilding = !startParameter.isDryRun && startParameter.taskNames.any { taskName ->
-    val task = taskName.substringAfterLast(':').lowercase()
-    task == "build" || buildVerbs.any { task.startsWith(it) }
-}
-
-val verMajor = versionProps.getProperty("versionMajor", "1")
-val verMinor = versionProps.getProperty("versionMinor", "0")
-// Detect a minor bump BEFORE the build-gated block so the reset also applies to CI/override builds
-// (and IDE syncs), where the block is skipped: a new minor always reads as patch 0 even if the file
-// still holds the previous minor's patch (it may not have been rewritten by a CI build yet).
-val lastMinor = versionProps.getProperty("versionMinorLast", verMinor)
-val isMinorBumped = verMinor != lastMinor
-
-var currentVersionCode = versionProps.getProperty("versionBuild", "1").toInt()
-var currentPatch = if (isMinorBumped) 0 else versionProps.getProperty("versionPatch", "0").toInt()
-
-// CI supplies its own versionCode (derived from the run number) and never rewrites the tracked
-// version.properties: the same commit then builds the same code however many compiles ran first,
-// and two branches' CI builds can't publish identical codes. Local builds use the tracked values as-is.
-//
-// versionName scheme for CI builds: "$major.$minor.$CI_VERSION_PATCH", where the publishing workflows
-// set CI_VERSION_PATCH to the commit count of the built commit (`git rev-list --count HEAD`, full
-// clone). That is stable per commit — release.yml, android-ci.yml and merged-build.yml all name the
-// same commit identically — and monotonic along main, so it never goes backwards across a minor bump
-// either. It is deliberately NOT the CI versionCode: those differ per workflow (1_000_000+run*10+attempt
-// in release.yml, 20000+run in android-ci/merged-build) and made the same commit read 1.43.1000010 in
-// one place and 1.43.20123 in another. Play ordering is governed solely by versionCode, which stays
-// CI_VERSION_CODE. Without CI_VERSION_PATCH (CI jobs that don't publish) the tracked patch is kept.
-// GitHub Actions sets both; other CI systems set CI=true.
-val isCi = System.getenv("CI").equals("true", ignoreCase = true) ||
-    System.getenv("GITHUB_ACTIONS").equals("true", ignoreCase = true)
-val ciVersionCode = System.getenv("CI_VERSION_CODE")?.toIntOrNull()?.takeIf { it > 0 }
-val ciVersionPatch = System.getenv("CI_VERSION_PATCH")?.toIntOrNull()?.takeIf { it >= 0 }
-if (ciVersionCode != null) {
-    currentVersionCode = ciVersionCode
-    if (ciVersionPatch != null) currentPatch = ciVersionPatch
-} else if (isBuilding && isCi) {
-    currentVersionCode++ // build never resets
-    // A minor bump makes this build the new minor's .0; otherwise advance the patch.
-    if (!isMinorBumped) currentPatch++
-
-    versionProps.setProperty("versionBuild", currentVersionCode.toString())
-    versionProps.setProperty("versionPatch", currentPatch.toString())
-    versionProps.setProperty("versionMinorLast", verMinor)
-    versionPropsFile.outputStream().use {
-        versionProps.store(it, "Auto-incremented on compile")
-    }
-}
-
-val currentVersionName = "$verMajor.$verMinor.$currentPatch"
+// Version resolution. version.properties belongs to the shared version contract
+// (HereLiesAz/workflows `version-contract`): its bot commits `chore(version): M.m.p.b` and owns every
+// field. The build only READS it; nothing here increments or rewrites it.
+//   - versionName = versionMajor.versionMinor.versionPatch.versionBuild, verbatim — the same string the
+//     contract commits, so each release reads 1.48.18.1, 1.48.19.1, … (it never grows new digits).
+//   - versionCode = CI_VERSION_CODE when set (release.yml: one above the highest code Play holds;
+//     android-ci / merged-build: a debug-only counter), else 1 for local builds.
+val verMajor = versionProps.getProperty("versionMajor", "1").trim()
+val verMinor = versionProps.getProperty("versionMinor", "0").trim()
+val verPatch = versionProps.getProperty("versionPatch", "0").trim()
+val verBuild = versionProps.getProperty("versionBuild", "0").trim()
+val currentVersionCode = System.getenv("CI_VERSION_CODE")?.toIntOrNull()?.takeIf { it > 0 } ?: 1
+val currentVersionName = "$verMajor.$verMinor.$verPatch.$verBuild"
 
 android {
     namespace = "com.hereliesaz.graffitixr"
@@ -247,8 +188,7 @@ androidComponents {
     onVariants { variant ->
         variant.outputs.forEach { output ->
             val version = variant.outputs.first().versionName.get()
-            val code = variant.outputs.first().versionCode.get()
-            val apkName = "GraffitiXR-${variant.name}-$version.$code.apk"
+            val apkName = "GraffitiXR-${variant.name}-$version.apk"
             (output as? com.android.build.api.variant.impl.VariantOutputImpl)?.outputFileName?.set(apkName)
         }
     }

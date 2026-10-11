@@ -46,13 +46,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Derive CI versionCode
-        # Any positive value keeps app/build.gradle.kts from rewriting the tracked version.properties.
-        env:
-          RUN_NUMBER: ${{ github.run_number }}
-          RUN_ATTEMPT: ${{ github.run_attempt }}
-        run: echo "CI_VERSION_CODE=$((1000000 + RUN_NUMBER * 10 + (RUN_ATTEMPT - 1)))" >> "$GITHUB_ENV"
-
       - name: Set up JDK 21
         uses: actions/setup-java@v6
         with:
@@ -170,35 +163,33 @@ jobs:
           PKG=$(grep -E 'applicationId\s*=' app/build.gradle.kts | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
           echo "package_name=$PKG" >> "$GITHUB_OUTPUT"
 
-      - name: Resolve CI versionCode
+      - name: Install Play API client
+        run: pip install --quiet google-api-python-client google-auth google-auth-httplib2 'httplib2>=0.22.0,<1'
+
+      - name: Resolve versionCode from Play
         id: vcode
         env:
-          RUN_NUMBER: ${{ github.run_number }}
-          RUN_ATTEMPT: ${{ github.run_attempt }}
+          PACKAGE_NAME: ${{ steps.meta.outputs.package_name }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
         run: |
           set -euo pipefail
-          # app/build.gradle.kts reads CI_VERSION_CODE as the Android versionCode and, when it is set,
-          # never rewrites the tracked version.properties — so the same commit builds the same code and
-          # the persist step below has nothing to commit (which is what previously raced into a conflict).
-          #
-          # Play requires a strictly increasing code. Pre-centralization builds reached ~14731; nothing
-          # has published since. The 1,000,000 floor clears that history with room to spare.
-          #
-          # run_number is monotonic but does NOT change on a re-run, so a re-run after Play already
-          # accepted the bundle would rebuild the same code and be rejected. run_attempt advances on each
-          # re-run, so include it: run_number*10 + (run_attempt-1) gives each attempt a distinct code
-          # while staying monotonic across runs and far below the 2,100,000,000 ceiling (allows 9
-          # attempts per run; run_number can reach ~209M before overflow).
-          echo "ci_version_code=$((1000000 + RUN_NUMBER * 10 + (RUN_ATTEMPT - 1)))" >> "$GITHUB_OUTPUT"
-          # versionName patch: commit count of this commit (full clone above), identical to what
-          # android-ci.yml / merged-build.yml stamp on the same commit. See app/build.gradle.kts.
-          echo "ci_version_patch=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+          # versionCode = one above the highest code Play holds (any track, any upload): it advances by
+          # exactly 1 per release, whatever the run number, and a re-run after Play accepted a bundle
+          # simply takes the next code. The versionName is version.properties verbatim (the shared
+          # version contract's major.minor.patch.build) — see app/build.gradle.kts.
+          if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::error::PLAY_SERVICE_ACCOUNT_JSON is empty — cannot read the next versionCode from Play." >&2
+            exit 1
+          fi
+          code=$(python .github/scripts/play_multitrack_publish.py --next-version-code)
+          [[ "$code" =~ ^[0-9]+$ ]] || { echo "::error::Play returned no versionCode: $code" >&2; exit 1; }
+          echo "Next Play versionCode: $code"
+          echo "ci_version_code=$code" >> "$GITHUB_OUTPUT"
 
       - name: Build signed AAB + APK
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CI_VERSION_CODE: ${{ steps.vcode.outputs.ci_version_code }}
-          CI_VERSION_PATCH: ${{ steps.vcode.outputs.ci_version_patch }}
           KEYSTORE_FILE: ${{ github.workspace }}/app/keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -227,9 +218,7 @@ jobs:
       - name: Resolve release version
         id: version
         run: |
-          # The GitHub release is a moving per-minor pointer (latest-release-vMAJOR.MINOR). versionBuild
-          # is no longer read here: with CI_VERSION_CODE set it stays at the tracked placeholder, so the
-          # release notes use the actual built versionCode (steps.vcode) instead.
+          # The GitHub release is a moving per-minor pointer (latest-release-vMAJOR.MINOR).
           echo "tag=latest-release-v$(grep -E '^versionMajor=' version.properties | cut -d'=' -f2 | tr -d '\r ').$(grep -E '^versionMinor=' version.properties | cut -d'=' -f2 | tr -d '\r ')" >> "$GITHUB_OUTPUT"
 
       # Play first, GitHub release second. Publishing the public GitHub release before Play meant a Play
@@ -244,11 +233,7 @@ jobs:
           PACKAGE_NAME: ${{ steps.meta.outputs.package_name }}
           AAB_GLOB: app/build/outputs/bundle/release/*.aab
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-        run: |
-          # httplib2 was pinned to 0.15.0, which predates the CVE-2020-11078 fix (0.18.0). The script
-          # only uses httplib2.Http(timeout=...), stable across 0.x; google-auth-httplib2 needs >=0.19.
-          pip install --quiet google-api-python-client google-auth google-auth-httplib2 'httplib2>=0.22.0,<1'
-          python .github/scripts/play_multitrack_publish.py
+        run: python .github/scripts/play_multitrack_publish.py
 
       - name: Fail loudly if Play upload didn't succeed
         if: ${{ always() && steps.play-upload.outcome != 'success' && steps.play-upload.outcome != 'skipped' }}
@@ -257,8 +242,8 @@ jobs:
           exit 1
 
       # Runs only after the Play upload step succeeded (a failed Play step fails the job and skips this),
-      # so the public GitHub release never advertises a build Play rejected. No versionCode persistence
-      # step: CI_VERSION_CODE comes from the run number, so the build never rewrites version.properties.
+      # so the public GitHub release never advertises a build Play rejected. Nothing is persisted: the
+      # versionCode comes from Play and the build never rewrites version.properties.
       - name: Publish APK to GitHub release
         if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.publish) }}
         env:
