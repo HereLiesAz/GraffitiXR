@@ -141,7 +141,14 @@
     <string name="lib_project_thumbnail">Thumbnail ng Proyekto</string>
     <string name="lib_delete_project_desc">Tanggalin ang proyekto %1$s</string>
     <string name="settings_title">Mga setting</string>
-    <string name="settings_preferences_section">Mga Kagustuhan</string>
+    <string name="settings_general_section">Pangkalahatan</string>
+    <string name="settings_ar_section">AR</string>
+    <string name="settings_glow_section">Liwanag ng saklaw</string>
+    <string name="settings_power_section">Power</string>
+    <string name="settings_privacy_section">Privacy</string>
+    <string name="settings_developer_section">Developer</string>
+    <string name="settings_power_saving_label">Pagtitipid ng power</string>
+    <string name="settings_power_saving_desc">Bumaba sa 30 fps kapag mainit ang telepono, naka-power saver, mahina ang baterya, o naglalag.</string>
     <string name="settings_hand_label">Dominant na Kamay</string>
     <string name="settings_hand_right">Tama</string>
     <string name="settings_hand_left">Kaliwa</string>

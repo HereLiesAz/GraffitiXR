@@ -353,7 +353,14 @@
 
     <!-- Settings Screen -->
     <string name="settings_title">Innstillinger</string>
-    <string name="settings_preferences_section">Preferanser</string>
+    <string name="settings_general_section">Generelt</string>
+    <string name="settings_ar_section">AR</string>
+    <string name="settings_glow_section">Dekningsglød</string>
+    <string name="settings_power_section">Strøm</string>
+    <string name="settings_privacy_section">Personvern</string>
+    <string name="settings_developer_section">Utvikler</string>
+    <string name="settings_power_saving_label">Strømsparing</string>
+    <string name="settings_power_saving_desc">Senk til 30 fps når telefonen er varm, i strømsparing, har lavt batteri eller henger etter.</string>
     <string name="settings_hand_label">Dominerende hånd</string>
     <string name="settings_hand_right">Høyre</string>
     <string name="settings_hand_left">Igjen</string>

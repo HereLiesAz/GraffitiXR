@@ -353,7 +353,14 @@
 
     <!-- Settings Screen -->
     <string name="settings_title">Einstellungen</string>
-    <string name="settings_preferences_section">Präferenzen</string>
+    <string name="settings_general_section">Allgemein</string>
+    <string name="settings_ar_section">AR</string>
+    <string name="settings_glow_section">Abdeckungsleuchten</string>
+    <string name="settings_power_section">Energie</string>
+    <string name="settings_privacy_section">Datenschutz</string>
+    <string name="settings_developer_section">Entwickler</string>
+    <string name="settings_power_saving_label">Energiesparen</string>
+    <string name="settings_power_saving_desc">Auf 30 fps senken, wenn das Telefon heiß ist, im Energiesparmodus, bei niedrigem Akku oder Verzögerung.</string>
     <string name="settings_hand_label">Dominante Hand</string>
     <string name="settings_hand_right">Rechts</string>
     <string name="settings_hand_left">Links</string>

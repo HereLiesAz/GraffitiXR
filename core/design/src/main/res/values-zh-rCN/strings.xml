@@ -370,7 +370,14 @@
 
 
     <string name="settings_title">设置</string>
-    <string name="settings_preferences_section">首选项</string>
+    <string name="settings_general_section">常规</string>
+    <string name="settings_ar_section">AR</string>
+    <string name="settings_glow_section">覆盖光晕</string>
+    <string name="settings_power_section">电源</string>
+    <string name="settings_privacy_section">隐私</string>
+    <string name="settings_developer_section">开发者</string>
+    <string name="settings_power_saving_label">省电</string>
+    <string name="settings_power_saving_desc">手机过热、处于省电模式、电量低或卡顿时降至 30 fps。</string>
     <string name="settings_hand_label">惯用手</string>
     <string name="settings_hand_right">右手</string>
     <string name="settings_hand_left">左手</string>

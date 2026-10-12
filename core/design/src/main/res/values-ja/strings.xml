@@ -370,7 +370,14 @@
 
 
     <string name="settings_title">設定</string>
-    <string name="settings_preferences_section">環境設定</string>
+    <string name="settings_general_section">一般</string>
+    <string name="settings_ar_section">AR</string>
+    <string name="settings_glow_section">カバレッジの光</string>
+    <string name="settings_power_section">電源</string>
+    <string name="settings_privacy_section">プライバシー</string>
+    <string name="settings_developer_section">開発者</string>
+    <string name="settings_power_saving_label">省電力</string>
+    <string name="settings_power_saving_desc">端末が熱い、省電力モード、バッテリー残量が少ない、または処理が遅れているときは30fpsに下げます。</string>
     <string name="settings_hand_label">利き手</string>
     <string name="settings_hand_right">右</string>
     <string name="settings_hand_left">左</string>

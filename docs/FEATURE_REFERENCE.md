@@ -404,6 +404,12 @@ descriptor will silently return null from `nativeSetWallFingerprint`. The contra
 
 Every persisted key, its default, and effect. Adaptive-throttle keys default **on**.
 
+**Settings screen layout:** General (language, hand, units, canvas background, reset tutorials) · AR
+(ARCore, ARCore depth, monocular depth, ambient scan, anchor boundary, camera fps) · Coverage glow ·
+Power (Power saving, Adaptive rate) · Privacy (crash reports, token) · App information (version,
+releases page, camera permission) · Developer (the §7.4 overlays; starts collapsed). On/off settings
+are switches.
+
 ### 7.1 Performance / perception throttle
 
 | Setting | Key | Default | Effect |
@@ -413,6 +419,9 @@ Every persisted key, its default, and effect. Adaptive-throttle keys default **o
 | Throttle on power-save | `throttle_on_power_save` | on | The same in OS power-save mode |
 | Throttle on low battery | `throttle_on_low_battery` | on | The same on the low-battery warning or at ≤ 15%; at ≤ 30%: analysis ≤ 20 fps, relocalizer and MiDaS at half rate |
 | Throttle on lag | `throttle_on_lag` | on | Perception floor 30 fps when frame lag is detected |
+
+The four `throttle_on_*` keys share one switch in Settings, **Power saving**: it reads on only while all
+four are on, and toggling it sets all four.
 | Camera target FPS | `camera_target_fps` | `60` | ARCore camera capture target; a change re-selects the live session's camera config immediately |
 
 **Perception model:** world-locked perception layers render into an offscreen FBO that refreshes only on
@@ -455,7 +464,7 @@ Settings screen:
 
 ### 7.4 Diagnostic overlays (editor toggles)
 
-Runtime visualization toggles for debugging tracking, each independently settable from Settings.
+Runtime visualization toggles for debugging tracking, each independently settable from Settings ▸ Developer.
 `showFeaturePoints` defaults **off** — it is a raw perception-debug visualization with no onboarding
 explanation. `showPlaneGrids` and `showPoints` default **on**, matching the onboarding copy that
 promises "coloured shapes appear as the engine maps the surface" as user-facing scanning feedback —
