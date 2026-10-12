@@ -1,5 +1,26 @@
 # SphereSLAM Implementation TODO
 
+## SphereSLAM 0.26.0 — oblique rectification, anchor tiles (adopted)
+
+The app consumes SphereSLAM **0.26.0** (tag `0.26.0`). No app code changes; both are library-side
+and on by default.
+
+- [x] Extreme perspectives: when the predicted view is at least 30° off the wall's normal, the full
+  KPM solve matches a virtual frontal re-rendering of the frame and solves the real pose from it
+  (`KpmMatchSpeedConfig.obliqueRectificationDeg`). Diagnostics report `matchMethod=KPM_RECTIFIED`.
+- [x] Anchor tiles: the tiles around a station's first lock (24°) are never evicted from the
+  photosphere, so the gyro bridge has its nearest references when the wall swings back into view.
+
+Device checks owed for 0.26.0:
+
+- [ ] Lock square-on, then walk sideways to 60–70° off the wall: the artwork stays on the wall and
+  `matchMethod` reads `KPM_RECTIFIED`.
+- [ ] Work away from the wall for minutes, swing back: the artwork re-places from the anchor tiles.
+
+Not done: the camera analysis stream stays at CameraX's default (640×480, matched at 320×240). At
+grazing angles the wall spans few pixels across; a higher analysis resolution would help and costs
+KPM, flow and depth time on the very phones that run this path (no ARCore).
+
 ## SphereSLAM 0.25.3 — full-sphere photosphere, per-tile scan progress (adopted)
 
 The app consumes SphereSLAM **0.25.3** (tag `0.25.3`). It is the 0.25.1 code; 0.25.1/0.25.2 never
