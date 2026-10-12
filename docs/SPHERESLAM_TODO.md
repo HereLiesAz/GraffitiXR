@@ -1220,14 +1220,16 @@ Still required:
 - [ ] process recreation test;
 - [ ] GL texture clear/replace test;
 - [ ] lifecycle analyzer/IMU teardown test;
-- [ ] backend routing test on ARCore-unavailable environment.
+- [x] backend routing test on ARCore-unavailable environment (`ArViewModelLiveSettingsTest`: an unsupported
+  device resolves to `STANDALONE`; `ArRailBackendPolicyTest`).
 
 ### Native
 
 - [ ] KPM JNI smoke test on packaged APK;
 - [ ] KPM add-page/match known-image integration test;
 - [x] native buffer-size guard tests (`core/nativebridge/src/test/cpp/FrameBufferGuardTest.cpp`, run in CI);
-- [ ] MobileGS standalone-frame integration tests after frame conversion exists;
+- [x] MobileGS standalone-frame integration tests (`MobileGSRelocTest`: a centred page-frame fingerprint with
+  an identity anchor locks and reports `camera_from_fingerprint` in the page frame; `MobileGSFrames.*`);
 - [ ] native thread/teardown race test.
 
 If the repo still lacks the required Android/native test infrastructure, create that infrastructure
