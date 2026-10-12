@@ -356,6 +356,16 @@
     <string name="settings_general_section">Geral</string>
     <string name="settings_ar_section">RA</string>
     <string name="settings_glow_section">Brilho de cobertura</string>
+    <string name="settings_anticipation_section">Antecipação</string>
+    <string name="settings_anticipation_desc">Vistas do alvo de todos os lados, para que uma sobreposição perdida volte a encontrar a parede. Mais vistas recuperam de mais ângulos e custam mais bateria e calor.</string>
+    <string name="settings_anticipation_distance">Distância</string>
+    <string name="settings_anticipation_latitude">Latitude</string>
+    <string name="settings_anticipation_longitude">Longitude</string>
+    <string name="settings_anticipation_roll">Rotação</string>
+    <string name="settings_anticipation_battery">A bateria reduz em</string>
+    <string name="settings_anticipation_heat">O calor reduz em</string>
+    <string name="settings_anticipation_compute">A carga reduz em</string>
+    <string name="settings_anticipation_views">No máximo %1$d vistas por página</string>
     <string name="settings_power_section">Energia</string>
     <string name="settings_privacy_section">Privacidade</string>
     <string name="settings_developer_section">Desenvolvedor</string>

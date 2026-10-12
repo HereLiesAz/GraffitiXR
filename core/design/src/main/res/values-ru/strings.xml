@@ -361,6 +361,16 @@
     <string name="settings_general_section">Общие</string>
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">Подсветка покрытия</string>
+    <string name="settings_anticipation_section">Предвидение</string>
+    <string name="settings_anticipation_desc">Виды цели со всех сторон, чтобы потерянное наложение снова нашло стену. Больше видов — захват с большего числа углов, но больше расход батареи и нагрев.</string>
+    <string name="settings_anticipation_distance">Расстояние</string>
+    <string name="settings_anticipation_latitude">Широта</string>
+    <string name="settings_anticipation_longitude">Долгота</string>
+    <string name="settings_anticipation_roll">Поворот</string>
+    <string name="settings_anticipation_battery">Батарея снижает на</string>
+    <string name="settings_anticipation_heat">Нагрев снижает на</string>
+    <string name="settings_anticipation_compute">Нагрузка снижает на</string>
+    <string name="settings_anticipation_views">Не более %1$d видов на страницу</string>
     <string name="settings_power_section">Питание</string>
     <string name="settings_privacy_section">Конфиденциальность</string>
     <string name="settings_developer_section">Для разработчиков</string>

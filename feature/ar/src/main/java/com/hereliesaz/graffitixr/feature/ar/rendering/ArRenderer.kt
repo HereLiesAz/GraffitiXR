@@ -830,6 +830,34 @@ class ArRenderer(
     // Parallel wall tracker. It observes camera luma beside ARCore; it never replaces poseSource.
     // Its output is reserved for relocalization/drift fusion once metric page scale is established.
     private val sphereSlamTracker = com.hereliesaz.sphereslam.SphereSlamTracker()
+    // The app's anticipated views of the KPM page (the fingerprint's teleological layer): the
+    // half-sphere of Settings → Anticipation, throttled by battery, heat and this renderer's load.
+    private val anticipation = com.hereliesaz.graffitixr.feature.ar.anticipation.AnticipationFeeder(
+        sink = object : com.hereliesaz.graffitixr.feature.ar.anticipation.AnticipationFeeder.Sink {
+            override fun addViews(pageNo: Int, views: List<com.hereliesaz.sphereslam.AnticipatedView>) =
+                sphereSlamTracker.addAnticipatedViews(views)
+            override fun setSearchable(ids: Set<String>?) = sphereSlamTracker.setSearchableAnticipatedViews(ids)
+        },
+        settings = com.hereliesaz.graffitixr.common.model.AnticipationSettings.DEFAULT,
+        pressure = com.hereliesaz.graffitixr.feature.ar.anticipation.AndroidDevicePressure(context),
+    )
+    // The tracker's camera (the CPU image KPM matches), which views are rendered for.
+    @Volatile private var anticipationCamera: com.hereliesaz.sphereslam.camera.CameraIntrinsics? = null
+    private var frameStartNs = 0L
+
+    /** Settings → Anticipation; applies from the next frame. */
+    var anticipationSettings: com.hereliesaz.graffitixr.common.model.AnticipationSettings
+        get() = anticipation.settings
+        set(value) {
+            anticipation.settings = value
+        }
+
+    /** Anticipate the tracker's new reference page for [camera]. */
+    private fun anticipateReference(luma: ByteArray, width: Int, height: Int, camera: com.hereliesaz.sphereslam.SphereSlamTracker.CameraModel) {
+        anticipation.reset()
+        anticipationCamera = com.hereliesaz.sphereslam.camera.CameraIntrinsics(camera.fx, camera.fy, camera.cx, camera.cy, camera.width, camera.height)
+        anticipation.setPage(0, luma, width, height)
+    }
     // KPM is asynchronous; this ring pairs each observation with the ARCore view + consensus anchor
     // from the SAME sensor timestamp before any correction enters PoseFusion.
     private val hybridPoseHistory =
@@ -983,6 +1011,8 @@ class ArRenderer(
         // Stop the old page synchronously BEFORE any asynchronous replacement work. Otherwise an
         // in-flight matcher can publish a perfectly valid observation from the superseded wall.
         sphereSlamTracker.clearReference()
+        anticipation.reset()
+        anticipationCamera = null
         hybridReferenceGeometry = null
         hybridReferencePhysicallyMetric = false
         hybridPoseHistory.clear()
@@ -1018,16 +1048,15 @@ class ArRenderer(
             val dims = intrinsics.imageDimensions
             val dpi = com.hereliesaz.sphereslam.SphereSlamPoseMath
                 .dpiForReferenceWidth(page.width, page.widthMeters)
-            sphereSlamTracker.reset(
-                com.hereliesaz.sphereslam.SphereSlamTracker.CameraModel(
-                    width = dims[0],
-                    height = dims[1],
-                    fx = intrinsics.focalLength[0],
-                    fy = intrinsics.focalLength[1],
-                    cx = intrinsics.principalPoint[0],
-                    cy = intrinsics.principalPoint[1],
-                )
+            val cameraModel = com.hereliesaz.sphereslam.SphereSlamTracker.CameraModel(
+                width = dims[0],
+                height = dims[1],
+                fx = intrinsics.focalLength[0],
+                fy = intrinsics.focalLength[1],
+                cx = intrinsics.principalPoint[0],
+                cy = intrinsics.principalPoint[1],
             )
+            sphereSlamTracker.reset(cameraModel)
             sphereSlamTracker.setReference(
                 luma = java.nio.ByteBuffer.wrap(page.luma),
                 width = page.width,
@@ -1035,6 +1064,7 @@ class ArRenderer(
                 rowStride = page.width,
                 dpi = dpi,
             )
+            anticipateReference(page.luma, page.width, page.height, cameraModel)
             hybridReferenceGeometry = com.hereliesaz.sphereslam.SphereSlamPoseMath
                 .pageGeometry(page.width, page.height, dpi)
             hybridReferencePhysicallyMetric = true
@@ -1520,6 +1550,7 @@ class ArRenderer(
         // instantaneous and we never touch a session that is being closed.
         if (isDestroying) return
         frameCount++
+        frameStartNs = android.os.SystemClock.elapsedRealtimeNanos()
         // Latch the export request HERE, at the top of the frame, not at the readback site near the
         // end. ArViewModel.requestExport sets hideVisualization before exportRequested, so observing
         // the request at frame start guarantees the suppression is already in effect for everything
@@ -2699,16 +2730,15 @@ class ArRenderer(
                                 )
                             }
                             if (geometry != null && reference != null) {
-                                sphereSlamTracker.reset(
-                                    com.hereliesaz.sphereslam.SphereSlamTracker.CameraModel(
-                                        width = image.width,
-                                        height = image.height,
-                                        fx = fx,
-                                        fy = fy,
-                                        cx = cx,
-                                        cy = cy,
-                                    )
+                                val cameraModel = com.hereliesaz.sphereslam.SphereSlamTracker.CameraModel(
+                                    width = image.width,
+                                    height = image.height,
+                                    fx = fx,
+                                    fy = fy,
+                                    cx = cx,
+                                    cy = cy,
                                 )
+                                sphereSlamTracker.reset(cameraModel)
                                 sphereSlamTracker.setReference(
                                     luma = java.nio.ByteBuffer.wrap(reference.luma),
                                     width = reference.width,
@@ -2716,6 +2746,7 @@ class ArRenderer(
                                     rowStride = reference.width,
                                     dpi = reference.referenceDpi,
                                 )
+                                anticipateReference(reference.luma, reference.width, reference.height, cameraModel)
                                 hybridReferenceGeometry = reference.pageGeometry
                                 hybridReferencePhysicallyMetric = true
                                 // Held for persistence until the page↔artwork relation freezes
@@ -2877,6 +2908,14 @@ class ArRenderer(
                                 height = image.height,
                                 rowStride = planes[0].rowStride,
                                 timestampNs = frame.timestamp,
+                            )
+                            // The frame's work so far stands for this renderer's load; this runs every
+                            // SPHERESLAM_FEED_DIVISOR frames, so that many frames' worth per interval.
+                            anticipation.onFrame(
+                                nowMs = android.os.SystemClock.elapsedRealtime(),
+                                workMs = SPHERESLAM_FEED_DIVISOR * (android.os.SystemClock.elapsedRealtimeNanos() - frameStartNs) / 1e6f,
+                                timestampNs = frame.timestamp,
+                                camera = anticipationCamera,
                             )
                         }
                     }
@@ -3618,6 +3657,7 @@ class ArRenderer(
         // runs off the GL thread and onDrawFrame may currently hold sessionLock inside a native ARCore
         // call. The page anchor is detached only after the bounded lock succeeds below.
         resetHybridReference(detachPageAnchor = false)
+        anticipation.close()
         sphereSlamTracker.close()
         // Bounded acquisition only. If the GL thread is wedged mid-frame holding the lock, null the
         // @Volatile session and drop Java references without making ANY off-lock ARCore native calls.

@@ -356,6 +356,16 @@
     <string name="settings_general_section">Allgemein</string>
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">Abdeckungsleuchten</string>
+    <string name="settings_anticipation_section">Antizipation</string>
+    <string name="settings_anticipation_desc">Ansichten des Ziels von allen Seiten, damit ein verlorenes Overlay die Wand wiederfindet. Mehr Ansichten fangen aus mehr Winkeln, kosten aber mehr Akku und Wärme.</string>
+    <string name="settings_anticipation_distance">Entfernung</string>
+    <string name="settings_anticipation_latitude">Breite</string>
+    <string name="settings_anticipation_longitude">Länge</string>
+    <string name="settings_anticipation_roll">Drehung</string>
+    <string name="settings_anticipation_battery">Akku drosselt um</string>
+    <string name="settings_anticipation_heat">Wärme drosselt um</string>
+    <string name="settings_anticipation_compute">Last drosselt um</string>
+    <string name="settings_anticipation_views">Höchstens %1$d Ansichten pro Seite</string>
     <string name="settings_power_section">Energie</string>
     <string name="settings_privacy_section">Datenschutz</string>
     <string name="settings_developer_section">Entwickler</string>

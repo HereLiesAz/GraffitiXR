@@ -396,6 +396,16 @@
     <string name="settings_general_section">General</string>
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">Coverage glow</string>
+    <string name="settings_anticipation_section">Anticipation</string>
+    <string name="settings_anticipation_desc">Views of the target from all around, so a lost overlay finds the wall again. More views relock from more angles and cost more battery and heat.</string>
+    <string name="settings_anticipation_distance">Distance</string>
+    <string name="settings_anticipation_latitude">Latitude</string>
+    <string name="settings_anticipation_longitude">Longitude</string>
+    <string name="settings_anticipation_roll">Roll</string>
+    <string name="settings_anticipation_battery">Battery throttles by</string>
+    <string name="settings_anticipation_heat">Heat throttles by</string>
+    <string name="settings_anticipation_compute">Load throttles by</string>
+    <string name="settings_anticipation_views">%1$d views per page at most</string>
     <string name="settings_power_section">Power</string>
     <string name="settings_privacy_section">Privacy</string>
     <string name="settings_developer_section">Developer</string>

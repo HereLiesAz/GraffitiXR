@@ -1,6 +1,36 @@
 # SphereSLAM Implementation TODO
 
-## SphereSLAM 0.26.5 — steep relocks, previews (adopted)
+## SphereSLAM 0.26.6 — anticipation is the app's (adopted)
+
+The app consumes SphereSLAM **0.26.6** (tag `0.26.6`). The library no longer chooses or renders
+previews; it learns and searches the views the app hands it (`AnticipatedView`), and turns the live
+frame by the sensors toward the nearest tile. The app's anticipation runs in every AR mode (standalone
+through `PhotosphereTrackingSession`, ARCore through `SphereSlamTracker`), on the KPM page of the
+fingerprint — the teleological layer's anticipated appearance of the wall.
+
+- [x] Half-sphere views (`feature/ar/.../anticipation/HalfSphere.kt`): target at the core, capture view
+  at the pole; meridians (latitude) cut by circles (longitude), a view at the pole and every cut, none
+  on the equator; `distance` half-spheres from the capture distance in (zoom in only); every view at
+  `roll` turns. Nearer half-spheres repeat over a grid of aim points across the target
+  (`⌈distance / (shell + 1)⌉` per side), so a close-up of any part of the wall is anticipated, partial
+  views (target overflowing the frame, part of it behind the camera) included.
+- [x] Settings → Anticipation: distance, latitude, longitude, roll (the maximum) and how far battery,
+  heat and the tracker's own load may cut it; applies at once.
+- [x] Throttling (`AnticipationGovernor`): far half-spheres go first, outermost in; the nearest one's
+  warps go last, and its aims never. Lowering builds nothing; relief waits 10 s.
+- [x] Built off the camera thread, farthest first, four at a time (`AnticipationFeeder`).
+- [x] Fingerprint review: a highlighted mark touching the photo's edge is excluded automatically.
+
+Device checks owed for 0.26.6:
+
+- [ ] Lose the lock with the phone a hand's width from the wall, over a corner of the target: it
+  relocks (`KPM_PREVIEW`).
+- [ ] Defaults (182 views per page) build in the background with no visible frame time; a hot device
+  drops the far half-spheres first.
+- [ ] A Settings change to Anticipation changes the view count in the diagnostics at once.
+- [ ] Fingerprint review never highlights a mark cut by the photo's edge.
+
+## SphereSLAM 0.26.5 — steep relocks, previews (adopted; previews superseded by 0.26.6)
 
 The app consumes SphereSLAM **0.26.5** (tag `0.26.5`). Nothing in the app changes: every new lever is
 on by default in `KpmMatchSpeedConfig`, which the app leaves at the library's defaults.

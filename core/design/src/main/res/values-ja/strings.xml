@@ -373,6 +373,16 @@
     <string name="settings_general_section">一般</string>
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">カバレッジの光</string>
+    <string name="settings_anticipation_section">予測</string>
+    <string name="settings_anticipation_desc">ターゲットをあらゆる方向から見たビュー。見失ったオーバーレイが壁を再び見つけられます。ビューが多いほど多くの角度から復帰できますが、バッテリーと発熱が増えます。</string>
+    <string name="settings_anticipation_distance">距離</string>
+    <string name="settings_anticipation_latitude">緯度</string>
+    <string name="settings_anticipation_longitude">経度</string>
+    <string name="settings_anticipation_roll">回転</string>
+    <string name="settings_anticipation_battery">バッテリーによる制限</string>
+    <string name="settings_anticipation_heat">発熱による制限</string>
+    <string name="settings_anticipation_compute">負荷による制限</string>
+    <string name="settings_anticipation_views">1ページあたり最大%1$d ビュー</string>
     <string name="settings_power_section">電源</string>
     <string name="settings_privacy_section">プライバシー</string>
     <string name="settings_developer_section">開発者</string>

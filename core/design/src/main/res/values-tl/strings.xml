@@ -144,6 +144,16 @@
     <string name="settings_general_section">Pangkalahatan</string>
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">Liwanag ng saklaw</string>
+    <string name="settings_anticipation_section">Pag-asam</string>
+    <string name="settings_anticipation_desc">Mga tanaw ng target mula sa lahat ng panig, para mahanap muli ng nawalang overlay ang pader. Mas maraming tanaw ang nakakabalik mula sa mas maraming anggulo pero mas magastos sa baterya at init.</string>
+    <string name="settings_anticipation_distance">Layo</string>
+    <string name="settings_anticipation_latitude">Latitud</string>
+    <string name="settings_anticipation_longitude">Longhitud</string>
+    <string name="settings_anticipation_roll">Ikot</string>
+    <string name="settings_anticipation_battery">Binabawasan ng baterya nang</string>
+    <string name="settings_anticipation_heat">Binabawasan ng init nang</string>
+    <string name="settings_anticipation_compute">Binabawasan ng load nang</string>
+    <string name="settings_anticipation_views">Hanggang %1$d tanaw bawat pahina</string>
     <string name="settings_power_section">Power</string>
     <string name="settings_privacy_section">Privacy</string>
     <string name="settings_developer_section">Developer</string>

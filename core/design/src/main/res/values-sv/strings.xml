@@ -361,6 +361,16 @@
     <string name="settings_general_section">Allmänt</string>
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">Täckningsglöd</string>
+    <string name="settings_anticipation_section">Förutseende</string>
+    <string name="settings_anticipation_desc">Vyer av målet från alla håll, så att ett förlorat överlägg hittar väggen igen. Fler vyer låser från fler vinklar och kostar mer batteri och värme.</string>
+    <string name="settings_anticipation_distance">Avstånd</string>
+    <string name="settings_anticipation_latitude">Latitud</string>
+    <string name="settings_anticipation_longitude">Longitud</string>
+    <string name="settings_anticipation_roll">Rotation</string>
+    <string name="settings_anticipation_battery">Batteri stryper med</string>
+    <string name="settings_anticipation_heat">Värme stryper med</string>
+    <string name="settings_anticipation_compute">Belastning stryper med</string>
+    <string name="settings_anticipation_views">Högst %1$d vyer per sida</string>
     <string name="settings_power_section">Ström</string>
     <string name="settings_privacy_section">Integritet</string>
     <string name="settings_developer_section">Utvecklare</string>

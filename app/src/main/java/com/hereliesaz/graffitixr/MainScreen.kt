@@ -459,6 +459,7 @@ fun MainScreen(
                             adaptiveRateEnabled = arUiState.adaptiveRateEnabled,
                             batteryTier = arUiState.batteryTier,
                             perceptionSystemThrottle = arUiState.perceptionSystemThrottle,
+                            anticipationSettings = arUiState.anticipation,
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {
@@ -721,6 +722,7 @@ fun MainScreen(
                                     // Adaptive idle rate: policy ceilings from the VM + the live
                                     // interaction flag (so a gesture instantly forces full rate).
                                     r.adaptiveRateEnabled = arUiState.adaptiveRateEnabled
+                                    r.anticipationSettings = arUiState.anticipation
                                     r.idleRateCeilingFps = arUiState.idleRateCeilingFps
                                     r.activeRateCeilingFps = arUiState.activeRateCeilingFps
                                     r.gestureInProgress = uiState.gestureInProgress

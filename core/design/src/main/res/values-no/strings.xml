@@ -356,6 +356,16 @@
     <string name="settings_general_section">Generelt</string>
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">Dekningsglød</string>
+    <string name="settings_anticipation_section">Forutseelse</string>
+    <string name="settings_anticipation_desc">Visninger av målet fra alle kanter, så et tapt overlegg finner veggen igjen. Flere visninger låser fra flere vinkler og koster mer batteri og varme.</string>
+    <string name="settings_anticipation_distance">Avstand</string>
+    <string name="settings_anticipation_latitude">Breddegrad</string>
+    <string name="settings_anticipation_longitude">Lengdegrad</string>
+    <string name="settings_anticipation_roll">Rotasjon</string>
+    <string name="settings_anticipation_battery">Batteri struper med</string>
+    <string name="settings_anticipation_heat">Varme struper med</string>
+    <string name="settings_anticipation_compute">Belastning struper med</string>
+    <string name="settings_anticipation_views">Høyst %1$d visninger per side</string>
     <string name="settings_power_section">Strøm</string>
     <string name="settings_privacy_section">Personvern</string>
     <string name="settings_developer_section">Utvikler</string>
