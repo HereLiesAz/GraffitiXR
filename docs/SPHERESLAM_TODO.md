@@ -764,6 +764,7 @@ Remaining:
   counterpart of `fitCenter`, plus the crop-aware projection and view→frame mapping). Done in
   0.24.1 (`camera.CameraFillCenter`); the app copy is gone.
 - [ ] Add GL/instrumentation tests for standalone texture clear/replace if test infrastructure permits.
+  Deferred by decision: verification is hands-on use of the app; no `androidTest` set-up for now.
 - [x] Sanitize and test standalone renderer transforms: non-finite values fall back safely, scale
   uses the shared 0.1–10 editor bounds, rotations normalize, and pathological finite pan values are
   bounded before GL matrix construction.
@@ -1122,9 +1123,12 @@ they were the same frame.
   frame waits (enforced by `tools/check_sphereslam_architecture.py` invariant 7). UI side:
   `consumeTrackedFrame` hands its values to a `LatestValueUiPost` — at most one main-thread post
   outstanding, applying the newest frame's values — so a slow UI thread never replays a backlog.
-- [ ] Add adaptive standalone analysis cadence if KPM exceeds the frame budget. KEEP_ONLY_LATEST
+- [x] Add adaptive standalone analysis cadence if KPM exceeds the frame budget. KEEP_ONLY_LATEST
   drops stale frames but does NOT throttle: when matching exceeds the budget the analyzer stays
-  continuously saturated. A match-duration-driven sampling interval is still required.
+  continuously saturated. `AnalysisFrameGate` (`DeviceStressPolicy.kt`): with Settings → Adaptive
+  rate on, an analyzer whose smoothed work exceeds a camera frame is held to half duty; under
+  thermal / power-save / low battery frames are capped at 20 / 15 fps. `DeviceStressPolicyTest`
+  drives it through a keep-only-latest simulation.
 - [x] Preserve low latency over maximum throughput: drop stale frames instead of queueing them
   (`CameraPreview.rememberCameraController` now pins it rather than inheriting CameraX's default).
 - [ ] Measure battery/thermal behavior over a realistic mural session.
@@ -1212,6 +1216,9 @@ Still required:
   `PhotosphereAtlasGrowthTest`, `AtlasMatcherWorkerTest`).
 
 ### Android/Robolectric/instrumented
+
+Unchecked items here need an on-device / instrumented test set-up. Deferred by decision:
+verification is hands-on use of the app, with failures reported back.
 
 - [x] Camera2 crop/intrinsic test (JVM: SphereSLAM `CameraIntrinsicsEstimatorTest`, app
   `CameraCapabilitiesTest`; an on-device one waits for an `androidTest` source set);
