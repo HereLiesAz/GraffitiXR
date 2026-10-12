@@ -1899,6 +1899,8 @@ class MainActivity : AppCompatActivity() {
                                     onCoverageGlowColorChanged = { arViewModel.setCoverageGlowColor(it) },
                                     onCoverageGlowIntensityChanged = { arViewModel.setCoverageGlowIntensity(it) },
                                     onCoverageGlowStyleChanged = { arViewModel.setCoverageGlowStyle(it) },
+                                    anticipation = arUiState.anticipation,
+                                    onAnticipationChanged = { arViewModel.setAnticipationSettings(it) },
                                     onOpenReleasesPage = { dashboardViewModel.openReleasesPage(this@MainActivity) },
                                     onResetTutorials = {
                                         settingsViewModel.resetCompletedTutorials()

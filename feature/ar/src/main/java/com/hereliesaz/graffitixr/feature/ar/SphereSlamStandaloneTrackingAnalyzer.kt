@@ -2,6 +2,10 @@
 
 package com.hereliesaz.graffitixr.feature.ar
 
+import com.hereliesaz.sphereslam.AnticipatedView
+import com.hereliesaz.graffitixr.feature.ar.anticipation.AnticipationFeeder
+import com.hereliesaz.graffitixr.feature.ar.anticipation.AndroidDevicePressure
+import com.hereliesaz.graffitixr.common.model.AnticipationSettings
 import android.content.Context
 import android.graphics.Bitmap
 import android.hardware.camera2.CameraCharacteristics
@@ -211,6 +215,13 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
      * skips MiDaS for new photosphere tiles. Read per frame, so a change applies at once.
      */
     private val frameGate: AnalysisFrameGate = AnalysisFrameGate(),
+    /**
+     * Settings → Anticipation: the half-sphere of views of the reference (and of every page the
+     * atlas grows) handed to the session for a lost camera to relock from, and how far battery, heat
+     * and this analyzer's own load may cut it ([AnticipationFeeder]). Read every frame, so a change
+     * applies at once.
+     */
+    private val anticipationSettings: () -> AnticipationSettings = { AnticipationSettings.DEFAULT },
     private val onDiagnostic: (String) -> Unit = {},
     private val onCalibrationChanged: (StandaloneCalibrationDiagnostics) -> Unit = {},
     private val onFailure: (StandaloneFailureEvent) -> Unit = {},
@@ -291,6 +302,16 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
 
     // The library session keys its precision-layer rebuild on reference identity, so each app
     // reference is converted once and the converted object reused while it stays current.
+    // The app's anticipated views (the fingerprint's teleological layer), fed to the session.
+    private val anticipation: AnticipationFeeder = AnticipationFeeder(
+        sink = object : AnticipationFeeder.Sink {
+            override fun addViews(pageNo: Int, views: List<AnticipatedView>) = session.addAnticipatedViews(pageNo, views)
+            override fun setSearchable(ids: Set<String>?) = session.setSearchableAnticipatedViews(ids)
+        },
+        settings = anticipationSettings(),
+        pressure = AndroidDevicePressure(context),
+    )
+
     private var convertedReferenceSource: SphereSlamStandaloneReferenceImage? = null
     private var convertedReference: PhotosphereTrackingSession.ReferenceImage? = null
 
@@ -354,6 +375,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             },
             onAtlasPageAdded = { page, attitude ->
                 depthCadence.onAtlasGrowth()
+                anticipation.setPage(page.pageNo, page.luma, page.width, page.height)
                 onAtlasPageAdded(
                     StandaloneAtlasGrowthCandidate(
                         pageNo = page.pageNo,
@@ -403,6 +425,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             atlasPages = atlasReferenceImages.map(::libraryAtlasPage),
             mapFromFingerprint = mobileGsMapFromFingerprint.validTransformOrNull(),
         )
+        anticipatePages(referenceImage, atlasReferenceImages)
         constructed = true
     }
 
@@ -450,12 +473,23 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
 
         // Deliberately does not touch the base photosphere (map orientation, keyframe cadence and
         // attitude reference survive inside the session).
+        val previous = session.atlasPages.map { it.pageNo }
+        val referenceChanged = convertedReferenceSource !== reference
         session.updatePrecisionLayer(
             reference = libraryReference(reference),
             atlasPages = atlasPages.map(::libraryAtlasPage),
             mapFromFingerprint = mapFromFingerprint.validTransformOrNull(),
             forceRebuild = fingerprintChanged || mapChanged,
         )
+        // The session drops views with the reference they were rendered from: render the new one's.
+        if (referenceChanged || previous != atlasPages.map { it.pageNo }) anticipatePages(reference, atlasPages)
+    }
+
+    /** Anticipate [reference] (page 0) and [atlasPages] from scratch. */
+    private fun anticipatePages(reference: SphereSlamStandaloneReferenceImage?, atlasPages: List<SphereSlamStandaloneAtlasReferenceImage>) {
+        anticipation.reset()
+        reference?.let { anticipation.setPage(0, it.luma, it.width, it.height) }
+        atlasPages.forEach { anticipation.setPage(it.pageNo, it.luma, it.width, it.height) }
     }
 
     @Synchronized
@@ -578,6 +612,14 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 ),
             )
             currentFrameIntrinsics = null
+            // Views for the camera KPM matches (known once the matcher is built), as allowed now.
+            anticipationSettings().let { if (it != anticipation.settings) anticipation.settings = it }
+            anticipation.onFrame(
+                nowMs = android.os.SystemClock.elapsedRealtime(),
+                workMs = (android.os.SystemClock.elapsedRealtimeNanos() - workStartNs) / 1e6f,
+                timestampNs = timestampNs,
+                camera = session.matchCamera,
+            )
             // A terminal failure inside the session was already reported (onFatalError above).
             if (session.isFatal) return
 
@@ -1111,6 +1153,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         lastFailureReason = null
         lastReportedTrackingState = null
         frameBuffer = null
+        anticipation.close()
         // Shuts the depth thread down; an inference already running finishes and is discarded.
         depthWorker?.close()
         depthCadence.reset()

@@ -373,6 +373,9 @@ fun SphereSlamStandaloneOverlay(
      * adaptive cadence ([AnalysisFrameGate]). Pushed on every composition, so a change applies at once.
      */
     perceptionSystemThrottle: Boolean = false,
+    /** Settings → Anticipation, read by the analyzer every frame (a change applies at once). */
+    anticipationSettings: com.hereliesaz.graffitixr.common.model.AnticipationSettings =
+        com.hereliesaz.graffitixr.common.model.AnticipationSettings.DEFAULT,
     /**
      * The host's onscreen hand-off ([StandaloneOverlayUiHost]): the status, Copy Diagnostics,
      * Recapture / New Target, sweep hint and fatal dialog are published there so the host draws them
@@ -1142,9 +1145,11 @@ fun SphereSlamStandaloneOverlay(
     // cap) applies immediately; the shared controller's defaults are restored on exit.
     // See StandaloneCameraTuning.kt.
     val frameGate = remember { AnalysisFrameGate() }
+    val anticipationBox = remember { java.util.concurrent.atomic.AtomicReference(anticipationSettings) }
     SideEffect {
         frameGate.stress = deviceStress(perceptionSystemThrottle, batteryTier)
         frameGate.adaptiveCadence = adaptiveRateEnabled
+        anticipationBox.set(anticipationSettings)
     }
 
     val standaloneTargetFps = standaloneEffectiveCameraTargetFps(
@@ -1236,6 +1241,7 @@ fun SphereSlamStandaloneOverlay(
             } else {
                 val analyzer = SphereSlamStandaloneTrackingAnalyzer(
                 context = context,
+                anticipationSettings = { anticipationBox.get() },
                 cameraId = activeCameraId,
                 referenceImage = standaloneReference,
                 atlasReferenceImages = activeAtlas,

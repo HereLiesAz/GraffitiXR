@@ -1,5 +1,7 @@
 package com.hereliesaz.graffitixr.data.repository
 
+import kotlinx.coroutines.flow.distinctUntilChanged
+import com.hereliesaz.graffitixr.common.model.AnticipationSettings
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -73,6 +75,13 @@ class SettingsRepositoryImpl @Inject constructor(
     private val COVERAGE_GLOW_COLOR = intPreferencesKey("coverage_glow_color")
     private val COVERAGE_GLOW_INTENSITY = floatPreferencesKey("coverage_glow_intensity")
     private val COVERAGE_GLOW_STYLE = stringPreferencesKey("coverage_glow_style")
+    private val ANTICIPATION_DISTANCE = intPreferencesKey("anticipation_distance")
+    private val ANTICIPATION_LATITUDE = intPreferencesKey("anticipation_latitude")
+    private val ANTICIPATION_LONGITUDE = intPreferencesKey("anticipation_longitude")
+    private val ANTICIPATION_ROLL = intPreferencesKey("anticipation_roll")
+    private val ANTICIPATION_BATTERY = floatPreferencesKey("anticipation_battery_weight")
+    private val ANTICIPATION_HEAT = floatPreferencesKey("anticipation_heat_weight")
+    private val ANTICIPATION_COMPUTE = floatPreferencesKey("anticipation_compute_weight")
 
     override val language: Flow<AppLanguage> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
@@ -318,6 +327,35 @@ class SettingsRepositoryImpl @Inject constructor(
     override val adaptiveRateEnabled: Flow<Boolean> = throttleFlow(ADAPTIVE_RATE_ENABLED)
     override suspend fun setAdaptiveRateEnabled(on: Boolean) {
         context.dataStore.edit { it[ADAPTIVE_RATE_ENABLED] = on }
+    }
+
+    override val anticipationSettings: Flow<AnticipationSettings> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { p ->
+            val d = AnticipationSettings.DEFAULT
+            AnticipationSettings(
+                distance = p[ANTICIPATION_DISTANCE] ?: d.distance,
+                latitude = p[ANTICIPATION_LATITUDE] ?: d.latitude,
+                longitude = p[ANTICIPATION_LONGITUDE] ?: d.longitude,
+                roll = p[ANTICIPATION_ROLL] ?: d.roll,
+                batteryWeight = p[ANTICIPATION_BATTERY] ?: d.batteryWeight,
+                heatWeight = p[ANTICIPATION_HEAT] ?: d.heatWeight,
+                computeWeight = p[ANTICIPATION_COMPUTE] ?: d.computeWeight,
+            ).sanitized()
+        }
+        .distinctUntilChanged()
+
+    override suspend fun setAnticipationSettings(settings: AnticipationSettings) {
+        val s = settings.sanitized()
+        context.dataStore.edit {
+            it[ANTICIPATION_DISTANCE] = s.distance
+            it[ANTICIPATION_LATITUDE] = s.latitude
+            it[ANTICIPATION_LONGITUDE] = s.longitude
+            it[ANTICIPATION_ROLL] = s.roll
+            it[ANTICIPATION_BATTERY] = s.batteryWeight
+            it[ANTICIPATION_HEAT] = s.heatWeight
+            it[ANTICIPATION_COMPUTE] = s.computeWeight
+        }
     }
 
     override val completedTutorials: Flow<Set<String>> = context.dataStore.data

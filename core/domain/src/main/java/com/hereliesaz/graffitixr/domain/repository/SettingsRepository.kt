@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.domain.repository
 
+import com.hereliesaz.graffitixr.common.model.AnticipationSettings
 import com.hereliesaz.graffitixr.common.model.AppLanguage
 import com.hereliesaz.graffitixr.common.model.CoverageGlowStyle
 import kotlinx.coroutines.flow.Flow
@@ -243,4 +244,12 @@ interface SettingsRepository {
 
     val coverageGlowStyle: Flow<CoverageGlowStyle>
     suspend fun setCoverageGlowStyle(style: CoverageGlowStyle)
+
+    /**
+     * Anticipation: the half-sphere of views of the target the trackers relock from (distance,
+     * latitude, longitude, roll) and how far battery, heat and load may cut it. Stored values out of
+     * range read back clamped ([AnticipationSettings.sanitized]).
+     */
+    val anticipationSettings: Flow<AnticipationSettings>
+    suspend fun setAnticipationSettings(settings: AnticipationSettings)
 }

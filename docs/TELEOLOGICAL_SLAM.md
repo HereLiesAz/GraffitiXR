@@ -167,6 +167,15 @@ convention and a missing capture-view factor, not rotation — see
 **low inlier ratio** points here. `NO TARGET` / `NO FEATURES` / a low in-frame
 feature count point at capture problems instead, which are covered above.
 
+## Anticipation: the wall as it will be seen
+
+The fingerprint's KPM page is matched not only as captured but as the artist will see it: the
+app renders the page from a half-sphere of viewpoints (Settings → Anticipation) and SphereSLAM learns
+each as another image of the page, in every AR mode. Close-ups get the most: nearer half-spheres
+repeat over a grid of aim points across the wall, since the artist is up close most of the time and
+always when it matters, and throttling for battery, heat and load takes the far views first and the
+close-ups last. See `feature/ar/.../anticipation/` and [SPHERESLAM_TODO.md](SPHERESLAM_TODO.md).
+
 ## Relationship to the rest of the engine
 
 - **Relocalization** (snap-back after tracking loss / screen-off) is the
@@ -182,4 +191,4 @@ feature count point at capture problems instead, which are covered above.
   enabled, not what a normal install experiences out of the box.
 
 ---
-*Documentation updated on 2026-09-04 (later pass): corrected the mechanism section — the bundled ONNX distortion head, not the descriptor-similarity test, is the producer of `mPaintingProgress`/`mCorroborationConfidence` in a normal (asset-present) install; the descriptor test only runs as a fallback when that asset is stripped. Earlier same-day pass corrected the confGlobal formula's input (corroboration confidence, not painting progress), self-grow's actual default (off, not on), the corroboration Lowe ratio (0.85, not 0.75), and removed a stale reference to the deleted voxel/splat map. Prior update: 2026-06-22, SLAM right-size and documentation-accuracy pass.*
+*Documentation updated on 2026-10-12: added Anticipation (half-sphere views of the KPM page, close-ups first). Earlier: 2026-09-04 (later pass): corrected the mechanism section — the bundled ONNX distortion head, not the descriptor-similarity test, is the producer of `mPaintingProgress`/`mCorroborationConfidence` in a normal (asset-present) install; the descriptor test only runs as a fallback when that asset is stripped. Earlier same-day pass corrected the confGlobal formula's input (corroboration confidence, not painting progress), self-grow's actual default (off, not on), the corroboration Lowe ratio (0.85, not 0.75), and removed a stale reference to the deleted voxel/splat map. Prior update: 2026-06-22, SLAM right-size and documentation-accuracy pass.*

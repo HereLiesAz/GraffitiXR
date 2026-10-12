@@ -373,6 +373,16 @@
     <string name="settings_general_section">常规</string>
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">覆盖光晕</string>
+    <string name="settings_anticipation_section">预判</string>
+    <string name="settings_anticipation_desc">从各个方向观察目标的视图，让丢失的叠加层重新找到墙面。视图越多，可从越多角度恢复，但耗电和发热也越多。</string>
+    <string name="settings_anticipation_distance">距离</string>
+    <string name="settings_anticipation_latitude">纬度</string>
+    <string name="settings_anticipation_longitude">经度</string>
+    <string name="settings_anticipation_roll">旋转</string>
+    <string name="settings_anticipation_battery">电量限制幅度</string>
+    <string name="settings_anticipation_heat">发热限制幅度</string>
+    <string name="settings_anticipation_compute">负载限制幅度</string>
+    <string name="settings_anticipation_views">每页最多 %1$d 个视图</string>
     <string name="settings_power_section">电源</string>
     <string name="settings_privacy_section">隐私</string>
     <string name="settings_developer_section">开发者</string>

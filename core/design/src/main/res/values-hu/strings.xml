@@ -361,6 +361,16 @@
     <string name="settings_general_section">Általános</string>
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">Lefedettségi fény</string>
+    <string name="settings_anticipation_section">Előrelátás</string>
+    <string name="settings_anticipation_desc">A cél nézetei minden irányból, hogy az elveszett átfedés újra megtalálja a falat. Több nézet több szögből talál vissza, de több akkut és hőt igényel.</string>
+    <string name="settings_anticipation_distance">Távolság</string>
+    <string name="settings_anticipation_latitude">Szélesség</string>
+    <string name="settings_anticipation_longitude">Hosszúság</string>
+    <string name="settings_anticipation_roll">Elforgatás</string>
+    <string name="settings_anticipation_battery">Az akkumulátor ennyivel fojt</string>
+    <string name="settings_anticipation_heat">A hő ennyivel fojt</string>
+    <string name="settings_anticipation_compute">A terhelés ennyivel fojt</string>
+    <string name="settings_anticipation_views">Legfeljebb %1$d nézet oldalanként</string>
     <string name="settings_power_section">Energia</string>
     <string name="settings_privacy_section">Adatvédelem</string>
     <string name="settings_developer_section">Fejlesztő</string>

@@ -361,6 +361,16 @@
     <string name="settings_general_section">一般</string>
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">覆蓋光暈</string>
+    <string name="settings_anticipation_section">預判</string>
+    <string name="settings_anticipation_desc">從各個方向觀察目標的視圖，讓遺失的疊加層重新找到牆面。視圖越多，可從越多角度恢復，但耗電和發熱也越多。</string>
+    <string name="settings_anticipation_distance">距離</string>
+    <string name="settings_anticipation_latitude">緯度</string>
+    <string name="settings_anticipation_longitude">經度</string>
+    <string name="settings_anticipation_roll">旋轉</string>
+    <string name="settings_anticipation_battery">電量限制幅度</string>
+    <string name="settings_anticipation_heat">發熱限制幅度</string>
+    <string name="settings_anticipation_compute">負載限制幅度</string>
+    <string name="settings_anticipation_views">每頁最多 %1$d 個視圖</string>
     <string name="settings_power_section">電源</string>
     <string name="settings_privacy_section">私隱</string>
     <string name="settings_developer_section">開發人員</string>

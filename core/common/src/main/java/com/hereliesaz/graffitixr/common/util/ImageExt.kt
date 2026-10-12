@@ -72,7 +72,8 @@ fun Bitmap.forTargetReview(
  * chaotic noise of the background to isolate only the high-contrast markings.
  * Uses a Bradley-Roth adaptive threshold to outsmart uneven lighting, then keeps only
  * connected mark blobs large enough to be a real mark (despeckle) and paints each whole mark
- * in [MARK_HIGHLIGHT_COLOR] so it is clearly visible — never a scatter of dots.
+ * in [MARK_HIGHLIGHT_COLOR] so it is clearly visible — never a scatter of dots. A mark touching the
+ * photo's edge is excluded: the frame cut it, so its shape there is the frame's, not the wall's.
  *
  * If [tapPos] is provided, the threshold becomes significantly more discerning
  * the further a pixel is from the tap location, ensuring only highly relevant
@@ -148,16 +149,27 @@ fun Bitmap.isolateMarkings(tapPos: Pair<Float, Float>? = null): Bitmap {
         }
     }
 
-    // 2) Despeckle + highlight: keep only 8-connected blobs big enough to be a real mark, and
-    //    paint each whole surviving mark with the highlight colour. 8-connectivity keeps diagonal
-    //    strokes whole (and matches eraseColorBlob, so a tap removes exactly one whole mark).
-    val minMarkPixels = maxOf(MIN_MARK_PIXELS_FLOOR, n / NOISE_AREA_DIVISOR)
+    // 2) Despeckle, drop marks cut by the frame, highlight the rest (see highlightWholeMarks).
+    // Reuses the integral buffer as the flood queue: it is no longer needed after thresholding.
+    val outPixels = highlightWholeMarks(isMark, w, h, maxOf(MIN_MARK_PIXELS_FLOOR, n / NOISE_AREA_DIVISOR), integral)
+    out.setPixels(outPixels, 0, w, 0, 0, w, h)
+    return out
+}
+
+/**
+ * The highlight of [isMark] ([w] × [h]): each 8-connected mark of at least [minMarkPixels] pixels
+ * that does not touch the image's edge, painted [MARK_HIGHLIGHT_COLOR] whole; everything else
+ * transparent (0). A mark touching the edge is cut by the frame — the photo shows only part of it,
+ * and the cut is the frame's line, not the wall's — so it is excluded before the artist sees it.
+ * 8-connectivity keeps diagonal strokes whole (and matches [eraseColorBlob], so a tap removes
+ * exactly one whole mark). [queue] (at least `w × h`) is scratch space.
+ */
+internal fun highlightWholeMarks(isMark: BooleanArray, w: Int, h: Int, minMarkPixels: Int, queue: IntArray = IntArray(w * h)): IntArray {
+    val n = w * h
     val outPixels = IntArray(n) // zero == transparent void
     val visited = BooleanArray(n)
     // The queue stores packed (y shl 16 or x) coordinates so the inner loop avoids per-pixel
-    // div/mod to recover x,y (image dims are always < 65536). Reuses the integral buffer, which
-    // is no longer needed after thresholding.
-    val queue = integral
+    // div/mod to recover x,y (image dims are always < 65536).
     var start = -1
     for (y in 0 until h) {
         for (x in 0 until w) {
@@ -165,12 +177,14 @@ fun Bitmap.isolateMarkings(tapPos: Pair<Float, Float>? = null): Bitmap {
             if (!isMark[start] || visited[start]) continue
             var head = 0
             var tail = 0
+            var touchesEdge = false
             queue[tail++] = (y shl 16) or x
             visited[start] = true
             while (head < tail) {
                 val p = queue[head++]
                 val px = p and 0xFFFF
                 val py = p ushr 16
+                if (px == 0 || py == 0 || px == w - 1 || py == h - 1) touchesEdge = true
                 var dy = -1
                 while (dy <= 1) {
                     var dx = -1
@@ -191,7 +205,7 @@ fun Bitmap.isolateMarkings(tapPos: Pair<Float, Float>? = null): Bitmap {
                     dy++
                 }
             }
-            if (tail >= minMarkPixels) {
+            if (!touchesEdge && tail >= minMarkPixels) {
                 for (k in 0 until tail) {
                     val p = queue[k]
                     outPixels[(p ushr 16) * w + (p and 0xFFFF)] = MARK_HIGHLIGHT_COLOR
@@ -199,8 +213,7 @@ fun Bitmap.isolateMarkings(tapPos: Pair<Float, Float>? = null): Bitmap {
             }
         }
     }
-    out.setPixels(outPixels, 0, w, 0, 0, w, h)
-    return out
+    return outPixels
 }
 
 /**

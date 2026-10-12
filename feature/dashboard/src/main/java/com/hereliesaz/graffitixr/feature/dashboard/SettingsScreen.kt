@@ -59,6 +59,7 @@ import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.graffitixr.common.model.AppLanguage
 import com.hereliesaz.graffitixr.common.model.CoverageGlowAppearance
 import com.hereliesaz.graffitixr.common.model.CoverageGlowColor
+import com.hereliesaz.graffitixr.common.model.AnticipationSettings
 import com.hereliesaz.graffitixr.common.model.CoverageGlowIntensity
 import com.hereliesaz.graffitixr.common.model.CoverageGlowStyle
 import androidx.compose.material3.Slider
@@ -116,6 +117,8 @@ fun SettingsScreen(
     onCoverageGlowColorChanged: (Int) -> Unit,
     onCoverageGlowIntensityChanged: (Float) -> Unit,
     onCoverageGlowStyleChanged: (CoverageGlowStyle) -> Unit,
+    anticipation: AnticipationSettings = AnticipationSettings.DEFAULT,
+    onAnticipationChanged: (AnticipationSettings) -> Unit = {},
     onOpenReleasesPage: () -> Unit,
     onResetTutorials: () -> Unit,
     onClose: () -> Unit,
@@ -361,6 +364,11 @@ fun SettingsScreen(
                         }
 
                         item {
+                            SettingsSectionTitle(strings.settings.anticipationSection)
+                            AnticipationSettingsControls(anticipation, onAnticipationChanged, strings)
+                        }
+
+                        item {
                             SettingsSectionTitle(strings.settings.privacy)
                             // Off by default and must ask, not assume. On a crash, the report (device
                             // model + recent logcat) goes to this project's PUBLIC GitHub issue
@@ -510,6 +518,66 @@ private fun CoverageGlowSettings(
         text = glowStyleDescription(appearance.style, strings),
         color = Color.Gray,
         fontSize = 12.sp,
+    )
+}
+
+/**
+ * Settings → Anticipation: the half-sphere of views (distance, latitude, longitude, roll; whole
+ * steps) and how far battery, heat and load may cut it (percent). Every move applies at once.
+ */
+@Composable
+private fun AnticipationSettingsControls(
+    settings: AnticipationSettings,
+    onChanged: (AnticipationSettings) -> Unit,
+    strings: AppStrings,
+) {
+    val s = settings.sanitized()
+    Text(text = strings.settings.anticipationDesc, color = Color.Gray, fontSize = 12.sp)
+    StepSlider(strings.settings.anticipationDistance, s.distance, 0, AnticipationSettings.MAX_DISTANCE) { onChanged(s.copy(distance = it)) }
+    StepSlider(strings.settings.anticipationLatitude, s.latitude, 0, AnticipationSettings.MAX_LATITUDE) { onChanged(s.copy(latitude = it)) }
+    StepSlider(strings.settings.anticipationLongitude, s.longitude, 0, AnticipationSettings.MAX_LONGITUDE) { onChanged(s.copy(longitude = it)) }
+    StepSlider(strings.settings.anticipationRoll, s.roll, 1, AnticipationSettings.MAX_ROLL) { onChanged(s.copy(roll = it)) }
+    Text(text = strings.settings.anticipationViews(s.maxViews), color = Color.Gray, fontSize = 12.sp)
+    WeightSlider(strings.settings.anticipationBattery, s.batteryWeight) { onChanged(s.copy(batteryWeight = it)) }
+    WeightSlider(strings.settings.anticipationHeat, s.heatWeight) { onChanged(s.copy(heatWeight = it)) }
+    WeightSlider(strings.settings.anticipationCompute, s.computeWeight) { onChanged(s.copy(computeWeight = it)) }
+}
+
+@Composable
+private fun StepSlider(label: String, value: Int, min: Int, max: Int, onChanged: (Int) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text = label, fontWeight = FontWeight.Medium)
+        Text(text = "$value", color = Color.Gray)
+    }
+    Slider(
+        value = value.toFloat(),
+        onValueChange = { v -> val n = v.roundToInt(); if (n != value) onChanged(n) },
+        valueRange = min.toFloat()..max.toFloat(),
+        steps = (max - min - 1).coerceAtLeast(0),
+        modifier = Modifier.fillMaxWidth().semantics { stateDescription = "$value" },
+    )
+}
+
+@Composable
+private fun WeightSlider(label: String, value: Float, onChanged: (Float) -> Unit) {
+    val percent = (value * 100f).roundToInt()
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text = label, fontWeight = FontWeight.Medium)
+        Text(text = "$percent%", color = Color.Gray)
+    }
+    Slider(
+        value = value,
+        onValueChange = onChanged,
+        valueRange = 0f..1f,
+        modifier = Modifier.fillMaxWidth().semantics { stateDescription = "$percent%" },
     )
 }
 

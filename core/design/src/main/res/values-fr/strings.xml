@@ -46,6 +46,16 @@
     <string name="settings_general_section">Général</string>
     <string name="settings_ar_section">RA</string>
     <string name="settings_glow_section">Halo de couverture</string>
+    <string name="settings_anticipation_section">Anticipation</string>
+    <string name="settings_anticipation_desc">Des vues de la cible de tous côtés, pour qu’une superposition perdue retrouve le mur. Plus de vues raccrochent sous plus d’angles et coûtent plus de batterie et de chaleur.</string>
+    <string name="settings_anticipation_distance">Distance</string>
+    <string name="settings_anticipation_latitude">Latitude</string>
+    <string name="settings_anticipation_longitude">Longitude</string>
+    <string name="settings_anticipation_roll">Rotation</string>
+    <string name="settings_anticipation_battery">La batterie réduit de</string>
+    <string name="settings_anticipation_heat">La chaleur réduit de</string>
+    <string name="settings_anticipation_compute">La charge réduit de</string>
+    <string name="settings_anticipation_views">%1$d vues par page au plus</string>
     <string name="settings_power_section">Énergie</string>
     <string name="settings_privacy_section">Confidentialité</string>
     <string name="settings_developer_section">Développeur</string>

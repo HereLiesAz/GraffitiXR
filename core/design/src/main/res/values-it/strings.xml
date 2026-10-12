@@ -356,6 +356,16 @@
     <string name="settings_general_section">Generale</string>
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">Bagliore di copertura</string>
+    <string name="settings_anticipation_section">Anticipazione</string>
+    <string name="settings_anticipation_desc">Viste del soggetto da ogni lato, perché una sovrapposizione persa ritrovi il muro. Più viste riagganciano da più angoli e costano più batteria e calore.</string>
+    <string name="settings_anticipation_distance">Distanza</string>
+    <string name="settings_anticipation_latitude">Latitudine</string>
+    <string name="settings_anticipation_longitude">Longitudine</string>
+    <string name="settings_anticipation_roll">Rotazione</string>
+    <string name="settings_anticipation_battery">La batteria riduce di</string>
+    <string name="settings_anticipation_heat">Il calore riduce di</string>
+    <string name="settings_anticipation_compute">Il carico riduce di</string>
+    <string name="settings_anticipation_views">Al massimo %1$d viste per pagina</string>
     <string name="settings_power_section">Energia</string>
     <string name="settings_privacy_section">Privacy</string>
     <string name="settings_developer_section">Sviluppatore</string>

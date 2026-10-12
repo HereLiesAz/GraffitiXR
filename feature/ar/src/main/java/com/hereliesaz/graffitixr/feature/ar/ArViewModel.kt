@@ -2040,6 +2040,29 @@ class ArViewModel @Inject constructor(
                 _uiState.update { it.copy(coverageGlow = it.coverageGlow.copy(style = style)) }
             }
         }
+        viewModelScope.launch {
+            settingsRepository.anticipationSettings.collect { settings ->
+                // A slider drag's debounced write pending: the live value is newer than the stored one.
+                if (anticipationPersistJob?.isActive == true) return@collect
+                _uiState.update { it.copy(anticipation = settings) }
+            }
+        }
+    }
+
+    private var anticipationPersistJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * Settings → Anticipation. Called continuously while a slider is dragged: every value reaches the
+     * trackers at once (they read it per frame), while only the settled value is written to DataStore.
+     */
+    fun setAnticipationSettings(settings: com.hereliesaz.graffitixr.common.model.AnticipationSettings) {
+        val sanitized = settings.sanitized()
+        _uiState.update { it.copy(anticipation = sanitized) }
+        anticipationPersistJob?.cancel()
+        anticipationPersistJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(COVERAGE_GLOW_PERSIST_DEBOUNCE_MS)
+            settingsRepository.setAnticipationSettings(sanitized)
+        }
     }
 
     // Debounces slider drags into one DataStore write; the live value is published immediately.

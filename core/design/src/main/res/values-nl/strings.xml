@@ -361,6 +361,16 @@
     <string name="settings_general_section">Algemeen</string>
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">Dekkingsgloed</string>
+    <string name="settings_anticipation_section">Anticipatie</string>
+    <string name="settings_anticipation_desc">Aanzichten van het doel van alle kanten, zodat een verloren overlay de muur terugvindt. Meer aanzichten herstellen vanuit meer hoeken en kosten meer batterij en warmte.</string>
+    <string name="settings_anticipation_distance">Afstand</string>
+    <string name="settings_anticipation_latitude">Breedte</string>
+    <string name="settings_anticipation_longitude">Lengte</string>
+    <string name="settings_anticipation_roll">Rotatie</string>
+    <string name="settings_anticipation_battery">Batterij beperkt met</string>
+    <string name="settings_anticipation_heat">Warmte beperkt met</string>
+    <string name="settings_anticipation_compute">Belasting beperkt met</string>
+    <string name="settings_anticipation_views">Hoogstens %1$d aanzichten per pagina</string>
     <string name="settings_power_section">Energie</string>
     <string name="settings_privacy_section">Privacy</string>
     <string name="settings_developer_section">Ontwikkelaar</string>

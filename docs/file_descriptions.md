@@ -27,6 +27,12 @@ This document lists key files in the repository and their purposes.
 
 ### `:core:common`
 *   `common/model/UiState.kt`: Shared state data classes (`ArUiState`, `EditorUiState`, `GpsData`, `SensorData`).
+*   `common/model/AnticipationSettings.kt`: Settings → Anticipation — the half-sphere resolution
+    (distance, latitude, longitude, roll), aims per half-sphere, the view count, and the battery /
+    heat / compute throttle weights.
+*   `common/util/ImageExt.kt`: target-review helpers — `isolateMarkings` (adaptive threshold, whole
+    marks highlighted, specks and marks touching the photo's edge excluded via `highlightWholeMarks`)
+    and `eraseColorBlob` (tap or drag removes a whole mark).
 *   `common/util/ImageUtils.kt`: Bitmap loading/decoding helpers used across the editor and AR
     pickers. (There is no `ImageProcessingUtils.kt` — it was replaced by
     `core/nativebridge/.../YuvConverter.kt`, a direct native YUV→RGBA JNI binding, and deleted;
@@ -138,6 +144,14 @@ the real (non-stub) tracker is packaged.
     SphereSLAM `sidecar.HybridAnchorFusion` (repeated-observation agreement before a large move)
     while keeping the shared correction and `FusionDiagnostics`. Neither path writes renderer
     camera matrices.
+*   `anticipation/HalfSphere.kt`: the half-sphere of anticipated views of a KPM page (poles and cuts,
+    nested half-spheres zooming in, aim points tiling the target up close, rolls), rendered as the
+    matching camera would see them (OpenCV, Kotlin fallback).
+*   `anticipation/AnticipationGovernor.kt`: device pressure (battery, heat) and the tracker's load
+    throttle the anticipation through nested subsets — far half-spheres first, close-ups last.
+*   `anticipation/AnticipationFeeder.kt`: renders the allowed views off the camera thread, farthest
+    first, four at a time, into a `PhotosphereTrackingSession` (standalone) or `SphereSlamTracker`
+    (ARCore), and tells it which to search.
 *   `SphereSlamStandaloneOverlay.kt`: non-ARCore AR surface. Owns rectified wall-target capture,
     CameraX analyzer lifecycle, KPM/reacquisition HUD, GL overlay, target restore, and copyable
     diagnostics.

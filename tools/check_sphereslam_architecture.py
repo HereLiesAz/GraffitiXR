@@ -131,6 +131,9 @@ allowed_tracker_calls = {
     "latestObservation",
     "currentReferenceGeometry",
     "close",
+    # Anticipation: what KPM learns and searches (the half-sphere views); no pose path.
+    "addAnticipatedViews",
+    "setSearchableAnticipatedViews",
 }
 tracker_calls = set(re.findall(r"sphereSlamTracker\.(\w+)\s*\(", ar_renderer))
 unexpected = sorted(tracker_calls - allowed_tracker_calls)
