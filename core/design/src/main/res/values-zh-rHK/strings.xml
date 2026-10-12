@@ -429,6 +429,7 @@
     <string name="target_review_desc">查看提取的目標</string>
     <string name="target_unwarp_hint">拖曳角點以恢復扭曲</string>
     <string name="target_review_title">查看擷取的標記</string>
+    <string name="fingerprint_closeups_progress">正在近距離學習牆面：%1$d / %2$d</string>
 
     <string name="target_exclude">排除</string>
     <string name="target_include">包括</string>

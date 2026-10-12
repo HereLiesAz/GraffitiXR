@@ -70,4 +70,11 @@ class CloseUpFeaturesTest {
         assertEquals(3, CloseUpFeatures.concat(listOf(c, sp))!!.rows)
         assertNull(CloseUpFeatures.concat(emptyList()))
     }
+
+    @Test
+    fun `progress counts close-ups done of the total`() {
+        assertEquals(0.5f, FingerprintBuildProgress.Step(2, 4).fraction, 0f)
+        assertEquals(0f, FingerprintBuildProgress.Step(0, 0).fraction, 0f)
+        assertNull(FingerprintBuildProgress.state.value)
+    }
 }

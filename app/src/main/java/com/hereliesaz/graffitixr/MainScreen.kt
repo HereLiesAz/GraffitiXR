@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
@@ -805,6 +807,36 @@ fun MainScreen(
                     onFeedbackShown = { editorViewModel.onFeedbackShown() },
                     modifier = Modifier.padding(top = 48.dp)
                 )
+            }
+        }
+
+        // Building a target's close-ups takes a few seconds: show that the app is working, and how
+        // much is left, in any mode (the build outlives the capture screen).
+        val closeUpProgress by com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintBuildProgress.state
+            .collectAsState()
+        closeUpProgress?.let { step ->
+            val appStrings = com.hereliesaz.graffitixr.design.theme.rememberAppStrings()
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+                androidx.compose.foundation.layout.Column(
+                    modifier = Modifier
+                        .padding(bottom = 96.dp, start = 24.dp, end = 24.dp)
+                        .background(Color.Black.copy(alpha = 0.75f), androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    androidx.compose.material3.Text(
+                        text = appStrings.ar.fingerprintCloseUpsProgress(step.done, step.total),
+                        color = Color.White,
+                        style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
+                    )
+                    androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
+                    androidx.compose.material3.LinearProgressIndicator(
+                        progress = { step.fraction },
+                        modifier = Modifier.width(220.dp),
+                        color = Color.White,
+                        trackColor = Color.White.copy(alpha = 0.25f),
+                    )
+                }
             }
         }
 

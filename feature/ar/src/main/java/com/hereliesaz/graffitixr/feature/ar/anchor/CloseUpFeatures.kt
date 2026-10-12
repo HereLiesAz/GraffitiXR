@@ -128,16 +128,23 @@ internal object CloseUpFeatures {
         val views = views(photo.width, photo.height)
         val per = perViewBudget(baseRows, views.size)
         val parts = ArrayList<DetectedFeatures>(views.size)
-        for (v in views) {
-            val crop = Bitmap.createBitmap(photo, v.x, v.y, v.w, v.h)
-            val (outW, outH) = outputSize(v, photo.width, photo.height)
-            val view = Bitmap.createScaledBitmap(crop, outW, outH, true)
-            try {
-                detect(view, per)?.let { parts += mapBack(truncated(it, per), v, outW, outH) }
-            } finally {
-                if (view !== crop) view.recycle()
-                if (crop !== photo) crop.recycle()
+        // The slow part of building a target: the artist sees it count down.
+        FingerprintBuildProgress.set(FingerprintBuildProgress.Step(0, views.size))
+        try {
+            for ((i, v) in views.withIndex()) {
+                val crop = Bitmap.createBitmap(photo, v.x, v.y, v.w, v.h)
+                val (outW, outH) = outputSize(v, photo.width, photo.height)
+                val view = Bitmap.createScaledBitmap(crop, outW, outH, true)
+                try {
+                    detect(view, per)?.let { parts += mapBack(truncated(it, per), v, outW, outH) }
+                } finally {
+                    if (view !== crop) view.recycle()
+                    if (crop !== photo) crop.recycle()
+                }
+                FingerprintBuildProgress.set(FingerprintBuildProgress.Step(i + 1, views.size))
             }
+        } finally {
+            FingerprintBuildProgress.set(null)
         }
         return concat(parts)
     }

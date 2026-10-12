@@ -429,6 +429,7 @@
     <string name="target_review_desc">Просмотрите извлеченную цель</string>
     <string name="target_unwarp_hint">Перетащите углы, чтобы развернуть</string>
     <string name="target_review_title">Просмотрите извлеченные метки</string>
+    <string name="fingerprint_closeups_progress">Изучение стены вблизи: %1$d из %2$d</string>
 
     <string name="target_exclude">Исключать</string>
     <string name="target_include">Включать</string>
