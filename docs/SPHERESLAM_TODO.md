@@ -1,5 +1,27 @@
 # SphereSLAM Implementation TODO
 
+## SphereSLAM 0.26.5 — steep relocks, previews (adopted)
+
+The app consumes SphereSLAM **0.26.5** (tag `0.26.5`). Nothing in the app changes: every new lever is
+on by default in `KpmMatchSpeedConfig`, which the app leaves at the library's defaults.
+
+- [x] A lost camera's oblique solve also starts from the matches' own homography, and after three
+  direct misses every other full solve rectifies a guessed steep view (`KPM_RECTIFIED`).
+- [x] Previews: each reference (and grown atlas page) is rendered tilted, resized and turned, and KPM
+  learns each as another image of its page, in a second matcher built off the camera thread. Once lost,
+  every other full solve searches the previews nearest the view the phone's rotation predicts, widening
+  on each miss (`KPM_PREVIEW`; `matchMethod=KPM_PREVIEW` in the diagnostics dump).
+- [x] `KpmBridge` loads the native library itself; a session no longer depends on an earlier
+  `isAvailable()` call.
+
+Device checks owed for 0.26.5 (the SphereSLAM test app grades most of these itself):
+
+- [ ] Lose the lock, walk well to the side and look back at the wall at 50–70°: it relocks
+  (`KPM_RECTIFIED` or `KPM_PREVIEW`).
+- [ ] Lose the lock, step far back or close in, or turn the phone sideways: it relocks (`KPM_PREVIEW`).
+- [ ] Preview building (≈ 40 images per page, background) costs no visible frame time or heat in a
+  long session with atlas growth.
+
 ## SphereSLAM 0.26.4 — floors and ceilings (adopted)
 
 The app consumes SphereSLAM **0.26.4** (tag `0.26.4`).
