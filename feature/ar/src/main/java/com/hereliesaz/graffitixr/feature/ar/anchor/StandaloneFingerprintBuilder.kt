@@ -60,11 +60,18 @@ object StandaloneFingerprintBuilder {
         val dpi = SphereSlamPoseMath.dpiForReferenceWidth(bitmap.width, referenceWidthMeters)
         val geometry = SphereSlamPoseMath.pageGeometry(bitmap.width, bitmap.height, dpi)
 
-        val detected = detectSuperPoint(slam, bitmap)
+        val base = detectSuperPoint(slam, bitmap)
             ?.let { filterByMask(it, mask, bitmap.width, bitmap.height) }
             ?.takeIf { it.rows >= minPoints }
             ?: detectOrb(bitmap, mask)?.takeIf { it.rows >= minPoints }
             ?: return null
+        // The close-ups, by the base's own detector (its descriptors are the ones the relocalizer
+        // matches against), kept to the same selected marks.
+        val superPoint = base.type == CvType.CV_32F
+        val closeUps = CloseUpFeatures.detect(bitmap, base.rows) { view, n ->
+            if (superPoint) detectSuperPoint(slam, view) else detectOrb(view, null, n)
+        }?.let { filterByMask(it, mask, bitmap.width, bitmap.height) }
+        val detected = CloseUpFeatures.concat(listOfNotNull(base, closeUps)) ?: base
 
         return assemble(
             detected = detected,
@@ -152,7 +159,7 @@ object StandaloneFingerprintBuilder {
         )
     }
 
-    private fun filterByMask(
+    internal fun filterByMask(
         detected: DetectedFeatures,
         mask: Bitmap?,
         width: Int,
@@ -196,7 +203,7 @@ object StandaloneFingerprintBuilder {
         }
     }
 
-    private fun detectSuperPoint(slam: SlamManager, bitmap: Bitmap): DetectedFeatures? {
+    internal fun detectSuperPoint(slam: SlamManager, bitmap: Bitmap): DetectedFeatures? {
         val raw = slam.detectSuperPoint(bitmap) ?: return null
         if (raw.size < 2) return null
         val n = raw[0].toInt()
@@ -222,14 +229,14 @@ object StandaloneFingerprintBuilder {
         )
     }
 
-    private fun detectOrb(bitmap: Bitmap, selectionMask: Bitmap?): DetectedFeatures? {
+    internal fun detectOrb(bitmap: Bitmap, selectionMask: Bitmap?, nFeatures: Int = ORB_FEATURES): DetectedFeatures? {
         val rgba = Mat()
         val gray = Mat()
         val normalized = Mat()
         val mask = Mat()
         val keypoints = MatOfKeyPoint()
         val descriptors = Mat()
-        val orb = ORB.create(ORB_FEATURES)
+        val orb = ORB.create(nFeatures)
         val clahe = Imgproc.createCLAHE(2.0, org.opencv.core.Size(8.0, 8.0))
         return try {
             Utils.bitmapToMat(bitmap, rgba)

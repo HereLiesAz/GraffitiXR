@@ -7,6 +7,8 @@
   modes; no pose needed.
 - [x] The wall's normal is learned at every well-supported lock, saved with the project, restored on
   load, and forgotten with a new target.
+- [x] Close-ups: the fingerprint carries the capture photo's features at zooms 6×, 3× and 2× over the
+  aim grid (`CloseUpFeatures`), at most as many as its own.
 
 Device checks owed:
 
@@ -14,6 +16,8 @@ Device checks owed:
   diagnostics show `turn` and it relocks.
 - [ ] Reopen the project and look at the wall steeply: the first relocalization already turns.
 - [ ] A magnetically noisy wall (rebar, metal): the turn still helps or stays out of the way.
+- [ ] Lose the lock a hand's width from one corner of the target: it relocks (close-ups).
+- [ ] Target capture still feels prompt with the close-ups (49 extra detections, background).
 
 ## SphereSLAM 0.26.6 — anticipation is the app's (adopted)
 
