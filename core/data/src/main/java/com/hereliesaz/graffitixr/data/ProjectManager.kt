@@ -357,7 +357,13 @@ class ProjectManager @Inject constructor(
     private fun atomicWriteText(target: File, text: String) {
         val tmp = File.createTempFile("${target.name}.", ".tmp", target.parentFile)
         try {
-            tmp.writeText(text)
+            // Flushed to the device before the rename, like the other writers here: without the sync a
+            // power loss after the rename can still leave an empty or partial project.json.
+            java.io.FileOutputStream(tmp).use { out ->
+                out.write(text.toByteArray())
+                out.flush()
+                out.fd.sync()
+            }
             // Some filesystems won't rename onto an existing file on the first try; retry a
             // couple times before giving up, rather than falling back to a direct write onto
             // target, which a crash mid-write could leave truncated.
@@ -603,7 +609,25 @@ class ProjectManager @Inject constructor(
         // why an index derived from (possibly already-pruned) list size would collide.
         val file = File.createTempFile("target_", ".png", root)
         FileOutputStream(file).use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
-        pruneTargetImages(existingUris + uriProvider.getUriForFile(file))
+        // Only the LIST is pruned here: the dropped files are still referenced by project.json until the
+        // caller commits this list, so the caller deletes them afterwards ([deleteTargetImages]).
+        (existingUris + uriProvider.getUriForFile(file)).takeLast(MAX_TARGET_IMAGES)
+    }
+
+    /**
+     * Delete target-image files that the committed project no longer references (the entries
+     * [appendTargetImage] pruned), or a new one whose commit lost the race. Best-effort.
+     */
+    suspend fun deleteTargetImages(uris: Collection<Uri>) = withContext(Dispatchers.IO) {
+        uris.forEach { uri ->
+            try {
+                uri.path?.let { File(it).delete() }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // A failed delete leaves an orphaned file, not a dangling reference.
+            }
+        }
     }
 
     /**

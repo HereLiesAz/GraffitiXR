@@ -327,6 +327,7 @@ class MainViewModel @Inject constructor(
                 }
 
                 if (!committed) {
+                    projectManager.deleteTargetImages(targetUris - baseTargetUris.toSet())
                     projectManager.deleteSphereSlamReference(
                         context,
                         currentProject.id,
@@ -343,6 +344,7 @@ class MainViewModel @Inject constructor(
                 }
                 // Only a committed target's patch reaches the native wall matcher.
                 slamManager.setWallPatchBytes(patch, PATCH_SIZE)
+                projectManager.deleteTargetImages(baseTargetUris - targetUris.toSet())
 
                 // The previous target stays on disk until native KPM accepts the candidate: a candidate
                 // that builds a fingerprint can still be too weak to register, and then the previous
@@ -610,9 +612,11 @@ class MainViewModel @Inject constructor(
                 committed = true
                 current.copy(
                     fingerprint = fp.copy(patchData = patch),
-                    // New capture = new fingerprint frame; paint placed in the old one is invalid.
+                    // New capture = new fingerprint frame; paint placed in the old one is invalid,
+                    // and so is the wall feature map (its points are in the old frame too).
                     paintMarks = null,
                     paintGrid = null,
+                    wallFeatureMap = null,
                     // This path records no co-registration. Clear any left by an earlier single
                     // capture: reload would otherwise pair these new points with the old capture's
                     // anchor, intrinsics and view, and relocalize against geometry that doesn't match.
@@ -624,9 +628,12 @@ class MainViewModel @Inject constructor(
                 )
             }
             if (!committed) {
+                projectManager.deleteTargetImages(updatedTargetUris - baseTargetUris.toSet())
                 notifyProjectChangedDuringSave()
                 return@launch
             }
+            // The pruned entries are no longer referenced now that the list is committed.
+            projectManager.deleteTargetImages(baseTargetUris - updatedTargetUris.toSet())
 
             projectRepository.loadProject(currentProject.id)
             _uiState.update { it.copy(targetCapturedThisSession = true) }
@@ -799,9 +806,11 @@ class MainViewModel @Inject constructor(
                 committed = true
                 current.copy(
                     fingerprint = fp.copy(patchData = patch),
-                    // New capture = new fingerprint frame; paint placed in the old one is invalid.
+                    // New capture = new fingerprint frame; paint placed in the old one is invalid,
+                    // and so is the wall feature map (its points are in the old frame too).
                     paintMarks = null,
                     paintGrid = null,
+                    wallFeatureMap = null,
                     // Persist the capture's intrinsics + anchor + view — the exact values just fed to
                     // restoreWallFingerprintMetric — so reload relocalizes with the true intrinsics
                     // and keeps the plane-guided rectification that the capture session had.
@@ -823,9 +832,12 @@ class MainViewModel @Inject constructor(
                 )
             }
             if (!committed) {
+                projectManager.deleteTargetImages(updatedTargetUris - baseTargetUris.toSet())
                 notifyProjectChangedDuringSave()
                 return@launch
             }
+            // The pruned entries are no longer referenced now that the list is committed.
+            projectManager.deleteTargetImages(baseTargetUris - updatedTargetUris.toSet())
             projectRepository.loadProject(currentProject.id)
             _uiState.update { it.copy(targetCapturedThisSession = true) }
             withContext(Dispatchers.Main) {

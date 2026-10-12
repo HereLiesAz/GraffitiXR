@@ -44,6 +44,8 @@ class SettingsRepositoryImplTest {
         val repo = newRepository()
         repo.setRightHanded(false)
         assertFalse(repo.isRightHanded.first())
+        // The DataStore can outlive a test: put the default back so no other test depends on order.
+        repo.setRightHanded(true)
     }
 
     @Test
@@ -67,6 +69,7 @@ class SettingsRepositoryImplTest {
         val repo = newRepository()
         repo.setCrashReportingConsent(true)
         assertTrue(repo.crashReportingConsent.first())
+        repo.setCrashReportingConsent(false) // restore the default (shared DataStore)
     }
 
     @Test
@@ -80,6 +83,7 @@ class SettingsRepositoryImplTest {
         val repo = newRepository()
         repo.setCrashReportToken("ghp_example")
         assertEquals("ghp_example", repo.crashReportToken.first())
+        repo.setCrashReportToken("") // restore the default (shared DataStore)
     }
 
     @Test
@@ -87,6 +91,7 @@ class SettingsRepositoryImplTest {
         val repo = newRepository()
         repo.setCrashReportToken("  ghp_example\n")
         assertEquals("ghp_example", repo.crashReportToken.first())
+        repo.setCrashReportToken("") // restore the default (shared DataStore)
     }
 
     // One test for the whole coverage-glow lifecycle: the DataStore instance can outlive a single

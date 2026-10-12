@@ -86,6 +86,8 @@ fun MainScreen(
     val isImageLocked = activeLayer?.isImageLocked ?: false
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    // Last isCaptureRequested pushed to the renderer (edge detection; see the AndroidView update).
+    val captureRequestApplied = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     val rendererRef = remember { mutableStateOf<ArRenderer?>(null) }
     // ARCore mode publishes metres/pixel through ArRenderer. Standalone SphereSLAM has no
     // ArRenderer, so its CameraX/KPM path publishes the same wall-unit/pixel quantity here.
@@ -697,12 +699,18 @@ fun MainScreen(
                             update = { view ->
                                 rendererRef.value?.let { r ->
                                     r.ambientScanEnabled = arUiState.ambientScanEnabled
-                                    r.captureRequested = arUiState.isCaptureRequested
+                                    // Rising edge only: the GL thread clears the flag when it starts the
+                                    // capture, but the UI request stays up until the capture lands, and
+                                    // any recomposition in between would otherwise re-arm a second one.
+                                    val requested = arUiState.isCaptureRequested
+                                    if (requested && !captureRequestApplied.get()) r.captureRequested = true
+                                    if (!requested) r.captureRequested = false
+                                    captureRequestApplied.set(requested)
                                     r.isCapturingTarget = mainUiState.isCapturingTarget
                                     r.hideVisualization = isExporting
                                     r.scanPhase = arUiState.scanPhase
                                     r.doodleLockActive = doodleDetectActive
-                                    // Independent in-world perception layers (Settings, default on).
+                                    // Independent in-world perception layers (Settings; feature points default off).
                                     r.showFeaturePoints = uiState.showFeaturePoints
                                     r.showPlaneGrids = uiState.showPlaneGrids
                                     r.showPoints = uiState.showPoints
