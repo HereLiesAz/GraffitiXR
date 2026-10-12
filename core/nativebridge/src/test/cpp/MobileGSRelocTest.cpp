@@ -137,6 +137,50 @@ TEST(MobileGSReloc, LocksOnTheFingerprintedWallAndPublishesTheLiveCamera) {
     g.destroy();
 }
 
+// The standalone (SphereSLAM) fingerprint frame: points on the centred page plane z = 0, Y up, an
+// identity fingerprint anchor — no capture camera. A live camera square-on to the page must lock
+// and report camera_from_fingerprint in that frame: page x → image right, page y (up) → image down,
+// so R = diag(1, −1, −1) and the page lies `distance` ahead.
+TEST(MobileGSReloc, LocksOnAStandalonePageFrameFingerprint) {
+    MobileGS g;
+    g.initialize(0, 0);
+    const cv::Mat page = makeWall(640, 480);
+    cv::Mat gray;
+    cv::cvtColor(page, gray, cv::COLOR_BGR2GRAY);
+    std::vector<cv::KeyPoint> kps;
+    cv::Mat descs;
+    cv::ORB::create(1500)->detectAndCompute(gray, cv::noArray(), kps, descs);
+    ASSERT_GE((int)kps.size(), 100) << "synthetic page too featureless for the test";
+
+    // 1 mm per page pixel, centred on the image centre, Y up.
+    const float unitsPerPx = 0.001f, distance = 0.5f;
+    const float cx = (page.cols - 1) * 0.5f, cy = (page.rows - 1) * 0.5f;
+    std::vector<cv::Point3f> points;
+    for (const auto& k : kps) points.emplace_back((k.pt.x - cx) * unitsPerPx, -(k.pt.y - cy) * unitsPerPx, 0.f);
+    const float identity[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    // A camera `distance` from the page with f = distance / unitsPerPx sees the page 1:1.
+    const float K[4] = {distance / unitsPerPx, distance / unitsPerPx, cx, cy};
+    g.restoreWallFingerprintMetric(descs, points, identity, K);
+    EXPECT_FALSE(MobileGSTestPeer::hasView(g)) << "a page frame has no capture-camera view";
+
+    g.setLiveIntrinsics(K);
+    g.setEvalSyncReloc(true, 1);
+    g.scheduleRelocCheck(page);
+
+    ASSERT_EQ(MobileGS::kRelocOk, g.lastRelocReject());
+    float out[35];
+    g.getRelocResult(out, false);
+    // Column-major camera_from_fingerprint.
+    EXPECT_NEAR(1.f, out[0], 0.02f);
+    EXPECT_NEAR(-1.f, out[5], 0.02f);
+    EXPECT_NEAR(-1.f, out[10], 0.02f);
+    EXPECT_NEAR(0.f, out[12], 0.005f);
+    EXPECT_NEAR(0.f, out[13], 0.005f);
+    EXPECT_NEAR(distance, out[14], 0.01f);
+    g.setEvalSyncReloc(false, 1);
+    g.destroy();
+}
+
 TEST(MobileGSReloc, PaintMarkCorrespondencesCountInThePublishedMatchTotal) {
     MobileGS g;
     g.initialize(0, 0);

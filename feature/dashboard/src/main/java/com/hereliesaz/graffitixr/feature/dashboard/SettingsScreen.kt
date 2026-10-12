@@ -391,7 +391,9 @@ fun SettingsScreen(
                             )
                             // Adaptive rate: gates heavy SLAM work while the projection is locked and
                             // the phone is still (snaps back instantly on motion), plus battery-tier
-                            // degradation. Default on; imperceptible. Off = always full rate.
+                            // degradation. Standalone: once tracking work exceeds a camera frame, the
+                            // analyzer skips frames to stay under half duty (AnalysisFrameGate).
+                            // Default on. Off = always full rate.
                             SettingsItem(
                                 label = "Adaptive rate (idle)",
                                 value = if (adaptiveRateEnabled) strings.settings.on else strings.settings.off,

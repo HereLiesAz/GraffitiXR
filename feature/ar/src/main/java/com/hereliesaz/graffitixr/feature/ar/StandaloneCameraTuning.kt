@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.feature.ar
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraMetadata
 import android.hardware.camera2.CaptureRequest
+import android.os.Build
 import android.util.Range
 import androidx.camera.camera2.interop.Camera2CameraControl
 import androidx.camera.camera2.interop.Camera2CameraInfo
@@ -10,6 +11,7 @@ import androidx.camera.camera2.interop.CaptureRequestOptions
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.view.CameraController
 import com.hereliesaz.graffitixr.common.model.CameraTargetFps
+import com.hereliesaz.sphereslam.camera.LensDistortion
 import timber.log.Timber
 
 /*
@@ -36,6 +38,11 @@ import timber.log.Timber
  *    assume the unwarped sensor geometry.
  *  - Optical stabilization (OIS) kept ON. It moves the lens for both streams alike (no preview vs.
  *    analysis desync, no added latency) and reduces blur, which helps KPM.
+ *  - Lens distortion correction (API 28+) FAST, else HIGH_QUALITY, when the camera offers it
+ *    (SphereSLAM `LensDistortion.chooseCorrectionMode`). KPM, flow PnP, the photosphere and the
+ *    projection all assume a zero-distortion pinhole; with correction on, the HAL delivers exactly
+ *    that on every processed stream, the YUV analysis stream included. Leaving the profile drops
+ *    the option, so the general default is the HAL's own.
  */
 
 /** Ranges are `[lower, upper]` pairs (Camera2 `Range<Int>` unpacked, so the policy is JVM-testable). */
@@ -83,7 +90,10 @@ internal fun defaultCaptureRequestOptions(): CaptureRequestOptions =
 
 /** Standalone SphereSLAM tracking options (see the file comment for the reasoning). */
 @ExperimentalCamera2Interop
-internal fun standaloneTrackingCaptureRequestOptions(aeFpsRange: Range<Int>?): CaptureRequestOptions =
+internal fun standaloneTrackingCaptureRequestOptions(
+    aeFpsRange: Range<Int>?,
+    distortionCorrectionMode: Int? = null,
+): CaptureRequestOptions =
     CaptureRequestOptions.Builder()
         .setCaptureRequestOption(
             CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
@@ -97,8 +107,19 @@ internal fun standaloneTrackingCaptureRequestOptions(aeFpsRange: Range<Int>?): C
             if (aeFpsRange != null) {
                 setCaptureRequestOption(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, aeFpsRange)
             }
+            if (distortionCorrectionMode != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                setCaptureRequestOption(CaptureRequest.DISTORTION_CORRECTION_MODE, distortionCorrectionMode)
+            }
         }
         .build()
+
+/** What [applyStandaloneTrackingCaptureOptions] applied. */
+internal class StandaloneCaptureApplied(
+    /** AE target range `[lower, upper]`, or null when left on the device's own range. */
+    val aeRange: IntArray?,
+    /** One-line lens distortion state (`LensDistortion.describe`). */
+    val distortion: String,
+)
 
 /** Apply the general default options to [controller]'s bound camera (no-op when unbound). */
 @ExperimentalCamera2Interop
@@ -111,29 +132,41 @@ internal fun applyDefaultCaptureOptions(controller: CameraController) {
 
 /**
  * Apply the standalone tracking profile for [effectiveTargetFps] to [controller]'s bound camera.
- * Returns the AE range applied (`[lower, upper]`), or null when unbound / unreported.
+ * Returns what was applied, or null when unbound or the options were refused.
  */
 @ExperimentalCamera2Interop
 internal fun applyStandaloneTrackingCaptureOptions(
     controller: CameraController,
     effectiveTargetFps: Int,
-): IntArray? {
+): StandaloneCaptureApplied? {
     val control = controller.cameraControl ?: return null
-    val info = controller.cameraInfo
-    val available = info?.let {
-        runCatching {
-            Camera2CameraInfo.from(it)
-                .getCameraCharacteristic(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES)
-        }.getOrNull()
+    val camera2Info = controller.cameraInfo?.let { runCatching { Camera2CameraInfo.from(it) }.getOrNull() }
+    val available = camera2Info?.let {
+        runCatching { it.getCameraCharacteristic(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES) }
+            .getOrNull()
     }?.map { intArrayOf(it.lower, it.upper) }.orEmpty()
     val chosen = StandaloneCameraTuning.chooseAeTargetFpsRange(available, effectiveTargetFps)
     val range = chosen?.let { Range(it[0], it[1]) }
+    val lens = lensDistortionProfile(camera2Info)
+    val correction = lens.trackingCorrectionMode
     runCatching {
         Camera2CameraControl.from(control)
-            .setCaptureRequestOptions(standaloneTrackingCaptureRequestOptions(range))
+            .setCaptureRequestOptions(standaloneTrackingCaptureRequestOptions(range, correction))
     }.onFailure {
         Timber.w(it, "Standalone camera capture options not applied")
         return null
     }
-    return chosen
+    return StandaloneCaptureApplied(chosen, LensDistortion.describe(lens, correction, null))
+}
+
+/** The bound camera's `LensDistortion.Profile` (empty below API 28 or when unreported). */
+@ExperimentalCamera2Interop
+private fun lensDistortionProfile(info: Camera2CameraInfo?): LensDistortion.Profile {
+    if (info == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return LensDistortion.Profile(null, IntArray(0))
+    return LensDistortion.Profile(
+        coefficients = runCatching { info.getCameraCharacteristic(CameraCharacteristics.LENS_DISTORTION) }.getOrNull(),
+        correctionModes = runCatching {
+            info.getCameraCharacteristic(CameraCharacteristics.DISTORTION_CORRECTION_AVAILABLE_MODES)
+        }.getOrNull() ?: IntArray(0),
+    )
 }

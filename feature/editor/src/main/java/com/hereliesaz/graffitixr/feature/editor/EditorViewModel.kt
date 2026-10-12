@@ -164,6 +164,8 @@ class EditorViewModel @Inject constructor(
     // current project. Each op writes a fresh file, so without pruning a spectator copy grows by one
     // full-size PNG per host effect toggle. Only files recorded here are ever deleted, and only once
     // neither the live design nor the undo/redo history points at them. Main thread only.
+    /** Sequence of peer design ops; a peer bitmap decode applies only if still the newest. */
+    private val peerDesignSeq = java.util.concurrent.atomic.AtomicLong(0)
     private val peerWrittenDesignPaths = mutableSetOf<String>()
     private var projectLoadJob: Job? = null
     private var backgroundLoadJob: Job? = null
@@ -1518,7 +1520,10 @@ class EditorViewModel @Inject constructor(
      */
     fun applySpectatorOp(op: Op, onApplied: () -> Unit = {}) {
         when (op) {
-            is Op.DesignReplace -> dispatch(EditorIntent.RestoreDesign(op.design))
+            is Op.DesignReplace -> {
+                peerDesignSeq.incrementAndGet() // a pending peer decode must not land over this
+                dispatch(EditorIntent.RestoreDesign(op.design))
+            }
             is Op.DesignTransform -> {
                 // The host encodes transform as [scale, offsetX, offsetY, rotX, rotY, rotZ, 0...0].
                 if (op.matrix.size >= 6) {
@@ -1541,6 +1546,9 @@ class EditorViewModel @Inject constructor(
             }
             is Op.DesignBitmapReplace -> {
                 if (_uiState.value.design == null) return
+                // Decodes run concurrently and finish in any order: only the newest peer design op
+                // may land (an older decode finishing last would otherwise win).
+                val seq = peerDesignSeq.incrementAndGet()
                 viewModelScope.launch(dispatchers.default) {
                     // Cap the decoded bitmap at 2x the longest screen edge — plenty for an image
                     // that rasterises to a screen quad, and it stops a peer accidentally shipping a
@@ -1572,6 +1580,10 @@ class EditorViewModel @Inject constructor(
                         }
                     }
                     withContext(dispatchers.main) {
+                        if (seq != peerDesignSeq.get()) {
+                            onApplied() // superseded by a newer peer op; the op itself is done
+                            return@withContext
+                        }
                         val persisted = localUri != null && isCurrentProject(projectId!!)
                         _uiState.update { s ->
                             s.copy(design = s.design?.let { d ->

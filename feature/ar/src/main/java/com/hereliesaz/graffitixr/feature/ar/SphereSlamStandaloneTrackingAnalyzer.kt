@@ -176,18 +176,18 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     @Volatile private var mobileGsWallFeatureMapFrameVersion: Int =
         com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     private val onFrameTracked: (SphereSlamStandaloneFrame?) -> Unit,
-    private val cameraAttitude: () -> Pair<Float, Float>? = { null },
+    /**
+     * Heading, elevation and the tracked image's roll for a given body->camera rotation, from ONE
+     * attitude sample ([StandaloneCameraAttitude]), or null when unknown. Stamped on each keyframe so
+     * a later fingerprint placement can rotate pixel rays correctly in any device orientation and at
+     * the poles.
+     */
+    private val cameraAttitude: (cameraFromDevice: FloatArray) -> StandaloneCameraAttitude? = { null },
     /**
      * Base photosphere keyframes (SphereSLAM [PhotosphereKeyframe]: display-upright luma, its
      * intrinsics, heading/elevation/roll and the rotation-only GL camera_from_map at capture).
      */
     private val onPhotosphereKeyframe: (PhotosphereKeyframe) -> Unit = {},
-    /**
-     * Roll of the tracked image's right axis above the horizon for a given body->camera rotation
-     * (`CameraAttitudeProvider.cameraRollDegrees`), or null when unknown. Stamped on each keyframe so
-     * a later fingerprint placement can rotate pixel rays correctly in any device orientation.
-     */
-    private val cameraRollDegrees: (cameraFromDevice: FloatArray) -> Float? = { null },
     /**
      * Solved on a frame where both base-map pose and KPM precision pose are known:
      * map_from_fingerprint = inverse(camera_from_map) * camera_from_fingerprint.
@@ -205,6 +205,12 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     // no depth is ever stashed, so the native map builds from wall-plane back-projection exactly as
     // before. The view model supplies this only on the standalone path with the feature-map flag on.
     private val depthEstimator: com.hereliesaz.sphereslam.models.DepthEstimator? = null,
+    /**
+     * Battery / heat safeties and Settings → Adaptive rate ([AnalysisFrameGate]): refused frames are
+     * closed unanalyzed; [AnalysisFrameGate.stress] also stretches the MiDaS cadence and, at HIGH,
+     * skips MiDaS for new photosphere tiles. Read per frame, so a change applies at once.
+     */
+    private val frameGate: AnalysisFrameGate = AnalysisFrameGate(),
     private val onDiagnostic: (String) -> Unit = {},
     private val onCalibrationChanged: (StandaloneCalibrationDiagnostics) -> Unit = {},
     private val onFailure: (StandaloneFailureEvent) -> Unit = {},
@@ -320,7 +326,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         // DepthEstimator calls are synchronized, so sharing it with the depth worker below is safe.
         tileDepthSource = depthEstimator?.let { estimator ->
             TileDepthSource { luma, width, height ->
-                if (!estimator.isLoaded && !estimator.load()) {
+                // Fail-soft null (tile keeps plane-only points) while the device is hot or nearly flat.
+                if (frameGate.stress == DeviceStress.HIGH) {
+                    null
+                } else if (!estimator.isLoaded && !estimator.load()) {
                     null
                 } else {
                     estimator.estimateLuma(luma, width, height)?.let { TileDepthMap(it.width, it.height, it.data) }
@@ -451,8 +460,11 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
 
     @Synchronized
     override fun analyze(image: ImageProxy) {
+        var workStartNs = Long.MIN_VALUE
         try {
             if (closed || fatal) return
+            if (!frameGate.admit(image.imageInfo.timestamp)) return
+            workStartNs = android.os.SystemClock.elapsedRealtimeNanos()
             applyFinishedDepth()
             val planes = image.planes
             if (planes.isEmpty()) return
@@ -543,7 +555,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             val cameraFromDevice =
                 DeviceCameraRotation.cameraFromDevice(sensorOrientationDeg, rotationDeg)
             val timestampNs = image.imageInfo.timestamp
-            val heading = cameraAttitude()
+            val heading = cameraAttitude(cameraFromDevice)
             currentFrameIntrinsics = intrinsics
             val result = session.onFrame(
                 PhotosphereTrackingSession.Frame(
@@ -559,9 +571,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                         scratch = captureAttitudeScratch,
                     ),
                     cameraFromDevice = cameraFromDevice,
-                    headingDeg = heading?.first,
-                    elevationDeg = heading?.second,
-                    rollDeg = cameraRollDegrees(cameraFromDevice),
+                    headingDeg = heading?.headingDeg,
+                    elevationDeg = heading?.elevationDeg,
+                    rollDeg = heading?.rollDeg,
                     convertDurationNs = convertDurationNs,
                 ),
             )
@@ -611,6 +623,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             }
         } finally {
             image.close()
+            if (workStartNs != Long.MIN_VALUE) {
+                frameGate.onWorkDone(android.os.SystemClock.elapsedRealtimeNanos() - workStartNs)
+            }
         }
     }
 
@@ -760,7 +775,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         val worker = depthWorker ?: return
         if (slamManager == null) return
         val now = android.os.SystemClock.elapsedRealtime()
-        if (worker.isBusy || !depthCadence.isDue(now)) return
+        if (worker.isBusy || !depthCadence.isDue(now, depthIntervalScale(frameGate.stress))) return
 
         val frameWidth = frame.width
         val frameHeight = frame.height

@@ -43,6 +43,34 @@ class StandaloneDepthSchedulingTest {
     }
 
     @Test
+    fun `heading noise over a floor is not a tile change`() {
+        val c = StandaloneDepthCadence(minIntervalMs = 1_000L, maxIntervalMs = 2_000L)
+        c.onViewDirection(10f, -89f)
+        c.markRun(0L)
+        // Looking straight down, the heading swings wildly with sub-degree tilt.
+        for (h in listOf(95f, 200f, 310f)) {
+            c.onViewDirection(h, -88.5f)
+            assertFalse(c.isDue(1_500L))
+        }
+        assertTrue(c.isDue(2_000L)) // still refreshed periodically
+        // Leaving the cap for the wall is a real change.
+        c.onViewDirection(200f, -30f)
+        assertTrue(c.isDue(1_000L))
+    }
+
+    @Test
+    fun `stress scale stretches both intervals`() {
+        val c = StandaloneDepthCadence(minIntervalMs = 1_000L, maxIntervalMs = 2_000L)
+        c.onViewDirection(10f, 0f)
+        c.markRun(0L)
+        assertFalse(c.isDue(2_000L, intervalScale = 4))
+        assertTrue(c.isDue(8_000L, intervalScale = 4))
+        c.onViewDirection(50f, 0f) // next heading tile
+        assertFalse(c.isDue(1_000L, intervalScale = 4))
+        assertTrue(c.isDue(4_000L, intervalScale = 4))
+    }
+
+    @Test
     fun `tile change is due after the min interval but not before`() {
         val c = StandaloneDepthCadence(minIntervalMs = 1_000L, maxIntervalMs = 2_000L)
         c.onViewDirection(10f, 0f)

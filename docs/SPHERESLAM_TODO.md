@@ -1,5 +1,71 @@
 # SphereSLAM Implementation TODO
 
+## SphereSLAM 0.26.4 — floors and ceilings (adopted)
+
+The app consumes SphereSLAM **0.26.4** (tag `0.26.4`).
+
+- [x] The tracking session's base map is gravity-level and north-referenced, the frame fingerprint
+  placements use; a capture-time placement is refined on the first confirmed lock (and the app
+  persists the refinement, `onMapFromFingerprintSolved`). Projects saved earlier carry a transform in
+  their own session's frame: the first lock replaces it.
+- [x] Fingerprint placement orients the page by the camera's image-up, live attitude, no ±89° clamp.
+- [x] The app reads heading, elevation and roll from one `CameraAttitudeProvider.latestAttitude()`
+  sample (`StandaloneCameraAttitude`) for keyframes and placement; separate getters could mix samples,
+  which near a floor rotates the result by tens of degrees.
+- [x] Standalone MiDaS treats each polar cap as one view tile.
+
+Device checks owed for 0.26.4 (the SphereSLAM test app grades most of these itself):
+
+- [ ] Capture a target looking straight down at a floor: it locks, and recaptures land the same way.
+- [ ] Start a session looking at the floor, then turn to the wall: the artwork stays placed.
+
+## SphereSLAM 0.26.3 — lens distortion, tracker refactor (adopted)
+
+- [x] Standalone tracking requests Camera2 distortion correction (FAST, else HIGH_QUALITY, API 28+)
+  through `LensDistortion` in `StandaloneCameraTuning`; the HAL then delivers the zero-distortion
+  pinhole image KPM assumes. The camera diagnostic line reports `lens=correction=…`, or the
+  uncorrected state.
+- [x] `SphereSlamTracker` drives `SphereSlamEngine` (library-side; no app change).
+
+Device checks owed for 0.26.3:
+
+- [ ] The camera diagnostic line reads `lens=correction=FAST` (or `HIGH_QUALITY`) on a phone that
+  offers it; the artwork stays registered at the frame edges.
+
+## SphereSLAM 0.26.2 — full-frame rectification, reference scale (adopted)
+
+No app code changes.
+
+- [x] The oblique virtual view is rendered from the full 640×480 analysis frame, not its 320×240
+  matcher copy: the foreshortened side of the wall keeps the camera's detail.
+- [x] The standalone fingerprint stays saved at the camera still's full resolution; KPM registers it
+  from an area-downscaled copy (long side ≤ 3 × the matcher's, 960 px), which puts the wall back
+  inside KPM's scale range. Page geometry is unchanged.
+
+Device checks owed for 0.26.2:
+
+- [ ] A target captured at full resolution locks as readily from 1 m as from 4 m.
+
+## SphereSLAM 0.26.0 — oblique rectification, anchor tiles (adopted)
+
+Both library-side and on by default.
+
+- [x] Extreme perspectives: when the predicted view is at least 30° off the wall's normal, the full
+  KPM solve matches a virtual frontal re-rendering of the frame and solves the real pose from it
+  (`KpmMatchSpeedConfig.obliqueRectificationDeg`). Diagnostics report `matchMethod=KPM_RECTIFIED`.
+- [x] Anchor tiles: the tiles around a station's first lock (24°) are never evicted from the
+  photosphere, so the gyro bridge has its nearest references when the wall swings back into view.
+
+Device checks owed for 0.26.0:
+
+- [ ] Lock square-on, then walk sideways to 60–70° off the wall: the artwork stays on the wall and
+  `matchMethod` reads `KPM_RECTIFIED`.
+- [ ] Work away from the wall for minutes, swing back: the artwork re-places from the anchor tiles.
+
+The camera analysis stream stays at CameraX's default (640×480, matched at 320×240) by decision: a
+higher resolution costs KPM, flow and depth time on the very phones that run this path (no ARCore).
+0.26.2 rectifies from the full frame instead.
+
 ## SphereSLAM 0.25.3 — full-sphere photosphere, per-tile scan progress (adopted)
 
 The app consumes SphereSLAM **0.25.3** (tag `0.25.3`). It is the 0.25.1 code; 0.25.1/0.25.2 never
@@ -13,6 +79,11 @@ published on JitPack (its image dropped Ninja), and 0.25.3 pins Ninja in `jitpac
   opaque as it fills, then opens to the camera. Every glow style; library default peak opacity.
 - [x] `firstCaptureForTile` now means "the axis tile's scan completed"; the diagnostic reads
   `photosphere tile scanned`.
+- [x] Replacing a standalone target keeps the previous one until native KPM accepts the new one:
+  `MainViewModel.onConfirmStandaloneTargetCreation` commits the candidate but holds the previous
+  page/atlas files as a pending rollback; the overlay reports the verdict
+  (`onPersistedReferenceRegistered` → previous files deleted; `onPersistedReferenceRejected` /
+  unreadable → previous project fields restored, candidate deleted, the overlay swaps back).
 - [x] The default haze colour is hot pink (`CoverageGlowColor.DEFAULT`); a colour already picked in
   Settings is kept.
 
@@ -64,11 +135,9 @@ It compiles unchanged; what changed underneath:
   `pickFirsts += "**/libc++_shared.so"` for the other native dependencies.
 - [x] `superpoint.onnx` in `:models` is byte-identical to the app's `core/nativebridge` asset.
 
-Open:
-
-- [ ] The artwork is held by the gyro bridge for only 400 ms (`maxBridgeMs`) after the wall leaves
-  view, then hidden until a visual relock, although the base photosphere pose is computed every
-  frame. Holding it on the base pose while off-wall is proposed, not adopted.
+- [x] ~~The artwork is held by the gyro bridge for only 400 ms (`maxBridgeMs`), then hidden until a
+  visual relock.~~ Superseded by 0.25.0: past the bridge SphereSLAM returns `PoseSource.PHOTOSPHERE`
+  / `HELD` and the app renders them (see the 0.25.0 section above).
 
 Device checks owed for 0.24.6:
 
@@ -222,8 +291,9 @@ Left in place, deliberately:
   pure-Kotlin JVM objects; MobileGS runs these inside its native reloc pass on the reloc thread, on
   native map state (`mMapPoints3D`, `mMapDescriptors`, …) under `mMutex`. Switching would mean moving
   the feature map and the reloc pass out of C++ (or a JNI upcall per reloc attempt), not swapping a
-  call. It would also change behaviour: the library calibrates radial depth with the robust
-  `DepthScaleFit` instead of plain least squares. The native rectify sign now matches the library
+  call. The calibration itself now matches the library: `include/DepthScaleFit.h` transliterates
+  the robust `DepthScaleFit` (it was plain least squares), pinned by `DepthScaleFitTest`. The
+  native rectify sign now matches the library
   (`R + t·nᵀ/d`; it used `R − t·nᵀ/d`, wrong whenever the capture and live cameras translate).
 - `core/common` `model/WallFeatureMap` (the persisted `@Serializable` project model) and
   `SlamManager.getWallFeatureMap`'s blob parser: a data model and native-blob reader, not the
@@ -518,7 +588,9 @@ Remaining:
     CameraController pinch-to-zoom and resets the camera to 1x while active, restoring the shared
     controller's previous zoom behavior on exit.
 - [x] If CameraX applies an ImageProxy crop region, incorporate that crop into `fx/fy/cx/cy`.
-- [ ] Verify lens distortion is acceptable with the current zero-distortion KPM camera model.
+- [x] Verify lens distortion is acceptable with the current zero-distortion KPM camera model. Where the
+  camera can correct (API 28+), standalone requests correction, making the model exact (0.26.3);
+  elsewhere the diagnostic line reports the coefficients' state.
 - [ ] If not, populate artoolkitX distortion parameters from Camera2 calibration metadata or undistort
   frames before KPM.
 - [x] Add a diagnostic line exposing standalone camera ID, raw/crop/display frame dimensions,
@@ -581,15 +653,18 @@ Implemented:
 
 Remaining:
 
-- [ ] Integrate standalone target capture into the normal AR target workflow/state machine instead of
-  maintaining a separate minimal capture UI.
-- [ ] Reuse the same capture/review language and error states where the concepts are equivalent.
-- [ ] Define what standalone does for ARCore-only target steps:
-  - [ ] plane hit test;
-  - [ ] depth sample;
-  - [ ] ARCore anchor creation;
-  - [ ] point cloud/plane coaching.
-- [ ] Hide or replace only the truly unavailable steps, not the entire workflow.
+- [x] Integrate standalone target capture into the normal AR target workflow/state machine instead of
+  maintaining a separate minimal capture UI: one `TargetCreationUi` for both backends, branching at
+  Confirm on `SphereSlamRuntimeMode.STANDALONE` → `MainViewModel.onConfirmStandaloneTargetCreation`
+  (`MainActivity`, `sharedTargetCapture = true` in `MainScreen`).
+- [x] Reuse the same capture/review language and error states where the concepts are equivalent
+  (same UI and strings; standalone-only failures are toasts and `StandalonePhotosphereCapture.Blocker`).
+- [x] Define what standalone does for ARCore-only target steps:
+  - [x] plane hit test → the tap ray into the photosphere;
+  - [x] depth sample → tile range and MiDaS `TileDepthSource`;
+  - [x] ARCore anchor creation → `mapFromFingerprint` (`PhotosphereFingerprintFrame.placement`);
+  - [x] point cloud/plane coaching → the ARCore tap hint is suppressed.
+- [x] Hide or replace only the truly unavailable steps, not the entire workflow.
 - [x] Add target-quality checks before accepting a KPM page:
   - [x] minimum image dimensions/pixel count;
   - [x] minimum native-generated KPM feature count (16 initial conservative floor);
@@ -665,13 +740,18 @@ Remaining:
 - [x] Feed those states into the standalone AR HUD and existing diagnostic log.
 - [ ] Evaluate whether KPM-only continuous wall tracking is sufficiently smooth for the intended
   wall-painting use case.
-- [ ] If not, add a true frame-to-frame visual/inertial tracker behind the same standalone pose
-  interface rather than extending IMU bridge duration.
-- [ ] If a continuous tracker is added:
-  - [ ] timestamp-align camera frames and IMU samples;
-  - [ ] define initialization/reset behavior;
-  - [ ] define KPM relocalization correction into that tracker;
-  - [ ] keep KPM page recognition independent of frame-to-frame VIO state.
+- [x] If not, add a true frame-to-frame visual/inertial tracker behind the same standalone pose
+  interface rather than extending IMU bridge duration: SphereSLAM's flow tracking (forward–backward
+  Lucas–Kanade + PnP against page coordinates, no chained drift) between full KPM solves, on by
+  default (`KpmMatchSpeedConfig.flowTracking`); the IMU side is the display-rate predictor and gyro
+  bridge, not a tightly fused VIO.
+- [x] With that continuous tracker:
+  - [x] timestamp-align camera frames and IMU samples (`StandaloneFrameAttitude`: attitude at the
+    frame timestamp on REALTIME sources);
+  - [x] define initialization/reset behavior (`FlowTracker.seed` / `reset`);
+  - [x] define KPM relocalization correction into that tracker (each full solve re-seeds flow);
+  - [x] keep KPM page recognition independent of frame-to-frame VIO state (full solves search the
+    atlas on their own schedule; FLOW poses never grow it).
 
 **ACCEPTANCE:** normal hand motion is smooth, short occlusions recover without a visible snap, long
 occlusions never present stale placement as live tracking, and reacquisition is deterministic.
@@ -731,6 +811,7 @@ Remaining:
   counterpart of `fitCenter`, plus the crop-aware projection and view→frame mapping). Done in
   0.24.1 (`camera.CameraFillCenter`); the app copy is gone.
 - [ ] Add GL/instrumentation tests for standalone texture clear/replace if test infrastructure permits.
+  Deferred by decision: verification is hands-on use of the app; no `androidTest` set-up for now.
 - [x] Sanitize and test standalone renderer transforms: non-finite values fall back safely, scale
   uses the shared 0.1–10 editor bounds, rotations normalize, and pathological finite pan values are
   bounded before GL matrix construction.
@@ -1084,15 +1165,17 @@ they were the same frame.
   `SphereSlamStandaloneTrackingAnalyzer.directFrame` grows one direct buffer only when a frame is
   larger and reuses it otherwise. (The heap `ByteArray` from `LumaFrameTransform.packCropAndRotate`
   is still allocated per frame — a GC-pressure measurement item, not a direct-buffer leak.)
-- [ ] Confirm pending work cannot queue unboundedly. **Camera side done:** the analyzer does its
-  matching synchronously and the shared controller pins `STRATEGY_KEEP_ONLY_LATEST`, so at most one
-  camera frame waits (enforced by `tools/check_sphereslam_architecture.py` invariant 7). **Still
-  open:** each tracked frame's `onFrameTracked` → `SphereSlamStandaloneOverlay.consumeTrackedFrame`
-  posts a main-thread runnable without waiting, so a slow UI thread can accumulate per-frame updates
-  and replay stale ticks in a burst; coalesce to a latest-value update.
-- [ ] Add adaptive standalone analysis cadence if KPM exceeds the frame budget. KEEP_ONLY_LATEST
+- [x] Confirm pending work cannot queue unboundedly. Camera side: the analyzer does its matching
+  synchronously and the shared controller pins `STRATEGY_KEEP_ONLY_LATEST`, so at most one camera
+  frame waits (enforced by `tools/check_sphereslam_architecture.py` invariant 7). UI side:
+  `consumeTrackedFrame` hands its values to a `LatestValueUiPost` — at most one main-thread post
+  outstanding, applying the newest frame's values — so a slow UI thread never replays a backlog.
+- [x] Add adaptive standalone analysis cadence if KPM exceeds the frame budget. KEEP_ONLY_LATEST
   drops stale frames but does NOT throttle: when matching exceeds the budget the analyzer stays
-  continuously saturated. A match-duration-driven sampling interval is still required.
+  continuously saturated. `AnalysisFrameGate` (`DeviceStressPolicy.kt`): with Settings → Adaptive
+  rate on, an analyzer whose smoothed work exceeds a camera frame is held to half duty; under
+  thermal / power-save / low battery frames are capped at 20 / 15 fps. `DeviceStressPolicyTest`
+  drives it through a keep-only-latest simulation.
 - [x] Preserve low latency over maximum throughput: drop stale frames instead of queueing them
   (`CameraPreview.rememberCameraController` now pins it rather than inheriting CameraX's default).
 - [ ] Measure battery/thermal behavior over a realistic mural session.
@@ -1170,29 +1253,38 @@ Still required:
   reacquisition thresholds;
 - [x] tracking-state hysteresis tests for initial lock, bridge, reacquisition, LOST timeout, and
   fatal/reset behavior;
-- [ ] standalone page↔MobileGS frame conversion tests;
+- [x] standalone page↔MobileGS frame conversion tests (`PhotosphereFingerprintFrameTest`,
+  `StandaloneFingerprintBuilderTest`);
 - [x] hybrid page↔ARCore frame conversion tests, including global-rebase invariance;
 - [x] timestamp pairing tests with bounded nearest-sample matching and clock-discontinuity reset;
-- [ ] physical-scale migration tests;
-- [ ] multi-page canonical-frame conversion tests.
+- [x] physical-scale migration tests (`ProjectManagerTest`: a pre-SphereSLAM project defaults to
+  width 1, not metric; import keeps width + metric flag);
+- [x] multi-page canonical-frame conversion tests (`GrownAtlasPagesTest`; SphereSLAM
+  `PhotosphereAtlasGrowthTest`, `AtlasMatcherWorkerTest`).
 
 ### Android/Robolectric/instrumented
 
-- [ ] Camera2 crop/intrinsic test;
+Unchecked items here need an on-device / instrumented test set-up. Deferred by decision:
+verification is hands-on use of the app, with failures reported back.
+
+- [x] Camera2 crop/intrinsic test (JVM: SphereSLAM `CameraIntrinsicsEstimatorTest`, app
+  `CameraCapabilitiesTest`; an on-device one waits for an `androidTest` source set);
 - [ ] CameraX camera-ID acquisition test;
-- [ ] target persistence/readback test;
-- [ ] project import URI relocation test;
+- [x] target persistence/readback test (`ProjectManagerTest`, `MainViewModelStandaloneReplacementTest`);
+- [x] project import URI relocation test (`ProjectManagerTest`);
 - [ ] process recreation test;
 - [ ] GL texture clear/replace test;
 - [ ] lifecycle analyzer/IMU teardown test;
-- [ ] backend routing test on ARCore-unavailable environment.
+- [x] backend routing test on ARCore-unavailable environment (`ArViewModelLiveSettingsTest`: an unsupported
+  device resolves to `STANDALONE`; `ArRailBackendPolicyTest`).
 
 ### Native
 
 - [ ] KPM JNI smoke test on packaged APK;
 - [ ] KPM add-page/match known-image integration test;
-- [ ] native buffer-size guard tests;
-- [ ] MobileGS standalone-frame integration tests after frame conversion exists;
+- [x] native buffer-size guard tests (`core/nativebridge/src/test/cpp/FrameBufferGuardTest.cpp`, run in CI);
+- [x] MobileGS standalone-frame integration tests (`MobileGSRelocTest`: a centred page-frame fingerprint with
+  an identity anchor locks and reports `camera_from_fingerprint` in the page frame; `MobileGSFrames.*`);
 - [ ] native thread/teardown race test.
 
 If the repo still lacks the required Android/native test infrastructure, create that infrastructure
@@ -1274,15 +1366,18 @@ For every device run, record:
 
 Remaining:
 
-- [ ] Update every stale comment that calls CameraX/homography the only "ARCore fallback".
-- [ ] Update `file_descriptions.md` with standalone classes and ownership.
-- [ ] Update `FEATURE_REFERENCE.md` with backend capability differences.
-- [ ] Update `SLAM_SETUP.md` with standalone CameraX/KPM data flow.
-- [ ] Update `NATIVE_ENGINE.md` once MobileGS standalone frame semantics are implemented.
-- [ ] Document physical-scale UX when chosen.
-- [ ] Document standalone tracking-state diagnostics and thresholds when finalized.
-- [ ] Document co-op cross-backend semantics when implemented.
-- [ ] Remove any obsolete statement that AR mode is hidden when ARCore is missing.
+- [x] Update every stale comment that calls CameraX/homography the only "ARCore fallback" (none left).
+- [x] Update `file_descriptions.md` with standalone classes and ownership.
+- [x] Update `FEATURE_REFERENCE.md` with backend capability differences (capability table).
+- [x] Update `SLAM_SETUP.md` with standalone CameraX/KPM data flow.
+- [x] Update `NATIVE_ENGINE.md` once MobileGS standalone frame semantics are implemented.
+- [x] Document physical-scale UX when chosen (`FEATURE_REFERENCE.md`, `NATIVE_ENGINE.md`,
+  `release-checklist.md`).
+- [x] Document standalone tracking-state diagnostics and thresholds when finalized
+  (`SPHERESLAM_ARCORE_SIDECAR.md`, `release-checklist.md`).
+- [x] Document co-op cross-backend semantics when implemented (`ARCHITECTURE.md`,
+  `FEATURE_REFERENCE.md`).
+- [x] Remove any obsolete statement that AR mode is hidden when ARCore is missing (none left).
 
 ---
 

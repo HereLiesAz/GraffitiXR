@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #include <opencv2/opencv.hpp>
 #include <opencv2/geometry.hpp>
 #include <opencv2/calib3d.hpp>
@@ -93,6 +94,19 @@ public:
     // stashed depth, the map builds exactly as before (wall-plane back-projection only), so the classic
     // planar path is byte-for-byte unchanged. Standalone + feature-map flag opts in.
     void setDepthPlacementEnabled(bool e) { mDepthPlacementEnabled.store(e, std::memory_order_relaxed); }
+    // Pause between reloc passes, locked / hunting. Defaults 200 / 60 ms; the host raises them under
+    // device stress (thermal, power-save, low battery). Clamped to [kRelocBackoffMinMs, kRelocBackoffMaxMs];
+    // read before each pause, so a change applies from the next pass.
+    static constexpr int kRelocLockedBackoffDefaultMs = 200;
+    static constexpr int kRelocHuntBackoffDefaultMs = 60;
+    static constexpr int kRelocBackoffMinMs = 10;
+    static constexpr int kRelocBackoffMaxMs = 2000;
+    void setRelocBackoffMs(int lockedMs, int huntMs) {
+        mRelocLockedBackoffMs.store(std::clamp(lockedMs, kRelocBackoffMinMs, kRelocBackoffMaxMs), std::memory_order_relaxed);
+        mRelocHuntBackoffMs.store(std::clamp(huntMs, kRelocBackoffMinMs, kRelocBackoffMaxMs), std::memory_order_relaxed);
+    }
+    int relocLockedBackoffMs() const { return mRelocLockedBackoffMs.load(std::memory_order_relaxed); }
+    int relocHuntBackoffMs() const { return mRelocHuntBackoffMs.load(std::memory_order_relaxed); }
     /**
      * Why the last relocalization attempt failed to publish a pose. Ordered by how early the gate
      * sits in the pipeline, so the largest value reached is the furthest the attempt got.
@@ -815,6 +829,8 @@ private:
     std::vector<float> mDepth;
     int mDepthW = 0, mDepthH = 0, mDepthFrameW = 0, mDepthFrameH = 0;
     std::atomic<bool> mDepthPlacementEnabled{false};
+    std::atomic<int> mRelocLockedBackoffMs{kRelocLockedBackoffDefaultMs};
+    std::atomic<int> mRelocHuntBackoffMs{kRelocHuntBackoffDefaultMs};
 
     float mAnchorMatrix[16];
 

@@ -5,6 +5,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.abs
 import kotlin.math.floor
 
 /*
@@ -59,13 +60,17 @@ internal class StandaloneDepthCadence(
         atlasGrew = true
     }
 
-    /** Whether a run is due at [nowMs]. Does not consume the slot; call [markRun] when one starts. */
-    fun isDue(nowMs: Long): Boolean {
+    /**
+     * Whether a run is due at [nowMs]. Does not consume the slot; call [markRun] when one starts.
+     * [intervalScale] (≥ 1) stretches both intervals under device stress ([depthIntervalScale]).
+     */
+    fun isDue(nowMs: Long, intervalScale: Int = 1): Boolean {
         if (lastRunMs == Long.MIN_VALUE) return true
+        val scale = intervalScale.coerceAtLeast(1)
         val elapsed = nowMs - lastRunMs
-        if (elapsed >= maxIntervalMs) return true
+        if (elapsed >= maxIntervalMs * scale) return true
         val changed = atlasGrew || (currentTile != null && currentTile != lastRunTile)
-        return changed && elapsed >= minIntervalMs
+        return changed && elapsed >= minIntervalMs * scale
     }
 
     /** A run actually started at [nowMs] (it was not dropped as busy). */
@@ -84,7 +89,9 @@ internal class StandaloneDepthCadence(
 
     private fun tileKey(headingDeg: Float, elevationDeg: Float): Long {
         val h = ((headingDeg % 360f) + 360f) % 360f
-        val hBin = floor(h / tileDegrees).toLong()
+        // Over a floor or under a ceiling the axis heading is sensor noise: binning it would call every
+        // frame a new tile and run MiDaS at the minimum interval. The polar caps are one tile each.
+        val hBin = if (abs(elevationDeg) >= POLAR_CAP_DEG) 0L else floor(h / tileDegrees).toLong()
         val eBin = floor(elevationDeg.coerceIn(-90f, 90f) / tileDegrees).toLong()
         return (hBin shl 32) or (eBin and 0xFFFFFFFFL)
     }
@@ -95,6 +102,9 @@ internal class StandaloneDepthCadence(
 
         /** Periodic refresh while the view stays in one tile. */
         const val DEFAULT_MAX_INTERVAL_MS = 2_000L
+
+        /** At or beyond this |elevation| the view is in a polar cap, one tile whatever the heading. */
+        const val POLAR_CAP_DEG = 60f
 
         /** Coarse view-direction tile; MiDaS output is downscaled to 128px, so finer is wasted. */
         const val DEFAULT_TILE_DEGREES = 30f

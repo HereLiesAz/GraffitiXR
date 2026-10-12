@@ -2,6 +2,7 @@
 // One definition, included by every test translation unit, so the struct is ODR-identical.
 #pragma once
 #include <opencv2/core.hpp>
+#include <vector>
 #include "MobileGS.h"
 
 struct MobileGSTestPeer {
@@ -17,4 +18,10 @@ struct MobileGSTestPeer {
     static void setCorrobGate(MobileGS& g, int v) { g.mCorrobGate.store(v); }
     static void setGrowOutcome(MobileGS& g, int v) { g.mGrowOutcome.store(v); }
     static long long evalFrameCounter(MobileGS& g) { return g.mEvalSyncFrameCounter.load(); }
+    static void setWallPoints(MobileGS& g, const std::vector<cv::Point3f>& p) { g.mWallKeypoints3D = p; }
+    static void grow(MobileGS& g, const glm::mat4& camFromFp, const std::vector<cv::KeyPoint>& kps,
+                     const cv::Mat& descs, double fx, double fy, double cx, double cy) {
+        g.growMapFromReloc(camFromFp, kps, descs, fx, fy, cx, cy);
+    }
+    static std::vector<cv::Point3f> mapPoints(MobileGS& g) { return g.mMapPoints3D; }
 };

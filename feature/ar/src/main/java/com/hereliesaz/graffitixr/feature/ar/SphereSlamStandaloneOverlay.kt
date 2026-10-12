@@ -32,6 +32,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -274,6 +275,14 @@ fun SphereSlamStandaloneOverlay(
      */
     onNewTargetRequested: (() -> Unit)? = null,
     onPersistedReferenceInvalid: (Uri) -> Unit = {},
+    /** Native KPM registered the page loaded from this persisted URI. */
+    onPersistedReferenceRegistered: (Uri) -> Unit = {},
+    /**
+     * Native KPM rejected the page loaded from this persisted URI as too weak. Return true when the
+     * host restores the previous target's persisted state (a replacement it had not yet confirmed):
+     * the overlay then waits for that URI and swaps back to it instead of restoring in memory.
+     */
+    onPersistedReferenceRejected: (Uri) -> Boolean = { false },
     onPersistedAtlasPageInvalid: (Int, Uri) -> Unit = { _, _ -> },
     onAtlasPageCaptured: (Bitmap, Int, Float, Boolean, FloatArray) -> Unit =
         { _, _, _, _, _ -> },
@@ -298,11 +307,6 @@ fun SphereSlamStandaloneOverlay(
      * independently of the fingerprint/teleological layer.
      */
     onPhotosphereKeyframe: (PhotosphereKeyframe) -> Unit = {},
-    /**
-     * Roll of the tracked image for a body->camera rotation (see
-     * `ArViewModel.latestCameraRollDegrees`), stamped on photosphere keyframes; null when unknown.
-     */
-    cameraRollDegrees: (cameraFromDevice: FloatArray) -> Float? = { null },
     /** Same-frame base-map to precision-target transform, solved only after a real KPM lock. */
     onMapFromFingerprintSolved: (FloatArray) -> Unit = {},
     /**
@@ -335,8 +339,11 @@ fun SphereSlamStandaloneOverlay(
     coverageRegionsInProgress: () -> List<PhotosphereMap.RegionProgress> = { emptyList() },
     /** The user's coverage-glow colour/intensity/style; a change restyles the live glow at once. */
     coverageGlowAppearance: CoverageGlowAppearance = CoverageGlowAppearance.DEFAULT,
-    /** Latest camera attitude `(headingDeg, elevationDeg)` stamped on photosphere keyframes, or null. */
-    cameraAttitude: () -> Pair<Float, Float>? = { null },
+    /**
+     * Latest camera attitude for a body->camera rotation — heading, elevation and that image's roll
+     * from one sample (`ArViewModel.latestCameraAttitude`) — stamped on photosphere keyframes, or null.
+     */
+    cameraAttitude: (cameraFromDevice: FloatArray) -> StandaloneCameraAttitude? = { null },
     /**
      * The host's `CameraAttitudeProvider.attitudeExtrapolator` (`TYPE_ROTATION_VECTOR`, sampled at
      * `SENSOR_DELAY_GAME`): drives the display-rate glow rotation and the artwork's per-draw pose
@@ -360,6 +367,12 @@ fun SphereSlamStandaloneOverlay(
     cameraTargetFps: Int = CameraTargetFps.DEVICE_DEFAULT,
     adaptiveRateEnabled: Boolean = false,
     batteryTier: Int = 0,
+    /**
+     * Thermal / power-save / low-battery-warning throttle (ArUiState.perceptionSystemThrottle). With
+     * [batteryTier] it sets the analyzers' [DeviceStress]; with [adaptiveRateEnabled] it sets their
+     * adaptive cadence ([AnalysisFrameGate]). Pushed on every composition, so a change applies at once.
+     */
+    perceptionSystemThrottle: Boolean = false,
     /**
      * The host's onscreen hand-off ([StandaloneOverlayUiHost]): the status, Copy Diagnostics,
      * Recapture / New Target, sweep hint and fatal dialog are published there so the host draws them
@@ -718,7 +731,12 @@ fun SphereSlamStandaloneOverlay(
     // A fresh candidate page exists before its project commit clears the OLD page's seed/map/atlas.
     // Never let those old coordinates cross into the candidate analyzer. Once the new versioned URI
     // lands, awaitingReferencePersistence flips false and we snapshot the freshly committed state.
-    val candidateUncommitted = referenceNeedsPersistence || awaitingReferencePersistence
+    // Shared capture: the project already names a new page (its seed/map/atlas with it) while this
+    // overlay still holds the previous page until the loader swaps. Same rule: no new coordinates on
+    // the old page.
+    val swapPending = sharedTargetCapture && reference != null &&
+        persistedReferenceUri != null && persistedReferenceUri != loadedReferenceUri
+    val candidateUncommitted = referenceNeedsPersistence || awaitingReferencePersistence || swapPending
     val runtimeMobileGsFingerprint =
         if (candidateUncommitted) null else mobileGsFingerprint
     // Snapshot persisted native state once per canonical page. Autosaves/grown-page commits publish
@@ -1028,6 +1046,24 @@ fun SphereSlamStandaloneOverlay(
         onDiagnostic("SphereSLAM standalone diagnostic dump copied")
     }
 
+    // Remembered once, so it reads the current composition's values through these.
+    val currentPeerOnlyTracking by rememberUpdatedState(peerOnlyTracking)
+    val currentOnUnitsPerPixel by rememberUpdatedState(onUnitsPerPixel)
+    val currentOnTrackingTick by rememberUpdatedState(onTrackingTick)
+    val trackedFrameUi = remember {
+        LatestValueUiPost<TrackedFrameUi>(post = { drain -> postUi(drain) }) { update ->
+            if (currentPeerOnlyTracking) {
+                trackingState =
+                    if (update.tracking) StandaloneTrackingState.LOCKED
+                    else StandaloneTrackingState.REACQUIRING
+            }
+            // A lost frame keeps the last match's diagnostics, as before.
+            update.match?.let { matchDiagnostics = it }
+            currentOnUnitsPerPixel(update.screenUnitsPerPixel)
+            currentOnTrackingTick(update.tracking)
+        }
+    }
+
     fun consumeTrackedFrame(frame: SphereSlamStandaloneFrame?) {
         // Renderer state is atomic/volatile and intentionally updated directly from the analysis
         // worker. Compose state belongs to Main and is posted there separately.
@@ -1050,26 +1086,25 @@ fun SphereSlamStandaloneOverlay(
                 surfaceHeightPixels = size.height,
             )
         } ?: 0f
-        postUi {
-            if (peerOnlyTracking) {
-                trackingState =
-                    if (frame != null) StandaloneTrackingState.LOCKED
-                    else StandaloneTrackingState.REACQUIRING
-            }
-            if (frame != null) {
-                matchDiagnostics = StandaloneMatchDiagnostics(
-                    pageNo = frame.pageNo,
-                    inliers = frame.inlierCount,
-                    reprojectionError = frame.reprojectionError,
-                    observationAgeMs = frame.observationAgeMs,
-                    matchDurationMs = frame.matchDurationMs,
-                    source = frame.source,
-                    matchMethod = frame.matchMethod?.name,
-                )
-            }
-            onUnitsPerPixel(screenUnitsPerPixel)
-            onTrackingTick(frame != null)
-        }
+        // Coalesced: at most one UI update outstanding, carrying the newest frame's values (a slow
+        // main thread must not replay a backlog of stale per-frame ticks).
+        trackedFrameUi.offer(
+            TrackedFrameUi(
+                tracking = frame != null,
+                match = frame?.let {
+                    StandaloneMatchDiagnostics(
+                        pageNo = it.pageNo,
+                        inliers = it.inlierCount,
+                        reprojectionError = it.reprojectionError,
+                        observationAgeMs = it.observationAgeMs,
+                        matchDurationMs = it.matchDurationMs,
+                        source = it.source,
+                        matchMethod = it.matchMethod?.name,
+                    )
+                },
+                screenUnitsPerPixel = screenUnitsPerPixel,
+            ),
+        )
     }
 
     // CameraController implements pinch-to-camera-zoom itself. That would change the effective
@@ -1106,6 +1141,12 @@ fun SphereSlamStandaloneOverlay(
     // desync), OIS kept. Keyed on the effective rate so a Settings change (or the adaptive battery
     // cap) applies immediately; the shared controller's defaults are restored on exit.
     // See StandaloneCameraTuning.kt.
+    val frameGate = remember { AnalysisFrameGate() }
+    SideEffect {
+        frameGate.stress = deviceStress(perceptionSystemThrottle, batteryTier)
+        frameGate.adaptiveCadence = adaptiveRateEnabled
+    }
+
     val standaloneTargetFps = standaloneEffectiveCameraTargetFps(
         targetFps = cameraTargetFps,
         adaptiveRateEnabled = adaptiveRateEnabled,
@@ -1118,24 +1159,31 @@ fun SphereSlamStandaloneOverlay(
             val applied = applyStandaloneTrackingCaptureOptions(cameraController, standaloneTargetFps)
             onDiagnostic(
                 "SphereSLAM standalone camera: setting=${CameraTargetFps.label(standaloneTargetFps)} " +
-                    "aeRange=" + (applied?.let { "[${it[0]},${it[1]}]" } ?: "unchanged") +
-                    " eis=off ois=on",
+                    "aeRange=" + (applied?.aeRange?.let { "[${it[0]},${it[1]}]" } ?: "unchanged") +
+                    " eis=off ois=on lens=" + (applied?.distortion ?: "unchanged"),
             )
             onDispose { applyDefaultCaptureOptions(cameraController) }
         }
     }
 
+    // Keyed on the atlas being loaded (not the list: growth must not tear the analyzer down) — when the
+    // camera id resolves first, the analyzer starts once the atlas decode lands.
+    val atlasLoaded = atlasReferenceImages != null
     DisposableEffect(
         cameraController,
         cameraId,
+        atlasLoaded,
         peerOnlyTracking,
         coopPeerSpatialFrame,
         coopPeerFingerprint,
         analyzerRestartGeneration,
     ) {
         // Re-arm the UI-post gate: a prior disposal set this true, and this fresh analyzer's posts
-        // must be delivered again.
+        // must be delivered again. The coalescer forgets a drain the purge dropped, or it would wait on
+        // it for good.
         disposed.set(false)
+        trackedFrameUi.reset()
+        frameGate.reset()
         val id = cameraId
         val restoredAtlas = atlasReferenceImages
         val standaloneReference = referenceImage
@@ -1173,6 +1221,7 @@ fun SphereSlamStandaloneOverlay(
                         spatialFrame = peerSpatial,
                         onFrameTracked = ::consumeTrackedFrame,
                         onDiagnostic = { text -> postUi { onDiagnostic(text) } },
+                        frameGate = frameGate,
                     )
                     cameraController.setImageAnalysisAnalyzer(executor, analyzer)
                     onDispose {
@@ -1219,6 +1268,7 @@ fun SphereSlamStandaloneOverlay(
                             // Restored page: durable metadata already points at this exact candidate,
                             // so successful addReference/configureMobileGs is the final readiness gate.
                             onReferenceRegistrationChanged(true)
+                            loadedReferenceUri?.let(onPersistedReferenceRegistered)
                         }
                     }
                 },
@@ -1284,7 +1334,6 @@ fun SphereSlamStandaloneOverlay(
                 attitudeSample = attitudeSample.takeIf { posePredictionWired },
                 attitudeExtrapolator = attitudeExtrapolator.takeIf { posePredictionWired },
                 displayPosePredictor = displayPosePredictor.takeIf { posePredictionWired },
-                cameraRollDegrees = cameraRollDegrees,
                 onMapFromFingerprintSolved = onMapFromFingerprintSolved,
                 onPhotosphereKeyframe = { keyframe ->
                     // Base-map update first so the current-tile read below observes the newly captured
@@ -1311,10 +1360,27 @@ fun SphereSlamStandaloneOverlay(
                 },
                 onKeyframeOrientation = onKeyframeOrientation,
                 depthEstimator = depthEstimator,
+                frameGate = frameGate,
                 onFatalError = { error ->
                     postUi {
                         analyzerFatal = true
                         val tooWeak = error as? StandaloneReferenceTooWeakException
+                        // A persisted page the host committed before KPM saw it (a replacement): the
+                        // host restores the previous target durably, and the reference loader swaps
+                        // back to it (restarting this fatal analyzer) when its URI returns.
+                        val rejectedUri = loadedReferenceUri.takeIf { tooWeak != null && !referenceNeedsPersistence }
+                        if (rejectedUri != null && onPersistedReferenceRejected(rejectedUri)) {
+                            referenceReady = false
+                            trackingState = StandaloneTrackingState.INITIALIZING
+                            currentFailure = null
+                            fatalMessage = null
+                            onDiagnostic(
+                                "SphereSLAM replacement target rejected: " +
+                                    "features=${tooWeak?.featureCount} minimum=${tooWeak?.minimumFeatureCount}; " +
+                                    "restoring the previous target",
+                            )
+                            return@postUi
+                        }
                         val old = previousReferenceBitmap
                         when (
                             standaloneFatalRecovery(
@@ -1617,3 +1683,10 @@ private fun PublishOrDraw(host: StandaloneOverlayUiHost?, panel: @Composable () 
         onDispose { host.content = null }
     }
 }
+
+/** One tracked frame's UI-thread values ([LatestValueUiPost]: only the newest is applied). */
+private class TrackedFrameUi(
+    val tracking: Boolean,
+    val match: StandaloneMatchDiagnostics?,
+    val screenUnitsPerPixel: Float,
+)

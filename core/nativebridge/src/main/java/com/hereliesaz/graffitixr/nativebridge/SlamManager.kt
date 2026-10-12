@@ -61,6 +61,8 @@ class SlamManager @Inject constructor(
             if (!isInitialized) {
                 nativeInitialize()
                 isInitialized = true
+                // A fresh engine starts at the native defaults; re-apply the host's current back-off.
+                relocBackoffMs?.let { (locked, hunt) -> nativeSetRelocBackoffMs(locked, hunt) }
             }
         }
     }
@@ -489,6 +491,21 @@ class SlamManager @Inject constructor(
      * wall-plane back-projection exactly as before. Standalone opts in behind the feature-map flag.
      */
     fun setDepthPlacementEnabled(enabled: Boolean) = nativeSetDepthPlacementEnabled(enabled)
+
+    @Volatile private var relocBackoffMs: Pair<Int, Int>? = null
+
+    /**
+     * Pause between relocalizer passes, once locked ([lockedMs]) and while hunting for a lock
+     * ([huntMs]). Native defaults are 200 / 60 ms; the host raises them under thermal, power-save
+     * and low-battery pressure. Applies from the next pass, and is re-applied when the engine is
+     * re-created. Native clamps both to 10..2000 ms.
+     */
+    fun setRelocBackoffMs(lockedMs: Int, huntMs: Int) {
+        synchronized(initLock) {
+            relocBackoffMs = lockedMs to huntMs
+            if (isInitialized) nativeSetRelocBackoffMs(lockedMs, huntMs)
+        }
+    }
 
     /**
      * Sphere map Phase 4: the last reloc attempt's persistent-map contribution as
@@ -939,6 +956,7 @@ class SlamManager @Inject constructor(
     private external fun nativeSetMapRelocEnabled(enabled: Boolean)
     private external fun nativeSetMapBuildEnabled(enabled: Boolean)
     private external fun nativeSetDepthPlacementEnabled(enabled: Boolean)
+    private external fun nativeSetRelocBackoffMs(lockedMs: Int, huntMs: Int)
     private external fun nativeSetLatestDepthMap(data: FloatArray?, w: Int, h: Int, frameW: Int, frameH: Int)
     private external fun nativeGetMapRelocCounts(out: IntArray)
     private external fun nativeExportWallFeatureMap(): ByteArray?

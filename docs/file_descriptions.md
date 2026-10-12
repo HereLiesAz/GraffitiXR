@@ -9,7 +9,7 @@ This document lists key files in the repository and their purposes.
 *   `build.gradle.kts`: Root build configuration.
 *   `settings.gradle.kts`: Module inclusion settings.
 *   `gradle/libs.versions.toml`: Version catalog — all dependency versions are defined here.
-*   `version.properties`: App Major/Minor version; build number auto-increments from git commit count.
+*   `version.properties`: The app version (major.minor.patch.build), owned by the shared version contract; read verbatim as the versionName.
 *   OpenCV (Java + native C++) is imported from Maven Central (`org.opencv:opencv`, native via its Prefab part); GLM headers are committed under `core/nativebridge/libs/glm`.
 
 ## Application (`:app`)
@@ -55,6 +55,9 @@ This document lists key files in the repository and their purposes.
     (when `distortion_head.onnx` is bundled — the shipped default) the distortion-head crop that
     produces painting-progress and corroboration confidence. No voxel/spatial-hash map — see
     `NATIVE_ENGINE.md`.
+*   `src/main/cpp/include/DepthScaleFit.h`: Header-only transliteration of SphereSLAM's robust
+    `DepthScaleFit` (least-median seed + trimmed least squares). `growMapFromReloc` uses it to
+    calibrate MiDaS inverse depth against the wall and place off-wall features radially.
 *   `src/main/cpp/DistortionHead.cpp`: ONNX inference wrapper for the distortion-head model —
     `docs/DISTORTION_HEAD.md`.
 *   `src/main/cpp/SuperPointDetector.cpp`: ONNX SuperPoint keypoint/descriptor detector, used as an
@@ -68,7 +71,7 @@ This document lists key files in the repository and their purposes.
 
 ### SphereSLAM (published dependency)
 
-SphereSLAM 0.25.3 public API baseline: GraffitiXR consumes the supported planar/coverage surface
+SphereSLAM 0.26.4 public API baseline: GraffitiXR consumes the supported planar/coverage surface
 and toolkit packages, and explicitly opts into the experimental `:reloc` and `:models` surfaces while
 preserving its existing `Standalone*` aliases.
 
@@ -138,6 +141,15 @@ the real (non-stub) tracker is packaged.
 *   `SphereSlamStandaloneOverlay.kt`: non-ARCore AR surface. Owns rectified wall-target capture,
     CameraX analyzer lifecycle, KPM/reacquisition HUD, GL overlay, target restore, and copyable
     diagnostics.
+*   `StandaloneCameraAttitude.kt`: heading, elevation and an image's roll from one attitude sample;
+    what keyframes and fingerprint placement read (the angles only mean something together near the
+    poles).
+*   `DeviceStressPolicy.kt`: routes the battery / heat safeties (thermal, power-save, low battery)
+    and Adaptive rate to the heavy work — the native relocalizer's back-off, standalone MiDaS cadence,
+    and `AnalysisFrameGate`, which spaces the standalone and co-op analyzers' frames under stress and,
+    with Adaptive rate on, keeps an overrunning analyzer under half duty.
+*   `LatestValueUiPost.kt`: worker→UI handoff with at most one main-thread post outstanding,
+    applying only the newest value; the standalone overlay's per-frame tracking updates go through it.
 *   `SphereSlamStandaloneTrackingAnalyzer.kt`: the CameraX adapter around SphereSLAM `:reloc`
     `PhotosphereTrackingSession`, which runs the synchronous calibrated KPM pose pipeline (quality
     gates, observation-age checks, pose-jump rejection, tracking-state hysteresis, the short

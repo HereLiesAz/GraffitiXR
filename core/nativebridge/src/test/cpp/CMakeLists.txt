@@ -27,6 +27,7 @@ add_executable(native_host_tests
     MobileGSRelocTest.cpp
     SuperPointDetectorTest.cpp
     FrameBufferGuardTest.cpp
+    DepthScaleFitTest.cpp
     ${SRC}/MobileGS.cpp
     ${SRC}/SuperPointDetector.cpp
     ${SRC}/DistortionHead.cpp

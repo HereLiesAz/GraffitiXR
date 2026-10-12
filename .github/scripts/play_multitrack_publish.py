@@ -9,13 +9,16 @@ script does in one edit transaction.
 
 Env inputs (all required):
     PACKAGE_NAME               applicationId, e.g. com.hereliesaz.graffitixr
-    AAB_GLOB                   glob resolving to exactly one .aab
+    AAB_GLOB                   glob resolving to exactly one .aab (not needed with --next-version-code)
     PLAY_SERVICE_ACCOUNT_JSON  raw JSON contents of the service-account key
+
+`--next-version-code` publishes nothing: it prints one above the highest versionCode Play holds on
+any track or as an upload (the code release.yml builds with), then exits.
 
 Non-zero exit on any failure. In .github/workflows/release.yml that fails the
 "Publish AAB to Google Play" step (id play-upload), which skips the GitHub
 release publish and lets the fail-loudly step re-annotate the run. Nothing is
-persisted back to the repo: the versionCode comes from CI_VERSION_CODE.
+persisted back to the repo: the versionCode comes from CI_VERSION_CODE (see --next-version-code).
 """
 import glob
 import json
@@ -66,22 +69,49 @@ def _raise_on_sigterm(signum, _frame):
     raise SystemExit(128 + signum)
 
 
+def _service():
+    creds = service_account.Credentials.from_service_account_info(
+        json.loads(os.environ["PLAY_SERVICE_ACCOUNT_JSON"]), scopes=SCOPES,
+    )
+    http = httplib2.Http(timeout=HTTP_TIMEOUT_S)
+    # Play's resumable upload answers each chunk with HTTP 308 "Resume Incomplete" and no Location
+    # header. httplib2 (>= 0.16) treats 308 as a redirect and raises RedirectMissingLocation;
+    # googleapiclient's own build_http() removes 308 for exactly this reason, but a hand-built Http
+    # (needed for the timeout) keeps it.
+    http.redirect_codes = http.redirect_codes - {308}
+    return build("androidpublisher", "v3", http=AuthorizedHttp(creds, http=http), cache_discovery=False)
+
+
+def next_version_code(svc, pkg: str) -> int:
+    """One above the highest versionCode Play holds, skipping any code already uploaded."""
+    edit_id = svc.edits().insert(packageName=pkg, body={}).execute(num_retries=PLAY_API_RETRIES)["id"]
+    try:
+        codes = [int(b["versionCode"]) for b in svc.edits().bundles().list(
+            packageName=pkg, editId=edit_id).execute(num_retries=PLAY_API_RETRIES).get("bundles", [])]
+        codes += [int(a["versionCode"]) for a in svc.edits().apks().list(
+            packageName=pkg, editId=edit_id).execute(num_retries=PLAY_API_RETRIES).get("apks", [])]
+        for track in svc.edits().tracks().list(
+                packageName=pkg, editId=edit_id).execute(num_retries=PLAY_API_RETRIES).get("tracks", []):
+            for release in track.get("releases", []):
+                codes += [int(c) for c in release.get("versionCodes", [])]
+    finally:
+        svc.edits().delete(packageName=pkg, editId=edit_id).execute(num_retries=PLAY_API_RETRIES)
+    return max(codes, default=0) + 1
+
+
 def main() -> None:
     signal.signal(signal.SIGTERM, _raise_on_sigterm)
     pkg = os.environ["PACKAGE_NAME"]
-    aab_glob = os.environ["AAB_GLOB"]
-    creds_json = os.environ["PLAY_SERVICE_ACCOUNT_JSON"]
+    svc = _service()
+    if "--next-version-code" in sys.argv[1:]:
+        print(next_version_code(svc, pkg))
+        return
 
+    aab_glob = os.environ["AAB_GLOB"]
     aabs = sorted(glob.glob(aab_glob))
     if len(aabs) != 1:
         sys.exit(f"Expected exactly one AAB from {aab_glob!r}, found {aabs}")
     aab = aabs[0]
-
-    creds = service_account.Credentials.from_service_account_info(
-        json.loads(creds_json), scopes=SCOPES,
-    )
-    authed_http = AuthorizedHttp(creds, http=httplib2.Http(timeout=HTTP_TIMEOUT_S))
-    svc = build("androidpublisher", "v3", http=authed_http, cache_discovery=False)
 
     # Play's concurrent-active-edits quota is small — if we fail between insert and commit,
     # the open edit sits on the quota until Play garbage-collects it. Delete it on any

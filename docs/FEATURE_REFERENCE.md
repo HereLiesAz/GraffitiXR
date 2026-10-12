@@ -408,17 +408,17 @@ Every persisted key, its default, and effect. Adaptive-throttle keys default **o
 
 | Setting | Key | Default | Effect |
 |---|---|---|---|
-| Adaptive rate | `adaptive_rate_enabled` | on | Master switch for the adaptive perception throttle |
-| Throttle on thermal | `throttle_on_thermal` | on | Floor perception to 15 fps when the device is thermally stressed |
-| Throttle on power-save | `throttle_on_power_save` | on | Floor to 15 fps in power-save mode |
-| Throttle on low battery | `throttle_on_low_battery` | on | Floor to 15 fps on low battery |
-| Throttle on lag | `throttle_on_lag` | on | Floor to 15 fps when frame lag is detected |
+| Adaptive rate | `adaptive_rate_enabled` | on | Master switch for the adaptive perception throttle; caps the camera to 30 fps at battery ≤ 30%; standalone tracking skips frames to stay under half duty once its work exceeds a camera frame |
+| Throttle on thermal | `throttle_on_thermal` | on | When the device is thermally stressed: perception floor 30 fps, standalone analysis ≤ 15 fps, slower relocalizer and MiDaS |
+| Throttle on power-save | `throttle_on_power_save` | on | The same in OS power-save mode |
+| Throttle on low battery | `throttle_on_low_battery` | on | The same on the low-battery warning or at ≤ 15%; at ≤ 30%: analysis ≤ 20 fps, relocalizer and MiDaS at half rate |
+| Throttle on lag | `throttle_on_lag` | on | Perception floor 30 fps when frame lag is detected |
 | Camera target FPS | `camera_target_fps` | `60` | ARCore camera capture target; a change re-selects the live session's camera config immediately |
 
 **Perception model:** world-locked perception layers render into an offscreen FBO that refreshes only on
 meaningful camera-pose change or SLAM-map growth, and is composited every frame while camera passthrough,
-artwork, and gestures stay at full display rate. With no throttle condition active, perception runs 30 fps;
-any active condition (per the toggles above) floors it to 15 fps.
+artwork, and gestures stay at full display rate. With no throttle condition active, perception runs 60 fps;
+any active condition (per the toggles above) floors it to 30 fps.
 
 ### 7.2 Depth / tracking
 

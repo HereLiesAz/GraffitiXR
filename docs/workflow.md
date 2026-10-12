@@ -30,10 +30,10 @@ the unit + native host tests, then builds a signed AAB/APK, publishes the AAB to
 to the `latest-release-v<major>.<minor>` GitHub release. See [`docs/RELEASE.md`](RELEASE.md).
 
 ## **3. Release Process**
--   **Versioning:** Update `version.properties` (Major/Minor).
--   **Build Number:** CI builds take `versionCode` from `CI_VERSION_CODE` (per workflow, from the
-    run number); local builds auto-increment `version.properties`' `versionBuild`. See
-    [`docs/RELEASE.md`](RELEASE.md) §1.
+-   **Versioning:** `version.properties` belongs to the shared version contract; the build reads it
+    as the versionName (`major.minor.patch.build`) and never rewrites it.
+-   **Build Number:** `release.yml` takes `versionCode` from Play (highest + 1); debug workflows use a
+    run-number counter. See [`docs/RELEASE.md`](RELEASE.md) §1.
 -   **Distribution:** Google Play + GitHub release via `release.yml`; debug APK prerelease via
     `android-ci.yml` (see §2 above).
 

@@ -1,6 +1,7 @@
 #include "include/MobileGS.h"
 #include "include/KeypointGrid.h"
 #include "include/SearchRadius.h"
+#include "include/DepthScaleFit.h"
 #include <jni.h>
 #include <EGL/egl.h>
 #include <algorithm>
@@ -833,8 +834,13 @@ void MobileGS::relocThreadFunc() {
         // matters most — hunting for the first lock, or re-acquiring after the artist looks away —
         // where the cost of an extra attempt is far smaller than the cost of the overlay staying
         // adrift. Locked and stable, 200 ms is plenty and keeps the thermal/battery profile.
+        // Both are raised under thermal / power-save / low-battery pressure (setRelocBackoffMs). The
+        // wait wakes early on destroy(), so a long back-off never delays shutdown.
         const bool locked = mLastRelocReject.load(std::memory_order_relaxed) == kRelocOk;
-        std::this_thread::sleep_for(std::chrono::milliseconds(locked ? 200 : 60));
+        const int backoffMs = locked ? mRelocLockedBackoffMs.load(std::memory_order_relaxed)
+                                     : mRelocHuntBackoffMs.load(std::memory_order_relaxed);
+        std::unique_lock<std::mutex> lock(mRelocMutex);
+        mRelocCv.wait_for(lock, std::chrono::milliseconds(backoffMs), [this] { return !mRelocRunning; });
     }
 }
 bool MobileGS::computeRectifyHomography(const float* viewCur16, const double* liveK4, cv::Mat& Hcur_fp,
@@ -1032,22 +1038,23 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
 
     // Sphere map Phase 2: calibrate MiDaS to this keyframe using the wall itself, then rescue the
     // off-wall features the plane path throws away. MiDaS is affine on INVERSE depth: invd = a*(1/Z)+b.
-    // The wall features (plane intersection in front, t>0) give known (1/Z, invd) pairs; a least-
-    // squares line recovers (a,b). Nothing here touches the wall-plane points placed below — it only
-    // adds points that today are discarded (t<=0), so the classic planar map is unchanged. Entirely
-    // gated: no stashed depth or the flag off ⇒ depthReady stays false ⇒ original behavior.
-    bool depthReady = false;
-    float depthA = 0.f, depthB = 0.f;
+    // The wall features (plane intersection in front, t>0) give known (1/Z, invd) pairs; a robust line
+    // fit (DepthScaleFit.h — SphereSLAM's DepthScaleFit, LMedS seed + trimmed LS) recovers (a,b), so
+    // mismatches and depth-network artefacts on the wall can't drag the calibration. Nothing here
+    // touches the wall-plane points placed below — it only adds points that today are discarded
+    // (t<=0), so the classic planar map is unchanged. Entirely gated: no stashed depth or the flag
+    // off ⇒ depthFit.ok stays false ⇒ original behavior.
+    graffitixr::DepthFit depthFit;
+    auto sampleInvDepth = [&](float px, float py) -> float {
+        int dxi = (int)(px * mDepthW / mDepthFrameW);
+        int dyi = (int)(py * mDepthH / mDepthFrameH);
+        if (dxi < 0 || dyi < 0 || dxi >= mDepthW || dyi >= mDepthH) return NAN;
+        return mDepth[(size_t)dyi * mDepthW + dxi];
+    };
     if (mDepthPlacementEnabled.load(std::memory_order_relaxed) &&
         !mDepth.empty() && mDepthFrameW > 0 && mDepthFrameH > 0) {
-        auto sampleInvDepth = [&](float px, float py) -> float {
-            int dxi = (int)(px * mDepthW / mDepthFrameW);
-            int dyi = (int)(py * mDepthH / mDepthFrameH);
-            if (dxi < 0 || dyi < 0 || dxi >= mDepthW || dyi >= mDepthH) return NAN;
-            return mDepth[(size_t)dyi * mDepthW + dxi];
-        };
-        // Accumulate the normal equations for y = a*x + b over wall (t>0) features.
-        double sx = 0, sy = 0, sxx = 0, sxy = 0; int nfit = 0;
+        std::vector<float> oneOverZ, invDepth;
+        oneOverZ.reserve(kps.size()); invDepth.reserve(kps.size());
         for (size_t i = 0; i < kps.size(); ++i) {
             glm::vec3 dir = R * glm::vec3((float)((kps[i].pt.x - cx) / fx),
                                           (float)((kps[i].pt.y - cy) / fy), 1.0f);
@@ -1057,19 +1064,10 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
             if (t <= 1e-3f) continue;
             float invd = sampleInvDepth(kps[i].pt.x, kps[i].pt.y);
             if (!std::isfinite(invd)) continue;
-            double x = 1.0 / (double)t, yv = (double)invd;
-            sx += x; sy += yv; sxx += x * x; sxy += x * yv; ++nfit;
+            oneOverZ.push_back(1.0f / t);
+            invDepth.push_back(invd);
         }
-        if (nfit >= 6) {
-            double denomFit = (double)nfit * sxx - sx * sx;
-            if (std::fabs(denomFit) > 1e-9) {
-                depthA = (float)(((double)nfit * sxy - sx * sy) / denomFit);
-                depthB = (float)((sy * sxx - sx * sxy) / denomFit);
-                // a>0 is the physical sign (nearer ⇒ larger invd ⇒ larger 1/Z). Reject a degenerate
-                // or inverted fit rather than place points from it.
-                if (depthA > 1e-6f) depthReady = true;
-            }
-        }
+        depthFit = graffitixr::fitDepthScale(oneOverZ, invDepth);
     }
 
     int added = 0;
@@ -1084,15 +1082,9 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
             // Off-wall feature: the plane path discards it. With a valid depth calibration, place it
             // radially at its MiDaS-derived camera-axis depth instead — the omnidirectional coverage
             // that makes the surrounding "sphere". Skip (as before) when depth is unavailable.
-            if (!depthReady) continue;
-            int dxi = (int)(kps[i].pt.x * mDepthW / mDepthFrameW);
-            int dyi = (int)(kps[i].pt.y * mDepthH / mDepthFrameH);
-            if (dxi < 0 || dyi < 0 || dxi >= mDepthW || dyi >= mDepthH) continue;
-            float invd = mDepth[(size_t)dyi * mDepthW + dxi];
-            if (!std::isfinite(invd)) continue;
-            float invZ = (invd - depthB) / depthA;    // 1/Z from the affine fit
-            if (invZ <= 1e-4f) continue;               // behind the camera / at infinity
-            t = 1.0f / invZ;
+            if (!depthFit.ok) continue;
+            t = depthFit.depthFor(sampleInvDepth(kps[i].pt.x, kps[i].pt.y));
+            if (t <= 0.f) continue;                    // off-map, behind the camera, or at infinity
             // Reject MiDaS outliers: keep radii within a sane band around the wall distance so a
             // single bad depth pixel can't scatter a point to infinity.
             if (t < 0.1f * wallZ || t > 10.f * wallZ) continue;

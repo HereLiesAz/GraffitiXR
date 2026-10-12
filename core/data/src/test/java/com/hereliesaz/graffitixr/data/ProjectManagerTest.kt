@@ -308,21 +308,28 @@ class ProjectManagerTest {
     }
 
     @Test
-    fun `appendTargetImage prunes beyond the cap without touching project json`() = runTest {
+    fun `appendTargetImage prunes the list but leaves the files to the caller's commit`() = runTest {
         val projectRepositoryProvider = mockk<javax.inject.Provider<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>>(relaxed = true)
         val pruningManager = ProjectManager(mockContext, uriProvider, projectRepositoryProvider)
         val bitmap = mockk<Bitmap>(relaxed = true)
 
         var uris = emptyList<Uri>()
+        val dropped = mutableListOf<Uri>()
         repeat(35) {
-            uris = pruningManager.appendTargetImage(mockContext, "capture_only", uris, bitmap)
+            val next = pruningManager.appendTargetImage(mockContext, "capture_only", uris, bitmap)
+            dropped += uris - next.toSet()
+            uris = next
         }
 
         assertEquals(30, uris.size)
+        assertEquals(5, dropped.size)
         // Pure file IO: appendTargetImage must never create project.json.
         assertFalse(File(tempFilesDir, "projects/capture_only/project.json").exists())
-        val targetFiles = File(tempFilesDir, "projects/capture_only").listFiles { f -> f.name.startsWith("target_") }
-        assertEquals(30, targetFiles?.size ?: -1)
+        fun targetFiles() = File(tempFilesDir, "projects/capture_only").listFiles { f -> f.name.startsWith("target_") }?.size
+        // A dropped file is still referenced until the caller commits the list: nothing deleted yet.
+        assertEquals(35, targetFiles())
+        pruningManager.deleteTargetImages(dropped)
+        assertEquals(30, targetFiles())
     }
 
 
