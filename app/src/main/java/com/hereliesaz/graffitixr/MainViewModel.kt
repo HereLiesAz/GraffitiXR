@@ -75,6 +75,22 @@ class MainViewModel @Inject constructor(
     // "a different project was opened" — only the latter should reset targetCapturedThisSession.
     private var lastSeenProjectId: String? = null
 
+    /**
+     * A standalone target replacement that is committed but not yet accepted by native KPM
+     * registration: [previous] is the project as it stood before (its page 0 and atlas files are kept
+     * until the verdict). [onStandaloneReferenceRegistered] deletes them; [onStandaloneReferenceRejected]
+     * restores them. In memory only: an app kill in the seconds between confirm and registration keeps
+     * the candidate and leaves the previous files orphaned.
+     */
+    private class PendingStandaloneReplacement(
+        val projectId: String,
+        val candidateUri: android.net.Uri,
+        val previous: com.hereliesaz.graffitixr.common.model.GraffitiProject,
+    )
+
+    private val replacementLock = Any()
+    private var pendingStandaloneReplacement: PendingStandaloneReplacement? = null // guarded by replacementLock
+
     init {
         // Track whether the loaded project already has a saved target so AR entry knows whether to
         // pre-select the Target button. Updated on confirm via the repository's project re-load.
@@ -257,7 +273,6 @@ class MainViewModel @Inject constructor(
 
                 val patch = grayPatchBytes(bitmap)
                 val fingerprint = fp.copy(patchData = patch)
-                slamManager.setWallPatchBytes(patch, PATCH_SIZE)
 
                 val oldReference = currentProject.sphereSlamReferenceUri
                 val oldAtlas = currentProject.sphereSlamAtlasPages
@@ -275,6 +290,7 @@ class MainViewModel @Inject constructor(
                     )
 
                 var committed = false
+                var previous: com.hereliesaz.graffitixr.common.model.GraffitiProject? = null
                 projectRepository.updateProject { current ->
                     if (
                         current.id != currentProject.id ||
@@ -283,6 +299,7 @@ class MainViewModel @Inject constructor(
                         current
                     } else {
                         committed = true
+                        previous = current
                         current.copy(
                             sphereSlamReferenceUri = candidateUri,
                             sphereSlamReferenceWidthMeters = placement.referenceWidthUnits,
@@ -315,20 +332,38 @@ class MainViewModel @Inject constructor(
                         currentProject.id,
                         candidateUri,
                     )
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            context,
+                            "The target changed while this one was saving — not saved. Try again.",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
                     return@launch
                 }
+                // Only a committed target's patch reaches the native wall matcher.
+                slamManager.setWallPatchBytes(patch, PATCH_SIZE)
 
-                projectManager.deleteSphereSlamReference(
-                    context,
-                    currentProject.id,
-                    oldReference,
-                )
-                oldAtlas.forEach { page ->
-                    projectManager.deleteSphereSlamAtlasPage(
-                        context,
-                        currentProject.id,
-                        page.referenceUri,
-                    )
+                // The previous target stays on disk until native KPM accepts the candidate: a candidate
+                // that builds a fingerprint can still be too weak to register, and then the previous
+                // target is restored (onStandaloneReferenceRejected). Replacing a candidate that is
+                // itself still unvalidated keeps the original rollback and drops that candidate.
+                val keepOldForRollback = synchronized(replacementLock) {
+                    val superseded = pendingStandaloneReplacement?.takeIf {
+                        it.projectId == currentProject.id && it.candidateUri == oldReference
+                    }
+                    val rollback = (superseded?.previous ?: previous)
+                        ?.takeIf { it.sphereSlamReferenceUri != null }
+                    pendingStandaloneReplacement =
+                        rollback?.let { PendingStandaloneReplacement(currentProject.id, candidateUri!!, it) }
+                    // The old page is the rollback itself only when it was not an unvalidated candidate.
+                    rollback != null && superseded == null
+                }
+                if (!keepOldForRollback) {
+                    projectManager.deleteSphereSlamReference(context, currentProject.id, oldReference)
+                    oldAtlas.forEach { page ->
+                        projectManager.deleteSphereSlamAtlasPage(context, currentProject.id, page.referenceUri)
+                    }
                 }
 
                 projectRepository.loadProject(currentProject.id)
@@ -362,6 +397,87 @@ class MainViewModel @Inject constructor(
                 _uiState.update { it.copy(isConfirmingTarget = false) }
             }
         }
+    }
+
+    /**
+     * Native KPM registered the standalone page persisted at [uri]. When it is a pending replacement,
+     * the previous target's files are no longer needed and are deleted.
+     */
+    fun onStandaloneReferenceRegistered(uri: android.net.Uri) {
+        val accepted = synchronized(replacementLock) {
+            pendingStandaloneReplacement?.takeIf { it.candidateUri == uri }
+                ?.also { pendingStandaloneReplacement = null }
+        } ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                projectManager.deleteSphereSlamReference(
+                    context, accepted.projectId, accepted.previous.sphereSlamReferenceUri,
+                )
+                accepted.previous.sphereSlamAtlasPages.forEach { page ->
+                    projectManager.deleteSphereSlamAtlasPage(context, accepted.projectId, page.referenceUri)
+                }
+            }
+        }
+    }
+
+    /**
+     * Native KPM rejected (or could not read) the standalone page persisted at [uri]. When it is a
+     * pending replacement, the previous target is restored in the project — the overlay then swaps
+     * back to it — and the candidate's file is deleted.
+     *
+     * @return true when [uri] was a pending replacement (the previous target is being restored).
+     */
+    fun onStandaloneReferenceRejected(uri: android.net.Uri): Boolean {
+        val rejected = synchronized(replacementLock) {
+            pendingStandaloneReplacement?.takeIf { it.candidateUri == uri }
+                ?.also { pendingStandaloneReplacement = null }
+        } ?: return false
+        viewModelScope.launch(Dispatchers.IO) {
+            val p = rejected.previous
+            var restored = false
+            projectRepository.updateProject { current ->
+                if (current.id != rejected.projectId || current.sphereSlamReferenceUri != uri) {
+                    current
+                } else {
+                    restored = true
+                    // A new generation: everything keyed on the anchor re-solves for the restored page.
+                    // The previous placement state is carried over (placed stays placed).
+                    val generation = current.sphereSlamAnchorGeneration + 1L
+                    current.copy(
+                        sphereSlamReferenceUri = p.sphereSlamReferenceUri,
+                        sphereSlamReferenceWidthMeters = p.sphereSlamReferenceWidthMeters,
+                        sphereSlamReferencePhysicallyMetric = p.sphereSlamReferencePhysicallyMetric,
+                        sphereSlamAnchorGeneration = generation,
+                        sphereSlamAnchorFrameVersion = p.sphereSlamAnchorFrameVersion,
+                        sphereSlamPlacementAnchorGeneration =
+                            if (p.sphereSlamPlacementAnchorGeneration == p.sphereSlamAnchorGeneration) {
+                                generation
+                            } else {
+                                p.sphereSlamPlacementAnchorGeneration
+                            },
+                        sphereSlamFingerprint = p.sphereSlamFingerprint,
+                        sphereSlamFingerprintFrameVersion = p.sphereSlamFingerprintFrameVersion,
+                        sphereSlamMapFromFingerprint = p.sphereSlamMapFromFingerprint,
+                        sphereSlamWallFeatureMap = p.sphereSlamWallFeatureMap,
+                        sphereSlamWallFeatureMapFrameVersion = p.sphereSlamWallFeatureMapFrameVersion,
+                        sphereSlamAtlasPages = p.sphereSlamAtlasPages,
+                        paintMarks = p.paintMarks,
+                        paintGrid = p.paintGrid,
+                    )
+                }
+            }
+            if (!restored) return@launch
+            runCatching { projectManager.deleteSphereSlamReference(context, rejected.projectId, uri) }
+            projectRepository.loadProject(rejected.projectId)
+            withContext(Dispatchers.Main) {
+                Toast.makeText(
+                    context,
+                    "That target has too little trackable detail — kept the previous one.",
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
+        return true
     }
 
     fun onConfirmTargetCreation(

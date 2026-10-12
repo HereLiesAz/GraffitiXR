@@ -502,7 +502,7 @@ class MainActivity : AppCompatActivity() {
                 val coopState = arUiState.coopSessionState
                 var showJoinScanner by remember { mutableStateOf(false) }
                 // Standalone overlay ↔ host: its status/actions render in onscreen (AzNavRail safe
-                // zones), and the rail's Target action reaches it as a new-target request.
+                // zones). The rail's Target action opens the shared capture flow directly.
                 val standaloneUiHost = remember { com.hereliesaz.graffitixr.feature.ar.StandaloneOverlayUiHost() }
                 val hostQr by arViewModel.hostQrPayload.collectAsState()
                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
@@ -979,6 +979,7 @@ class MainActivity : AppCompatActivity() {
                         isTouchLocked = mainUiState.isTouchLocked,
                         isWaitingForTap = mainUiState.isWaitingForTap,
                         isCapturingTarget = mainUiState.isCapturingTarget,
+                        isConfirmingTarget = mainUiState.isConfirmingTarget,
                         isOverlayGyroActive = mainUiState.isOverlayGyroActive,
                         onShowJoinScanner = { showJoinScanner = true },
                         onWallPhoto = {
@@ -2048,6 +2049,7 @@ class MainActivity : AppCompatActivity() {
         isTouchLocked: Boolean,
         isWaitingForTap: Boolean = false,
         isCapturingTarget: Boolean = false,
+        isConfirmingTarget: Boolean = false,
         isOverlayGyroActive: Boolean = false,
         onShowJoinScanner: () -> Unit = {},
         onWallPhoto: () -> Unit = {},
@@ -2214,7 +2216,8 @@ class MainActivity : AppCompatActivity() {
                         color = navItemColor,
                         classifiers = setOf("toggle"),
                         shape = AzButtonShape.NONE,
-                        disabled = showLibrary,
+                        // Not while a confirmed target is still saving: a second capture would race it.
+                        disabled = showLibrary || isConfirmingTarget,
                         onClick = {
                             if (isWaitingForTap) {
                                 mainViewModel.cancelTapMode()

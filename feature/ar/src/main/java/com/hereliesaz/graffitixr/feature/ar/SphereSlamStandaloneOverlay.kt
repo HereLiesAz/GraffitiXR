@@ -274,6 +274,14 @@ fun SphereSlamStandaloneOverlay(
      */
     onNewTargetRequested: (() -> Unit)? = null,
     onPersistedReferenceInvalid: (Uri) -> Unit = {},
+    /** Native KPM registered the page loaded from this persisted URI. */
+    onPersistedReferenceRegistered: (Uri) -> Unit = {},
+    /**
+     * Native KPM rejected the page loaded from this persisted URI as too weak. Return true when the
+     * host restores the previous target's persisted state (a replacement it had not yet confirmed):
+     * the overlay then waits for that URI and swaps back to it instead of restoring in memory.
+     */
+    onPersistedReferenceRejected: (Uri) -> Boolean = { false },
     onPersistedAtlasPageInvalid: (Int, Uri) -> Unit = { _, _ -> },
     onAtlasPageCaptured: (Bitmap, Int, Float, Boolean, FloatArray) -> Unit =
         { _, _, _, _, _ -> },
@@ -718,7 +726,12 @@ fun SphereSlamStandaloneOverlay(
     // A fresh candidate page exists before its project commit clears the OLD page's seed/map/atlas.
     // Never let those old coordinates cross into the candidate analyzer. Once the new versioned URI
     // lands, awaitingReferencePersistence flips false and we snapshot the freshly committed state.
-    val candidateUncommitted = referenceNeedsPersistence || awaitingReferencePersistence
+    // Shared capture: the project already names a new page (its seed/map/atlas with it) while this
+    // overlay still holds the previous page until the loader swaps. Same rule: no new coordinates on
+    // the old page.
+    val swapPending = sharedTargetCapture && reference != null &&
+        persistedReferenceUri != null && persistedReferenceUri != loadedReferenceUri
+    val candidateUncommitted = referenceNeedsPersistence || awaitingReferencePersistence || swapPending
     val runtimeMobileGsFingerprint =
         if (candidateUncommitted) null else mobileGsFingerprint
     // Snapshot persisted native state once per canonical page. Autosaves/grown-page commits publish
@@ -1125,9 +1138,13 @@ fun SphereSlamStandaloneOverlay(
         }
     }
 
+    // Keyed on the atlas being loaded (not the list: growth must not tear the analyzer down) — when the
+    // camera id resolves first, the analyzer starts once the atlas decode lands.
+    val atlasLoaded = atlasReferenceImages != null
     DisposableEffect(
         cameraController,
         cameraId,
+        atlasLoaded,
         peerOnlyTracking,
         coopPeerSpatialFrame,
         coopPeerFingerprint,
@@ -1219,6 +1236,7 @@ fun SphereSlamStandaloneOverlay(
                             // Restored page: durable metadata already points at this exact candidate,
                             // so successful addReference/configureMobileGs is the final readiness gate.
                             onReferenceRegistrationChanged(true)
+                            loadedReferenceUri?.let(onPersistedReferenceRegistered)
                         }
                     }
                 },
@@ -1315,6 +1333,22 @@ fun SphereSlamStandaloneOverlay(
                     postUi {
                         analyzerFatal = true
                         val tooWeak = error as? StandaloneReferenceTooWeakException
+                        // A persisted page the host committed before KPM saw it (a replacement): the
+                        // host restores the previous target durably, and the reference loader swaps
+                        // back to it (restarting this fatal analyzer) when its URI returns.
+                        val rejectedUri = loadedReferenceUri.takeIf { tooWeak != null && !referenceNeedsPersistence }
+                        if (rejectedUri != null && onPersistedReferenceRejected(rejectedUri)) {
+                            referenceReady = false
+                            trackingState = StandaloneTrackingState.INITIALIZING
+                            currentFailure = null
+                            fatalMessage = null
+                            onDiagnostic(
+                                "SphereSLAM replacement target rejected: " +
+                                    "features=${tooWeak?.featureCount} minimum=${tooWeak?.minimumFeatureCount}; " +
+                                    "restoring the previous target",
+                            )
+                            return@postUi
+                        }
                         val old = previousReferenceBitmap
                         when (
                             standaloneFatalRecovery(

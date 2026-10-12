@@ -383,7 +383,16 @@ fun MainScreen(
                                 )
                             },
                             onPersistedReferenceInvalid = { uri ->
-                                arViewModel.clearSphereSlamReferenceIfMatches(uri)
+                                // An unreadable replacement rolls back to the previous target.
+                                if (!mainViewModel.onStandaloneReferenceRejected(uri)) {
+                                    arViewModel.clearSphereSlamReferenceIfMatches(uri)
+                                }
+                            },
+                            onPersistedReferenceRegistered = { uri ->
+                                mainViewModel.onStandaloneReferenceRegistered(uri)
+                            },
+                            onPersistedReferenceRejected = { uri ->
+                                mainViewModel.onStandaloneReferenceRejected(uri)
                             },
                             onPersistedAtlasPageInvalid = { pageNo, uri ->
                                 arViewModel.clearSphereSlamAtlasPageIfMatches(pageNo, uri)

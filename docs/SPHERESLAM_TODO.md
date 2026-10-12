@@ -13,6 +13,11 @@ published on JitPack (its image dropped Ninja), and 0.25.3 pins Ninja in `jitpac
   opaque as it fills, then opens to the camera. Every glow style; library default peak opacity.
 - [x] `firstCaptureForTile` now means "the axis tile's scan completed"; the diagnostic reads
   `photosphere tile scanned`.
+- [x] Replacing a standalone target keeps the previous one until native KPM accepts the new one:
+  `MainViewModel.onConfirmStandaloneTargetCreation` commits the candidate but holds the previous
+  page/atlas files as a pending rollback; the overlay reports the verdict
+  (`onPersistedReferenceRegistered` → previous files deleted; `onPersistedReferenceRejected` /
+  unreadable → previous project fields restored, candidate deleted, the overlay swaps back).
 - [x] The default haze colour is hot pink (`CoverageGlowColor.DEFAULT`); a colour already picked in
   Settings is kept.
 
@@ -64,11 +69,9 @@ It compiles unchanged; what changed underneath:
   `pickFirsts += "**/libc++_shared.so"` for the other native dependencies.
 - [x] `superpoint.onnx` in `:models` is byte-identical to the app's `core/nativebridge` asset.
 
-Open:
-
-- [ ] The artwork is held by the gyro bridge for only 400 ms (`maxBridgeMs`) after the wall leaves
-  view, then hidden until a visual relock, although the base photosphere pose is computed every
-  frame. Holding it on the base pose while off-wall is proposed, not adopted.
+- [x] ~~The artwork is held by the gyro bridge for only 400 ms (`maxBridgeMs`), then hidden until a
+  visual relock.~~ Superseded by 0.25.0: past the bridge SphereSLAM returns `PoseSource.PHOTOSPHERE`
+  / `HELD` and the app renders them (see the 0.25.0 section above).
 
 Device checks owed for 0.24.6:
 
