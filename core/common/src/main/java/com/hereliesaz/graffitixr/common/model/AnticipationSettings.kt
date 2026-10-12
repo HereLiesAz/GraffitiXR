@@ -51,8 +51,10 @@ data class AnticipationSettings(
     }
 
     companion object {
-        // KPM matches up to about 30° of viewing angle: circles at 30° and 60°, meridians 60° apart.
-        const val DEFAULT_DISTANCE = 3
+        // Each view covers about ±15° of viewing angle (KPM holds to about 33°): the pole, then
+        // circles at 30° and 60° on six meridians 60° apart. Six half-spheres reach a sixth of the
+        // capture distance, where the artist works.
+        const val DEFAULT_DISTANCE = 6
         const val DEFAULT_LATITUDE = 6
         const val DEFAULT_LONGITUDE = 2
         // The sensors turn the frame upright before a search: one roll serves.

@@ -319,8 +319,12 @@ internal object HalfSphere {
         val hm = Mat(3, 3, CvType.CV_64F).apply { put(0, 0, *h) }
         val dst = Mat()
         Imgproc.warpPerspective(input, dst, hm, Size(plan.width.toDouble(), plan.height.toDouble()), Imgproc.INTER_LINEAR, org.opencv.core.Core.BORDER_REPLICATE)
-        ByteArray(plan.width * plan.height).also { dst.get(0, 0, it) }
-            .also { src.release(); if (input !== src) input.release(); hm.release(); dst.release() }
+        val pixels = ByteArray(plan.width * plan.height).also { dst.get(0, 0, it) }
+        src.release()
+        if (input !== src) input.release()
+        hm.release()
+        dst.release()
+        pixels
     } catch (_: LinkageError) {
         null
     }

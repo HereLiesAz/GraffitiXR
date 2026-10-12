@@ -10,7 +10,7 @@ fingerprint — the teleological layer's anticipated appearance of the wall.
 
 - [x] Half-sphere views (`feature/ar/.../anticipation/HalfSphere.kt`): target at the core, capture view
   at the pole; meridians (latitude) cut by circles (longitude), a view at the pole and every cut, none
-  on the equator; `distance` half-spheres from the capture distance in (zoom in only); every view at
+  on the equator (defaults: six half-spheres, circles at 30° and 60° on six meridians); `distance` half-spheres from the capture distance in (zoom in only); every view at
   `roll` turns. Nearer half-spheres repeat over a grid of aim points across the target
   (`⌈distance / (shell + 1)⌉` per side), so a close-up of any part of the wall is anticipated, partial
   views (target overflowing the frame, part of it behind the camera) included.
@@ -25,7 +25,7 @@ Device checks owed for 0.26.6:
 
 - [ ] Lose the lock with the phone a hand's width from the wall, over a corner of the target: it
   relocks (`KPM_PREVIEW`).
-- [ ] Defaults (182 views per page) build in the background with no visible frame time; a hot device
+- [ ] Defaults (754 views per page) build in the background with no visible frame time; a hot device
   drops the far half-spheres first.
 - [ ] A Settings change to Anticipation changes the view count in the diagnostics at once.
 - [ ] Fingerprint review never highlights a mark cut by the photo's edge.
