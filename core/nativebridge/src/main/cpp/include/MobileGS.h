@@ -357,6 +357,10 @@ public:
     int lastRelocObliquityDeg() const { return mLastRelocObliquityDeg.load(std::memory_order_relaxed); }
     /** Extra correspondences the rectification pass contributed to the last attempt. */
     int lastRelocRectifiedCorr() const { return mLastRelocRectifiedCorr.load(std::memory_order_relaxed); }
+    /** How far the sensor turn turned the last frame (deg), or -1 when it did not run. */
+    int lastRelocTurnDeg() const { return mLastRelocTurnDeg.load(std::memory_order_relaxed); }
+    /** Extra correspondences the sensor turn contributed to the last attempt. */
+    int lastRelocTurnCorr() const { return mLastRelocTurnCorr.load(std::memory_order_relaxed); }
     /**
      * Stored fingerprint points in F_out — the backbone the reloc PnP is allowed to use — or -1 when
      * no attempt has got far enough to look. An unpartitioned fingerprint reports its full point
@@ -550,6 +554,17 @@ public:
     void setLiveIntrinsics(const float* intr4);
 
     /**
+     * The live frame's camera attitude from the phone's sensors: earth (East-North-Up) <- camera,
+     * row-major 3x3, OpenCV camera axes of the frame as it is fed (display-upright). Snapshotted with
+     * each reloc frame, like the view matrix. Null forgets it (no sensor, or one not north-referenced).
+     */
+    void setCameraAttitude(const float* earthFromCam9);
+    /** The wall's normal (East-North-Up, pointing out of the wall), learned at trusted locks. */
+    bool getWallNormalEnu(float out3[3]) const;
+    /** Seed the wall normal (e.g. the project's saved one); null forgets it. */
+    void setWallNormalEnu(const float* n3);
+
+    /**
      * How much of the registered design the wall now answers for: a PROGRESS measurement, on the
      * timescale of hours, roughly monotonic. For the user's progress readout.
      *
@@ -632,6 +647,30 @@ public:
      */
     static std::vector<RelocScalePass> relocScalePasses(int frameW, int frameH, bool superPoint);
 
+    /**
+     * The sensor turn: the homography (virtual <- current image) that turns the live frame, about its
+     * own centre, into a camera square-on to the wall and upright, from the phone's attitude alone
+     * ([earthFromCam], East-North-Up <- OpenCV camera) and the wall's normal ([wallNormalEnu], out of
+     * the wall). No translation is needed: a pure turn is a homography whatever the camera's position.
+     * The virtual focal is K's times cos(obliquity), and its principal point sits where the live
+     * frame's centre lands, so what the frame saw stays in view. [turnDeg] is the turn's angle,
+     * [obliquityDeg] the view's angle off the normal. False when the wall faces away (> 75 deg off),
+     * the attitude or normal is degenerate, or the turn is under 10 deg (nothing to gain). Pure.
+     */
+    static bool sensorTurnHomography(const cv::Matx33d& earthFromCam, const cv::Vec3d& wallNormalEnu,
+                                     const double K4[4], cv::Matx33d& virtFromCur,
+                                     double& turnDeg, double& obliquityDeg);
+
+    /**
+     * The wall's normal in East-North-Up from a lock: the plane of the fingerprint's points [pts]
+     * (fingerprint frame), turned into the camera by the PnP pose ([camFromFpR], [camFromFpT]) and
+     * into the earth by the frame's attitude ([earthFromCam]), pointing toward the camera. False when
+     * the points are too few or not planar enough to have one. Pure.
+     */
+    static bool wallNormalFromLock(const std::vector<cv::Point3f>& pts, const cv::Matx33d& camFromFpR,
+                                   const cv::Vec3d& camFromFpT, const cv::Matx33d& earthFromCam,
+                                   cv::Vec3d& outEnu);
+
     /** Why the last autoFitDesign() returned false (or kAutoFitOk). Diagnostic only. */
     enum AutoFitResult {
         kAutoFitOk = 0,
@@ -647,7 +686,7 @@ private:
      * EVALUATION.md 3.1 — one relocalization attempt over one frame, callable either from the
      * background worker or inline from the caller in eval sync mode.
      */
-    void runRelocPass(const cv::Mat& frame, const float* relocView);
+    void runRelocPass(const cv::Mat& frame, const float* relocView, const float* relocAttitude = nullptr);
     // Teleological self-grow (gatekeeper stage): measure how much of the registered artwork base is now
     // corroborated by real wall content in the clean camera frame -> mPaintingProgress. Read-only on the
     // reloc fingerprint; the promotion step (adding validated new marks) is staged separately.
@@ -907,6 +946,15 @@ private:
     cv::Mat mWallPatch; // raw 256x256 gray canonical patch for the distortion head (desc_fp source)
     // VIO view snapshot captured alongside the reloc frame, so the rectifying warp matches that frame.
     float mRelocViewMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    // Sensor attitude snapshotted with the reloc frame (mRelocMutex), and the latest one (mMutex).
+    float mRelocAttitude[9] = {1,0,0, 0,1,0, 0,0,1};
+    bool mRelocHasAttitude = false;
+    float mCameraAttitude[9] = {1,0,0, 0,1,0, 0,0,1};
+    bool mHasCameraAttitude = false;
+    // The wall's normal in East-North-Up, learned at trusted locks or seeded from the project (mMutex).
+    float mWallNormalEnu[3] = {0, 0, 0};
+    bool mHasWallNormalEnu = false;
+    int mWallNormalDisagree = 0; // (mMutex) consecutive locks that disagree with it
     // Written by updateLightLevel() on the caller's thread, read (unlocked) by the reloc worker
     // thread in runRelocPass / getSuperPointFeatures / getFingerprintKeypoints / generateFingerprint
     // to decide whether to run the low-light enhancer. Atomic, like every other piece of cross-thread
@@ -950,6 +998,8 @@ private:
     // extra correspondences it contributed.
     std::atomic<int>        mLastRelocObliquityDeg{-1};
     std::atomic<int>        mLastRelocRectifiedCorr{0};
+    std::atomic<int>        mLastRelocTurnDeg{-1};
+    std::atomic<int>        mLastRelocTurnCorr{0};
     // IMPLEMENTATION.md 2.11 — the backbone (F_out) counts, all three -1 for "not measured".
     // They CANNOT default to 0 the way the totals above do. With the partition landed, a zero
     // backbone is a real reading with a specific meaning — the artwork covers the whole wall, so

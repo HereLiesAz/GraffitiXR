@@ -106,6 +106,104 @@ void MobileGS::setLiveIntrinsics(const float* intr4) {
     memcpy(mLiveIntrinsics, intr4, 4 * sizeof(float));
 }
 
+void MobileGS::setCameraAttitude(const float* earthFromCam9) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mHasCameraAttitude = false;
+    if (!earthFromCam9) return;
+    for (int i = 0; i < 9; ++i) if (!std::isfinite(earthFromCam9[i])) return;
+    memcpy(mCameraAttitude, earthFromCam9, 9 * sizeof(float));
+    mHasCameraAttitude = true;
+}
+
+bool MobileGS::getWallNormalEnu(float out3[3]) const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (!mHasWallNormalEnu) return false;
+    memcpy(out3, mWallNormalEnu, 3 * sizeof(float));
+    return true;
+}
+
+void MobileGS::setWallNormalEnu(const float* n3) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mHasWallNormalEnu = false;
+    mWallNormalDisagree = 0;
+    if (!n3) return;
+    const double len = std::sqrt((double)n3[0] * n3[0] + (double)n3[1] * n3[1] + (double)n3[2] * n3[2]);
+    if (!(len > 1e-6) || !std::isfinite(len)) return;
+    for (int i = 0; i < 3; ++i) mWallNormalEnu[i] = (float)(n3[i] / len);
+    mHasWallNormalEnu = true;
+}
+
+bool MobileGS::sensorTurnHomography(const cv::Matx33d& earthFromCam, const cv::Vec3d& wallNormalEnu,
+                                    const double K4[4], cv::Matx33d& virtFromCur,
+                                    double& turnDeg, double& obliquityDeg) {
+    turnDeg = 0.0; obliquityDeg = 0.0;
+    if (!(K4[0] > 0.0) || !(K4[1] > 0.0)) return false;
+    const double nLen = cv::norm(wallNormalEnu);
+    if (!(nLen > 1e-9)) return false;
+    const cv::Matx33d camFromEarth = earthFromCam.t();
+    // The virtual camera looks INTO the wall: its optical axis is minus the normal, in the camera.
+    cv::Vec3d z = -(camFromEarth * (wallNormalEnu / nLen));
+    const double zLen = cv::norm(z);
+    if (!(zLen > 1e-9)) return false;
+    z /= zLen;
+    obliquityDeg = std::acos(std::max(-1.0, std::min(1.0, z[2]))) * 180.0 / CV_PI;
+    if (obliquityDeg > 75.0) return false; // the wall faces away, or is nearly edge-on
+    // Upright: image down is the world's down, projected across the view; for a floor or ceiling
+    // (normal along gravity) there is no world down across it, so keep the live frame's own.
+    const cv::Vec3d upCam = camFromEarth * cv::Vec3d(0, 0, 1);
+    cv::Vec3d y = -(upCam - upCam.dot(z) * z);
+    if (cv::norm(y) < 0.2) {
+        const cv::Vec3d down(0, 1, 0);
+        y = down - down.dot(z) * z;
+    }
+    const double yLen = cv::norm(y);
+    if (!(yLen > 1e-9)) return false;
+    y /= yLen;
+    const cv::Vec3d x = y.cross(z);
+    // Rows are the virtual axes in live-camera coordinates: R maps live-camera rays to virtual ones.
+    const cv::Matx33d R(x[0], x[1], x[2], y[0], y[1], y[2], z[0], z[1], z[2]);
+    turnDeg = std::acos(std::max(-1.0, std::min(1.0, (cv::trace(R) - 1.0) / 2.0))) * 180.0 / CV_PI;
+    if (turnDeg < 10.0) return false;
+    // Square-on, the wall the frame saw spreads by 1/cos(obliquity): narrow the focal to match, and
+    // put the principal point where the live frame's centre lands.
+    const double c = std::max(0.26, std::cos(obliquityDeg * CV_PI / 180.0));
+    const double fx = K4[0] * c, fy = K4[1] * c;
+    const cv::Vec3d centreRay = R * cv::Vec3d(0, 0, 1);
+    if (!(centreRay[2] > 1e-6)) return false;
+    const double cx = K4[2] - fx * centreRay[0] / centreRay[2];
+    const double cy = K4[3] - fy * centreRay[1] / centreRay[2];
+    const cv::Matx33d Kv(fx, 0, cx, 0, fy, cy, 0, 0, 1);
+    const cv::Matx33d K(K4[0], 0, K4[2], 0, K4[1], K4[3], 0, 0, 1);
+    cv::Matx33d H = Kv * R * K.inv();
+    if (!(std::abs(H(2, 2)) > 1e-12)) return false;
+    virtFromCur = (1.0 / H(2, 2)) * H;
+    return true;
+}
+
+bool MobileGS::wallNormalFromLock(const std::vector<cv::Point3f>& pts, const cv::Matx33d& camFromFpR,
+                                  const cv::Vec3d& camFromFpT, const cv::Matx33d& earthFromCam,
+                                  cv::Vec3d& outEnu) {
+    if (pts.size() < 12) return false;
+    cv::Mat data((int)pts.size(), 3, CV_64F);
+    for (int i = 0; i < (int)pts.size(); ++i) {
+        data.at<double>(i, 0) = pts[i].x; data.at<double>(i, 1) = pts[i].y; data.at<double>(i, 2) = pts[i].z;
+    }
+    cv::PCA pca(data, cv::noArray(), cv::PCA::DATA_AS_ROW);
+    const double l1 = pca.eigenvalues.at<double>(1), l2 = pca.eigenvalues.at<double>(2);
+    // A wall: spread in two directions, thin in the third.
+    if (!(l1 > 1e-12) || l2 > 0.1 * l1) return false;
+    cv::Vec3d n(pca.eigenvectors.at<double>(2, 0), pca.eigenvectors.at<double>(2, 1), pca.eigenvectors.at<double>(2, 2));
+    const cv::Vec3d mean(pca.mean.at<double>(0), pca.mean.at<double>(1), pca.mean.at<double>(2));
+    // Toward the camera: its centre in the fingerprint frame is -R^T t.
+    const cv::Vec3d centre = -(camFromFpR.t() * camFromFpT);
+    if (n.dot(centre - mean) < 0) n = -n;
+    cv::Vec3d enu = earthFromCam * (camFromFpR * n);
+    const double len = cv::norm(enu);
+    if (!(len > 1e-9)) return false;
+    outEnu = enu / len;
+    return true;
+}
+
 void MobileGS::updateCamera(float* viewMat, float* projMat) {
     std::lock_guard<std::mutex> lock(mMutex);
     memcpy(mViewMatrix, viewMat, 16 * sizeof(float));
@@ -246,7 +344,7 @@ bool MobileGS::fingerprintFrameIsCaptureCamera(const std::vector<cv::Point3f>& p
  *
  * @param relocView the VIO view matrix snapshotted alongside the frame, for the rectifying warp.
  */
-void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
+void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const float* relocAttitude) {
     cv::Mat wallDescs;
     std::vector<cv::Point3f> wallKps3d;
     // Phase 2: parallel to wallKps3d, or empty for a legacy fingerprint (= all backbone).
@@ -262,6 +360,12 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
     std::vector<cv::Point3f> mapKps3d;
     float mapPriorPose[16];
     long mapPriorSeq = 0;
+    // The sensor turn's inputs: the wall's normal (East-North-Up) and this frame's attitude.
+    bool hasWallNormal = false;
+    cv::Vec3d wallNormal;
+    const bool hasAttitude = relocAttitude != nullptr;
+    cv::Matx33d earthFromCam = cv::Matx33d::eye();
+    if (hasAttitude) for (int i = 0; i < 9; ++i) earthFromCam.val[i] = relocAttitude[i];
     {
         std::lock_guard<std::mutex> lock(mMutex);
         wallDescs = mWallDescriptors.clone();
@@ -271,6 +375,8 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
         memcpy(fpIntrinsics, mFingerprintIntrinsics, 4 * sizeof(float));
         hasFpView = mHasFingerprintView;
         memcpy(liveIntrinsics, mLiveIntrinsics, 4 * sizeof(float));
+        hasWallNormal = mHasWallNormalEnu;
+        wallNormal = cv::Vec3d(mWallNormalEnu[0], mWallNormalEnu[1], mWallNormalEnu[2]);
         mapDescs = mMapDescriptors.clone();
         mapKps3d = mMapPoints3D;
         memcpy(mapPriorPose, mPnpCamFromFpWorld, 16 * sizeof(float));
@@ -316,6 +422,8 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
     mLastRelocDetected.store(0, std::memory_order_relaxed);
     mLastRelocObliquityDeg.store(-1, std::memory_order_relaxed);
     mLastRelocRectifiedCorr.store(0, std::memory_order_relaxed);
+    mLastRelocTurnDeg.store(-1, std::memory_order_relaxed);
+    mLastRelocTurnCorr.store(0, std::memory_order_relaxed);
     mLastRelocMatches.store(0, std::memory_order_relaxed);
     mLastRelocInliers.store(0, std::memory_order_relaxed);
     // ...and the two downstream outcome codes. They are written by tryUpdateFingerprint, which the
@@ -503,11 +611,13 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
     // the durable centred page frame, so there is no ARCore capture-camera view to rectify against.
     // The backend-neutral validity flag only says relocView is current; hasFpView separately proves
     // the stored capture-view contract exists and is compatible.
+    bool rectifiedRan = false;
     if (hasFpView && mHasTrackingPose.load(std::memory_order_relaxed) && wallKps3d.size() >= 12) {
         cv::Mat Hcur_fp, Hfp_cur; double obliqDeg = 0.0;
         const bool haveH = computeRectifyHomography(relocView, liveK, Hcur_fp, Hfp_cur, obliqDeg);
         if (haveH) mLastRelocObliquityDeg.store((int)(obliqDeg + 0.5), std::memory_order_relaxed);
         if (haveH && obliqDeg > 25.0) {
+            rectifiedRan = true;
             cv::Mat grayRect;
             cv::warpPerspective(gray, grayRect, Hfp_cur, gray.size());
             size_t before = imgPts.size();
@@ -516,6 +626,29 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
             if (imgPts.size() > before)
                 LOGI("Reloc: rectified (obliquity %.0f deg) added %zu corr (total %zu)",
                      obliqDeg, imgPts.size() - before, imgPts.size());
+        }
+    }
+
+    // The sensor turn (the lost case). With no tracking pose there is nothing to rectify against,
+    // but the phone's sensors still say which way the camera faces, and the wall's normal (learned at
+    // an earlier lock, or saved with the project) says which way the wall does. Turning the frame
+    // about its own centre to face the wall square-on and upright needs no position at all, and it
+    // undoes what neither ORB nor SuperPoint survives: the steep tilt of an artist looking up or
+    // sideways at the wall, and (for SuperPoint) the camera's roll. Matched like the rectified pass:
+    // features found in the turned frame are mapped back to this image for the one PnP below.
+    if (!rectifiedRan && hasAttitude && hasWallNormal && wallKps3d.size() >= 12) {
+        cv::Matx33d virtFromCur; double turnDeg = 0.0, obliqDeg = 0.0;
+        if (sensorTurnHomography(earthFromCam, wallNormal, liveK, virtFromCur, turnDeg, obliqDeg)) {
+            mLastRelocTurnDeg.store((int)(turnDeg + 0.5), std::memory_order_relaxed);
+            cv::Mat Hturn(virtFromCur), Hback(virtFromCur.inv());
+            cv::Mat grayTurned;
+            cv::warpPerspective(gray, grayTurned, Hturn, gray.size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT);
+            const size_t before = imgPts.size();
+            buildCorr(grayTurned, Hback, imgPts, objPts, corrFromBackbone);
+            mLastRelocTurnCorr.store((int)(imgPts.size() - before), std::memory_order_relaxed);
+            if (imgPts.size() > before)
+                LOGI("Reloc: sensor turn %.0f deg (obliquity %.0f deg) added %zu corr (total %zu)",
+                     turnDeg, obliqDeg, imgPts.size() - before, imgPts.size());
         }
     }
 
@@ -795,6 +928,34 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
                 mPnpResultSeq.fetch_add(1, std::memory_order_relaxed);
                 mLastRelocReject.store(kRelocOk, std::memory_order_relaxed);
                 LOGI("Relocalization: PnP match published (%zu/%zu inliers)", inliers.size(), imgPts.size());
+                // Learn the wall's normal in the earth's frame from a well-supported lock, for the
+                // sensor turn the next time the camera is lost. Averaged in, so one lock's noise
+                // moves it little; three disagreeing locks in a row mean it was wrong, and replace it.
+                if (hasAttitude && inliers.size() >= 12) {
+                    cv::Vec3d n;
+                    const cv::Matx33d Rm = (cv::Matx33d)R;
+                    const cv::Vec3d tv(tvec.at<double>(0), tvec.at<double>(1), tvec.at<double>(2));
+                    if (wallNormalFromLock(wallKps3d, Rm, tv, earthFromCam, n)) {
+                        std::lock_guard<std::mutex> lock(mMutex);
+                        const cv::Vec3d prev(mWallNormalEnu[0], mWallNormalEnu[1], mWallNormalEnu[2]);
+                        cv::Vec3d next = n;
+                        if (mHasWallNormalEnu) {
+                            if (prev.dot(n) > 0.5) {
+                                mWallNormalDisagree = 0;
+                                next = 0.8 * prev + 0.2 * n;
+                            } else if (++mWallNormalDisagree < 3) {
+                                next = prev;
+                            } else {
+                                mWallNormalDisagree = 0;
+                            }
+                        }
+                        const double len = cv::norm(next);
+                        if (len > 1e-9) {
+                            for (int i = 0; i < 3; ++i) mWallNormalEnu[i] = (float)(next[i] / len);
+                            mHasWallNormalEnu = true;
+                        }
+                    }
+                }
                 // Phase 3 passive build: grow the feature map from this locked frame (default OFF).
                 if (mMapBuildEnabled.load(std::memory_order_relaxed))
                     growMapFromReloc(pnpMat, baseKps, baseDescs, fx, fy, cx, cy);
@@ -815,12 +976,16 @@ void MobileGS::relocThreadFunc() {
     while (mRelocRunning) {
         cv::Mat frame;
         float relocView[16];
+        float relocAttitude[9];
+        bool relocHasAttitude = false;
         {
             std::unique_lock<std::mutex> lock(mRelocMutex);
             mRelocCv.wait(lock, [this] { return mRelocRequested || !mRelocRunning; });
             if (!mRelocRunning) break;
             frame = mRelocColorFrame.clone();
             memcpy(relocView, mRelocViewMatrix, 16 * sizeof(float));
+            memcpy(relocAttitude, mRelocAttitude, 9 * sizeof(float));
+            relocHasAttitude = mRelocHasAttitude;
             mRelocRequested = false;
         }
 
@@ -828,7 +993,7 @@ void MobileGS::relocThreadFunc() {
         // the pass on the caller's thread and never sets mRelocRequested, so the wait above simply
         // parks. (Switching modes mid-run can let one already-queued request through; the flag is an
         // eval affordance set before a run starts, not a live toggle.)
-        runRelocPass(frame, relocView);
+        runRelocPass(frame, relocView, relocHasAttitude ? relocAttitude : nullptr);
 
         // Back off only once locked. A flat 200 ms capped every state at 5 Hz, including the one that
         // matters most — hunting for the first lock, or re-acquiring after the artist looks away —
@@ -1747,6 +1912,9 @@ void MobileGS::clearWallFingerprint() {
     memcpy(mFingerprintAnchorMatrix, kIdentity16, 16 * sizeof(float));
     memset(mFingerprintIntrinsics, 0, 4 * sizeof(float));
     mHasFingerprintView = false;
+    // The wall's normal belongs to this wall; the next project may be another.
+    mHasWallNormalEnu = false;
+    mWallNormalDisagree = 0;
 
     // The ARTWORK side has to go too. It used to survive, and there is no other path that clears it:
     // an un-fingerprinted project would then be validated against the PREVIOUS project's artwork by
@@ -2029,17 +2197,23 @@ void MobileGS::scheduleRelocCheck(const cv::Mat& f) {
         const long long n = mEvalSyncFrameCounter.fetch_add(1, std::memory_order_relaxed) + 1;
         if (n % everyN != 0) return;
         float view[16];
+        float attitude[9];
+        bool hasAttitude = false;
         {
             // Same snapshot the async path takes, under the same lock, so the rectifying warp sees
             // the view that goes with this frame in both modes. Running inline does not make an
             // unsynchronized read of mViewMatrix safe -- updateCamera is still another thread.
             std::lock_guard<std::mutex> lock(mMutex);
             memcpy(view, mViewMatrix, 16 * sizeof(float));
+            memcpy(attitude, mCameraAttitude, 9 * sizeof(float));
+            hasAttitude = mHasCameraAttitude;
         }
-        runRelocPass(f, view);
+        runRelocPass(f, view, hasAttitude ? attitude : nullptr);
         return;
     }
     float viewSnapshot[16];
+    float attitudeSnapshot[9];
+    bool hasAttitudeSnapshot = false;
     {
         // Snapshot the latest VIO view under mMutex -- the same lock updateCamera writes it
         // under -- rather than reading it here unlocked. This used to rely on gEngineMutex's
@@ -2050,12 +2224,16 @@ void MobileGS::scheduleRelocCheck(const cv::Mat& f) {
         // nests with mRelocMutex below, matching the pattern above.
         std::lock_guard<std::mutex> lock(mMutex);
         memcpy(viewSnapshot, mViewMatrix, 16 * sizeof(float));
+        memcpy(attitudeSnapshot, mCameraAttitude, 9 * sizeof(float));
+        hasAttitudeSnapshot = mHasCameraAttitude;
     }
     {
         std::lock_guard<std::mutex> lock(mRelocMutex);
         if (mRelocRequested) return;
         f.copyTo(mRelocColorFrame);
         memcpy(mRelocViewMatrix, viewSnapshot, 16 * sizeof(float));
+        memcpy(mRelocAttitude, attitudeSnapshot, 9 * sizeof(float));
+        mRelocHasAttitude = hasAttitudeSnapshot;
         mRelocRequested = true;
     }
     mRelocCv.notify_one();

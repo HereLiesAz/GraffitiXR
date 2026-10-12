@@ -411,6 +411,45 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetLiveIntrinsics(
     if (gSlamEngine) gSlamEngine->setLiveIntrinsics(intr);
 }
 
+// earth (East-North-Up) <- camera, row-major 3x3; null or short forgets the attitude.
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetCameraAttitude(JNIEnv* env, jobject thiz, jfloatArray earthFromCam) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return;
+    if (!earthFromCam || env->GetArrayLength(earthFromCam) < 9) {
+        gSlamEngine->setCameraAttitude(nullptr);
+        return;
+    }
+    float m[9];
+    env->GetFloatArrayRegion(earthFromCam, 0, 9, m);
+    gSlamEngine->setCameraAttitude(m);
+}
+
+// The wall's normal (East-North-Up) into out[0..2]; false when unknown.
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetWallNormalEnu(JNIEnv* env, jobject thiz, jfloatArray out) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine || !out || env->GetArrayLength(out) < 3) return JNI_FALSE;
+    float n[3];
+    if (!gSlamEngine->getWallNormalEnu(n)) return JNI_FALSE;
+    env->SetFloatArrayRegion(out, 0, 3, n);
+    return JNI_TRUE;
+}
+
+// Seed the wall's normal (East-North-Up); null or short forgets it.
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallNormalEnu(JNIEnv* env, jobject thiz, jfloatArray normal) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return;
+    if (!normal || env->GetArrayLength(normal) < 3) {
+        gSlamEngine->setWallNormalEnu(nullptr);
+        return;
+    }
+    float n[3];
+    env->GetFloatArrayRegion(normal, 0, 3, n);
+    gSlamEngine->setWallNormalEnu(n);
+}
+
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(
         JNIEnv* env, jobject thiz,

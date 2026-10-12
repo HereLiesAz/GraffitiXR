@@ -152,6 +152,10 @@ the real (non-stub) tracker is packaged.
 *   `anticipation/AnticipationFeeder.kt`: renders the allowed views off the camera thread, farthest
     first, four at a time, into a `PhotosphereTrackingSession` (standalone) or `SphereSlamTracker`
     (ARCore), and tells it which to search.
+*   `anchor/CloseUpFeatures.kt`: the fingerprint's close-ups — square-on crops of the capture photo
+    at zooms 6×, 3×, 2× over the aim grid, detected with the base detector, mapped back to its pixels.
+*   `RelocAttitude.kt`: the earth ← OpenCV-camera rotation MobileGS turns a lost frame by, from the
+    rotation-vector quaternion and the frame's camera ← device rotation.
 *   `SphereSlamStandaloneOverlay.kt`: non-ARCore AR surface. Owns rectified wall-target capture,
     CameraX analyzer lifecycle, KPM/reacquisition HUD, GL overlay, target restore, and copyable
     diagnostics.

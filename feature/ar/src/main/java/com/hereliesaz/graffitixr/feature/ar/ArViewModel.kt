@@ -3280,6 +3280,8 @@ class ArViewModel @Inject constructor(
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                             sphereSlamPlacementAnchorGeneration = 0L,
                             sphereSlamFingerprint = standaloneFingerprint,
+                            // A new target may be another wall: its normal is learned afresh.
+                            fingerprintWallNormalEnu = emptyList(),
                             sphereSlamFingerprintFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                             // Precision target replacement never resets the base photosphere. Attach
@@ -3301,6 +3303,8 @@ class ArViewModel @Inject constructor(
                 }
 
                 if (transformApplied) {
+                    // A new target: its wall normal is learned afresh.
+                    slamManager.setWallNormalEnu(null)
                     projectManager.deleteSphereSlamReference(
                         appContext,
                         projectId,
@@ -3809,6 +3813,7 @@ class ArViewModel @Inject constructor(
         val projectId = loadedProjectId ?: return
         val currentProject = projectRepository.currentProject.value ?: return
         if (currentProject.id != projectId) return
+        saveWallNormalIfChanged(projectId, currentProject)
 
         val map = slamManager.getWallFeatureMap()?.takeIf { it.pointCount > 0 }
         val ui = _uiState.value
@@ -3876,6 +3881,26 @@ class ArViewModel @Inject constructor(
         }
         paint?.let { lastSavedPaintCount.set(it.pointCount) }
         lastSavedProgress = slamManager.getPaintingProgress()
+    }
+
+    /**
+     * Persist the wall's normal MobileGS learned at its locks ([SlamManager.getWallNormalEnu]) when it
+     * is new or has moved more than a couple of degrees, so the next session's first relocalization
+     * can turn a lost frame by it.
+     */
+    private suspend fun saveWallNormalIfChanged(
+        projectId: String,
+        currentProject: com.hereliesaz.graffitixr.common.model.GraffitiProject,
+    ) {
+        val normal = slamManager.getWallNormalEnu() ?: return
+        val saved = currentProject.fingerprintWallNormalEnu
+        if (saved.size == 3) {
+            val dot = saved[0] * normal[0] + saved[1] * normal[1] + saved[2] * normal[2]
+            if (dot > WALL_NORMAL_RESAVE_COS) return
+        }
+        projectRepository.updateProject { project ->
+            if (project.id == projectId) project.copy(fingerprintWallNormalEnu = normal.toList()) else project
+        }
     }
 
     /**
@@ -4405,6 +4430,10 @@ class ArViewModel @Inject constructor(
                 }
             }
             lastSavedProgress = 0f
+            // The wall's normal this project learned, for the sensor turn from the first attempt.
+            slamManager.setWallNormalEnu(
+                project.fingerprintWallNormalEnu.takeIf { it.size == 3 }?.toFloatArray(),
+            )
         }
     }
 
@@ -5840,6 +5869,8 @@ class ArViewModel @Inject constructor(
 
     // --- Doodle demo: headless fingerprint build ---
     internal companion object {
+        /** cos 2°: a learned wall normal is saved again only once it has moved more than this. */
+        private const val WALL_NORMAL_RESAVE_COS = 0.99939f
         /** How long a Measure tap waits for the GL thread to resolve it. */
         private const val MEASURE_TAP_TIMEOUT_MS = 1_000L
         /** Quiet period after the last glow-intensity slider tick before it is written to DataStore. */

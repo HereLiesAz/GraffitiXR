@@ -8,6 +8,15 @@
 ### 1. The wall fingerprint
 A fingerprint is ORB (`cv::ORB::create(1500)`) or SuperPoint descriptors paired with the triangulated 3D positions of the marks the artist drew, captured once when the target is confirmed (`restoreWallFingerprintMetric`). It optionally carries a per-point region tag (`Footprint::Region` — INSIDE/BAND/OUTSIDE) so relocalization can exclude points that sit under the artwork itself and will be painted over.
 
+Both app builders (`MetricFingerprintBuilder`, `StandaloneFingerprintBuilder`) add the capture
+photo's **close-ups** (`CloseUpFeatures`): crops at zooms 6×, 3× and 2× (the anticipation
+half-spheres, square-on), each tiled by its grid of aim points, enlarged to about a live frame's size
+and run through the base fingerprint's own detector. Their features map back to the photo's pixels
+and onto the wall like the capture's own, so a close-up of any corner meets dense features at the
+size it sees them. At most as many as the capture's own (≤ 2000), shared across the 49 crops.
+While they build, a progress bar counts the crops down (`FingerprintBuildProgress`, shown by
+`MainScreen` in any mode).
+
 ### 2. Relocalization ("snap-back")
 A background thread (`relocThreadFunc`) continuously matches the live camera frame's descriptors against the stored fingerprint (Lowe ratio test, `kRelocLoweRatio = 0.75`) and solves the resulting 2D↔3D correspondences with `cv::solvePnPRansac` (100 iterations, 8px reprojection threshold, 0.99 confidence). A big lock (`kBigLockInliers = 20` inliers) is accepted outright; smaller locks go through additional consistency checks before the global anchor transform is corrected. This — not a mapping/rendering layer — is the actual mechanism behind the "Pocket-Ready" pitch: it needs no persistent map, just the one fingerprint.
 
@@ -31,6 +40,19 @@ The ownership boundary is strict:
 MobileGS does not consume the hybrid KPM page frame and KPM does not mutate MobileGS fingerprint
 coordinates. The only shared downstream object is PoseFusion's **anchor-local correction**, which is
 frame-invariant under ARCore global world rebases. The correction switch remains off by default.
+
+### 2b. The sensor turn (lost frames)
+When no tracking pose is current, the pose-based rectifying pass cannot run. The phone's sensors still
+say which way the camera faces (`setCameraAttitude`: earth ← camera from the north-referenced rotation
+vector, fed with every frame in both AR modes), and the wall's normal says which way the wall faces.
+The live frame is then turned about its own centre into a camera square-on to the wall and upright
+(`sensorTurnHomography`: focal × cos(obliquity), principal point where the frame's centre lands),
+matched there, and the matches mapped back for the one PnP. A pure turn needs no position, so this
+works from the first lost frame. The normal is learned at every well-supported lock
+(`wallNormalFromLock`: the fingerprint's plane through the PnP pose and that frame's attitude),
+averaged in, saved with the project (`fingerprintWallNormalEnu`) and restored on load, so it is
+there for the first relocalization of the next session; a new target forgets it. Diagnostics:
+`lastRelocTurnDeg`, `lastRelocTurnCorr`.
 
 ### 3. Teleological corroboration and self-grow (both off by default)
 Two optional, separately-gated mechanisms sit on top of relocalization:
@@ -63,6 +85,8 @@ A representative subset of the real, currently-exported surface (see `SlamManage
 | `getCorroborationConfidence()` | Teleological corroboration's confidence signal (see `TELEOLOGICAL_SLAM.md`). |
 | `setSelfGrowEnabled(enabled)` | Toggles self-grow (default off). |
 | `feedYuvFrame(...)` | Per-frame camera feed into the reloc thread. |
+| `setCameraAttitude(earthFromCamera)` | The frame's north-referenced camera attitude, for the sensor turn. |
+| `getWallNormalEnu()` / `setWallNormalEnu(n)` | The wall's normal learned at locks; saved with and restored from the project. |
 | `clearWallFingerprint()` | Drops the current fingerprint (new project / re-target). |
 
 

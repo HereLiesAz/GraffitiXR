@@ -309,6 +309,8 @@ class MainViewModel @Inject constructor(
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                             sphereSlamPlacementAnchorGeneration = 0L,
                             sphereSlamFingerprint = fingerprint,
+                            // A new target may be another wall: its normal is learned afresh.
+                            fingerprintWallNormalEnu = emptyList(),
                             sphereSlamFingerprintFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                             sphereSlamMapFromFingerprint = placement.mapFromFingerprint.toList(),
@@ -344,6 +346,7 @@ class MainViewModel @Inject constructor(
                 }
                 // Only a committed target's patch reaches the native wall matcher.
                 slamManager.setWallPatchBytes(patch, PATCH_SIZE)
+                slamManager.setWallNormalEnu(null) // a new target: its wall normal is learned afresh
                 projectManager.deleteTargetImages(baseTargetUris - targetUris.toSet())
 
                 // The previous target stays on disk until native KPM accepts the candidate: a candidate
@@ -592,6 +595,7 @@ class MainViewModel @Inject constructor(
             // fingerprint so the head survives reload. Inert unless its model is bundled.
             val patch = grayPatchBytes(sensorBmp)
             slamManager.setWallPatchBytes(patch, PATCH_SIZE)
+            slamManager.setWallNormalEnu(null) // a new target: its wall normal is learned afresh
             // This path produces no capture pose. A stale one from an earlier capture this session
             // would pair these points with the old anchor in PoseFusion.
             slamManager.captureAnchorCam = null
@@ -624,6 +628,8 @@ class MainViewModel @Inject constructor(
                     fingerprintAnchor = emptyList(),
                     fingerprintViewMatrix = emptyList(),
                     fingerprintCaptureRotationDeg = -1,
+                    // A new target may be another wall: its normal is learned afresh.
+                    fingerprintWallNormalEnu = emptyList(),
                     targetImageUris = updatedTargetUris,
                 )
             }
@@ -789,6 +795,7 @@ class MainViewModel @Inject constructor(
             // Canonical patch (keyframe of the marks) for the distortion head — fed live AND persisted.
             val patch = grayPatchBytes(bitmap)
             slamManager.setWallPatchBytes(patch, PATCH_SIZE)
+            slamManager.setWallNormalEnu(null) // a new target: its wall normal is learned afresh
 
             // Target capture is a writer of the SAME project.json as the editor's design-layer save and
             // AR's wall-feature-map save. A raw whole-object saveProject here (as this used to be) would
@@ -824,6 +831,8 @@ class MainViewModel @Inject constructor(
                         MetricMarks.glViewDisplayOriented(view, rotationDeg).toList(),
                     // 0.11 — which display frame that was. -1 elsewhere means "genuinely unknown".
                     fingerprintCaptureRotationDeg = rotationDeg,
+                    // A new target may be another wall: its normal is learned afresh.
+                    fingerprintWallNormalEnu = emptyList(),
                     // The full record of how and where the device was held at capture. The
                     // fingerprint's geometry is frozen at that instant, so these are the conditions
                     // any later attribution has to work from — and they exist nowhere else.

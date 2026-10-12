@@ -424,6 +424,7 @@
     <string name="target_review_desc">Revisar Alvo Extraído</string>
     <string name="target_unwarp_hint">Arraste os cantos para desfazer distorções</string>
     <string name="target_review_title">Revisar Marcações Extraídas</string>
+    <string name="fingerprint_closeups_progress">Aprendendo a parede de perto: %1$d de %2$d</string>
 
     <string name="target_exclude">Excluir</string>
     <string name="target_include">Incluir</string>

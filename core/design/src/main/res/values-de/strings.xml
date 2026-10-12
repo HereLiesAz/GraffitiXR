@@ -424,6 +424,7 @@
     <string name="target_review_desc">Extrahiertes Ziel überprüfen</string>
     <string name="target_unwarp_hint">Ecken ziehen zum Entzerren</string>
     <string name="target_review_title">Extrahierte Markierungen überprüfen</string>
+    <string name="fingerprint_closeups_progress">Die Wand aus der Nähe lernen: %1$d von %2$d</string>
 
     <string name="target_exclude">Ausschließen</string>
     <string name="target_include">Einschließen</string>

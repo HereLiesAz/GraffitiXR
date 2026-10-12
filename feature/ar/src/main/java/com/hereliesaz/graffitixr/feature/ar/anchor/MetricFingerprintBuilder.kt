@@ -263,7 +263,11 @@ object MetricFingerprintBuilder {
                 val pixels = ArrayList<Pixel>(pos.size / 2)
                 var i = 0
                 while (i + 1 < pos.size) { pixels.add(Pixel(pos[i], pos[i + 1])); i += 2 }
-                val (mPixels, mDescs) = applyMask(mask, bitmap, pixels, descs)
+                val (basePixels, baseDescs) = applyMask(mask, bitmap, pixels, descs)
+                val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs) { view, _ ->
+                    StandaloneFingerprintBuilder.detectSuperPoint(slam, view)
+                }
+                if (baseDescs !== descs && baseDescs !== mDescs) baseDescs.release()
                 val fp = try {
                     ingestSingle(slam, mDescs, mPixels, cvView, intr,
                         planePointWorld, planeNormalWorld, anchorModel, minPoints, glView, rotationDeg)
@@ -292,7 +296,11 @@ object MetricFingerprintBuilder {
                 return null
             }
             val pixels = kp.toArray().map { Pixel(it.pt.x.toFloat(), it.pt.y.toFloat()) }
-            val (mPixels, mDescs) = applyMask(mask, bitmap, pixels, d)
+            val (basePixels, baseDescs) = applyMask(mask, bitmap, pixels, d)
+            val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs) { view, n ->
+                StandaloneFingerprintBuilder.detectOrb(view, null, n)
+            }
+            if (baseDescs !== d && baseDescs !== mDescs) baseDescs.release()
             try {
                 return ingestSingle(slam, mDescs, mPixels, cvView, intr,
                     planePointWorld, planeNormalWorld, anchorModel, minPoints, glView, rotationDeg)
@@ -302,6 +310,36 @@ object MetricFingerprintBuilder {
         } finally {
             gray.release(); norm.release(); kp.release(); d.release()
         }
+    }
+
+    /**
+     * [pixels]/[descs] followed by the photo's close-up features ([CloseUpFeatures]) found by
+     * [detect] (the same detector, so the descriptors match), kept to [mask]. Returns the inputs
+     * unchanged when there are none; otherwise a new descriptor Mat the caller must release.
+     */
+    private fun withCloseUps(
+        bitmap: Bitmap, mask: Bitmap?, pixels: List<Pixel>, descs: Mat,
+        detect: (Bitmap, Int) -> StandaloneFingerprintBuilder.DetectedFeatures?,
+    ): Pair<List<Pixel>, Mat> {
+        if (pixels.isEmpty() || descs.empty()) return pixels to descs
+        val extra = CloseUpFeatures.detect(bitmap, pixels.size, detect)
+            ?.let { StandaloneFingerprintBuilder.filterByMask(it, mask, bitmap.width, bitmap.height) }
+            ?.takeIf { it.rows > 0 && it.cols == descs.cols() && it.type == descs.type() }
+            ?: return pixels to descs
+        val extraDescs = Mat(extra.rows, extra.cols, extra.type)
+        if (extra.type == org.opencv.core.CvType.CV_32F) {
+            val floats = FloatArray(extra.rows * extra.cols)
+            java.nio.ByteBuffer.wrap(extra.descriptorsData).order(java.nio.ByteOrder.nativeOrder())
+                .asFloatBuffer().get(floats)
+            extraDescs.put(0, 0, floats)
+        } else {
+            extraDescs.put(0, 0, extra.descriptorsData)
+        }
+        val all = Mat()
+        org.opencv.core.Core.vconcat(listOf(descs, extraDescs), all)
+        extraDescs.release()
+        val extraPixels = List(extra.rows) { Pixel(extra.positions[it * 2], extra.positions[it * 2 + 1]) }
+        return (pixels + extraPixels) to all
     }
 
     /**

@@ -676,6 +676,20 @@ class SlamManager @Inject constructor(
     /** Display-oriented intrinsics of the frames fed via [feedYuvFrame]; the reloc PnP uses these. */
     fun setLiveIntrinsics(fx: Float, fy: Float, cx: Float, cy: Float) = nativeSetLiveIntrinsics(fx, fy, cx, cy)
 
+    /**
+     * The live frame's attitude from the phone's sensors: earth (East-North-Up) ← camera, row-major
+     * 3×3, OpenCV axes of the frame as it is fed (display-upright). Lets relocalization turn a lost
+     * frame square-on to the wall. Null forgets it; pass only a north-referenced attitude
+     * (`TYPE_ROTATION_VECTOR`), never a game rotation, whose heading means nothing across sessions.
+     */
+    fun setCameraAttitude(earthFromCamera: FloatArray?) = nativeSetCameraAttitude(earthFromCamera)
+
+    /** The wall's normal (East-North-Up, out of the wall) learned at trusted locks, or null. */
+    fun getWallNormalEnu(): FloatArray? = FloatArray(3).takeIf { nativeGetWallNormalEnu(it) }
+
+    /** Seed the wall's normal (the project's saved one); null forgets it. */
+    fun setWallNormalEnu(normal: FloatArray?) = nativeSetWallNormalEnu(normal)
+
     fun updateCamera(
         viewMatrix: FloatArray,
         projectionMatrix: FloatArray,
@@ -976,6 +990,9 @@ class SlamManager @Inject constructor(
     private external fun nativeSetWallPatchBytes(data: ByteArray, size: Int)
     private external fun nativeSetMappingPaused(paused: Boolean)
     private external fun nativeSetLiveIntrinsics(fx: Float, fy: Float, cx: Float, cy: Float)
+    private external fun nativeSetCameraAttitude(earthFromCamera: FloatArray?)
+    private external fun nativeGetWallNormalEnu(out: FloatArray): Boolean
+    private external fun nativeSetWallNormalEnu(normal: FloatArray?)
     private external fun nativeFeedYuvFrame(
         yBuffer: ByteBuffer,
         uBuffer: ByteBuffer,
