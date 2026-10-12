@@ -1,9 +1,37 @@
 # SphereSLAM Implementation TODO
 
+## SphereSLAM 0.26.3 — lens distortion, tracker refactor (adopted)
+
+The app consumes SphereSLAM **0.26.3** (tag `0.26.3`).
+
+- [x] Standalone tracking requests Camera2 distortion correction (FAST, else HIGH_QUALITY, API 28+)
+  through `LensDistortion` in `StandaloneCameraTuning`; the HAL then delivers the zero-distortion
+  pinhole image KPM assumes. The camera diagnostic line reports `lens=correction=…`, or the
+  uncorrected state.
+- [x] `SphereSlamTracker` drives `SphereSlamEngine` (library-side; no app change).
+
+Device checks owed for 0.26.3:
+
+- [ ] The camera diagnostic line reads `lens=correction=FAST` (or `HIGH_QUALITY`) on a phone that
+  offers it; the artwork stays registered at the frame edges.
+
+## SphereSLAM 0.26.2 — full-frame rectification, reference scale (adopted)
+
+No app code changes.
+
+- [x] The oblique virtual view is rendered from the full 640×480 analysis frame, not its 320×240
+  matcher copy: the foreshortened side of the wall keeps the camera's detail.
+- [x] The standalone fingerprint stays saved at the camera still's full resolution; KPM registers it
+  from an area-downscaled copy (long side ≤ 3 × the matcher's, 960 px), which puts the wall back
+  inside KPM's scale range. Page geometry is unchanged.
+
+Device checks owed for 0.26.2:
+
+- [ ] A target captured at full resolution locks as readily from 1 m as from 4 m.
+
 ## SphereSLAM 0.26.0 — oblique rectification, anchor tiles (adopted)
 
-The app consumes SphereSLAM **0.26.0** (tag `0.26.0`). No app code changes; both are library-side
-and on by default.
+Both library-side and on by default.
 
 - [x] Extreme perspectives: when the predicted view is at least 30° off the wall's normal, the full
   KPM solve matches a virtual frontal re-rendering of the frame and solves the real pose from it
@@ -17,9 +45,9 @@ Device checks owed for 0.26.0:
   `matchMethod` reads `KPM_RECTIFIED`.
 - [ ] Work away from the wall for minutes, swing back: the artwork re-places from the anchor tiles.
 
-Not done: the camera analysis stream stays at CameraX's default (640×480, matched at 320×240). At
-grazing angles the wall spans few pixels across; a higher analysis resolution would help and costs
-KPM, flow and depth time on the very phones that run this path (no ARCore).
+The camera analysis stream stays at CameraX's default (640×480, matched at 320×240) by decision: a
+higher resolution costs KPM, flow and depth time on the very phones that run this path (no ARCore).
+0.26.2 rectifies from the full frame instead.
 
 ## SphereSLAM 0.25.3 — full-sphere photosphere, per-tile scan progress (adopted)
 
@@ -543,7 +571,9 @@ Remaining:
     CameraController pinch-to-zoom and resets the camera to 1x while active, restoring the shared
     controller's previous zoom behavior on exit.
 - [x] If CameraX applies an ImageProxy crop region, incorporate that crop into `fx/fy/cx/cy`.
-- [ ] Verify lens distortion is acceptable with the current zero-distortion KPM camera model.
+- [x] Verify lens distortion is acceptable with the current zero-distortion KPM camera model. Where the
+  camera can correct (API 28+), standalone requests correction, making the model exact (0.26.3);
+  elsewhere the diagnostic line reports the coefficients' state.
 - [ ] If not, populate artoolkitX distortion parameters from Camera2 calibration metadata or undistort
   frames before KPM.
 - [x] Add a diagnostic line exposing standalone camera ID, raw/crop/display frame dimensions,

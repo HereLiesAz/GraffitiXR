@@ -1161,8 +1161,8 @@ fun SphereSlamStandaloneOverlay(
             val applied = applyStandaloneTrackingCaptureOptions(cameraController, standaloneTargetFps)
             onDiagnostic(
                 "SphereSLAM standalone camera: setting=${CameraTargetFps.label(standaloneTargetFps)} " +
-                    "aeRange=" + (applied?.let { "[${it[0]},${it[1]}]" } ?: "unchanged") +
-                    " eis=off ois=on",
+                    "aeRange=" + (applied?.aeRange?.let { "[${it[0]},${it[1]}]" } ?: "unchanged") +
+                    " eis=off ois=on lens=" + (applied?.distortion ?: "unchanged"),
             )
             onDispose { applyDefaultCaptureOptions(cameraController) }
         }
