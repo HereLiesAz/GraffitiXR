@@ -1135,23 +1135,23 @@ class ArViewModel @Inject constructor(
     val isStandaloneAttitudeSensorAvailable: Boolean
         get() = cameraAttitudeProvider.isAvailable
 
-    /** Latest camera attitude (headingDeg, elevationDeg) stamped on photosphere keyframes, or null. */
-    val latestCameraAttitude: Pair<Float, Float>?
-        get() {
-            val h = cameraAttitudeProvider.latestHeadingDegrees() ?: return null
-            return h to (cameraAttitudeProvider.latestElevationDegrees() ?: 0f)
-        }
-
     /**
-     * Roll of an image's right axis above the horizon, degrees, for the image frame [cameraFromDevice]
-     * maps the device body into (SphereSLAM `DeviceCameraRotation`), or null without a sample. Pairs
-     * with [latestCameraAttitude] for `PhotosphereMap.directionOfPixel`.
+     * The latest camera attitude for the image [cameraFromDevice] maps the device body into
+     * (SphereSLAM `DeviceCameraRotation`): heading, elevation and that image's roll, all from one
+     * sample. Stamped on photosphere keyframes and used to place a capture tap; null without a sample.
      */
-    fun latestCameraRollDegrees(cameraFromDevice: FloatArray): Float? {
-        val deviceToWorld = cameraAttitudeProvider.latestDeviceToWorldMatrix() ?: return null
-        return com.hereliesaz.sphereslam.CameraAttitudeProvider
-            .cameraRollDegrees(deviceToWorld, cameraFromDevice)
+    fun latestCameraAttitude(cameraFromDevice: FloatArray): StandaloneCameraAttitude? {
+        val a = cameraAttitudeProvider.latestAttitude() ?: return null
+        return StandaloneCameraAttitude(
+            headingDeg = a.headingDeg,
+            elevationDeg = a.elevationDeg,
+            rollDeg = com.hereliesaz.sphereslam.CameraAttitudeProvider.cameraRollDegrees(a.deviceToWorld, cameraFromDevice),
+        )
     }
+
+    /** The latest camera-axis (heading, elevation), from one sample; null without a sample. */
+    private val latestCameraAxis: Pair<Float, Float>?
+        get() = cameraAttitudeProvider.latestAttitude()?.let { it.headingDeg to it.elevationDeg }
 
     /** Current display rotation in degrees (0/90/180/270); 0 when the display is unavailable. */
     private fun displayRotationDegrees(): Int = runCatching {
@@ -1319,7 +1319,7 @@ class ArViewModel @Inject constructor(
     }
 
     private fun currentPhotosphereTile(): com.hereliesaz.sphereslam.TileId? {
-        val attitude = latestCameraAttitude ?: return null
+        val attitude = latestCameraAxis ?: return null
         return synchronized(spherePhotosphereLock) {
             spherePhotosphere.tileAt(attitude.first, attitude.second)
         }
@@ -5214,16 +5214,17 @@ class ArViewModel @Inject constructor(
         tap: Pair<Float, Float>?,
         tapViewSize: Pair<Int, Int>?,
     ): StandaloneFingerprintPlacement? {
-        val attitude = latestCameraAttitude ?: return null
-        // Roll of the display-upright frame the keyframes and the capture tap live in.
-        val rollDeg = latestCameraRollDegrees(
+        // Heading, elevation and the roll of the display-upright frame the keyframes and the capture
+        // tap live in — one sample, so the triple stays exact looking down at a floor.
+        val attitude = latestCameraAttitude(
             com.hereliesaz.sphereslam.attitude.DeviceCameraRotation
                 .bodyToDisplay(displayRotationDegrees()),
-        ) ?: 0f
+        ) ?: return null
+        val rollDeg = attitude.rollDeg ?: 0f
         return synchronized(spherePhotosphereLock) {
             // The current tile's own keyframe, or (fresh tile) the session intrinsics paired with the
             // CURRENT attitude — never another tile's direction.
-            val view = spherePhotosphereKeyframes.view(attitude.first, attitude.second, rollDeg)
+            val view = spherePhotosphereKeyframes.view(attitude.headingDeg, attitude.elevationDeg, rollDeg)
                 ?: return@synchronized null
             // The tapped pixel's direction is rotated through heading, elevation AND roll
             // (PhotosphereMap.directionOfPixel). A missing tile range means the map is still the
@@ -5249,7 +5250,7 @@ class ArViewModel @Inject constructor(
     private fun standalonePlacementBlocker(): StandalonePhotosphereCapture.Blocker? =
         StandalonePhotosphereCapture.blocker(
             attitudeSensorAvailable = cameraAttitudeProvider.isAvailable,
-            attitude = latestCameraAttitude,
+            attitude = latestCameraAxis,
             hasAnyKeyframe = synchronized(spherePhotosphereLock) {
                 spherePhotosphereKeyframes.latest != null &&
                     spherePhotosphere.snapshot().wallHeadingDeg != null

@@ -1,8 +1,25 @@
 # SphereSLAM Implementation TODO
 
-## SphereSLAM 0.26.3 — lens distortion, tracker refactor (adopted)
+## SphereSLAM 0.26.4 — floors and ceilings (adopted)
 
-The app consumes SphereSLAM **0.26.3** (tag `0.26.3`).
+The app consumes SphereSLAM **0.26.4** (tag `0.26.4`).
+
+- [x] The tracking session's base map is gravity-level and north-referenced, the frame fingerprint
+  placements use; a capture-time placement is refined on the first confirmed lock (and the app
+  persists the refinement, `onMapFromFingerprintSolved`). Projects saved earlier carry a transform in
+  their own session's frame: the first lock replaces it.
+- [x] Fingerprint placement orients the page by the camera's image-up, live attitude, no ±89° clamp.
+- [x] The app reads heading, elevation and roll from one `CameraAttitudeProvider.latestAttitude()`
+  sample (`StandaloneCameraAttitude`) for keyframes and placement; separate getters could mix samples,
+  which near a floor rotates the result by tens of degrees.
+- [x] Standalone MiDaS treats each polar cap as one view tile.
+
+Device checks owed for 0.26.4 (the SphereSLAM test app grades most of these itself):
+
+- [ ] Capture a target looking straight down at a floor: it locks, and recaptures land the same way.
+- [ ] Start a session looking at the floor, then turn to the wall: the artwork stays placed.
+
+## SphereSLAM 0.26.3 — lens distortion, tracker refactor (adopted)
 
 - [x] Standalone tracking requests Camera2 distortion correction (FAST, else HIGH_QUALITY, API 28+)
   through `LensDistortion` in `StandaloneCameraTuning`; the HAL then delivers the zero-distortion

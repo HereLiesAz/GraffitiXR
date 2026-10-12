@@ -442,7 +442,9 @@ fun MainScreen(
                                 arViewModel.sphereRegionsInProgress.value
                             },
                             coverageGlowAppearance = arUiState.coverageGlow,
-                            cameraAttitude = { arViewModel.latestCameraAttitude },
+                            cameraAttitude = { cameraFromDevice ->
+                                arViewModel.latestCameraAttitude(cameraFromDevice)
+                            },
                             // Only with a rotation-vector sensor: without one these stay empty, and
                             // null lets the analyzer fall back to its own game-rotation sensor (frame
                             // attitude + gyro bridge) with no predictor, keeping one sensor per path.
@@ -452,9 +454,6 @@ fun MainScreen(
                                 arViewModel::latestStandaloneAttitudeSample
                             } else {
                                 null
-                            },
-                            cameraRollDegrees = { cameraFromDevice ->
-                                arViewModel.latestCameraRollDegrees(cameraFromDevice)
                             },
                             cameraTargetFps = arUiState.cameraTargetFps,
                             adaptiveRateEnabled = arUiState.adaptiveRateEnabled,

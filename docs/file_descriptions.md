@@ -71,7 +71,7 @@ This document lists key files in the repository and their purposes.
 
 ### SphereSLAM (published dependency)
 
-SphereSLAM 0.26.3 public API baseline: GraffitiXR consumes the supported planar/coverage surface
+SphereSLAM 0.26.4 public API baseline: GraffitiXR consumes the supported planar/coverage surface
 and toolkit packages, and explicitly opts into the experimental `:reloc` and `:models` surfaces while
 preserving its existing `Standalone*` aliases.
 
@@ -141,6 +141,9 @@ the real (non-stub) tracker is packaged.
 *   `SphereSlamStandaloneOverlay.kt`: non-ARCore AR surface. Owns rectified wall-target capture,
     CameraX analyzer lifecycle, KPM/reacquisition HUD, GL overlay, target restore, and copyable
     diagnostics.
+*   `StandaloneCameraAttitude.kt`: heading, elevation and an image's roll from one attitude sample;
+    what keyframes and fingerprint placement read (the angles only mean something together near the
+    poles).
 *   `DeviceStressPolicy.kt`: routes the battery / heat safeties (thermal, power-save, low battery)
     and Adaptive rate to the heavy work — the native relocalizer's back-off, standalone MiDaS cadence,
     and `AnalysisFrameGate`, which spaces the standalone and co-op analyzers' frames under stress and,

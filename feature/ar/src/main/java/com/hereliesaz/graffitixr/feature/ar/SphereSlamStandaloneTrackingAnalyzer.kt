@@ -176,18 +176,18 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     @Volatile private var mobileGsWallFeatureMapFrameVersion: Int =
         com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     private val onFrameTracked: (SphereSlamStandaloneFrame?) -> Unit,
-    private val cameraAttitude: () -> Pair<Float, Float>? = { null },
+    /**
+     * Heading, elevation and the tracked image's roll for a given body->camera rotation, from ONE
+     * attitude sample ([StandaloneCameraAttitude]), or null when unknown. Stamped on each keyframe so
+     * a later fingerprint placement can rotate pixel rays correctly in any device orientation and at
+     * the poles.
+     */
+    private val cameraAttitude: (cameraFromDevice: FloatArray) -> StandaloneCameraAttitude? = { null },
     /**
      * Base photosphere keyframes (SphereSLAM [PhotosphereKeyframe]: display-upright luma, its
      * intrinsics, heading/elevation/roll and the rotation-only GL camera_from_map at capture).
      */
     private val onPhotosphereKeyframe: (PhotosphereKeyframe) -> Unit = {},
-    /**
-     * Roll of the tracked image's right axis above the horizon for a given body->camera rotation
-     * (`CameraAttitudeProvider.cameraRollDegrees`), or null when unknown. Stamped on each keyframe so
-     * a later fingerprint placement can rotate pixel rays correctly in any device orientation.
-     */
-    private val cameraRollDegrees: (cameraFromDevice: FloatArray) -> Float? = { null },
     /**
      * Solved on a frame where both base-map pose and KPM precision pose are known:
      * map_from_fingerprint = inverse(camera_from_map) * camera_from_fingerprint.
@@ -555,7 +555,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             val cameraFromDevice =
                 DeviceCameraRotation.cameraFromDevice(sensorOrientationDeg, rotationDeg)
             val timestampNs = image.imageInfo.timestamp
-            val heading = cameraAttitude()
+            val heading = cameraAttitude(cameraFromDevice)
             currentFrameIntrinsics = intrinsics
             val result = session.onFrame(
                 PhotosphereTrackingSession.Frame(
@@ -571,9 +571,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                         scratch = captureAttitudeScratch,
                     ),
                     cameraFromDevice = cameraFromDevice,
-                    headingDeg = heading?.first,
-                    elevationDeg = heading?.second,
-                    rollDeg = cameraRollDegrees(cameraFromDevice),
+                    headingDeg = heading?.headingDeg,
+                    elevationDeg = heading?.elevationDeg,
+                    rollDeg = heading?.rollDeg,
                     convertDurationNs = convertDurationNs,
                 ),
             )

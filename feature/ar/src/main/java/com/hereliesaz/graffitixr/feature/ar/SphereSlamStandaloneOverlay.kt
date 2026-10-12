@@ -307,11 +307,6 @@ fun SphereSlamStandaloneOverlay(
      * independently of the fingerprint/teleological layer.
      */
     onPhotosphereKeyframe: (PhotosphereKeyframe) -> Unit = {},
-    /**
-     * Roll of the tracked image for a body->camera rotation (see
-     * `ArViewModel.latestCameraRollDegrees`), stamped on photosphere keyframes; null when unknown.
-     */
-    cameraRollDegrees: (cameraFromDevice: FloatArray) -> Float? = { null },
     /** Same-frame base-map to precision-target transform, solved only after a real KPM lock. */
     onMapFromFingerprintSolved: (FloatArray) -> Unit = {},
     /**
@@ -344,8 +339,11 @@ fun SphereSlamStandaloneOverlay(
     coverageRegionsInProgress: () -> List<PhotosphereMap.RegionProgress> = { emptyList() },
     /** The user's coverage-glow colour/intensity/style; a change restyles the live glow at once. */
     coverageGlowAppearance: CoverageGlowAppearance = CoverageGlowAppearance.DEFAULT,
-    /** Latest camera attitude `(headingDeg, elevationDeg)` stamped on photosphere keyframes, or null. */
-    cameraAttitude: () -> Pair<Float, Float>? = { null },
+    /**
+     * Latest camera attitude for a body->camera rotation — heading, elevation and that image's roll
+     * from one sample (`ArViewModel.latestCameraAttitude`) — stamped on photosphere keyframes, or null.
+     */
+    cameraAttitude: (cameraFromDevice: FloatArray) -> StandaloneCameraAttitude? = { null },
     /**
      * The host's `CameraAttitudeProvider.attitudeExtrapolator` (`TYPE_ROTATION_VECTOR`, sampled at
      * `SENSOR_DELAY_GAME`): drives the display-rate glow rotation and the artwork's per-draw pose
@@ -1336,7 +1334,6 @@ fun SphereSlamStandaloneOverlay(
                 attitudeSample = attitudeSample.takeIf { posePredictionWired },
                 attitudeExtrapolator = attitudeExtrapolator.takeIf { posePredictionWired },
                 displayPosePredictor = displayPosePredictor.takeIf { posePredictionWired },
-                cameraRollDegrees = cameraRollDegrees,
                 onMapFromFingerprintSolved = onMapFromFingerprintSolved,
                 onPhotosphereKeyframe = { keyframe ->
                     // Base-map update first so the current-tile read below observes the newly captured
