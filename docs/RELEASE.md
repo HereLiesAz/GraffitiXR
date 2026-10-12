@@ -44,9 +44,13 @@ The `release` signing config is only created when the keystore file exists
 
 `app/build.gradle.kts` only reads `version.properties`; nothing in the build increments or rewrites it.
 
-- **versionName** is `versionMajor.versionMinor.versionPatch.versionBuild`, verbatim. Those fields
-  belong to the shared version contract (HereLiesAz/workflows `version-contract`), whose bot commits
-  `chore(version): M.m.p.b` after each merge, so releases read 1.48.18.1, 1.48.19.1, …
+- **versionName** is the shared version contract's version (HereLiesAz/workflows `version-contract`),
+  `major.minor.patch.build`. The contract bot assigns a pushed commit its version *after* the push
+  (`chore(version): M.m.p.b [skip ci]`, recording `source_sha` in `.version-state.json`), so the
+  pushed commit's own `version.properties` still holds the previous version. `release.yml` and
+  `android-ci.yml` (pushes to main) therefore wait for the bot's record of the built commit
+  (`.github/scripts/contract_version.py`, up to 15 min, failing without one) and pass it as
+  `CI_VERSION_NAME`. Without it (PR builds, local builds) the build uses `version.properties`.
 - **versionCode** is `CI_VERSION_CODE` when set, else 1 (local builds):
 
   | Workflow | `CI_VERSION_CODE` | Published to |
@@ -71,9 +75,10 @@ Triggers: every push to `main` (except pushes that only touch `version.propertie
 | `publish` | `true`  | Off ⇒ build + upload the signed AAB/APK as the `graffitixr-release` workflow artifact only. |
 
 Publishing (Play and GitHub release) only ever happens for `refs/heads/main`; a dispatch on another
-branch builds the artifact and stops. Runs share the `release-publish` concurrency group with
-`cancel-in-progress: false`, so a newer push queues behind an in-progress publish instead of
-cancelling it mid-upload.
+branch builds the artifact and stops. One concurrency group per workflow with `cancel-in-progress`:
+the newest run cancels the one in progress (an uncommitted Play edit is deleted on the way out). A
+dispatch — on any branch, or with `publish` off — therefore also cancels an in-progress publish of
+`main`, which then does not ship; re-run it.
 
 Jobs:
 
@@ -83,8 +88,9 @@ Jobs:
    1. Checks out with `fetch-depth: 0`; decodes the base64 `KEYSTORE_RAW` secret to
       `app/keystore.jks` and fails if it or any of `KEYSTORE_PASSWORD` / `KEY_ALIAS` /
       `KEY_PASSWORD` is missing, so an unsigned build is never published.
-   2. Sets up JDK 21 (Temurin) + Gradle, reads `applicationId` from `app/build.gradle.kts`, and
-      reads `CI_VERSION_CODE` from Play (see [versionCode](#versioncode-and-versionname)).
+   2. Sets up JDK 21 (Temurin) + Gradle, reads `applicationId` from `app/build.gradle.kts`, reads
+      `CI_VERSION_CODE` from Play and `CI_VERSION_NAME` from the version contract (see
+      [versionCode](#versioncode-and-versionname)).
    3. Runs `./gradlew bundleRelease assembleRelease` with the signing env vars, uploads the AAB and
       APK as the `graffitixr-release` artifact, and runs the SphereSLAM packaging/manifest checks
       against the release variant.
@@ -94,8 +100,8 @@ Jobs:
    5. Only after Play succeeded, creates or updates the moving GitHub release
       `latest-release-v<major>.<minor>` with the signed APK.
 
-Nothing is committed back to the repository; the version comes from the run, not from
-`version.properties`.
+Nothing is committed back to the repository: the versionCode comes from Play, the versionName from
+the version contract.
 
 ---
 

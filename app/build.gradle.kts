@@ -31,8 +31,10 @@ val localProperties = Properties().apply {
 // Version resolution. version.properties belongs to the shared version contract
 // (HereLiesAz/workflows `version-contract`): its bot commits `chore(version): M.m.p.b` and owns every
 // field. The build only READS it; nothing here increments or rewrites it.
-//   - versionName = versionMajor.versionMinor.versionPatch.versionBuild, verbatim — the same string the
-//     contract commits, so each release reads 1.48.18.1, 1.48.19.1, … (it never grows new digits).
+//   - versionName = CI_VERSION_NAME when set, else versionMajor.versionMinor.versionPatch.versionBuild.
+//     The bot assigns a pushed commit its version AFTER the push, so a CI build of that commit still
+//     has the previous version in version.properties: release.yml / android-ci.yml wait for the bot's
+//     record of the built commit (.github/scripts/contract_version.py) and pass it as CI_VERSION_NAME.
 //   - versionCode = CI_VERSION_CODE when set (release.yml: one above the highest code Play holds;
 //     android-ci / merged-build: a debug-only counter), else 1 for local builds.
 val verMajor = versionProps.getProperty("versionMajor", "1").trim()
@@ -40,7 +42,8 @@ val verMinor = versionProps.getProperty("versionMinor", "0").trim()
 val verPatch = versionProps.getProperty("versionPatch", "0").trim()
 val verBuild = versionProps.getProperty("versionBuild", "0").trim()
 val currentVersionCode = System.getenv("CI_VERSION_CODE")?.toIntOrNull()?.takeIf { it > 0 } ?: 1
-val currentVersionName = "$verMajor.$verMinor.$verPatch.$verBuild"
+val currentVersionName = System.getenv("CI_VERSION_NAME")?.trim()?.takeIf { it.isNotEmpty() }
+    ?: "$verMajor.$verMinor.$verPatch.$verBuild"
 
 android {
     namespace = "com.hereliesaz.graffitixr"

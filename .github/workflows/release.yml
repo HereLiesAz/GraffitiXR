@@ -186,10 +186,21 @@ jobs:
           echo "Next Play versionCode: $code"
           echo "ci_version_code=$code" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve versionName from the version contract
+        id: vname
+        # The contract bot assigns this commit its version after the push (a [skip ci] commit), so
+        # version.properties here still holds the previous one. Wait for the bot's record of this SHA.
+        run: |
+          set -euo pipefail
+          name=$(python .github/scripts/contract_version.py "$GITHUB_SHA")
+          echo "Contract version for $GITHUB_SHA: $name"
+          echo "ci_version_name=$name" >> "$GITHUB_OUTPUT"
+
       - name: Build signed AAB + APK
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CI_VERSION_CODE: ${{ steps.vcode.outputs.ci_version_code }}
+          CI_VERSION_NAME: ${{ steps.vname.outputs.ci_version_name }}
           KEYSTORE_FILE: ${{ github.workspace }}/app/keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -217,9 +228,12 @@ jobs:
 
       - name: Resolve release version
         id: version
+        env:
+          VERSION_NAME: ${{ steps.vname.outputs.ci_version_name }}
         run: |
-          # The GitHub release is a moving per-minor pointer (latest-release-vMAJOR.MINOR).
-          echo "tag=latest-release-v$(grep -E '^versionMajor=' version.properties | cut -d'=' -f2 | tr -d '\r ').$(grep -E '^versionMinor=' version.properties | cut -d'=' -f2 | tr -d '\r ')" >> "$GITHUB_OUTPUT"
+          # The GitHub release is a moving per-minor pointer (latest-release-vMAJOR.MINOR) of the
+          # contract version this commit was built as.
+          echo "tag=latest-release-v$(cut -d. -f1,2 <<<"$VERSION_NAME")" >> "$GITHUB_OUTPUT"
 
       # Play first, GitHub release second. Publishing the public GitHub release before Play meant a Play
       # failure left the moving release advertising a build that never shipped to users; ordering Play
@@ -250,10 +264,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.version.outputs.tag }}
           VERSION_CODE: ${{ steps.vcode.outputs.ci_version_code }}
+          VERSION_NAME: ${{ steps.vname.outputs.ci_version_name }}
         run: |
           set -euo pipefail
           apk=$(ls app/build/outputs/apk/release/*.apk | head -n1)
-          notes="Automated release build — versionCode ${VERSION_CODE} (${GITHUB_SHA})"
+          notes="Automated release build — ${VERSION_NAME} (versionCode ${VERSION_CODE}, ${GITHUB_SHA})"
           if gh release view "$TAG" >/dev/null 2>&1; then
             # Moving release already exists: refresh its notes to this build and replace the APK, so the
             # tag's metadata and asset track the latest build instead of staying frozen at the first run.
