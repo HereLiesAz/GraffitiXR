@@ -1041,6 +1041,24 @@ fun SphereSlamStandaloneOverlay(
         onDiagnostic("SphereSLAM standalone diagnostic dump copied")
     }
 
+    // Remembered once, so it reads the current composition's values through these.
+    val currentPeerOnlyTracking by rememberUpdatedState(peerOnlyTracking)
+    val currentOnUnitsPerPixel by rememberUpdatedState(onUnitsPerPixel)
+    val currentOnTrackingTick by rememberUpdatedState(onTrackingTick)
+    val trackedFrameUi = remember {
+        LatestValueUiPost<TrackedFrameUi>(post = { drain -> postUi(drain) }) { update ->
+            if (currentPeerOnlyTracking) {
+                trackingState =
+                    if (update.tracking) StandaloneTrackingState.LOCKED
+                    else StandaloneTrackingState.REACQUIRING
+            }
+            // A lost frame keeps the last match's diagnostics, as before.
+            update.match?.let { matchDiagnostics = it }
+            currentOnUnitsPerPixel(update.screenUnitsPerPixel)
+            currentOnTrackingTick(update.tracking)
+        }
+    }
+
     fun consumeTrackedFrame(frame: SphereSlamStandaloneFrame?) {
         // Renderer state is atomic/volatile and intentionally updated directly from the analysis
         // worker. Compose state belongs to Main and is posted there separately.
@@ -1063,26 +1081,25 @@ fun SphereSlamStandaloneOverlay(
                 surfaceHeightPixels = size.height,
             )
         } ?: 0f
-        postUi {
-            if (peerOnlyTracking) {
-                trackingState =
-                    if (frame != null) StandaloneTrackingState.LOCKED
-                    else StandaloneTrackingState.REACQUIRING
-            }
-            if (frame != null) {
-                matchDiagnostics = StandaloneMatchDiagnostics(
-                    pageNo = frame.pageNo,
-                    inliers = frame.inlierCount,
-                    reprojectionError = frame.reprojectionError,
-                    observationAgeMs = frame.observationAgeMs,
-                    matchDurationMs = frame.matchDurationMs,
-                    source = frame.source,
-                    matchMethod = frame.matchMethod?.name,
-                )
-            }
-            onUnitsPerPixel(screenUnitsPerPixel)
-            onTrackingTick(frame != null)
-        }
+        // Coalesced: at most one UI update outstanding, carrying the newest frame's values (a slow
+        // main thread must not replay a backlog of stale per-frame ticks).
+        trackedFrameUi.offer(
+            TrackedFrameUi(
+                tracking = frame != null,
+                match = frame?.let {
+                    StandaloneMatchDiagnostics(
+                        pageNo = it.pageNo,
+                        inliers = it.inlierCount,
+                        reprojectionError = it.reprojectionError,
+                        observationAgeMs = it.observationAgeMs,
+                        matchDurationMs = it.matchDurationMs,
+                        source = it.source,
+                        matchMethod = it.matchMethod?.name,
+                    )
+                },
+                screenUnitsPerPixel = screenUnitsPerPixel,
+            ),
+        )
     }
 
     // CameraController implements pinch-to-camera-zoom itself. That would change the effective
@@ -1151,8 +1168,10 @@ fun SphereSlamStandaloneOverlay(
         analyzerRestartGeneration,
     ) {
         // Re-arm the UI-post gate: a prior disposal set this true, and this fresh analyzer's posts
-        // must be delivered again.
+        // must be delivered again. The coalescer forgets a drain the purge dropped, or it would wait on
+        // it for good.
         disposed.set(false)
+        trackedFrameUi.reset()
         val id = cameraId
         val restoredAtlas = atlasReferenceImages
         val standaloneReference = referenceImage
@@ -1651,3 +1670,10 @@ private fun PublishOrDraw(host: StandaloneOverlayUiHost?, panel: @Composable () 
         onDispose { host.content = null }
     }
 }
+
+/** One tracked frame's UI-thread values ([LatestValueUiPost]: only the newest is applied). */
+private class TrackedFrameUi(
+    val tracking: Boolean,
+    val match: StandaloneMatchDiagnostics?,
+    val screenUnitsPerPixel: Float,
+)

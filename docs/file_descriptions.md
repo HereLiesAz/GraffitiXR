@@ -138,6 +138,8 @@ the real (non-stub) tracker is packaged.
 *   `SphereSlamStandaloneOverlay.kt`: non-ARCore AR surface. Owns rectified wall-target capture,
     CameraX analyzer lifecycle, KPM/reacquisition HUD, GL overlay, target restore, and copyable
     diagnostics.
+*   `LatestValueUiPost.kt`: worker→UI handoff with at most one main-thread post outstanding,
+    applying only the newest value; the standalone overlay's per-frame tracking updates go through it.
 *   `SphereSlamStandaloneTrackingAnalyzer.kt`: the CameraX adapter around SphereSLAM `:reloc`
     `PhotosphereTrackingSession`, which runs the synchronous calibrated KPM pose pipeline (quality
     gates, observation-age checks, pose-jump rejection, tracking-state hysteresis, the short
