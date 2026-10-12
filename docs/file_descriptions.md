@@ -55,6 +55,9 @@ This document lists key files in the repository and their purposes.
     (when `distortion_head.onnx` is bundled — the shipped default) the distortion-head crop that
     produces painting-progress and corroboration confidence. No voxel/spatial-hash map — see
     `NATIVE_ENGINE.md`.
+*   `src/main/cpp/include/DepthScaleFit.h`: Header-only transliteration of SphereSLAM's robust
+    `DepthScaleFit` (least-median seed + trimmed least squares). `growMapFromReloc` uses it to
+    calibrate MiDaS inverse depth against the wall and place off-wall features radially.
 *   `src/main/cpp/DistortionHead.cpp`: ONNX inference wrapper for the distortion-head model —
     `docs/DISTORTION_HEAD.md`.
 *   `src/main/cpp/SuperPointDetector.cpp`: ONNX SuperPoint keypoint/descriptor detector, used as an

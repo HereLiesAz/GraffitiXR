@@ -83,6 +83,7 @@ libgtest-dev`.
 | Test | Pins |
 |---|---|
 | `MobileGSFingerprintStateTest` | `restoreWallFingerprint` / `alignToFingerprint` clear the previous fingerprint's capture view, anchor, intrinsics (and, for the restore, the canonical patch); malformed peer bytes change nothing. Private state via the `MobileGSTestPeer` friend. Mutation-checked. |
+| `DepthScaleFitTest` | `include/DepthScaleFit.h` (ports SphereSLAM's `DepthScaleFitTest`), and `growMapFromReloc` placing off-wall features at their calibrated depth with a third of the wall depth samples corrupted. Mutation-checked against plain least squares. |
 | `FrameBufferGuardTest` | `include/FrameBufferGuard.h`, the bounds arithmetic of `nativeFeedYuvFrame`, `nativeFeedColorFrame`, `nativeYuvToRgbaBitmap`, incl. 32-bit wrap. |
 
 **OpenCV 4 vs 5:** the device links OpenCV 5; the host suite builds against 4. Only APIs present in

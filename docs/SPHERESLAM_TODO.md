@@ -246,8 +246,9 @@ Left in place, deliberately:
   pure-Kotlin JVM objects; MobileGS runs these inside its native reloc pass on the reloc thread, on
   native map state (`mMapPoints3D`, `mMapDescriptors`, …) under `mMutex`. Switching would mean moving
   the feature map and the reloc pass out of C++ (or a JNI upcall per reloc attempt), not swapping a
-  call. It would also change behaviour: the library calibrates radial depth with the robust
-  `DepthScaleFit` instead of plain least squares. The native rectify sign now matches the library
+  call. The calibration itself now matches the library: `include/DepthScaleFit.h` transliterates
+  the robust `DepthScaleFit` (it was plain least squares), pinned by `DepthScaleFitTest`. The
+  native rectify sign now matches the library
   (`R + t·nᵀ/d`; it used `R − t·nᵀ/d`, wrong whenever the capture and live cameras translate).
 - `core/common` `model/WallFeatureMap` (the persisted `@Serializable` project model) and
   `SlamManager.getWallFeatureMap`'s blob parser: a data model and native-blob reader, not the
