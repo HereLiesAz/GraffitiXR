@@ -59,13 +59,17 @@ internal class StandaloneDepthCadence(
         atlasGrew = true
     }
 
-    /** Whether a run is due at [nowMs]. Does not consume the slot; call [markRun] when one starts. */
-    fun isDue(nowMs: Long): Boolean {
+    /**
+     * Whether a run is due at [nowMs]. Does not consume the slot; call [markRun] when one starts.
+     * [intervalScale] (≥ 1) stretches both intervals under device stress ([depthIntervalScale]).
+     */
+    fun isDue(nowMs: Long, intervalScale: Int = 1): Boolean {
         if (lastRunMs == Long.MIN_VALUE) return true
+        val scale = intervalScale.coerceAtLeast(1)
         val elapsed = nowMs - lastRunMs
-        if (elapsed >= maxIntervalMs) return true
+        if (elapsed >= maxIntervalMs * scale) return true
         val changed = atlasGrew || (currentTile != null && currentTile != lastRunTile)
-        return changed && elapsed >= minIntervalMs
+        return changed && elapsed >= minIntervalMs * scale
     }
 
     /** A run actually started at [nowMs] (it was not dropped as busy). */

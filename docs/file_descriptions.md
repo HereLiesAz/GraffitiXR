@@ -141,6 +141,10 @@ the real (non-stub) tracker is packaged.
 *   `SphereSlamStandaloneOverlay.kt`: non-ARCore AR surface. Owns rectified wall-target capture,
     CameraX analyzer lifecycle, KPM/reacquisition HUD, GL overlay, target restore, and copyable
     diagnostics.
+*   `DeviceStressPolicy.kt`: routes the battery / heat safeties (thermal, power-save, low battery)
+    and Adaptive rate to the heavy work — the native relocalizer's back-off, standalone MiDaS cadence,
+    and `AnalysisFrameGate`, which spaces the standalone and co-op analyzers' frames under stress and,
+    with Adaptive rate on, keeps an overrunning analyzer under half duty.
 *   `LatestValueUiPost.kt`: worker→UI handoff with at most one main-thread post outstanding,
     applying only the newest value; the standalone overlay's per-frame tracking updates go through it.
 *   `SphereSlamStandaloneTrackingAnalyzer.kt`: the CameraX adapter around SphereSLAM `:reloc`

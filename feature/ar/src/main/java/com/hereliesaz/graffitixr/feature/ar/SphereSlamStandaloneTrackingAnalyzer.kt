@@ -205,6 +205,12 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     // no depth is ever stashed, so the native map builds from wall-plane back-projection exactly as
     // before. The view model supplies this only on the standalone path with the feature-map flag on.
     private val depthEstimator: com.hereliesaz.sphereslam.models.DepthEstimator? = null,
+    /**
+     * Battery / heat safeties and Settings → Adaptive rate ([AnalysisFrameGate]): refused frames are
+     * closed unanalyzed; [AnalysisFrameGate.stress] also stretches the MiDaS cadence and, at HIGH,
+     * skips MiDaS for new photosphere tiles. Read per frame, so a change applies at once.
+     */
+    private val frameGate: AnalysisFrameGate = AnalysisFrameGate(),
     private val onDiagnostic: (String) -> Unit = {},
     private val onCalibrationChanged: (StandaloneCalibrationDiagnostics) -> Unit = {},
     private val onFailure: (StandaloneFailureEvent) -> Unit = {},
@@ -320,7 +326,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         // DepthEstimator calls are synchronized, so sharing it with the depth worker below is safe.
         tileDepthSource = depthEstimator?.let { estimator ->
             TileDepthSource { luma, width, height ->
-                if (!estimator.isLoaded && !estimator.load()) {
+                // Fail-soft null (tile keeps plane-only points) while the device is hot or nearly flat.
+                if (frameGate.stress == DeviceStress.HIGH) {
+                    null
+                } else if (!estimator.isLoaded && !estimator.load()) {
                     null
                 } else {
                     estimator.estimateLuma(luma, width, height)?.let { TileDepthMap(it.width, it.height, it.data) }
@@ -451,8 +460,11 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
 
     @Synchronized
     override fun analyze(image: ImageProxy) {
+        var workStartNs = Long.MIN_VALUE
         try {
             if (closed || fatal) return
+            if (!frameGate.admit(image.imageInfo.timestamp)) return
+            workStartNs = android.os.SystemClock.elapsedRealtimeNanos()
             applyFinishedDepth()
             val planes = image.planes
             if (planes.isEmpty()) return
@@ -611,6 +623,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             }
         } finally {
             image.close()
+            if (workStartNs != Long.MIN_VALUE) {
+                frameGate.onWorkDone(android.os.SystemClock.elapsedRealtimeNanos() - workStartNs)
+            }
         }
     }
 
@@ -760,7 +775,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         val worker = depthWorker ?: return
         if (slamManager == null) return
         val now = android.os.SystemClock.elapsedRealtime()
-        if (worker.isBusy || !depthCadence.isDue(now)) return
+        if (worker.isBusy || !depthCadence.isDue(now, depthIntervalScale(frameGate.stress))) return
 
         val frameWidth = frame.width
         val frameHeight = frame.height

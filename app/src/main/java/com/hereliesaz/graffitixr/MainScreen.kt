@@ -459,6 +459,7 @@ fun MainScreen(
                             cameraTargetFps = arUiState.cameraTargetFps,
                             adaptiveRateEnabled = arUiState.adaptiveRateEnabled,
                             batteryTier = arUiState.batteryTier,
+                            perceptionSystemThrottle = arUiState.perceptionSystemThrottle,
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {

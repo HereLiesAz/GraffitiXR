@@ -32,6 +32,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -368,6 +369,12 @@ fun SphereSlamStandaloneOverlay(
     cameraTargetFps: Int = CameraTargetFps.DEVICE_DEFAULT,
     adaptiveRateEnabled: Boolean = false,
     batteryTier: Int = 0,
+    /**
+     * Thermal / power-save / low-battery-warning throttle (ArUiState.perceptionSystemThrottle). With
+     * [batteryTier] it sets the analyzers' [DeviceStress]; with [adaptiveRateEnabled] it sets their
+     * adaptive cadence ([AnalysisFrameGate]). Pushed on every composition, so a change applies at once.
+     */
+    perceptionSystemThrottle: Boolean = false,
     /**
      * The host's onscreen hand-off ([StandaloneOverlayUiHost]): the status, Copy Diagnostics,
      * Recapture / New Target, sweep hint and fatal dialog are published there so the host draws them
@@ -1136,6 +1143,12 @@ fun SphereSlamStandaloneOverlay(
     // desync), OIS kept. Keyed on the effective rate so a Settings change (or the adaptive battery
     // cap) applies immediately; the shared controller's defaults are restored on exit.
     // See StandaloneCameraTuning.kt.
+    val frameGate = remember { AnalysisFrameGate() }
+    SideEffect {
+        frameGate.stress = deviceStress(perceptionSystemThrottle, batteryTier)
+        frameGate.adaptiveCadence = adaptiveRateEnabled
+    }
+
     val standaloneTargetFps = standaloneEffectiveCameraTargetFps(
         targetFps = cameraTargetFps,
         adaptiveRateEnabled = adaptiveRateEnabled,
@@ -1172,6 +1185,7 @@ fun SphereSlamStandaloneOverlay(
         // it for good.
         disposed.set(false)
         trackedFrameUi.reset()
+        frameGate.reset()
         val id = cameraId
         val restoredAtlas = atlasReferenceImages
         val standaloneReference = referenceImage
@@ -1209,6 +1223,7 @@ fun SphereSlamStandaloneOverlay(
                         spatialFrame = peerSpatial,
                         onFrameTracked = ::consumeTrackedFrame,
                         onDiagnostic = { text -> postUi { onDiagnostic(text) } },
+                        frameGate = frameGate,
                     )
                     cameraController.setImageAnalysisAnalyzer(executor, analyzer)
                     onDispose {
@@ -1348,6 +1363,7 @@ fun SphereSlamStandaloneOverlay(
                 },
                 onKeyframeOrientation = onKeyframeOrientation,
                 depthEstimator = depthEstimator,
+                frameGate = frameGate,
                 onFatalError = { error ->
                     postUi {
                         analyzerFatal = true

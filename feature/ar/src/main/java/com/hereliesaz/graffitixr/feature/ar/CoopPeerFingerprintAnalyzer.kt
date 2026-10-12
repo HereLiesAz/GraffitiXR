@@ -39,6 +39,8 @@ internal class CoopPeerFingerprintAnalyzer(
     private val spatialFrame: CoopSpatialFrame,
     private val onFrameTracked: (SphereSlamStandaloneFrame?) -> Unit,
     private val onDiagnostic: (String) -> Unit = {},
+    /** Battery / heat safeties and Adaptive rate; a refused frame is closed unanalyzed. */
+    private val frameGate: AnalysisFrameGate = AnalysisFrameGate(),
 ) : ImageAnalysis.Analyzer, AutoCloseable {
 
     private val peerBytes = peerFingerprint.copyOf()
@@ -69,8 +71,11 @@ internal class CoopPeerFingerprintAnalyzer(
     private val lumaPool = LumaFrameBufferPool(slots = 2)
 
     override fun analyze(image: ImageProxy) {
+        var workStartNs = Long.MIN_VALUE
         try {
             if (closed) return
+            if (!frameGate.admit(image.imageInfo.timestamp)) return
+            workStartNs = android.os.SystemClock.elapsedRealtimeNanos()
             val y = image.planes.firstOrNull() ?: return
             val rawWidth = image.width
             val rawHeight = image.height
@@ -187,6 +192,9 @@ internal class CoopPeerFingerprintAnalyzer(
             }
         } finally {
             image.close()
+            if (workStartNs != Long.MIN_VALUE) {
+                frameGate.onWorkDone(android.os.SystemClock.elapsedRealtimeNanos() - workStartNs)
+            }
         }
     }
 

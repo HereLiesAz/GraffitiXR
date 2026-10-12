@@ -43,6 +43,18 @@ class StandaloneDepthSchedulingTest {
     }
 
     @Test
+    fun `stress scale stretches both intervals`() {
+        val c = StandaloneDepthCadence(minIntervalMs = 1_000L, maxIntervalMs = 2_000L)
+        c.onViewDirection(10f, 0f)
+        c.markRun(0L)
+        assertFalse(c.isDue(2_000L, intervalScale = 4))
+        assertTrue(c.isDue(8_000L, intervalScale = 4))
+        c.onViewDirection(50f, 0f) // next heading tile
+        assertFalse(c.isDue(1_000L, intervalScale = 4))
+        assertTrue(c.isDue(4_000L, intervalScale = 4))
+    }
+
+    @Test
     fun `tile change is due after the min interval but not before`() {
         val c = StandaloneDepthCadence(minIntervalMs = 1_000L, maxIntervalMs = 2_000L)
         c.onViewDirection(10f, 0f)

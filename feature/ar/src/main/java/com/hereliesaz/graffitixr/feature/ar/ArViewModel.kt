@@ -1967,6 +1967,9 @@ class ArViewModel @Inject constructor(
             settingsRepository.throttleOnLowBattery.collect { on ->
                 _uiState.update { it.copy(throttleOnLowBattery = on) }
                 recomputeSystemThrottle()
+                // The battery tier caps a live ARCore camera to 30 fps (effectiveCameraTargetFps), so
+                // the toggle must reach the running session, as the Adaptive rate toggle does.
+                reconcileLiveSessionSettings(checkCameraFps = true)
             }
         }
         viewModelScope.launch {
@@ -6148,6 +6151,10 @@ class ArViewModel @Inject constructor(
                 activeRateCeilingFps = activeCeiling,
             )
         }
+        // The native relocalizer runs on every backend; nothing else lowers its pass rate.
+        val s = _uiState.value
+        val (lockedMs, huntMs) = relocBackoffMs(deviceStress(s.perceptionSystemThrottle, s.batteryTier))
+        slamManager.setRelocBackoffMs(lockedMs, huntMs)
     }
 
     private fun startSystemThrottleMonitoring() {

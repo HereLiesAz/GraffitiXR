@@ -1093,6 +1093,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetDepthPlacementE
 }
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetRelocBackoffMs(JNIEnv*, jobject, jint lockedMs, jint huntMs) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (gSlamEngine) gSlamEngine->setRelocBackoffMs((int)lockedMs, (int)huntMs);
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetLatestDepthMap(
         JNIEnv* env, jobject, jfloatArray data, jint w, jint h, jint frameW, jint frameH) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);

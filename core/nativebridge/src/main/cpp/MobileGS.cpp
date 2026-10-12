@@ -834,8 +834,13 @@ void MobileGS::relocThreadFunc() {
         // matters most — hunting for the first lock, or re-acquiring after the artist looks away —
         // where the cost of an extra attempt is far smaller than the cost of the overlay staying
         // adrift. Locked and stable, 200 ms is plenty and keeps the thermal/battery profile.
+        // Both are raised under thermal / power-save / low-battery pressure (setRelocBackoffMs). The
+        // wait wakes early on destroy(), so a long back-off never delays shutdown.
         const bool locked = mLastRelocReject.load(std::memory_order_relaxed) == kRelocOk;
-        std::this_thread::sleep_for(std::chrono::milliseconds(locked ? 200 : 60));
+        const int backoffMs = locked ? mRelocLockedBackoffMs.load(std::memory_order_relaxed)
+                                     : mRelocHuntBackoffMs.load(std::memory_order_relaxed);
+        std::unique_lock<std::mutex> lock(mRelocMutex);
+        mRelocCv.wait_for(lock, std::chrono::milliseconds(backoffMs), [this] { return !mRelocRunning; });
     }
 }
 bool MobileGS::computeRectifyHomography(const float* viewCur16, const double* liveK4, cv::Mat& Hcur_fp,
