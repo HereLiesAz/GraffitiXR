@@ -26,8 +26,8 @@ internal data class StandaloneMatchDiagnostics(
     val matchDurationMs: Float,
     val source: SphereSlamStandalonePoseSource,
     /**
-     * How SphereSLAM solved the visual pose (`VisualMatchMethod`: full / focused / rectified KPM or
-     * flow tracking), by name; null when the source has no such notion (bridge, co-op peer).
+     * How SphereSLAM solved the visual pose (`VisualMatchMethod`: full / focused / rectified / preview
+     * KPM or flow tracking), by name; null when the source has no such notion (bridge, co-op peer).
      */
     val matchMethod: String? = null,
 )
