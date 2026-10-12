@@ -393,7 +393,14 @@
 
     <!-- Settings Screen -->
     <string name="settings_title">Settings</string>
-    <string name="settings_preferences_section">Preferences</string>
+    <string name="settings_general_section">General</string>
+    <string name="settings_ar_section">AR</string>
+    <string name="settings_glow_section">Coverage glow</string>
+    <string name="settings_power_section">Power</string>
+    <string name="settings_privacy_section">Privacy</string>
+    <string name="settings_developer_section">Developer</string>
+    <string name="settings_power_saving_label">Power saving</string>
+    <string name="settings_power_saving_desc">Drop to 30 fps when the phone is hot, in power saver, on low battery, or lagging.</string>
     <string name="settings_language_label">Language</string>
     <string name="settings_hand_label">Dominant Hand</string>
     <string name="settings_hand_right">Right</string>

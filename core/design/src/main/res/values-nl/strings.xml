@@ -358,7 +358,14 @@
 
 
     <string name="settings_title">Instellingen</string>
-    <string name="settings_preferences_section">Voorkeuren</string>
+    <string name="settings_general_section">Algemeen</string>
+    <string name="settings_ar_section">AR</string>
+    <string name="settings_glow_section">Dekkingsgloed</string>
+    <string name="settings_power_section">Energie</string>
+    <string name="settings_privacy_section">Privacy</string>
+    <string name="settings_developer_section">Ontwikkelaar</string>
+    <string name="settings_power_saving_label">Energiebesparing</string>
+    <string name="settings_power_saving_desc">Terug naar 30 fps als de telefoon heet is, in energiebesparing, bij een lage batterij of bij vertraging.</string>
     <string name="settings_hand_label">Dominante hand</string>
     <string name="settings_hand_right">Rechts</string>
     <string name="settings_hand_left">Links</string>

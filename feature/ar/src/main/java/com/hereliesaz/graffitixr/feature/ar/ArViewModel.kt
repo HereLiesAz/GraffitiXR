@@ -2328,20 +2328,14 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.setMonocularDepthEnabled(on) }
     }
 
-    fun setThrottleOnThermal(on: Boolean) {
-        viewModelScope.launch { settingsRepository.setThrottleOnThermal(on) }
-    }
-
-    fun setThrottleOnPowerSave(on: Boolean) {
-        viewModelScope.launch { settingsRepository.setThrottleOnPowerSave(on) }
-    }
-
-    fun setThrottleOnLowBattery(on: Boolean) {
-        viewModelScope.launch { settingsRepository.setThrottleOnLowBattery(on) }
-    }
-
-    fun setThrottleOnLag(on: Boolean) {
-        viewModelScope.launch { settingsRepository.setThrottleOnLag(on) }
+    /** Settings ▸ Power saving: arms or disarms all four throttle triggers together. */
+    fun setPowerSaving(on: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setThrottleOnThermal(on)
+            settingsRepository.setThrottleOnPowerSave(on)
+            settingsRepository.setThrottleOnLowBattery(on)
+            settingsRepository.setThrottleOnLag(on)
+        }
     }
 
     fun setAdaptiveRateEnabled(on: Boolean) {

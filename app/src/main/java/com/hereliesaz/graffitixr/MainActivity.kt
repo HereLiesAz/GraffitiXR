@@ -1881,14 +1881,10 @@ class MainActivity : AppCompatActivity() {
                                     onArCoreDepthEnabledChanged = { arViewModel.setArCoreDepthEnabled(it) },
                                     monocularDepthEnabled = arUiState.monocularDepthEnabled,
                                     onMonocularDepthEnabledChanged = { arViewModel.setMonocularDepthEnabled(it) },
-                                    throttleOnThermal = arUiState.throttleOnThermal,
-                                    onThrottleOnThermalChanged = { arViewModel.setThrottleOnThermal(it) },
-                                    throttleOnPowerSave = arUiState.throttleOnPowerSave,
-                                    onThrottleOnPowerSaveChanged = { arViewModel.setThrottleOnPowerSave(it) },
-                                    throttleOnLowBattery = arUiState.throttleOnLowBattery,
-                                    onThrottleOnLowBatteryChanged = { arViewModel.setThrottleOnLowBattery(it) },
-                                    throttleOnLag = arUiState.throttleOnLag,
-                                    onThrottleOnLagChanged = { arViewModel.setThrottleOnLag(it) },
+                                    // On only while all four triggers are armed; toggling sets all four.
+                                    powerSaving = arUiState.throttleOnThermal && arUiState.throttleOnPowerSave &&
+                                        arUiState.throttleOnLowBattery && arUiState.throttleOnLag,
+                                    onPowerSavingChanged = { arViewModel.setPowerSaving(it) },
                                     adaptiveRateEnabled = arUiState.adaptiveRateEnabled,
                                     onAdaptiveRateEnabledChanged = { arViewModel.setAdaptiveRateEnabled(it) },
                                     ambientScanEnabled = arUiState.ambientScanEnabled,

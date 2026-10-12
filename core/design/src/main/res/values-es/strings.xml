@@ -353,7 +353,14 @@
 
     <!-- Settings Screen -->
     <string name="settings_title">Ajustes</string>
-    <string name="settings_preferences_section">Preferencias</string>
+    <string name="settings_general_section">General</string>
+    <string name="settings_ar_section">RA</string>
+    <string name="settings_glow_section">Brillo de cobertura</string>
+    <string name="settings_power_section">Energía</string>
+    <string name="settings_privacy_section">Privacidad</string>
+    <string name="settings_developer_section">Desarrollador</string>
+    <string name="settings_power_saving_label">Ahorro de energía</string>
+    <string name="settings_power_saving_desc">Bajar a 30 fps cuando el teléfono está caliente, en ahorro de energía, con batería baja o con retraso.</string>
     <string name="settings_hand_label">Mano Dominante</string>
     <string name="settings_hand_right">Derecha</string>
     <string name="settings_hand_left">Izquierda</string>

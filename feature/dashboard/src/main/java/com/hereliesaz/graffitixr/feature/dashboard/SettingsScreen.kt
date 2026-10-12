@@ -28,6 +28,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Switch
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -95,14 +100,8 @@ fun SettingsScreen(
     onArCoreDepthEnabledChanged: (Boolean) -> Unit,
     monocularDepthEnabled: Boolean,
     onMonocularDepthEnabledChanged: (Boolean) -> Unit,
-    throttleOnThermal: Boolean,
-    onThrottleOnThermalChanged: (Boolean) -> Unit,
-    throttleOnPowerSave: Boolean,
-    onThrottleOnPowerSaveChanged: (Boolean) -> Unit,
-    throttleOnLowBattery: Boolean,
-    onThrottleOnLowBatteryChanged: (Boolean) -> Unit,
-    throttleOnLag: Boolean,
-    onThrottleOnLagChanged: (Boolean) -> Unit,
+    powerSaving: Boolean,
+    onPowerSavingChanged: (Boolean) -> Unit,
     adaptiveRateEnabled: Boolean,
     onAdaptiveRateEnabledChanged: (Boolean) -> Unit,
     ambientScanEnabled: Boolean,
@@ -154,6 +153,8 @@ fun SettingsScreen(
     }
 
     var showLanguageDialog by remember { mutableStateOf(false) }
+    // Developer overlays are for diagnosing tracking, not for painting: closed until asked for.
+    var developerExpanded by rememberSaveable { mutableStateOf(false) }
     var showTokenDialog by remember { mutableStateOf(false) }
 
     if (showTokenDialog) {
@@ -274,9 +275,8 @@ fun SettingsScreen(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Preferences Section
                         item {
-                            SettingsSectionTitle(strings.settings.preferences)
+                            SettingsSectionTitle(strings.settings.general)
                             SettingsItem(
                                 label = strings.settings.languageLabel,
                                 value = currentLanguage.displayName,
@@ -287,50 +287,36 @@ fun SettingsScreen(
                                 value = if (isRightHanded) strings.settings.handRight else strings.settings.handLeft,
                                 modifier = Modifier.clickable { onHandednessChanged(!isRightHanded) }
                             )
-                            // Off by default and must ask, not assume. On a crash, the report (device
-                            // model + recent logcat) goes to this project's PUBLIC GitHub issue
-                            // tracker — never silently, and never anywhere else. Apart from co-op
-                            // sessions the artist starts, this is the only network call the app
-                            // makes: there is no update check (Updates below just opens the
-                            // releases page in the browser when tapped).
-                            Text(
-                                text = "On a crash, send the device model and recent logs to a public bug report? Off by default.",
-                                color = Color.Gray,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
                             SettingsItem(
-                                label = "Crash reports",
-                                value = if (crashReportingConsent) strings.settings.on else strings.settings.off,
-                                modifier = Modifier.clickable { onCrashReportingConsentChanged(!crashReportingConsent) }
+                                label = strings.settings.units,
+                                value = if (isImperialUnits) strings.settings.imperial else strings.settings.metric,
+                                modifier = Modifier.clickable { onImperialUnitsChanged(!isImperialUnits) }
                             )
-                            // The credential for the upload above. Entered here, held only on-device,
-                            // never compiled into the APK. Shown as Set/Not set — never the value.
+                            CanvasBackgroundSwatches(backgroundColor, onBackgroundColorChanged, strings)
                             SettingsItem(
-                                label = "Crash-report token",
-                                value = if (crashReportToken.isNotBlank()) "Set" else "Not set",
-                                modifier = Modifier.clickable { showTokenDialog = true }
+                                label = strings.settings.resetTutorials,
+                                value = strings.settings.resetTutorialsValue,
+                                modifier = Modifier.clickable { onResetTutorials() }
                             )
-                            SettingsItem(
-                                label = strings.settings.diagOverlay,
-                                value = if (showDiagOverlay) strings.settings.on else strings.settings.off,
-                                modifier = Modifier.clickable { onDiagOverlayChanged() }
-                            )
-                            SettingsItem(
-                                label = strings.settings.layerFeaturePoints,
-                                value = if (showFeaturePoints) strings.settings.on else strings.settings.off,
-                                modifier = Modifier.clickable { onFeaturePointsChanged() }
-                            )
-                            SettingsItem(
-                                label = strings.settings.layerPlaneGrids,
-                                value = if (showPlaneGrids) strings.settings.on else strings.settings.off,
-                                modifier = Modifier.clickable { onPlaneGridsChanged() }
-                            )
-                            SettingsItem(
-                                label = strings.settings.layerPoints,
-                                value = if (showPoints) strings.settings.on else strings.settings.off,
-                                modifier = Modifier.clickable { onPointsChanged() }
-                            )
+                        }
+
+                        item {
+                            SettingsSectionTitle(strings.settings.ar)
+                            // Use ARCore when the device supports it (default on). Off forces the
+                            // standalone SphereSLAM/KPM path even on an ARCore-capable device. ARCore
+                            // depth is AUTOMATIC (monocular/ML) depth, which feeds plane finding and
+                            // stabilizes the feature cloud; off is the escape hatch for hardware whose
+                            // ML depth graph destabilizes VIO. Both apply immediately, mid-AR included.
+                            SettingsSwitch("Use ARCore", arCoreEnabled, onArCoreEnabledChanged)
+                            SettingsSwitch("ARCore depth", arCoreDepthEnabled, onArCoreDepthEnabledChanged)
+                            // Monocular depth (MiDaS Small) — standalone (non-ARCore) backend only:
+                            // calibrates the sphere map's point radii while the feature map builds.
+                            // Default on; never loaded on the ARCore backend (MiDaS depth is relative,
+                            // so it can't stand in for ARCore depth). A self-test runs when it loads;
+                            // its result shows in the diag overlay.
+                            SettingsSwitch("Monocular depth (beta)", monocularDepthEnabled, onMonocularDepthEnabledChanged)
+                            SettingsSwitch("Ambient scan", ambientScanEnabled, onAmbientScanEnabledChanged)
+                            SettingsSwitch(strings.settings.anchorBoundary, showAnchorBoundary, onAnchorBoundaryChanged)
                             SettingsItem(
                                 label = strings.settings.cameraFps,
                                 value = com.hereliesaz.graffitixr.common.model.CameraTargetFps
@@ -342,142 +328,10 @@ fun SettingsScreen(
                                     )
                                 }
                             )
-                            // Use ARCore when the device supports it (default on). Off forces the
-                            // standalone SphereSLAM/KPM path even on an ARCore-capable device. ARCore
-                            // depth is AUTOMATIC (monocular/ML) depth, which feeds plane finding and
-                            // stabilizes the feature cloud; off is the escape hatch for hardware whose
-                            // ML depth graph destabilizes VIO. Both apply immediately, mid-AR included.
-                            SettingsItem(
-                                label = "Use ARCore",
-                                value = if (arCoreEnabled) strings.settings.on else strings.settings.off,
-                                modifier = Modifier.clickable { onArCoreEnabledChanged(!arCoreEnabled) }
-                            )
-                            SettingsItem(
-                                label = "ARCore depth",
-                                value = if (arCoreDepthEnabled) strings.settings.on else strings.settings.off,
-                                modifier = Modifier.clickable { onArCoreDepthEnabledChanged(!arCoreDepthEnabled) }
-                            )
-                            // Monocular depth (MiDaS Small) — standalone (non-ARCore) backend only:
-                            // calibrates the sphere map's point radii while the feature map builds.
-                            // Default on; never loaded on the ARCore backend (MiDaS depth is relative,
-                            // so it can't stand in for ARCore depth). A self-test runs when it loads;
-                            // its result shows in the diag overlay.
-                            SettingsItem(
-                                label = "Monocular depth (beta)",
-                                value = if (monocularDepthEnabled) strings.settings.on else strings.settings.off,
-                                modifier = Modifier.clickable { onMonocularDepthEnabledChanged(!monocularDepthEnabled) }
-                            )
-                            // Perception throttle triggers: each drops perception 60→30 fps to save
-                            // power while active. Default on. Lower = laggier perception but less drain.
-                            SettingsItem(
-                                label = "Throttle: heat",
-                                value = if (throttleOnThermal) strings.settings.on else strings.settings.off,
-                                modifier = Modifier.clickable { onThrottleOnThermalChanged(!throttleOnThermal) }
-                            )
-                            SettingsItem(
-                                label = "Throttle: power saver",
-                                value = if (throttleOnPowerSave) strings.settings.on else strings.settings.off,
-                                modifier = Modifier.clickable { onThrottleOnPowerSaveChanged(!throttleOnPowerSave) }
-                            )
-                            SettingsItem(
-                                label = "Throttle: low battery",
-                                value = if (throttleOnLowBattery) strings.settings.on else strings.settings.off,
-                                modifier = Modifier.clickable { onThrottleOnLowBatteryChanged(!throttleOnLowBattery) }
-                            )
-                            SettingsItem(
-                                label = "Throttle: frame lag",
-                                value = if (throttleOnLag) strings.settings.on else strings.settings.off,
-                                modifier = Modifier.clickable { onThrottleOnLagChanged(!throttleOnLag) }
-                            )
-                            // Adaptive rate: gates heavy SLAM work while the projection is locked and
-                            // the phone is still (snaps back instantly on motion), plus battery-tier
-                            // degradation. Standalone: once tracking work exceeds a camera frame, the
-                            // analyzer skips frames to stay under half duty (AnalysisFrameGate).
-                            // Default on. Off = always full rate.
-                            SettingsItem(
-                                label = "Adaptive rate (idle)",
-                                value = if (adaptiveRateEnabled) strings.settings.on else strings.settings.off,
-                                modifier = Modifier.clickable { onAdaptiveRateEnabledChanged(!adaptiveRateEnabled) }
-                            )
-                            SettingsItem(
-                                label = "Ambient scan",
-                                value = if (ambientScanEnabled) strings.settings.on else strings.settings.off,
-                                modifier = Modifier.clickable {
-                                    onAmbientScanEnabledChanged(!ambientScanEnabled)
-                                }
-                            )
+                        }
 
-                            SettingsItem(
-                                label = strings.settings.anchorBoundary,
-                                value = if (showAnchorBoundary) strings.settings.on else strings.settings.off,
-                                modifier = Modifier.clickable { onAnchorBoundaryChanged(!showAnchorBoundary) }
-                            )
-                            SettingsItem(
-                                label = strings.settings.units,
-                                value = if (isImperialUnits) strings.settings.imperial else strings.settings.metric,
-                                modifier = Modifier.clickable { onImperialUnitsChanged(!isImperialUnits) }
-                            )
-                            SettingsItem(
-                                label = strings.settings.resetTutorials,
-                                value = strings.settings.resetTutorialsValue,
-                                modifier = Modifier.clickable { onResetTutorials() }
-                            )
-                            // A label-left/swatches-right Row (SettingRow's shape) can't fit five
-                            // 48dp touch targets + 4×8dp gaps (272dp) plus any label width on a
-                            // compact/split-screen card — Compose doesn't wrap a plain Row, so it
-                            // clipped or shrank targets below the accessibility fix's own minimum.
-                            // Label on its own line, swatches in a horizontally scrollable row
-                            // below: every swatch stays reachable (via scroll) at any width, and
-                            // none of the 48dp targets are ever compressed.
-                            Text(
-                                strings.settings.canvasBg,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(top = 8.dp)
-                            )
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState())
-                                    .padding(vertical = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                listOf(
-                                    "Black" to 0xFF000000.toInt(),
-                                    "Dark"  to 0xFF1A1A2E.toInt(),
-                                    "Grey"  to 0xFF2C2C2C.toInt(),
-                                    "White" to 0xFFFFFFFF.toInt(),
-                                    "Navy"  to 0xFF0D1B2A.toInt(),
-                                ).forEach { (label, argb) ->
-                                    val isSelected = backgroundColor == argb
-                                    // The visible color circle stays 32dp (8dp padding inside a 48dp
-                                    // box), matching Android's 48dp minimum touch target without the
-                                    // swatch itself looking oversized. The color-only Box also gets a
-                                    // contentDescription + Button role via clickable's onClickLabel/
-                                    // role so a screen reader hears "Black, selected" instead of
-                                    // nothing at all.
-                                    Box(
-                                        modifier = Modifier
-                                            .size(48.dp)
-                                            .clickable(
-                                                role = Role.Button,
-                                                onClickLabel = label,
-                                                onClick = { onBackgroundColorChanged(argb) }
-                                            )
-                                            .semantics(mergeDescendants = true) {
-                                                contentDescription = label
-                                                stateDescription = if (isSelected) "Selected" else ""
-                                            }
-                                            .padding(8.dp)
-                                            .background(Color(argb.toLong() and 0xFFFFFFFFL), CircleShape)
-                                            .border(
-                                                width = if (isSelected) 2.dp else 0.5.dp,
-                                                color = if (isSelected) Color.Cyan else Color.Gray,
-                                                shape = CircleShape
-                                            )
-                                    )
-                                }
-                            }
-
+                        item {
+                            SettingsSectionTitle(strings.settings.glowSection)
                             CoverageGlowSettings(
                                 appearance = coverageGlow,
                                 onColorChanged = onCoverageGlowColorChanged,
@@ -487,28 +341,67 @@ fun SettingsScreen(
                             )
                         }
 
-                        // Version Section
+                        item {
+                            SettingsSectionTitle(strings.settings.power)
+                            // One switch for all four perception throttle triggers (heat, power
+                            // saver, low battery, frame lag): each drops perception 60→30 fps and
+                            // backs relocalization off while active. Default on.
+                            SettingsSwitch(
+                                label = strings.settings.powerSaving,
+                                checked = powerSaving,
+                                onCheckedChange = onPowerSavingChanged,
+                                description = strings.settings.powerSavingDesc,
+                            )
+                            // Adaptive rate: gates heavy SLAM work while the projection is locked and
+                            // the phone is still (snaps back instantly on motion), plus battery-tier
+                            // degradation. Standalone: once tracking work exceeds a camera frame, the
+                            // analyzer skips frames to stay under half duty (AnalysisFrameGate).
+                            // Default on. Off = always full rate.
+                            SettingsSwitch("Adaptive rate (idle)", adaptiveRateEnabled, onAdaptiveRateEnabledChanged)
+                        }
+
+                        item {
+                            SettingsSectionTitle(strings.settings.privacy)
+                            // Off by default and must ask, not assume. On a crash, the report (device
+                            // model + recent logcat) goes to this project's PUBLIC GitHub issue
+                            // tracker — never silently, and never anywhere else. Apart from co-op
+                            // sessions the artist starts, this is the only network call the app
+                            // makes: there is no update check (Updates below just opens the
+                            // releases page in the browser when tapped).
+                            SettingsSwitch(
+                                label = "Crash reports",
+                                checked = crashReportingConsent,
+                                onCheckedChange = onCrashReportingConsentChanged,
+                                description = "On a crash, send the device model and recent logs to a public bug report? Off by default.",
+                            )
+                            // The credential for the upload above. Entered here, held only on-device,
+                            // never compiled into the APK. Shown as Set/Not set — never the value.
+                            SettingsItem(
+                                label = "Crash-report token",
+                                value = if (crashReportToken.isNotBlank()) "Set" else "Not set",
+                                modifier = Modifier.clickable { showTokenDialog = true }
+                            )
+                        }
+
                         item {
                             SettingsSectionTitle(strings.settings.appInfo)
                             SettingsItem(
                                 label = strings.settings.version,
                                 value = currentVersion
                             )
-                        }
-
-                        // Updates Section. The app never contacts a server to look for updates
-                        // (docs/en/PRIVACY_POLICY.md); this only opens the public releases page in the
-                        // browser, on tap.
-                        item {
-                            SettingsSectionTitle(strings.settings.updates)
+                            // The app never contacts a server to look for updates
+                            // (docs/en/PRIVACY_POLICY.md); this only opens the public releases page
+                            // in the browser, on tap.
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .heightIn(min = 48.dp)
                                     .clickable(
                                         onClick = onOpenReleasesPage,
                                         role = Role.Button,
                                         onClickLabel = strings.settings.openReleases,
                                     )
+                                    .padding(vertical = 4.dp)
                             ) {
                                 Text(text = strings.settings.openReleases, fontWeight = FontWeight.Medium)
                                 Text(
@@ -517,15 +410,24 @@ fun SettingsScreen(
                                     color = Color.Gray,
                                 )
                             }
+                            // Only permissions the app actually declares: there is no notification
+                            // row because the merged manifest has no POST_NOTIFICATIONS — the app
+                            // posts no notifications, so the row could only ever read "not granted".
+                            PermissionItem(name = strings.settings.cameraAccess, isGranted = cameraPermission, onClick = openAppSettings, strings = strings)
                         }
 
-                        // Permissions Section (User can accept/revoke via App Settings). Only
-                        // permissions the app actually declares: there is no notification row
-                        // because the merged manifest has no POST_NOTIFICATIONS — the app posts no
-                        // notifications, so the row could only ever read "not granted".
                         item {
-                            SettingsSectionTitle(strings.settings.permissions)
-                            PermissionItem(name = strings.settings.cameraAccess, isGranted = cameraPermission, onClick = openAppSettings, strings = strings)
+                            DeveloperSectionHeader(
+                                title = strings.settings.developer,
+                                expanded = developerExpanded,
+                                onToggle = { developerExpanded = !developerExpanded },
+                            )
+                            if (developerExpanded) {
+                                SettingsSwitch(strings.settings.diagOverlay, showDiagOverlay, { onDiagOverlayChanged() })
+                                SettingsSwitch(strings.settings.layerFeaturePoints, showFeaturePoints, { onFeaturePointsChanged() })
+                                SettingsSwitch(strings.settings.layerPlaneGrids, showPlaneGrids, { onPlaneGridsChanged() })
+                                SettingsSwitch(strings.settings.layerPoints, showPoints, { onPointsChanged() })
+                            }
                         }
                     }
 
@@ -687,6 +589,118 @@ fun SettingsItem(label: String, value: String, modifier: Modifier = Modifier) {
     ) {
         Text(text = label, fontWeight = FontWeight.Medium)
         Text(text = value, color = Color.Gray)
+    }
+}
+
+/**
+ * An on/off setting: the whole row toggles (48dp minimum, Switch role), the Switch just shows the
+ * state. [description], when given, sits under the label.
+ */
+@Composable
+private fun SettingsSwitch(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    description: String? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(text = label, fontWeight = FontWeight.Medium)
+            if (description != null) {
+                Text(text = description, color = Color.Gray, fontSize = 12.sp)
+            }
+        }
+        Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
+/** The Developer section's title, doubling as its expand/collapse control. */
+@Composable
+private fun DeveloperSectionHeader(title: String, expanded: Boolean, onToggle: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(role = Role.Button, onClick = onToggle)
+            .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Icon(
+            imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+            contentDescription = null, // Handled by stateDescription
+            tint = MaterialTheme.colorScheme.primary,
+        )
+    }
+}
+
+/**
+ * Canvas background swatches. A label-left/swatches-right Row (SettingsItem's shape) can't fit five
+ * 48dp touch targets + 4×8dp gaps (272dp) plus any label width on a compact/split-screen card —
+ * Compose doesn't wrap a plain Row, so it clipped or shrank targets below the accessibility minimum.
+ * Label on its own line, swatches in a horizontally scrollable row below: every swatch stays
+ * reachable (via scroll) at any width, and none of the 48dp targets are ever compressed.
+ */
+@Composable
+private fun CanvasBackgroundSwatches(backgroundColor: Int, onChanged: (Int) -> Unit, strings: AppStrings) {
+    Text(
+        strings.settings.canvasBg,
+        fontWeight = FontWeight.Medium,
+        modifier = Modifier.padding(top = 8.dp)
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        listOf(
+            "Black" to 0xFF000000.toInt(),
+            "Dark"  to 0xFF1A1A2E.toInt(),
+            "Grey"  to 0xFF2C2C2C.toInt(),
+            "White" to 0xFFFFFFFF.toInt(),
+            "Navy"  to 0xFF0D1B2A.toInt(),
+        ).forEach { (label, argb) ->
+            val isSelected = backgroundColor == argb
+            // The visible color circle stays 32dp (8dp padding inside a 48dp box), matching
+            // Android's 48dp minimum touch target without the swatch itself looking oversized.
+            // The color-only Box also gets a contentDescription + Button role via clickable's
+            // onClickLabel/role so a screen reader hears "Black, selected" instead of nothing.
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clickable(
+                        role = Role.Button,
+                        onClickLabel = label,
+                        onClick = { onChanged(argb) }
+                    )
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = label
+                        stateDescription = if (isSelected) "Selected" else ""
+                    }
+                    .padding(8.dp)
+                    .background(Color(argb.toLong() and 0xFFFFFFFFL), CircleShape)
+                    .border(
+                        width = if (isSelected) 2.dp else 0.5.dp,
+                        color = if (isSelected) Color.Cyan else Color.Gray,
+                        shape = CircleShape
+                    )
+            )
+        }
     }
 }
 
