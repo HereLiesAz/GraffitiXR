@@ -515,6 +515,35 @@ fun MainScreen(
                         LaunchedEffect(arUiState.isFlashlightOn, rendererRef.value) {
                             rendererRef.value?.updateFlashlight(arUiState.isFlashlightOn)
                         }
+
+                        // The phone's north-referenced attitude, for MobileGS to turn a lost frame
+                        // square-on to the wall. The same sensor the standalone path samples; released
+                        // while paused so the compass does not run in the background.
+                        DisposableEffect(lifecycleOwner) {
+                            if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                                arViewModel.startStandaloneCameraAttitude()
+                            }
+                            val attitudeObserver = LifecycleEventObserver { _, event ->
+                                when (event) {
+                                    Lifecycle.Event.ON_RESUME -> arViewModel.startStandaloneCameraAttitude()
+                                    Lifecycle.Event.ON_PAUSE -> arViewModel.stopStandaloneCameraAttitude()
+                                    else -> {}
+                                }
+                            }
+                            lifecycleOwner.lifecycle.addObserver(attitudeObserver)
+                            onDispose {
+                                lifecycleOwner.lifecycle.removeObserver(attitudeObserver)
+                                arViewModel.stopStandaloneCameraAttitude()
+                            }
+                        }
+                        LaunchedEffect(rendererRef.value) {
+                            rendererRef.value?.relocAttitude =
+                                if (arViewModel.isStandaloneAttitudeSensorAvailable) {
+                                    { arViewModel.latestStandaloneAttitudeSample() }
+                                } else {
+                                    null
+                                }
+                        }
     
                         // Dead-camera watchdog. On some devices (e.g. Samsung SM-A236U) the camera HAL
                         // never feeds ARCore — the session opens but no frame ever lands (frame.timestamp

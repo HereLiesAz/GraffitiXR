@@ -257,6 +257,8 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         if (attitudeSample == null) GameRotationAttitudeSource(context) else null
     private val readAttitude: () -> AttitudeSample? =
         attitudeSample ?: { ownAttitudeSource?.latestSample() }
+    // The host's sensor is the rotation vector (north-referenced); the fallback is not.
+    private val attitudeIsNorthReferenced = attitudeSample != null
     private val captureAttitudeHistory: AttitudeExtrapolator? =
         attitudeExtrapolator.takeIf { attitudeSample != null }
     private val captureAttitudeScratch = FloatArray(4)
@@ -591,19 +593,25 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             val timestampNs = image.imageInfo.timestamp
             val heading = cameraAttitude(cameraFromDevice)
             currentFrameIntrinsics = intrinsics
+            val frameAttitude = StandaloneFrameAttitude.atCapture(
+                latest = readAttitude(),
+                history = captureAttitudeHistory,
+                frameTimestampNs = timestampNs,
+                frameTimestampIsRealtime =
+                    cameraTimestampSource == StandaloneCameraTimestampSource.REALTIME,
+                scratch = captureAttitudeScratch,
+            )
+            // MobileGS turns a lost frame by the phone's attitude, so only a north-referenced one
+            // (the host's rotation vector): the fallback game rotation's heading means nothing to a
+            // wall normal saved in another session. Read now, before the scratch is reused.
+            val relocAttitude = frameAttitude?.takeIf { attitudeIsNorthReferenced }
+                ?.let { RelocAttitude.earthFromCvCamera(it.quaternion, cameraFromDevice) }
             val result = session.onFrame(
                 PhotosphereTrackingSession.Frame(
                     luma = rotated.bytes,
                     intrinsics = intrinsics,
                     timestampNs = timestampNs,
-                    attitude = StandaloneFrameAttitude.atCapture(
-                        latest = readAttitude(),
-                        history = captureAttitudeHistory,
-                        frameTimestampNs = timestampNs,
-                        frameTimestampIsRealtime =
-                            cameraTimestampSource == StandaloneCameraTimestampSource.REALTIME,
-                        scratch = captureAttitudeScratch,
-                    ),
+                    attitude = frameAttitude,
                     cameraFromDevice = cameraFromDevice,
                     headingDeg = heading?.headingDeg,
                     elevationDeg = heading?.elevationDeg,
@@ -640,7 +648,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                     // KPM and MobileGS are precision/enrichment estimators in fingerprint-local space;
                     // MobileGS is handed the accepted pose already rebased into the base SphereSLAM
                     // map. The fingerprint never becomes the world.
-                    feedMobileGsFrame(rotated, timestampNs, result.projection, result.acceptedCameraFromMap)
+                    feedMobileGsFrame(rotated, timestampNs, result.projection, result.acceptedCameraFromMap, relocAttitude)
                     maybePushDepth(rotated)
                     onFrameTracked(result.pose?.let { standaloneFrame(it) })
                 }
@@ -650,7 +658,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                     // This is also the path while the session's first background matcher build is
                     // in flight (pose == null, no failure reported): nothing is torn down here, the
                     // UI keeps its state and only the artwork stays hidden until a pose exists.
-                    feedMobileGsFrame(rotated, timestampNs, result.projection, null)
+                    feedMobileGsFrame(rotated, timestampNs, result.projection, null, relocAttitude)
                     onFrameTracked(result.pose?.let { standaloneFrame(it) })
                 }
             }
@@ -985,6 +993,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         timestampNs: Long,
         projection: FloatArray?,
         acceptedView: FloatArray?,
+        earthFromCamera: FloatArray?,
     ) {
         val slam = slamManager ?: return
         // This flag describes the freshness of updateCamera(), not which backend produced it.
@@ -1000,6 +1009,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         if (acceptedView != null && projection != null) {
             slam.updateCamera(acceptedView, projection, timestampNs)
         }
+        slam.setCameraAttitude(earthFromCamera)
         slam.feedLumaFrame(directFrame(frame.bytes), frame.width, frame.height, timestampNs)
     }
 

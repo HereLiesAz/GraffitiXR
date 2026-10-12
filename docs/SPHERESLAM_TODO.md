@@ -1,5 +1,20 @@
 # SphereSLAM Implementation TODO
 
+## MobileGS sensor turn
+
+- [x] A lost frame is turned by the phone's north-referenced attitude square-on to the wall and
+  upright, matched there, and its matches mapped back for PnP (`sensorTurnHomography`), in both AR
+  modes; no pose needed.
+- [x] The wall's normal is learned at every well-supported lock, saved with the project, restored on
+  load, and forgotten with a new target.
+
+Device checks owed:
+
+- [ ] Lose the lock, then look up at the wall from close below (40°+) with the phone rolled: the
+  diagnostics show `turn` and it relocks.
+- [ ] Reopen the project and look at the wall steeply: the first relocalization already turns.
+- [ ] A magnetically noisy wall (rebar, metal): the turn still helps or stays out of the way.
+
 ## SphereSLAM 0.26.6 — anticipation is the app's (adopted)
 
 The app consumes SphereSLAM **0.26.6** (tag `0.26.6`). The library no longer chooses or renders

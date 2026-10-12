@@ -32,6 +32,19 @@ MobileGS does not consume the hybrid KPM page frame and KPM does not mutate Mobi
 coordinates. The only shared downstream object is PoseFusion's **anchor-local correction**, which is
 frame-invariant under ARCore global world rebases. The correction switch remains off by default.
 
+### 2b. The sensor turn (lost frames)
+When no tracking pose is current, the pose-based rectifying pass cannot run. The phone's sensors still
+say which way the camera faces (`setCameraAttitude`: earth ← camera from the north-referenced rotation
+vector, fed with every frame in both AR modes), and the wall's normal says which way the wall faces.
+The live frame is then turned about its own centre into a camera square-on to the wall and upright
+(`sensorTurnHomography`: focal × cos(obliquity), principal point where the frame's centre lands),
+matched there, and the matches mapped back for the one PnP. A pure turn needs no position, so this
+works from the first lost frame. The normal is learned at every well-supported lock
+(`wallNormalFromLock`: the fingerprint's plane through the PnP pose and that frame's attitude),
+averaged in, saved with the project (`fingerprintWallNormalEnu`) and restored on load, so it is
+there for the first relocalization of the next session; a new target forgets it. Diagnostics:
+`lastRelocTurnDeg`, `lastRelocTurnCorr`.
+
 ### 3. Teleological corroboration and self-grow (both off by default)
 Two optional, separately-gated mechanisms sit on top of relocalization:
 - **Corroboration**: compares descriptors from the design composite against the live wall to produce a confidence signal (Lowe ratio `kCorrobLoweRatio = 0.85`) — see `docs/TELEOLOGICAL_SLAM.md` for what it does and does not measure.
@@ -63,6 +76,8 @@ A representative subset of the real, currently-exported surface (see `SlamManage
 | `getCorroborationConfidence()` | Teleological corroboration's confidence signal (see `TELEOLOGICAL_SLAM.md`). |
 | `setSelfGrowEnabled(enabled)` | Toggles self-grow (default off). |
 | `feedYuvFrame(...)` | Per-frame camera feed into the reloc thread. |
+| `setCameraAttitude(earthFromCamera)` | The frame's north-referenced camera attitude, for the sensor turn. |
+| `getWallNormalEnu()` / `setWallNormalEnu(n)` | The wall's normal learned at locks; saved with and restored from the project. |
 | `clearWallFingerprint()` | Drops the current fingerprint (new project / re-target). |
 
 

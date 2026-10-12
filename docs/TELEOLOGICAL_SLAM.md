@@ -176,6 +176,10 @@ repeat over a grid of aim points across the wall, since the artist is up close m
 always when it matters, and throttling for battery, heat and load takes the far views first and the
 close-ups last. See `feature/ar/.../anticipation/` and [SPHERESLAM_TODO.md](SPHERESLAM_TODO.md).
 
+The ORB/SuperPoint fingerprint meets the view from the other side: a lost frame is turned by the
+phone's sensors square-on to the wall before it is matched (the sensor turn, NATIVE_ENGINE.md §2b),
+using the wall's normal learned at earlier locks and saved with the project.
+
 ## Relationship to the rest of the engine
 
 - **Relocalization** (snap-back after tracking loss / screen-off) is the

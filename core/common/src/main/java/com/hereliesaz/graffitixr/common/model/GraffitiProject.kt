@@ -309,6 +309,12 @@ data class GraffitiProject(
     // inferred at load time.
     val fingerprintCaptureRotationDeg: Int = -1,
 
+    // The wall's normal in East-North-Up (out of the wall), learned by MobileGS at trusted locks in
+    // either AR mode. With the phone's north-referenced attitude it lets relocalization turn a lost
+    // frame square-on to the wall, from the first attempt of a session. Empty until learned; cleared
+    // with a new target, which may be another wall.
+    val fingerprintWallNormalEnu: List<Float> = emptyList(),
+
     // The AR design quad's half-width in metres, fixed at its first placement in this project. The
     // first placement fits the quad to the screen at the anchor's distance; persisting the result
     // keeps the mural the same real-world size on every later visit instead of re-fitting to wherever

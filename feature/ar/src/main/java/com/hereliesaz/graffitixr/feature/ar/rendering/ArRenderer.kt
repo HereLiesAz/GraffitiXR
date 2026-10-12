@@ -501,6 +501,13 @@ class ArRenderer(
             }
         }
     /** When true the SLAM/cloud visualization is suppressed — processing continues but nothing is drawn. */
+    /**
+     * The phone's north-referenced attitude (`TYPE_ROTATION_VECTOR`, body → East-North-Up), or null
+     * without one. Fed to MobileGS with each frame so relocalization can turn a lost frame square-on
+     * to the wall ([com.hereliesaz.graffitixr.feature.ar.RelocAttitude]).
+     */
+    @Volatile var relocAttitude: (() -> com.hereliesaz.sphereslam.attitude.AttitudeSample?)? = null
+
     @Volatile var hideVisualization: Boolean = false
     /** Current scan phase. Fog is rendered only when AMBIENT and not yet anchored. */
     @Volatile var scanPhase: ScanPhase = ScanPhase.AMBIENT
@@ -2883,6 +2890,18 @@ class ArRenderer(
                     )
                     slamManager.setLiveIntrinsics(live[0], live[1], live[2], live[3])
                 }
+                // The phone's north-referenced attitude for this frame, as the feed below turns it
+                // (display-upright): what lets a lost frame be turned square-on to the wall.
+                slamManager.setCameraAttitude(
+                    relocAttitude?.invoke()
+                        ?.takeIf { it.ageNs(android.os.SystemClock.elapsedRealtimeNanos()) <= com.hereliesaz.graffitixr.feature.ar.RelocAttitude.MAX_AGE_NS }
+                        ?.let {
+                            com.hereliesaz.graffitixr.feature.ar.RelocAttitude.earthFromCvCamera(
+                                it.quaternion,
+                                com.hereliesaz.sphereslam.attitude.DeviceCameraRotation.cameraFromDeviceForDisplayFrame(displayRotation * 90),
+                            )
+                        },
+                )
 
                 try {
                     frame.acquireCameraImage().use { image ->
