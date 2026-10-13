@@ -371,6 +371,13 @@
     <string name="settings_anticipation_heat">A hő ennyivel fojt</string>
     <string name="settings_anticipation_compute">A terhelés ennyivel fojt</string>
     <string name="settings_anticipation_views">Legfeljebb %1$d nézet oldalanként</string>
+    <string name="settings_fingerprint_features">Ujjlenyomat</string>
+    <string name="settings_fingerprint_superpoint">SuperPoint</string>
+    <string name="settings_fingerprint_half_sphere">Félgömb</string>
+    <string name="settings_fingerprint_both">Mindkettő</string>
+    <string name="settings_fingerprint_superpoint_desc">Csak a felvétel SuperPoint jellemzői. Bírja a fényt és a kopást; kb. 1,5 MB célonként. A következő célra érvényes.</string>
+    <string name="settings_fingerprint_half_sphere_desc">A felvétel és 49 közeli nézetének ORB jellemzői. Közelről erős és kicsi, 0,1 MB alatt célonként. A következő célra érvényes.</string>
+    <string name="settings_fingerprint_both_desc">A felvétel és 49 közeli nézetének SuperPoint jellemzői. A legerősebb; kb. 2–3 MB célonként. A következő célra érvényes.</string>
     <string name="settings_power_section">Energia</string>
     <string name="settings_privacy_section">Adatvédelem</string>
     <string name="settings_developer_section">Fejlesztő</string>

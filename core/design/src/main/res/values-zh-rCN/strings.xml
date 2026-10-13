@@ -383,6 +383,13 @@
     <string name="settings_anticipation_heat">发热限制幅度</string>
     <string name="settings_anticipation_compute">负载限制幅度</string>
     <string name="settings_anticipation_views">每页最多 %1$d 个视图</string>
+    <string name="settings_fingerprint_features">指纹</string>
+    <string name="settings_fingerprint_superpoint">SuperPoint</string>
+    <string name="settings_fingerprint_half_sphere">半球</string>
+    <string name="settings_fingerprint_both">两者</string>
+    <string name="settings_fingerprint_superpoint_desc">仅采集图像的 SuperPoint 特征。耐光照与磨损；每个目标约 1.5 MB。从下一个目标起生效。</string>
+    <string name="settings_fingerprint_half_sphere_desc">采集图像及其 49 个特写的 ORB 特征。近距离强且小，每个目标不到 0.1 MB。从下一个目标起生效。</string>
+    <string name="settings_fingerprint_both_desc">采集图像及其 49 个特写的 SuperPoint 特征。最强；每个目标约 2–3 MB。从下一个目标起生效。</string>
     <string name="settings_power_section">电源</string>
     <string name="settings_privacy_section">隐私</string>
     <string name="settings_developer_section">开发者</string>

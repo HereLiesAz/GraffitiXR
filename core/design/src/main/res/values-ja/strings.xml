@@ -383,6 +383,13 @@
     <string name="settings_anticipation_heat">発熱による制限</string>
     <string name="settings_anticipation_compute">負荷による制限</string>
     <string name="settings_anticipation_views">1ページあたり最大%1$d ビュー</string>
+    <string name="settings_fingerprint_features">フィンガープリント</string>
+    <string name="settings_fingerprint_superpoint">SuperPoint</string>
+    <string name="settings_fingerprint_half_sphere">半球</string>
+    <string name="settings_fingerprint_both">両方</string>
+    <string name="settings_fingerprint_superpoint_desc">撮影画像のSuperPoint特徴のみ。光や摩耗に強く、ターゲットあたり約1.5 MB。次のターゲットから適用。</string>
+    <string name="settings_fingerprint_half_sphere_desc">撮影画像と49枚のクローズアップのORB特徴。近距離に強く小さい（ターゲットあたり0.1 MB未満）。次のターゲットから適用。</string>
+    <string name="settings_fingerprint_both_desc">撮影画像と49枚のクローズアップのSuperPoint特徴。最も強く、ターゲットあたり約2〜3 MB。次のターゲットから適用。</string>
     <string name="settings_power_section">電源</string>
     <string name="settings_privacy_section">プライバシー</string>
     <string name="settings_developer_section">開発者</string>

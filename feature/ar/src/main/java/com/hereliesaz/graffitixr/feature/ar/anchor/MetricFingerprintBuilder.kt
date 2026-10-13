@@ -249,6 +249,9 @@ object MetricFingerprintBuilder {
          * `getFingerprintKeypoints` / `generateFingerprint` apply to an ARGB mask. Null keeps all.
          */
         mask: Bitmap? = null,
+        /** SuperPoint or ORB, with or without the close-ups (Settings → Fingerprint). */
+        features: com.hereliesaz.graffitixr.common.model.FingerprintFeatures =
+            com.hereliesaz.graffitixr.common.model.FingerprintFeatures.DEFAULT,
     ): Fingerprint? {
         lastDetected = 0; lastPlaced = 0; lastRequired = minPoints
         // Convention B: the bitmap and intrinsics arrived in display orientation, so the view goes
@@ -256,7 +259,7 @@ object MetricFingerprintBuilder {
         // display-frame rays intersecting a sensor-frame plane.
         val cvView = MetricMarks.glViewToCvDisplay(glView, rotationDeg)
 
-        val sp = unpackSuperPoint(slam.detectSuperPoint(bitmap))
+        val sp = if (features.superPoint) unpackSuperPoint(slam.detectSuperPoint(bitmap)) else null
         if (sp != null) {
             val (pos, descs) = sp
             try {
@@ -264,7 +267,7 @@ object MetricFingerprintBuilder {
                 var i = 0
                 while (i + 1 < pos.size) { pixels.add(Pixel(pos[i], pos[i + 1])); i += 2 }
                 val (basePixels, baseDescs) = applyMask(mask, bitmap, pixels, descs)
-                val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs) { view, _ ->
+                val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps) { view, _ ->
                     StandaloneFingerprintBuilder.detectSuperPoint(slam, view)
                 }
                 if (baseDescs !== descs && baseDescs !== mDescs) baseDescs.release()
@@ -297,7 +300,7 @@ object MetricFingerprintBuilder {
             }
             val pixels = kp.toArray().map { Pixel(it.pt.x.toFloat(), it.pt.y.toFloat()) }
             val (basePixels, baseDescs) = applyMask(mask, bitmap, pixels, d)
-            val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs) { view, n ->
+            val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps) { view, n ->
                 StandaloneFingerprintBuilder.detectOrb(view, null, n)
             }
             if (baseDescs !== d && baseDescs !== mDescs) baseDescs.release()
@@ -318,10 +321,10 @@ object MetricFingerprintBuilder {
      * unchanged when there are none; otherwise a new descriptor Mat the caller must release.
      */
     private fun withCloseUps(
-        bitmap: Bitmap, mask: Bitmap?, pixels: List<Pixel>, descs: Mat,
+        bitmap: Bitmap, mask: Bitmap?, pixels: List<Pixel>, descs: Mat, enabled: Boolean,
         detect: (Bitmap, Int) -> StandaloneFingerprintBuilder.DetectedFeatures?,
     ): Pair<List<Pixel>, Mat> {
-        if (pixels.isEmpty() || descs.empty()) return pixels to descs
+        if (!enabled || pixels.isEmpty() || descs.empty()) return pixels to descs
         val extra = CloseUpFeatures.detect(bitmap, pixels.size, detect)
             ?.let { StandaloneFingerprintBuilder.filterByMask(it, mask, bitmap.width, bitmap.height) }
             ?.takeIf { it.rows > 0 && it.cols == descs.cols() && it.type == descs.type() }

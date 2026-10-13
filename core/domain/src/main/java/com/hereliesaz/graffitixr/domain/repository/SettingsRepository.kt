@@ -245,6 +245,10 @@ interface SettingsRepository {
     val coverageGlowStyle: Flow<CoverageGlowStyle>
     suspend fun setCoverageGlowStyle(style: CoverageGlowStyle)
 
+    /** Settings → Fingerprint: what a new target's fingerprint is made of; default [FingerprintFeatures.DEFAULT]. */
+    val fingerprintFeatures: Flow<com.hereliesaz.graffitixr.common.model.FingerprintFeatures>
+    suspend fun setFingerprintFeatures(features: com.hereliesaz.graffitixr.common.model.FingerprintFeatures)
+
     /**
      * Anticipation: the half-sphere of views of the target the trackers relock from (distance,
      * latitude, longitude, roll) and how far battery, heat and load may cut it. Stored values out of

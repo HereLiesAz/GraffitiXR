@@ -366,6 +366,13 @@
     <string name="settings_anticipation_heat">Il calore riduce di</string>
     <string name="settings_anticipation_compute">Il carico riduce di</string>
     <string name="settings_anticipation_views">Al massimo %1$d viste per pagina</string>
+    <string name="settings_fingerprint_features">Impronta</string>
+    <string name="settings_fingerprint_superpoint">SuperPoint</string>
+    <string name="settings_fingerprint_half_sphere">Semisfera</string>
+    <string name="settings_fingerprint_both">Entrambi</string>
+    <string name="settings_fingerprint_superpoint_desc">Solo i tratti SuperPoint della cattura. Regge a luce e usura; circa 1,5 MB per soggetto. Vale dal prossimo soggetto.</string>
+    <string name="settings_fingerprint_half_sphere_desc">Tratti ORB della cattura e dei suoi 49 primi piani. Forte da vicino e leggero, meno di 0,1 MB per soggetto. Vale dal prossimo soggetto.</string>
+    <string name="settings_fingerprint_both_desc">Tratti SuperPoint della cattura e dei suoi 49 primi piani. Il più forte; circa 2–3 MB per soggetto. Vale dal prossimo soggetto.</string>
     <string name="settings_power_section">Energia</string>
     <string name="settings_privacy_section">Privacy</string>
     <string name="settings_developer_section">Sviluppatore</string>

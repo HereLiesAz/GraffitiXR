@@ -366,6 +366,13 @@
     <string name="settings_anticipation_heat">O calor reduz em</string>
     <string name="settings_anticipation_compute">A carga reduz em</string>
     <string name="settings_anticipation_views">No máximo %1$d vistas por página</string>
+    <string name="settings_fingerprint_features">Impressão</string>
+    <string name="settings_fingerprint_superpoint">SuperPoint</string>
+    <string name="settings_fingerprint_half_sphere">Meia esfera</string>
+    <string name="settings_fingerprint_both">Ambos</string>
+    <string name="settings_fingerprint_superpoint_desc">Só traços SuperPoint da captura. Resiste a luz e desgaste; cerca de 1,5 MB por alvo. Vale a partir do próximo alvo.</string>
+    <string name="settings_fingerprint_half_sphere_desc">Traços ORB da captura e dos seus 49 close-ups. Forte de perto e pequeno, menos de 0,1 MB por alvo. Vale a partir do próximo alvo.</string>
+    <string name="settings_fingerprint_both_desc">Traços SuperPoint da captura e dos seus 49 close-ups. O mais forte; cerca de 2–3 MB por alvo. Vale a partir do próximo alvo.</string>
     <string name="settings_power_section">Energia</string>
     <string name="settings_privacy_section">Privacidade</string>
     <string name="settings_developer_section">Desenvolvedor</string>

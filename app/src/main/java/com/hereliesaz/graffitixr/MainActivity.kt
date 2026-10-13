@@ -1901,6 +1901,8 @@ class MainActivity : AppCompatActivity() {
                                     onCoverageGlowStyleChanged = { arViewModel.setCoverageGlowStyle(it) },
                                     anticipation = arUiState.anticipation,
                                     onAnticipationChanged = { arViewModel.setAnticipationSettings(it) },
+                                    fingerprintFeatures = arUiState.fingerprintFeatures,
+                                    onFingerprintFeaturesChanged = { arViewModel.setFingerprintFeatures(it) },
                                     onOpenReleasesPage = { dashboardViewModel.openReleasesPage(this@MainActivity) },
                                     onResetTutorials = {
                                         settingsViewModel.resetCompletedTutorials()

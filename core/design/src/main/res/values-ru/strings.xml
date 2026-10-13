@@ -371,6 +371,13 @@
     <string name="settings_anticipation_heat">Нагрев снижает на</string>
     <string name="settings_anticipation_compute">Нагрузка снижает на</string>
     <string name="settings_anticipation_views">Не более %1$d видов на страницу</string>
+    <string name="settings_fingerprint_features">Отпечаток</string>
+    <string name="settings_fingerprint_superpoint">SuperPoint</string>
+    <string name="settings_fingerprint_half_sphere">Полусфера</string>
+    <string name="settings_fingerprint_both">Оба</string>
+    <string name="settings_fingerprint_superpoint_desc">Только признаки SuperPoint снимка. Устойчив к свету и износу; около 1,5 МБ на цель. Действует со следующей цели.</string>
+    <string name="settings_fingerprint_half_sphere_desc">Признаки ORB снимка и его 49 крупных планов. Силён вблизи и мал, меньше 0,1 МБ на цель. Действует со следующей цели.</string>
+    <string name="settings_fingerprint_both_desc">Признаки SuperPoint снимка и его 49 крупных планов. Самый сильный; около 2–3 МБ на цель. Действует со следующей цели.</string>
     <string name="settings_power_section">Питание</string>
     <string name="settings_privacy_section">Конфиденциальность</string>
     <string name="settings_developer_section">Для разработчиков</string>

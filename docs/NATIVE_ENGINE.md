@@ -14,7 +14,11 @@ half-spheres, square-on), each tiled by its grid of aim points, enlarged to abou
 and run through the base fingerprint's own detector. Their features map back to the photo's pixels
 and onto the wall like the capture's own, so a close-up of any corner meets dense features at the
 size it sees them. At most as many as the capture's own (≤ 2000), shared across the 49 crops.
-While they build, a progress bar counts the crops down (`FingerprintBuildProgress`, shown by
+Settings → Fingerprint chooses what a new target's fingerprint is made of (`FingerprintFeatures`):
+**SuperPoint** (SuperPoint features of the capture only, ~1.5 MB), **Half sphere** (ORB features of
+the capture and its close-ups, < 0.1 MB) or **Both** (SuperPoint and the close-ups, ~2–3 MB; the
+default). It applies to the next capture; relocalization matches whichever descriptors a fingerprint
+holds. While they build, a progress bar counts the crops down (`FingerprintBuildProgress`, shown by
 `MainScreen` in any mode).
 
 ### 2. Relocalization ("snap-back")

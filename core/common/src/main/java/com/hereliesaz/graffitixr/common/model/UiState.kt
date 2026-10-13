@@ -271,6 +271,8 @@ data class ArUiState(
     val coverageGlow: CoverageGlowAppearance = CoverageGlowAppearance.DEFAULT,
     /** Settings → Anticipation: the half-sphere of views the trackers relock from, and its throttle. */
     val anticipation: AnticipationSettings = AnticipationSettings.DEFAULT,
+    /** Settings → Fingerprint: what the next target's fingerprint is made of. */
+    val fingerprintFeatures: FingerprintFeatures = FingerprintFeatures.DEFAULT,
 
     // True once ARCore has been confirmed installed and supported on this device and the artist has
     // "Use ARCore" on (re-derived the moment that setting changes).

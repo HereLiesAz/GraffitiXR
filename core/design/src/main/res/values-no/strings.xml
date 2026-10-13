@@ -366,6 +366,13 @@
     <string name="settings_anticipation_heat">Varme struper med</string>
     <string name="settings_anticipation_compute">Belastning struper med</string>
     <string name="settings_anticipation_views">Høyst %1$d visninger per side</string>
+    <string name="settings_fingerprint_features">Fingeravtrykk</string>
+    <string name="settings_fingerprint_superpoint">SuperPoint</string>
+    <string name="settings_fingerprint_half_sphere">Halvkule</string>
+    <string name="settings_fingerprint_both">Begge</string>
+    <string name="settings_fingerprint_superpoint_desc">Bare SuperPoint-trekk fra opptaket. Tåler lys og slitasje; omtrent 1,5 MB per mål. Gjelder fra neste mål.</string>
+    <string name="settings_fingerprint_half_sphere_desc">ORB-trekk fra opptaket og dets 49 nærbilder. Sterkt på nært hold og lite, under 0,1 MB per mål. Gjelder fra neste mål.</string>
+    <string name="settings_fingerprint_both_desc">SuperPoint-trekk fra opptaket og dets 49 nærbilder. Sterkest; omtrent 2–3 MB per mål. Gjelder fra neste mål.</string>
     <string name="settings_power_section">Strøm</string>
     <string name="settings_privacy_section">Personvern</string>
     <string name="settings_developer_section">Utvikler</string>

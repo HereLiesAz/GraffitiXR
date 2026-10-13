@@ -406,6 +406,13 @@
     <string name="settings_anticipation_heat">Heat throttles by</string>
     <string name="settings_anticipation_compute">Load throttles by</string>
     <string name="settings_anticipation_views">%1$d views per page at most</string>
+    <string name="settings_fingerprint_features">Fingerprint</string>
+    <string name="settings_fingerprint_superpoint">SuperPoint</string>
+    <string name="settings_fingerprint_half_sphere">Half sphere</string>
+    <string name="settings_fingerprint_both">Both</string>
+    <string name="settings_fingerprint_superpoint_desc">SuperPoint features of the capture only. Holds through light and wear; about 1.5 MB per target. Applies to the next target.</string>
+    <string name="settings_fingerprint_half_sphere_desc">ORB features of the capture and its 49 close-ups. Strong up close and small, under 0.1 MB per target. Applies to the next target.</string>
+    <string name="settings_fingerprint_both_desc">SuperPoint features of the capture and its 49 close-ups. The strongest; about 2–3 MB per target. Applies to the next target.</string>
     <string name="settings_power_section">Power</string>
     <string name="settings_privacy_section">Privacy</string>
     <string name="settings_developer_section">Developer</string>
