@@ -30,6 +30,8 @@ This document lists key files in the repository and their purposes.
 *   `common/model/AnticipationSettings.kt`: Settings → Anticipation — the half-sphere resolution
     (distance, latitude, longitude, roll), aims per half-sphere, the view count, and the battery /
     heat / compute throttle weights.
+*   `common/model/FingerprintFeatures.kt`: Settings → Fingerprint — SuperPoint, Half sphere (ORB plus
+    close-ups) or Both; what the next target's fingerprint is built from.
 *   `common/util/ImageExt.kt`: target-review helpers — `isolateMarkings` (adaptive threshold, whole
     marks highlighted, specks and marks touching the photo's edge excluded via `highlightWholeMarks`)
     and `eraseColorBlob` (tap or drag removes a whole mark).

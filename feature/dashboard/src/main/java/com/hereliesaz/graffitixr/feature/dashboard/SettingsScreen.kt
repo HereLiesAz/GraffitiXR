@@ -119,6 +119,9 @@ fun SettingsScreen(
     onCoverageGlowStyleChanged: (CoverageGlowStyle) -> Unit,
     anticipation: AnticipationSettings = AnticipationSettings.DEFAULT,
     onAnticipationChanged: (AnticipationSettings) -> Unit = {},
+    fingerprintFeatures: com.hereliesaz.graffitixr.common.model.FingerprintFeatures =
+        com.hereliesaz.graffitixr.common.model.FingerprintFeatures.DEFAULT,
+    onFingerprintFeaturesChanged: (com.hereliesaz.graffitixr.common.model.FingerprintFeatures) -> Unit = {},
     onOpenReleasesPage: () -> Unit,
     onResetTutorials: () -> Unit,
     onClose: () -> Unit,
@@ -366,6 +369,21 @@ fun SettingsScreen(
                         item {
                             SettingsSectionTitle(strings.settings.anticipationSection)
                             AnticipationSettingsControls(anticipation, onAnticipationChanged, strings)
+                            // What the next target's fingerprint is made of: tap to cycle.
+                            SettingsItem(
+                                label = strings.settings.fingerprintFeatures,
+                                value = fingerprintFeaturesLabel(fingerprintFeatures, strings),
+                                modifier = Modifier.clickable {
+                                    onFingerprintFeaturesChanged(
+                                        com.hereliesaz.graffitixr.common.model.FingerprintFeatures.next(fingerprintFeatures),
+                                    )
+                                },
+                            )
+                            Text(
+                                text = fingerprintFeaturesDescription(fingerprintFeatures, strings),
+                                color = Color.Gray,
+                                fontSize = 12.sp,
+                            )
                         }
 
                         item {
@@ -614,6 +632,25 @@ private fun glowColorLabel(color: CoverageGlowColor, strings: AppStrings): Strin
     CoverageGlowColor.BLACK -> strings.settings.glowColorBlack
     CoverageGlowColor.HOT_PINK -> strings.settings.glowColorPink
     CoverageGlowColor.CYAN -> strings.settings.glowColorCyan
+}
+
+// Exhaustive on purpose: a new FingerprintFeatures entry won't compile until it has a label here.
+private fun fingerprintFeaturesLabel(
+    features: com.hereliesaz.graffitixr.common.model.FingerprintFeatures,
+    strings: AppStrings,
+): String = when (features) {
+    com.hereliesaz.graffitixr.common.model.FingerprintFeatures.SUPERPOINT -> strings.settings.fingerprintSuperPoint
+    com.hereliesaz.graffitixr.common.model.FingerprintFeatures.HALF_SPHERE -> strings.settings.fingerprintHalfSphere
+    com.hereliesaz.graffitixr.common.model.FingerprintFeatures.BOTH -> strings.settings.fingerprintBoth
+}
+
+private fun fingerprintFeaturesDescription(
+    features: com.hereliesaz.graffitixr.common.model.FingerprintFeatures,
+    strings: AppStrings,
+): String = when (features) {
+    com.hereliesaz.graffitixr.common.model.FingerprintFeatures.SUPERPOINT -> strings.settings.fingerprintSuperPointDesc
+    com.hereliesaz.graffitixr.common.model.FingerprintFeatures.HALF_SPHERE -> strings.settings.fingerprintHalfSphereDesc
+    com.hereliesaz.graffitixr.common.model.FingerprintFeatures.BOTH -> strings.settings.fingerprintBothDesc
 }
 
 // Exhaustive on purpose: a new CoverageGlowStyle entry won't compile until it has a label here.

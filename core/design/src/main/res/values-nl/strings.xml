@@ -371,6 +371,13 @@
     <string name="settings_anticipation_heat">Warmte beperkt met</string>
     <string name="settings_anticipation_compute">Belasting beperkt met</string>
     <string name="settings_anticipation_views">Hoogstens %1$d aanzichten per pagina</string>
+    <string name="settings_fingerprint_features">Vingerafdruk</string>
+    <string name="settings_fingerprint_superpoint">SuperPoint</string>
+    <string name="settings_fingerprint_half_sphere">Halve bol</string>
+    <string name="settings_fingerprint_both">Beide</string>
+    <string name="settings_fingerprint_superpoint_desc">Alleen SuperPoint-kenmerken van de opname. Bestand tegen licht en slijtage; ongeveer 1,5 MB per doel. Geldt vanaf het volgende doel.</string>
+    <string name="settings_fingerprint_half_sphere_desc">ORB-kenmerken van de opname en haar 49 close-ups. Sterk van dichtbij en klein, onder 0,1 MB per doel. Geldt vanaf het volgende doel.</string>
+    <string name="settings_fingerprint_both_desc">SuperPoint-kenmerken van de opname en haar 49 close-ups. Het sterkst; ongeveer 2–3 MB per doel. Geldt vanaf het volgende doel.</string>
     <string name="settings_power_section">Energie</string>
     <string name="settings_privacy_section">Privacy</string>
     <string name="settings_developer_section">Ontwikkelaar</string>

@@ -56,6 +56,13 @@
     <string name="settings_anticipation_heat">La chaleur réduit de</string>
     <string name="settings_anticipation_compute">La charge réduit de</string>
     <string name="settings_anticipation_views">%1$d vues par page au plus</string>
+    <string name="settings_fingerprint_features">Empreinte</string>
+    <string name="settings_fingerprint_superpoint">SuperPoint</string>
+    <string name="settings_fingerprint_half_sphere">Demi-sphère</string>
+    <string name="settings_fingerprint_both">Les deux</string>
+    <string name="settings_fingerprint_superpoint_desc">Seulement les points SuperPoint de la capture. Tient à la lumière et à l’usure ; environ 1,5 Mo par cible. S’applique à la prochaine cible.</string>
+    <string name="settings_fingerprint_half_sphere_desc">Points ORB de la capture et de ses 49 gros plans. Solide de près et léger, moins de 0,1 Mo par cible. S’applique à la prochaine cible.</string>
+    <string name="settings_fingerprint_both_desc">Points SuperPoint de la capture et de ses 49 gros plans. Le plus solide ; environ 2–3 Mo par cible. S’applique à la prochaine cible.</string>
     <string name="settings_power_section">Énergie</string>
     <string name="settings_privacy_section">Confidentialité</string>
     <string name="settings_developer_section">Développeur</string>

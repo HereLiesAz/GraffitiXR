@@ -366,6 +366,13 @@
     <string name="settings_anticipation_heat">Wärme drosselt um</string>
     <string name="settings_anticipation_compute">Last drosselt um</string>
     <string name="settings_anticipation_views">Höchstens %1$d Ansichten pro Seite</string>
+    <string name="settings_fingerprint_features">Fingerabdruck</string>
+    <string name="settings_fingerprint_superpoint">SuperPoint</string>
+    <string name="settings_fingerprint_half_sphere">Halbkugel</string>
+    <string name="settings_fingerprint_both">Beides</string>
+    <string name="settings_fingerprint_superpoint_desc">Nur SuperPoint-Merkmale der Aufnahme. Hält bei Licht und Abnutzung; etwa 1,5 MB pro Ziel. Gilt ab dem nächsten Ziel.</string>
+    <string name="settings_fingerprint_half_sphere_desc">ORB-Merkmale der Aufnahme und ihrer 49 Nahansichten. Stark aus der Nähe und klein, unter 0,1 MB pro Ziel. Gilt ab dem nächsten Ziel.</string>
+    <string name="settings_fingerprint_both_desc">SuperPoint-Merkmale der Aufnahme und ihrer 49 Nahansichten. Am stärksten; etwa 2–3 MB pro Ziel. Gilt ab dem nächsten Ziel.</string>
     <string name="settings_power_section">Energie</string>
     <string name="settings_privacy_section">Datenschutz</string>
     <string name="settings_developer_section">Entwickler</string>

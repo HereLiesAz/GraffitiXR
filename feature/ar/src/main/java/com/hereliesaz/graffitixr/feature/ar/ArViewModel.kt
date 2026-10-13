@@ -2041,6 +2041,11 @@ class ArViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            settingsRepository.fingerprintFeatures.collect { features ->
+                _uiState.update { it.copy(fingerprintFeatures = features) }
+            }
+        }
+        viewModelScope.launch {
             settingsRepository.anticipationSettings.collect { settings ->
                 // A slider drag's debounced write pending: the live value is newer than the stored one.
                 if (anticipationPersistJob?.isActive == true) return@collect
@@ -2050,6 +2055,12 @@ class ArViewModel @Inject constructor(
     }
 
     private var anticipationPersistJob: kotlinx.coroutines.Job? = null
+
+    /** Settings → Fingerprint. Shown at once, persisted; the next target capture builds with it. */
+    fun setFingerprintFeatures(features: com.hereliesaz.graffitixr.common.model.FingerprintFeatures) {
+        _uiState.update { it.copy(fingerprintFeatures = features) }
+        viewModelScope.launch { settingsRepository.setFingerprintFeatures(features) }
+    }
 
     /**
      * Settings → Anticipation. Called continuously while a slider is dragged: every value reaches the
@@ -3256,6 +3267,7 @@ class ArViewModel @Inject constructor(
                         slam = slamManager,
                         bitmap = bitmap,
                         referenceWidthMeters = referenceWidthMeters,
+                        features = _uiState.value.fingerprintFeatures,
                     ) ?: error("Standalone target produced no teleological SLAM fingerprint")
 
                 newUri = projectManager.saveSphereSlamReference(appContext, projectId, bitmap)
@@ -6071,6 +6083,7 @@ class ArViewModel @Inject constructor(
                     slamManager, rotated, viewMatrix, intr, planePoint, planeNormal, anchor,
                     // The same angle `rotated` and `intr` were built with, a dozen lines above.
                     rotationDeg = displayRotation,
+                    features = _uiState.value.fingerprintFeatures,
                 )
                 if (fp != null) {
                     doodleFingerprintBuilt = true

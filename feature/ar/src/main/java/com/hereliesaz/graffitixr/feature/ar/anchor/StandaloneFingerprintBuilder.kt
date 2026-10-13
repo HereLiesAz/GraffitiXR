@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
 
 import android.graphics.Bitmap
 import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.FingerprintFeatures
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.sphereslam.SphereSlamPoseMath
 import java.nio.ByteBuffer
@@ -52,6 +53,8 @@ object StandaloneFingerprintBuilder {
         referenceWidthMeters: Float,
         mask: Bitmap? = null,
         minPoints: Int = DEFAULT_MIN_POINTS,
+        /** SuperPoint or ORB, with or without the close-ups (Settings → Fingerprint). */
+        features: FingerprintFeatures = FingerprintFeatures.DEFAULT,
     ): Fingerprint? {
         require(bitmap.width > 0 && bitmap.height > 0)
         require(referenceWidthMeters.isFinite() && referenceWidthMeters > 0f)
@@ -60,7 +63,7 @@ object StandaloneFingerprintBuilder {
         val dpi = SphereSlamPoseMath.dpiForReferenceWidth(bitmap.width, referenceWidthMeters)
         val geometry = SphereSlamPoseMath.pageGeometry(bitmap.width, bitmap.height, dpi)
 
-        val base = detectSuperPoint(slam, bitmap)
+        val base = (if (features.superPoint) detectSuperPoint(slam, bitmap) else null)
             ?.let { filterByMask(it, mask, bitmap.width, bitmap.height) }
             ?.takeIf { it.rows >= minPoints }
             ?: detectOrb(bitmap, mask)?.takeIf { it.rows >= minPoints }
@@ -68,7 +71,7 @@ object StandaloneFingerprintBuilder {
         // The close-ups, by the base's own detector (its descriptors are the ones the relocalizer
         // matches against), kept to the same selected marks.
         val superPoint = base.type == CvType.CV_32F
-        val closeUps = CloseUpFeatures.detect(bitmap, base.rows) { view, n ->
+        val closeUps = if (!features.closeUps) null else CloseUpFeatures.detect(bitmap, base.rows) { view, n ->
             if (superPoint) detectSuperPoint(slam, view) else detectOrb(view, null, n)
         }?.let { filterByMask(it, mask, bitmap.width, bitmap.height) }
         val detected = CloseUpFeatures.concat(listOfNotNull(base, closeUps)) ?: base

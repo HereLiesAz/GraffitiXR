@@ -127,6 +127,12 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    /** Settings → Fingerprint, for the target captures built here. */
+    private val fingerprintFeatures: StateFlow<com.hereliesaz.graffitixr.common.model.FingerprintFeatures> =
+        settingsRepository.fingerprintFeatures.stateIn(
+            viewModelScope, SharingStarted.Eagerly, com.hereliesaz.graffitixr.common.model.FingerprintFeatures.DEFAULT,
+        )
+
     val completedTutorials: StateFlow<Set<String>> = settingsRepository.completedTutorials
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
@@ -256,6 +262,7 @@ class MainViewModel @Inject constructor(
                     bitmap = bitmap,
                     referenceWidthMeters = placement.referenceWidthUnits,
                     mask = selectionMask,
+                    features = fingerprintFeatures.value,
                 )
                 if (fp == null) {
                     MetricFingerprintBuilder.recordPreconditionFailure(
@@ -770,6 +777,7 @@ class MainViewModel @Inject constructor(
                 slamManager, bitmap, view, intr, planePoint, planeNormal, anchor,
                 rotationDeg = rotationDeg,
                 mask = selectionMask,
+                features = fingerprintFeatures.value,
             )
             if (fp == null) {
                 // Say WHICH way it fell short. "Not enough texture" was the same message whether the
