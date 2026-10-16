@@ -2,16 +2,23 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
+import android.hardware.display.DisplayManager
+import android.os.Handler
+import android.os.Looper
 import android.view.Surface
+import android.view.View
 import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.view.LifecycleCameraController
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.withFrameNanos
@@ -64,8 +71,10 @@ enum class OverlayGyroRelease {
  *
  * **Release.** Rotating past [GyroCompensationMath.DEFAULT_RELEASE_DEGREES] (the tripod was
  * bumped or the phone picked up) calls [onRelease] with [OverlayGyroRelease.MOVED] instead of
- * dragging the design several degrees on an unverifiable reading. A display-rotation change restarts
- * the effect with a fresh reference. When [active] goes false — the toggle, or leaving Overlay — the
+ * dragging the design several degrees on an unverifiable reading. A display-rotation change —
+ * including the 90°<->270° flip between the two landscape orientations, which is NOT a configuration
+ * change and so never reaches a `LocalConfiguration`-keyed read — is tracked with a
+ * [DisplayManager.DisplayListener] and restarts the effect with a fresh reference. When [active] goes false — the toggle, or leaving Overlay — the
  * effect is cancelled and the sensor listener is unregistered.
  *
  * @return the row-major 3x3 homography to draw the design through, or null for "no compensation".
@@ -80,18 +89,7 @@ fun rememberOverlayGyroCompensation(
     onRelease: (OverlayGyroRelease) -> Unit,
 ): State<FloatArray?> {
     val context = LocalContext.current
-    val view = LocalView.current
-    // Keyed on the configuration so an orientation change (handled in place: MainActivity declares
-    // configChanges=orientation) re-reads the display rotation.
-    val configuration = LocalConfiguration.current
-    val displayRotationDeg = remember(configuration, view) {
-        when (view.display?.rotation ?: Surface.ROTATION_0) {
-            Surface.ROTATION_90 -> 90
-            Surface.ROTATION_180 -> 180
-            Surface.ROTATION_270 -> 270
-            else -> 0
-        }
-    }
+    val displayRotationDeg = rememberDisplayRotationDegrees()
     val homography = remember { mutableStateOf<FloatArray?>(null) }
     val currentOnRelease by rememberUpdatedState(onRelease)
 
@@ -153,6 +151,51 @@ fun rememberOverlayGyroCompensation(
         }
     }
     return homography
+}
+
+/** `Surface.ROTATION_*` as the clockwise degrees [GyroCompensationMath] takes. */
+internal fun surfaceRotationToDegrees(surfaceRotation: Int): Int = when (surfaceRotation) {
+    Surface.ROTATION_90 -> 90
+    Surface.ROTATION_180 -> 180
+    Surface.ROTATION_270 -> 270
+    else -> 0
+}
+
+private fun readDisplayRotationDegrees(view: View): Int =
+    surfaceRotationToDegrees(view.display?.rotation ?: Surface.ROTATION_0)
+
+/**
+ * The current display rotation in degrees, kept live.
+ *
+ * This used to be `remember(configuration, view) { view.display.rotation }`. The activity handles
+ * orientation changes in place (`configChanges=orientation`), and turning the phone from landscape
+ * to the OPPOSITE landscape (90°<->270°) is not a configuration change at all — the `orientation`
+ * config value is "landscape" on both sides — so the cached rotation went stale and the homography
+ * was remapped for the wrong side, mirroring the compensation. A [DisplayManager.DisplayListener]
+ * fires for every rotation change of this view's display, so the value is re-read there; the
+ * configuration is kept as a second trigger for the cases that do change it.
+ */
+@Composable
+private fun rememberDisplayRotationDegrees(): Int {
+    val context = LocalContext.current
+    val view = LocalView.current
+    val configuration = LocalConfiguration.current
+    var rotation by remember(view) { mutableIntStateOf(readDisplayRotationDegrees(view)) }
+    DisposableEffect(view, context, configuration) {
+        // Resync first: a change between the initial read and the listener registering is not lost.
+        rotation = readDisplayRotationDegrees(view)
+        val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager
+        val listener = object : DisplayManager.DisplayListener {
+            override fun onDisplayAdded(displayId: Int) = Unit
+            override fun onDisplayRemoved(displayId: Int) = Unit
+            override fun onDisplayChanged(displayId: Int) {
+                if (displayId == view.display?.displayId) rotation = readDisplayRotationDegrees(view)
+            }
+        }
+        displayManager?.registerDisplayListener(listener, Handler(Looper.getMainLooper()))
+        onDispose { displayManager?.unregisterDisplayListener(listener) }
+    }
+    return rotation
 }
 
 /** How long to wait for the rotation sensor's first sample before giving up. */
