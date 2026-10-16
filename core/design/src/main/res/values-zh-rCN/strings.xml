@@ -649,4 +649,9 @@
     <string name="nav_gyro_info">使用三脚架时,借助运动传感器抵消细微震动,让设计稳定在墙面上。手机架好后再开启;手机被移动时会自动解除。</string>
     <string name="gyro_released_moved">陀螺仪已解除:手机移动幅度过大。</string>
     <string name="gyro_unavailable">陀螺仪需要旋转传感器,但此设备未提供。</string>
+    <string name="export_failed">导出失败：无法将图片保存到相册。</string>
+    <string name="export_failed_permission">无法保存到相册。请允许 GraffitiXR 访问存储空间后重试。</string>
+    <string name="export_ar_unavailable">导出尚未就绪：AR 相机视图未运行。请打开 AR 视图后重试。</string>
+    <string name="export_standalone_ar_unavailable">独立 AR 模式暂不支持导出。</string>
+    <string name="rail_checking_ar_backend">正在检查 AR 后端…</string>
 </resources>

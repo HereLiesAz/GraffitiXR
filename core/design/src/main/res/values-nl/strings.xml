@@ -637,4 +637,9 @@
     <string name="nav_gyro_info">Houdt het ontwerp op een statief stil op de muur tegen kleine trillingen met de bewegingssensor. Zet aan zodra de telefoon staat; laat los als de telefoon wordt bewogen.</string>
     <string name="gyro_released_moved">Gyro losgelaten: de telefoon bewoog te veel.</string>
     <string name="gyro_unavailable">Gyro heeft een rotatiesensor nodig die dit apparaat niet biedt.</string>
+    <string name="export_failed">Exporteren mislukt: de afbeelding kon niet in je galerij worden opgeslagen.</string>
+    <string name="export_failed_permission">Opslaan in je galerij is niet gelukt. Geef GraffitiXR toegang tot de opslag en probeer het opnieuw.</string>
+    <string name="export_ar_unavailable">Exporteren is niet klaar: de AR-camerabeeld draait niet. Open de AR-weergave en probeer het opnieuw.</string>
+    <string name="export_standalone_ar_unavailable">Exporteren is nog niet beschikbaar in zelfstandige AR.</string>
+    <string name="rail_checking_ar_backend">AR-backend controleren…</string>
 </resources>

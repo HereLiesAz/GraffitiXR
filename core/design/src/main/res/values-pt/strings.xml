@@ -632,4 +632,9 @@
     <string name="nav_gyro_info">No tripé, mantém o design parado na parede contra pequenas vibrações usando o sensor de movimento. Ative com o telefone já posicionado; ele solta se o telefone for movido.</string>
     <string name="gyro_released_moved">Giro liberado: o telefone se moveu demais.</string>
     <string name="gyro_unavailable">O Giro precisa de um sensor de rotação que este dispositivo não informa.</string>
+    <string name="export_failed">Falha na exportação: não foi possível salvar a imagem na galeria.</string>
+    <string name="export_failed_permission">Não foi possível salvar na galeria. Permita que o GraffitiXR acesse o armazenamento e tente novamente.</string>
+    <string name="export_ar_unavailable">A exportação não está pronta: a visualização da câmera AR não está em execução. Abra a visualização AR e tente novamente.</string>
+    <string name="export_standalone_ar_unavailable">A exportação ainda não está disponível no AR independente.</string>
+    <string name="rail_checking_ar_backend">Verificando o mecanismo AR…</string>
 </resources>

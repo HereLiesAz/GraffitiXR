@@ -654,4 +654,15 @@
     <string name="nav_gyro_info">On a tripod, holds the design still on the wall against small vibrations using the motion sensor. Turn on once the phone is set; it lets go if the phone is moved.</string>
     <string name="gyro_released_moved">Gyro released: the phone moved too far.</string>
     <string name="gyro_unavailable">Gyro needs a rotation sensor this device doesn\'t report.</string>
+    <!-- Gallery export / AR export availability -->
+    <!-- Export to the gallery failed for a reason other than permission. -->
+    <string name="export_failed">Export failed: the image couldn\'t be saved to your gallery.</string>
+    <!-- Export failed because storage access (API 26-28 only) was refused. -->
+    <string name="export_failed_permission">Couldn\'t save to your gallery. Allow storage access for GraffitiXR and try again.</string>
+    <!-- AR export was requested while the AR renderer is not attached. -->
+    <string name="export_ar_unavailable">Export isn\'t ready: the AR camera view isn\'t running. Open the AR view and try again.</string>
+    <!-- Shown when Export is tapped in standalone (non-ARCore) AR. -->
+    <string name="export_standalone_ar_unavailable">Export isn\'t available in standalone AR yet.</string>
+    <!-- Export reason while the AR backend is still being detected. -->
+    <string name="rail_checking_ar_backend">Checking AR backend…</string>
 </resources>

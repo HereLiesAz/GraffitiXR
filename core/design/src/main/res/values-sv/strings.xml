@@ -637,4 +637,9 @@
     <string name="nav_gyro_info">På stativ håller designen still på väggen mot små vibrationer med rörelsesensorn. Slå på när telefonen står still; släpper om telefonen flyttas.</string>
     <string name="gyro_released_moved">Gyro släppt: telefonen flyttades för mycket.</string>
     <string name="gyro_unavailable">Gyro behöver en rotationssensor som den här enheten saknar.</string>
+    <string name="export_failed">Exporten misslyckades: bilden kunde inte sparas i galleriet.</string>
+    <string name="export_failed_permission">Det gick inte att spara i galleriet. Ge GraffitiXR åtkomst till lagring och försök igen.</string>
+    <string name="export_ar_unavailable">Exporten är inte redo: AR-kameravyn körs inte. Öppna AR-vyn och försök igen.</string>
+    <string name="export_standalone_ar_unavailable">Export är inte tillgänglig i fristående AR ännu.</string>
+    <string name="rail_checking_ar_backend">Kontrollerar AR-backend…</string>
 </resources>

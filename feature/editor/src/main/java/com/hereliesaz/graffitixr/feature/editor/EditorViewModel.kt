@@ -16,7 +16,9 @@ import com.hereliesaz.graffitixr.common.util.ImageUtils
 import com.hereliesaz.graffitixr.common.util.SketchProcessor
 import com.hereliesaz.graffitixr.common.util.computeAutoTune
 import com.hereliesaz.graffitixr.common.util.imageStats
+import com.hereliesaz.graffitixr.common.util.GallerySaveResult
 import com.hereliesaz.graffitixr.common.util.saveBitmapToGallery
+import com.hereliesaz.graffitixr.design.R as DesignR
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.data.ProjectManager
@@ -27,6 +29,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -160,13 +163,18 @@ class EditorViewModel @Inject constructor(
     }
 
     private val history = EditHistory()
-    // Absolute paths of design files this device wrote for a peer's DesignBitmapReplace, in the
-    // current project. Each op writes a fresh file, so without pruning a spectator copy grows by one
-    // full-size PNG per host effect toggle. Only files recorded here are ever deleted, and only once
-    // neither the live design nor the undo/redo history points at them. Main thread only.
     /** Sequence of peer design ops; a peer bitmap decode applies only if still the newest. */
     private val peerDesignSeq = java.util.concurrent.atomic.AtomicLong(0)
-    private val peerWrittenDesignPaths = mutableSetOf<String>()
+    // Absolute paths of design files this device wrote in the current project: each local import
+    // ([applyNewDesign]) and each peer DesignBitmapReplace writes a fresh design_<uuid>.png, so
+    // without pruning a project grows by one full-size PNG per replacement. Only files recorded here
+    // are ever deleted by [pruneSupersededDesignFiles] (a co-op host's files, referenced through
+    // RestoreDesign, never are), and only once the live design, the persisted manifest and the
+    // undo/redo history all stop pointing at them. Main thread only.
+    private val writtenDesignPaths = mutableSetOf<String>()
+    // Design files older than this ViewModel were written by a previous session, so if the saved
+    // project does not mention them either, nothing here (undo history starts empty) can need them.
+    private val sessionStartMs = System.currentTimeMillis()
     private var projectLoadJob: Job? = null
     private var backgroundLoadJob: Job? = null
     private var importJob: Job? = null
@@ -264,6 +272,7 @@ class EditorViewModel @Inject constructor(
             projectRepository.currentProject.collect { project ->
                 if (project != null) {
                     if (_uiState.value.projectId != project.id) {
+                        rememberOpenProject(project.id)
                         loadProject(project)
                     } else if (
                         observedStandaloneAnchor !=
@@ -272,16 +281,58 @@ class EditorViewModel @Inject constructor(
                         onStandaloneAnchorGenerationChanged(project)
                     }
                 } else {
+                    // Only a project that WAS open and is now closed or deleted is forgotten; the
+                    // null a fresh process starts with must not erase what restore is about to read.
+                    if (_uiState.value.projectId != null) rememberOpenProject(null)
                     cancelProjectWork()
                     standaloneArPlacementGeneration = 0L
                     observedStandaloneAnchor = null
                     dispatch(EditorIntent.ClearProject)
                     history.clear()
                     updateHistoryCounts()
-                    peerWrittenDesignPaths.clear()
+                    writtenDesignPaths.clear()
                 }
             }
         }
+    }
+
+    /**
+     * Records which project is open so it can be reopened after process death (see
+     * [restoreLastOpenProject]). Spectator copies are never recorded: their session does not
+     * survive the process. Best-effort; a failed write only costs the restore.
+     */
+    private fun rememberOpenProject(projectId: String?) {
+        if (projectId != null && projectManager.isSpectatorProject(projectId)) return
+        launchIoCatching { settingsRepository.setLastOpenProjectId(projectId) }
+    }
+
+    /**
+     * Reopens the project that was open when the process last died. The navigation back stack is
+     * restored by the system but [ProjectRepository.currentProject] lives only in memory, so the
+     * editor route can come back with nothing loaded.
+     *
+     * Returns true when a project is open afterwards (including one that already was), false when
+     * there is nothing to restore or it can no longer be loaded, in which case the caller should
+     * send the user to the library. Never replaces a project that is already open.
+     */
+    suspend fun restoreLastOpenProject(): Boolean {
+        if (projectRepository.currentProject.value != null) return true
+        val id = try {
+            settingsRepository.lastOpenProjectId.first()
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            null
+        } ?: return false
+        if (projectManager.isSpectatorProject(id)) return false
+        val loaded = try {
+            projectRepository.loadProject(id).isSuccess
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            android.util.Log.w("EditorViewModel", "Couldn't restore the last open project", e)
+            false
+        }
+        if (!loaded) launchIoCatching { settingsRepository.setLastOpenProjectId(null) }
+        return loaded
     }
 
     private fun loadProject(project: GraffitiProject) {
@@ -298,9 +349,20 @@ class EditorViewModel @Inject constructor(
         updateHistoryCounts()
         // Files the previous project's peer wrote belong to THAT project's project.json; never
         // judge them against this one's design.
-        peerWrittenDesignPaths.clear()
+        writtenDesignPaths.clear()
         designSourceBitmap = null
         anchorHalfExtentMeters = null
+
+        // Reclaim design images superseded in earlier sessions (the in-memory tracking above only
+        // knows this session's writes). Best-effort; the age bound keeps it clear of a new import.
+        viewModelScope.launch(dispatchers.io) {
+            try {
+                projectManager.deleteUnreferencedDesignFiles(context, project.id, sessionStartMs)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                android.util.Log.w("EditorViewModel", "Couldn't clean up superseded design files", e)
+            }
+        }
 
         val current = _uiState.value.design
         val loaded = project.design?.toLayer()?.let { design ->
@@ -561,8 +623,8 @@ class EditorViewModel @Inject constructor(
                     scale = initialScale
                 )
 
-                withContext(dispatchers.main) {
-                    if (!isCurrentProject(projectId)) return@withContext
+                val adopted = withContext(dispatchers.main) {
+                    if (!isCurrentProject(projectId)) return@withContext false
                     pushHistory()
                     // A new import starts with no effects, so it is its own source.
                     designSourceBitmap = bitmap
@@ -573,8 +635,14 @@ class EditorViewModel @Inject constructor(
                     // pixels — nothing renders until some later, unrelated op happens to also carry
                     // bytes. Ship the pixels too, the same way recomputeDesignEffects does.
                     opEmitter.emit(Op.DesignBitmapReplace(ImageUtils.bitmapToByteArray(bitmap)))
+                    // Tracked so the file this import supersedes is deleted once the saved project
+                    // and the undo history have both let go of it (saveProject prunes on success).
+                    writtenDesignPaths += path
                     saveProject()
+                    true
                 }
+                // The project changed while the image was being written: nothing references the file.
+                if (!adopted) runCatching { File(path).delete() }
             } else {
                 withContext(dispatchers.main) {
                     Toast.makeText(context, "Invalid image format or missing project", Toast.LENGTH_SHORT).show()
@@ -817,6 +885,8 @@ class EditorViewModel @Inject constructor(
                     }
                 }
                 scheduleThumbnailUpdate()
+                // The manifest now points at the saved design, so earlier design files may be free.
+                pruneSupersededDesignFiles()
                 onComplete(true)
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
@@ -855,10 +925,16 @@ class EditorViewModel @Inject constructor(
         // Confine the job cancel/assign to the main thread so concurrent saveProject() calls (which
         // run on the multi-threaded IO dispatcher) can't race on thumbnailJob and leak coroutines.
         viewModelScope.launch(dispatchers.main) {
+            // This launch is queued: by the time it runs, the project may have been switched or
+            // deleted, and cancelProjectWork() has already cancelled the thumbnailJob it would
+            // replace. Starting a job now would write into (and re-create the folder of) a project
+            // that is no longer open.
+            if (!isCurrentProject(projectId)) return@launch
             thumbnailJob?.cancel()
             thumbnailJob = viewModelScope.launch(dispatchers.default) {
                 try {
                     kotlinx.coroutines.delay(2000)
+                    if (!isCurrentProject(projectId)) return@launch
                     // NOTE: this uses the full display size, which includes system bars/insets and so
                     // can differ from the editor Box's actual content region — the composite's Fit math
                     // then frames the design slightly differently from what the artist saw on screen.
@@ -884,7 +960,15 @@ class EditorViewModel @Inject constructor(
                     val bytes = ImageUtils.bitmapToByteArray(thumb)
                     if (thumb !== composite) thumb.recycle()
                     composite.recycle()
+                    if (!isCurrentProject(projectId)) return@launch
                     val path = projectRepository.saveArtifact(projectId, "thumbnail.png", bytes)
+                    if (!isCurrentProject(projectId) && projectRepository.getProject(projectId) == null) {
+                        // The project was deleted in the instant between the check and the write,
+                        // and saveArtifact re-created its folder: remove the stray file (and the
+                        // folder, which File.delete only removes while empty).
+                        File(path).let { it.delete(); it.parentFile?.delete() }
+                        return@launch
+                    }
                     projectRepository.updateProject {
                         if (it.id == projectId) it.copy(thumbnailUri = "file://$path".toUri()) else it
                     }
@@ -1001,13 +1085,21 @@ class EditorViewModel @Inject constructor(
                     )
                 }
 
-                val success = saveBitmapToGallery(context, exportBitmap)
+                val result = saveBitmapToGallery(context, exportBitmap)
 
                 withContext(dispatchers.main) {
                     dispatch(EditorIntent.SetLoading(false))
+                    // Only a refused write is a permissions problem (API 26-28 without
+                    // WRITE_EXTERNAL_STORAGE); every other failure says it plainly instead of
+                    // sending the user to settings that cannot fix it.
                     Toast.makeText(
                         context,
-                        if (success) "Image exported to gallery" else "Export failed — check storage permissions",
+                        when (result) {
+                            GallerySaveResult.SAVED -> "Image exported to gallery"
+                            GallerySaveResult.PERMISSION_DENIED ->
+                                context.getString(DesignR.string.export_failed_permission)
+                            GallerySaveResult.FAILED -> context.getString(DesignR.string.export_failed)
+                        },
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -1592,10 +1684,10 @@ class EditorViewModel @Inject constructor(
                         }
                         onApplied()
                         if (persisted) {
-                            localUri?.path?.let { peerWrittenDesignPaths += it }
+                            localUri?.path?.let { writtenDesignPaths += it }
                             // Prune only after project.json points at the new file, so a crash in
                             // between never leaves the saved project referencing a deleted one.
-                            saveProject { saved -> if (saved) prunePeerWrittenDesignFiles() }
+                            saveProject { saved -> if (saved) pruneSupersededDesignFiles() }
                         }
                     }
                 }
@@ -1611,18 +1703,19 @@ class EditorViewModel @Inject constructor(
     }
 
     /**
-     * Deletes design files written for earlier peer DesignBitmapReplace ops that nothing points at
-     * any more: not the live design, and no undo/redo entry (undo reloads a changed image from its
-     * URI, so a referenced file must survive). A still-referenced file stays tracked and is retried
-     * on the next replace.
+     * Deletes design files this device wrote for earlier imports and peer DesignBitmapReplace ops
+     * that nothing points at any more: not the live design, not the persisted manifest, and no
+     * undo/redo entry (undo reloads a changed image from its URI, so a referenced file must
+     * survive). A still-referenced file stays tracked and is retried after the next save.
      */
-    private fun prunePeerWrittenDesignFiles() {
+    private fun pruneSupersededDesignFiles() {
         val livePath = _uiState.value.design?.uri?.path
-        val stale = peerWrittenDesignPaths.filter { path ->
-            path != livePath && !history.referencesDesign { it.uri?.path == path }
+        val persistedPath = projectRepository.currentProject.value?.design?.uri?.path
+        val stale = writtenDesignPaths.filter { path ->
+            path != livePath && path != persistedPath && !history.referencesDesign { it.uri?.path == path }
         }
         if (stale.isEmpty()) return
-        peerWrittenDesignPaths -= stale.toSet()
+        writtenDesignPaths -= stale.toSet()
         viewModelScope.launch(dispatchers.io) {
             stale.forEach { path -> runCatching { File(path).delete() } }
         }

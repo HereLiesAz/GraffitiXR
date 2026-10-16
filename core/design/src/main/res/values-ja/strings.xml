@@ -649,4 +649,9 @@
     <string name="nav_gyro_info">三脚使用時、モーションセンサーで小さな振動を打ち消し、デザインを壁上に固定します。スマホを設置してからオンにしてください。動かすと解除されます。</string>
     <string name="gyro_released_moved">ジャイロを解除しました:スマホが大きく動きました。</string>
     <string name="gyro_unavailable">ジャイロには、この端末が提供していない回転センサーが必要です。</string>
+    <string name="export_failed">エクスポートに失敗しました。画像をギャラリーに保存できませんでした。</string>
+    <string name="export_failed_permission">ギャラリーに保存できませんでした。GraffitiXRにストレージへのアクセスを許可してから、もう一度お試しください。</string>
+    <string name="export_ar_unavailable">エクスポートの準備ができていません。ARカメラビューが動作していません。ARビューを開いてもう一度お試しください。</string>
+    <string name="export_standalone_ar_unavailable">スタンドアロンARでは、まだエクスポートできません。</string>
+    <string name="rail_checking_ar_backend">ARバックエンドを確認しています…</string>
 </resources>

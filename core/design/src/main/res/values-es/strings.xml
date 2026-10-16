@@ -632,4 +632,9 @@
     <string name="nav_gyro_info">En trípode, mantiene el diseño quieto en la pared frente a pequeñas vibraciones usando el sensor de movimiento. Actívalo con el teléfono ya fijo; se suelta si el teléfono se mueve.</string>
     <string name="gyro_released_moved">Giro desactivado: el teléfono se movió demasiado.</string>
     <string name="gyro_unavailable">Giro necesita un sensor de rotación que este dispositivo no ofrece.</string>
+    <string name="export_failed">Error al exportar: no se pudo guardar la imagen en la galería.</string>
+    <string name="export_failed_permission">No se pudo guardar en la galería. Permite a GraffitiXR acceder al almacenamiento e inténtalo de nuevo.</string>
+    <string name="export_ar_unavailable">La exportación no está lista: la vista de cámara AR no está activa. Abre la vista AR e inténtalo de nuevo.</string>
+    <string name="export_standalone_ar_unavailable">La exportación aún no está disponible en AR independiente.</string>
+    <string name="rail_checking_ar_backend">Comprobando el motor AR…</string>
 </resources>

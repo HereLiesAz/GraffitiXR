@@ -637,4 +637,9 @@
     <string name="nav_gyro_info">На штативе удерживает дизайн на стене, гася мелкие вибрации с помощью датчика движения. Включайте, когда телефон закреплён; при смещении телефона отключается.</string>
     <string name="gyro_released_moved">Гиро отключено: телефон сдвинулся слишком сильно.</string>
     <string name="gyro_unavailable">Для Гиро нужен датчик вращения, которого нет на этом устройстве.</string>
+    <string name="export_failed">Не удалось экспортировать: изображение не сохранилось в галерее.</string>
+    <string name="export_failed_permission">Не удалось сохранить в галерею. Разрешите GraffitiXR доступ к хранилищу и повторите попытку.</string>
+    <string name="export_ar_unavailable">Экспорт пока недоступен: камера AR не запущена. Откройте режим AR и повторите попытку.</string>
+    <string name="export_standalone_ar_unavailable">Экспорт в автономном AR пока недоступен.</string>
+    <string name="rail_checking_ar_backend">Проверка AR-движка…</string>
 </resources>

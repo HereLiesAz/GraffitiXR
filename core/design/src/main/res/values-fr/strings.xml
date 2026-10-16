@@ -368,4 +368,9 @@
     <string name="nav_gyro_info">Sur trépied, maintient le design immobile sur le mur malgré les petites vibrations grâce au capteur de mouvement. Activez-le une fois le téléphone installé ; il se relâche si le téléphone bouge.</string>
     <string name="gyro_released_moved">Gyro relâché : le téléphone a trop bougé.</string>
     <string name="gyro_unavailable">Gyro nécessite un capteur de rotation que cet appareil ne fournit pas.</string>
+    <string name="export_failed">Échec de l\'exportation : l\'image n\'a pas pu être enregistrée dans la galerie.</string>
+    <string name="export_failed_permission">Impossible d\'enregistrer dans la galerie. Autorisez GraffitiXR à accéder au stockage et réessayez.</string>
+    <string name="export_ar_unavailable">L\'exportation n\'est pas prête : la vue caméra AR n\'est pas active. Ouvrez la vue AR et réessayez.</string>
+    <string name="export_standalone_ar_unavailable">L\'exportation n\'est pas encore disponible en AR autonome.</string>
+    <string name="rail_checking_ar_backend">Vérification du moteur AR…</string>
 </resources>

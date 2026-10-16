@@ -637,4 +637,9 @@
     <string name="nav_gyro_info">使用三腳架時,藉助動作感應器抵銷細微震動,令設計穩定在牆上。手機架好後再開啟;手機被移動時會自動解除。</string>
     <string name="gyro_released_moved">陀螺儀已解除:手機移動幅度過大。</string>
     <string name="gyro_unavailable">陀螺儀需要旋轉感應器,但此裝置未有提供。</string>
+    <string name="export_failed">匯出失敗：無法將圖片儲存到相簿。</string>
+    <string name="export_failed_permission">無法儲存到相簿。請允許 GraffitiXR 存取儲存空間後再試一次。</string>
+    <string name="export_ar_unavailable">匯出尚未就緒：AR 相機檢視未運行。請開啟 AR 檢視後再試一次。</string>
+    <string name="export_standalone_ar_unavailable">獨立 AR 模式暫不支援匯出。</string>
+    <string name="rail_checking_ar_backend">正在檢查 AR 後端…</string>
 </resources>

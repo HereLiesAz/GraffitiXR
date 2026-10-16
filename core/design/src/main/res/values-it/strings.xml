@@ -632,4 +632,9 @@
     <string name="nav_gyro_info">Su treppiede, tiene fermo il design sul muro contro le piccole vibrazioni usando il sensore di movimento. Attivalo a telefono posizionato; si sgancia se il telefono viene spostato.</string>
     <string name="gyro_released_moved">Giro rilasciato: il telefono si è mosso troppo.</string>
     <string name="gyro_unavailable">Giro richiede un sensore di rotazione che questo dispositivo non fornisce.</string>
+    <string name="export_failed">Esportazione non riuscita: non è stato possibile salvare l\'immagine nella galleria.</string>
+    <string name="export_failed_permission">Impossibile salvare nella galleria. Consenti a GraffitiXR l\'accesso all\'archiviazione e riprova.</string>
+    <string name="export_ar_unavailable">L\'esportazione non è pronta: la vista fotocamera AR non è attiva. Apri la vista AR e riprova.</string>
+    <string name="export_standalone_ar_unavailable">L\'esportazione non è ancora disponibile nell\'AR autonoma.</string>
+    <string name="rail_checking_ar_backend">Verifica del motore AR…</string>
 </resources>

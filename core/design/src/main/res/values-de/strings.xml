@@ -632,4 +632,9 @@
     <string name="nav_gyro_info">Hält das Design auf dem Stativ trotz kleiner Vibrationen mit dem Bewegungssensor ruhig auf der Wand. Einschalten, sobald das Gerät steht; bei Bewegung wird es gelöst.</string>
     <string name="gyro_released_moved">Gyro gelöst: Das Gerät wurde zu stark bewegt.</string>
     <string name="gyro_unavailable">Gyro benötigt einen Drehsensor, den dieses Gerät nicht meldet.</string>
+    <string name="export_failed">Export fehlgeschlagen: Das Bild konnte nicht in der Galerie gespeichert werden.</string>
+    <string name="export_failed_permission">Speichern in der Galerie nicht möglich. Erlaube GraffitiXR den Speicherzugriff und versuche es erneut.</string>
+    <string name="export_ar_unavailable">Export nicht bereit: Die AR-Kameraansicht läuft nicht. Öffne die AR-Ansicht und versuche es erneut.</string>
+    <string name="export_standalone_ar_unavailable">Der Export ist im eigenständigen AR noch nicht verfügbar.</string>
+    <string name="rail_checking_ar_backend">AR-Backend wird geprüft…</string>
 </resources>

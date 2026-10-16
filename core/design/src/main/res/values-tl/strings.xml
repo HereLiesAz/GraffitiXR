@@ -347,4 +347,9 @@
     <string name="nav_gyro_info">Sa tripod, pinapanatiling nakapirmi ang disenyo sa pader laban sa maliliit na pag-uga gamit ang motion sensor. I-on kapag nakapuwesto na ang phone; bibitaw ito kapag ginalaw ang phone.</string>
     <string name="gyro_released_moved">Bumitaw ang Gyro: masyadong gumalaw ang phone.</string>
     <string name="gyro_unavailable">Kailangan ng Gyro ng rotation sensor na wala sa device na ito.</string>
+    <string name="export_failed">Nabigo ang pag-export: hindi na-save ang larawan sa iyong gallery.</string>
+    <string name="export_failed_permission">Hindi ma-save sa iyong gallery. Payagan ang GraffitiXR na ma-access ang storage at subukan ulit.</string>
+    <string name="export_ar_unavailable">Hindi pa handa ang pag-export: hindi tumatakbo ang AR camera view. Buksan ang AR view at subukan ulit.</string>
+    <string name="export_standalone_ar_unavailable">Hindi pa available ang pag-export sa standalone na AR.</string>
+    <string name="rail_checking_ar_backend">Sinusuri ang AR backend…</string>
 </resources>

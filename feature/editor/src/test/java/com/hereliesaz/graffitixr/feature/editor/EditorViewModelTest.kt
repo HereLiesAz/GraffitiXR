@@ -371,6 +371,67 @@ class EditorViewModelTest {
     }
 
     @Test
+    fun `a replaced import keeps the previous design file while undo can still reach it`() = runTest {
+        val dir = kotlin.io.path.createTempDirectory("gxr_import_design").toFile()
+        try {
+            coEvery { projectRepository.saveArtifact(any(), any(), any()) } coAnswers {
+                File(dir, secondArg<String>()).apply { writeBytes(thirdArg()) }.absolutePath
+            }
+            addDesign()
+            val first = dir.listFiles { f -> f.name.startsWith("design_") }!!.single()
+
+            viewModel.onAddLayer(Uri.parse("content://test/second.png"))
+            viewModel.confirmReplaceDesign()
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            val designs = dir.listFiles { f -> f.name.startsWith("design_") }!!.toList()
+            assertEquals(2, designs.size)
+            assertTrue("undo restores the first design from its file", first.exists())
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `restore keeps the project that is already open`() = runTest {
+        assertTrue(viewModel.restoreLastOpenProject())
+        coVerify(exactly = 0) { projectRepository.loadProject(any()) }
+    }
+
+    @Test
+    fun `restore reopens the remembered project when none is open`() = runTest {
+        currentProjectFlow.value = null
+        testDispatcher.scheduler.advanceUntilIdle()
+        every { settingsRepository.lastOpenProjectId } returns kotlinx.coroutines.flow.flowOf("remembered")
+        coEvery { projectRepository.loadProject("remembered") } returns Result.success(Unit)
+
+        assertTrue(viewModel.restoreLastOpenProject())
+        coVerify { projectRepository.loadProject("remembered") }
+    }
+
+    @Test
+    fun `restore reports failure and forgets a project that can no longer be loaded`() = runTest {
+        currentProjectFlow.value = null
+        testDispatcher.scheduler.advanceUntilIdle()
+        every { settingsRepository.lastOpenProjectId } returns kotlinx.coroutines.flow.flowOf("gone")
+        coEvery { projectRepository.loadProject("gone") } returns Result.failure(Exception("Project not found"))
+
+        org.junit.Assert.assertFalse(viewModel.restoreLastOpenProject())
+        testDispatcher.scheduler.advanceUntilIdle()
+        coVerify { settingsRepository.setLastOpenProjectId(null) }
+    }
+
+    @Test
+    fun `restore does nothing when no project was remembered`() = runTest {
+        currentProjectFlow.value = null
+        testDispatcher.scheduler.advanceUntilIdle()
+        every { settingsRepository.lastOpenProjectId } returns kotlinx.coroutines.flow.flowOf<String?>(null)
+
+        org.junit.Assert.assertFalse(viewModel.restoreLastOpenProject())
+        coVerify(exactly = 0) { projectRepository.loadProject(any()) }
+    }
+
+    @Test
     fun `saveProject calls updateProject when project exists`() = runTest {
         addDesign()
 

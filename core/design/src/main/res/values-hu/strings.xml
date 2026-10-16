@@ -637,4 +637,9 @@
     <string name="nav_gyro_info">Állványon a mozgásérzékelővel a falon tartja a dizájnt apró rezgések ellenére. Kapcsold be, ha a telefon már a helyén van; ha elmozdul, elengedi.</string>
     <string name="gyro_released_moved">Giroszkóp kikapcsolva: a telefon túl sokat mozdult.</string>
     <string name="gyro_unavailable">A giroszkóphoz forgásérzékelő kell, amit ez az eszköz nem jelez.</string>
+    <string name="export_failed">Az exportálás nem sikerült: a képet nem lehetett menteni a galériába.</string>
+    <string name="export_failed_permission">Nem sikerült a galériába menteni. Engedélyezd a tárhely-hozzáférést a GraffitiXR számára, majd próbáld újra.</string>
+    <string name="export_ar_unavailable">Az exportálás nem áll készen: az AR kameranézet nem fut. Nyisd meg az AR nézetet, majd próbáld újra.</string>
+    <string name="export_standalone_ar_unavailable">Az exportálás az önálló AR-ban még nem érhető el.</string>
+    <string name="rail_checking_ar_backend">AR háttérrendszer ellenőrzése…</string>
 </resources>
