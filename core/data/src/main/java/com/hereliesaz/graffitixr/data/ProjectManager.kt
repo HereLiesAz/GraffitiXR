@@ -71,9 +71,26 @@ class ProjectManager @Inject constructor(
         /**
          * Cap on total decompressed bytes accepted from an imported/peer-received `.gxr` archive.
          * Both sources are untrusted (a shared file, or the co-op wire), so a zip bomb must not
-         * be able to fill the app sandbox. Generous vs. real projects (multi-layer PNGs).
+         * be able to fill the app sandbox.
+         *
+         * Why 512 MiB: a project is a design PNG (or a few superseded ones), at most
+         * [MAX_TARGET_IMAGES] captured target PNGs, evolution frames, the SphereSLAM reference/atlas
+         * pages and the hybrid KPM page. Camera-resolution PNGs are ~5-15 MB each, so even a heavily
+         * used project stays well under ~200 MiB; 512 MiB leaves ~2.5x headroom over that. It is
+         * also what a co-op host can plausibly hold as one in-memory zip ([serializeCurrentProject])
+         * and what a mid-range phone can be expected to have free for the extraction temp files plus
+         * the staged copy (see [hasRoomToImport], which checks the free space up front).
          */
         private const val MAX_IMPORT_BYTES = 512L * 1024 * 1024
+
+        /**
+         * Free space always required before an import starts extracting, on top of a multiple of the
+         * archive's declared size: the manifest rewrite, directory entries and filesystem slack.
+         */
+        private const val IMPORT_MIN_FREE_BYTES = 64L * 1024 * 1024
+
+        /** Under filesDir, outside projects/: where an import is built before it becomes a project. */
+        private const val IMPORT_STAGING_DIR = "import_staging"
 
         /**
          * Cap on how many captured target images a single project keeps, enforced by
@@ -155,7 +172,8 @@ class ProjectManager @Inject constructor(
         // unconditional preserve-from-existing as the fingerprint/intrinsics/anchor; the wall feature
         // map and cloud anchor id can each legitimately be set on a routine (non-fingerprint) save
         // (e.g. the passive wall-map save), so those instead only fall back to the on-disk value when
-        // the incoming project doesn't set one, same as the legacy target-fingerprint references.
+        // the incoming project doesn't set one, same as the legacy target-fingerprint references (the
+        // learned wall normal and the capture environment follow the same fallback).
         //
         // An incoming fingerprint does not switch the merge off wholesale. Only a fingerprint that
         // DIFFERS from the persisted one is a new target, and only the state expressed in the old
@@ -181,6 +199,12 @@ class ProjectManager @Inject constructor(
                     fingerprintAnchor = existing.fingerprintAnchor,
                     fingerprintViewMatrix = existing.fingerprintViewMatrix,
                     fingerprintCaptureRotationDeg = existing.fingerprintCaptureRotationDeg,
+                    // Learned by MobileGS at trusted locks (so a routine save may carry a newer one);
+                    // an older whole-object writer that never saw it must not clear it.
+                    fingerprintWallNormalEnu =
+                        projectData.fingerprintWallNormalEnu.ifEmpty { existing.fingerprintWallNormalEnu },
+                    // Captured with the fingerprint, in the same frame as the view matrix above.
+                    captureEnvironment = projectData.captureEnvironment ?: existing.captureEnvironment,
                     // Preserve the legacy target-fingerprint references too, so no save without them
                     // can wipe an existing target.
                     targetFingerprint = projectData.targetFingerprint ?: existing.targetFingerprint,
@@ -307,9 +331,7 @@ class ProjectManager @Inject constructor(
 
         val thumbnailUri = if (thumbnail != null) {
             val file = File(root, "thumbnail.png")
-            FileOutputStream(file).use { out ->
-                thumbnail.compress(Bitmap.CompressFormat.PNG, 100, out)
-            }
+            writePngAtomically(thumbnail, file, "project thumbnail")
             uriProvider.getUriForFile(file)
         } else {
             incoming.thumbnailUri ?: run {
@@ -324,10 +346,8 @@ class ProjectManager @Inject constructor(
         // index derived from it would collide with — and silently overwrite — a still-kept file.
         val savedTargetUris = if (targetImages != null) {
             val newUris = targetImages.map { bitmap ->
-                val file = File.createTempFile("target_", ".png", root)
-                FileOutputStream(file).use { out ->
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-                }
+                val file = File(root, "target_${UUID.randomUUID()}.png")
+                writePngAtomically(bitmap, file, "target image")
                 uriProvider.getUriForFile(file)
             }
             pruneTargetImages(incoming.targetImageUris + newUris)
@@ -374,6 +394,26 @@ class ProjectManager @Inject constructor(
                 renamed = tmp.renameTo(target)
             }
             check(renamed) { "Could not atomically replace ${target.name}" }
+        } finally {
+            if (tmp.exists()) tmp.delete()
+        }
+    }
+
+    /**
+     * Encodes [bitmap] as PNG into a sibling temp file, fsyncs it, then renames it over [target], the
+     * same commit discipline as [saveSphereSlamReference]. A failed encode (compress returns false),
+     * a full disk or a kill mid-write therefore never leaves a truncated PNG at [target]; it throws
+     * instead, so no caller records a URI for an image that was not fully written.
+     */
+    private fun writePngAtomically(bitmap: Bitmap, target: File, label: String) {
+        val tmp = File.createTempFile("${target.nameWithoutExtension}_", ".tmp", target.parentFile)
+        try {
+            FileOutputStream(tmp).use { out ->
+                check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) { "Could not encode $label" }
+                out.flush()
+                out.fd.sync()
+            }
+            check(tmp.renameTo(target)) { "Could not install $label" }
         } finally {
             if (tmp.exists()) tmp.delete()
         }
@@ -607,8 +647,8 @@ class ProjectManager @Inject constructor(
         val root = File(context.filesDir, "projects/$projectId").also { if (!it.exists()) it.mkdirs() }
         // Unique filename, not size-indexed — see the comment in saveProject's target-image block for
         // why an index derived from (possibly already-pruned) list size would collide.
-        val file = File.createTempFile("target_", ".png", root)
-        FileOutputStream(file).use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
+        val file = File(root, "target_${UUID.randomUUID()}.png")
+        writePngAtomically(bitmap, file, "target image")
         // Only the LIST is pruned here: the dropped files are still referenced by project.json until the
         // caller commits this list, so the caller deletes them afterwards ([deleteTargetImages]).
         (existingUris + uriProvider.getUriForFile(file)).takeLast(MAX_TARGET_IMAGES)
@@ -643,6 +683,8 @@ class ProjectManager @Inject constructor(
      * re-applied (cheaply — a couple of reference/equality checks) on every load; the dead function
      * and its now-inaccurate comments have been removed rather than wired up, since nothing in the
      * app needs pre-loaded target-image bitmaps and re-migrating on every read is not a real cost.
+     *
+     * Returns null (and logs) when the manifest's id does not match [projectId], the folder name.
      */
     suspend fun loadProjectMetadata(context: Context, projectId: String): GraffitiProject? = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/$projectId")
@@ -652,7 +694,20 @@ class ProjectManager @Inject constructor(
         return@withContext try {
             val jsonString = projectFile.readText()
             val project = json.decodeFromString<GraffitiProject>(jsonString)
+            // The folder name is the project's identity everywhere else (saves, deletes, the file
+            // URIs under it). A manifest whose id differs (a legacy half-finished import that kept
+            // the archive's id, a hand-copied folder) would list under one id and then save, delete
+            // and open under another, so it is refused rather than served.
+            if (project.id != projectId) {
+                Log.e(
+                    "ProjectManager",
+                    "Refusing project folder '$projectId': its manifest id is '${project.id}'",
+                )
+                return@withContext null
+            }
             migrateInMemory(project)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e // never swallow cancellation
         } catch (e: Exception) {
             Log.e("ProjectManager", "Failed to load project metadata", e)
             null
@@ -798,11 +853,45 @@ class ProjectManager @Inject constructor(
         return tmp to total
     }
 
+    /**
+     * Whether the device has the free space to extract an archive of [declaredBytes] (the compressed
+     * size, or a negative number when the source could not report one).
+     *
+     * Extraction first streams every entry to a temp file under the cache dir (at most
+     * [MAX_IMPORT_BYTES] in total) and then moves or, across filesystems, copies it into staging, so
+     * the worst case holds the data twice. The requirement is [IMPORT_MIN_FREE_BYTES] plus twice the
+     * declared size, never more than twice [MAX_IMPORT_BYTES]. With no declared size only the floor
+     * applies; the cumulative cap in [streamEntryBounded] still bounds the rest, and a disk that
+     * fills mid-way fails the import cleanly.
+     */
+    internal fun hasRoomToImport(declaredBytes: Long): Boolean {
+        val needed = if (declaredBytes > 0) {
+            minOf(IMPORT_MIN_FREE_BYTES + 2 * declaredBytes, 2 * MAX_IMPORT_BYTES)
+        } else {
+            IMPORT_MIN_FREE_BYTES
+        }
+        return appContext.cacheDir.usableSpace >= needed && appContext.filesDir.usableSpace >= needed
+    }
+
+    /** Best-effort size of the archive behind [uri]; -1 when the provider does not report one. */
+    private fun declaredArchiveSize(uri: Uri): Long = try {
+        appContext.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        -1L
+    }
+
     suspend fun importProjectFromUri(context: Context, uri: Uri): GraffitiProject? = withContext(Dispatchers.IO) {
         // All callers pass the application context here (same object as the injected [appContext]),
         // so the body uses [appContext] throughout rather than mixing it with this parameter.
         val extractedFiles = mutableMapOf<String, File>()
+        var stagingDir: File? = null
         return@withContext try {
+            if (!hasRoomToImport(declaredArchiveSize(uri))) {
+                Log.e("ProjectManager", "Import refused: not enough free storage to extract the archive")
+                return@withContext null
+            }
             appContext.contentResolver.openInputStream(uri)?.use { inputStream ->
                 ZipInputStream(inputStream).use { zis ->
                     var projectData: GraffitiProject? = null
@@ -849,21 +938,33 @@ class ProjectManager @Inject constructor(
                     val importedId = if (File(appContext.filesDir, "projects/${project.id}").exists())
                         java.util.UUID.randomUUID().toString() else project.id
                     val destDir = File(appContext.filesDir, "projects/$importedId")
-                    destDir.mkdirs()
-                    check(destDir.isDirectory) { "Could not create import directory" }
-                    try {
-                        for ((name, tmpFile) in extractedFiles) {
-                            val dest = resolveInside(destDir, name) ?: continue
-                            dest.parentFile?.mkdirs()
+                    // Built outside projects/ (like loadAsSpectator), so the archive's project.json,
+                    // which still carries the sender's id, is never visible as a library entry, and
+                    // a failure or kill part-way leaves nothing listed. The folder only appears under
+                    // its final name, whole, once the corrected manifest has been written.
+                    val staging = File(appContext.filesDir, "$IMPORT_STAGING_DIR/${UUID.randomUUID()}")
+                        .also { it.mkdirs() }
+                    stagingDir = staging
+                    check(staging.isDirectory) { "Could not create import staging directory" }
+
+                    for ((name, tmpFile) in extractedFiles) {
+                        val dest = resolveInside(staging, name) ?: continue
+                        dest.parentFile?.mkdirs()
+                        if (dest.exists()) dest.delete()
+                        if (!tmpFile.renameTo(dest)) {
                             tmpFile.copyTo(dest, overwrite = true)
+                            tmpFile.delete()
                         }
-                        val imported = relocateProjectFiles(project, destDir).copy(id = importedId)
-                        atomicWriteText(File(destDir, "project.json"), json.encodeToString(imported))
-                        imported
-                    } catch (e: Exception) {
-                        destDir.deleteRecursively()
-                        throw e
                     }
+                    // Validate and re-key against the staged files, but point every URI at the final
+                    // folder the staging directory is about to become.
+                    val imported = relocateProjectFiles(project, staging, finalRoot = destDir)
+                        .copy(id = importedId)
+                    atomicWriteText(File(staging, "project.json"), json.encodeToString(imported))
+                    destDir.parentFile?.mkdirs()
+                    check(!destDir.exists()) { "Import destination already exists" }
+                    check(staging.renameTo(destDir)) { "Could not install imported project" }
+                    imported
                 }
             }
         } catch (e: Exception) {
@@ -871,18 +972,32 @@ class ProjectManager @Inject constructor(
             Log.e("ProjectManager", "Import failed", e)
             null
         } finally {
-            // Extracted temp files are copied (not renamed) into the destination directory on the
-            // success path and left in place; clear them here on every path (success and failure).
+            // Extracted temp files are moved (or copied) into staging on the success path; clear any
+            // stragglers here on every path (success and failure).
             extractedFiles.values.forEach { if (it.exists()) it.delete() }
+            // Renamed into projects/ on success; anything still here is a failed import's leftovers.
+            stagingDir?.let { if (it.exists()) it.deleteRecursively() }
         }
     }
 
-    private fun relocateProjectFiles(project: GraffitiProject, root: File): GraffitiProject {
+    /**
+     * Re-points every file reference in [project] at the matching file under [root], failing if the
+     * archive lacks one. With [finalRoot] the files are checked under [root] (a staging directory)
+     * but the returned URIs and paths name the same relative file under [finalRoot], the folder
+     * [root] is about to be renamed to.
+     */
+    private fun relocateProjectFiles(
+        project: GraffitiProject,
+        root: File,
+        finalRoot: File = root,
+    ): GraffitiProject {
         fun localPath(path: String): File {
             val marker = "/projects/${project.id}/"
             val relative = if (marker in path) path.substringAfter(marker) else path.substringAfterLast('/')
-            return resolveInside(root, relative)?.takeIf { it.isFile }
+            val staged = resolveInside(root, relative)?.takeIf { it.isFile }
                 ?: error("Archive is missing project asset: $relative")
+            return if (finalRoot == root) staged
+            else File(finalRoot, staged.canonicalFile.relativeTo(root.canonicalFile).path)
         }
         fun localUri(uri: Uri?): Uri? = uri?.let {
             uriProvider.getUriForFile(localPath(it.path ?: it.toString()))
@@ -1137,6 +1252,9 @@ class ProjectManager @Inject constructor(
         retired.deleteRecursively()
     }
 
+    /** Whether [projectId] names a co-op spectator copy (see [spectatorId]) rather than a user's project. */
+    fun isSpectatorProject(projectId: String): Boolean = projectId.startsWith(SPECTATOR_PREFIX)
+
     /** Local id for a spectated host project; distinct from the host id so it never collides. */
     internal fun spectatorId(hostId: String): String =
         if (hostId.startsWith(SPECTATOR_PREFIX)) hostId else SPECTATOR_PREFIX + hostId
@@ -1147,8 +1265,10 @@ class ProjectManager @Inject constructor(
      * Names of superseded design images in [folder]: root-level `design_*` files that its
      * project.json no longer mentions. Every import and every co-op pixel replacement writes a new
      * one, so without this each bulk transfer and export would ship every design the project ever
-     * had. They are only left out of archives, never deleted: an in-memory undo entry may still
-     * point at one, and undo reloads a changed image from its file. No project.json, no exclusions.
+     * had. They are only left out of archives here, never deleted: an in-memory undo entry may still
+     * point at one, and undo reloads a changed image from its file. The device-side cleanup is
+     * [deleteUnreferencedDesignFiles], which the editor runs when it loads a project (its undo
+     * history is empty then). No project.json, no exclusions.
      */
     private fun unreferencedDesignFiles(folder: File): Set<String> {
         val manifest = File(folder, "project.json").takeIf { it.isFile }?.readText() ?: return emptySet()
@@ -1156,6 +1276,31 @@ class ProjectManager @Inject constructor(
             ?.filter { it.isFile && it.name.startsWith(DESIGN_FILE_PREFIX) && it.name !in manifest }
             ?.mapTo(mutableSetOf()) { it.name }
             ?: emptySet()
+    }
+
+    /**
+     * Deletes the superseded design images of [projectId] that its project.json no longer mentions
+     * and that were last modified before [modifiedBeforeMs]. Returns how many were deleted.
+     *
+     * Exports already leave such files out of archives; this reclaims them on the device. The age
+     * bound is what keeps it safe against an import in flight: the editor writes a new design image
+     * before project.json points at it, so a caller passes the time its own session started, and a
+     * file written since then is never touched. Nothing is deleted when the project has no manifest.
+     */
+    suspend fun deleteUnreferencedDesignFiles(
+        context: Context,
+        projectId: String,
+        modifiedBeforeMs: Long,
+    ): Int = withContext(Dispatchers.IO) {
+        if (!isSafeProjectId(projectId)) return@withContext 0
+        val root = File(context.filesDir, "projects/$projectId")
+        if (!root.isDirectory) return@withContext 0
+        var deleted = 0
+        for (name in unreferencedDesignFiles(root)) {
+            val file = File(root, name)
+            if (file.lastModified() < modifiedBeforeMs && file.delete()) deleted++
+        }
+        deleted
     }
 
     private fun zipFolder(

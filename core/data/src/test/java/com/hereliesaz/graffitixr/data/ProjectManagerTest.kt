@@ -834,4 +834,91 @@ class ProjectManagerTest {
         )
     }
 
+
+    @Test
+    fun `loadProjectMetadata refuses a manifest whose id differs from its folder`() = runTest {
+        val projectDir = File(tempFilesDir, "projects/folder_name").also { it.mkdirs() }
+        File(projectDir, "project.json").writeText("""{"id":"other_id","name":"Mismatched"}""")
+        assertNull(manager.loadProjectMetadata(mockContext, "folder_name"))
+    }
+
+    @Test
+    fun `import stages outside projects and leaves no staging or foreign manifest behind`() = runTest {
+        manager.saveProject(mockContext, GraffitiProject(id = "taken", name = "Current work"))
+        val imported = importZip(zipOf("project.json" to projectJson("taken"), "design.png" to byteArrayOf(1)))
+        assertNotNull(imported)
+        // Only the existing project and the re-keyed import are library entries, and each folder's
+        // manifest carries its own folder's id (never the archive's).
+        assertEquals(setOf("taken", imported!!.id), manager.getProjectList(mockContext).toSet())
+        assertEquals(imported.id, manager.loadProjectMetadata(mockContext, imported.id)?.id)
+        val staging = File(tempFilesDir, "import_staging")
+        assertTrue(staging.listFiles().isNullOrEmpty())
+    }
+
+    @Test
+    fun `a failed import creates no project folder`() = runTest {
+        val manifest = """{"id":"broken","name":"Wall","design":{"uri":"file:///sender/files/projects/broken/gone.png"}}""".toByteArray()
+        assertNull(importZip(zipOf("project.json" to manifest)))
+        assertFalse(File(tempFilesDir, "projects/broken").exists())
+        assertTrue(manager.getProjectList(mockContext).isEmpty())
+        assertTrue(File(tempFilesDir, "import_staging").listFiles().isNullOrEmpty())
+    }
+
+    @Test
+    fun `import free-space check passes for a small or unknown archive size`() {
+        assertTrue(manager.hasRoomToImport(-1L))
+        assertTrue(manager.hasRoomToImport(1024L))
+    }
+
+    @Test
+    fun `stale whole-object save keeps the wall normal and the capture environment`() = runTest {
+        val env = CaptureEnvironment(location = LocationFix(latitude = 1.0, longitude = 2.0))
+        manager.saveProjectExact(
+            mockContext,
+            GraffitiProject(
+                id = "env_stale", name = "Wall", fingerprint = fingerprint(2),
+                fingerprintWallNormalEnu = listOf(0f, 1f, 0f), captureEnvironment = env,
+            ),
+        )
+        manager.saveProject(mockContext, GraffitiProject(id = "env_stale", name = "Renamed"))
+        val loaded = manager.loadProjectMetadata(mockContext, "env_stale")
+        assertEquals(listOf(0f, 1f, 0f), loaded?.fingerprintWallNormalEnu)
+        assertEquals(1.0, loaded?.captureEnvironment?.location?.latitude ?: 0.0, 0.0)
+    }
+
+    @Test
+    fun `thumbnail and target writes install atomically and leave no temp files`() = runTest {
+        val bitmap = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
+        val saved = manager.saveProject(
+            mockContext,
+            GraffitiProject(id = "png_atomic", name = "Wall"),
+            targetImages = listOf(bitmap),
+            thumbnail = bitmap,
+        )
+        val root = File(tempFilesDir, "projects/png_atomic")
+        assertTrue(File(root, "thumbnail.png").isFile)
+        assertEquals(1, saved.targetImageUris.size)
+        assertTrue(File(requireNotNull(saved.targetImageUris[0].path)).isFile)
+        assertTrue(root.listFiles { f -> f.name.endsWith(".tmp") }.isNullOrEmpty())
+    }
+
+
+    @Test
+    fun `deleteUnreferencedDesignFiles removes only old unreferenced design files`() = runTest {
+        val root = File(tempFilesDir, "projects/gc").also { it.mkdirs() }
+        File(root, "project.json").writeText("""{"id":"gc","name":"Wall","design":{"uri":"file:///x/projects/gc/design_live.png"}}""")
+        val live = File(root, "design_live.png").apply { writeBytes(byteArrayOf(1)) }
+        val old = File(root, "design_old.png").apply { writeBytes(byteArrayOf(2)); setLastModified(1_000L) }
+        val fresh = File(root, "design_fresh.png").apply { writeBytes(byteArrayOf(3)) }
+        val other = File(root, "target_1.png").apply { writeBytes(byteArrayOf(4)); setLastModified(1_000L) }
+
+        val deleted = manager.deleteUnreferencedDesignFiles(mockContext, "gc", modifiedBeforeMs = 10_000L)
+
+        assertEquals(1, deleted)
+        assertFalse(old.exists())
+        assertTrue("referenced design must stay", live.exists())
+        assertTrue("a file newer than the session start may be an import in flight", fresh.exists())
+        assertTrue("only design_* files are candidates", other.exists())
+    }
+
 }
