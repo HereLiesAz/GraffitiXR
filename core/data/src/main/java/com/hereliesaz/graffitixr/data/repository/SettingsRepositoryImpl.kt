@@ -49,6 +49,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val SELF_GROW_ENABLED = booleanPreferencesKey("self_grow_enabled")
     private val CRASH_REPORTING_CONSENT = booleanPreferencesKey("crash_reporting_consent")
     private val CRASH_REPORT_TOKEN = stringPreferencesKey("crash_report_token")
+    private val LAST_OPEN_PROJECT_ID = stringPreferencesKey("last_open_project_id")
     private val FEATURE_MAP_ENABLED = booleanPreferencesKey("feature_map_enabled")
     private val AUTO_FOCUS_ENABLED = booleanPreferencesKey("auto_focus_enabled")
     private val FORCED_STEREO_UNSTABLE = booleanPreferencesKey("forced_stereo_unstable")
@@ -448,6 +449,18 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setFingerprintFeatures(features: com.hereliesaz.graffitixr.common.model.FingerprintFeatures) {
         context.dataStore.edit { it[FINGERPRINT_FEATURES] = features.storageKey }
+    }
+
+    override val lastOpenProjectId: Flow<String?> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[LAST_OPEN_PROJECT_ID]?.takeIf { it.isNotBlank() } }
+        .distinctUntilChanged()
+
+    override suspend fun setLastOpenProjectId(id: String?) {
+        context.dataStore.edit { preferences ->
+            if (id.isNullOrBlank()) preferences.remove(LAST_OPEN_PROJECT_ID)
+            else preferences[LAST_OPEN_PROJECT_ID] = id
+        }
     }
 
     private companion object {

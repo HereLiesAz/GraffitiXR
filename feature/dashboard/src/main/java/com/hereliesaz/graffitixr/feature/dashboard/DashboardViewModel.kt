@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -17,7 +18,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
-    private val repository: ProjectRepository
+    private val repository: ProjectRepository,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -164,12 +166,28 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 repository.deleteProject(projectId)
+                // AWAITED, here, before the caller can navigate anywhere: the editor's own collector
+                // forgets a closed project too, but asynchronously, and a restore that reads the
+                // stored id in that gap reopens the project that was just deleted.
+                forgetIfLastOpen(projectId)
                 loadAvailableProjects()
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 android.util.Log.e("DashboardViewModel", "Error deleting project: $projectId", e)
                 _uiState.update { it.copy(projectErrorMessage = "Couldn't delete this project.") }
             }
+        }
+    }
+
+    /** Clears the "reopen after process death" id if it names [projectId]; best effort, never throws. */
+    private suspend fun forgetIfLastOpen(projectId: String) {
+        try {
+            if (settingsRepository.lastOpenProjectId.first() == projectId) {
+                settingsRepository.setLastOpenProjectId(null)
+            }
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            android.util.Log.e("DashboardViewModel", "Couldn't forget deleted project $projectId", e)
         }
     }
 

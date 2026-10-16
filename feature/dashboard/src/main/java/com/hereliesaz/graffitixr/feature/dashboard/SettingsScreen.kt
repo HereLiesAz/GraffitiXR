@@ -28,9 +28,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material3.Card
@@ -170,12 +172,11 @@ fun SettingsScreen(
         var draft by remember { mutableStateOf(crashReportToken) }
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showTokenDialog = false },
-            title = { Text("Crash-report token") },
+            title = { Text(strings.settings.crashTokenLabel) },
             text = {
                 Column {
                     Text(
-                        text = "A GitHub token with Issues: write on HereLiesAz/GraffitiXR. Stored " +
-                            "only on this device, never in the app. Leave blank to disable uploads.",
+                        text = strings.settings.crashTokenDesc,
                         color = Color.Gray,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -188,7 +189,7 @@ fun SettingsScreen(
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = androidx.compose.ui.text.input.KeyboardType.Password
                         ),
-                        label = { Text("Token") },
+                        label = { Text(strings.settings.crashTokenField) },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -214,18 +215,33 @@ fun SettingsScreen(
                     LazyColumn {
                         items(AppLanguage.entries.size) { index ->
                             val lang = AppLanguage.entries[index]
-                            Text(
-                                text = lang.displayName,
-                                fontSize = 18.sp,
-                                color = if (lang == currentLanguage) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                            val isSelected = lang == currentLanguage
+                            // A radio group: the selection is a radio button (and RadioButton
+                            // semantics via selectable), not only a colour change, so it reads on
+                            // every theme and is announced by TalkBack.
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable {
-                                        onLanguageChanged(lang)
-                                        showLanguageDialog = false
-                                    }
-                                    .padding(12.dp)
-                            )
+                                    .heightIn(min = 48.dp)
+                                    .selectable(
+                                        selected = isSelected,
+                                        role = Role.RadioButton,
+                                        onClick = {
+                                            onLanguageChanged(lang)
+                                            showLanguageDialog = false
+                                        },
+                                    )
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                RadioButton(selected = isSelected, onClick = null)
+                                Text(
+                                    text = lang.displayName,
+                                    fontSize = 18.sp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                                    modifier = Modifier.padding(start = 12.dp),
+                                )
+                            }
                         }
                     }
                 }
@@ -313,20 +329,19 @@ fun SettingsScreen(
                             // depth is AUTOMATIC (monocular/ML) depth, which feeds plane finding and
                             // stabilizes the feature cloud; off is the escape hatch for hardware whose
                             // ML depth graph destabilizes VIO. Both apply immediately, mid-AR included.
-                            SettingsSwitch("Use ARCore", arCoreEnabled, onArCoreEnabledChanged)
-                            SettingsSwitch("ARCore depth", arCoreDepthEnabled, onArCoreDepthEnabledChanged)
+                            SettingsSwitch(strings.settings.useArCore, arCoreEnabled, onArCoreEnabledChanged)
+                            SettingsSwitch(strings.settings.arCoreDepth, arCoreDepthEnabled, onArCoreDepthEnabledChanged)
                             // Monocular depth (MiDaS Small) — standalone (non-ARCore) backend only:
                             // calibrates the sphere map's point radii while the feature map builds.
                             // Default on; never loaded on the ARCore backend (MiDaS depth is relative,
                             // so it can't stand in for ARCore depth). A self-test runs when it loads;
                             // its result shows in the diag overlay.
-                            SettingsSwitch("Monocular depth (beta)", monocularDepthEnabled, onMonocularDepthEnabledChanged)
-                            SettingsSwitch("Ambient scan", ambientScanEnabled, onAmbientScanEnabledChanged)
+                            SettingsSwitch(strings.settings.monocularDepth, monocularDepthEnabled, onMonocularDepthEnabledChanged)
+                            SettingsSwitch(strings.settings.ambientScan, ambientScanEnabled, onAmbientScanEnabledChanged)
                             SettingsSwitch(strings.settings.anchorBoundary, showAnchorBoundary, onAnchorBoundaryChanged)
                             SettingsItem(
                                 label = strings.settings.cameraFps,
-                                value = com.hereliesaz.graffitixr.common.model.CameraTargetFps
-                                    .label(cameraTargetFps),
+                                value = cameraTargetFpsLabel(cameraTargetFps, strings),
                                 modifier = Modifier.clickable {
                                     onCameraTargetFpsChanged(
                                         com.hereliesaz.graffitixr.common.model.CameraTargetFps
@@ -363,7 +378,7 @@ fun SettingsScreen(
                             // degradation. Standalone: once tracking work exceeds a camera frame, the
                             // analyzer skips frames to stay under half duty (AnalysisFrameGate).
                             // Default on. Off = always full rate.
-                            SettingsSwitch("Adaptive rate (idle)", adaptiveRateEnabled, onAdaptiveRateEnabledChanged)
+                            SettingsSwitch(strings.settings.adaptiveRate, adaptiveRateEnabled, onAdaptiveRateEnabledChanged)
                         }
 
                         item {
@@ -395,16 +410,16 @@ fun SettingsScreen(
                             // makes: there is no update check (Updates below just opens the
                             // releases page in the browser when tapped).
                             SettingsSwitch(
-                                label = "Crash reports",
+                                label = strings.settings.crashReports,
                                 checked = crashReportingConsent,
                                 onCheckedChange = onCrashReportingConsentChanged,
-                                description = "On a crash, send the device model and recent logs to a public bug report? Off by default.",
+                                description = strings.settings.crashReportsDesc,
                             )
                             // The credential for the upload above. Entered here, held only on-device,
                             // never compiled into the APK. Shown as Set/Not set — never the value.
                             SettingsItem(
-                                label = "Crash-report token",
-                                value = if (crashReportToken.isNotBlank()) "Set" else "Not set",
+                                label = strings.settings.crashTokenLabel,
+                                value = if (crashReportToken.isNotBlank()) strings.settings.crashTokenSet else strings.settings.crashTokenNotSet,
                                 modifier = Modifier.clickable { showTokenDialog = true }
                             )
                         }
@@ -446,6 +461,8 @@ fun SettingsScreen(
                             DeveloperSectionHeader(
                                 title = strings.settings.developer,
                                 expanded = developerExpanded,
+                                expandedLabel = strings.settings.stateExpanded,
+                                collapsedLabel = strings.settings.stateCollapsed,
                                 onToggle = { developerExpanded = !developerExpanded },
                             )
                             if (developerExpanded) {
@@ -502,6 +519,7 @@ private fun CoverageGlowSettings(
                 label = glowColorLabel(swatch, strings),
                 argb = swatch.argb,
                 isSelected = swatch == selectedColor,
+                selectedLabel = strings.settings.stateSelected,
                 onClick = { onColorChanged(swatch.argb) },
             )
         }
@@ -540,7 +558,7 @@ private fun CoverageGlowSettings(
 }
 
 /**
- * Settings → Anticipation: the half-sphere of views (distance, latitude, longitude, roll; whole
+ * Settings → Anticipation: the half-sphere of views (distance, meridians, circles, roll; whole
  * steps) and how far battery, heat and load may cut it (percent). Every move applies at once.
  */
 @Composable
@@ -552,8 +570,11 @@ private fun AnticipationSettingsControls(
     val s = settings.sanitized()
     Text(text = strings.settings.anticipationDesc, color = Color.Gray, fontSize = 12.sp)
     StepSlider(strings.settings.anticipationDistance, s.distance, 0, AnticipationSettings.MAX_DISTANCE) { onChanged(s.copy(distance = it)) }
-    StepSlider(strings.settings.anticipationLatitude, s.latitude, 0, AnticipationSettings.MAX_LATITUDE) { onChanged(s.copy(latitude = it)) }
-    StepSlider(strings.settings.anticipationLongitude, s.longitude, 0, AnticipationSettings.MAX_LONGITUDE) { onChanged(s.copy(longitude = it)) }
+    // The stored field names are historical and swapped relative to geography: `latitude` counts the
+    // MERIDIANS (lines of longitude) and `longitude` the circles of latitude (see HalfSphere.plans).
+    // The labels follow the geography; the stored fields keep their meaning.
+    StepSlider(strings.settings.anticipationLongitude, s.latitude, 0, AnticipationSettings.MAX_LATITUDE) { onChanged(s.copy(latitude = it)) }
+    StepSlider(strings.settings.anticipationLatitude, s.longitude, 0, AnticipationSettings.MAX_LONGITUDE) { onChanged(s.copy(longitude = it)) }
     StepSlider(strings.settings.anticipationRoll, s.roll, 1, AnticipationSettings.MAX_ROLL) { onChanged(s.copy(roll = it)) }
     Text(text = strings.settings.anticipationViews(s.maxViews), color = Color.Gray, fontSize = 12.sp)
     WeightSlider(strings.settings.anticipationBattery, s.batteryWeight) { onChanged(s.copy(batteryWeight = it)) }
@@ -604,14 +625,20 @@ private fun WeightSlider(label: String, value: Float, onChanged: (Float) -> Unit
  * on every swatch colour (a coloured border vanishes on a swatch of the same colour).
  */
 @Composable
-private fun GlowColorSwatch(label: String, argb: Int, isSelected: Boolean, onClick: () -> Unit) {
+private fun GlowColorSwatch(
+    label: String,
+    argb: Int,
+    isSelected: Boolean,
+    selectedLabel: String,
+    onClick: () -> Unit,
+) {
     Box(
         modifier = Modifier
             .size(48.dp)
             .clickable(role = Role.Button, onClickLabel = label, onClick = onClick)
             .semantics(mergeDescendants = true) {
                 contentDescription = label
-                stateDescription = if (isSelected) "Selected" else ""
+                stateDescription = if (isSelected) selectedLabel else ""
             }
             .padding(2.dp)
             .border(
@@ -624,6 +651,14 @@ private fun GlowColorSwatch(label: String, argb: Int, isSelected: Boolean, onCli
             .border(width = 0.5.dp, color = Color.Gray, shape = CircleShape)
     )
 }
+
+/** The camera-FPS row's value: the two device sentinels are named (localized), real rates show the number. */
+private fun cameraTargetFpsLabel(value: Int, strings: AppStrings): String =
+    when (com.hereliesaz.graffitixr.common.model.CameraTargetFps.display(value)) {
+        com.hereliesaz.graffitixr.common.model.CameraTargetFps.Display.DEVICE_DEFAULT -> strings.settings.fpsDeviceDefault
+        com.hereliesaz.graffitixr.common.model.CameraTargetFps.Display.DEVICE_MAX -> strings.settings.fpsDeviceMax
+        com.hereliesaz.graffitixr.common.model.CameraTargetFps.Display.RATE -> value.toString()
+    }
 
 private fun glowColorLabel(color: CoverageGlowColor, strings: AppStrings): String = when (color) {
     CoverageGlowColor.WHITE -> strings.settings.glowColorWhite
@@ -729,13 +764,19 @@ private fun SettingsSwitch(
 
 /** The Developer section's title, doubling as its expand/collapse control. */
 @Composable
-private fun DeveloperSectionHeader(title: String, expanded: Boolean, onToggle: () -> Unit) {
+private fun DeveloperSectionHeader(
+    title: String,
+    expanded: Boolean,
+    expandedLabel: String,
+    collapsedLabel: String,
+    onToggle: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
             .clickable(role = Role.Button, onClick = onToggle)
-            .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
+            .semantics { stateDescription = if (expanded) expandedLabel else collapsedLabel },
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -774,11 +815,11 @@ private fun CanvasBackgroundSwatches(backgroundColor: Int, onChanged: (Int) -> U
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         listOf(
-            "Black" to 0xFF000000.toInt(),
-            "Dark"  to 0xFF1A1A2E.toInt(),
-            "Grey"  to 0xFF2C2C2C.toInt(),
-            "White" to 0xFFFFFFFF.toInt(),
-            "Navy"  to 0xFF0D1B2A.toInt(),
+            strings.settings.canvasBlack to 0xFF000000.toInt(),
+            strings.settings.canvasDark to 0xFF1A1A2E.toInt(),
+            strings.settings.canvasGrey to 0xFF2C2C2C.toInt(),
+            strings.settings.canvasWhite to 0xFFFFFFFF.toInt(),
+            strings.settings.canvasNavy to 0xFF0D1B2A.toInt(),
         ).forEach { (label, argb) ->
             val isSelected = backgroundColor == argb
             // The visible color circle stays 32dp (8dp padding inside a 48dp box), matching
@@ -795,7 +836,7 @@ private fun CanvasBackgroundSwatches(backgroundColor: Int, onChanged: (Int) -> U
                     )
                     .semantics(mergeDescendants = true) {
                         contentDescription = label
-                        stateDescription = if (isSelected) "Selected" else ""
+                        stateDescription = if (isSelected) strings.settings.stateSelected else ""
                     }
                     .padding(8.dp)
                     .background(Color(argb.toLong() and 0xFFFFFFFFL), CircleShape)

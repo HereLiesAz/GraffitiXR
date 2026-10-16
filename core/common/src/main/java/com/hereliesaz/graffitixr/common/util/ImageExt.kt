@@ -217,24 +217,21 @@ internal fun highlightWholeMarks(isMark: BooleanArray, w: Int, h: Int, minMarkPi
 }
 
 /**
- * Executes a ruthless, non-recursive flood fill to eradicate one contiguous mark from
- * existence (clearing it to transparent) without inducing a StackOverflowError. 8-connected
- * so a single tap removes the WHOLE mark — including diagonal strokes — matching the
- * connectivity [isolateMarkings] uses to group marks.
+ * Erases ONE contiguous mark from the highlight mask [pixels] ([w] × [h], ARGB; 0 == transparent)
+ * in place, with a non-recursive 8-connected flood fill (no StackOverflowError), and returns whether
+ * anything was erased. 8-connected so a single tap removes the WHOLE mark — including diagonal
+ * strokes — matching the connectivity [isolateMarkings] uses to group marks.
  *
- * The touch isn't pixel-precise: if the tapped pixel is empty, we snap to the NEAREST mark
- * pixel within a finger-sized radius and flood from there, so tapping (or dragging) close to
- * a mark still removes it. Only a tap with no mark anywhere in reach is a true no-op.
+ * The touch isn't pixel-precise: if the tapped pixel is empty, the seed snaps to the NEAREST mark
+ * pixel within a finger-sized radius so tapping (or dragging) close to a mark still removes it. A tap
+ * with no mark anywhere in reach returns false having touched nothing.
+ *
+ * [queue] (at least `w × h`) is scratch space for the fill, passed in so a gesture's many samples
+ * share one buffer instead of allocating per call; it holds `y * w + x` indices.
  */
-fun Bitmap.eraseColorBlob(nx: Float, ny: Float): Bitmap {
-    val w = this.width
-    val h = this.height
+internal fun eraseMarkAt(pixels: IntArray, w: Int, h: Int, nx: Float, ny: Float, queue: IntArray): Boolean {
     val x = (nx * w).toInt().coerceIn(0, w - 1)
     val y = (ny * h).toInt().coerceIn(0, h - 1)
-
-    val out = this.copy(Bitmap.Config.ARGB_8888, true)
-    val pixels = IntArray(w * h)
-    out.getPixels(pixels, 0, w, 0, 0, w, h)
 
     // Resolve the flood seed. If the tap landed dead-on a mark, use it; otherwise hunt the
     // closest mark pixel within ERASE_TOUCH_RADIUS_FRACTION of the larger image dimension
@@ -273,25 +270,18 @@ fun Bitmap.eraseColorBlob(nx: Float, ny: Float): Bitmap {
             }
             sy++
         }
-        if (!found) return out // No mark within reach — a genuine void tap, do nothing
+        if (!found) return false // No mark within reach — a genuine void tap, do nothing
     }
 
-    // Primitive arrays instead of object allocations because efficiency is next to godliness
-    val qx = IntArray(w * h)
-    val qy = IntArray(w * h)
     var head = 0
     var tail = 0
-
-    qx[tail] = seedX
-    qy[tail] = seedY
-    tail++
+    queue[tail++] = seedY * w + seedX
     pixels[seedY * w + seedX] = 0
 
     while (head < tail) {
-        val cx = qx[head]
-        val cy = qy[head]
-        head++
-
+        val p = queue[head++]
+        val cx = p % w
+        val cy = p / w
         var dy = -1
         while (dy <= 1) {
             var dx = -1
@@ -301,9 +291,7 @@ fun Bitmap.eraseColorBlob(nx: Float, ny: Float): Bitmap {
                     val ay = cy + dy
                     if (ax in 0 until w && ay in 0 until h && pixels[ay * w + ax] != 0) {
                         pixels[ay * w + ax] = 0
-                        qx[tail] = ax
-                        qy[tail] = ay
-                        tail++
+                        queue[tail++] = ay * w + ax
                     }
                 }
                 dx++
@@ -311,7 +299,55 @@ fun Bitmap.eraseColorBlob(nx: Float, ny: Float): Bitmap {
             dy++
         }
     }
+    return true
+}
 
-    out.setPixels(pixels, 0, w, 0, 0, w, h)
-    return out
+/**
+ * The editable pixels of one mark-highlight mask, for a gesture of many erases.
+ *
+ * Decoding the mask ([Bitmap.getPixels]) and allocating the flood-fill queue are the two big costs
+ * of an erase, and a drag fires dozens of erases a second. This holds both for the life of the
+ * gesture: construct once from the bitmap on screen, [erase] as often as needed (each call touches
+ * only the pixels of the mark it removes), then [publish] ONE new bitmap for the whole batch.
+ * [publish] returns the new bitmap and retargets the eraser at it, so the next batch continues from it
+ * with no re-decode; [isFor] says whether the eraser still describes the bitmap the UI shows (it does
+ * not once the mask has been replaced by a new capture).
+ *
+ * Bitmaps are never mutated in place — Compose draws them by reference — and the superseded one is
+ * deliberately not recycled here: the UI (and, after Confirm, the fingerprint job) may still hold it,
+ * and recycling a bitmap that is being drawn crashes the draw. Dropping the reference is the safe
+ * release. Not thread-safe; owned by one serialized caller.
+ */
+class MarkEraser(source: Bitmap) {
+    private val w = source.width
+    private val h = source.height
+    private val pixels = IntArray(w * h).also { source.getPixels(it, 0, w, 0, 0, w, h) }
+    private val queue = IntArray(w * h)
+    private var current: Bitmap = source
+
+    /** True while this eraser's pixels are the content of [bitmap]. */
+    fun isFor(bitmap: Bitmap): Boolean = current === bitmap
+
+    /** Erase the whole mark at ([nx], [ny]) (fractions of the image); false if none was in reach. */
+    fun erase(nx: Float, ny: Float): Boolean = eraseMarkAt(pixels, w, h, nx, ny, queue)
+
+    /** A new bitmap holding the erased state; this eraser now describes it. */
+    fun publish(): Bitmap {
+        val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        out.setPixels(pixels, 0, w, 0, 0, w, h)
+        current = out
+        return out
+    }
+}
+
+/**
+ * Erases one whole mark at ([nx], [ny]) from this highlight mask — see [eraseMarkAt] for the touch
+ * rules. Returns THIS bitmap, untouched and with no allocation of a bitmap, when no mark was in
+ * reach (a genuine void tap costs one pixel decode and a bounded neighbourhood scan, not a copy);
+ * otherwise a new bitmap, leaving the receiver unchanged. A caller erasing repeatedly (a drag) should
+ * hold a [MarkEraser] instead, which also skips the per-call decode and queue allocation.
+ */
+fun Bitmap.eraseColorBlob(nx: Float, ny: Float): Bitmap {
+    val eraser = MarkEraser(this)
+    return if (eraser.erase(nx, ny)) eraser.publish() else this
 }

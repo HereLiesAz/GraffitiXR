@@ -32,7 +32,6 @@
 
 
 
-    <string name="nav_scan_mode_toggle_info">Váltás a Vászon (kisebb, asztali méretű művészetre optimalizálva) és a Falfestmény (nagy méretű falakra és Gauss-splattingra optimalizálva) között.</string>
 
 
 
@@ -606,9 +605,9 @@
         <item>Csippentéssel méretezhető, húzással áthelyezhető. A rétegzés a képernyődhöz rögzítve marad — lépj hátrébb, hogy lásd, hogyan illeszkedik a falhoz.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
-        <item>Ez az eszköz nem támogatja az ARCore-t, ezért az AR-vetítés mód nem érhető el.</item>
-        <item>A Rajzolás, a Makett és az Élő rétegzés módokat továbbra is használhatod — az AR kivételével minden mód működik ARCore nélkül.</item>
-        <item>Koppints az elvetéshez.</item>
+        <item>Ez az eszköz nem támogatja az ARCore-t, ezért az AR mód önálló falkövetést használ.</item>
+        <item>AR módban először fotót készítesz a fal egy texturált részéről, és megjelölöd a négy sarkát. A követés ezután erre a célpontra rögzül.</item>
+        <item>A Rajzolás, a Makett és a Rétegzés a szokásos módon működik. Koppints a bezáráshoz.</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>Fotómakett — nézd meg a terved egy fotón, mielőtt akár ecsetet is fognál.</item>
@@ -637,4 +636,125 @@
     <string name="nav_gyro_info">Állványon a mozgásérzékelővel a falon tartja a dizájnt apró rezgések ellenére. Kapcsold be, ha a telefon már a helyén van; ha elmozdul, elengedi.</string>
     <string name="gyro_released_moved">Giroszkóp kikapcsolva: a telefon túl sokat mozdult.</string>
     <string name="gyro_unavailable">A giroszkóphoz forgásérzékelő kell, amit ez az eszköz nem jelez.</string>
+    <string name="export_failed">Az exportálás nem sikerült: a képet nem lehetett menteni a galériába.</string>
+    <string name="export_failed_permission">Nem sikerült a galériába menteni. Engedélyezd a tárhely-hozzáférést a GraffitiXR számára, majd próbáld újra.</string>
+    <string name="export_ar_unavailable">Az exportálás nem áll készen: az AR kameranézet nem fut. Nyisd meg az AR nézetet, majd próbáld újra.</string>
+    <string name="export_standalone_ar_unavailable">Az exportálás az önálló AR-ban még nem érhető el.</string>
+    <string name="rail_checking_ar_backend">AR háttérrendszer ellenőrzése…</string>
+
+    <string name="settings_use_arcore">ARCore használata</string>
+    <string name="settings_arcore_depth">ARCore mélység</string>
+    <string name="settings_monocular_depth">Monokuláris mélység (béta)</string>
+    <string name="settings_ambient_scan">Környezeti letapogatás</string>
+    <string name="settings_adaptive_rate">Adaptív sebesség (tétlen)</string>
+    <string name="settings_crash_reports">Összeomlási jelentések</string>
+    <string name="settings_crash_reports_desc">Összeomláskor elküldjük az eszköz típusát és a legutóbbi naplókat egy nyilvános hibajelentésben? Alapértelmezés szerint kikapcsolva.</string>
+    <string name="settings_crash_token_label">Összeomlási jelentés tokenje</string>
+    <string name="settings_crash_token_set">Beállítva</string>
+    <string name="settings_crash_token_not_set">Nincs beállítva</string>
+    <string name="settings_crash_token_desc">Egy GitHub-token „Issues: write” jogosultsággal a HereLiesAz/GraffitiXR tárolóhoz. Csak ezen az eszközön tárolódik, az alkalmazásban soha. Hagyd üresen a feltöltések kikapcsolásához.</string>
+    <string name="settings_crash_token_field">Token</string>
+    <string name="settings_canvas_color_black">Fekete</string>
+    <string name="settings_canvas_color_dark">Sötét</string>
+    <string name="settings_canvas_color_grey">Szürke</string>
+    <string name="settings_canvas_color_white">Fehér</string>
+    <string name="settings_canvas_color_navy">Tengerészkék</string>
+    <string name="state_selected">Kiválasztva</string>
+    <string name="state_expanded">Kibontva</string>
+    <string name="state_collapsed">Összecsukva</string>
+    <string name="settings_fps_device_default">Eszköz alapértelmezett</string>
+    <string name="settings_fps_device_max">Eszköz maximuma</string>
+    <string name="first_run_photo_title">Nézd meg a falon</string>
+    <string name="first_run_photo_text">Válassz egy referenciafotót az alkotásodról, és megmutatjuk, hogyan mutat egy valódi falon, AR-ban.</string>
+    <string name="first_run_choose_photo">Fotó kiválasztása</string>
+    <string name="first_run_not_now">Most nem</string>
+    <string name="first_run_draw_title">Rajzold ezt a falra</string>
+    <string name="first_run_draw_hint">Rajzold nagyra – nagyjából az alkotásod méretére. Elég, ha felismerhető, nem kell szépnek lennie.</string>
+    <string name="first_run_draw_done">Megrajzoltam</string>
+    <string name="first_run_draw_skip">Kihagyás – magam helyezem el</string>
+    <string name="first_run_detect_title">Most irányítsd a kamerát arra, amit rajzoltál</string>
+    <string name="first_run_detect_movement_hint">Lassan mozgasd az eszközt körbe</string>
+    <string name="design_instructions_title">Tervezd meg a falfestményt</string>
+    <string name="design_instructions_text">Koppints a sávon a(z) „%1$s”, majd a(z) „%2$s” elemre, hogy kiválaszd az alkotásod fotóját.</string>
+    <string name="got_it_button">Értem</string>
+    <string name="standalone_width_prompt">Mérd meg a célpont bal és jobb széle közötti valódi szélességet.</string>
+    <string name="standalone_width_label_metric">Célpont szélessége (méter)</string>
+    <string name="standalone_width_label_imperial">Célpont szélessége (láb és hüvelyk)</string>
+    <string name="standalone_width_range_error">Adj meg %1$s és %2$s közötti szélességet.</string>
+    <string name="standalone_use_measured_width">Mért szélesség használata</string>
+    <string name="standalone_continue_without_scale">Folytatás fizikai méretarány nélkül</string>
+    <string name="standalone_recapture">Újrafelvétel</string>
+    <string name="standalone_capture_wall_target">Falcélpont rögzítése</string>
+    <string name="standalone_capture_failed">A falcélpontot nem sikerült rögzíteni – próbáld újra.</string>
+    <string name="standalone_rectify_failed">A célpontot nem sikerült kiegyenesíteni – jelölj meg négy jól látható sarkot.</string>
+    <string name="standalone_target_too_weak">Ebben a célpontban túl kevés a követhető részlet (%1$d KPM-jellemző; %2$d szükséges). Rögzíts egy gazdagabb falrészletet.</string>
+    <string name="standalone_new_target">Új célpont</string>
+    <string name="standalone_copy_diagnostics">Diagnosztika másolása</string>
+    <string name="standalone_wall_target_lost">Falcélpont elveszett</string>
+    <string name="standalone_recapture_target">Célpont újrafelvétele</string>
+    <string name="standalone_sweep_hint">Fordulj lassan a tér feltérképezéséhez — %1$d%%</string>
+    <string name="standalone_failure_native_library_unavailable">A SphereSLAM nem érhető el ebben a buildben.</string>
+    <string name="standalone_failure_camera_unavailable">A kamera nem érhető el az önálló AR-hez.</string>
+    <string name="standalone_failure_intrinsics_unavailable">A kamerakalibráció nem érhető el az önálló AR-hez.</string>
+    <string name="standalone_failure_reference_too_weak">Ebben a falcélpontban túl kevés a követhető részlet. Rögzíts egy gazdagabb részt.</string>
+    <string name="standalone_failure_no_page_match">Tartsd látótérben a falcélpontot.</string>
+    <string name="standalone_failure_stale_observation">A követés késik. Mozgasd lassabban a telefont.</string>
+    <string name="standalone_failure_reprojection_error">A falillesztés instabil. Igazítsd újra a célpontot.</string>
+    <string name="standalone_failure_insufficient_inliers">Nem látszik elég részlet a célpontból.</string>
+    <string name="standalone_failure_pose_jump">A követési ugrást elutasítottuk. Tartsd a telefont nyugodtan a falcélponton.</string>
+    <string name="standalone_failure_persisted_target_corrupt">A mentett falcélpont hiányzik vagy nem olvasható. Rögzíts új célpontot.</string>
+    <string name="standalone_failure_internal">A SphereSLAM nem tudta folytatni a célpont követését.</string>
+    <string name="standalone_tracking_stopped">A SphereSLAM-követés leállt. Az újraindításhoz rögzítsd újra a célpontot.</string>
+    <string name="standalone_status_mapping">SphereSLAM térképez • koppints a Célpontra ujjlenyomat hozzáadásához</string>
+    <string name="standalone_status_preparing">Ujjlenyomat-célpont előkészítése…</string>
+    <string name="standalone_status_finding">Ujjlenyomat-célpont keresése…</string>
+    <string name="standalone_quality_too_small">Ez a falcélpont a kiegyenesítés után túl kicsi. Rögzíts nagyobb részt.</string>
+    <string name="standalone_quality_low_contrast">Ennek a falcélpontnak túl kicsi a vizuális kontrasztja. Vonj be több textúrát vagy részletet.</string>
+    <string name="standalone_quality_blurry">Ez a falcélpont túl homályos a megbízható követéshez. Tartsd nyugodtan, és rögzítsd újra.</string>
+    <string name="standalone_quality_not_strong_enough">Ez a falcélpont nem elég erős a megbízható követéshez.</string>
+    <string name="standalone_quality_too_dark">Ez a célpont erősen alulexponált; a követés kevésbé lehet megbízható.</string>
+    <string name="standalone_quality_too_bright">Ez a célpont erősen túlexponált; a követés kevésbé lehet megbízható.</string>
+    <string name="standalone_photosphere_no_sensor">Ennek a telefonnak nincs forgásérzékelője, ezért a SphereSLAM itt nem tud célpontot elhelyezni.</string>
+    <string name="standalone_photosphere_compass_not_ready">Az iránytű még nem áll készen – tartsd egy másodpercig nyugodtan a telefont, majd ismételd meg a felvételt.</string>
+    <string name="standalone_photosphere_not_mapped">A SphereSLAM még nem térképezte fel ezt a nézetet – tartsd a kamerát egy másodpercig nyugodtan a felület egy megvilágított, részletes részén, majd ismételd meg a felvételt.</string>
+    <string name="target_rectify_title">Felület kiegyenesítése</string>
+    <string name="target_rectify_text">Most húzd a sarkokat úgy, hogy a ciánkék keret illeszkedjen a fal sík felületéhez.</string>
+    <string name="target_remove_marks_title">Jelölések eltávolítása</string>
+    <string name="target_erase_hint">Koppints egy jelölésre az eltávolításához, vagy húzd át az ujjad több jelölésen.</string>
+    <string name="target_cd_raw_capture">Nyers felvétel</string>
+    <string name="target_cd_detected_marks">Észlelt jelölések</string>
+    <string name="target_cd_confirm">Megerősítés</string>
+    <string name="target_cd_unwarp_base">Rögzített falfotó sarokfogantyúkkal</string>
+    <string name="guidance_open_via_design_overlay">Koppints a sávon a „Tervezés”, majd a „Megnyitás” elemre egy réteg hozzáadásához – válassz egy fotót, és az itt jelenik meg, az élő kameranézet fölött lebegve.</string>
+    <string name="guidance_open_via_design_mockup">Koppints a sávon a „Tervezés”, majd a „Megnyitás” elemre egy réteg hozzáadásához a falfotó fölé. Csípéssel és húzással állítsd be a méretét és a helyét.</string>
+    <string name="guidance_open_via_design_trace">Koppints a sávon a „Tervezés”, majd a „Megnyitás” elemre az első réteg hozzáadásához. Ha bekerült, csípéssel és húzással méretezd és helyezd el a vásznon.</string>
+    <string name="guidance_open_via_design_ar">Koppints a sávon a „Tervezés”, majd a „Megnyitás” elemre egy tervréteg hozzáadásához – az az imént beállított horgony segítségével vetül a falra.</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">Ezt a módosítást nem lehet megosztani a házigazdával – csak ezen az eszközön marad meg</string>
+    <string name="ar_feedback_backend_resolving">Az AR-háttér még kiválasztás alatt áll – próbáld újra a házigazdaként indítást egy pillanat múlva</string>
+    <string name="ar_feedback_open_project_first">Megosztás előtt nyiss meg egy projektet – még nincs mit küldeni a vendégnek</string>
+    <string name="ar_feedback_host_need_target_arcore">Házigazdaként indítás előtt rögzíts és zárolj egy aktuális falcélpontot</string>
+    <string name="ar_feedback_host_need_target_standalone">Házigazdaként indítás előtt rögzíts egy önálló falcélpontot</string>
+    <string name="ar_feedback_fingerprint_not_ready">A fal ujjlenyomata még nem áll készen – tartsd a célpontot a képben, és próbáld újra a házigazdaként indítást</string>
+    <string name="ar_feedback_package_failed">Nem sikerült becsomagolni a projektet a megosztáshoz – próbáld előbb elmenteni</string>
+    <string name="ar_feedback_host_failed">Nem sikerült elindítani a megosztást: %1$s</string>
+    <string name="ar_feedback_join_load_failed">Nem sikerült betölteni a házigazda projektjét – a munkamenet véget ért.</string>
+    <string name="ar_feedback_join_no_geometry">A házigazda nem adott meg olyan geometriát, amelyhez az ARCore igazodni tud.</string>
+    <string name="ar_feedback_join_failed">Nem sikerült csatlakozni: %1$s</string>
+    <string name="ar_feedback_wall_target_changed">A falcélpont megváltozott – a megosztás véget ért. Indítsd újra a házigazdaként indítást az új falhoz.</string>
+    <string name="ar_feedback_backend_changed">A követési háttér megváltozott – a megosztás véget ért. Indítsd újra a megosztást.</string>
+    <string name="ar_feedback_camera_busy">A kamera foglalt vagy nem érhető el – zárd be a többi kamera-alkalmazást, majd lépj be újra az AR-ba</string>
+    <string name="ar_feedback_ar_start_failed">Nem sikerült elindítani az AR-t – lehet, hogy a kamerát egy másik alkalmazás használja</string>
+    <string name="ar_feedback_camera_setting_apply_failed">Nem sikerült alkalmazni a kamerabeállítást a futó AR-munkamenetre – lépj ki az AR-ból, majd lépj be újra</string>
+    <string name="ar_feedback_sphere_target_save_failed">A falkövetés ebben a munkamenetben működik, de a SphereSLAM-célpontot nem sikerült elmenteni.</string>
+    <string name="ar_feedback_camera_not_resumed">Az AR-kamera nem indult újra – próbálj kilépni az AR módból, majd belépni újra</string>
+    <string name="ar_feedback_camera_permission">A kamera nem érhető el – ellenőrizd a kamera-engedélyt, majd lépj be újra az AR-ba</string>
+    <string name="ar_feedback_camera_not_paused">Az AR-kamera nem állt le tisztán – előfordulhat, hogy a háttérben tovább fut</string>
+    <string name="ar_feedback_backbone_warning">A műalkotás szinte az egész látható falat lefedi – csak %1$d követett jellemző esik rajta kívül. Kicsinyítsd le, vagy lépj hátrébb, különben a célpont lehet, hogy nem záródik be.</string>
+    <string name="ar_feedback_legacy_target_geometry">A projekt mentett célpontját egy régebbi verzió készítette, és a 3D-geometriája nem javítható. A használatához hozd létre újra a célpontot.</string>
+    <string name="ar_feedback_camera_no_frames">A kamera nem ad képkockákat – lépj ki az AR-ból, és próbáld újra</string>
+    <string name="ar_feedback_camera_recovery_timeout">Az AR-kamera helyreállítása biztonságosan időtúllépést kapott – lépj ki az AR-ból, majd lépj be újra</string>
+    <string name="ar_feedback_target_prepare_failed">Nem sikerült előkészíteni a rögzített célpontot. Próbáld újra.</string>
+    <string name="ar_feedback_wall_width_save_failed">Nem sikerült elmenteni a fal szélességét. Próbáld újra a mentést.</string>
+    <string name="ar_feedback_unknown_error">ismeretlen hiba</string>
 </resources>

@@ -653,6 +653,16 @@ Java_com_hereliesaz_graffitixr_nativebridge_YuvConverter_nativeYuvToRgbaBitmap(
         return;
     }
 
+    // 4:2:0 chroma is subsampled 2x2, and COLOR_YUV2RGBA_NV21 throws cv::Exception on an odd width
+    // or height. This entry point is called from Kotlin with no C++ handler above it, so an escaped
+    // exception aborts the process: refuse odd sizes here, and catch whatever is left below.
+    if ((width & 1) != 0 || (height & 1) != 0) {
+        LOGE("nativeYuvToRgbaBitmap: odd frame size %dx%d rejected (4:2:0 needs even dimensions)",
+             width, height);
+        return;
+    }
+
+    try {
     // Build the packed NV21 buffer OpenCV's cvtColor understands. This matches the NV21 layout
     // camera frames from Camera2 / CameraX / ARCore ship in (Y plane, then interleaved V/U).
     cv::Mat yMat(height, width, CV_8UC1, yData, yStride);
@@ -708,6 +718,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_YuvConverter_nativeYuvToRgbaBitmap(
     // matToBitmap locks the pixels, copies with cvtColor as needed, then unlocks. rgba is already
     // CV_8UC4, so this becomes a direct memcpy of `width*height*4` bytes.
     matToBitmap(env, rgba, outBitmap);
+
+    } catch (const std::exception& e) {
+        LOGE("nativeYuvToRgbaBitmap: exception: %s", e.what());
+    } catch (...) {
+        LOGE("nativeYuvToRgbaBitmap: unknown exception");
+    }
 }
 
 JNIEXPORT void JNICALL
@@ -1731,10 +1747,18 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocResult(JNI
     // sentinel into every slot instead (an all-(-1) 4x4 matrix cannot be a valid rotation, so this
     // cannot be confused with a real pose).
     if (!gSlamEngine) {
-        if (out && env->GetArrayLength(out) >= 19) {
-            float sentinel[19];
-            std::fill(sentinel, sentinel + 19, -1.0f);
-            env->SetFloatArrayRegion(out, 0, 19, sentinel);
+        // Fill however many slots the caller gave us (19 legacy, 35 with the solve view): the
+        // solve-view slots are otherwise left at whatever the reusable buffer last held. The seq
+        // slot ([18]) reads -1, which every consumer already rejects (seq > 0f), and [34] == -1
+        // is not the rigid-view marker (1.0f), so PoseFusion.solveViewOf reports no view.
+        if (out) {
+            const jsize len = env->GetArrayLength(out);
+            if (len >= 19) {
+                const jsize n = len >= 35 ? 35 : 19;
+                float sentinel[35];
+                std::fill(sentinel, sentinel + 35, -1.0f);
+                env->SetFloatArrayRegion(out, 0, n, sentinel);
+            }
         }
         return;
     }

@@ -42,7 +42,7 @@ import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.sensor.Vec3
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
-import com.hereliesaz.graffitixr.common.util.eraseColorBlob
+import com.hereliesaz.graffitixr.common.util.MarkEraser
 import com.hereliesaz.graffitixr.common.util.forTargetReview
 import com.hereliesaz.graffitixr.common.wearable.ConnectionState
 import com.hereliesaz.graffitixr.common.wearable.WearableManager
@@ -328,7 +328,7 @@ class ArViewModel @Inject constructor(
                 reportedGuestEditDrop = true
                 _feedback.tryEmit(
                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                        "That change can't be shared with the host — it stays on this device"
+                        appContext.getString(DesignR.string.ar_feedback_guest_edit_dropped)
                     )
                 )
             }
@@ -345,7 +345,7 @@ class ArViewModel @Inject constructor(
                 if (!st.isArCoreAvailabilityResolved) {
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                            "AR backend is still being resolved — try Host again in a moment"
+                            appContext.getString(DesignR.string.ar_feedback_backend_resolving)
                         )
                     )
                     return@launch
@@ -354,7 +354,7 @@ class ArViewModel @Inject constructor(
                 if (project == null) {
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                            "Open a project before sharing — there's nothing to send to a guest yet"
+                            appContext.getString(DesignR.string.ar_feedback_open_project_first)
                         )
                     )
                     return@launch
@@ -365,9 +365,9 @@ class ArViewModel @Inject constructor(
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
                             if (st.isArCoreAvailable) {
-                                "Capture and lock a current wall target before hosting"
+                                appContext.getString(DesignR.string.ar_feedback_host_need_target_arcore)
                             } else {
-                                "Capture a standalone Wall Target before hosting"
+                                appContext.getString(DesignR.string.ar_feedback_host_need_target_standalone)
                             }
                         )
                     )
@@ -385,7 +385,7 @@ class ArViewModel @Inject constructor(
                 ) {
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                            "Wall fingerprint is not ready yet — keep the target in view and try Host again"
+                            appContext.getString(DesignR.string.ar_feedback_fingerprint_not_ready)
                         )
                     )
                     return@launch
@@ -394,7 +394,7 @@ class ArViewModel @Inject constructor(
                 if (projectManager.serializeCurrentProject().isEmpty()) {
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                            "Couldn't package this project to share — try saving it first"
+                            appContext.getString(DesignR.string.ar_feedback_package_failed)
                         )
                     )
                     return@launch
@@ -446,7 +446,7 @@ class ArViewModel @Inject constructor(
                 android.util.Log.e("ArViewModel", "Failed to start hosting", e)
                 _feedback.tryEmit(
                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                        "Couldn't start sharing: ${e.message ?: "unknown error"}", e
+                        appContext.getString(DesignR.string.ar_feedback_host_failed, e.message ?: appContext.getString(DesignR.string.ar_feedback_unknown_error)), e
                     )
                 )
                 return@launch
@@ -511,7 +511,7 @@ class ArViewModel @Inject constructor(
                         ) {
                             _feedback.tryEmit(
                                 com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                                    "Couldn't load the host's project — the session was ended.", null
+                                    appContext.getString(DesignR.string.ar_feedback_join_load_failed), null
                                 )
                             )
                             leaveSession()
@@ -523,7 +523,7 @@ class ArViewModel @Inject constructor(
                             if (fingerprint.isEmpty()) {
                                 _feedback.tryEmit(
                                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                                        "The host did not provide geometry ARCore can align to.", null
+                                        appContext.getString(DesignR.string.ar_feedback_join_no_geometry), null
                                     )
                                 )
                                 leaveSession()
@@ -572,7 +572,7 @@ class ArViewModel @Inject constructor(
                 android.util.Log.e("ArViewModel", "Failed to join session", e)
                 _feedback.tryEmit(
                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                        "Couldn't join: ${e.message ?: "unknown error"}", e
+                        appContext.getString(DesignR.string.ar_feedback_join_failed, e.message ?: appContext.getString(DesignR.string.ar_feedback_unknown_error)), e
                     )
                 )
             }
@@ -1546,9 +1546,9 @@ class ArViewModel @Inject constructor(
     /**
      * Where auto-captured screenshots land, beside the eval CSVs they are shared with.
      *
-     * They are reachable by `FileProvider` because `file_paths.xml` exposes the whole of `filesDir`
-     * (`<files-path path="."/>`), not because `eval/` is called out — worth stating plainly, since
-     * a reader who assumes a scoped entry would also assume moving this directory is safe.
+     * They are reachable by `FileProvider` only because `file_paths.xml` exposes `filesDir/eval/`
+     * (`<files-path path="eval/"/>`, which covers `eval/captures/` too) — moving this directory out
+     * of `eval/` would make the bundle's attachments fail to resolve, so change both together.
      *
      * **Purged once per view-model lifetime**, on first use. Without it the directory accumulates
      * across every session the app has ever run, and [writeDiagnosticBundle] — which globs the
@@ -1772,6 +1772,11 @@ class ArViewModel @Inject constructor(
     private var autoSaveJob: kotlinx.coroutines.Job? = null
     private var loadedProjectId: String? = null
 
+    // Whose state native MobileGS holds. `loadedProjectId` flips on emission, but native keeps the
+    // previous project's map until loadFingerprintIfExists finishes swapping it, so saves gate on
+    // THIS token instead (see NativeStateOwner).
+    private val nativeStateOwner = NativeStateOwner()
+
     @Volatile
     private var pendingTapPosition: Pair<Float, Float>? = null
 
@@ -1891,7 +1896,7 @@ class ArViewModel @Inject constructor(
                         if (current != hosted) {
                             _feedback.tryEmit(
                                 com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                                    "Wall target changed — sharing ended. Start Host again for the new wall."
+                                    appContext.getString(DesignR.string.ar_feedback_wall_target_changed)
                                 )
                             )
                             leaveSession()
@@ -1906,6 +1911,8 @@ class ArViewModel @Inject constructor(
                         // The yaw sweep and the COMPLETE latch describe the previous project's wall.
                         if (loadedProjectId != null) resetScanProgress()
                     }
+                    // BEFORE anything can be written: native still holds the previous project's state.
+                    nativeStateOwner.beginSwitch(project.id)
                     loadedProjectId = project.id
                     // Native MobileGS has exactly one active fingerprint frame. Standalone owns it
                     // on non-ARCore devices; an ARCore co-op GUEST also owns it once protocol-v3 peer
@@ -2174,6 +2181,7 @@ class ArViewModel @Inject constructor(
             // unavailable"; the standalone analyzer starts only after this state update and will then
             // install the centered page-frame fingerprint deterministically.
             loadedFingerprint = null
+            nativeStateOwner.clear()
             slamManager.clearWallFingerprint()
             slamManager.clearWallFeatureMap()
             slamManager.overlayMarkCenterLocal = null
@@ -2194,7 +2202,7 @@ class ArViewModel @Inject constructor(
             if (_uiState.value.coopRole != com.hereliesaz.graffitixr.common.model.CoopRole.NONE) {
                 _feedback.tryEmit(
                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                        "Tracking backend changed — sharing ended. Start sharing again."
+                        appContext.getString(DesignR.string.ar_feedback_backend_changed)
                     )
                 )
                 leaveSession()
@@ -2259,7 +2267,11 @@ class ArViewModel @Inject constructor(
                         .onFailure { Timber.w(it, "depth self-test threw") }
                 } else if (!wanted && loaded && !_evalFeatureMapEnabled.value) {
                     depthEstimator.close()
-                    appendDiag("depth: monocular depth not needed — model unloaded")
+                    // `close()` releases the model now, but this estimator is shared by reference with a
+                    // standalone analyzer that may already hold it (see standaloneDepthEstimatorOrNull);
+                    // that analyzer loads on demand, so "released" is what is true — not "unloaded for
+                    // good". A session that was started without depth never receives the estimator.
+                    appendDiag("depth: monocular depth not needed — model released (reloads on demand if a running analyzer still asks)")
                 }
             }
         }
@@ -2706,7 +2718,7 @@ class ArViewModel @Inject constructor(
                         appendDiag("camera gate FAILED — refusing to open AR session on an unconfirmed camera")
                         _feedback.tryEmit(
                             com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                                "Camera is busy or unavailable — close other camera apps, then re-enter AR"
+                                appContext.getString(DesignR.string.ar_feedback_camera_busy)
                             )
                         )
                     }
@@ -2941,7 +2953,7 @@ class ArViewModel @Inject constructor(
             // Surface the failure instead of leaving the user on a frozen black AR screen.
             _isCameraInUseByAr.value = false
             _feedback.tryEmit(
-                com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error("Couldn't start AR — your camera may be in use by another app", e)
+                com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(appContext.getString(DesignR.string.ar_feedback_ar_start_failed), e)
             )
         }
     }
@@ -3082,7 +3094,7 @@ class ArViewModel @Inject constructor(
                     appendDiag("settings: GL thread still owns ARCore after 1500ms — live reconfigure aborted")
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                            "Couldn't apply the camera setting to the running AR session — exit and re-enter AR"
+                            appContext.getString(DesignR.string.ar_feedback_camera_setting_apply_failed)
                         )
                     )
                     return@withLock
@@ -3358,7 +3370,7 @@ class ArViewModel @Inject constructor(
                 Timber.e(e, "Failed to persist standalone SphereSLAM reference")
                 _feedback.tryEmit(
                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                        "Wall tracking works for this session, but the SphereSLAM target couldn't be saved.",
+                        appContext.getString(DesignR.string.ar_feedback_sphere_target_save_failed),
                         e,
                     ),
                 )
@@ -3633,7 +3645,7 @@ class ArViewModel @Inject constructor(
                     )
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                            "AR camera did not resume — try leaving and re-entering AR mode"
+                            appContext.getString(DesignR.string.ar_feedback_camera_not_resumed)
                         )
                     )
                 }
@@ -3644,7 +3656,7 @@ class ArViewModel @Inject constructor(
             // Permission revoked at runtime, or the camera is held elsewhere. Tell the user
             // rather than leaving a frozen preview.
             _feedback.tryEmit(
-                com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error("Camera unavailable — check the camera permission, then re-enter AR", e)
+                com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(appContext.getString(DesignR.string.ar_feedback_camera_permission), e)
             )
         } catch (e: Exception) {
             Timber.e(e, "Failed to resume ARCore session")
@@ -3676,7 +3688,7 @@ class ArViewModel @Inject constructor(
                     )
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                            "AR camera did not pause cleanly — it may keep running in the background"
+                            appContext.getString(DesignR.string.ar_feedback_camera_not_paused)
                         )
                     )
                 }
@@ -3756,6 +3768,7 @@ class ArViewModel @Inject constructor(
     private fun clearCaptureState() {
         pendingTapPosition = null
         pendingStandaloneFingerprintPlacement = null
+        resetCapturePipeline()
         _uiState.update {
             it.copy(
                 tempCaptureBitmap = null,
@@ -3763,8 +3776,7 @@ class ArViewModel @Inject constructor(
                 targetRawBitmap = null,
                 targetDepthBuffer = null,
                 tapMarks = emptyList(),
-                unwarpPoints = emptyList(),
-                targetKeypoints = emptyList()
+                unwarpPoints = emptyList()
             )
         }
     }
@@ -3825,15 +3837,25 @@ class ArViewModel @Inject constructor(
         val projectId = loadedProjectId ?: return
         val currentProject = projectRepository.currentProject.value ?: return
         if (currentProject.id != projectId) return
-        saveWallNormalIfChanged(projectId, currentProject)
-
-        val map = slamManager.getWallFeatureMap()?.takeIf { it.pointCount > 0 }
         val ui = _uiState.value
         val standaloneBackend =
             ui.isArCoreAvailabilityResolved &&
                 !ui.isArCoreAvailable &&
                 currentProject.sphereSlamReferenceUri != null &&
                 currentProject.sphereSlamFingerprint != null
+        // ARCore-frame state (wall normal, wall map, paint marks, grid) is what the loader swaps in;
+        // between a project switch and the end of that swap native still holds the PREVIOUS
+        // project's, and writing it here would put project A's map into project B. Skip until the
+        // loader has claimed ownership; the next autosave tick picks it up. The standalone branch
+        // below is installed by the standalone analyzer, not by that loader, and is guarded by its
+        // own reference-URI / map_from_fingerprint checks.
+        if (!standaloneBackend && !nativeStateOwner.owns(projectId)) {
+            Timber.d("Wall map save skipped: native state is not (yet) project $projectId's")
+            return
+        }
+        saveWallNormalIfChanged(projectId, currentProject)
+
+        val map = slamManager.getWallFeatureMap()?.takeIf { it.pointCount > 0 }
 
         if (standaloneBackend) {
             if (map == null) return
@@ -3994,9 +4016,7 @@ class ArViewModel @Inject constructor(
         if (tooSmall && !wasTooSmall) {
             _feedback.tryEmit(
                 com.hereliesaz.graffitixr.common.model.FeedbackEvent.Toast(
-                    "The artwork covers nearly all the wall in view — only $backbone tracked " +
-                        "features sit outside it. Make it smaller or step back, or the target " +
-                        "may not lock.",
+                    appContext.getString(DesignR.string.ar_feedback_backbone_warning, backbone),
                 ),
             )
         }
@@ -4218,6 +4238,7 @@ class ArViewModel @Inject constructor(
      * a future branch cannot get one and forget the others.
      */
     private fun dropLoadedFingerprint() {
+        nativeStateOwner.clear()
         slamManager.clearWallFingerprint()
         slamManager.overlayMarkCenterLocal = null
         // 0.9 — same lifetime: without it PoseFusion cannot compose a correction at all.
@@ -4245,19 +4266,61 @@ class ArViewModel @Inject constructor(
 
     @Volatile private var loadedFingerprint: LoadedFingerprint? = null
 
+    /** Loader runs between their start and their `finally`; see [loadFingerprintIfExists]. */
+    private val fingerprintLoadsInFlight = java.util.concurrent.atomic.AtomicInteger(0)
+
     /**
      * Restore (or clear) the wall fingerprint for the current project.
      *
-     * **Single exit, and every state write in one place.** There are no early returns past the
-     * idempotence check: the branches decide an OUTCOME and the tail applies it. That shape is the
-     * actual fix for this function's history — the wall-feature-map block below used to be skipped
-     * by the refusal branch's `return`, so a refused project kept the previous project's map in
-     * native and then SAVED it into the refused project's file on teardown. Two branches, one
-     * `return`, and the sixth instance of the same family.
+     * **One place decides native-state ownership: the `finally` here.** Every exit path ends in it:
+     *
+     *  - [NativeStateOwner.LoadExit.LOADED] — [nativeStateOwner] is marked as the loader's last step (only
+     *    if the project is still current).
+     *  - [NativeStateOwner.LoadExit.UNCHANGED] — the idempotence early return in [applyProjectFingerprint]. It
+     *    used to skip the marking, so an A -> B -> A switch (the collector had dropped A's ownership
+     *    on B's emission, then A came back before B's loader changed anything) left ownership null
+     *    while native still held A's state, and [saveProjectWallMap] then refused every ARCore
+     *    wall-map autosave for A for the rest of the session. Native still describes the project, so
+     *    ownership is re-claimed — but only when no OTHER loader is mid-flight: a loader that is
+     *    still rewriting native (map, paint marks, grid) must be the one to claim it when it finishes.
+     *  - [NativeStateOwner.LoadExit.ABANDONED] after native was possibly touched (a throw, or cancellation
+     *    with the view model) — ownership is released, since native may hold a mixture.
+     *
+     * Inside [applyProjectFingerprint] the branches of the load decide an OUTCOME and the tail applies
+     * it, with a single early return (the idempotence check). That shape is the actual fix for this
+     * function's history — the wall-feature-map block used to be skipped by the refusal branch's
+     * `return`, so a refused project kept the previous project's map in native and then SAVED it into
+     * the refused project's file on teardown.
      */
     private fun loadFingerprintIfExists() {
         viewModelScope.launch(Dispatchers.IO) {
             val project = projectRepository.currentProject.value ?: return@launch
+            var exit = NativeStateOwner.LoadExit.ABANDONED
+            fingerprintLoadsInFlight.incrementAndGet()
+            try {
+                applyProjectFingerprint(project) { exit = it }
+            } finally {
+                nativeStateOwner.finishLoad(
+                    project.id,
+                    exit,
+                    // Read AFTER the loader's work: a load overtaken by a newer project must not claim.
+                    stillCurrent = projectRepository.currentProject.value?.id == project.id,
+                    othersInFlight = fingerprintLoadsInFlight.decrementAndGet() > 0,
+                )
+            }
+        }
+    }
+
+    /**
+     * The body of [loadFingerprintIfExists]. [reportExit] is called BEFORE the exit's last work (the
+     * unchanged path's partition) so that a throw there still leaves the caller knowing native was
+     * not touched; an exception anywhere else leaves the caller at [NativeStateOwner.LoadExit.ABANDONED].
+     */
+    private suspend fun applyProjectFingerprint(
+        project: com.hereliesaz.graffitixr.common.model.GraffitiProject,
+        reportExit: (NativeStateOwner.LoadExit) -> Unit,
+    ) {
+        run {
             val fp = project.fingerprint
             val incoming = LoadedFingerprint(project.id, fp)
             val current = loadedFingerprint
@@ -4268,8 +4331,9 @@ class ArViewModel @Inject constructor(
             // including the ones the partition itself causes — from re-pushing and, on the refusal
             // path, from re-wiping native's artwork registration every time a layer is saved.
             if (current == incoming) {
+                reportExit(NativeStateOwner.LoadExit.UNCHANGED)
                 partitionLiveFingerprintIfNeeded()
-                return@launch
+                return
             }
             // A different project — and `current != null` is load-bearing, not defensive. On the
             // FIRST load of a session there is no previous project, and the footprint present is the
@@ -4278,6 +4342,9 @@ class ArViewModel @Inject constructor(
             // `ArViewModelTest.loading an unpartitioned fingerprint partitions it and writes exactly
             // once`, which is why that test exists.)
             if (current != null && current.projectId != project.id) latestDesignFootprint = null
+            // Native is about to be rewritten for `project`; until the END of this load it holds a
+            // mixture, and no save may attribute it to this project.
+            nativeStateOwner.beginSwitch(project.id)
 
             val intr = project.fingerprintIntrinsics
             val anchor = project.fingerprintAnchor
@@ -4332,8 +4399,7 @@ class ArViewModel @Inject constructor(
                         // like bad tracking.
                         _feedback.tryEmit(
                             com.hereliesaz.graffitixr.common.model.FeedbackEvent.Toast(
-                                "This project's saved target was made by an older version and its " +
-                                    "3D geometry can't be corrected. Create the target again to use it.",
+                                appContext.getString(DesignR.string.ar_feedback_legacy_target_geometry),
                             ),
                         )
                     }
@@ -4398,8 +4464,10 @@ class ArViewModel @Inject constructor(
                 // IMPLEMENTATION.md 0.9 — the third factor of PoseFusion.composeCorrected. A
                 // pre-Phase-2 fingerprint has none, and null there means "do not correct" rather
                 // than "correct with the world anchor", which is the frame defect 0.9 fixed.
-                slamManager.captureAnchorCam =
-                    if (fp.captureAnchorCam.size == 16) fp.captureAnchorCam.toFloatArray() else null
+                // Also lowers the re-capture gate: this project's fingerprint and pose are now both in.
+                slamManager.completeFingerprintReplacement(
+                    if (fp.captureAnchorCam.size == 16) fp.captureAnchorCam.toFloatArray() else null,
+                )
             }
 
             loadedFingerprint = incoming
@@ -4447,6 +4515,8 @@ class ArViewModel @Inject constructor(
                 project.fingerprintWallNormalEnu.takeIf { it.size == 3 }?.toFloatArray(),
             )
         }
+        // Last step: native now holds this project's state. The caller's `finally` claims ownership.
+        reportExit(NativeStateOwner.LoadExit.LOADED)
     }
 
     /**
@@ -4930,7 +5000,7 @@ class ArViewModel @Inject constructor(
             appendDiag("camera not feeding on mono — armed safe-config recovery; exit and re-enter AR to retry")
             _feedback.tryEmit(
                 com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                    "Camera isn't delivering frames — exit AR and try again"
+                    appContext.getString(DesignR.string.ar_feedback_camera_no_frames)
                 )
             )
             return
@@ -4970,7 +5040,7 @@ class ArViewModel @Inject constructor(
                     appendDiag("stereo recovery: GL thread still owns ARCore after 1500ms — aborting live reconfigure")
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                            "AR camera recovery timed out safely — exit and re-enter AR"
+                            appContext.getString(DesignR.string.ar_feedback_camera_recovery_timeout)
                         )
                     )
                     return@withLock
@@ -5347,9 +5417,9 @@ class ArViewModel @Inject constructor(
             // Fail closed, but tell the artist what to do instead of failing silently at Confirm.
             _feedback.tryEmit(
                 com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                    StandalonePhotosphereCapture.userMessage(
+                    StandalonePhotosphereCapture.userText(
                         blocker ?: StandalonePhotosphereCapture.Blocker.PHOTOSPHERE_EMPTY
-                    )
+                    ).resolve(appContext)
                 )
             )
         }
@@ -5407,7 +5477,7 @@ class ArViewModel @Inject constructor(
                 )
                 _feedback.tryEmit(
                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                        "Couldn't prepare the captured target. Try again.",
+                        appContext.getString(DesignR.string.ar_feedback_target_prepare_failed),
                         e,
                     )
                 )
@@ -5449,97 +5519,186 @@ class ArViewModel @Inject constructor(
         val extent = computePhysicalExtent(
             depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics, depthBufStride, displayRotation,
         )
+        if (tapPos != null) pendingTapPosition = null
+        // Stop the capture request NOW, on this (GL) thread's call: the renderer re-arms a capture
+        // every frame while the flag is up, and the preparation below no longer happens inline.
+        _uiState.update { it.copy(isCaptureRequested = false) }
 
-        val rotatedBmp = if (displayRotation != 0) {
-            val matrix = android.graphics.Matrix().apply { postRotate(displayRotation.toFloat()) }
-            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-        } else bitmap
-
-        if (tapPos != null) {
-            pendingTapPosition = null
-            
-            // INITIALIZE: Default unwarp quad to the corners of the view (NORMALIZED)
-            val padding = 0.15f
-            val initialPoints = listOf(
-                Offset(padding, padding),
-                Offset(1f - padding, padding),
-                Offset(1f - padding, 1f - padding),
-                Offset(padding, 1f - padding)
-            )
-
-            _uiState.update {
-                it.copy(
-                    tapMarks = it.tapMarks + com.hereliesaz.graffitixr.common.model.TapMark(tapPos.first, tapPos.second, tapDistanceMeters),
-                    targetRawBitmap = bitmap,
-                    targetDisplayRotation = displayRotation,
-                    targetCaptureEnvironment = environment,
-                    targetDepthBuffer = depthBuffer,
-                    targetDepthWidth = colorW,
-                    targetDepthHeight = colorH,
-                    targetDepthBufferWidth = depthBufW,
-                    targetDepthBufferHeight = depthBufH,
-                    targetDepthStride = depthBufStride,
-                    targetIntrinsics = intrinsics,
-                    targetCaptureViewMatrix = viewMatrix,
-                    targetWallPlane = wallPlane,
-                    targetPhysicalExtent = extent,
-                    isCaptureRequested = false,
-                    tempCaptureBitmap = rotatedBmp,
-                    annotatedCaptureBitmap = rotatedBmp.isolateMarkings(),
-                    unwarpPoints = initialPoints
-                )
+        if (tapPos == null) {
+            extent?.let { (halfW, halfH) ->
+                renderer?.updateOverlayExtent(halfW, halfH)
             }
-            return
         }
 
-        extent?.let { (halfW, halfH) ->
-            renderer?.updateOverlayExtent(halfW, halfH)
-        }
+        // The rotation (a full-frame Bitmap copy) and isolateMarkings (an adaptive threshold over
+        // every pixel plus a flood fill) used to run right here, inside `_uiState.update {}` — on the
+        // GL thread, which also re-ran them whenever the update lambda was retried under CAS
+        // contention. Compute off the caller's thread and publish ONE state with the finished result.
+        // A newer capture, or Retake/cancel, supersedes this one: the job is cancelled and a stale
+        // result is never written.
+        captureComputeJob?.cancel()
+        captureComputeJob = viewModelScope.launch(dispatchers.default) {
+            val rotatedBmp = if (displayRotation != 0) {
+                val matrix = android.graphics.Matrix().apply { postRotate(displayRotation.toFloat()) }
+                Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+            } else bitmap
+            val markings = rotatedBmp.isolateMarkings()
+            ensureActive()
 
-        _uiState.update {
-            it.copy(
-                tempCaptureBitmap = rotatedBmp,
-                annotatedCaptureBitmap = rotatedBmp.isolateMarkings(),
-                targetRawBitmap = bitmap,
-                targetDisplayRotation = displayRotation,
-                targetCaptureEnvironment = environment,
-                targetDepthBuffer = depthBuffer,
-                targetDepthWidth = colorW,
-                targetDepthHeight = colorH,
-                targetDepthBufferWidth = depthBufW,
-                targetDepthBufferHeight = depthBufH,
-                targetDepthStride = depthBufStride,
-                targetIntrinsics = intrinsics,
-                targetCaptureViewMatrix = viewMatrix,
-                targetWallPlane = wallPlane,
-                targetPhysicalExtent = extent,
-                isCaptureRequested = false
-            )
+            if (tapPos != null) {
+                // INITIALIZE: Default unwarp quad to the corners of the view (NORMALIZED)
+                val padding = 0.15f
+                val initialPoints = listOf(
+                    Offset(padding, padding),
+                    Offset(1f - padding, padding),
+                    Offset(1f - padding, 1f - padding),
+                    Offset(padding, 1f - padding)
+                )
+                _uiState.update {
+                    it.copy(
+                        tapMarks = it.tapMarks + com.hereliesaz.graffitixr.common.model.TapMark(tapPos.first, tapPos.second, tapDistanceMeters),
+                        targetRawBitmap = bitmap,
+                        targetDisplayRotation = displayRotation,
+                        targetCaptureEnvironment = environment,
+                        targetDepthBuffer = depthBuffer,
+                        targetDepthWidth = colorW,
+                        targetDepthHeight = colorH,
+                        targetDepthBufferWidth = depthBufW,
+                        targetDepthBufferHeight = depthBufH,
+                        targetDepthStride = depthBufStride,
+                        targetIntrinsics = intrinsics,
+                        targetCaptureViewMatrix = viewMatrix,
+                        targetWallPlane = wallPlane,
+                        targetPhysicalExtent = extent,
+                        isCaptureRequested = false,
+                        tempCaptureBitmap = rotatedBmp,
+                        annotatedCaptureBitmap = markings,
+                        unwarpPoints = initialPoints
+                    )
+                }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        tempCaptureBitmap = rotatedBmp,
+                        annotatedCaptureBitmap = markings,
+                        targetRawBitmap = bitmap,
+                        targetDisplayRotation = displayRotation,
+                        targetCaptureEnvironment = environment,
+                        targetDepthBuffer = depthBuffer,
+                        targetDepthWidth = colorW,
+                        targetDepthHeight = colorH,
+                        targetDepthBufferWidth = depthBufW,
+                        targetDepthBufferHeight = depthBufH,
+                        targetDepthStride = depthBufStride,
+                        targetIntrinsics = intrinsics,
+                        targetCaptureViewMatrix = viewMatrix,
+                        targetWallPlane = wallPlane,
+                        targetPhysicalExtent = extent,
+                        isCaptureRequested = false
+                    )
+                }
+            }
+        }
+    }
+
+    // The in-flight rotate + isolateMarkings of the latest capture (see onTargetCaptured).
+    private var captureComputeJob: Job? = null
+
+    /**
+     * A capture is being discarded (Retake, cancel, confirm): stop its preparation, drop queued mark
+     * erases and release the eraser's pixel buffers, so none of it lands on the NEXT capture's mask.
+     */
+    private fun resetCapturePipeline() {
+        captureComputeJob?.cancel()
+        captureComputeJob = null
+        // FIRST: from here every sample queued for the discarded capture (including a batch a drain
+        // has already polled and is about to apply) fails the generation check in
+        // applyPendingMarkRemovalsLocked, so it cannot erase whatever mask comes next.
+        captureGeneration.incrementAndGet()
+        pendingMarkRemovals.clear()
+        // The eraser is mutex-guarded state: drop it under the mutex rather than racing a drain that
+        // may be assigning it. (A stale eraser could not be applied to the new mask anyway - it is
+        // keyed by bitmap identity - this releases its pixel buffers without a data race.)
+        viewModelScope.launch(dispatchers.default) {
+            markRemovalMutex.withLock { markEraser = null }
         }
     }
 
     /**
      * Remove the ENTIRE mark the user tapped or dragged onto from the fingerprint mask.
-     * Floods the whole connected highlighted blob to transparent (see eraseColorBlob) — no
-     * partial pixel erasing, no per-point dots. A drag calls this per touch sample; once a mark
-     * is cleared, re-touching its now-transparent area is a cheap no-op. The mask's alpha channel
-     * is what the native fingerprint masker reads, so the mark simply stops contributing.
+     * Floods the whole connected highlighted blob to transparent (see [MarkEraser]) — no partial
+     * pixel erasing, no per-point dots. A drag calls this per touch sample. Samples are queued and
+     * applied in batches to ONE working pixel buffer, publishing one new mask per batch; a touch with
+     * no mark in reach erases nothing and publishes nothing (it costs a bounded neighbourhood scan,
+     * not an image copy). The mask's alpha channel is what the native fingerprint masker reads, so
+     * the mark simply stops contributing.
+     *
+     * Asynchronous: the mask in [uiState] lags the touches by the queue. Anything that consumes the
+     * mask (Confirm) must go through [awaitLatestTargetCapture], which applies every queued erase first.
      */
-    // Serializes drag-time mark removals so each flood-fill starts from the LATEST mask rather than
-    // a snapshot taken when the gesture sample fired. Without this, two rapid removeMarkAt calls both
-    // read the same bitmap and the later write clobbers the earlier removal, making erased marks
-    // reappear. A mutex (vs. doing the work inside _uiState.update {}) guarantees the expensive
-    // flood-fill runs exactly once per call instead of being re-evaluated on CAS contention.
+    // Serializes the batches so each starts from the LATEST mask rather than a snapshot taken when the
+    // gesture sample fired. Without this, two rapid removals both read the same bitmap and the later
+    // write clobbers the earlier one, making erased marks reappear. Samples are enqueued
+    // synchronously, BEFORE the drain is launched, so a drain (or a flush) that holds this mutex
+    // always sees every sample enqueued before it started.
     private val markRemovalMutex = Mutex()
+    /** One queued erase sample, tagged with the capture it was aimed at. */
+    private class MarkRemoval(val generation: Int, val nx: Float, val ny: Float)
+
+    private val pendingMarkRemovals = java.util.concurrent.ConcurrentLinkedQueue<MarkRemoval>()
+
+    // Identity of the capture whose mask erases apply to; advanced by resetCapturePipeline. A sample
+    // is applied only if the generation it was queued under is still this one when the drain has the
+    // current mask in hand - otherwise a drag sample that was already polled (or arrived late) would
+    // erase the NEW capture's mask.
+    private val captureGeneration = java.util.concurrent.atomic.AtomicInteger(0)
+
+    /** Test seam, null in production: runs in a drain after the queue is polled, before the mask is read. */
+    @Volatile internal var markBatchPolledHookForTest: (() -> Unit)? = null
+    // Pixel buffers of the mask currently on screen (see MarkEraser). Guarded by markRemovalMutex.
+    @Volatile private var markEraser: MarkEraser? = null
 
     fun removeMarkAt(nx: Float, ny: Float) {
+        pendingMarkRemovals.add(MarkRemoval(captureGeneration.get(), nx, ny))
         viewModelScope.launch(dispatchers.default) {
-            markRemovalMutex.withLock {
-                val current = _uiState.value.annotatedCaptureBitmap ?: return@withLock
-                val updated = current.eraseColorBlob(nx, ny)
-                _uiState.update { it.copy(annotatedCaptureBitmap = updated) }
-            }
+            markRemovalMutex.withLock { applyPendingMarkRemovalsLocked() }
         }
+    }
+
+    /** Apply every queued erase to the current mask and publish it once. Caller holds [markRemovalMutex]. */
+    private fun applyPendingMarkRemovalsLocked() {
+        val polled = ArrayList<MarkRemoval>()
+        while (true) polled.add(pendingMarkRemovals.poll() ?: break)
+        if (polled.isEmpty()) return
+        markBatchPolledHookForTest?.invoke()
+        val current = _uiState.value.annotatedCaptureBitmap ?: return
+        // Read AFTER the mask: a capture reset bumps the generation before any later mask is
+        // published, so if `current` is a newer capture's mask the bump is already visible here.
+        val generation = captureGeneration.get()
+        val batch = polled.filter { it.generation == generation }
+        if (batch.isEmpty()) return
+        val eraser = markEraser?.takeIf { it.isFor(current) } ?: MarkEraser(current).also { markEraser = it }
+        var changed = false
+        for (sample in batch) if (eraser.erase(sample.nx, sample.ny)) changed = true
+        if (!changed) return
+        val updated = eraser.publish()
+        // Only if the mask is still the one these erases were applied to: a Retake or new capture
+        // during the batch replaced it, and the stale result must not overwrite the new mask.
+        _uiState.update { if (it.annotatedCaptureBitmap === current) it.copy(annotatedCaptureBitmap = updated) else it }
+    }
+
+    /**
+     * The capture bitmap and fingerprint mask as they stand NOW, after every mark erase queued so far
+     * has been applied. Confirm calls this instead of reading the composition's snapshot, which can
+     * predate erases still in flight — the artist taps the last mark and Confirm immediately, and the
+     * fingerprint was built with that mark still in it.
+     */
+    suspend fun awaitLatestTargetCapture(): Pair<Bitmap?, Bitmap?> {
+        withContext(dispatchers.default) {
+            markRemovalMutex.withLock { applyPendingMarkRemovalsLocked() }
+        }
+        val state = _uiState.value
+        return state.tempCaptureBitmap to state.annotatedCaptureBitmap
     }
 
     // ── AR Measure (BACKLOG Phase 6 step 1) ─────────────────────────────────────────────────────
@@ -5652,7 +5811,7 @@ class ArViewModel @Inject constructor(
                 cancelMeasure()
             } else {
                 _feedback.tryEmit(
-                    com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error("Couldn't save the wall width. Try Save again."),
+                    com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(appContext.getString(DesignR.string.ar_feedback_wall_width_save_failed)),
                 )
             }
         }
@@ -5682,8 +5841,7 @@ class ArViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 tapMarks = emptyList(),
-                unwarpPoints = emptyList(),
-                targetKeypoints = emptyList()
+                unwarpPoints = emptyList()
             )
         }
     }
@@ -5697,14 +5855,14 @@ class ArViewModel @Inject constructor(
     fun clearCaptureForRetry() {
         pendingTapPosition = null
         pendingStandaloneFingerprintPlacement = null
+        resetCapturePipeline()
         _uiState.update {
             it.copy(
                 tempCaptureBitmap = null,
                 annotatedCaptureBitmap = null,
                 targetWallPlane = null,
                 tapMarks = emptyList(),
-                unwarpPoints = emptyList(),
-                targetKeypoints = emptyList()
+                unwarpPoints = emptyList()
             )
         }
     }
@@ -5747,38 +5905,6 @@ class ArViewModel @Inject constructor(
         return halfW to halfH
     }
 
-    fun setTempCapture(bitmap: Bitmap?) {
-        _uiState.update { it.copy(tempCaptureBitmap = bitmap) }
-    }
-
-    fun setAnnotatedCapture(bitmap: Bitmap?) {
-        _uiState.update { it.copy(annotatedCaptureBitmap = bitmap) }
-        computeTargetKeypoints()
-    }
-
-    /**
-     * Detect the REAL fingerprint features on the captured target (same detector as
-     * generateFingerprint, restricted to the current mask) and publish them normalized for the
-     * refinement overlay, so the user sees exactly what will anchor and can erase the spurious ones.
-     */
-    private fun computeTargetKeypoints() {
-        val raw = _uiState.value.tempCaptureBitmap
-        if (raw == null) {
-            _uiState.update { it.copy(targetKeypoints = emptyList()) }
-            return
-        }
-        val mask = _uiState.value.annotatedCaptureBitmap
-        val w = raw.width.toFloat().coerceAtLeast(1f)
-        val h = raw.height.toFloat().coerceAtLeast(1f)
-        viewModelScope.launch(Dispatchers.IO) {
-            val pts = slamManager.getFingerprintKeypoints(raw, mask)
-                .map { androidx.compose.ui.geometry.Offset(it.first / w, it.second / h) }
-            _uiState.update { it.copy(targetKeypoints = pts) }
-        }
-    }
-
-
-
 
     fun onCaptureConsumed() {
         clearCaptureState()
@@ -5793,6 +5919,17 @@ class ArViewModel @Inject constructor(
         // that succeeded is discarded with "couldn't lock an anchor".
         slamManager.captureAnchorGenerationBaseline = slamManager.anchorGeneration.value
         slamManager.captureSessionEpochBaseline = slamManager.sessionEpochValue
+        // A (re-)capture replaces the anchor, and `captureAnchorCam` is expressed against the anchor
+        // it was built for. Left in place it would pair the NEW anchor with the OLD capture pose from
+        // the moment the renderer resets fusion until the builder publishes the new one (it awaits
+        // this anchor first, so the new value always lands after this clear). If the build then fails,
+        // fusion reports NO_CAPTURE_POSE instead of correcting in the wrong frame.
+        //
+        // Beyond the pose, native still holds the PREVIOUS wall's fingerprint and keeps solving against
+        // it, so its results (seq advancing) are in the old wall's frame too. The replacement gate
+        // makes the renderer ignore reloc and the arbiter never pick it until the builder (or a
+        // project load) installs the new fingerprint AND the new pose.
+        slamManager.beginFingerprintReplacement()
         renderer?.pendingAnchorEstablishment = true
     }
 

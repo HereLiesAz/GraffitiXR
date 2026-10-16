@@ -100,8 +100,12 @@ project.
 - **Function:** Owns all project file I/O — `project.json`, target/thumbnail PNGs, and `.gxr`
   export/import/co-op transfer. See `docs/data_formats.md` for the exact layout.
 - **Notable behaviors:**
-  - **Atomic writes.** `project.json` is written to a sibling `.tmp` file and renamed over the
-    target, so a crash mid-write can't leave a truncated, unparseable manifest.
+  - **Atomic writes.** `project.json` is written to a sibling `.tmp` file, fsynced and renamed over
+    the target, so a crash mid-write can't leave a truncated, unparseable manifest. The thumbnail,
+    target-image, SphereSLAM and KPM PNGs (and `ProjectRepository.saveArtifact`) use the same
+    temp-file, fsync, rename sequence, and a failed PNG encode throws rather than being recorded.
+  - **Folder id is the identity.** `loadProjectMetadata` refuses a project whose manifest id does
+    not match its folder name, so the library skips such folders.
   - **In-memory migration.** Old-shape projects (a `layers` list instead of `design`, or the older
     `legacyVisuals` grouping) are migrated on every load (`migrateInMemory`), purely in memory —
     nothing re-persists the migrated shape, so a project keeps its legacy fields in the JSON file
@@ -118,7 +122,10 @@ project.
     cap before the cap is ever checked), enforce a cumulative decompressed-size cap
     (`MAX_IMPORT_BYTES`), reject path-traversal ("Zip-Slip") entry names, validate the archive's
     project id before using it as a path segment, and clean up every temp file — including a
-    superseded one on a duplicate entry name, and on any exception mid-extraction.
+    superseded one on a duplicate entry name, and on any exception mid-extraction. Import checks
+    free space up front and builds the project in a hidden staging directory
+    (`filesDir/import_staging`), renaming it to `projects/<id>` only after the corrected manifest
+    is written; exports and co-op transfers omit superseded `design_*` images.
 
 ### `ProjectRepository` / `ProjectRepositoryImpl`
 - **Location:** `core/domain/.../repository/ProjectRepository.kt` (interface),

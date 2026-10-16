@@ -16,8 +16,15 @@ class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
-    val language: StateFlow<AppLanguage> = settingsRepository.language
-        .stateIn(viewModelScope, SharingStarted.Eagerly, AppLanguage.SYSTEM)
+    /**
+     * The stored language, or `null` until the first read from the store has completed. `null`
+     * deliberately is not [AppLanguage.SYSTEM]: SYSTEM is a real choice that means "clear the app
+     * locale", so seeding with it made the host call `setApplicationLocales(empty)` before the
+     * stored value arrived (undoing the locale AppCompat's `autoStoreLocales` had just restored, then
+     * flipping back — a flash and an extra recreate). Callers apply a locale only for a non-null value.
+     */
+    val language: StateFlow<AppLanguage?> = settingsRepository.language
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     val crashReportingConsent: StateFlow<Boolean> = settingsRepository.crashReportingConsent
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)

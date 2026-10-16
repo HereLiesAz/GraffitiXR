@@ -256,4 +256,16 @@ interface SettingsRepository {
      */
     val anticipationSettings: Flow<AnticipationSettings>
     suspend fun setAnticipationSettings(settings: AnticipationSettings)
+
+    /**
+     * Id of the project that was open when the app last ran, or null when none was (or it was
+     * closed or deleted since).
+     *
+     * ProjectRepository holds the open project in memory only, but the navigation back stack is
+     * restored after process death, so the editor route can come back with no project behind it.
+     * This is what lets the app reopen the project the user was in, or fall back to the library when
+     * it no longer exists. Never a co-op spectator copy: those belong to a session that is gone.
+     */
+    val lastOpenProjectId: Flow<String?>
+    suspend fun setLastOpenProjectId(id: String?)
 }

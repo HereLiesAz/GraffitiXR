@@ -38,7 +38,12 @@ object OffsetSerializer : KSerializer<Offset> {
         val parts = string.split(",")
         return if (parts.size == 2) {
             try {
-                Offset(parts[0].toFloat(), parts[1].toFloat())
+                val x = parts[0].toFloat()
+                val y = parts[1].toFloat()
+                // String.toFloat accepts "NaN" and "Infinity", which serialize() never writes; a
+                // hand-edited or hostile manifest carrying them would put a non-finite offset into
+                // the layer transform. Treat them like any other invalid input.
+                if (x.isFinite() && y.isFinite()) Offset(x, y) else Offset.Zero
             } catch (e: NumberFormatException) {
                 Offset.Zero
             }

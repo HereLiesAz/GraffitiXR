@@ -29,11 +29,6 @@
     <string name="nav_trace_info">Use your design as a light-table overlay to trace reference lines onto a physical surface.</string>
     <!-- Alternative name for Trace mode, often referred to as Lightbox. -->
 
-    <!-- Label for Canvas mode, which is optimized for smaller, desk-scale artwork. -->
-    <!-- Label for Mural mode, which is optimized for large-scale wall artwork. -->
-    <!-- Description for the toggle between Canvas and Mural scanning modes. -->
-    <string name="nav_scan_mode_toggle_info">Switch between Canvas (optimized for smaller desk-scale art) and Mural (optimized for large-scale walls and Voxel-based spatial tracking).</string>
-
     <!-- Label for the Stencil generation tool. -->
     <!-- Description of the Stencil tool, explaining how it creates multi-layer printable templates. -->
 
@@ -604,11 +599,13 @@
         <item>Tap \'Open\' to add a layer — pick a photo and it appears here, floating over the live camera view.</item>
         <item>Pinch to scale, drag to reposition. The overlay stays fixed to your screen — step back to see how it fits the wall.</item>
     </string-array>
-    <!-- Shown once on first launch on devices where ARCore is not supported. -->
+    <!-- Shown once (ArUnavailableOverlay, key "ar_unavailable_explainer") on a device without ARCore.
+         It must stay true to the standalone SphereSLAM path: AR still works there, via a captured
+         wall target, so this explains the difference instead of saying AR is unavailable. -->
     <string-array name="onboarding_ar_unavailable">
-        <item>This device doesn\'t support ARCore, so the AR Projection mode isn\'t available.</item>
-        <item>You can still use Trace, Mockup, and Live Overlay — every mode except AR works without ARCore.</item>
-        <item>Tap to dismiss.</item>
+        <item>This device doesn\'t support ARCore, so AR mode uses standalone wall tracking instead.</item>
+        <item>In AR mode you\'ll first capture a photo of a textured patch of wall and mark its four corners. Tracking then locks onto that target.</item>
+        <item>Trace, Mockup and Overlay work as usual. Tap to dismiss.</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>Photo Mockup — preview your design on a photo before you ever pick up a brush.</item>
@@ -625,10 +622,8 @@
          under the Design host and is hidden until Design is opened first (expandWhen collapses
          it in every other mode) — unlike onboarding_overlay[1]/onboarding_mockup[2]/
          onboarding_trace[1]/onboarding_ar[3] above, which say "Tap Open" alone and point at a
-         control that isn't actually visible yet. Not yet translated into this app's other 14
-         locales (matches the pre-existing, same-shaped gap in MainActivity's
-         showDesignInstructionsDialog, which is also English-only) — tracked in BACKLOG.md rather
-         than left undocumented. -->
+         control that isn't actually visible yet. Each locale names the two rail items with its own
+         nav_design / nav_open labels so the words match what is on screen. -->
     <string name="guidance_open_via_design_overlay">Tap \'Design\' on the rail, then \'Open\', to add a layer — pick a photo and it appears here, floating over the live camera view.</string>
     <string name="guidance_open_via_design_mockup">Tap \'Design\' on the rail, then \'Open\', to add a layer on top of the wall photo. Pinch and drag to size and position it.</string>
     <string name="guidance_open_via_design_trace">Tap \'Design\' on the rail, then \'Open\', to add your first layer. Once it\'s in, pinch and drag on the canvas to size and place it.</string>
@@ -654,4 +649,129 @@
     <string name="nav_gyro_info">On a tripod, holds the design still on the wall against small vibrations using the motion sensor. Turn on once the phone is set; it lets go if the phone is moved.</string>
     <string name="gyro_released_moved">Gyro released: the phone moved too far.</string>
     <string name="gyro_unavailable">Gyro needs a rotation sensor this device doesn\'t report.</string>
+    <!-- Gallery export / AR export availability -->
+    <!-- Export to the gallery failed for a reason other than permission. -->
+    <string name="export_failed">Export failed: the image couldn\'t be saved to your gallery.</string>
+    <!-- Export failed because storage access (API 26-28 only) was refused. -->
+    <string name="export_failed_permission">Couldn\'t save to your gallery. Allow storage access for GraffitiXR and try again.</string>
+    <!-- AR export was requested while the AR renderer is not attached. -->
+    <string name="export_ar_unavailable">Export isn\'t ready: the AR camera view isn\'t running. Open the AR view and try again.</string>
+    <!-- Shown when Export is tapped in standalone (non-ARCore) AR. -->
+    <string name="export_standalone_ar_unavailable">Export isn\'t available in standalone AR yet.</string>
+    <!-- Export reason while the AR backend is still being detected. -->
+    <string name="rail_checking_ar_backend">Checking AR backend…</string>
+
+    <!-- Hard-coded English moved out of Settings, the first-run flow, the standalone SphereSLAM
+         overlay and target creation. Every key here exists in every values-* directory. -->
+    <string name="settings_use_arcore">Use ARCore</string>
+    <string name="settings_arcore_depth">ARCore depth</string>
+    <string name="settings_monocular_depth">Monocular depth (beta)</string>
+    <string name="settings_ambient_scan">Ambient scan</string>
+    <string name="settings_adaptive_rate">Adaptive rate (idle)</string>
+    <string name="settings_crash_reports">Crash reports</string>
+    <string name="settings_crash_reports_desc">On a crash, send the device model and recent logs to a public bug report? Off by default.</string>
+    <string name="settings_crash_token_label">Crash-report token</string>
+    <string name="settings_crash_token_set">Set</string>
+    <string name="settings_crash_token_not_set">Not set</string>
+    <string name="settings_crash_token_desc">A GitHub token with Issues: write on HereLiesAz/GraffitiXR. Stored only on this device, never in the app. Leave blank to disable uploads.</string>
+    <string name="settings_crash_token_field">Token</string>
+    <string name="settings_canvas_color_black">Black</string>
+    <string name="settings_canvas_color_dark">Dark</string>
+    <string name="settings_canvas_color_grey">Grey</string>
+    <string name="settings_canvas_color_white">White</string>
+    <string name="settings_canvas_color_navy">Navy</string>
+    <string name="state_selected">Selected</string>
+    <string name="state_expanded">Expanded</string>
+    <string name="state_collapsed">Collapsed</string>
+    <string name="settings_fps_device_default">Device default</string>
+    <string name="settings_fps_device_max">Device max</string>
+    <string name="first_run_photo_title">See it on your wall</string>
+    <string name="first_run_photo_text">Pick a reference photo of your artwork and we\'ll show you how it looks on a real wall, in AR.</string>
+    <string name="first_run_choose_photo">Choose Photo</string>
+    <string name="first_run_not_now">Not now</string>
+    <string name="first_run_draw_title">Draw this on your wall</string>
+    <string name="first_run_draw_hint">Make it big — roughly the size of your artwork. It only has to be recognisable, not neat.</string>
+    <string name="first_run_draw_done">I\'ve drawn it</string>
+    <string name="first_run_draw_skip">Skip — I\'ll place it myself</string>
+    <string name="first_run_detect_title">Now point your camera at what you drew</string>
+    <string name="first_run_detect_movement_hint">Slowly move your device in a circle</string>
+    <string name="design_instructions_title">Design Your Mural</string>
+    <string name="design_instructions_text">Tap \'%1$s\' on the rail, then \'%2$s\', to choose a photo of your artwork.</string>
+    <string name="got_it_button">Got it</string>
+    <string name="standalone_width_prompt">Measure the real width between the left and right edges of the target.</string>
+    <string name="standalone_width_label_metric">Target width (meters)</string>
+    <string name="standalone_width_label_imperial">Target width (feet and inches)</string>
+    <string name="standalone_width_range_error">Enter a width from %1$s to %2$s.</string>
+    <string name="standalone_use_measured_width">Use Measured Width</string>
+    <string name="standalone_continue_without_scale">Continue Without Physical Scale</string>
+    <string name="standalone_recapture">Recapture</string>
+    <string name="standalone_capture_wall_target">Capture Wall Target</string>
+    <string name="standalone_capture_failed">Couldn\'t capture the wall target — try again.</string>
+    <string name="standalone_rectify_failed">Couldn\'t rectify that target — mark four clear corners.</string>
+    <string name="standalone_target_too_weak">That target has too little trackable detail (%1$d KPM features; need %2$d). Recapture a richer wall patch.</string>
+    <string name="standalone_new_target">New Target</string>
+    <string name="standalone_copy_diagnostics">Copy Diagnostics</string>
+    <string name="standalone_wall_target_lost">Wall target lost</string>
+    <string name="standalone_recapture_target">Recapture Target</string>
+    <string name="standalone_sweep_hint">Turn slowly to map the space — %1$d%%</string>
+    <string name="standalone_failure_native_library_unavailable">SphereSLAM isn\'t available in this build.</string>
+    <string name="standalone_failure_camera_unavailable">Camera isn\'t available for standalone AR.</string>
+    <string name="standalone_failure_intrinsics_unavailable">Camera calibration is unavailable for standalone AR.</string>
+    <string name="standalone_failure_reference_too_weak">That wall target has too little trackable detail. Capture a richer patch.</string>
+    <string name="standalone_failure_no_page_match">Keep the wall target in view.</string>
+    <string name="standalone_failure_stale_observation">Tracking is lagging. Move the phone more slowly.</string>
+    <string name="standalone_failure_reprojection_error">Wall match is unstable. Reframe the target.</string>
+    <string name="standalone_failure_insufficient_inliers">Not enough target detail is visible.</string>
+    <string name="standalone_failure_pose_jump">Tracking jump rejected. Hold on the wall target.</string>
+    <string name="standalone_failure_persisted_target_corrupt">Saved wall target is missing or unreadable. Capture a new target.</string>
+    <string name="standalone_failure_internal">SphereSLAM couldn\'t continue tracking this target.</string>
+    <string name="standalone_tracking_stopped">SphereSLAM tracking stopped. Recapture the target to restart it.</string>
+    <string name="standalone_status_mapping">SphereSLAM mapping • tap Target to add fingerprint</string>
+    <string name="standalone_status_preparing">Preparing fingerprint target…</string>
+    <string name="standalone_status_finding">Finding fingerprint target…</string>
+    <string name="standalone_quality_too_small">That wall target is too small after rectification. Capture a larger patch.</string>
+    <string name="standalone_quality_low_contrast">That wall target has too little visual contrast. Include more texture or detail.</string>
+    <string name="standalone_quality_blurry">That wall target is too blurry for reliable tracking. Hold steady and recapture.</string>
+    <string name="standalone_quality_not_strong_enough">That wall target is not strong enough for reliable tracking.</string>
+    <string name="standalone_quality_too_dark">This target is heavily underexposed; tracking may be less reliable.</string>
+    <string name="standalone_quality_too_bright">This target is heavily overexposed; tracking may be less reliable.</string>
+    <string name="standalone_photosphere_no_sensor">This phone has no rotation sensor, so SphereSLAM can\'t place a target here.</string>
+    <string name="standalone_photosphere_compass_not_ready">Compass isn\'t ready yet — hold the phone still for a second, then retake.</string>
+    <string name="standalone_photosphere_not_mapped">SphereSLAM hasn\'t mapped this view yet — hold the camera steady on a lit, detailed part of the surface for a second, then retake.</string>
+    <string name="target_rectify_title">Rectify surface</string>
+    <string name="target_rectify_text">Now, drag the corners to align the cyan frame with the flat surface of your wall.</string>
+    <string name="target_remove_marks_title">Remove marks</string>
+    <string name="target_erase_hint">Tap a mark to remove it, or drag across marks to remove several.</string>
+    <string name="target_cd_raw_capture">Raw capture</string>
+    <string name="target_cd_detected_marks">Detected marks</string>
+    <string name="target_cd_confirm">Confirm</string>
+    <string name="target_cd_unwarp_base">Captured wall photo with corner handles</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">That change can\'t be shared with the host — it stays on this device</string>
+    <string name="ar_feedback_backend_resolving">AR backend is still being resolved — try Host again in a moment</string>
+    <string name="ar_feedback_open_project_first">Open a project before sharing — there\'s nothing to send to a guest yet</string>
+    <string name="ar_feedback_host_need_target_arcore">Capture and lock a current wall target before hosting</string>
+    <string name="ar_feedback_host_need_target_standalone">Capture a standalone Wall Target before hosting</string>
+    <string name="ar_feedback_fingerprint_not_ready">Wall fingerprint is not ready yet — keep the target in view and try Host again</string>
+    <string name="ar_feedback_package_failed">Couldn\'t package this project to share — try saving it first</string>
+    <string name="ar_feedback_host_failed">Couldn\'t start sharing: %1$s</string>
+    <string name="ar_feedback_join_load_failed">Couldn\'t load the host\'s project — the session was ended.</string>
+    <string name="ar_feedback_join_no_geometry">The host did not provide geometry ARCore can align to.</string>
+    <string name="ar_feedback_join_failed">Couldn\'t join: %1$s</string>
+    <string name="ar_feedback_wall_target_changed">Wall target changed — sharing ended. Start Host again for the new wall.</string>
+    <string name="ar_feedback_backend_changed">Tracking backend changed — sharing ended. Start sharing again.</string>
+    <string name="ar_feedback_camera_busy">Camera is busy or unavailable — close other camera apps, then re-enter AR</string>
+    <string name="ar_feedback_ar_start_failed">Couldn\'t start AR — your camera may be in use by another app</string>
+    <string name="ar_feedback_camera_setting_apply_failed">Couldn\'t apply the camera setting to the running AR session — exit and re-enter AR</string>
+    <string name="ar_feedback_sphere_target_save_failed">Wall tracking works for this session, but the SphereSLAM target couldn\'t be saved.</string>
+    <string name="ar_feedback_camera_not_resumed">AR camera did not resume — try leaving and re-entering AR mode</string>
+    <string name="ar_feedback_camera_permission">Camera unavailable — check the camera permission, then re-enter AR</string>
+    <string name="ar_feedback_camera_not_paused">AR camera did not pause cleanly — it may keep running in the background</string>
+    <string name="ar_feedback_backbone_warning">The artwork covers nearly all the wall in view — only %1$d tracked features sit outside it. Make it smaller or step back, or the target may not lock.</string>
+    <string name="ar_feedback_legacy_target_geometry">This project\'s saved target was made by an older version and its 3D geometry can\'t be corrected. Create the target again to use it.</string>
+    <string name="ar_feedback_camera_no_frames">Camera isn\'t delivering frames — exit AR and try again</string>
+    <string name="ar_feedback_camera_recovery_timeout">AR camera recovery timed out safely — exit and re-enter AR</string>
+    <string name="ar_feedback_target_prepare_failed">Couldn\'t prepare the captured target. Try again.</string>
+    <string name="ar_feedback_wall_width_save_failed">Couldn\'t save the wall width. Try Save again.</string>
+    <string name="ar_feedback_unknown_error">unknown error</string>
 </resources>

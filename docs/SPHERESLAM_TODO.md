@@ -28,12 +28,12 @@ through `PhotosphereTrackingSession`, ARCore through `SphereSlamTracker`), on th
 fingerprint — the teleological layer's anticipated appearance of the wall.
 
 - [x] Half-sphere views (`feature/ar/.../anticipation/HalfSphere.kt`): target at the core, capture view
-  at the pole; meridians (latitude) cut by circles (longitude), a view at the pole and every cut, none
+  at the pole; meridians (lines of longitude; the `AnticipationSettings.latitude` field, a historical name) cut by tilt circles (lines of latitude; the `longitude` field), a view at the pole and every cut, none
   on the equator (defaults: six half-spheres, circles at 30° and 60° on six meridians); `distance` half-spheres from the capture distance in (zoom in only); every view at
   `roll` turns. Nearer half-spheres repeat over a grid of aim points across the target
   (`⌈distance / (shell + 1)⌉` per side), so a close-up of any part of the wall is anticipated, partial
   views (target overflowing the frame, part of it behind the camera) included.
-- [x] Settings → Anticipation: distance, latitude, longitude, roll (the maximum) and how far battery,
+- [x] Settings → Anticipation: distance, "Longitude" (how many meridians), "Latitude" (how many tilt circles), roll (the maximum) and how far battery,
   heat and the tracker's own load may cut it; applies at once.
 - [x] Throttling (`AnticipationGovernor`): far half-spheres go first, outermost in; the nearest one's
   warps go last, and its aims never. Lowering builds nothing; relief waits 10 s.

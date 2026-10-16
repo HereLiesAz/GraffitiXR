@@ -32,7 +32,6 @@
 
 
 
-    <string name="nav_scan_mode_toggle_info">キャンバス（小規模なデスク上のアート向け）と壁画（大規模な壁とガウシアンスプラッティング向け）のスキャンモードを切り替えます。</string>
 
 
 
@@ -618,9 +617,9 @@
         <item>ピンチで拡大縮小、ドラッグで移動します。オーバーレイは画面に固定されたままです — 後ろに下がって、壁にどう収まるか確認しましょう。</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
-        <item>このデバイスはARCoreに対応していないため、AR投影モードは使用できません。</item>
-        <item>ライトボックス、モックアップ、ライブオーバーレイは引き続き使用できます — AR以外のすべてのモードはARCoreなしで動作します。</item>
-        <item>タップして閉じます。</item>
+        <item>この端末は ARCore に対応していないため、AR モードでは独立した壁トラッキングを使用します。</item>
+        <item>AR モードでは、まずテクスチャのある壁面を撮影し、その 4 つの角を指定します。その後、トラッキングがそのターゲットに固定されます。</item>
+        <item>ライトボックス、モックアップ、オーバーレイはいつもどおり使えます。タップして閉じます。</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>写真モックアップ — 筆を取る前に、写真の上でデザインをプレビューできます。</item>
@@ -649,4 +648,125 @@
     <string name="nav_gyro_info">三脚使用時、モーションセンサーで小さな振動を打ち消し、デザインを壁上に固定します。スマホを設置してからオンにしてください。動かすと解除されます。</string>
     <string name="gyro_released_moved">ジャイロを解除しました:スマホが大きく動きました。</string>
     <string name="gyro_unavailable">ジャイロには、この端末が提供していない回転センサーが必要です。</string>
+    <string name="export_failed">エクスポートに失敗しました。画像をギャラリーに保存できませんでした。</string>
+    <string name="export_failed_permission">ギャラリーに保存できませんでした。GraffitiXRにストレージへのアクセスを許可してから、もう一度お試しください。</string>
+    <string name="export_ar_unavailable">エクスポートの準備ができていません。ARカメラビューが動作していません。ARビューを開いてもう一度お試しください。</string>
+    <string name="export_standalone_ar_unavailable">スタンドアロンARでは、まだエクスポートできません。</string>
+    <string name="rail_checking_ar_backend">ARバックエンドを確認しています…</string>
+
+    <string name="settings_use_arcore">ARCore を使用</string>
+    <string name="settings_arcore_depth">ARCore 深度</string>
+    <string name="settings_monocular_depth">単眼深度（ベータ）</string>
+    <string name="settings_ambient_scan">周囲スキャン</string>
+    <string name="settings_adaptive_rate">アダプティブレート（アイドル時）</string>
+    <string name="settings_crash_reports">クラッシュレポート</string>
+    <string name="settings_crash_reports_desc">クラッシュ時に、端末のモデルと最近のログを公開バグ報告として送信しますか？初期設定ではオフです。</string>
+    <string name="settings_crash_token_label">クラッシュレポート用トークン</string>
+    <string name="settings_crash_token_set">設定済み</string>
+    <string name="settings_crash_token_not_set">未設定</string>
+    <string name="settings_crash_token_desc">HereLiesAz/GraffitiXR で「Issues: write」権限を持つ GitHub トークン。この端末にのみ保存され、アプリ内には保存されません。空欄にするとアップロードが無効になります。</string>
+    <string name="settings_crash_token_field">トークン</string>
+    <string name="settings_canvas_color_black">黒</string>
+    <string name="settings_canvas_color_dark">ダーク</string>
+    <string name="settings_canvas_color_grey">グレー</string>
+    <string name="settings_canvas_color_white">白</string>
+    <string name="settings_canvas_color_navy">ネイビー</string>
+    <string name="state_selected">選択中</string>
+    <string name="state_expanded">展開中</string>
+    <string name="state_collapsed">折りたたみ中</string>
+    <string name="settings_fps_device_default">端末の既定</string>
+    <string name="settings_fps_device_max">端末の最大</string>
+    <string name="first_run_photo_title">壁で確認しましょう</string>
+    <string name="first_run_photo_text">作品の参考写真を選ぶと、実際の壁でどう見えるかを AR で表示します。</string>
+    <string name="first_run_choose_photo">写真を選択</string>
+    <string name="first_run_not_now">今はしない</string>
+    <string name="first_run_draw_title">これを壁に描いてください</string>
+    <string name="first_run_draw_hint">作品と同じくらいの大きさで、大きく描いてください。きれいでなくても、見分けがつけば十分です。</string>
+    <string name="first_run_draw_done">描きました</string>
+    <string name="first_run_draw_skip">スキップ — 自分で配置します</string>
+    <string name="first_run_detect_title">描いたものにカメラを向けてください</string>
+    <string name="first_run_detect_movement_hint">端末をゆっくり円を描くように動かしてください</string>
+    <string name="design_instructions_title">壁画をデザインしましょう</string>
+    <string name="design_instructions_text">レールの「%1$s」をタップし、続けて「%2$s」をタップして、作品の写真を選択します。</string>
+    <string name="got_it_button">了解</string>
+    <string name="standalone_width_prompt">ターゲットの左端から右端までの実際の幅を測ってください。</string>
+    <string name="standalone_width_label_metric">ターゲットの幅（メートル）</string>
+    <string name="standalone_width_label_imperial">ターゲットの幅（フィートとインチ）</string>
+    <string name="standalone_width_range_error">幅を %1$s から %2$s の範囲で入力してください。</string>
+    <string name="standalone_use_measured_width">測定した幅を使用</string>
+    <string name="standalone_continue_without_scale">実寸なしで続行</string>
+    <string name="standalone_recapture">再撮影</string>
+    <string name="standalone_capture_wall_target">壁ターゲットを撮影</string>
+    <string name="standalone_capture_failed">壁ターゲットを撮影できませんでした。もう一度お試しください。</string>
+    <string name="standalone_rectify_failed">このターゲットを補正できませんでした。はっきりした 4 つの角を指定してください。</string>
+    <string name="standalone_target_too_weak">このターゲットは追跡できる特徴が少なすぎます（KPM 特徴 %1$d 個、必要数 %2$d 個）。より特徴の多い壁面を撮影し直してください。</string>
+    <string name="standalone_new_target">新しいターゲット</string>
+    <string name="standalone_copy_diagnostics">診断情報をコピー</string>
+    <string name="standalone_wall_target_lost">壁ターゲットを見失いました</string>
+    <string name="standalone_recapture_target">ターゲットを撮り直す</string>
+    <string name="standalone_sweep_hint">ゆっくり向きを変えて空間をマッピングしてください — %1$d%%</string>
+    <string name="standalone_failure_native_library_unavailable">このビルドでは SphereSLAM を利用できません。</string>
+    <string name="standalone_failure_camera_unavailable">スタンドアロン AR ではカメラを利用できません。</string>
+    <string name="standalone_failure_intrinsics_unavailable">スタンドアロン AR ではカメラのキャリブレーションを利用できません。</string>
+    <string name="standalone_failure_reference_too_weak">この壁ターゲットは追跡できる細部が少なすぎます。より細部の多い部分を撮影してください。</string>
+    <string name="standalone_failure_no_page_match">壁ターゲットを視界に入れたままにしてください。</string>
+    <string name="standalone_failure_stale_observation">トラッキングが遅れています。スマートフォンをもっとゆっくり動かしてください。</string>
+    <string name="standalone_failure_reprojection_error">壁との照合が不安定です。ターゲットを撮り直してください。</string>
+    <string name="standalone_failure_insufficient_inliers">ターゲットの細部が十分に見えていません。</string>
+    <string name="standalone_failure_pose_jump">トラッキングの急な飛びを無視しました。壁ターゲットに向けて動かさずに保持してください。</string>
+    <string name="standalone_failure_persisted_target_corrupt">保存された壁ターゲットが見つからないか、読み取れません。新しいターゲットを撮影してください。</string>
+    <string name="standalone_failure_internal">SphereSLAM はこのターゲットの追跡を続行できませんでした。</string>
+    <string name="standalone_tracking_stopped">SphereSLAM のトラッキングが停止しました。ターゲットを撮り直して再開してください。</string>
+    <string name="standalone_status_mapping">SphereSLAM マッピング中 • 「ターゲット」をタップしてフィンガープリントを追加</string>
+    <string name="standalone_status_preparing">フィンガープリントターゲットを準備中…</string>
+    <string name="standalone_status_finding">フィンガープリントターゲットを探しています…</string>
+    <string name="standalone_quality_too_small">この壁ターゲットは補正後のサイズが小さすぎます。より広い範囲を撮影してください。</string>
+    <string name="standalone_quality_low_contrast">この壁ターゲットは視覚的なコントラストが低すぎます。テクスチャや細部をより多く含めてください。</string>
+    <string name="standalone_quality_blurry">この壁ターゲットはぼやけすぎていて、確実に追跡できません。手元を安定させて撮り直してください。</string>
+    <string name="standalone_quality_not_strong_enough">この壁ターゲットは、確実に追跡するには特徴が不十分です。</string>
+    <string name="standalone_quality_too_dark">このターゲットは大幅に露出不足です。トラッキングの信頼性が下がる場合があります。</string>
+    <string name="standalone_quality_too_bright">このターゲットは大幅に露出過多です。トラッキングの信頼性が下がる場合があります。</string>
+    <string name="standalone_photosphere_no_sensor">この端末には回転センサーがないため、SphereSLAM はここにターゲットを配置できません。</string>
+    <string name="standalone_photosphere_compass_not_ready">コンパスの準備がまだできていません。端末を 1 秒ほど動かさずに持ち、もう一度撮影してください。</string>
+    <string name="standalone_photosphere_not_mapped">SphereSLAM はまだこのビューをマッピングしていません。明るく細部の多い面にカメラを 1 秒ほど固定してから、もう一度撮影してください。</string>
+    <string name="target_rectify_title">面を補正</string>
+    <string name="target_rectify_text">角をドラッグして、シアンの枠を壁の平らな面に合わせてください。</string>
+    <string name="target_remove_marks_title">マークを削除</string>
+    <string name="target_erase_hint">マークをタップして削除するか、複数のマークをなぞって削除します。</string>
+    <string name="target_cd_raw_capture">未加工の撮影画像</string>
+    <string name="target_cd_detected_marks">検出されたマーク</string>
+    <string name="target_cd_confirm">確認</string>
+    <string name="target_cd_unwarp_base">角のハンドル付きで撮影した壁の写真</string>
+    <string name="guidance_open_via_design_overlay">レールの「デザイン」をタップし、続けて「開く」をタップしてレイヤーを追加します。写真を選ぶと、ライブカメラ映像の上に浮かんで表示されます。</string>
+    <string name="guidance_open_via_design_mockup">レールの「デザイン」をタップし、続けて「開く」をタップして、壁の写真の上にレイヤーを追加します。ピンチとドラッグで大きさと位置を調整します。</string>
+    <string name="guidance_open_via_design_trace">レールの「デザイン」をタップし、続けて「開く」をタップして、最初のレイヤーを追加します。追加後は、キャンバス上でピンチとドラッグをして大きさと位置を決めます。</string>
+    <string name="guidance_open_via_design_ar">レールの「デザイン」をタップし、続けて「開く」をタップしてデザインレイヤーを追加します。設定したばかりのアンカーを使って壁に投影されます。</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">この変更はホストと共有できません。この端末にのみ残ります</string>
+    <string name="ar_feedback_backend_resolving">AR バックエンドを判定中です。しばらくしてからもう一度ホストを試してください</string>
+    <string name="ar_feedback_open_project_first">共有する前にプロジェクトを開いてください。ゲストに送るものがまだありません</string>
+    <string name="ar_feedback_host_need_target_arcore">ホストする前に、最新の壁ターゲットを撮影してロックしてください</string>
+    <string name="ar_feedback_host_need_target_standalone">ホストする前に、スタンドアロンの壁ターゲットを撮影してください</string>
+    <string name="ar_feedback_fingerprint_not_ready">壁のフィンガープリントの準備がまだできていません。ターゲットを画面内に保ったまま、もう一度ホストを試してください</string>
+    <string name="ar_feedback_package_failed">このプロジェクトを共有用にパッケージできませんでした。先に保存してみてください</string>
+    <string name="ar_feedback_host_failed">共有を開始できませんでした：%1$s</string>
+    <string name="ar_feedback_join_load_failed">ホストのプロジェクトを読み込めませんでした。セッションを終了しました。</string>
+    <string name="ar_feedback_join_no_geometry">ホストが ARCore で位置合わせできるジオメトリを提供しませんでした。</string>
+    <string name="ar_feedback_join_failed">参加できませんでした：%1$s</string>
+    <string name="ar_feedback_wall_target_changed">壁ターゲットが変わったため、共有を終了しました。新しい壁で、もう一度ホストを開始してください。</string>
+    <string name="ar_feedback_backend_changed">トラッキングバックエンドが変わったため、共有を終了しました。もう一度共有を開始してください。</string>
+    <string name="ar_feedback_camera_busy">カメラが使用中か利用できません。他のカメラアプリを閉じてから、AR にもう一度入ってください</string>
+    <string name="ar_feedback_ar_start_failed">AR を開始できませんでした。カメラが他のアプリで使用されている可能性があります</string>
+    <string name="ar_feedback_camera_setting_apply_failed">カメラ設定を実行中の AR セッションに適用できませんでした。AR を終了して、もう一度入ってください</string>
+    <string name="ar_feedback_sphere_target_save_failed">このセッションでは壁のトラッキングは機能しますが、SphereSLAM ターゲットを保存できませんでした。</string>
+    <string name="ar_feedback_camera_not_resumed">AR カメラが再開しませんでした。AR モードを終了して、もう一度入ってみてください</string>
+    <string name="ar_feedback_camera_permission">カメラを利用できません。カメラの権限を確認してから、AR にもう一度入ってください</string>
+    <string name="ar_feedback_camera_not_paused">AR カメラを正常に一時停止できませんでした。バックグラウンドで動き続ける可能性があります</string>
+    <string name="ar_feedback_backbone_warning">作品が視野内の壁のほぼ全体を覆っており、その外側にある追跡特徴は %1$d 個だけです。小さくするか、少し下がってください。そうしないとターゲットがロックされない場合があります。</string>
+    <string name="ar_feedback_legacy_target_geometry">このプロジェクトに保存されているターゲットは古いバージョンで作成されたもので、3D ジオメトリを補正できません。使用するにはターゲットを作成し直してください。</string>
+    <string name="ar_feedback_camera_no_frames">カメラからフレームが届いていません。AR を終了して、もう一度試してください</string>
+    <string name="ar_feedback_camera_recovery_timeout">AR カメラの復旧は安全にタイムアウトしました。AR を終了して、もう一度入ってください</string>
+    <string name="ar_feedback_target_prepare_failed">撮影したターゲットを準備できませんでした。もう一度お試しください。</string>
+    <string name="ar_feedback_wall_width_save_failed">壁の幅を保存できませんでした。もう一度保存をお試しください。</string>
+    <string name="ar_feedback_unknown_error">不明なエラー</string>
 </resources>

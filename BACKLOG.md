@@ -157,9 +157,11 @@ hosts) share Measure results.
   should move WITH the wall when the tripod head is nudged (sign/axes pinned only by SphereSLAM's
   `GyroCompensationMathTest`, not hardware), in portrait and both landscapes; the
   perspective `Matrix` concat around the graphicsLayer must render on hardware canvases; the 3°
-  release threshold and 15 s MiDaS cadence are first guesses; slow `GAME_ROTATION_VECTOR` yaw drift
-  on long sessions is uncorrected (it eventually trips the release). MiDaS depth is sampled but
-  unused while translation is unmeasured.
+  release threshold is a first guess; slow `GAME_ROTATION_VECTOR` yaw drift on long sessions is
+  uncorrected (it eventually trips the release). MiDaS was removed from this feature (it sampled a
+  depth it never used); depth returns only with measured translation, and must be metric. The
+  display rotation now tracks a `DisplayManager.DisplayListener`, so a 90°<->270° landscape flip
+  restarts the effect with a fresh reference — also worth confirming on hardware.
 
 #### Glee audit pass (2026-09-04) — not yet acted on
 

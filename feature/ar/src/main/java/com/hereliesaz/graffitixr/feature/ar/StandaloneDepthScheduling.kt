@@ -223,3 +223,52 @@ internal object DepthLumaDownsampler {
         return Grid(out, ow, oh)
     }
 }
+
+/**
+ * Stops a depth model that failed to load from being re-loaded on every tile and every job.
+ *
+ * `DepthEstimator.load()` is not free (it opens the model asset and builds the interpreter) and
+ * reports failure by returning false without remembering it, so a missing/incompatible model made
+ * both consumers — the tile source on SphereSLAM's tile worker and [estimateDepth] on the depth
+ * worker — retry the whole load for every tile and every cadence tick, for the life of the session.
+ *
+ * Policy: after a failure the next attempt is not allowed until [backoffMs] has passed, doubling up to
+ * [maxBackoffMs]; after [maxFailures] failures the model is failed for good for this guard's lifetime
+ * (one session — the analyzer owns the guard). A success clears the history. Thread-safe: the two
+ * consumers run on different threads.
+ */
+internal class DepthLoadGuard(
+    private val backoffMs: Long = DEFAULT_BACKOFF_MS,
+    private val maxBackoffMs: Long = DEFAULT_MAX_BACKOFF_MS,
+    private val maxFailures: Int = DEFAULT_MAX_FAILURES,
+) {
+    private var failures = 0
+    private var nextAttemptMs = 0L
+
+    /** True once the model has failed [maxFailures] times: no further load will be attempted. */
+    @Synchronized
+    fun failedForGood(): Boolean = failures >= maxFailures
+
+    /** Whether a load attempt is allowed at [nowMs]. */
+    @Synchronized
+    fun shouldAttempt(nowMs: Long): Boolean = failures < maxFailures && nowMs >= nextAttemptMs
+
+    @Synchronized
+    fun onSuccess() {
+        failures = 0
+        nextAttemptMs = 0L
+    }
+
+    @Synchronized
+    fun onFailure(nowMs: Long) {
+        failures++
+        val delay = (backoffMs shl (failures - 1).coerceAtMost(20)).coerceAtMost(maxBackoffMs)
+        nextAttemptMs = nowMs + delay
+    }
+
+    companion object {
+        const val DEFAULT_BACKOFF_MS = 30_000L
+        const val DEFAULT_MAX_BACKOFF_MS = 5 * 60_000L
+        const val DEFAULT_MAX_FAILURES = 3
+    }
+}

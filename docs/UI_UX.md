@@ -18,6 +18,8 @@ The screen is divided into two layers: The **AR World** (Camera) and the **Overl
 * **Move Device:** Translates the camera in 3D space.
 * **Tap Wall:** Places the "Anchor" (Origin point). A plain tap on its own does **not** start target creation anymore — first select **Target** on the Rail (under the AR mode host) to arm tap-to-place, then tap the surface to capture and lock the anchor.
 * **Standalone (no ARCore):** **Target** on the Rail opens the shared target-capture flow, the same one ARCore uses; the current wall target keeps tracking until the new one is saved, so backing out changes nothing. **New Target** (while a loaded target is not yet tracking) and **Recapture** do the same. A co-op guest keeps the session's wall frame and gets none of these. The tracking status and its actions (Copy Diagnostics, Recapture / New Target, the sweep hint) render in the rail's onscreen layer — inside its safe zones — never in the camera background.
+* **Target width (standalone):** after rectifying, the width prompt follows Settings → Units: metres, or feet and inches (`12' 6"`, `12 ft 6 in`, or decimal feet). The accepted range is shown in the active unit and the value is stored in metres. "Continue Without Physical Scale" skips it (normalized units, not metres).
+* **No ARCore:** on a device without ARCore (with *Use ARCore* on) a one-shot tap-to-advance explainer appears the first time you are in the editor with no dialog open, explaining that AR uses standalone wall tracking. It is announced as a button ("Next"/"Done") and each line is read once; it never shows on ARCore devices.
 * **Photosphere:** the standalone photosphere covers the whole sphere (24 × 6 tiles of 15° × 30°), ceiling and floor included.
 * **Long Press (Rail Item):** Locks the specific tool (e.g., locks the opacity slider so accidental touches don't change it).
 
@@ -57,3 +59,14 @@ Settings uses a modal window so its covered rail cannot open another action. Pro
 navigates only after persistence succeeds. Save waits for the wall map and editable manifest,
 keeps its dialog open on failure, and does not export an image or archive. Export saves an image;
 Share Wall produces a portable `.gxr`. Importing an existing id creates a separate library copy.
+
+## Settings accessibility and language (2026-10)
+
+The Language picker is a radio group: the current language shows a radio button and is announced as
+selected, not just tinted. Selected canvas-colour/glow swatches and the Developer section's
+expanded/collapsed state are announced in the active language, and every Settings string (including
+the crash-report token dialog) is localized — 15 `values*` directories, now including Russian
+(`Русский`) in the picker. The Anticipation sliders are labelled by geography: **Longitude** is the
+number of meridians (the stored `latitude` field), **Latitude** the number of circles (the stored
+`longitude` field); the stored names are unchanged. A Knob adjusted through an accessibility action
+(TalkBack set-progress) is recorded for undo and saved exactly like a drag or double-tap.

@@ -31,10 +31,12 @@ internal object Frame {
 
     /**
      * Read one frame. Returns null on clean EOF (peer closed before the next frame).
-     * Throws IOException on truncated frame or bad type code.
+     * Throws IOException on truncated frame, bad type code, or a declared payload above
+     * [maxPayloadBytes] (checked before the buffer is allocated, so a pre-auth peer cannot make the
+     * reader allocate [MAX_PAYLOAD_BYTES] by declaring it).
      */
     @Throws(IOException::class)
-    fun read(input: InputStream): FrameRead? {
+    fun read(input: InputStream, maxPayloadBytes: Int = MAX_PAYLOAD_BYTES): FrameRead? {
         val data = DataInputStream(input)
         val length = try {
             data.readInt()
@@ -44,8 +46,8 @@ internal object Frame {
         if (length < HEADER_TYPE_BYTES) {
             throw IOException("frame length $length below minimum $HEADER_TYPE_BYTES")
         }
-        if (length - HEADER_TYPE_BYTES > MAX_PAYLOAD_BYTES) {
-            throw IOException("frame payload ${length - HEADER_TYPE_BYTES} exceeds max $MAX_PAYLOAD_BYTES")
+        if (length - HEADER_TYPE_BYTES > maxPayloadBytes) {
+            throw IOException("frame payload ${length - HEADER_TYPE_BYTES} exceeds max $maxPayloadBytes")
         }
         val typeCode = data.readByte()
         val type = FrameType.ofCode(typeCode)

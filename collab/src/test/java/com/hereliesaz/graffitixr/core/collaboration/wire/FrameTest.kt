@@ -74,4 +74,17 @@ class FrameTest {
             Frame.read(ByteArrayInputStream(out.toByteArray()))
         }
     }
+
+    @Test
+    fun `declared length above a caller cap throws before the payload is read`() {
+        val out = ByteArrayOutputStream()
+        val dataOut = java.io.DataOutputStream(out)
+        // Within MAX_PAYLOAD_BYTES but far above a 4 KB pre-auth cap; no payload bytes follow, so a
+        // reader that allocated first and read second would block or hit EOF instead of throwing early.
+        dataOut.writeInt(1 + 1_000_000)
+        dataOut.writeByte(FrameType.HELLO.code.toInt())
+        assertThrows(IOException::class.java) {
+            Frame.read(ByteArrayInputStream(out.toByteArray()), maxPayloadBytes = 4 * 1024)
+        }
+    }
 }

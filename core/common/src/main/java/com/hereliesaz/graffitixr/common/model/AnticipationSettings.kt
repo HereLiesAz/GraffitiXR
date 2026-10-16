@@ -7,7 +7,10 @@ package com.hereliesaz.graffitixr.common.model
  * The anticipation resolution is a half-sphere over the target, the target at its core and the
  * camera's capture view at its pole: [latitude] meridians run from the pole to the equator, cut by
  * [longitude] circles; a preview is taken at the pole and at every cut, aimed at the core (none on the
- * equator, edge-on). [distance] nests that many half-spheres between the target and the capture
+ * equator, edge-on). **The field names are swapped relative to geography**: [latitude] counts the
+ * meridians (lines of longitude) and [longitude] the circles (lines of latitude). They are persisted
+ * and used by name, so they stay; Settings → Anticipation labels each slider by what it counts
+ * (the [latitude] slider reads "Longitude", the [longitude] slider "Latitude"). [distance] nests that many half-spheres between the target and the capture
  * distance (zooming in), and [roll] takes every view turned that many times, evenly from upright.
  * Up close the frame holds only part of the target, so a nearer half-sphere is repeated over a grid
  * of aim points across the target ([aimsPerSide]), its core moved to each: every part of the wall

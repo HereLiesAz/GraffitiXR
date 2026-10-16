@@ -43,23 +43,26 @@ class StandaloneAnalyzerRecoveryTest {
 
     @Test
     fun `a fatal analyzer never shows the preparing text`() {
-        val text = standaloneInitializingStatusText(
-            analyzerFatal = true,
-            fatalMessage = "That target has too little trackable detail",
-            currentFailure = null,
-            referenceReady = false,
-            hasReference = true,
+        val tooWeak = StandaloneText(StandaloneTextKey.TARGET_TOO_WEAK, listOf(3, 16))
+        assertEquals(
+            tooWeak,
+            standaloneInitializingStatusText(
+                analyzerFatal = true,
+                fatalMessage = tooWeak,
+                currentFailure = null,
+                referenceReady = false,
+                hasReference = true,
+            ),
         )
-        assertEquals("That target has too little trackable detail", text)
         val fatalEvent = StandaloneFailureClassifier.event(
             StandaloneFailureReason.entries.first { StandaloneFailureClassifier.event(it).severity == StandaloneFailureSeverity.FATAL },
         )
         assertEquals(
-            fatalEvent.userMessage,
+            fatalEvent.userText,
             standaloneInitializingStatusText(true, null, fatalEvent, referenceReady = false, hasReference = true),
         )
         assertEquals(
-            STANDALONE_TRACKING_STOPPED_MESSAGE,
+            StandaloneText(StandaloneTextKey.TRACKING_STOPPED),
             standaloneInitializingStatusText(true, null, null, referenceReady = false, hasReference = true),
         )
     }
@@ -67,23 +70,30 @@ class StandaloneAnalyzerRecoveryTest {
     @Test
     fun `a live analyzer shows mapping, preparing or finding`() {
         assertEquals(
-            "SphereSLAM mapping • tap Target to add fingerprint",
-            standaloneInitializingStatusText(false, null, null, referenceReady = false, hasReference = false),
+            StandaloneTextKey.STATUS_MAPPING,
+            standaloneInitializingStatusText(false, null, null, referenceReady = false, hasReference = false).key,
         )
         assertEquals(
-            "Preparing fingerprint target…",
-            standaloneInitializingStatusText(false, null, null, referenceReady = false, hasReference = true),
+            StandaloneTextKey.STATUS_PREPARING,
+            standaloneInitializingStatusText(false, null, null, referenceReady = false, hasReference = true).key,
         )
         assertEquals(
-            "Finding fingerprint target…",
-            standaloneInitializingStatusText(false, null, null, referenceReady = true, hasReference = true),
+            StandaloneTextKey.STATUS_FINDING,
+            standaloneInitializingStatusText(false, null, null, referenceReady = true, hasReference = true).key,
         )
         val transient = StandaloneFailureClassifier.event(
             StandaloneFailureReason.entries.first { StandaloneFailureClassifier.event(it).severity == StandaloneFailureSeverity.TRANSIENT },
         )
         assertEquals(
-            transient.userMessage,
+            transient.userText,
             standaloneInitializingStatusText(false, null, transient, referenceReady = false, hasReference = true),
         )
+    }
+
+    @Test
+    fun `every failure reason has its own message key`() {
+        val keys = StandaloneFailureReason.entries.map { it.textKey() }
+        assertEquals(keys.size, keys.toSet().size)
+        assertTrue(keys.all { it.name.startsWith("FAILURE_") })
     }
 }

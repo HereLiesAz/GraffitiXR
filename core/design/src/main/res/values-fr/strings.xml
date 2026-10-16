@@ -162,7 +162,6 @@
     <string name="nav_mockup_info">Prévisualisez votre conception composée sur une photo d\'un mur. Aucune caméra ni numérisation requise.</string>
     <string name="nav_trace">Calque</string>
     <string name="nav_trace_info">Utilisez votre conception comme une table lumineuse pour tracer des lignes de référence sur une surface physique.</string>
-    <string name="nav_scan_mode_toggle_info">Basculer entre Toile (optimisé pour les petites œuvres à l\'échelle d\'un bureau) et Fresque (optimisé pour les murs à grande échelle et le Gaussian Splatting).</string>
     <string name="nav_grid">Cible</string>
     <string name="nav_grid_info">Créez et gérez des cibles d\'ancrage AR. Photographiez les marques de référence peintes sur le mur pour verrouiller la projection en place.</string>
     <string name="nav_create">Créer</string>
@@ -337,9 +336,9 @@
         <item>Pincez pour redimensionner, faites glisser pour repositionner. La superposition reste fixée à votre écran — reculez pour voir comment elle s\'adapte au mur.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
-        <item>Cet appareil ne prend pas en charge ARCore, le mode Projection AR n\'est donc pas disponible.</item>
-        <item>Vous pouvez toujours utiliser Calque, Maquette et Superposition en direct — tous les modes sauf AR fonctionnent sans ARCore.</item>
-        <item>Appuyez pour fermer.</item>
+        <item>Cet appareil ne prend pas en charge ARCore ; le mode AR utilise donc un suivi mural autonome.</item>
+        <item>En mode AR, vous capturerez d\'abord une photo d\'une zone de mur texturée et marquerez ses quatre coins. Le suivi s\'accroche ensuite à cette cible.</item>
+        <item>Calque, Maquette et Superposition fonctionnent comme d\'habitude. Touchez pour fermer.</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>Maquette photo — prévisualisez votre design sur une photo avant même de prendre un pinceau.</item>
@@ -368,4 +367,125 @@
     <string name="nav_gyro_info">Sur trépied, maintient le design immobile sur le mur malgré les petites vibrations grâce au capteur de mouvement. Activez-le une fois le téléphone installé ; il se relâche si le téléphone bouge.</string>
     <string name="gyro_released_moved">Gyro relâché : le téléphone a trop bougé.</string>
     <string name="gyro_unavailable">Gyro nécessite un capteur de rotation que cet appareil ne fournit pas.</string>
+    <string name="export_failed">Échec de l\'exportation : l\'image n\'a pas pu être enregistrée dans la galerie.</string>
+    <string name="export_failed_permission">Impossible d\'enregistrer dans la galerie. Autorisez GraffitiXR à accéder au stockage et réessayez.</string>
+    <string name="export_ar_unavailable">L\'exportation n\'est pas prête : la vue caméra AR n\'est pas active. Ouvrez la vue AR et réessayez.</string>
+    <string name="export_standalone_ar_unavailable">L\'exportation n\'est pas encore disponible en AR autonome.</string>
+    <string name="rail_checking_ar_backend">Vérification du moteur AR…</string>
+
+    <string name="settings_use_arcore">Utiliser ARCore</string>
+    <string name="settings_arcore_depth">Profondeur ARCore</string>
+    <string name="settings_monocular_depth">Profondeur monoculaire (bêta)</string>
+    <string name="settings_ambient_scan">Scan ambiant</string>
+    <string name="settings_adaptive_rate">Fréquence adaptative (inactif)</string>
+    <string name="settings_crash_reports">Rapports de plantage</string>
+    <string name="settings_crash_reports_desc">En cas de plantage, envoyer le modèle de l\'appareil et les journaux récents dans un rapport de bug public ? Désactivé par défaut.</string>
+    <string name="settings_crash_token_label">Jeton de rapport de plantage</string>
+    <string name="settings_crash_token_set">Défini</string>
+    <string name="settings_crash_token_not_set">Non défini</string>
+    <string name="settings_crash_token_desc">Un jeton GitHub avec « Issues : write » sur HereLiesAz/GraffitiXR. Stocké uniquement sur cet appareil, jamais dans l\'application. Laissez vide pour désactiver les envois.</string>
+    <string name="settings_crash_token_field">Jeton</string>
+    <string name="settings_canvas_color_black">Noir</string>
+    <string name="settings_canvas_color_dark">Sombre</string>
+    <string name="settings_canvas_color_grey">Gris</string>
+    <string name="settings_canvas_color_white">Blanc</string>
+    <string name="settings_canvas_color_navy">Bleu marine</string>
+    <string name="state_selected">Sélectionné</string>
+    <string name="state_expanded">Développé</string>
+    <string name="state_collapsed">Réduit</string>
+    <string name="settings_fps_device_default">Par défaut de l\'appareil</string>
+    <string name="settings_fps_device_max">Maximum de l\'appareil</string>
+    <string name="first_run_photo_title">Voyez-le sur votre mur</string>
+    <string name="first_run_photo_text">Choisissez une photo de référence de votre œuvre et nous vous montrerons son rendu sur un vrai mur, en AR.</string>
+    <string name="first_run_choose_photo">Choisir une photo</string>
+    <string name="first_run_not_now">Pas maintenant</string>
+    <string name="first_run_draw_title">Dessinez ceci sur votre mur</string>
+    <string name="first_run_draw_hint">Faites grand, à peu près la taille de votre œuvre. Il suffit que ce soit reconnaissable, pas soigné.</string>
+    <string name="first_run_draw_done">C\'est dessiné</string>
+    <string name="first_run_draw_skip">Passer : je le placerai moi-même</string>
+    <string name="first_run_detect_title">Pointez maintenant la caméra vers ce que vous avez dessiné</string>
+    <string name="first_run_detect_movement_hint">Déplacez lentement votre appareil en cercle</string>
+    <string name="design_instructions_title">Concevez votre fresque</string>
+    <string name="design_instructions_text">Appuyez sur « %1$s » dans la barre, puis sur « %2$s », pour choisir une photo de votre œuvre.</string>
+    <string name="got_it_button">Compris</string>
+    <string name="standalone_width_prompt">Mesurez la largeur réelle entre les bords gauche et droit de la cible.</string>
+    <string name="standalone_width_label_metric">Largeur de la cible (mètres)</string>
+    <string name="standalone_width_label_imperial">Largeur de la cible (pieds et pouces)</string>
+    <string name="standalone_width_range_error">Saisissez une largeur comprise entre %1$s et %2$s.</string>
+    <string name="standalone_use_measured_width">Utiliser la largeur mesurée</string>
+    <string name="standalone_continue_without_scale">Continuer sans échelle physique</string>
+    <string name="standalone_recapture">Reprendre</string>
+    <string name="standalone_capture_wall_target">Capturer la cible murale</string>
+    <string name="standalone_capture_failed">Impossible de capturer la cible murale. Réessayez.</string>
+    <string name="standalone_rectify_failed">Impossible de rectifier cette cible. Marquez quatre coins bien nets.</string>
+    <string name="standalone_target_too_weak">Cette cible comporte trop peu de détails exploitables (%1$d caractéristiques KPM ; %2$d requises). Capturez une zone de mur plus riche.</string>
+    <string name="standalone_new_target">Nouvelle cible</string>
+    <string name="standalone_copy_diagnostics">Copier le diagnostic</string>
+    <string name="standalone_wall_target_lost">Cible murale perdue</string>
+    <string name="standalone_recapture_target">Reprendre la cible</string>
+    <string name="standalone_sweep_hint">Tournez lentement pour cartographier l\'espace — %1$d%%</string>
+    <string name="standalone_failure_native_library_unavailable">SphereSLAM n\'est pas disponible dans cette version.</string>
+    <string name="standalone_failure_camera_unavailable">La caméra n\'est pas disponible pour la RA autonome.</string>
+    <string name="standalone_failure_intrinsics_unavailable">L\'étalonnage de la caméra n\'est pas disponible pour la RA autonome.</string>
+    <string name="standalone_failure_reference_too_weak">Cette cible murale comporte trop peu de détails exploitables. Capturez une zone plus riche.</string>
+    <string name="standalone_failure_no_page_match">Gardez la cible murale dans le champ.</string>
+    <string name="standalone_failure_stale_observation">Le suivi prend du retard. Déplacez le téléphone plus lentement.</string>
+    <string name="standalone_failure_reprojection_error">La correspondance avec le mur est instable. Recadrez la cible.</string>
+    <string name="standalone_failure_insufficient_inliers">Les détails visibles de la cible sont insuffisants.</string>
+    <string name="standalone_failure_pose_jump">Saut de suivi rejeté. Maintenez le téléphone stable sur la cible murale.</string>
+    <string name="standalone_failure_persisted_target_corrupt">La cible murale enregistrée est introuvable ou illisible. Capturez une nouvelle cible.</string>
+    <string name="standalone_failure_internal">SphereSLAM n\'a pas pu continuer à suivre cette cible.</string>
+    <string name="standalone_tracking_stopped">Le suivi SphereSLAM s\'est arrêté. Recapturez la cible pour le relancer.</string>
+    <string name="standalone_status_mapping">Cartographie SphereSLAM • touchez Cible pour ajouter une empreinte</string>
+    <string name="standalone_status_preparing">Préparation de la cible d\'empreinte…</string>
+    <string name="standalone_status_finding">Recherche de la cible d\'empreinte…</string>
+    <string name="standalone_quality_too_small">Cette cible murale est trop petite après rectification. Capturez une zone plus grande.</string>
+    <string name="standalone_quality_low_contrast">Cette cible murale manque de contraste visuel. Incluez plus de texture ou de détails.</string>
+    <string name="standalone_quality_blurry">Cette cible murale est trop floue pour un suivi fiable. Restez stable et recapturez.</string>
+    <string name="standalone_quality_not_strong_enough">Cette cible murale n\'est pas assez solide pour un suivi fiable.</string>
+    <string name="standalone_quality_too_dark">Cette cible est fortement sous-exposée ; le suivi peut être moins fiable.</string>
+    <string name="standalone_quality_too_bright">Cette cible est fortement surexposée ; le suivi peut être moins fiable.</string>
+    <string name="standalone_photosphere_no_sensor">Ce téléphone n\'a pas de capteur de rotation, SphereSLAM ne peut donc pas y placer de cible.</string>
+    <string name="standalone_photosphere_compass_not_ready">La boussole n\'est pas encore prête : tenez le téléphone immobile une seconde, puis reprenez.</string>
+    <string name="standalone_photosphere_not_mapped">SphereSLAM n\'a pas encore cartographié cette vue : tenez l\'appareil photo immobile sur une zone éclairée et détaillée de la surface pendant une seconde, puis reprenez.</string>
+    <string name="target_rectify_title">Rectifier la surface</string>
+    <string name="target_rectify_text">Faites maintenant glisser les coins pour aligner le cadre cyan sur la surface plane de votre mur.</string>
+    <string name="target_remove_marks_title">Supprimer les marques</string>
+    <string name="target_erase_hint">Appuyez sur une marque pour la supprimer, ou glissez sur plusieurs marques pour les supprimer.</string>
+    <string name="target_cd_raw_capture">Capture brute</string>
+    <string name="target_cd_detected_marks">Marques détectées</string>
+    <string name="target_cd_confirm">Confirmer</string>
+    <string name="target_cd_unwarp_base">Photo du mur capturée avec poignées de coin</string>
+    <string name="guidance_open_via_design_overlay">Appuyez sur « Conception » dans la barre, puis sur « Ouvrir », pour ajouter un calque : choisissez une photo et elle apparaît ici, flottant sur la vue caméra en direct.</string>
+    <string name="guidance_open_via_design_mockup">Appuyez sur « Conception » dans la barre, puis sur « Ouvrir », pour ajouter un calque sur la photo du mur. Pincez et faites glisser pour le dimensionner et le positionner.</string>
+    <string name="guidance_open_via_design_trace">Appuyez sur « Conception » dans la barre, puis sur « Ouvrir », pour ajouter votre premier calque. Une fois en place, pincez et faites glisser sur le canevas pour le dimensionner et le placer.</string>
+    <string name="guidance_open_via_design_ar">Appuyez sur « Conception » dans la barre, puis sur « Ouvrir », pour ajouter un calque de conception : il se projette sur le mur à partir de l\'ancre que vous venez de définir.</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">Ce changement ne peut pas être partagé avec l\'hôte : il reste sur cet appareil</string>
+    <string name="ar_feedback_backend_resolving">Le moteur AR est encore en cours de sélection : réessayez d\'héberger dans un instant</string>
+    <string name="ar_feedback_open_project_first">Ouvrez un projet avant de partager : il n\'y a encore rien à envoyer à un invité</string>
+    <string name="ar_feedback_host_need_target_arcore">Capturez et verrouillez une cible murale à jour avant d\'héberger</string>
+    <string name="ar_feedback_host_need_target_standalone">Capturez une cible murale autonome avant d\'héberger</string>
+    <string name="ar_feedback_fingerprint_not_ready">L\'empreinte du mur n\'est pas encore prête : gardez la cible dans le champ et réessayez d\'héberger</string>
+    <string name="ar_feedback_package_failed">Impossible d\'empaqueter ce projet pour le partager : essayez d\'abord de l\'enregistrer</string>
+    <string name="ar_feedback_host_failed">Impossible de démarrer le partage : %1$s</string>
+    <string name="ar_feedback_join_load_failed">Impossible de charger le projet de l\'hôte : la session a été terminée.</string>
+    <string name="ar_feedback_join_no_geometry">L\'hôte n\'a pas fourni de géométrie sur laquelle ARCore puisse s\'aligner.</string>
+    <string name="ar_feedback_join_failed">Impossible de rejoindre : %1$s</string>
+    <string name="ar_feedback_wall_target_changed">La cible murale a changé : le partage est terminé. Relancez l\'hébergement pour le nouveau mur.</string>
+    <string name="ar_feedback_backend_changed">Le moteur de suivi a changé : le partage est terminé. Relancez le partage.</string>
+    <string name="ar_feedback_camera_busy">La caméra est occupée ou indisponible : fermez les autres applications de caméra, puis rouvrez l\'AR</string>
+    <string name="ar_feedback_ar_start_failed">Impossible de démarrer l\'AR : votre caméra est peut-être utilisée par une autre application</string>
+    <string name="ar_feedback_camera_setting_apply_failed">Impossible d\'appliquer le réglage de la caméra à la session AR en cours : quittez l\'AR puis rouvrez-la</string>
+    <string name="ar_feedback_sphere_target_save_failed">Le suivi du mur fonctionne pour cette session, mais la cible SphereSLAM n\'a pas pu être enregistrée.</string>
+    <string name="ar_feedback_camera_not_resumed">La caméra AR n\'a pas repris : essayez de quitter le mode AR puis d\'y revenir</string>
+    <string name="ar_feedback_camera_permission">Caméra indisponible : vérifiez l\'autorisation de la caméra, puis rouvrez l\'AR</string>
+    <string name="ar_feedback_camera_not_paused">La caméra AR ne s\'est pas mise en pause proprement : elle peut continuer à tourner en arrière-plan</string>
+    <string name="ar_feedback_backbone_warning">L\'œuvre couvre presque tout le mur visible : seuls %1$d points suivis se trouvent en dehors. Réduisez-la ou reculez, sinon la cible risque de ne pas se verrouiller.</string>
+    <string name="ar_feedback_legacy_target_geometry">La cible enregistrée de ce projet a été créée par une version plus ancienne et sa géométrie 3D ne peut pas être corrigée. Recréez la cible pour l\'utiliser.</string>
+    <string name="ar_feedback_camera_no_frames">La caméra ne fournit aucune image : quittez l\'AR et réessayez</string>
+    <string name="ar_feedback_camera_recovery_timeout">La récupération de la caméra AR a expiré sans risque : quittez l\'AR puis rouvrez-la</string>
+    <string name="ar_feedback_target_prepare_failed">Impossible de préparer la cible capturée. Réessayez.</string>
+    <string name="ar_feedback_wall_width_save_failed">Impossible d\'enregistrer la largeur du mur. Réessayez d\'enregistrer.</string>
+    <string name="ar_feedback_unknown_error">erreur inconnue</string>
 </resources>

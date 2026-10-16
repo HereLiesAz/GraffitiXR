@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -135,6 +136,15 @@ class MainViewModel @Inject constructor(
 
     val completedTutorials: StateFlow<Set<String>> = settingsRepository.completedTutorials
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    /**
+     * True once [completedTutorials] has been read from the store. The StateFlow's `emptySet()` seed
+     * is indistinguishable from "nothing completed yet", so a one-shot overlay must wait for this
+     * before deciding it has not been shown.
+     */
+    val completedTutorialsLoaded: StateFlow<Boolean> = settingsRepository.completedTutorials
+        .map { true }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     fun markTutorialCompletePersistent(key: String) {
         viewModelScope.launch { settingsRepository.markTutorialComplete(key) }

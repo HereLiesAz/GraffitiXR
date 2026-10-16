@@ -38,14 +38,12 @@ internal object StandalonePhotosphereCapture {
         else -> null
     }
 
-    /** Concise artist-facing instruction for [blocker]. */
-    fun userMessage(blocker: Blocker): String = when (blocker) {
-        Blocker.ATTITUDE_SENSOR_MISSING ->
-            "This phone has no rotation sensor, so SphereSLAM can't place a target here."
-        Blocker.ATTITUDE_NOT_READY ->
-            "Compass isn't ready yet — hold the phone still for a second, then retake."
-        Blocker.PHOTOSPHERE_EMPTY ->
-            "SphereSLAM hasn't mapped this view yet — hold the camera steady on a lit, " +
-                "detailed part of the surface for a second, then retake."
-    }
+    /** Concise artist-facing instruction for [blocker], as a typed key resolved at the UI edge. */
+    fun userText(blocker: Blocker): StandaloneText = StandaloneText(
+        when (blocker) {
+            Blocker.ATTITUDE_SENSOR_MISSING -> StandaloneTextKey.PHOTOSPHERE_NO_SENSOR
+            Blocker.ATTITUDE_NOT_READY -> StandaloneTextKey.PHOTOSPHERE_COMPASS_NOT_READY
+            Blocker.PHOTOSPHERE_EMPTY -> StandaloneTextKey.PHOTOSPHERE_NOT_MAPPED
+        }
+    )
 }

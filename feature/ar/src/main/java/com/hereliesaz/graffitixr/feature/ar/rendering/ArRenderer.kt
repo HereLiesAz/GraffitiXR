@@ -342,6 +342,13 @@ class ArRenderer(
 
     private val anchorOrchestrator = AnchorOrchestrator()
     private val poseFusion = com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion()
+    // Decides which correction source (hybrid KPM vs MobileGS reloc) drives poseFusion on a frame, so
+    // the two never alternate frame by frame. GL thread only. See CorrectionSourceArbiter.
+    private val correctionArbiter = com.hereliesaz.graffitixr.feature.ar.anchor.CorrectionSourceArbiter()
+    // Reused destination for SlamManager.getRelocResultInto: the reloc result is read up to three
+    // times a frame on the GL thread, and a fresh 35-float array per read was steady GC churn. GL
+    // thread only; nothing retains it across a call.
+    private val relocBuf = FloatArray(com.hereliesaz.graffitixr.nativebridge.SlamManager.RELOC_RESULT_SIZE)
     // A/B switch for the Sub-project A harness: when false, the overlay is driven purely by the
     // world-locked ARCore anchor (the stable pre/post-anchor behavior). When true, the mark-PnP
     // relocalization correction is fused on top — which, for a richly-detailed fingerprint (e.g. a
@@ -1677,11 +1684,12 @@ class ArRenderer(
                 pendingAnchorEstablishment = true
             }
             if (!anchorEstablished && !pendingAnchorEstablishment && !isCapturingTarget &&
+                !slamManager.awaitingNewFingerprint &&
                 frame.camera.trackingState == TrackingState.TRACKING
             ) {
                 val cac = slamManager.captureAnchorCam
                 if (cac != null) {
-                    val r = slamManager.getRelocResult()
+                    val r = slamManager.getRelocResultInto(relocBuf)
                     val seq = r[18]
                     if (seq > 0f && seq != relocAnchorLastSeq) {
                         relocAnchorLastSeq = seq
@@ -1921,7 +1929,13 @@ class ArRenderer(
                     // tracking loss) deliberately does NOT clear it, because a plain tracking loss is a
                     // different event from the anchor itself changing. Reset unconditionally; a no-op
                     // on the session's first anchor, since correction starts null anyway.
-                    poseFusion.reset()
+                    //
+                    // The native PnP result still latched at this instant was solved against the
+                    // OLD fingerprint. Hand its seq to the reset so it counts as consumed: with
+                    // lastSeq rewound to 0 it looked brand new on the next frame and cold-snapped
+                    // the new anchor onto the old wall.
+                    poseFusion.reset(slamManager.getRelocResultInto(relocBuf)[18])
+                    correctionArbiter.reset()
                     anchorGeneration++
                     // KPM observations and pose-history samples from before this anchor existed
                     // pair against a backbone that was not this anchor (e.g. a restored page that
@@ -2132,6 +2146,11 @@ class ArRenderer(
             // which drifts; correcting in the wrong frame pulls it somewhere confidently wrong, and
             // PAPER.md §8.3 is explicit that the second is worse.
             val captureAnchorCam = slamManager.captureAnchorCam
+            // A re-capture's anchor exists but its fingerprint and capture pose are not both installed
+            // yet: native may still solve against the previous wall and Kotlin still describes the
+            // previous anchor. Reloc is ignored (the arbiter will not pick it, and the skip reason
+            // below says why) until SlamManager.completeFingerprintReplacement lowers the gate.
+            val relocGated = slamManager.awaitingNewFingerprint
             // The three reasons fusion can be skipped are known HERE and nowhere else — PoseFusion
             // is never called, so it cannot report them. Without this the overlay simply drifts and
             // every other row on the overlay looks healthy, which is the failure mode this whole
@@ -2149,6 +2168,10 @@ class ArRenderer(
                 // MobileGS captureAnchorCam. Only report the legacy missing-fingerprint gates when
                 // neither correction source is capable of carrying the standing correction.
                 hybridFrameReady -> null
+                // The new wall's fingerprint is still being built: "no fingerprint yet" is the truth,
+                // not NO_CAPTURE_POSE ("old target - re-create it"), which the previous wall's
+                // still-loaded point count would otherwise produce.
+                relocGated -> com.hereliesaz.graffitixr.common.model.FusionState.NO_FINGERPRINT
                 captureAnchorCam == null ->
                     if (slamManager.getWallKeypointCount() <= 0) {
                         com.hereliesaz.graffitixr.common.model.FusionState.NO_FINGERPRINT
@@ -2158,9 +2181,27 @@ class ArRenderer(
                 else -> null
             }
             val hybridAccepted = hybridDecision?.accepted
+            // ONE correction source per frame, by a fixed rule (CorrectionSourceArbiter): an accepted
+            // hybrid observation applies; while hybrid is fresh the anchor is HELD on frames without
+            // one; MobileGS reloc drives only before hybrid first accepts or after it has been silent
+            // for the whole window. Previously a frame with no hybrid observation fell through to
+            // reloc, so with both sources present the correction alternated between two estimators.
+            val correctionSource =
+                if (!fusionEnabled || !anchorEstablished) {
+                    com.hereliesaz.graffitixr.feature.ar.anchor.CorrectionSourceArbiter.Source.NONE
+                } else {
+                    correctionArbiter.select(
+                        nowNs = frame.timestamp,
+                        hybridAccepted = hybridAccepted != null,
+                        hybridFrameReady = hybridFrameReady,
+                        hasRelocCapturePose = captureAnchorCam != null,
+                        relocGated = relocGated,
+                    )
+                }
             val anchorMatrix: FloatArray = when {
                 !fusionEnabled || !anchorEstablished -> backbone
-                hybridAccepted != null ->
+                correctionSource == com.hereliesaz.graffitixr.feature.ar.anchor.CorrectionSourceArbiter.Source.HYBRID &&
+                    hybridAccepted != null ->
                     poseFusion.currentAnchorFromHybridObservation(
                         currentBackbone = backbone,
                         backboneAtObservation = hybridAccepted.backboneAtObservation,
@@ -2190,11 +2231,12 @@ class ArRenderer(
                             Timber.d("ARDIAG hybrid KPM ${lastHybridKpmDiagnostics.summary()}")
                         }
                     }
-                captureAnchorCam != null ->
+                correctionSource == com.hereliesaz.graffitixr.feature.ar.anchor.CorrectionSourceArbiter.Source.RELOC &&
+                    captureAnchorCam != null && !relocGated ->
                     poseFusion.currentAnchor(
                     backbone = backbone,
                     vCurrent = viewMatrix,
-                    reloc = slamManager.getRelocResult(),
+                    reloc = slamManager.getRelocResultInto(relocBuf),
                     captureAnchorCam = captureAnchorCam,
                     // THE teleological input, finally connected. The claim in TELEOLOGICAL_SLAM.md is
                     // that the further along the painting is, the more real-world corroboration the
@@ -2225,7 +2267,8 @@ class ArRenderer(
                     // feeding a negative through a parameter documented as [0,1].
                     confGlobal = slamManager.getCorroborationConfidence().coerceAtLeast(0f),
                 )
-                hybridFrameReady -> poseFusion.holdCurrentAnchor(backbone)
+                correctionSource == com.hereliesaz.graffitixr.feature.ar.anchor.CorrectionSourceArbiter.Source.HOLD ->
+                    poseFusion.holdCurrentAnchor(backbone)
                 else -> backbone
             }
 
@@ -2393,7 +2436,7 @@ class ArRenderer(
                 // fires when the teleological SLAM has genuinely latched onto the drawn marks. On a
                 // blank wall relocalization stays weak until the user draws, so this self-times.
                 anchorLockTracker.update(anchorMatrix[12], anchorMatrix[13], anchorMatrix[14])
-                val relocInliers = slamManager.getRelocResult()[16].toInt()
+                val relocInliers = slamManager.getRelocResultInto(relocBuf)[16].toInt()
                 if (anchorLockTracker.locked && relocInliers >= DOODLE_MIN_RELOC_INLIERS) {
                     doodleLockReported = true
                     onDoodleLocked()

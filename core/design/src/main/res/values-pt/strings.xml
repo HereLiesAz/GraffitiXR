@@ -32,7 +32,6 @@
     <!-- Label for Canvas mode, which is optimized for smaller, desk-scale artwork. -->
     <!-- Label for Mural mode, which is optimized for large-scale wall artwork. -->
     <!-- Description for the toggle between Canvas and Mural scanning modes. -->
-    <string name="nav_scan_mode_toggle_info">Alterne entre Tela (otimizado para arte em menor escala, de mesa) e Mural (otimizado para paredes em grande escala e Gaussian Splatting).</string>
 
     <!-- Label for the Stencil generation tool. -->
     <!-- Description of the Stencil tool, explaining how it creates multi-layer printable templates. -->
@@ -601,9 +600,9 @@
         <item>Belisque para escalar, arraste para reposicionar. A sobreposição permanece fixa na sua tela — afaste-se para ver como ela se encaixa na parede.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
-        <item>Este dispositivo não é compatível com o ARCore, então o modo Projeção AR não está disponível.</item>
-        <item>Você ainda pode usar Traçar, Maquete e Sobreposição ao vivo — todos os modos, exceto AR, funcionam sem o ARCore.</item>
-        <item>Toque para dispensar.</item>
+        <item>Este dispositivo não é compatível com o ARCore, então o modo AR usa um rastreamento de parede independente.</item>
+        <item>No modo AR, você primeiro captura uma foto de um trecho de parede com textura e marca os quatro cantos. O rastreamento então se fixa nesse alvo.</item>
+        <item>Traçar, Maquete e Sobreposição funcionam normalmente. Toque para fechar.</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>Maquete fotográfica — visualize seu design em uma foto antes mesmo de pegar um pincel.</item>
@@ -632,4 +631,125 @@
     <string name="nav_gyro_info">No tripé, mantém o design parado na parede contra pequenas vibrações usando o sensor de movimento. Ative com o telefone já posicionado; ele solta se o telefone for movido.</string>
     <string name="gyro_released_moved">Giro liberado: o telefone se moveu demais.</string>
     <string name="gyro_unavailable">O Giro precisa de um sensor de rotação que este dispositivo não informa.</string>
+    <string name="export_failed">Falha na exportação: não foi possível salvar a imagem na galeria.</string>
+    <string name="export_failed_permission">Não foi possível salvar na galeria. Permita que o GraffitiXR acesse o armazenamento e tente novamente.</string>
+    <string name="export_ar_unavailable">A exportação não está pronta: a visualização da câmera AR não está em execução. Abra a visualização AR e tente novamente.</string>
+    <string name="export_standalone_ar_unavailable">A exportação ainda não está disponível no AR independente.</string>
+    <string name="rail_checking_ar_backend">Verificando o mecanismo AR…</string>
+
+    <string name="settings_use_arcore">Usar o ARCore</string>
+    <string name="settings_arcore_depth">Profundidade do ARCore</string>
+    <string name="settings_monocular_depth">Profundidade monocular (beta)</string>
+    <string name="settings_ambient_scan">Varredura do ambiente</string>
+    <string name="settings_adaptive_rate">Taxa adaptativa (ocioso)</string>
+    <string name="settings_crash_reports">Relatórios de falhas</string>
+    <string name="settings_crash_reports_desc">Em caso de falha, enviar o modelo do dispositivo e os registros recentes em um relatório de erro público? Desativado por padrão.</string>
+    <string name="settings_crash_token_label">Token de relatórios de falhas</string>
+    <string name="settings_crash_token_set">Definido</string>
+    <string name="settings_crash_token_not_set">Não definido</string>
+    <string name="settings_crash_token_desc">Um token do GitHub com «Issues: write» em HereLiesAz/GraffitiXR. Armazenado apenas neste dispositivo, nunca no app. Deixe em branco para desativar os envios.</string>
+    <string name="settings_crash_token_field">Token</string>
+    <string name="settings_canvas_color_black">Preto</string>
+    <string name="settings_canvas_color_dark">Escuro</string>
+    <string name="settings_canvas_color_grey">Cinza</string>
+    <string name="settings_canvas_color_white">Branco</string>
+    <string name="settings_canvas_color_navy">Azul-marinho</string>
+    <string name="state_selected">Selecionado</string>
+    <string name="state_expanded">Expandido</string>
+    <string name="state_collapsed">Recolhido</string>
+    <string name="settings_fps_device_default">Padrão do dispositivo</string>
+    <string name="settings_fps_device_max">Máximo do dispositivo</string>
+    <string name="first_run_photo_title">Veja na sua parede</string>
+    <string name="first_run_photo_text">Escolha uma foto de referência da sua obra e mostraremos como ela fica em uma parede real, em AR.</string>
+    <string name="first_run_choose_photo">Escolher foto</string>
+    <string name="first_run_not_now">Agora não</string>
+    <string name="first_run_draw_title">Desenhe isto na sua parede</string>
+    <string name="first_run_draw_hint">Faça grande, mais ou menos do tamanho da sua obra. Só precisa ser reconhecível, não caprichado.</string>
+    <string name="first_run_draw_done">Já desenhei</string>
+    <string name="first_run_draw_skip">Pular – eu mesmo posiciono</string>
+    <string name="first_run_detect_title">Agora aponte a câmera para o que você desenhou</string>
+    <string name="first_run_detect_movement_hint">Mova o dispositivo lentamente em círculo</string>
+    <string name="design_instructions_title">Crie o seu mural</string>
+    <string name="design_instructions_text">Toque em «%1$s» na barra e depois em «%2$s» para escolher uma foto da sua obra.</string>
+    <string name="got_it_button">Entendi</string>
+    <string name="standalone_width_prompt">Meça a largura real entre as bordas esquerda e direita do alvo.</string>
+    <string name="standalone_width_label_metric">Largura do alvo (metros)</string>
+    <string name="standalone_width_label_imperial">Largura do alvo (pés e polegadas)</string>
+    <string name="standalone_width_range_error">Informe uma largura de %1$s a %2$s.</string>
+    <string name="standalone_use_measured_width">Usar a largura medida</string>
+    <string name="standalone_continue_without_scale">Continuar sem escala física</string>
+    <string name="standalone_recapture">Capturar de novo</string>
+    <string name="standalone_capture_wall_target">Capturar alvo da parede</string>
+    <string name="standalone_capture_failed">Não foi possível capturar o alvo da parede. Tente novamente.</string>
+    <string name="standalone_rectify_failed">Não foi possível retificar esse alvo. Marque quatro cantos nítidos.</string>
+    <string name="standalone_target_too_weak">Esse alvo tem poucos detalhes rastreáveis (%1$d características KPM; são necessárias %2$d). Capture um trecho de parede mais rico.</string>
+    <string name="standalone_new_target">Novo alvo</string>
+    <string name="standalone_copy_diagnostics">Copiar diagnóstico</string>
+    <string name="standalone_wall_target_lost">Alvo da parede perdido</string>
+    <string name="standalone_recapture_target">Capturar o alvo de novo</string>
+    <string name="standalone_sweep_hint">Gire devagar para mapear o espaço — %1$d%%</string>
+    <string name="standalone_failure_native_library_unavailable">O SphereSLAM não está disponível nesta versão.</string>
+    <string name="standalone_failure_camera_unavailable">A câmera não está disponível para a RA independente.</string>
+    <string name="standalone_failure_intrinsics_unavailable">A calibração da câmera não está disponível para a RA independente.</string>
+    <string name="standalone_failure_reference_too_weak">Esse alvo da parede tem poucos detalhes rastreáveis. Capture um trecho mais rico.</string>
+    <string name="standalone_failure_no_page_match">Mantenha o alvo da parede à vista.</string>
+    <string name="standalone_failure_stale_observation">O rastreamento está atrasado. Mova o telefone mais devagar.</string>
+    <string name="standalone_failure_reprojection_error">A correspondência com a parede está instável. Reenquadre o alvo.</string>
+    <string name="standalone_failure_insufficient_inliers">Não há detalhes suficientes do alvo visíveis.</string>
+    <string name="standalone_failure_pose_jump">Salto de rastreamento rejeitado. Mantenha o telefone parado sobre o alvo da parede.</string>
+    <string name="standalone_failure_persisted_target_corrupt">O alvo da parede salvo está ausente ou ilegível. Capture um novo alvo.</string>
+    <string name="standalone_failure_internal">O SphereSLAM não conseguiu continuar rastreando este alvo.</string>
+    <string name="standalone_tracking_stopped">O rastreamento do SphereSLAM parou. Capture o alvo novamente para reiniciá-lo.</string>
+    <string name="standalone_status_mapping">SphereSLAM mapeando • toque em Alvo para adicionar uma impressão digital</string>
+    <string name="standalone_status_preparing">Preparando o alvo de impressão digital…</string>
+    <string name="standalone_status_finding">Procurando o alvo de impressão digital…</string>
+    <string name="standalone_quality_too_small">Esse alvo da parede ficou pequeno demais após a retificação. Capture um trecho maior.</string>
+    <string name="standalone_quality_low_contrast">Esse alvo da parede tem pouco contraste visual. Inclua mais textura ou detalhes.</string>
+    <string name="standalone_quality_blurry">Esse alvo da parede está borrado demais para um rastreamento confiável. Mantenha firme e capture novamente.</string>
+    <string name="standalone_quality_not_strong_enough">Esse alvo da parede não é forte o bastante para um rastreamento confiável.</string>
+    <string name="standalone_quality_too_dark">Este alvo está muito subexposto; o rastreamento pode ficar menos confiável.</string>
+    <string name="standalone_quality_too_bright">Este alvo está muito superexposto; o rastreamento pode ficar menos confiável.</string>
+    <string name="standalone_photosphere_no_sensor">Este telefone não tem sensor de rotação, então o SphereSLAM não pode posicionar um alvo aqui.</string>
+    <string name="standalone_photosphere_compass_not_ready">A bússola ainda não está pronta: mantenha o telefone parado por um segundo e capture de novo.</string>
+    <string name="standalone_photosphere_not_mapped">O SphereSLAM ainda não mapeou esta visão: mantenha a câmera parada por um segundo sobre uma parte iluminada e detalhada da superfície e capture de novo.</string>
+    <string name="target_rectify_title">Retificar superfície</string>
+    <string name="target_rectify_text">Agora arraste os cantos para alinhar a moldura ciano com a superfície plana da sua parede.</string>
+    <string name="target_remove_marks_title">Remover marcas</string>
+    <string name="target_erase_hint">Toque em uma marca para removê-la ou arraste sobre várias marcas para removê-las.</string>
+    <string name="target_cd_raw_capture">Captura bruta</string>
+    <string name="target_cd_detected_marks">Marcas detectadas</string>
+    <string name="target_cd_confirm">Confirmar</string>
+    <string name="target_cd_unwarp_base">Foto da parede capturada com alças nos cantos</string>
+    <string name="guidance_open_via_design_overlay">Toque em «Design» na barra e depois em «Abrir» para adicionar uma camada: escolha uma foto e ela aparece aqui, flutuando sobre a visão ao vivo da câmera.</string>
+    <string name="guidance_open_via_design_mockup">Toque em «Design» na barra e depois em «Abrir» para adicionar uma camada sobre a foto da parede. Pince e arraste para ajustar o tamanho e a posição.</string>
+    <string name="guidance_open_via_design_trace">Toque em «Design» na barra e depois em «Abrir» para adicionar sua primeira camada. Depois que ela entrar, pince e arraste na tela para ajustar o tamanho e posicioná-la.</string>
+    <string name="guidance_open_via_design_ar">Toque em «Design» na barra e depois em «Abrir» para adicionar uma camada de design: ela é projetada na parede usando a âncora que você acabou de definir.</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">Essa alteração não pode ser compartilhada com o anfitrião — ela fica só neste dispositivo</string>
+    <string name="ar_feedback_backend_resolving">O backend de AR ainda está sendo definido — tente hospedar de novo em instantes</string>
+    <string name="ar_feedback_open_project_first">Abra um projeto antes de compartilhar — ainda não há nada para enviar a um convidado</string>
+    <string name="ar_feedback_host_need_target_arcore">Capture e bloqueie um alvo de parede atual antes de hospedar</string>
+    <string name="ar_feedback_host_need_target_standalone">Capture um alvo de parede independente antes de hospedar</string>
+    <string name="ar_feedback_fingerprint_not_ready">A impressão digital da parede ainda não está pronta — mantenha o alvo à vista e tente hospedar de novo</string>
+    <string name="ar_feedback_package_failed">Não foi possível empacotar este projeto para compartilhar — tente salvá-lo primeiro</string>
+    <string name="ar_feedback_host_failed">Não foi possível iniciar o compartilhamento: %1$s</string>
+    <string name="ar_feedback_join_load_failed">Não foi possível carregar o projeto do anfitrião — a sessão foi encerrada.</string>
+    <string name="ar_feedback_join_no_geometry">O anfitrião não forneceu geometria à qual o ARCore possa se alinhar.</string>
+    <string name="ar_feedback_join_failed">Não foi possível entrar: %1$s</string>
+    <string name="ar_feedback_wall_target_changed">O alvo de parede mudou — o compartilhamento foi encerrado. Inicie a hospedagem de novo para a nova parede.</string>
+    <string name="ar_feedback_backend_changed">O backend de rastreamento mudou — o compartilhamento foi encerrado. Inicie o compartilhamento de novo.</string>
+    <string name="ar_feedback_camera_busy">A câmera está ocupada ou indisponível — feche outros apps de câmera e entre no AR novamente</string>
+    <string name="ar_feedback_ar_start_failed">Não foi possível iniciar o AR — a câmera pode estar em uso por outro app</string>
+    <string name="ar_feedback_camera_setting_apply_failed">Não foi possível aplicar a configuração da câmera à sessão de AR em andamento — saia do AR e entre novamente</string>
+    <string name="ar_feedback_sphere_target_save_failed">O rastreamento da parede funciona nesta sessão, mas não foi possível salvar o alvo do SphereSLAM.</string>
+    <string name="ar_feedback_camera_not_resumed">A câmera do AR não retomou — tente sair do modo AR e entrar novamente</string>
+    <string name="ar_feedback_camera_permission">Câmera indisponível — verifique a permissão da câmera e entre no AR novamente</string>
+    <string name="ar_feedback_camera_not_paused">A câmera do AR não pausou corretamente — ela pode continuar em execução em segundo plano</string>
+    <string name="ar_feedback_backbone_warning">A obra cobre quase toda a parede visível — apenas %1$d características rastreadas ficam fora dela. Deixe-a menor ou afaste-se, ou o alvo pode não travar.</string>
+    <string name="ar_feedback_legacy_target_geometry">O alvo salvo deste projeto foi criado por uma versão mais antiga e sua geometria 3D não pode ser corrigida. Crie o alvo de novo para usá-lo.</string>
+    <string name="ar_feedback_camera_no_frames">A câmera não está entregando quadros — saia do AR e tente novamente</string>
+    <string name="ar_feedback_camera_recovery_timeout">A recuperação da câmera do AR expirou com segurança — saia do AR e entre novamente</string>
+    <string name="ar_feedback_target_prepare_failed">Não foi possível preparar o alvo capturado. Tente novamente.</string>
+    <string name="ar_feedback_wall_width_save_failed">Não foi possível salvar a largura da parede. Tente salvar novamente.</string>
+    <string name="ar_feedback_unknown_error">erro desconhecido</string>
 </resources>

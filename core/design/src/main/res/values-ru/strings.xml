@@ -32,7 +32,6 @@
 
 
 
-    <string name="nav_scan_mode_toggle_info">Переключайтесь между холстом (оптимизировано для небольших произведений искусства на столе) и настенной росписью (оптимизировано для крупномасштабных стен и гауссовских брызг).</string>
 
 
 
@@ -606,9 +605,9 @@
         <item>Сведите пальцы для изменения масштаба, перетаскивайте для перемещения. Наложение остаётся зафиксированным на экране — отойдите назад, чтобы увидеть, как оно вписывается в стену.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
-        <item>Это устройство не поддерживает ARCore, поэтому режим AR-проекции недоступен.</item>
-        <item>Вы всё ещё можете использовать режимы След, Макет и Живое наложение — все режимы, кроме AR, работают без ARCore.</item>
-        <item>Нажмите, чтобы закрыть.</item>
+        <item>Это устройство не поддерживает ARCore, поэтому режим AR использует автономное отслеживание стены.</item>
+        <item>В режиме AR сначала вы снимаете фото текстурированного участка стены и отмечаете его четыре угла. Затем отслеживание фиксируется на этой цели.</item>
+        <item>Режимы «След», «Макет» и «Наложение» работают как обычно. Нажмите, чтобы закрыть.</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>Фотомакет — просмотрите свой дизайн на фотографии, прежде чем вообще браться за кисть.</item>
@@ -637,4 +636,125 @@
     <string name="nav_gyro_info">На штативе удерживает дизайн на стене, гася мелкие вибрации с помощью датчика движения. Включайте, когда телефон закреплён; при смещении телефона отключается.</string>
     <string name="gyro_released_moved">Гиро отключено: телефон сдвинулся слишком сильно.</string>
     <string name="gyro_unavailable">Для Гиро нужен датчик вращения, которого нет на этом устройстве.</string>
+    <string name="export_failed">Не удалось экспортировать: изображение не сохранилось в галерее.</string>
+    <string name="export_failed_permission">Не удалось сохранить в галерею. Разрешите GraffitiXR доступ к хранилищу и повторите попытку.</string>
+    <string name="export_ar_unavailable">Экспорт пока недоступен: камера AR не запущена. Откройте режим AR и повторите попытку.</string>
+    <string name="export_standalone_ar_unavailable">Экспорт в автономном AR пока недоступен.</string>
+    <string name="rail_checking_ar_backend">Проверка AR-движка…</string>
+
+    <string name="settings_use_arcore">Использовать ARCore</string>
+    <string name="settings_arcore_depth">Глубина ARCore</string>
+    <string name="settings_monocular_depth">Монокулярная глубина (бета)</string>
+    <string name="settings_ambient_scan">Сканирование окружения</string>
+    <string name="settings_adaptive_rate">Адаптивная частота (простой)</string>
+    <string name="settings_crash_reports">Отчёты о сбоях</string>
+    <string name="settings_crash_reports_desc">При сбое отправлять модель устройства и недавние журналы в публичный отчёт об ошибке? По умолчанию выключено.</string>
+    <string name="settings_crash_token_label">Токен отчётов о сбоях</string>
+    <string name="settings_crash_token_set">Задан</string>
+    <string name="settings_crash_token_not_set">Не задан</string>
+    <string name="settings_crash_token_desc">Токен GitHub с правом «Issues: write» в репозитории HereLiesAz/GraffitiXR. Хранится только на этом устройстве, никогда в приложении. Оставьте поле пустым, чтобы отключить отправку.</string>
+    <string name="settings_crash_token_field">Токен</string>
+    <string name="settings_canvas_color_black">Чёрный</string>
+    <string name="settings_canvas_color_dark">Тёмный</string>
+    <string name="settings_canvas_color_grey">Серый</string>
+    <string name="settings_canvas_color_white">Белый</string>
+    <string name="settings_canvas_color_navy">Тёмно-синий</string>
+    <string name="state_selected">Выбрано</string>
+    <string name="state_expanded">Развёрнуто</string>
+    <string name="state_collapsed">Свёрнуто</string>
+    <string name="settings_fps_device_default">По умолчанию для устройства</string>
+    <string name="settings_fps_device_max">Максимум устройства</string>
+    <string name="first_run_photo_title">Посмотрите на своей стене</string>
+    <string name="first_run_photo_text">Выберите опорное фото своей работы, и мы покажем в AR, как она выглядит на настоящей стене.</string>
+    <string name="first_run_choose_photo">Выбрать фото</string>
+    <string name="first_run_not_now">Не сейчас</string>
+    <string name="first_run_draw_title">Нарисуйте это на своей стене</string>
+    <string name="first_run_draw_hint">Рисуйте крупно — примерно с размер вашей работы. Достаточно, чтобы рисунок был узнаваем, аккуратность не нужна.</string>
+    <string name="first_run_draw_done">Я нарисовал(а)</string>
+    <string name="first_run_draw_skip">Пропустить — я размещу сам(а)</string>
+    <string name="first_run_detect_title">Теперь наведите камеру на нарисованное</string>
+    <string name="first_run_detect_movement_hint">Медленно двигайте устройство по кругу</string>
+    <string name="design_instructions_title">Создайте свой мурал</string>
+    <string name="design_instructions_text">Нажмите «%1$s» на панели, затем «%2$s», чтобы выбрать фото вашей работы.</string>
+    <string name="got_it_button">Понятно</string>
+    <string name="standalone_width_prompt">Измерьте реальную ширину между левым и правым краями цели.</string>
+    <string name="standalone_width_label_metric">Ширина цели (метры)</string>
+    <string name="standalone_width_label_imperial">Ширина цели (футы и дюймы)</string>
+    <string name="standalone_width_range_error">Введите ширину от %1$s до %2$s.</string>
+    <string name="standalone_use_measured_width">Использовать измеренную ширину</string>
+    <string name="standalone_continue_without_scale">Продолжить без физического масштаба</string>
+    <string name="standalone_recapture">Переснять</string>
+    <string name="standalone_capture_wall_target">Снять цель на стене</string>
+    <string name="standalone_capture_failed">Не удалось снять цель на стене — повторите попытку.</string>
+    <string name="standalone_rectify_failed">Не удалось выровнять эту цель — отметьте четыре чётких угла.</string>
+    <string name="standalone_target_too_weak">В этой цели слишком мало отслеживаемых деталей (признаков KPM: %1$d, нужно %2$d). Снимите более насыщенный участок стены.</string>
+    <string name="standalone_new_target">Новая цель</string>
+    <string name="standalone_copy_diagnostics">Копировать диагностику</string>
+    <string name="standalone_wall_target_lost">Цель на стене потеряна</string>
+    <string name="standalone_recapture_target">Переснять цель</string>
+    <string name="standalone_sweep_hint">Медленно поворачивайтесь, чтобы отсканировать пространство — %1$d%%</string>
+    <string name="standalone_failure_native_library_unavailable">SphereSLAM недоступен в этой сборке.</string>
+    <string name="standalone_failure_camera_unavailable">Камера недоступна для автономной AR.</string>
+    <string name="standalone_failure_intrinsics_unavailable">Калибровка камеры недоступна для автономной AR.</string>
+    <string name="standalone_failure_reference_too_weak">В этой цели на стене слишком мало отслеживаемых деталей. Снимите более насыщенный участок.</string>
+    <string name="standalone_failure_no_page_match">Держите цель на стене в кадре.</string>
+    <string name="standalone_failure_stale_observation">Отслеживание отстаёт. Двигайте телефон медленнее.</string>
+    <string name="standalone_failure_reprojection_error">Совпадение со стеной нестабильно. Перекадрируйте цель.</string>
+    <string name="standalone_failure_insufficient_inliers">Видно недостаточно деталей цели.</string>
+    <string name="standalone_failure_pose_jump">Скачок отслеживания отклонён. Держите телефон неподвижно, направив на цель на стене.</string>
+    <string name="standalone_failure_persisted_target_corrupt">Сохранённая цель на стене отсутствует или не читается. Снимите новую цель.</string>
+    <string name="standalone_failure_internal">SphereSLAM не смог продолжить отслеживание этой цели.</string>
+    <string name="standalone_tracking_stopped">Отслеживание SphereSLAM остановлено. Снимите цель заново, чтобы перезапустить его.</string>
+    <string name="standalone_status_mapping">SphereSLAM строит карту • нажмите «Цель», чтобы добавить отпечаток</string>
+    <string name="standalone_status_preparing">Подготовка цели-отпечатка…</string>
+    <string name="standalone_status_finding">Поиск цели-отпечатка…</string>
+    <string name="standalone_quality_too_small">Эта цель на стене слишком мала после выравнивания. Снимите участок побольше.</string>
+    <string name="standalone_quality_low_contrast">В этой цели на стене слишком мало визуального контраста. Захватите больше текстуры или деталей.</string>
+    <string name="standalone_quality_blurry">Эта цель на стене слишком размыта для надёжного отслеживания. Держите телефон ровно и снимите заново.</string>
+    <string name="standalone_quality_not_strong_enough">Эта цель на стене недостаточно выразительна для надёжного отслеживания.</string>
+    <string name="standalone_quality_too_dark">Эта цель сильно недоэкспонирована; отслеживание может быть менее надёжным.</string>
+    <string name="standalone_quality_too_bright">Эта цель сильно переэкспонирована; отслеживание может быть менее надёжным.</string>
+    <string name="standalone_photosphere_no_sensor">В этом телефоне нет датчика поворота, поэтому SphereSLAM не может здесь разместить цель.</string>
+    <string name="standalone_photosphere_compass_not_ready">Компас ещё не готов — подержите телефон неподвижно секунду и снимите заново.</string>
+    <string name="standalone_photosphere_not_mapped">SphereSLAM ещё не построил карту этого вида — секунду держите камеру неподвижно, направив на освещённый детализированный участок поверхности, затем снимите заново.</string>
+    <string name="target_rectify_title">Выровнять поверхность</string>
+    <string name="target_rectify_text">Теперь перетащите углы так, чтобы голубая рамка совпала с плоской поверхностью стены.</string>
+    <string name="target_remove_marks_title">Удалить метки</string>
+    <string name="target_erase_hint">Нажмите на метку, чтобы удалить её, или проведите пальцем по нескольким меткам.</string>
+    <string name="target_cd_raw_capture">Необработанный снимок</string>
+    <string name="target_cd_detected_marks">Обнаруженные метки</string>
+    <string name="target_cd_confirm">Подтвердить</string>
+    <string name="target_cd_unwarp_base">Снимок стены с маркерами по углам</string>
+    <string name="guidance_open_via_design_overlay">Нажмите «Дизайн» на панели, затем «Открыть», чтобы добавить слой: выберите фото, и оно появится здесь, поверх живого изображения с камеры.</string>
+    <string name="guidance_open_via_design_mockup">Нажмите «Дизайн» на панели, затем «Открыть», чтобы добавить слой поверх фото стены. Сведите и разведите пальцы и перетащите, чтобы задать размер и положение.</string>
+    <string name="guidance_open_via_design_trace">Нажмите «Дизайн» на панели, затем «Открыть», чтобы добавить первый слой. Когда он появится, сводите пальцы и перетаскивайте по холсту, чтобы задать размер и положение.</string>
+    <string name="guidance_open_via_design_ar">Нажмите «Дизайн» на панели, затем «Открыть», чтобы добавить слой дизайна: он проецируется на стену с помощью только что заданного якоря.</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">Это изменение нельзя передать хосту — оно останется только на этом устройстве</string>
+    <string name="ar_feedback_backend_resolving">Движок AR ещё определяется — повторите запуск хоста через мгновение</string>
+    <string name="ar_feedback_open_project_first">Откройте проект перед тем, как делиться, — гостю пока нечего отправлять</string>
+    <string name="ar_feedback_host_need_target_arcore">Перед запуском хоста снимите и зафиксируйте актуальную цель на стене</string>
+    <string name="ar_feedback_host_need_target_standalone">Перед запуском хоста снимите автономную цель на стене</string>
+    <string name="ar_feedback_fingerprint_not_ready">Отпечаток стены ещё не готов — держите цель в кадре и повторите запуск хоста</string>
+    <string name="ar_feedback_package_failed">Не удалось подготовить проект к отправке — сначала попробуйте его сохранить</string>
+    <string name="ar_feedback_host_failed">Не удалось начать совместный доступ: %1$s</string>
+    <string name="ar_feedback_join_load_failed">Не удалось загрузить проект хоста — сеанс завершён.</string>
+    <string name="ar_feedback_join_no_geometry">Хост не передал геометрию, по которой ARCore мог бы выровняться.</string>
+    <string name="ar_feedback_join_failed">Не удалось присоединиться: %1$s</string>
+    <string name="ar_feedback_wall_target_changed">Цель на стене изменилась — совместный доступ завершён. Снова запустите хост для новой стены.</string>
+    <string name="ar_feedback_backend_changed">Механизм отслеживания изменился — совместный доступ завершён. Начните делиться снова.</string>
+    <string name="ar_feedback_camera_busy">Камера занята или недоступна — закройте другие приложения с камерой и снова войдите в AR</string>
+    <string name="ar_feedback_ar_start_failed">Не удалось запустить AR — возможно, камеру использует другое приложение</string>
+    <string name="ar_feedback_camera_setting_apply_failed">Не удалось применить настройку камеры к текущему сеансу AR — выйдите из AR и войдите снова</string>
+    <string name="ar_feedback_sphere_target_save_failed">Отслеживание стены работает в этом сеансе, но цель SphereSLAM не удалось сохранить.</string>
+    <string name="ar_feedback_camera_not_resumed">Камера AR не возобновила работу — выйдите из режима AR и войдите снова</string>
+    <string name="ar_feedback_camera_permission">Камера недоступна — проверьте разрешение на камеру и снова войдите в AR</string>
+    <string name="ar_feedback_camera_not_paused">Камера AR не приостановилась корректно — она может продолжать работать в фоне</string>
+    <string name="ar_feedback_backbone_warning">Работа закрывает почти всю видимую стену — за её пределами остаётся только %1$d отслеживаемых признаков. Уменьшите её или отойдите назад, иначе цель может не зафиксироваться.</string>
+    <string name="ar_feedback_legacy_target_geometry">Сохранённая цель этого проекта создана в старой версии, и её 3D-геометрию нельзя исправить. Создайте цель заново, чтобы использовать её.</string>
+    <string name="ar_feedback_camera_no_frames">Камера не передаёт кадры — выйдите из AR и повторите попытку</string>
+    <string name="ar_feedback_camera_recovery_timeout">Время восстановления камеры AR безопасно истекло — выйдите из AR и войдите снова</string>
+    <string name="ar_feedback_target_prepare_failed">Не удалось подготовить снятую цель. Повторите попытку.</string>
+    <string name="ar_feedback_wall_width_save_failed">Не удалось сохранить ширину стены. Повторите сохранение.</string>
+    <string name="ar_feedback_unknown_error">неизвестная ошибка</string>
 </resources>

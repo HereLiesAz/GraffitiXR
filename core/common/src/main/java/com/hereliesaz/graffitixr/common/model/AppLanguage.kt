@@ -15,5 +15,6 @@ enum class AppLanguage(val code: String, val displayName: String) {
     SPANISH("es", "Español"),
     CHINESE_SIMPLIFIED("zh-CN", "简体中文"),
     CHINESE_TRADITIONAL("zh-HK", "繁體中文"),
+    RUSSIAN("ru", "Русский"),
     TAGALOG("tl", "Tagalog")
 }
