@@ -119,9 +119,10 @@ standing anchor-local correction, so exactly one drives it on any frame
 
 1. a hybrid observation accepted this frame is applied;
 2. otherwise, **while hybrid is fresh** (accepted within the last 3 s) the correction is **held** —
-   reloc is not consulted, even when it has a new result;
-3. otherwise reloc drives (when a capture pose exists): before hybrid has ever accepted, or after it
-   has been silent for the whole 3 s window. With only a hybrid page and no capture pose the
+   reloc is not consulted, even when it has a new result, and even if the KPM page was just unloaded
+   (the window, not the page, decides when reloc may take over);
+3. otherwise reloc drives (when a capture pose exists and reloc is not gated, below): before hybrid
+   has ever accepted, or after it has been silent for the whole 3 s window. With only a hybrid page and no capture pose the
    correction is held; with neither, the raw ARCore backbone is used.
 
 The handover is one-way and timed — reloc until hybrid first accepts, hybrid while it keeps
@@ -130,8 +131,21 @@ estimators frame by frame (they differ in latency and bias). A re-capture resets
 window is unmeasured; it belongs to the same eval sweep as the other fusion constants.
 
 On a re-capture `PoseFusion.reset(seq)` also adopts the native reloc seq current at that instant as
-already consumed, and `clearWallFingerprint` zeroes the latched result's counts, so the pre-capture
-fix cannot cold-snap the new anchor.
+already consumed, and every fingerprint replacement zeroes the latched result's counts, so the
+pre-capture fix cannot cold-snap the new anchor.
+
+That alone left a window: between the anchor being re-established and the NEW fingerprint being
+installed, native keeps solving against the OLD fingerprint (the seq advances) while Kotlin holds the
+old (or no) capture pose, so a later seq would cold-snap the new anchor onto the old wall. An explicit
+**awaiting-new-fingerprint gate** closes it. `ArViewModel.setInitialAnchorFromCapture` raises it
+(`SlamManager.beginFingerprintReplacement`, which also drops `captureAnchorCam`); it is lowered only by
+`completeFingerprintReplacement`, which `MetricFingerprintBuilder` calls after the new fingerprint is
+installed natively and the new `captureAnchorCam` is computed (or a project load does after restoring
+both), or by `clearWallFingerprint`. While it is up `ArRenderer` ignores reloc results, the arbiter
+never returns `RELOC` (`relocGated`), and fusion reports `NO_FINGERPRINT`. Native independently drops
+any solve that was in flight when the fingerprint changed (fingerprint generation, see
+NATIVE_ENGINE.md), so a result computed against the old fingerprint can never be published after the
+swap.
 
 The overlay also shows how many features the live frame yielded *before* matching.
 That disambiguates `FEW_MATCHES`, which means opposite things depending on it: a

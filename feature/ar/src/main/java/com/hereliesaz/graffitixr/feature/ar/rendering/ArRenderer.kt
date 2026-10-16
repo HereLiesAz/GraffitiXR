@@ -1684,6 +1684,7 @@ class ArRenderer(
                 pendingAnchorEstablishment = true
             }
             if (!anchorEstablished && !pendingAnchorEstablishment && !isCapturingTarget &&
+                !slamManager.awaitingNewFingerprint &&
                 frame.camera.trackingState == TrackingState.TRACKING
             ) {
                 val cac = slamManager.captureAnchorCam
@@ -2145,6 +2146,11 @@ class ArRenderer(
             // which drifts; correcting in the wrong frame pulls it somewhere confidently wrong, and
             // PAPER.md §8.3 is explicit that the second is worse.
             val captureAnchorCam = slamManager.captureAnchorCam
+            // A re-capture's anchor exists but its fingerprint and capture pose are not both installed
+            // yet: native may still solve against the previous wall and Kotlin still describes the
+            // previous anchor. Reloc is ignored (the arbiter will not pick it, and the skip reason
+            // below says why) until SlamManager.completeFingerprintReplacement lowers the gate.
+            val relocGated = slamManager.awaitingNewFingerprint
             // The three reasons fusion can be skipped are known HERE and nowhere else — PoseFusion
             // is never called, so it cannot report them. Without this the overlay simply drifts and
             // every other row on the overlay looks healthy, which is the failure mode this whole
@@ -2162,6 +2168,10 @@ class ArRenderer(
                 // MobileGS captureAnchorCam. Only report the legacy missing-fingerprint gates when
                 // neither correction source is capable of carrying the standing correction.
                 hybridFrameReady -> null
+                // The new wall's fingerprint is still being built: "no fingerprint yet" is the truth,
+                // not NO_CAPTURE_POSE ("old target - re-create it"), which the previous wall's
+                // still-loaded point count would otherwise produce.
+                relocGated -> com.hereliesaz.graffitixr.common.model.FusionState.NO_FINGERPRINT
                 captureAnchorCam == null ->
                     if (slamManager.getWallKeypointCount() <= 0) {
                         com.hereliesaz.graffitixr.common.model.FusionState.NO_FINGERPRINT
@@ -2185,6 +2195,7 @@ class ArRenderer(
                         hybridAccepted = hybridAccepted != null,
                         hybridFrameReady = hybridFrameReady,
                         hasRelocCapturePose = captureAnchorCam != null,
+                        relocGated = relocGated,
                     )
                 }
             val anchorMatrix: FloatArray = when {
@@ -2221,7 +2232,7 @@ class ArRenderer(
                         }
                     }
                 correctionSource == com.hereliesaz.graffitixr.feature.ar.anchor.CorrectionSourceArbiter.Source.RELOC &&
-                    captureAnchorCam != null ->
+                    captureAnchorCam != null && !relocGated ->
                     poseFusion.currentAnchor(
                     backbone = backbone,
                     vCurrent = viewMatrix,

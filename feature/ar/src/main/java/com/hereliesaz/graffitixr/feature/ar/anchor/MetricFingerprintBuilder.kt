@@ -408,9 +408,6 @@ object MetricFingerprintBuilder {
         // Center the AR overlay on the marks (their centroid), not the screen-center anchor.
         val markCenterLocal = marksCentroidLocal(res.points, cvView, anchorModel)
         slam.overlayMarkCenterLocal = markCenterLocal
-        // IMPLEMENTATION.md 0.9 — published at capture as well as on reload, or the session that
-        // CREATED the target would relocalize without a correction until the project was reopened.
-        slam.captureAnchorCam = anchorCam.copyOf()
 
         val keptDesc = Mat(res.count, descAll.cols(), descAll.type())
         val keypoints = ArrayList<KeyPoint>(res.count)
@@ -453,6 +450,13 @@ object MetricFingerprintBuilder {
             // FingerprintPartition.partition re-pushes with real regions once the artwork lands.
             regions = ByteArray(0),
         )
+        // IMPLEMENTATION.md 0.9 — published at capture as well as on reload, or the session that
+        // CREATED the target would relocalize without a correction until the project was reopened.
+        // AFTER the fingerprint is installed, never before: the new pose paired with the previous
+        // fingerprint is the same wrong-frame composition the replacement gate exists to prevent.
+        // This is also what lowers `awaitingNewFingerprint` -- the new fingerprint AND the new pose
+        // are both in place only here.
+        slam.completeFingerprintReplacement(anchorCam.copyOf())
         return Fingerprint(
             keypoints, res.points.toList(), bytes, rows, cols, type,
             markCenterLocal = markCenterLocal?.toList() ?: emptyList(),

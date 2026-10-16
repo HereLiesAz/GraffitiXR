@@ -24,6 +24,14 @@ struct MobileGSTestPeer {
         g.mPnpMatchCount.store(matches);
         g.mPnpResultSeq.store(seq);
     }
+    static void setBeforeRelocPublishHook(MobileGS& g, std::function<void()> f) {
+        g.mBeforeRelocPublishHook = std::move(f);
+    }
+    static uint64_t fingerprintGeneration(MobileGS& g) {
+        std::lock_guard<std::mutex> lock(g.mMutex);
+        return g.mFingerprintGeneration;
+    }
+    static long pnpSeq(MobileGS& g) { return g.mPnpResultSeq.load(); }
     static long long evalFrameCounter(MobileGS& g) { return g.mEvalSyncFrameCounter.load(); }
     static void setWallPoints(MobileGS& g, const std::vector<cv::Point3f>& p) { g.mWallKeypoints3D = p; }
     static void grow(MobileGS& g, const glm::mat4& camFromFp, const std::vector<cv::KeyPoint>& kps,

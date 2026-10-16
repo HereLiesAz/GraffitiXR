@@ -4424,8 +4424,10 @@ class ArViewModel @Inject constructor(
                 // IMPLEMENTATION.md 0.9 — the third factor of PoseFusion.composeCorrected. A
                 // pre-Phase-2 fingerprint has none, and null there means "do not correct" rather
                 // than "correct with the world anchor", which is the frame defect 0.9 fixed.
-                slamManager.captureAnchorCam =
-                    if (fp.captureAnchorCam.size == 16) fp.captureAnchorCam.toFloatArray() else null
+                // Also lowers the re-capture gate: this project's fingerprint and pose are now both in.
+                slamManager.completeFingerprintReplacement(
+                    if (fp.captureAnchorCam.size == 16) fp.captureAnchorCam.toFloatArray() else null,
+                )
             }
 
             loadedFingerprint = incoming
@@ -5859,7 +5861,12 @@ class ArViewModel @Inject constructor(
         // the moment the renderer resets fusion until the builder publishes the new one (it awaits
         // this anchor first, so the new value always lands after this clear). If the build then fails,
         // fusion reports NO_CAPTURE_POSE instead of correcting in the wrong frame.
-        slamManager.captureAnchorCam = null
+        //
+        // Beyond the pose, native still holds the PREVIOUS wall's fingerprint and keeps solving against
+        // it, so its results (seq advancing) are in the old wall's frame too. The replacement gate
+        // makes the renderer ignore reloc and the arbiter never pick it until the builder (or a
+        // project load) installs the new fingerprint AND the new pose.
+        slamManager.beginFingerprintReplacement()
         renderer?.pendingAnchorEstablishment = true
     }
 

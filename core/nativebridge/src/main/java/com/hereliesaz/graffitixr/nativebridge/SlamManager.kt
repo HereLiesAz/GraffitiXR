@@ -231,6 +231,40 @@ class SlamManager @Inject constructor(
     @Volatile var captureAnchorCam: FloatArray? = null
 
     /**
+     * True from the moment a (re-)capture replaces the anchor until its NEW wall fingerprint and its
+     * NEW [captureAnchorCam] are both installed.
+     *
+     * In that window the native engine still holds the previous wall's fingerprint (and may solve
+     * against it, bumping the result seq) and the Kotlin side still describes the previous anchor, so
+     * any reloc result is in the OLD wall's frame: composed with the new anchor it cold-snaps the
+     * overlay onto the old wall. While this is set the renderer ignores reloc results and the
+     * correction-source arbiter never selects reloc. Native additionally drops a solve that was in
+     * flight when the fingerprint was replaced (its fingerprint generation).
+     *
+     * Raise it with [beginFingerprintReplacement]; lower it only through
+     * [completeFingerprintReplacement] (both halves installed), [clearWallFingerprint] (nothing left
+     * to be stale against) or a successful depth-path [setWallFingerprint].
+     */
+    @Volatile var awaitingNewFingerprint: Boolean = false
+        private set
+
+    /** A re-capture is replacing the anchor: forget the old capture pose and gate reloc. */
+    fun beginFingerprintReplacement() {
+        captureAnchorCam = null
+        awaitingNewFingerprint = true
+    }
+
+    /**
+     * The new fingerprint is already installed natively; publish its [newCaptureAnchorCam] (null for a
+     * fingerprint that has none, which leaves reloc uncorrected) and only THEN lower the gate, so a
+     * frame can never see the gate down beside a stale or missing pose.
+     */
+    fun completeFingerprintReplacement(newCaptureAnchorCam: FloatArray?) {
+        captureAnchorCam = newCaptureAnchorCam
+        awaitingNewFingerprint = false
+    }
+
+    /**
      * A no-op in the current native engine: neither [angularVel] nor [linearVel] is read by any
      * consumer there (there is no deblur or motion-compensation stage). Kept as a callable, logged
      * no-op (native logs a warning once) rather than removed so this doesn't need to change ahead of
@@ -363,7 +397,10 @@ class SlamManager @Inject constructor(
         viewMatrix: FloatArray
     ): Fingerprint? {
         if (!depthBuffer.isDirect) return null
-        return nativeSetWallFingerprint(bitmap, mask, depthBuffer, depthW, depthH, depthStride, intrinsics, viewMatrix)
+        val fp = nativeSetWallFingerprint(bitmap, mask, depthBuffer, depthW, depthH, depthStride, intrinsics, viewMatrix)
+        // A depth-path fingerprint is installed and carries no capture pose: nothing is left to wait for.
+        if (fp != null) awaitingNewFingerprint = false
+        return fp
     }
 
     fun restoreWallFingerprint(descriptorsData: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray) {
@@ -407,7 +444,11 @@ class SlamManager @Inject constructor(
      * (notably the marks built during first-run onboarding). Call it when loading a project that has
      * no saved fingerprint, alongside [clearWallFeatureMap].
      */
-    fun clearWallFingerprint() = nativeClearWallFingerprint()
+    fun clearWallFingerprint() {
+        nativeClearWallFingerprint()
+        // No fingerprint left to be stale against; reloc has nothing to match either way.
+        awaitingNewFingerprint = false
+    }
 
     /** Restore the persistent wall feature map into native (Phase 2a: stored; matched in Phase 2b). */
     fun restoreWallFeatureMap(map: WallFeatureMap) {

@@ -271,6 +271,55 @@ TEST(MobileGSReloc, EarlyOutAttemptsDoNotKeepThePreviousOutcomeCodes) {
     g.destroy();
 }
 
+TEST(MobileGSReloc, ASolveInFlightWhenTheFingerprintIsReplacedNeverPublishes) {
+    MobileGS g;
+    g.initialize(0, 0);
+    const cv::Mat wall = makeWall(640, 480);
+    const float K[4] = {600.f, 600.f, 320.f, 240.f};
+    fingerprintFrontalWall(g, wall, K);
+    g.setEvalSyncReloc(true, 1);
+
+    // Control: with nothing replaced the same frame locks, so the assertions below are about the
+    // generation check and not about a frame that never solves.
+    g.scheduleRelocCheck(wall);
+    ASSERT_EQ(MobileGS::kRelocOk, g.lastRelocReject());
+    const long seqBefore = MobileGSTestPeer::pnpSeq(g);
+
+    // Replace the fingerprint (a re-capture's restore) at the instant the solve is about to publish.
+    MobileGSTestPeer::setBeforeRelocPublishHook(g, [&g] {
+        g.restoreWallFingerprint(cv::Mat(3, 32, CV_8U, cv::Scalar(5)), {{0,0,1}, {1,0,1}, {0,1,1}});
+    });
+    g.scheduleRelocCheck(wall);
+    MobileGSTestPeer::setBeforeRelocPublishHook(g, nullptr);
+
+    EXPECT_EQ(seqBefore, MobileGSTestPeer::pnpSeq(g)) << "a solve against the replaced fingerprint advanced the seq";
+    float out[35];
+    g.getRelocResult(out, true);
+    EXPECT_FLOAT_EQ(0.f, out[16]) << "the old wall's inliers were latched onto the new fingerprint";
+    EXPECT_FLOAT_EQ(0.f, out[17]);
+    for (int i = 0; i < 16; ++i) EXPECT_FLOAT_EQ(i % 5 == 0 ? 1.f : 0.f, out[i]) << "pose[" << i << "]";
+    EXPECT_NE(MobileGS::kRelocOk, g.lastRelocReject());
+    g.setEvalSyncReloc(false, 1);
+    g.destroy();
+}
+
+TEST(MobileGSReloc, ASolveInFlightWhenTheFingerprintIsClearedNeverPublishes) {
+    MobileGS g;
+    g.initialize(0, 0);
+    const cv::Mat wall = makeWall(640, 480);
+    const float K[4] = {600.f, 600.f, 320.f, 240.f};
+    fingerprintFrontalWall(g, wall, K);
+    g.setEvalSyncReloc(true, 1);
+    const long seqBefore = MobileGSTestPeer::pnpSeq(g);
+    MobileGSTestPeer::setBeforeRelocPublishHook(g, [&g] { g.clearWallFingerprint(); });
+    g.scheduleRelocCheck(wall);
+    MobileGSTestPeer::setBeforeRelocPublishHook(g, nullptr);
+    EXPECT_EQ(seqBefore, MobileGSTestPeer::pnpSeq(g));
+    EXPECT_NE(MobileGS::kRelocOk, g.lastRelocReject());
+    g.setEvalSyncReloc(false, 1);
+    g.destroy();
+}
+
 // ---- Pure helpers --------------------------------------------------------------------------------
 
 TEST(MobileGSIntrinsics, LiveWinsThenFingerprintThenAFrameCentredDefault) {
