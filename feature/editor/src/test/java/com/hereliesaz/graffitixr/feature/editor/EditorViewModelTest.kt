@@ -411,14 +411,39 @@ class EditorViewModelTest {
 
     @Test
     fun `restore reports failure and forgets a project that can no longer be loaded`() = runTest {
+        // Close the project the fixture opened and let that settle: closing a project that WAS open
+        // legitimately forgets it (the collector calls setLastOpenProjectId(null)), which would make
+        // the assertion below pass even with the restore path deleted. Forget the recorded calls so
+        // only what the restore itself does is counted.
         currentProjectFlow.value = null
         testDispatcher.scheduler.advanceUntilIdle()
+        io.mockk.clearMocks(settingsRepository, answers = false)
         every { settingsRepository.lastOpenProjectId } returns kotlinx.coroutines.flow.flowOf("gone")
         coEvery { projectRepository.loadProject("gone") } returns Result.failure(Exception("Project not found"))
+        coVerify(exactly = 0) { settingsRepository.setLastOpenProjectId(any()) }
 
         org.junit.Assert.assertFalse(viewModel.restoreLastOpenProject())
         testDispatcher.scheduler.advanceUntilIdle()
-        coVerify { settingsRepository.setLastOpenProjectId(null) }
+
+        coVerifyOrder {
+            projectRepository.loadProject("gone")
+            settingsRepository.setLastOpenProjectId(null)
+        }
+        coVerify(exactly = 1) { settingsRepository.setLastOpenProjectId(any()) }
+    }
+
+    @Test
+    fun `a successful restore does not forget the project`() = runTest {
+        currentProjectFlow.value = null
+        testDispatcher.scheduler.advanceUntilIdle()
+        io.mockk.clearMocks(settingsRepository, answers = false)
+        every { settingsRepository.lastOpenProjectId } returns kotlinx.coroutines.flow.flowOf("remembered")
+        coEvery { projectRepository.loadProject("remembered") } returns Result.success(Unit)
+
+        org.junit.Assert.assertTrue(viewModel.restoreLastOpenProject())
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify(exactly = 0) { settingsRepository.setLastOpenProjectId(null) }
     }
 
     @Test
