@@ -774,9 +774,25 @@ class SlamManager @Inject constructor(
      *  doing nothing. */
     fun setStageEnabled(stage: Int, enabled: Boolean) = nativeSetStageEnabled(stage, enabled)
 
-    /** Pose fusion (B): [0..15]=pnpMat, [16]=inlierCount, [17]=matchCount, [18]=seq. */
-    /** [0..15] PnP camera_from_fp, 16 inliers, 17 matches, 18 seq, [19..34] view matrix of the solve frame. */
-    fun getRelocResult(): FloatArray { val o = FloatArray(35); nativeGetRelocResult(o); return o }
+    /**
+     * Pose fusion (B): [0..15] PnP camera_from_fp, 16 inliers, 17 matches, 18 seq, [19..34] view
+     * matrix of the solve frame. Allocates a fresh array per call, which is fine off the render
+     * loop; the GL thread reads it up to three times a frame and uses [getRelocResultInto].
+     */
+    fun getRelocResult(): FloatArray = getRelocResultInto(FloatArray(RELOC_RESULT_SIZE))
+
+    /**
+     * [getRelocResult] into a caller-owned buffer of at least [RELOC_RESULT_SIZE] floats (same
+     * layout), returning [out] itself so a call site can index the result in one expression. The
+     * buffer is overwritten in full and must not be shared between threads; a consumer that keeps a
+     * result past the next call has to copy what it needs. A shorter array is refused rather than
+     * silently given the legacy 19-float layout (which has no solve view).
+     */
+    fun getRelocResultInto(out: FloatArray): FloatArray {
+        require(out.size >= RELOC_RESULT_SIZE) { "reloc buffer must hold $RELOC_RESULT_SIZE floats" }
+        nativeGetRelocResult(out)
+        return out
+    }
 
     /** Pose fusion (B): the anchor model matrix captured in the fingerprint world frame. */
     fun getFingerprintAnchor(): FloatArray { val o = FloatArray(16); nativeGetFingerprintAnchor(o); return o }
@@ -1016,8 +1032,11 @@ class SlamManager @Inject constructor(
     private external fun nativeDestroy()
     private external fun nativeAnnotateKeypoints(bitmap: Bitmap)
 
-    private companion object {
+    companion object {
         private const val TAG = "SlamManager"
+
+        /** Floats in a full reloc result: 19 pose/counter slots + the 16-float solve-frame view. */
+        const val RELOC_RESULT_SIZE = 35
 
         /**
          * How long a capture waits for the anchor to be established before giving up.
@@ -1027,6 +1046,6 @@ class SlamManager @Inject constructor(
          * dropped frame, not an expected duration, and timing out is a refusal rather than a
          * fallback. Recorded in `PARAMETERS.md` §6.
          */
-        const val ANCHOR_WAIT_MS = 2_000L
+        private const val ANCHOR_WAIT_MS = 2_000L
     }
 }

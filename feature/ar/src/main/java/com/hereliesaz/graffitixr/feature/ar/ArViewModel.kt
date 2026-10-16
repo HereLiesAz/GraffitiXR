@@ -5854,6 +5854,12 @@ class ArViewModel @Inject constructor(
 
     /**
      * Called from ArRenderer (on the GL thread) the first time the primary
+        // A (re-)capture replaces the anchor, and `captureAnchorCam` is expressed against the anchor
+        // it was built for. Left in place it would pair the NEW anchor with the OLD capture pose from
+        // the moment the renderer resets fusion until the builder publishes the new one (it awaits
+        // this anchor first, so the new value always lands after this clear). If the build then fails,
+        // fusion reports NO_CAPTURE_POSE instead of correcting in the wrong frame.
+        slamManager.captureAnchorCam = null
      * anchor is created for this session. Flipping isAnchorEstablished is
      * what unlocks the Design rail (canEdit) and advances scanPhase to
      * COMPLETE in the next tracking-update tick. _uiState is a
