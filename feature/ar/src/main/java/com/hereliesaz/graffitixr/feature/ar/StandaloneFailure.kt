@@ -8,37 +8,29 @@ import com.hereliesaz.sphereslam.reloc.TrackingFailureReason
 /*
  * The standalone failure taxonomy is SphereSLAM's (`reloc.TrackingFailure*`, ported from this file):
  * reasons, severities and the classifier that maps pose rejections and exceptions onto them. The
- * library deliberately carries no user-facing wording, so the app's on-screen text lives here as
- * [userMessage].
+ * library deliberately carries no user-facing wording, so the app's on-screen wording is a typed [StandaloneTextKey] here
+ * ([userText]), localized in `core/design` string resources.
  */
 internal typealias StandaloneFailureSeverity = com.hereliesaz.sphereslam.reloc.TrackingFailureSeverity
 internal typealias StandaloneFailureReason = TrackingFailureReason
 internal typealias StandaloneFailureEvent = TrackingFailureEvent
 internal typealias StandaloneFailureClassifier = com.hereliesaz.sphereslam.reloc.TrackingFailureClassifier
 
-/** The artist-facing explanation of this failure. */
-internal val TrackingFailureEvent.userMessage: String
-    get() = when (reason) {
-        TrackingFailureReason.NATIVE_LIBRARY_UNAVAILABLE ->
-            "SphereSLAM isn't available in this build."
-        TrackingFailureReason.CAMERA_UNAVAILABLE ->
-            "Camera isn't available for standalone AR."
-        TrackingFailureReason.INTRINSICS_UNAVAILABLE ->
-            "Camera calibration is unavailable for standalone AR."
-        TrackingFailureReason.REFERENCE_TOO_WEAK ->
-            "That wall target has too little trackable detail. Capture a richer patch."
-        TrackingFailureReason.NO_CURRENT_PAGE_MATCH ->
-            "Keep the wall target in view."
-        TrackingFailureReason.STALE_OBSERVATION ->
-            "Tracking is lagging. Move the phone more slowly."
-        TrackingFailureReason.EXCESSIVE_REPROJECTION_ERROR ->
-            "Wall match is unstable. Reframe the target."
-        TrackingFailureReason.INSUFFICIENT_INLIERS ->
-            "Not enough target detail is visible."
-        TrackingFailureReason.POSE_JUMP ->
-            "Tracking jump rejected. Hold on the wall target."
-        TrackingFailureReason.PERSISTED_TARGET_CORRUPT ->
-            "Saved wall target is missing or unreadable. Capture a new target."
-        TrackingFailureReason.INTERNAL_FAILURE ->
-            "SphereSLAM couldn't continue tracking this target."
-    }
+/** The typed (localizable) artist-facing explanation key for this failure reason. */
+internal fun TrackingFailureReason.textKey(): StandaloneTextKey = when (this) {
+    TrackingFailureReason.NATIVE_LIBRARY_UNAVAILABLE -> StandaloneTextKey.FAILURE_NATIVE_LIBRARY_UNAVAILABLE
+    TrackingFailureReason.CAMERA_UNAVAILABLE -> StandaloneTextKey.FAILURE_CAMERA_UNAVAILABLE
+    TrackingFailureReason.INTRINSICS_UNAVAILABLE -> StandaloneTextKey.FAILURE_INTRINSICS_UNAVAILABLE
+    TrackingFailureReason.REFERENCE_TOO_WEAK -> StandaloneTextKey.FAILURE_REFERENCE_TOO_WEAK
+    TrackingFailureReason.NO_CURRENT_PAGE_MATCH -> StandaloneTextKey.FAILURE_NO_PAGE_MATCH
+    TrackingFailureReason.STALE_OBSERVATION -> StandaloneTextKey.FAILURE_STALE_OBSERVATION
+    TrackingFailureReason.EXCESSIVE_REPROJECTION_ERROR -> StandaloneTextKey.FAILURE_REPROJECTION_ERROR
+    TrackingFailureReason.INSUFFICIENT_INLIERS -> StandaloneTextKey.FAILURE_INSUFFICIENT_INLIERS
+    TrackingFailureReason.POSE_JUMP -> StandaloneTextKey.FAILURE_POSE_JUMP
+    TrackingFailureReason.PERSISTED_TARGET_CORRUPT -> StandaloneTextKey.FAILURE_PERSISTED_TARGET_CORRUPT
+    TrackingFailureReason.INTERNAL_FAILURE -> StandaloneTextKey.FAILURE_INTERNAL
+}
+
+/** The artist-facing explanation of this failure, as a typed key resolved at the UI edge. */
+internal val TrackingFailureEvent.userText: StandaloneText
+    get() = StandaloneText(reason.textKey())

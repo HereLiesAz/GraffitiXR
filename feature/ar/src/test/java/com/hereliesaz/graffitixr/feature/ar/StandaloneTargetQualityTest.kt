@@ -1,6 +1,8 @@
 package com.hereliesaz.graffitixr.feature.ar
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -13,6 +15,8 @@ class StandaloneTargetQualityTest {
         assertFalse(report.acceptable)
         assertTrue(StandaloneTargetQualityIssue.LOW_CONTRAST in report.blockingIssues)
         assertTrue(StandaloneTargetQualityIssue.BLURRY in report.blockingIssues)
+        // Contrast outranks blur when both block.
+        assertEquals(StandaloneTextKey.QUALITY_LOW_CONTRAST, StandaloneTargetQuality.blockingText(report)?.key)
     }
 
     @Test
@@ -26,6 +30,7 @@ class StandaloneTargetQualityTest {
         }
         val report = StandaloneTargetQuality.analyze(luma, width, height)
         assertTrue(report.acceptable)
+        assertNull(StandaloneTargetQuality.blockingText(report))
     }
 
     @Test
@@ -33,6 +38,7 @@ class StandaloneTargetQualityTest {
         val luma = ByteArray(64 * 64) { i -> (i and 0xff).toByte() }
         val report = StandaloneTargetQuality.analyze(luma, 64, 64)
         assertTrue(StandaloneTargetQualityIssue.TOO_SMALL in report.blockingIssues)
+        assertEquals(StandaloneTextKey.QUALITY_TOO_SMALL, StandaloneTargetQuality.blockingText(report)?.key)
     }
 
     @Test
@@ -40,5 +46,6 @@ class StandaloneTargetQualityTest {
         val black = ByteArray(256 * 256) { 0 }
         val report = StandaloneTargetQuality.analyze(black, 256, 256)
         assertTrue(StandaloneTargetQualityIssue.TOO_DARK in report.warnings)
+        assertEquals(StandaloneTextKey.QUALITY_TOO_DARK, StandaloneTargetQuality.warningText(report)?.key)
     }
 }

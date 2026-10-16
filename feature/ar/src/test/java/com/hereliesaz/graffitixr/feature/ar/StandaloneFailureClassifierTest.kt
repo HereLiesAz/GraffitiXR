@@ -44,7 +44,7 @@ class StandaloneFailureClassifierTest {
         )
         assertEquals(StandaloneFailureReason.NATIVE_LIBRARY_UNAVAILABLE, event.reason)
         assertEquals(StandaloneFailureSeverity.FATAL, event.severity)
-        assertTrue(event.userMessage.contains("isn't available"))
+        assertEquals(StandaloneTextKey.FAILURE_NATIVE_LIBRARY_UNAVAILABLE, event.userText.key)
         assertTrue(event.diagnostic.contains("missing libarx"))
     }
 

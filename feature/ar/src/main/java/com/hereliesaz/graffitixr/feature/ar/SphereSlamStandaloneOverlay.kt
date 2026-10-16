@@ -413,7 +413,7 @@ fun SphereSlamStandaloneOverlay(
 
     var rawCaptureBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var pendingReferenceBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var pendingReferenceWarning by remember { mutableStateOf<String?>(null) }
+    var pendingReferenceWarning by remember { mutableStateOf<StandaloneText?>(null) }
     var referenceNeedsPersistence by remember { mutableStateOf(false) }
     var previousReferenceBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var previousReferenceWidthMeters by remember { mutableStateOf(1f) }
@@ -439,7 +439,7 @@ fun SphereSlamStandaloneOverlay(
     var trackingState by remember {
         mutableStateOf(StandaloneTrackingState.INITIALIZING)
     }
-    var fatalMessage by remember { mutableStateOf<String?>(null) }
+    var fatalMessage by remember { mutableStateOf<StandaloneText?>(null) }
     // The current analyzer reported a fatal error. Its SphereSLAM session is terminal (it ignores
     // every later frame and never resets), so tracking resumes only through a NEW analyzer:
     // bumping analyzerRestartGeneration (a key of the analyzer effect) recreates it.
@@ -462,7 +462,7 @@ fun SphereSlamStandaloneOverlay(
             )
         }
         if (event.severity == StandaloneFailureSeverity.FATAL) {
-            fatalMessage = event.userMessage
+            fatalMessage = event.userText
         }
     }
 
@@ -630,7 +630,7 @@ fun SphereSlamStandaloneOverlay(
                         }
                         pendingReferenceWarning?.let { warning ->
                             Text(
-                                warning,
+                                warning.resolve(),
                                 color = Color.White,
                                 modifier = Modifier.padding(top = 8.dp),
                             )
@@ -669,7 +669,7 @@ fun SphereSlamStandaloneOverlay(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         fatalMessage?.let { message ->
                             Text(
-                                text = message,
+                                text = message.resolve(),
                                 color = Color.White,
                                 modifier = Modifier
                                     .padding(bottom = 12.dp)
@@ -685,7 +685,7 @@ fun SphereSlamStandaloneOverlay(
                                         cameraController.takePictureAsBitmap(context)
                                     }
                                     rawCaptureBitmap = result.getOrElse {
-                                        fatalMessage = context.getString(DesignR.string.standalone_capture_failed)
+                                        fatalMessage = StandaloneText(StandaloneTextKey.CAPTURE_FAILED)
                                         null
                                     }
                                 }
@@ -708,7 +708,7 @@ fun SphereSlamStandaloneOverlay(
                         val unwarped = PerspectiveProcessor.unwarpImage(raw, pixelPoints)
                         withContext(Dispatchers.Main) {
                             if (unwarped == null) {
-                                fatalMessage = context.getString(DesignR.string.standalone_rectify_failed)
+                                fatalMessage = StandaloneText(StandaloneTextKey.RECTIFY_FAILED)
                                 rawCaptureBitmap = null
                             } else {
                                 val report = StandaloneTargetQuality.analyze(
@@ -716,13 +716,13 @@ fun SphereSlamStandaloneOverlay(
                                     width = unwarped.width,
                                     height = unwarped.height,
                                 )
-                                val blockingMessage = StandaloneTargetQuality.blockingMessage(report)
-                                if (blockingMessage != null) {
-                                    fatalMessage = blockingMessage
+                                val blockingText = StandaloneTargetQuality.blockingText(report)
+                                if (blockingText != null) {
+                                    fatalMessage = blockingText
                                     rawCaptureBitmap = null
                                 } else {
                                     pendingReferenceWarning =
-                                        StandaloneTargetQuality.warningMessage(report)
+                                        StandaloneTargetQuality.warningText(report)
                                     pendingReferenceBitmap = unwarped
                                     rawCaptureBitmap = null
                                 }
@@ -1441,16 +1441,18 @@ fun SphereSlamStandaloneOverlay(
                                 )
                             }
                             StandaloneFatalRecovery.REPORT_TOO_WEAK -> {
-                                fatalMessage = context.getString(
-                                    DesignR.string.standalone_target_too_weak,
-                                    tooWeak?.featureCount ?: 0,
-                                    tooWeak?.minimumFeatureCount ?: 0,
+                                fatalMessage = StandaloneText(
+                                    StandaloneTextKey.TARGET_TOO_WEAK,
+                                    listOf(
+                                        tooWeak?.featureCount ?: 0,
+                                        tooWeak?.minimumFeatureCount ?: 0,
+                                    ),
                                 )
                             }
                             StandaloneFatalRecovery.REPORT_FAILURE -> {
                                 val event = StandaloneFailureClassifier.fromThrowable(error)
                                 currentFailure = event
-                                fatalMessage = event.userMessage
+                                fatalMessage = event.userText
                             }
                         }
                     }
@@ -1538,7 +1540,7 @@ fun SphereSlamStandaloneOverlay(
                             currentFailure = currentFailure,
                             referenceReady = referenceReady,
                             hasReference = referenceImage != null,
-                        ),
+                        ).resolve(),
                         color = Color.White,
                         modifier = Modifier
                             .padding(top = 32.dp)
@@ -1572,7 +1574,7 @@ fun SphereSlamStandaloneOverlay(
                     Text(
                         text = currentFailure
                             ?.takeIf { it.severity != StandaloneFailureSeverity.FATAL }
-                            ?.userMessage
+                            ?.userText?.resolve()
                             ?: if (trackingState == StandaloneTrackingState.LOST) {
                                 stringResource(DesignR.string.standalone_wall_target_lost)
                             } else {
@@ -1647,7 +1649,7 @@ fun SphereSlamStandaloneOverlay(
                         .padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(message, color = Color.White)
+                    Text(message.resolve(), color = Color.White)
                     if (newTargetAvailable) {
                         Button(
                             onClick = { requestNewTarget() },

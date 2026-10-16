@@ -5420,9 +5420,9 @@ class ArViewModel @Inject constructor(
             // Fail closed, but tell the artist what to do instead of failing silently at Confirm.
             _feedback.tryEmit(
                 com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                    StandalonePhotosphereCapture.userMessage(
+                    StandalonePhotosphereCapture.userText(
                         blocker ?: StandalonePhotosphereCapture.Blocker.PHOTOSPHERE_EMPTY
-                    )
+                    ).resolve(appContext)
                 )
             )
         }

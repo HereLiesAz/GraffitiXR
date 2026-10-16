@@ -48,9 +48,9 @@ class StandalonePhotosphereCaptureTest {
     }
 
     @Test
-    fun everyBlockerHasAnArtistMessage() {
-        StandalonePhotosphereCapture.Blocker.entries.forEach { blocker ->
-            assertTrue(StandalonePhotosphereCapture.userMessage(blocker).isNotBlank())
-        }
+    fun everyBlockerHasItsOwnArtistMessageKey() {
+        val keys = StandalonePhotosphereCapture.Blocker.entries.map { StandalonePhotosphereCapture.userText(it).key }
+        assertEquals(keys.size, keys.toSet().size)
+        assertTrue(keys.all { it.name.startsWith("PHOTOSPHERE_") })
     }
 }

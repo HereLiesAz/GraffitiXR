@@ -9,7 +9,7 @@ import com.hereliesaz.sphereslam.reloc.TargetQualityReport
 /*
  * The target quality gate (size, contrast, sharpness, clipping) and the KPM feature floor are
  * SphereSLAM's (`reloc.TargetQuality`, ported from this file). The library reports issues only; the
- * app's on-screen wording stays here.
+ * app's on-screen wording is a typed [StandaloneTextKey], localized in `core/design`.
  */
 typealias StandaloneTargetQualityIssue = TargetQualityIssue
 typealias StandaloneTargetQualityConfig = com.hereliesaz.sphereslam.reloc.TargetQualityConfig
@@ -24,24 +24,22 @@ internal object StandaloneTargetQuality {
         config: StandaloneTargetQualityConfig = StandaloneTargetQualityConfig(),
     ): StandaloneTargetQualityReport = TargetQuality.analyze(luma, width, height, config)
 
-    fun blockingMessage(report: StandaloneTargetQualityReport): String? {
+    /** The text for the first blocking issue, or null when the target is acceptable. */
+    fun blockingText(report: StandaloneTargetQualityReport): StandaloneText? {
         if (report.acceptable) return null
-        return when {
-            TargetQualityIssue.TOO_SMALL in report.blockingIssues ->
-                "That wall target is too small after rectification. Capture a larger patch."
-            TargetQualityIssue.LOW_CONTRAST in report.blockingIssues ->
-                "That wall target has too little visual contrast. Include more texture or detail."
-            TargetQualityIssue.BLURRY in report.blockingIssues ->
-                "That wall target is too blurry for reliable tracking. Hold steady and recapture."
-            else -> "That wall target is not strong enough for reliable tracking."
-        }
+        return StandaloneText(
+            when {
+                TargetQualityIssue.TOO_SMALL in report.blockingIssues -> StandaloneTextKey.QUALITY_TOO_SMALL
+                TargetQualityIssue.LOW_CONTRAST in report.blockingIssues -> StandaloneTextKey.QUALITY_LOW_CONTRAST
+                TargetQualityIssue.BLURRY in report.blockingIssues -> StandaloneTextKey.QUALITY_BLURRY
+                else -> StandaloneTextKey.QUALITY_NOT_STRONG_ENOUGH
+            }
+        )
     }
 
-    fun warningMessage(report: StandaloneTargetQualityReport): String? = when {
-        TargetQualityIssue.TOO_DARK in report.warnings ->
-            "This target is heavily underexposed; tracking may be less reliable."
-        TargetQualityIssue.TOO_BRIGHT in report.warnings ->
-            "This target is heavily overexposed; tracking may be less reliable."
+    fun warningText(report: StandaloneTargetQualityReport): StandaloneText? = when {
+        TargetQualityIssue.TOO_DARK in report.warnings -> StandaloneText(StandaloneTextKey.QUALITY_TOO_DARK)
+        TargetQualityIssue.TOO_BRIGHT in report.warnings -> StandaloneText(StandaloneTextKey.QUALITY_TOO_BRIGHT)
         else -> null
     }
 }
