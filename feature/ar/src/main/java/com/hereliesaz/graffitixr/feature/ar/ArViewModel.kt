@@ -5614,8 +5614,17 @@ class ArViewModel @Inject constructor(
     private fun resetCapturePipeline() {
         captureComputeJob?.cancel()
         captureComputeJob = null
+        // FIRST: from here every sample queued for the discarded capture (including a batch a drain
+        // has already polled and is about to apply) fails the generation check in
+        // applyPendingMarkRemovalsLocked, so it cannot erase whatever mask comes next.
+        captureGeneration.incrementAndGet()
         pendingMarkRemovals.clear()
-        markEraser = null
+        // The eraser is mutex-guarded state: drop it under the mutex rather than racing a drain that
+        // may be assigning it. (A stale eraser could not be applied to the new mask anyway - it is
+        // keyed by bitmap identity - this releases its pixel buffers without a data race.)
+        viewModelScope.launch(dispatchers.default) {
+            markRemovalMutex.withLock { markEraser = null }
+        }
     }
 
     /**
@@ -5636,12 +5645,24 @@ class ArViewModel @Inject constructor(
     // synchronously, BEFORE the drain is launched, so a drain (or a flush) that holds this mutex
     // always sees every sample enqueued before it started.
     private val markRemovalMutex = Mutex()
-    private val pendingMarkRemovals = java.util.concurrent.ConcurrentLinkedQueue<Pair<Float, Float>>()
+    /** One queued erase sample, tagged with the capture it was aimed at. */
+    private class MarkRemoval(val generation: Int, val nx: Float, val ny: Float)
+
+    private val pendingMarkRemovals = java.util.concurrent.ConcurrentLinkedQueue<MarkRemoval>()
+
+    // Identity of the capture whose mask erases apply to; advanced by resetCapturePipeline. A sample
+    // is applied only if the generation it was queued under is still this one when the drain has the
+    // current mask in hand - otherwise a drag sample that was already polled (or arrived late) would
+    // erase the NEW capture's mask.
+    private val captureGeneration = java.util.concurrent.atomic.AtomicInteger(0)
+
+    /** Test seam, null in production: runs in a drain after the queue is polled, before the mask is read. */
+    @Volatile internal var markBatchPolledHookForTest: (() -> Unit)? = null
     // Pixel buffers of the mask currently on screen (see MarkEraser). Guarded by markRemovalMutex.
     @Volatile private var markEraser: MarkEraser? = null
 
     fun removeMarkAt(nx: Float, ny: Float) {
-        pendingMarkRemovals.add(nx to ny)
+        pendingMarkRemovals.add(MarkRemoval(captureGeneration.get(), nx, ny))
         viewModelScope.launch(dispatchers.default) {
             markRemovalMutex.withLock { applyPendingMarkRemovalsLocked() }
         }
@@ -5649,13 +5670,19 @@ class ArViewModel @Inject constructor(
 
     /** Apply every queued erase to the current mask and publish it once. Caller holds [markRemovalMutex]. */
     private fun applyPendingMarkRemovalsLocked() {
-        val batch = ArrayList<Pair<Float, Float>>()
-        while (true) batch.add(pendingMarkRemovals.poll() ?: break)
-        if (batch.isEmpty()) return
+        val polled = ArrayList<MarkRemoval>()
+        while (true) polled.add(pendingMarkRemovals.poll() ?: break)
+        if (polled.isEmpty()) return
+        markBatchPolledHookForTest?.invoke()
         val current = _uiState.value.annotatedCaptureBitmap ?: return
+        // Read AFTER the mask: a capture reset bumps the generation before any later mask is
+        // published, so if `current` is a newer capture's mask the bump is already visible here.
+        val generation = captureGeneration.get()
+        val batch = polled.filter { it.generation == generation }
+        if (batch.isEmpty()) return
         val eraser = markEraser?.takeIf { it.isFor(current) } ?: MarkEraser(current).also { markEraser = it }
         var changed = false
-        for ((nx, ny) in batch) if (eraser.erase(nx, ny)) changed = true
+        for (sample in batch) if (eraser.erase(sample.nx, sample.ny)) changed = true
         if (!changed) return
         val updated = eraser.publish()
         // Only if the mask is still the one these erases were applied to: a Retake or new capture

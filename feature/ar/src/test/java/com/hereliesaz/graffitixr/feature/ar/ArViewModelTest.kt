@@ -642,6 +642,73 @@ class ArViewModelTest {
         assertNotNull(viewModel.uiState.value.annotatedCaptureBitmap)
     }
 
+    // ==================== Mark erase vs capture reset ====================
+
+    @Suppress("UNCHECKED_CAST")
+    private fun uiStateFlow(vm: ArViewModel): MutableStateFlow<ArUiState> {
+        val f = ArViewModel::class.java.getDeclaredField("_uiState")
+        f.isAccessible = true
+        return f.get(vm) as MutableStateFlow<ArUiState>
+    }
+
+    /**
+     * A drag sample that a drain has already polled when the capture is discarded must not erase the
+     * NEXT capture's mask. The drain polls its batch, the artist retakes (the pipeline reset bumps the
+     * capture generation and clears the queue - too late for the polled batch), the new mask is
+     * published, and only then does the drain read "the current mask". Without the generation
+     * carried by each sample, the stale batch lands on the new capture.
+     */
+    @Test
+    fun `a polled mark erase from a discarded capture never touches the next capture's mask`() = runTest {
+        mockkConstructor(com.hereliesaz.graffitixr.common.util.MarkEraser::class)
+        try {
+            every { anyConstructed<com.hereliesaz.graffitixr.common.util.MarkEraser>().isFor(any()) } returns true
+            every { anyConstructed<com.hereliesaz.graffitixr.common.util.MarkEraser>().erase(any(), any()) } returns true
+            every { anyConstructed<com.hereliesaz.graffitixr.common.util.MarkEraser>().publish() } returns
+                mockk<Bitmap>(relaxed = true)
+
+            captureBitmap(mockk<Bitmap>(relaxed = true))
+            val newMask = mockk<Bitmap>(relaxed = true)
+            viewModel.markBatchPolledHookForTest = {
+                viewModel.clearCaptureForRetry()
+                uiStateFlow(viewModel).value = uiStateFlow(viewModel).value.copy(annotatedCaptureBitmap = newMask)
+            }
+
+            viewModel.removeMarkAt(0.5f, 0.5f)
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            verify(exactly = 0) {
+                anyConstructed<com.hereliesaz.graffitixr.common.util.MarkEraser>().erase(any(), any())
+            }
+            assertSame("the new capture's mask must be left alone", newMask, viewModel.uiState.value.annotatedCaptureBitmap)
+        } finally {
+            viewModel.markBatchPolledHookForTest = null
+            unmockkConstructor(com.hereliesaz.graffitixr.common.util.MarkEraser::class)
+        }
+    }
+
+    @Test
+    fun `a mark erase queued for the current capture is still applied`() = runTest {
+        mockkConstructor(com.hereliesaz.graffitixr.common.util.MarkEraser::class)
+        try {
+            val erased = mockk<Bitmap>(relaxed = true)
+            every { anyConstructed<com.hereliesaz.graffitixr.common.util.MarkEraser>().isFor(any()) } returns true
+            every { anyConstructed<com.hereliesaz.graffitixr.common.util.MarkEraser>().erase(any(), any()) } returns true
+            every { anyConstructed<com.hereliesaz.graffitixr.common.util.MarkEraser>().publish() } returns erased
+
+            captureBitmap(mockk<Bitmap>(relaxed = true))
+            viewModel.removeMarkAt(0.5f, 0.5f)
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            verify(exactly = 1) {
+                anyConstructed<com.hereliesaz.graffitixr.common.util.MarkEraser>().erase(0.5f, 0.5f)
+            }
+            assertSame(erased, viewModel.uiState.value.annotatedCaptureBitmap)
+        } finally {
+            unmockkConstructor(com.hereliesaz.graffitixr.common.util.MarkEraser::class)
+        }
+    }
+
     // ==================== Scan Mode Tests ====================
 
     /**
