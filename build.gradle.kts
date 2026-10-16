@@ -3,10 +3,10 @@ buildscript {
     val commonForcedDependencies = listOf(
         "commons-beanutils:commons-beanutils:1.11.0",
         "org.jdom:jdom2:2.0.6.1",
-        "io.netty:netty-codec:4.2.18.Final",
-        "io.netty:netty-codec-http2:4.2.18.Final",
-        "io.netty:netty-handler:4.2.18.Final",
-        "io.netty:netty-handler-proxy:4.2.18.Final",
+        "io.netty:netty-codec:4.2.19.Final",
+        "io.netty:netty-codec-http2:4.2.19.Final",
+        "io.netty:netty-handler:4.2.19.Final",
+        "io.netty:netty-handler-proxy:4.2.19.Final",
         "org.bitbucket.b_c:jose4j:0.9.7",
         "org.apache.commons:commons-lang3:3.21.0",
         "org.apache.httpcomponents:httpclient:4.5.14",
@@ -37,7 +37,7 @@ buildscript {
         // version numbers have been corrected to match current pins (Hilt 2.60.1 / Kotlin 2.4.20)
         // but whether the underlying incompatibility still reproduces at these versions has not
         // been re-verified — treat as a candidate to re-test before removing.
-        "org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.20"
+        "org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.21"
     )
 
     val protobufModules = listOf(
