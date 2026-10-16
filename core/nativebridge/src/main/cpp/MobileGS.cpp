@@ -922,10 +922,15 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
                     // pair this pose with another camera. Zeroed for the coarse default, which they
                     // treat as "no intrinsics" (the old unset-fingerprint-K behaviour).
                     for (int i = 0; i < 4; ++i) mPnpIntrinsics[i] = liveKReal ? (float)liveK[i] : 0.0f;
+                    // Counts and seq are published in the SAME critical section as the pose.
+                    // getRelocResult and the grow/corroboration readers snapshot all of them under
+                    // mMutex, so a reader can never pair this pose with the previous solve's
+                    // inliers/matches, or see the new seq before the pose that earned it. (They stay
+                    // atomics only because a few diagnostics read them without the lock.)
+                    mPnpInlierCount.store((int)inliers.size(), std::memory_order_relaxed);
+                    mPnpMatchCount.store((int)imgPts.size(), std::memory_order_relaxed);
+                    mPnpResultSeq.fetch_add(1, std::memory_order_relaxed);
                 }
-                mPnpInlierCount.store((int)inliers.size(), std::memory_order_relaxed);
-                mPnpMatchCount.store((int)imgPts.size(), std::memory_order_relaxed);
-                mPnpResultSeq.fetch_add(1, std::memory_order_relaxed);
                 mLastRelocReject.store(kRelocOk, std::memory_order_relaxed);
                 LOGI("Relocalization: PnP match published (%zu/%zu inliers)", inliers.size(), imgPts.size());
                 // Learn the wall's normal in the earth's frame from a well-supported lock, for the
@@ -1915,6 +1920,17 @@ void MobileGS::clearWallFingerprint() {
     // The wall's normal belongs to this wall; the next project may be another.
     mHasWallNormalEnu = false;
     mWallNormalDisagree = 0;
+    // The last PnP result was solved against THIS fingerprint. Left behind, a re-capture would hand
+    // Kotlin the old wall's pose with a seq it may not have consumed yet (PoseFusion cold-snapping
+    // the new anchor onto the old fix). Back to "no relock": identity pose, zero counts. The seq is
+    // deliberately NOT rewound -- it stays monotonic so a consumer holding the old value can never
+    // mistake a later, genuine result for one it has already seen. Zero inliers/matches also make
+    // any consumer that does treat the stale seq as new reject it (ratio 0 < MIN_INLIER_RATIO).
+    memcpy(mPnpCamFromFpWorld, kIdentity16, 16 * sizeof(float));
+    memcpy(mPnpSolveView, kIdentity16, 16 * sizeof(float));
+    memset(mPnpIntrinsics, 0, 4 * sizeof(float));
+    mPnpInlierCount.store(0, std::memory_order_relaxed);
+    mPnpMatchCount.store(0, std::memory_order_relaxed);
 
     // The ARTWORK side has to go too. It used to survive, and there is no other path that clears it:
     // an un-fingerprinted project would then be validated against the PREVIOUS project's artwork by
@@ -2082,6 +2098,16 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
     int channels = CV_MAT_CN(descType);
     if (depth < 0 || depth > CV_64F || channels < 1 || channels > 4) return;
     if (descRows == 0 || descCols == 0 || descRows > 100000 || descCols > 100000) return;
+
+    // Row i of the descriptors IS point i's descriptor; every other restore path refuses a set whose
+    // point and descriptor counts differ (the reloc thread indexes one by the other). A peer that
+    // sends a mismatched pair would otherwise install a fingerprint whose matches subscript past
+    // the points.
+    if (numPoints != descRows) {
+        LOGE("alignToFingerprint: rejecting peer fingerprint: %u points vs %u descriptor rows",
+             numPoints, descRows);
+        return;
+    }
 
     uint64_t descDataSize = static_cast<uint64_t>(descRows) * descCols * CV_ELEM_SIZE(descType);
     if (static_cast<uint64_t>(end - ptr) < descDataSize) return;

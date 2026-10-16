@@ -131,3 +131,40 @@ TEST(MobileGSFingerprintState, MalformedPeerBytesChangeNothing) {
     EXPECT_TRUE(MobileGSTestPeer::hasView(guest));
     EXPECT_EQ(0, std::memcmp(MobileGSTestPeer::anchor(guest), kAnchor, sizeof kAnchor));
 }
+
+TEST(MobileGSFingerprintState, ClearForgetsTheLatchedPnpResultButKeepsTheSeqMonotonic) {
+    // A re-capture hands Kotlin the latched result; it was solved against the OLD fingerprint.
+    MobileGS g;
+    seedMetric(g);
+    MobileGSTestPeer::setPnpResult(g, 40, 50, 7);
+    float out[35];
+    g.getRelocResult(out, true);
+    ASSERT_FLOAT_EQ(40.f, out[16]);
+    ASSERT_FLOAT_EQ(7.f, out[18]);
+
+    g.clearWallFingerprint();
+    g.getRelocResult(out, true);
+    EXPECT_FLOAT_EQ(0.f, out[16]) << "stale inliers survived the clear";
+    EXPECT_FLOAT_EQ(0.f, out[17]) << "stale matches survived the clear";
+    EXPECT_FLOAT_EQ(7.f, out[18]) << "seq must stay monotonic, not rewind to a value a consumer may hold";
+    for (int i = 0; i < 16; ++i) EXPECT_FLOAT_EQ(kIdentity[i], out[i]) << "pose[" << i << "]";
+}
+
+TEST(MobileGSFingerprintState, PeerFingerprintWithMismatchedPointAndDescriptorCountsIsRejected) {
+    MobileGS host;
+    cv::Mat descs(3, 32, CV_8U, cv::Scalar(3));
+    host.restoreWallFingerprint(descs, {{0,0,0}, {1,0,0}, {0,1,0}});
+    std::vector<uint8_t> wire = host.exportFingerprint();
+    ASSERT_FALSE(wire.empty());
+    // Wire layout: u32 numPoints, numPoints * Point3f, then u32 descRows... Lower numPoints to 2 and
+    // drop one point's bytes so every length check still passes and ONLY the count mismatch remains.
+    const uint32_t two = 2;
+    std::memcpy(wire.data(), &two, sizeof two);
+    wire.erase(wire.begin() + 4 + 2 * sizeof(cv::Point3f), wire.begin() + 4 + 3 * sizeof(cv::Point3f));
+
+    MobileGS guest;
+    seedMetric(guest);
+    guest.alignToFingerprint(wire.data(), wire.size());
+    EXPECT_EQ(4, guest.getWallKeypointCount()) << "a mismatched peer fingerprint replaced the local one";
+    EXPECT_TRUE(MobileGSTestPeer::hasView(guest));
+}

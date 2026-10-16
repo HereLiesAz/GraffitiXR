@@ -17,6 +17,13 @@ struct MobileGSTestPeer {
     static void setRelocReject(MobileGS& g, int v) { g.mLastRelocReject.store(v); }
     static void setCorrobGate(MobileGS& g, int v) { g.mCorrobGate.store(v); }
     static void setGrowOutcome(MobileGS& g, int v) { g.mGrowOutcome.store(v); }
+    // Latch a published PnP result as the reloc worker would (counts + seq), for stale-result tests.
+    static void setPnpResult(MobileGS& g, int inliers, int matches, long seq) {
+        std::lock_guard<std::mutex> lock(g.mMutex);
+        g.mPnpInlierCount.store(inliers);
+        g.mPnpMatchCount.store(matches);
+        g.mPnpResultSeq.store(seq);
+    }
     static long long evalFrameCounter(MobileGS& g) { return g.mEvalSyncFrameCounter.load(); }
     static void setWallPoints(MobileGS& g, const std::vector<cv::Point3f>& p) { g.mWallKeypoints3D = p; }
     static void grow(MobileGS& g, const glm::mat4& camFromFp, const std::vector<cv::KeyPoint>& kps,
