@@ -177,6 +177,14 @@ private const val VOLUME_UNLOCK_WINDOW_MS = 1500L
 
 /** Saved-state key for a shared-in image still waiting for a project to land in. */
 private const val STATE_PENDING_SHARED_IMAGE = "pending_shared_image"
+private const val STATE_PENDING_GALLERY_EXPORT = "pending_gallery_export"
+
+/**
+ * Whether this process has already decided if the last open project should be restored (see
+ * [ProjectRestorePolicy]). Process-wide on purpose: an activity recreation inside a live process is
+ * never a reason to reopen anything.
+ */
+@Volatile private var projectRestoreDecided = false
 
 /**
  * Stages of the first-run "drawing in 60 seconds" flow. Split because the two halves need different
@@ -298,30 +306,33 @@ class MainActivity : AppCompatActivity() {
     // Gallery export on API 26-28: a MediaStore insert into the shared Pictures collection needs
     // WRITE_EXTERNAL_STORAGE there (declared with maxSdkVersion=28); from API 29 the app owns the
     // rows it inserts and nothing is asked. The export waits here until the answer is in.
-    private var pendingGalleryExport: (() -> Unit)? = null
+    //
+    // The waiting export is a saveable VALUE (GalleryExportRequest), not a closure: the activity can
+    // be recreated while the system dialog is up, and a lambda over the old composition would be
+    // lost silently. It is saved in onSaveInstanceState; after a grant the composition that is
+    // current THEN runs the matching action (galleryExportToRun).
+    private var pendingGalleryExport: GalleryExportRequest? = null
+    private var galleryExportToRun by mutableStateOf<GalleryExportRequest?>(null)
     private val galleryPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             val pending = pendingGalleryExport
             pendingGalleryExport = null
-            if (pending != null) {
-                if (granted) {
-                    pending()
-                } else {
-                    Toast.makeText(
-                        this, getString(DesignR.string.export_failed_permission), Toast.LENGTH_LONG,
-                    ).show()
-                }
+            when (val outcome = GalleryExportPolicy.onPermissionResult(pending, granted)) {
+                is GalleryPermissionOutcome.Run -> galleryExportToRun = outcome.request
+                GalleryPermissionOutcome.Fail -> Toast.makeText(
+                    this, getString(DesignR.string.export_failed_permission), Toast.LENGTH_LONG,
+                ).show()
             }
         }
 
-    /** Runs [export] now, or after the storage permission it needs on API 26-28 has been granted. */
-    private fun withGalleryWritePermission(export: () -> Unit) {
+    /** Runs [export] now, or - after the storage permission it needs on API 26-28 is granted - via [galleryExportToRun]. */
+    private fun withGalleryWritePermission(request: GalleryExportRequest, export: () -> Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ||
             isGranted(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         ) {
             export()
         } else {
-            pendingGalleryExport = export
+            pendingGalleryExport = request
             galleryPermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
     }
@@ -354,6 +365,8 @@ class MainActivity : AppCompatActivity() {
         // A share still waiting for a project survives recreation (locale switch, process death)
         // through saved state — the launch intent is NOT re-read on restore (see onCreate).
         incomingSharedImage?.let { outState.putParcelable(STATE_PENDING_SHARED_IMAGE, it) }
+        // An export waiting on the storage-permission dialog survives recreation as a plain value.
+        pendingGalleryExport?.let { outState.putString(STATE_PENDING_GALLERY_EXPORT, it.name) }
     }
 
     /**
@@ -431,6 +444,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
         markShareHandled(intent)
+        pendingGalleryExport = GalleryExportRequest.fromSavedName(
+            savedInstanceState?.getString(STATE_PENDING_GALLERY_EXPORT),
+        )
 
         hasCameraPermission = ContextCompat.checkSelfPermission(
             this, Manifest.permission.CAMERA
@@ -521,19 +537,32 @@ class MainActivity : AppCompatActivity() {
 
                 val editorUiState by editorViewModel.uiState.collectAsState()
                 // After process death the NavController restores the editor route, but the open
-                // project lived only in memory. Reopen the one the user was in, once per process;
-                // if it can't be loaded, the editor would have nothing behind it, so go to the
-                // library. restoreLastOpenProject never replaces a project that is already open, so
-                // a normal New/Open (whose navigation follows the load) is unaffected. Deliberately
-                // `remember`, not rememberSaveable: the flag must reset with the process.
-                var lastProjectRestoreAttempted by remember { mutableStateOf(false) }
-                LaunchedEffect(showLibrary, editorUiState.projectId) {
-                    if (!showLibrary && editorUiState.projectId == null && !lastProjectRestoreAttempted) {
-                        lastProjectRestoreAttempted = true
-                        if (!editorViewModel.restoreLastOpenProject()) {
-                            navController.navigate(LIBRARY_ROUTE) {
-                                currentRoute?.let { popUpTo(it) { inclusive = true } }
-                                launchSingleTop = true
+                // project lived only in memory. Reopen the one the user was in; if it can't be
+                // loaded, the editor would have nothing behind it, so go to the library.
+                //
+                // Decided ONCE per process, on the first route the controller reports (see
+                // ProjectRestorePolicy): process death is the only case this exists for. It used to
+                // fire on any later transition to a non-library route with no project, so closing or
+                // deleting a project (stored id still being forgotten) could reopen it. The flag is
+                // process-wide, not remembered: activity recreation must not re-run the decision.
+                LaunchedEffect(currentRoute) {
+                    when (
+                        ProjectRestorePolicy.decide(
+                            alreadyDecided = projectRestoreDecided,
+                            route = currentRoute,
+                            libraryRoute = LIBRARY_ROUTE,
+                            openProjectId = editorViewModel.uiState.value.projectId,
+                        )
+                    ) {
+                        ProjectRestorePolicy.Decision.WAIT -> Unit
+                        ProjectRestorePolicy.Decision.SKIP -> projectRestoreDecided = true
+                        ProjectRestorePolicy.Decision.RESTORE -> {
+                            projectRestoreDecided = true
+                            if (!editorViewModel.restoreLastOpenProject()) {
+                                navController.navigate(LIBRARY_ROUTE) {
+                                    currentRoute?.let { popUpTo(it) { inclusive = true } }
+                                    launchSingleTop = true
+                                }
                             }
                         }
                     }
@@ -1026,6 +1055,84 @@ class MainActivity : AppCompatActivity() {
                     // onboarding text, and per-mode goals that self-activate on mode entry.
                     ConfigureGuidance(editorUiState, arUiState, mainUiState.isCapturingTarget, context, strings)
 
+                    // The Export rail action, run now or - on API 26-28 - after the storage permission
+                    // grant (see withGalleryWritePermission / galleryExportToRun).
+                    val performRailExport: () -> Unit = {
+                        // Mode-aware dispatch of the Export rail button. The spec is
+                        // "screenshot of the mode's content minus the rail/settings" — nothing
+                        // here touches the Compose window, so no UI overlays leak in:
+                        //   - AR: ArRenderer already reads its GL framebuffer (camera + wall
+                        //     overlay quad). skipLayerComposite=true because the layers are
+                        //     already baked into the readback as the wall quad.
+                        //   - Overlay: CameraX ImageCapture yields the sensor still; the
+                        //     editor composites layers on top at screen positions.
+                        //   - Mockup / Trace / Design: no camera capture, editor composites
+                        //     against per-mode background (backgroundBitmap / transparent).
+                        when (editorUiState.editorMode) {
+                            EditorMode.AR -> {
+                                isExporting = true
+                                // Guards against onExportCaptured never firing (see
+                                // EXPORT_TIMEOUT_MS doc above) — cancelled below the moment the
+                                // readback callback or the "not requested" fallback runs, so it
+                                // never double-fires against a completed/failed export.
+                                val timeoutJob = exportDispatchScope.launch {
+                                    kotlinx.coroutines.delay(EXPORT_TIMEOUT_MS)
+                                    if (isExporting) {
+                                        isExporting = false
+                                        Toast.makeText(
+                                            context,
+                                            "Export timed out — try again",
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                    }
+                                }
+                                val requested = arViewModel.requestExport { bmp ->
+                                    // The timeout job may have already fired and completed
+                                    // (isExporting=false, "timed out" toast shown) before this
+                                    // late readback lands — cancel() on a job that already ran
+                                    // to completion is a no-op, so check isCompleted explicitly
+                                    // and drop the stale callback rather than exporting twice /
+                                    // reporting success after a failure the user already saw.
+                                    if (timeoutJob.isCompleted) {
+                                        return@requestExport
+                                    }
+                                    timeoutJob.cancel()
+                                    isExporting = false
+                                    editorViewModel.exportImage(backgroundBitmap = bmp, skipLayerComposite = true)
+                                }
+                                if (!requested) {
+                                    // No renderer attached (e.g. AR mode without camera
+                                    // permission), so there is no framebuffer to read back.
+                                    // Do NOT fall back to a layers-only export: in AR the
+                                    // placement lives in AR space (modeAdjustments[AR]), which
+                                    // the flat composite would misapply and then report as a
+                                    // successful export. Say why nothing was exported instead.
+                                    timeoutJob.cancel()
+                                    isExporting = false
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(DesignR.string.export_ar_unavailable),
+                                        Toast.LENGTH_LONG,
+                                    ).show()
+                                }
+                            }
+                            EditorMode.OVERLAY -> {
+                                exportDispatchScope.launch {
+                                    try {
+                                        val bmp = cameraController.takePictureAsBitmap(context)
+                                        editorViewModel.exportImage(backgroundBitmap = bmp)
+                                    } catch (t: Throwable) {
+                                        // Fall back to a layers-only export so the user
+                                        // still gets something rather than a silent failure.
+                                        android.util.Log.w("MainActivity", "Overlay capture failed; exporting layers only", t)
+                                        editorViewModel.exportImage()
+                                    }
+                                }
+                            }
+                            else -> editorViewModel.exportImage()
+                        }
+                    }
+
                     // Registered UNCONDITIONALLY. This used to be gated on an isRailVisible built from
                     // hideUiForCapture / isTouchLocked / isCapturingTarget / showSettings /
                     // isExporting, which emptied the rail outright in those states. The app icon stays
@@ -1066,81 +1173,7 @@ class MainActivity : AppCompatActivity() {
                             }
                         },
                         onExportRequested = {
-                            // Mode-aware dispatch of the Export rail button. The spec is
-                            // "screenshot of the mode's content minus the rail/settings" — nothing
-                            // here touches the Compose window, so no UI overlays leak in:
-                            //   - AR: ArRenderer already reads its GL framebuffer (camera + wall
-                            //     overlay quad). skipLayerComposite=true because the layers are
-                            //     already baked into the readback as the wall quad.
-                            //   - Overlay: CameraX ImageCapture yields the sensor still; the
-                            //     editor composites layers on top at screen positions.
-                            //   - Mockup / Trace / Design: no camera capture, editor composites
-                            //     against per-mode background (backgroundBitmap / transparent).
-                            withGalleryWritePermission {
-                                when (editorUiState.editorMode) {
-                                    EditorMode.AR -> {
-                                        isExporting = true
-                                        // Guards against onExportCaptured never firing (see
-                                        // EXPORT_TIMEOUT_MS doc above) — cancelled below the moment the
-                                        // readback callback or the "not requested" fallback runs, so it
-                                        // never double-fires against a completed/failed export.
-                                        val timeoutJob = exportDispatchScope.launch {
-                                            kotlinx.coroutines.delay(EXPORT_TIMEOUT_MS)
-                                            if (isExporting) {
-                                                isExporting = false
-                                                Toast.makeText(
-                                                    context,
-                                                    "Export timed out — try again",
-                                                    Toast.LENGTH_SHORT,
-                                                ).show()
-                                            }
-                                        }
-                                        val requested = arViewModel.requestExport { bmp ->
-                                            // The timeout job may have already fired and completed
-                                            // (isExporting=false, "timed out" toast shown) before this
-                                            // late readback lands — cancel() on a job that already ran
-                                            // to completion is a no-op, so check isCompleted explicitly
-                                            // and drop the stale callback rather than exporting twice /
-                                            // reporting success after a failure the user already saw.
-                                            if (timeoutJob.isCompleted) {
-                                                return@requestExport
-                                            }
-                                            timeoutJob.cancel()
-                                            isExporting = false
-                                            editorViewModel.exportImage(backgroundBitmap = bmp, skipLayerComposite = true)
-                                        }
-                                        if (!requested) {
-                                            // No renderer attached (e.g. AR mode without camera
-                                            // permission), so there is no framebuffer to read back.
-                                            // Do NOT fall back to a layers-only export: in AR the
-                                            // placement lives in AR space (modeAdjustments[AR]), which
-                                            // the flat composite would misapply and then report as a
-                                            // successful export. Say why nothing was exported instead.
-                                            timeoutJob.cancel()
-                                            isExporting = false
-                                            Toast.makeText(
-                                                context,
-                                                context.getString(DesignR.string.export_ar_unavailable),
-                                                Toast.LENGTH_LONG,
-                                            ).show()
-                                        }
-                                    }
-                                    EditorMode.OVERLAY -> {
-                                        exportDispatchScope.launch {
-                                            try {
-                                                val bmp = cameraController.takePictureAsBitmap(context)
-                                                editorViewModel.exportImage(backgroundBitmap = bmp)
-                                            } catch (t: Throwable) {
-                                                // Fall back to a layers-only export so the user
-                                                // still gets something rather than a silent failure.
-                                                android.util.Log.w("MainActivity", "Overlay capture failed; exporting layers only", t)
-                                                editorViewModel.exportImage()
-                                            }
-                                        }
-                                    }
-                                    else -> editorViewModel.exportImage()
-                                }
-                            }
+                            withGalleryWritePermission(GalleryExportRequest.RAIL_EXPORT, performRailExport)
                         },
                     )
 
@@ -1151,6 +1184,16 @@ class MainActivity : AppCompatActivity() {
                         // Fold it away for them. This is the one deliberate exception to the "fold
                         // state is the user's call, not app state's" rule below: unfreezing does NOT
                         // re-expand it, so a manual re-fold elsewhere in the session is respected.
+                        // An export that waited on the API 26-28 storage dialog (possibly across an
+                        // activity recreation) runs here, in the composition that is current when the
+                        // grant arrives.
+                        LaunchedEffect(galleryExportToRun) {
+                            val request = galleryExportToRun ?: return@LaunchedEffect
+                            galleryExportToRun = null
+                            when (request) {
+                                GalleryExportRequest.RAIL_EXPORT -> performRailExport()
+                            }
+                        }
                         LaunchedEffect(traceFrozen) {
                             if (traceFrozen) {
                                 // COMPLETE_GUIDE contract: noMenu makes isFoldedUp authoritative.
