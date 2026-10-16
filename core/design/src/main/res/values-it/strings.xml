@@ -669,9 +669,6 @@
     <string name="first_run_draw_skip">Salta: lo posizionerò io</string>
     <string name="first_run_detect_title">Ora inquadra con la fotocamera ciò che hai disegnato</string>
     <string name="first_run_detect_movement_hint">Muovi lentamente il dispositivo in cerchio</string>
-    <string name="design_instructions_title">Progetta il tuo murale</string>
-    <string name="design_instructions_text">Tocca «%1$s» nella barra, poi «%2$s», per scegliere una foto della tua opera.</string>
-    <string name="got_it_button">Capito</string>
     <string name="standalone_width_prompt">Misura la larghezza reale tra il bordo sinistro e quello destro del bersaglio.</string>
     <string name="standalone_width_label_metric">Larghezza del bersaglio (metri)</string>
     <string name="standalone_width_label_imperial">Larghezza del bersaglio (piedi e pollici)</string>

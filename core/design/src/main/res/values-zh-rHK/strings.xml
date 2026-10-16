@@ -674,9 +674,6 @@
     <string name="first_run_draw_skip">略過 — 我自己擺放</string>
     <string name="first_run_detect_title">現在把相機對準你畫的圖案</string>
     <string name="first_run_detect_movement_hint">請緩慢地以畫圓方式移動裝置</string>
-    <string name="design_instructions_title">設計你的壁畫</string>
-    <string name="design_instructions_text">點按導軌上的「%1$s」，再點按「%2$s」，選擇一張你的作品相片。</string>
-    <string name="got_it_button">知道了</string>
     <string name="standalone_width_prompt">請量度目標左右兩邊之間的實際闊度。</string>
     <string name="standalone_width_label_metric">目標闊度（米）</string>
     <string name="standalone_width_label_imperial">目標闊度（英尺和英寸）</string>

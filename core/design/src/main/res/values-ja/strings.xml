@@ -686,9 +686,6 @@
     <string name="first_run_draw_skip">スキップ — 自分で配置します</string>
     <string name="first_run_detect_title">描いたものにカメラを向けてください</string>
     <string name="first_run_detect_movement_hint">端末をゆっくり円を描くように動かしてください</string>
-    <string name="design_instructions_title">壁画をデザインしましょう</string>
-    <string name="design_instructions_text">レールの「%1$s」をタップし、続けて「%2$s」をタップして、作品の写真を選択します。</string>
-    <string name="got_it_button">了解</string>
     <string name="standalone_width_prompt">ターゲットの左端から右端までの実際の幅を測ってください。</string>
     <string name="standalone_width_label_metric">ターゲットの幅（メートル）</string>
     <string name="standalone_width_label_imperial">ターゲットの幅（フィートとインチ）</string>

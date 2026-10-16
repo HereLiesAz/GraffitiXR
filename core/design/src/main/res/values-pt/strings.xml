@@ -669,9 +669,6 @@
     <string name="first_run_draw_skip">Pular – eu mesmo posiciono</string>
     <string name="first_run_detect_title">Agora aponte a câmera para o que você desenhou</string>
     <string name="first_run_detect_movement_hint">Mova o dispositivo lentamente em círculo</string>
-    <string name="design_instructions_title">Crie o seu mural</string>
-    <string name="design_instructions_text">Toque em «%1$s» na barra e depois em «%2$s» para escolher uma foto da sua obra.</string>
-    <string name="got_it_button">Entendi</string>
     <string name="standalone_width_prompt">Meça a largura real entre as bordas esquerda e direita do alvo.</string>
     <string name="standalone_width_label_metric">Largura do alvo (metros)</string>
     <string name="standalone_width_label_imperial">Largura do alvo (pés e polegadas)</string>

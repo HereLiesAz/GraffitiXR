@@ -913,6 +913,15 @@ class MainActivity : AppCompatActivity() {
                 // it is dismissed, without waiting for the persisted key to round-trip the DataStore.
                 var arUnavailableExplainerDismissed by rememberSaveable { mutableStateOf(false) }
                 val completedTutorialsLoaded by mainViewModel.completedTutorialsLoaded.collectAsState()
+                // True while the no-ARCore explainer is due. Computed here (not only where it is drawn) so
+                // the AzNavRail guidance graph can stay quiet while it, or the first-run walkthrough, is up:
+                // one tutorial surface at a time.
+                val arUnavailableExplainerPending = !arUnavailableExplainerDismissed &&
+                    completedTutorialsLoaded &&
+                    arUiState.isArCoreAvailabilityResolved &&
+                    !arUiState.isArCoreAvailable &&
+                    arUiState.arCoreEnabled &&
+                    AR_UNAVAILABLE_EXPLAINER_KEY !in firstRunCompletedTutorials
 
                 val firstRunImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                     if (uri != null) {
@@ -965,16 +974,6 @@ class MainActivity : AppCompatActivity() {
                         firstRunStage = FirstRunStage.NONE
                         editorViewModel.autoTuneActiveLayer(arUiState.doodleWallStats)
                         mainViewModel.markTutorialCompletePersistent(firstRunDoodleKey)
-                    }
-                }
-
-                var showDesignInstructionsDialog by remember { mutableStateOf(false) }
-
-                // Show design instructions when the anchor is established and the project has no
-                // design yet.
-                LaunchedEffect(arUiState.isAnchorEstablished) {
-                    if (arUiState.isAnchorEstablished && editorUiState.design == null) {
-                        showDesignInstructionsDialog = true
                     }
                 }
 
@@ -1052,7 +1051,17 @@ class MainActivity : AppCompatActivity() {
                     // Reactive status-driven guidance (replaces the old adaptive coach and the removed
                     // scripted-tutorial API): milestone statuses, edges that reuse the existing
                     // onboarding text, and per-mode goals that self-activate on mode entry.
-                    ConfigureGuidance(editorUiState, arUiState, mainUiState.isCapturingTarget, context, strings)
+                    ConfigureGuidance(
+                        editorUiState,
+                        arUiState,
+                        isCapturingTarget = mainUiState.isCapturingTarget,
+                        // The first-run walkthrough and the no-ARCore explainer are tutorials in their
+                        // own right; the reactive per-mode guidance waits until they are done.
+                        ownTutorialActive = firstRunStage != FirstRunStage.NONE ||
+                            showFirstRunPhotoExplainer || arUnavailableExplainerPending,
+                        context = context,
+                        strings = strings,
+                    )
 
                     // The Export rail action, run now or - on API 26-28 - after the storage permission
                     // grant (see withGalleryWritePermission / galleryExportToRun).
@@ -1242,7 +1251,39 @@ class MainActivity : AppCompatActivity() {
                             mainUiState.isCapturingTarget || showSaveDialog || pendingCrashReport != null ||
                             dashboardUiState.showNewProjectDialog
 
-                        val completedTutorials by mainViewModel.completedTutorials.collectAsState()
+                        // The wall's close-ups are being learned ("Learning the wall up close: 17 of 49"). Per
+                        // the AzNavRail layout rules (docs/AZNAVRAIL_COMPLETE_GUIDE.md, "Layout Layers"),
+                        // app UI belongs in `onscreen { }`, which the host pads to the safe zones and the
+                        // rail; a `background()` layer is the camera feed and sits beneath the whole onscreen
+                        // book. Top-centre keeps it clear of the artwork and the knobs, and narrow enough
+                        // (150 dp) to fit between the logo/readout and the status pill. Display-only.
+                        val closeUpProgress by com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintBuildProgress.state
+                            .collectAsState()
+                        closeUpProgress?.let { step ->
+                            if (!showLibrary && !showSettings) {
+                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                                    Column(
+                                        modifier = Modifier
+                                            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        Text(
+                                            text = strings.ar.fingerprintCloseUpsProgress(step.done, step.total),
+                                            color = Color.White,
+                                            style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
+                                        )
+                                        Spacer(Modifier.height(4.dp))
+                                        androidx.compose.material3.LinearProgressIndicator(
+                                            progress = { step.fraction },
+                                            modifier = Modifier.width(150.dp),
+                                            color = Color.White,
+                                            trackColor = Color.White.copy(alpha = 0.25f),
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
                         // Standalone (no-ARCore) tracking status and its actions — Copy Diagnostics,
                         // Recapture / New Target, the sweep hint — published by the overlay. Hidden
@@ -1271,12 +1312,7 @@ class MainActivity : AppCompatActivity() {
                             !anyModalActive &&
                             firstRunStage == FirstRunStage.NONE &&
                             !showFirstRunPhotoExplainer &&
-                            !arUnavailableExplainerDismissed &&
-                            completedTutorialsLoaded &&
-                            arUiState.isArCoreAvailabilityResolved &&
-                            !arUiState.isArCoreAvailable &&
-                            arUiState.arCoreEnabled &&
-                            AR_UNAVAILABLE_EXPLAINER_KEY !in completedTutorials
+                            arUnavailableExplainerPending
                         ) {
                             com.hereliesaz.graffitixr.onboarding.ArUnavailableOverlay(
                                 lines = stringArrayResource(DesignR.array.onboarding_ar_unavailable).toList(),
@@ -1528,11 +1564,8 @@ class MainActivity : AppCompatActivity() {
                                         .padding(bottom = 140.dp)
                                 )
                             }
-                            if (basePostTargetVisible && hasWallFingerprint) {
-                                PostTargetInstructionOverlay(
-                                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp)
-                                )
-                            }
+                            // With a fingerprint there is nothing to add here: the rail's guidance callout
+                            // (gx.hasTarget -> gx.hasDesign) is the one "now open a design" instruction.
 
                             val showProgress = editorUiState.editorMode == EditorMode.AR
                                     && arUiState.isAnchorEstablished
@@ -1795,39 +1828,8 @@ class MainActivity : AppCompatActivity() {
                                 )
                             }
 
-                            // In-capture hint: shows the "just tap the screen" line (onboarding_ar[2])
-                            // *inside* the capture modal, exactly when it applies. The guidance overlay
-                            // is suppressed here by anyModalActive, so this line would otherwise never
-                            // reach the user at the moment they need it. Dismissed when the anchor lands.
-                            // Not on the standalone SphereSLAM backend (ARCore resolved unavailable):
-                            // there TargetCreationUi's own "Target Creation" card is the instruction,
-                            // drawn at the same TopCenter spot, and the two texts stacked illegibly.
-                            // The card wins; ARCore's path is unchanged.
-                            val isStandaloneArBackend = editorUiState.editorMode == EditorMode.AR
-                                && arUiState.isArCoreAvailabilityResolved
-                                && !arUiState.isArCoreAvailable
-                            val showCaptureHint = mainUiState.isCapturingTarget
-                                && mainUiState.isWaitingForTap
-                                && !arUiState.isAnchorEstablished
-                                && !isStandaloneArBackend
-                            if (showCaptureHint) {
-                                val captureHintText = remember {
-                                    context.resources.getStringArray(DesignR.array.onboarding_ar)
-                                        .getOrNull(2).orEmpty()
-                                }
-                                if (captureHintText.isNotEmpty()) {
-                                    Text(
-                                        text = captureHintText,
-                                        color = Color.White,
-                                        modifier = Modifier
-                                            .align(Alignment.TopCenter)
-                                            .padding(top = 24.dp, start = 24.dp, end = 24.dp)
-                                            .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
-                                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                                    )
-                                }
-                            }
-
+                            // No separate "just tap the screen" hint here: TargetCreationUi's own card is the one
+                            // instruction while a capture is up (the guidance graph is suppressed for it too).
                             if (mainUiState.isCapturingTarget) {
                                 TargetCreationUi(
                                     rawBitmap = arUiState.tempCaptureBitmap,
@@ -1938,32 +1940,6 @@ class MainActivity : AppCompatActivity() {
                                 )
                             }
 
-
-                            if (showDesignInstructionsDialog) {
-                                androidx.compose.material3.AlertDialog(
-                                    onDismissRequest = { showDesignInstructionsDialog = false },
-                                    title = { Text(stringResource(DesignR.string.design_instructions_title), color = Color.White) },
-                                    // "Open" lives under the "mode.design" host, which
-                                    // expandWhen auto-collapses outside Design mode — this dialog
-                                    // fires from AR (the anchor-established effect above is its only
-                                    // trigger), where "tap Open" alone pointed at an invisible
-                                    // control. Route through Design first.
-                                    text = {
-                                        Text(
-                                            stringResource(
-                                                DesignR.string.design_instructions_text,
-                                                navStrings.design,
-                                                navStrings.open,
-                                            ),
-                                            color = Color.White,
-                                        )
-                                    },
-                                    containerColor = Color(0xEE1A1A1A),
-                                    confirmButton = {
-                                        AzButton(text = stringResource(DesignR.string.got_it_button), onClick = { showDesignInstructionsDialog = false }, shape = AzButtonShape.RECTANGLE)
-                                    }
-                                )
-                            }
 
                             // "Open" stages a replace instead of applying it immediately when a
                             // design is already placed (EditorViewModel.onAddLayer) — surface that
@@ -3604,38 +3580,6 @@ private fun TargetIncompleteOverlay(modifier: Modifier = Modifier) {
                 color = Color.White,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
-@Composable
-private fun PostTargetInstructionOverlay(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .background(Color(0xEE1A1A1A), RoundedCornerShape(20.dp))
-            .border(2.dp, Color.Cyan, RoundedCornerShape(20.dp))
-            .padding(horizontal = 24.dp, vertical = 20.dp)
-            .widthIn(max = 340.dp)
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "TARGET ESTABLISHED",
-                color = Color.Cyan,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                textAlign = TextAlign.Center
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                // "Open" lives under the "mode.design" host, which expandWhen auto-collapses
-                // outside Design mode — this overlay only ever shows in AR, so "tap Open" alone
-                // points at an invisible control. Route through Design first.
-                text = "Now tap 'Design' on the rail, then 'Open', to add a photo of your artwork.",
-                color = Color.White,
-                textAlign = TextAlign.Center,
-                fontSize = 15.sp,
-                lineHeight = 22.sp
             )
         }
     }

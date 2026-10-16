@@ -384,9 +384,6 @@
     <string name="first_run_draw_skip">Laktawan — ako na ang maglalagay</string>
     <string name="first_run_detect_title">Ngayon, itutok ang camera sa iginuhit mo</string>
     <string name="first_run_detect_movement_hint">Dahan-dahang igalaw ang device nang pabilog</string>
-    <string name="design_instructions_title">Idisenyo ang iyong mural</string>
-    <string name="design_instructions_text">I-tap ang \'%1$s\' sa rail, pagkatapos ang \'%2$s\', para pumili ng larawan ng iyong obra.</string>
-    <string name="got_it_button">Naintindihan ko</string>
     <string name="standalone_width_prompt">Sukatin ang tunay na lapad sa pagitan ng kaliwa at kanang gilid ng target.</string>
     <string name="standalone_width_label_metric">Lapad ng target (metro)</string>
     <string name="standalone_width_label_imperial">Lapad ng target (talampakan at pulgada)</string>
