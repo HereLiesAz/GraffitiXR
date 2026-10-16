@@ -221,4 +221,39 @@ class StandaloneDepthSchedulingTest {
         assertNull(DepthLumaDownsampler.downsample(ByteArray(3), 2, 2))
         assertNull(DepthLumaDownsampler.downsample(ByteArray(0), 0, 2))
     }
+
+    // ---- load guard ----------------------------------------------------------------------------
+
+    @Test
+    fun `load guard allows the first attempt and backs off after a failure`() {
+        val g = DepthLoadGuard(backoffMs = 1_000L, maxBackoffMs = 8_000L, maxFailures = 4)
+        assertTrue(g.shouldAttempt(0L))
+        g.onFailure(0L)
+        assertFalse(g.shouldAttempt(999L))
+        assertTrue(g.shouldAttempt(1_000L))
+        g.onFailure(1_000L) // second failure: 2 s
+        assertFalse(g.shouldAttempt(2_999L))
+        assertTrue(g.shouldAttempt(3_000L))
+    }
+
+    @Test
+    fun `load guard fails for good after the failure budget`() {
+        val g = DepthLoadGuard(backoffMs = 10L, maxBackoffMs = 10L, maxFailures = 2)
+        g.onFailure(0L)
+        assertFalse(g.failedForGood())
+        g.onFailure(100L)
+        assertTrue(g.failedForGood())
+        assertFalse("never retried once failed for good", g.shouldAttempt(Long.MAX_VALUE / 2))
+    }
+
+    @Test
+    fun `load guard backoff is capped and a success clears the history`() {
+        val g = DepthLoadGuard(backoffMs = 1_000L, maxBackoffMs = 3_000L, maxFailures = 10)
+        repeat(5) { g.onFailure(0L) }
+        assertFalse(g.shouldAttempt(2_999L))
+        assertTrue(g.shouldAttempt(3_000L))
+        g.onSuccess()
+        assertTrue(g.shouldAttempt(0L))
+        assertFalse(g.failedForGood())
+    }
 }

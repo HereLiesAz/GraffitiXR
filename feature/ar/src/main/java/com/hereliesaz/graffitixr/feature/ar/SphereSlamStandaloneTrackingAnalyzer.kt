@@ -300,6 +300,40 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     // Sequence of the last MobileGS reloc result consumed by fuseWithReloc, so a given relocalization
     // is evaluated once. 0 = none seen (the native no-result sentinel).
     private var lastRelocSeq = 0f
+    // Reused destination for the per-frame reloc read in fuseWithReloc (analysis thread only).
+    private val relocBuf = FloatArray(com.hereliesaz.graffitixr.nativebridge.SlamManager.RELOC_RESULT_SIZE)
+
+    /**
+     * Treat the reloc result native holds RIGHT NOW as already consumed. Called when the fingerprint
+     * or map the reloc is solved against changes: native keeps the last PnP result latched (same
+     * seq) until a new solve finishes, and that result was solved against the OLD reference.
+     * Rewinding [lastRelocSeq] to 0 made it count as new again on the next frame, so a stale fix
+     * could pull the new reference's pose. Only a solve published after this point (a different seq)
+     * is evaluated.
+     */
+    private fun adoptCurrentRelocSeq() {
+        val seq = slamManager?.getRelocResult()?.get(18) ?: 0f
+        lastRelocSeq = if (seq > 0f) seq else 0f
+    }
+
+    // A depth model that failed to load is not re-loaded for every tile / job; see DepthLoadGuard.
+    private val depthLoadGuard = DepthLoadGuard()
+
+    /** True when [estimator] is loaded or could be loaded now (respecting the failed-load backoff). */
+    private fun ensureDepthModelLoaded(estimator: com.hereliesaz.sphereslam.models.DepthEstimator): Boolean {
+        if (estimator.isLoaded) return true
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (!depthLoadGuard.shouldAttempt(now)) return false
+        if (estimator.load()) {
+            depthLoadGuard.onSuccess()
+            return true
+        }
+        depthLoadGuard.onFailure(now)
+        if (depthLoadGuard.failedForGood()) {
+            Timber.w("Standalone depth model failed to load repeatedly; disabled for this session")
+        }
+        return false
+    }
     private var frameBuffer: ByteBuffer? = null
 
     // The library session keys its precision-layer rebuild on reference identity, so each app
@@ -352,7 +386,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 // Fail-soft null (tile keeps plane-only points) while the device is hot or nearly flat.
                 if (frameGate.stress == DeviceStress.HIGH) {
                     null
-                } else if (!estimator.isLoaded && !estimator.load()) {
+                } else if (!ensureDepthModelLoaded(estimator)) {
                     null
                 } else {
                     estimator.estimateLuma(luma, width, height)?.let { TileDepthMap(it.width, it.height, it.data) }
@@ -371,8 +405,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 onMapFromFingerprintSolved(mapFromFingerprint)
             },
             onReferenceReady = { registered ->
-                lastRelocSeq = 0f
                 currentFrameIntrinsics?.let { configureMobileGs(it) }
+                // After the re-seed, so the result adopted as consumed is the one the new
+                // reference inherits, not one a mid-swap clear is about to zero.
+                adoptCurrentRelocSeq()
                 onReferenceReady(registered)
             },
             onAtlasPageAdded = { page, attitude ->
@@ -471,7 +507,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         mobileGsMapFromFingerprint = mapFromFingerprint?.copyOf()
         mobileGsWallFeatureMap = wallFeatureMap
         mobileGsWallFeatureMapFrameVersion = wallFeatureMapFrameVersion
-        if (fingerprintChanged || mapChanged) lastRelocSeq = 0f
+        if (fingerprintChanged || mapChanged) adoptCurrentRelocSeq()
 
         // Deliberately does not touch the base photosphere (map orientation, keyframe cadence and
         // attitude reference survive inside the session).
@@ -846,7 +882,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         frameWidth: Int,
         frameHeight: Int,
     ): DepthOutcome? {
-        if (!estimator.isLoaded && !estimator.load()) return null
+        if (!ensureDepthModelLoaded(estimator)) return null
         // The grid is this job's own copy (never a pooled frame), fed straight in as luma: the
         // estimator resamples it to the model input with grey in all three channels — no ARGB
         // Bitmap round trip. Depth here is downscaled and only calibrates a radius, not a texture.
@@ -1035,8 +1071,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
      */
     private fun fuseWithReloc(kpmView: FloatArray): FloatArray {
         val slam = slamManager ?: return kpmView
-        val reloc = slam.getRelocResult()
-        if (reloc.size < 19) return kpmView
+        val reloc = slam.getRelocResultInto(relocBuf)
         val seq = reloc[18]
         // Evaluate each relocalization once — accepted or not — mirroring PoseFusion's seq handling.
         if (seq <= 0f || seq == lastRelocSeq) return kpmView
@@ -1047,9 +1082,25 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         if (inlierRatio < PoseFusion.MIN_INLIER_RATIO || inliers < RELOC_MIN_INLIERS) return kpmView
         val relocViewGl = RigidMath.cvViewToGl(reloc.copyOfRange(0, 16))
         if (!relocViewGl.all { it.isFinite() } || relocViewGl[15] != 1f) return kpmView
+        // The reloc fix describes the camera at the frame it was SOLVED on, hundreds of ms ago, and
+        // `kpmView` is the camera now. Comparing them directly would read every bit of hand motion
+        // in that gap as drift (and reject the fix, or blend the pose back toward where the camera
+        // was). The solve view (reloc[19..34]) is the KPM view of that same frame, so what the
+        // reloc actually says is the fingerprint-local difference
+        //     C = solveView^-1 . relocView        (relocView == solveView . C)
+        // and the estimate for NOW is kpmView . C: the live camera carrying that correction, with
+        // the latency motion cancelled. Same algebra as PoseFusion's anchor-local correction.
+        // A legacy 19-float result / no-engine sentinel has no solve view: fall back to the raw fix.
+        val solveView = PoseFusion.solveViewOf(reloc)
+        val target = if (solveView != null && solveView.all { it.isFinite() }) {
+            PoseFusion.latencyCompensatedView(kpmView, solveView, relocViewGl)
+        } else {
+            relocViewGl
+        }
+        if (!target.all { it.isFinite() }) return kpmView
         // Trust the reloc only when it already corroborates the current KPM pose.
-        if (PoseBlend.diverged(kpmView, relocViewGl)) return kpmView
-        return PoseBlend.blend(kpmView, relocViewGl, RELOC_ALPHA)
+        if (PoseBlend.diverged(kpmView, target)) return kpmView
+        return PoseBlend.blend(kpmView, target, RELOC_ALPHA)
     }
 
     private fun directFrame(bytes: ByteArray): ByteBuffer {

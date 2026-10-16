@@ -2259,7 +2259,11 @@ class ArViewModel @Inject constructor(
                         .onFailure { Timber.w(it, "depth self-test threw") }
                 } else if (!wanted && loaded && !_evalFeatureMapEnabled.value) {
                     depthEstimator.close()
-                    appendDiag("depth: monocular depth not needed — model unloaded")
+                    // `close()` releases the model now, but this estimator is shared by reference with a
+                    // standalone analyzer that may already hold it (see standaloneDepthEstimatorOrNull);
+                    // that analyzer loads on demand, so "released" is what is true — not "unloaded for
+                    // good". A session that was started without depth never receives the estimator.
+                    appendDiag("depth: monocular depth not needed — model released (reloads on demand if a running analyzer still asks)")
                 }
             }
         }
