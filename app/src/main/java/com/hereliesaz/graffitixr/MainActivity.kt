@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -1502,28 +1501,13 @@ class MainActivity : AppCompatActivity() {
                                 }
                             }
 
-                            // Confirming a target unmounts TargetCreationUi (and its own isLoading
-                            // spinner) immediately via resetCaptureUi(), well before the async
-                            // fingerprint-build work (awaitAnchorTransform's up-to-2s timeout, then a
-                            // full ORB/SuperPoint pass) finishes — see MainViewModel's
-                            // isConfirmingTarget doc. Without a separate indicator surviving that
-                            // unmount, the artist saw a plain AR feed with no sign anything was
-                            // happening between tapping Confirm and the eventual toast.
-                            if (mainUiState.isConfirmingTarget) {
-                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        CircularProgressIndicator(color = Color.White)
-                                        Spacer(Modifier.height(12.dp))
-                                        Text(
-                                            text = "Saving target…",
-                                            color = Color.White,
-                                            modifier = Modifier
-                                                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
-                                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                                        )
-                                    }
-                                }
-                            }
+                            // Confirming a target unmounts TargetCreationUi right away, and the
+                            // fingerprint build (awaitAnchorTransform, the ORB/SuperPoint pass, the
+                            // close-ups) carries on in the background. There is deliberately NO spinner
+                            // or "Saving target" cover here: the artist can keep using the AR overlay
+                            // while the wall is learned, and the only indicator is the close-up progress
+                            // bar at the top of the screen (MainScreen). isConfirmingTarget still blocks
+                            // a SECOND capture from racing the save (see its uses).
 
                             // isAnchorEstablished means ARCore made an anchor. It says NOTHING about
                             // whether the wall fingerprint got built, and gating the success banner
