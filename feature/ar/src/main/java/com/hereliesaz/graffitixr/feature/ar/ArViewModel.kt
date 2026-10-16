@@ -42,7 +42,7 @@ import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.sensor.Vec3
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
-import com.hereliesaz.graffitixr.common.util.eraseColorBlob
+import com.hereliesaz.graffitixr.common.util.MarkEraser
 import com.hereliesaz.graffitixr.common.util.forTargetReview
 import com.hereliesaz.graffitixr.common.wearable.ConnectionState
 import com.hereliesaz.graffitixr.common.wearable.WearableManager
@@ -3768,6 +3768,7 @@ class ArViewModel @Inject constructor(
     private fun clearCaptureState() {
         pendingTapPosition = null
         pendingStandaloneFingerprintPlacement = null
+        resetCapturePipeline()
         _uiState.update {
             it.copy(
                 tempCaptureBitmap = null,
@@ -3775,8 +3776,7 @@ class ArViewModel @Inject constructor(
                 targetRawBitmap = null,
                 targetDepthBuffer = null,
                 tapMarks = emptyList(),
-                unwarpPoints = emptyList(),
-                targetKeypoints = emptyList()
+                unwarpPoints = emptyList()
             )
         }
     }
@@ -3837,12 +3837,12 @@ class ArViewModel @Inject constructor(
         val projectId = loadedProjectId ?: return
         val currentProject = projectRepository.currentProject.value ?: return
         if (currentProject.id != projectId) return
-        saveWallNormalIfChanged(projectId, currentProject)
-
-        val map = slamManager.getWallFeatureMap()?.takeIf { it.pointCount > 0 }
         val ui = _uiState.value
         val standaloneBackend =
             ui.isArCoreAvailabilityResolved &&
+                !ui.isArCoreAvailable &&
+                currentProject.sphereSlamReferenceUri != null &&
+                currentProject.sphereSlamFingerprint != null
         // ARCore-frame state (wall normal, wall map, paint marks, grid) is what the loader swaps in;
         // between a project switch and the end of that swap native still holds the PREVIOUS
         // project's, and writing it here would put project A's map into project B. Skip until the
@@ -3856,9 +3856,6 @@ class ArViewModel @Inject constructor(
         saveWallNormalIfChanged(projectId, currentProject)
 
         val map = slamManager.getWallFeatureMap()?.takeIf { it.pointCount > 0 }
-                !ui.isArCoreAvailable &&
-                currentProject.sphereSlamReferenceUri != null &&
-                currentProject.sphereSlamFingerprint != null
 
         if (standaloneBackend) {
             if (map == null) return
@@ -4240,10 +4237,10 @@ class ArViewModel @Inject constructor(
      * sibling was missed. The refusal branch got the Kotlin half and not `clearWallFingerprint`, so
      * a project whose target was refused went on relocalizing against the PREVIOUS project's wall
      * and centring its overlay on the previous project's marks. Bundling the three operations means
-        nativeStateOwner.clear()
      * a future branch cannot get one and forget the others.
      */
     private fun dropLoadedFingerprint() {
+        nativeStateOwner.clear()
         slamManager.clearWallFingerprint()
         slamManager.overlayMarkCenterLocal = null
         // 0.9 — same lifetime: without it PoseFusion cannot compose a correction at all.
@@ -4301,12 +4298,12 @@ class ArViewModel @Inject constructor(
             // FIRST load of a session there is no previous project, and the footprint present is the
             // one the renderer just published for the artwork now on screen; nulling it there wipes
             // exactly the value the partition is about to need. (Caught by
-            // Native is about to be rewritten for `project`; until the END of this load it holds a
-            // mixture, and no save may attribute it to this project.
-            nativeStateOwner.beginSwitch(project.id)
             // `ArViewModelTest.loading an unpartitioned fingerprint partitions it and writes exactly
             // once`, which is why that test exists.)
             if (current != null && current.projectId != project.id) latestDesignFootprint = null
+            // Native is about to be rewritten for `project`; until the END of this load it holds a
+            // mixture, and no save may attribute it to this project.
+            nativeStateOwner.beginSwitch(project.id)
 
             val intr = project.fingerprintIntrinsics
             val anchor = project.fingerprintAnchor
@@ -4472,14 +4469,14 @@ class ArViewModel @Inject constructor(
             }
             lastSavedProgress = 0f
             // The wall's normal this project learned, for the sensor turn from the first attempt.
+            slamManager.setWallNormalEnu(
+                project.fingerprintWallNormalEnu.takeIf { it.size == 3 }?.toFloatArray(),
+            )
             // Last step: native now holds this project's state. A load that was overtaken by a
             // newer project (its coroutine ran long) must not claim ownership.
             nativeStateOwner.markLoaded(
                 project.id,
                 stillCurrent = projectRepository.currentProject.value?.id == project.id,
-            )
-            slamManager.setWallNormalEnu(
-                project.fingerprintWallNormalEnu.takeIf { it.size == 3 }?.toFloatArray(),
             )
         }
     }
@@ -5481,104 +5478,162 @@ class ArViewModel @Inject constructor(
         }
 
         val tapPos = pendingTapPosition
+        val extent = computePhysicalExtent(
+            depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics, depthBufStride, displayRotation,
+        )
         if (tapPos != null) pendingTapPosition = null
         // Stop the capture request NOW, on this (GL) thread's call: the renderer re-arms a capture
         // every frame while the flag is up, and the preparation below no longer happens inline.
         _uiState.update { it.copy(isCaptureRequested = false) }
-        val extent = computePhysicalExtent(
-            depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics, depthBufStride, displayRotation,
-        )
 
-        val rotatedBmp = if (displayRotation != 0) {
-            val matrix = android.graphics.Matrix().apply { postRotate(displayRotation.toFloat()) }
-            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-        } else bitmap
-
-        if (tapPos != null) {
-            pendingTapPosition = null
-            
-            // INITIALIZE: Default unwarp quad to the corners of the view (NORMALIZED)
-            val padding = 0.15f
-            val initialPoints = listOf(
-                Offset(padding, padding),
-                Offset(1f - padding, padding),
-                Offset(1f - padding, 1f - padding),
-                Offset(padding, 1f - padding)
-            )
-
-            _uiState.update {
-                it.copy(
-                    tapMarks = it.tapMarks + com.hereliesaz.graffitixr.common.model.TapMark(tapPos.first, tapPos.second, tapDistanceMeters),
-                    targetRawBitmap = bitmap,
-                    targetDisplayRotation = displayRotation,
-                    targetCaptureEnvironment = environment,
-                    targetDepthBuffer = depthBuffer,
-                    targetDepthWidth = colorW,
-                    targetDepthHeight = colorH,
-                    targetDepthBufferWidth = depthBufW,
-                    targetDepthBufferHeight = depthBufH,
-                    targetDepthStride = depthBufStride,
-                    targetIntrinsics = intrinsics,
-                    targetCaptureViewMatrix = viewMatrix,
-                    targetWallPlane = wallPlane,
-                    targetPhysicalExtent = extent,
-                    isCaptureRequested = false,
-                    tempCaptureBitmap = rotatedBmp,
-                    annotatedCaptureBitmap = rotatedBmp.isolateMarkings(),
-                    unwarpPoints = initialPoints
-                )
+        if (tapPos == null) {
+            extent?.let { (halfW, halfH) ->
+                renderer?.updateOverlayExtent(halfW, halfH)
             }
-            return
         }
 
-        extent?.let { (halfW, halfH) ->
-            renderer?.updateOverlayExtent(halfW, halfH)
-        }
+        // The rotation (a full-frame Bitmap copy) and isolateMarkings (an adaptive threshold over
+        // every pixel plus a flood fill) used to run right here, inside `_uiState.update {}` — on the
+        // GL thread, which also re-ran them whenever the update lambda was retried under CAS
+        // contention. Compute off the caller's thread and publish ONE state with the finished result.
+        // A newer capture, or Retake/cancel, supersedes this one: the job is cancelled and a stale
+        // result is never written.
+        captureComputeJob?.cancel()
+        captureComputeJob = viewModelScope.launch(dispatchers.default) {
+            val rotatedBmp = if (displayRotation != 0) {
+                val matrix = android.graphics.Matrix().apply { postRotate(displayRotation.toFloat()) }
+                Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+            } else bitmap
+            val markings = rotatedBmp.isolateMarkings()
+            ensureActive()
 
-        _uiState.update {
-            it.copy(
-                tempCaptureBitmap = rotatedBmp,
-                annotatedCaptureBitmap = rotatedBmp.isolateMarkings(),
-                targetRawBitmap = bitmap,
-                targetDisplayRotation = displayRotation,
-                targetCaptureEnvironment = environment,
-                targetDepthBuffer = depthBuffer,
-                targetDepthWidth = colorW,
-                targetDepthHeight = colorH,
-                targetDepthBufferWidth = depthBufW,
-                targetDepthBufferHeight = depthBufH,
-                targetDepthStride = depthBufStride,
-                targetIntrinsics = intrinsics,
-                targetCaptureViewMatrix = viewMatrix,
-                targetWallPlane = wallPlane,
-                targetPhysicalExtent = extent,
-                isCaptureRequested = false
-            )
+            if (tapPos != null) {
+                // INITIALIZE: Default unwarp quad to the corners of the view (NORMALIZED)
+                val padding = 0.15f
+                val initialPoints = listOf(
+                    Offset(padding, padding),
+                    Offset(1f - padding, padding),
+                    Offset(1f - padding, 1f - padding),
+                    Offset(padding, 1f - padding)
+                )
+                _uiState.update {
+                    it.copy(
+                        tapMarks = it.tapMarks + com.hereliesaz.graffitixr.common.model.TapMark(tapPos.first, tapPos.second, tapDistanceMeters),
+                        targetRawBitmap = bitmap,
+                        targetDisplayRotation = displayRotation,
+                        targetCaptureEnvironment = environment,
+                        targetDepthBuffer = depthBuffer,
+                        targetDepthWidth = colorW,
+                        targetDepthHeight = colorH,
+                        targetDepthBufferWidth = depthBufW,
+                        targetDepthBufferHeight = depthBufH,
+                        targetDepthStride = depthBufStride,
+                        targetIntrinsics = intrinsics,
+                        targetCaptureViewMatrix = viewMatrix,
+                        targetWallPlane = wallPlane,
+                        targetPhysicalExtent = extent,
+                        isCaptureRequested = false,
+                        tempCaptureBitmap = rotatedBmp,
+                        annotatedCaptureBitmap = markings,
+                        unwarpPoints = initialPoints
+                    )
+                }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        tempCaptureBitmap = rotatedBmp,
+                        annotatedCaptureBitmap = markings,
+                        targetRawBitmap = bitmap,
+                        targetDisplayRotation = displayRotation,
+                        targetCaptureEnvironment = environment,
+                        targetDepthBuffer = depthBuffer,
+                        targetDepthWidth = colorW,
+                        targetDepthHeight = colorH,
+                        targetDepthBufferWidth = depthBufW,
+                        targetDepthBufferHeight = depthBufH,
+                        targetDepthStride = depthBufStride,
+                        targetIntrinsics = intrinsics,
+                        targetCaptureViewMatrix = viewMatrix,
+                        targetWallPlane = wallPlane,
+                        targetPhysicalExtent = extent,
+                        isCaptureRequested = false
+                    )
+                }
+            }
         }
+    }
+
+    // The in-flight rotate + isolateMarkings of the latest capture (see onTargetCaptured).
+    private var captureComputeJob: Job? = null
+
+    /**
+     * A capture is being discarded (Retake, cancel, confirm): stop its preparation, drop queued mark
+     * erases and release the eraser's pixel buffers, so none of it lands on the NEXT capture's mask.
+     */
+    private fun resetCapturePipeline() {
+        captureComputeJob?.cancel()
+        captureComputeJob = null
+        pendingMarkRemovals.clear()
+        markEraser = null
     }
 
     /**
      * Remove the ENTIRE mark the user tapped or dragged onto from the fingerprint mask.
-     * Floods the whole connected highlighted blob to transparent (see eraseColorBlob) — no
-     * partial pixel erasing, no per-point dots. A drag calls this per touch sample; once a mark
-     * is cleared, re-touching its now-transparent area is a cheap no-op. The mask's alpha channel
-     * is what the native fingerprint masker reads, so the mark simply stops contributing.
+     * Floods the whole connected highlighted blob to transparent (see [MarkEraser]) — no partial
+     * pixel erasing, no per-point dots. A drag calls this per touch sample. Samples are queued and
+     * applied in batches to ONE working pixel buffer, publishing one new mask per batch; a touch with
+     * no mark in reach erases nothing and publishes nothing (it costs a bounded neighbourhood scan,
+     * not an image copy). The mask's alpha channel is what the native fingerprint masker reads, so
+     * the mark simply stops contributing.
+     *
+     * Asynchronous: the mask in [uiState] lags the touches by the queue. Anything that consumes the
+     * mask (Confirm) must go through [awaitLatestTargetCapture], which applies every queued erase first.
      */
-    // Serializes drag-time mark removals so each flood-fill starts from the LATEST mask rather than
-    // a snapshot taken when the gesture sample fired. Without this, two rapid removeMarkAt calls both
-    // read the same bitmap and the later write clobbers the earlier removal, making erased marks
-    // reappear. A mutex (vs. doing the work inside _uiState.update {}) guarantees the expensive
-    // flood-fill runs exactly once per call instead of being re-evaluated on CAS contention.
+    // Serializes the batches so each starts from the LATEST mask rather than a snapshot taken when the
+    // gesture sample fired. Without this, two rapid removals both read the same bitmap and the later
+    // write clobbers the earlier one, making erased marks reappear. Samples are enqueued
+    // synchronously, BEFORE the drain is launched, so a drain (or a flush) that holds this mutex
+    // always sees every sample enqueued before it started.
     private val markRemovalMutex = Mutex()
+    private val pendingMarkRemovals = java.util.concurrent.ConcurrentLinkedQueue<Pair<Float, Float>>()
+    // Pixel buffers of the mask currently on screen (see MarkEraser). Guarded by markRemovalMutex.
+    @Volatile private var markEraser: MarkEraser? = null
 
     fun removeMarkAt(nx: Float, ny: Float) {
+        pendingMarkRemovals.add(nx to ny)
         viewModelScope.launch(dispatchers.default) {
-            markRemovalMutex.withLock {
-                val current = _uiState.value.annotatedCaptureBitmap ?: return@withLock
-                val updated = current.eraseColorBlob(nx, ny)
-                _uiState.update { it.copy(annotatedCaptureBitmap = updated) }
-            }
+            markRemovalMutex.withLock { applyPendingMarkRemovalsLocked() }
         }
+    }
+
+    /** Apply every queued erase to the current mask and publish it once. Caller holds [markRemovalMutex]. */
+    private fun applyPendingMarkRemovalsLocked() {
+        val batch = ArrayList<Pair<Float, Float>>()
+        while (true) batch.add(pendingMarkRemovals.poll() ?: break)
+        if (batch.isEmpty()) return
+        val current = _uiState.value.annotatedCaptureBitmap ?: return
+        val eraser = markEraser?.takeIf { it.isFor(current) } ?: MarkEraser(current).also { markEraser = it }
+        var changed = false
+        for ((nx, ny) in batch) if (eraser.erase(nx, ny)) changed = true
+        if (!changed) return
+        val updated = eraser.publish()
+        // Only if the mask is still the one these erases were applied to: a Retake or new capture
+        // during the batch replaced it, and the stale result must not overwrite the new mask.
+        _uiState.update { if (it.annotatedCaptureBitmap === current) it.copy(annotatedCaptureBitmap = updated) else it }
+    }
+
+    /**
+     * The capture bitmap and fingerprint mask as they stand NOW, after every mark erase queued so far
+     * has been applied. Confirm calls this instead of reading the composition's snapshot, which can
+     * predate erases still in flight — the artist taps the last mark and Confirm immediately, and the
+     * fingerprint was built with that mark still in it.
+     */
+    suspend fun awaitLatestTargetCapture(): Pair<Bitmap?, Bitmap?> {
+        withContext(dispatchers.default) {
+            markRemovalMutex.withLock { applyPendingMarkRemovalsLocked() }
+        }
+        val state = _uiState.value
+        return state.tempCaptureBitmap to state.annotatedCaptureBitmap
     }
 
     // ── AR Measure (BACKLOG Phase 6 step 1) ─────────────────────────────────────────────────────
@@ -5721,8 +5776,7 @@ class ArViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 tapMarks = emptyList(),
-                unwarpPoints = emptyList(),
-                targetKeypoints = emptyList()
+                unwarpPoints = emptyList()
             )
         }
     }
@@ -5736,14 +5790,14 @@ class ArViewModel @Inject constructor(
     fun clearCaptureForRetry() {
         pendingTapPosition = null
         pendingStandaloneFingerprintPlacement = null
+        resetCapturePipeline()
         _uiState.update {
             it.copy(
                 tempCaptureBitmap = null,
                 annotatedCaptureBitmap = null,
                 targetWallPlane = null,
                 tapMarks = emptyList(),
-                unwarpPoints = emptyList(),
-                targetKeypoints = emptyList()
+                unwarpPoints = emptyList()
             )
         }
     }
@@ -5786,38 +5840,6 @@ class ArViewModel @Inject constructor(
         return halfW to halfH
     }
 
-    fun setTempCapture(bitmap: Bitmap?) {
-        _uiState.update { it.copy(tempCaptureBitmap = bitmap) }
-    }
-
-    fun setAnnotatedCapture(bitmap: Bitmap?) {
-        _uiState.update { it.copy(annotatedCaptureBitmap = bitmap) }
-        computeTargetKeypoints()
-    }
-
-    /**
-     * Detect the REAL fingerprint features on the captured target (same detector as
-     * generateFingerprint, restricted to the current mask) and publish them normalized for the
-     * refinement overlay, so the user sees exactly what will anchor and can erase the spurious ones.
-     */
-    private fun computeTargetKeypoints() {
-        val raw = _uiState.value.tempCaptureBitmap
-        if (raw == null) {
-            _uiState.update { it.copy(targetKeypoints = emptyList()) }
-            return
-        }
-        val mask = _uiState.value.annotatedCaptureBitmap
-        val w = raw.width.toFloat().coerceAtLeast(1f)
-        val h = raw.height.toFloat().coerceAtLeast(1f)
-        viewModelScope.launch(Dispatchers.IO) {
-            val pts = slamManager.getFingerprintKeypoints(raw, mask)
-                .map { androidx.compose.ui.geometry.Offset(it.first / w, it.second / h) }
-            _uiState.update { it.copy(targetKeypoints = pts) }
-        }
-    }
-
-
-
 
     fun onCaptureConsumed() {
         clearCaptureState()
@@ -5832,6 +5854,12 @@ class ArViewModel @Inject constructor(
         // that succeeded is discarded with "couldn't lock an anchor".
         slamManager.captureAnchorGenerationBaseline = slamManager.anchorGeneration.value
         slamManager.captureSessionEpochBaseline = slamManager.sessionEpochValue
+        // A (re-)capture replaces the anchor, and `captureAnchorCam` is expressed against the anchor
+        // it was built for. Left in place it would pair the NEW anchor with the OLD capture pose from
+        // the moment the renderer resets fusion until the builder publishes the new one (it awaits
+        // this anchor first, so the new value always lands after this clear). If the build then fails,
+        // fusion reports NO_CAPTURE_POSE instead of correcting in the wrong frame.
+        slamManager.captureAnchorCam = null
         renderer?.pendingAnchorEstablishment = true
     }
 
@@ -5893,12 +5921,6 @@ class ArViewModel @Inject constructor(
 
     /**
      * Called from ArRenderer (on the GL thread) the first time the primary
-        // A (re-)capture replaces the anchor, and `captureAnchorCam` is expressed against the anchor
-        // it was built for. Left in place it would pair the NEW anchor with the OLD capture pose from
-        // the moment the renderer resets fusion until the builder publishes the new one (it awaits
-        // this anchor first, so the new value always lands after this clear). If the build then fails,
-        // fusion reports NO_CAPTURE_POSE instead of correcting in the wrong frame.
-        slamManager.captureAnchorCam = null
      * anchor is created for this session. Flipping isAnchorEstablished is
      * what unlocks the Design rail (canEdit) and advances scanPhase to
      * COMPLETE in the next tracking-update tick. _uiState is a

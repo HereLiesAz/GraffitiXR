@@ -34,39 +34,67 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.hereliesaz.graffitixr.common.model.ArUiState
+import kotlinx.coroutines.launch
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.design.theme.AppStrings
 import com.hereliesaz.graffitixr.design.theme.HotPink
 
+/**
+ * @param rawBitmap the captured photo and [annotatedBitmap] its highlighted-marks mask, as of this
+ *   composition. Taken as the two bitmaps, not the whole ArUiState, so the screen recomposes only
+ *   when one of them changes rather than on every unrelated AR state tick.
+ * @param latestCapture the photo and mask as they stand when Confirm is tapped, after every queued
+ *   mark erase has been applied (`ArViewModel.awaitLatestTargetCapture`). Erases are asynchronous, so
+ *   the composition's own bitmaps can predate the last tap; Confirm uses this instead. The default
+ *   just returns the composition's bitmaps (previews, tests).
+ */
 @Composable
 fun TargetCreationUi(
-    uiState: ArUiState,
+    rawBitmap: Bitmap?,
+    annotatedBitmap: Bitmap?,
     captureStep: CaptureStep,
     isWaitingForTap: Boolean,
     strings: AppStrings,
     onConfirmTarget: (bitmap: Bitmap?, mask: Bitmap?) -> Unit,
     onRetake: () -> Unit,
     onCancel: () -> Unit,
-    onEraseAtPoint: (Float, Float) -> Unit
+    onEraseAtPoint: (Float, Float) -> Unit,
+    latestCapture: suspend () -> Pair<Bitmap?, Bitmap?> = { rawBitmap to annotatedBitmap },
 ) {
+    val scope = rememberCoroutineScope()
+    val currentLatestCapture by rememberUpdatedState(latestCapture)
+    val currentOnConfirmTarget by rememberUpdatedState(onConfirmTarget)
+    var confirming by remember { mutableStateOf(false) }
     Box(modifier = Modifier.fillMaxSize()) {
         // CaptureStep.RECTIFY (a manual 4-corner unwarp step) is never set by any writer of
         // captureStep (MainViewModel only ever sets NONE/CAPTURE/REVIEW) — AR's own target
         // capture went straight from CAPTURE to REVIEW once plane-guided rectification landed.
+        // MASK is not set by any writer either; its branch below is kept as an alias of REVIEW (the
+        // same mark-removal screen) so a writer using the older step name still lands there.
         // UnwarpScreen/UnwarpOverlay themselves are NOT dead: the standalone SphereSLAM AR
         // target flow reuses them directly with local state — only this unreachable branch and the onUnwarpConfirm/isLoading wiring that
         // existed solely to feed it were removed.
         when (captureStep) {
             CaptureStep.MASK, CaptureStep.REVIEW -> {
                 FeatureSelectionReview(
-                    annotatedBitmap = uiState.annotatedCaptureBitmap,
-                    rawBitmap = uiState.tempCaptureBitmap,
+                    annotatedBitmap = annotatedBitmap,
+                    rawBitmap = rawBitmap,
                     strings = strings,
                     onConfirm = {
-                        // The annotatedCaptureBitmap IS the mask — its alpha channel
-                        // (opaque = detect, transparent = skip) drives native ORB masking.
-                        onConfirmTarget(uiState.tempCaptureBitmap, uiState.annotatedCaptureBitmap)
+                        if (!confirming) {
+                            confirming = true
+                            scope.launch {
+                                try {
+                                    // Applies every queued erase first, then reads the state: the
+                                    // annotated bitmap IS the mask — its alpha channel
+                                    // (opaque = detect, transparent = skip) drives native ORB masking.
+                                    val (raw, mask) = currentLatestCapture()
+                                    currentOnConfirmTarget(raw, mask)
+                                } finally {
+                                    confirming = false
+                                }
+                            }
+                        }
                     },
                     onRetake = onRetake,
                     onEraseAtPoint = onEraseAtPoint
@@ -187,6 +215,9 @@ private fun FeatureSelectionReview(
     onEraseAtPoint: (Float, Float) -> Unit
 ) {
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
+    // The gesture handler below outlives recompositions; read the callback through this so it never
+    // calls a stale lambda.
+    val currentOnEraseAtPoint by rememberUpdatedState(onEraseAtPoint)
 
     Box(
         modifier = Modifier
@@ -195,8 +226,11 @@ private fun FeatureSelectionReview(
     ) {
         // -- Raw capture as faint context, dimmed so the highlighted marks dominate --
         rawBitmap?.let { bmp ->
+            // remember(bmp): asImageBitmap wraps the bitmap in a new object on every call, and the
+            // gesture layer recomposes this on every layout change.
+            val image = remember(bmp) { bmp.asImageBitmap() }
             Image(
-                bitmap = bmp.asImageBitmap(),
+                bitmap = image,
                 contentDescription = "Raw Capture",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
@@ -210,8 +244,9 @@ private fun FeatureSelectionReview(
 
         // -- Highlighted marks (the whole-mark fingerprint mask), always shown --
         annotatedBitmap?.let { bmp ->
+            val image = remember(bmp) { bmp.asImageBitmap() }
             Image(
-                bitmap = bmp.asImageBitmap(),
+                bitmap = image,
                 contentDescription = "Detected marks",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
@@ -256,7 +291,7 @@ private fun FeatureSelectionReview(
                             if (last != null && (pos - last).getDistance() < minMovePx) return false
                             val nx = ((pos.x - imgX) / imgW).coerceIn(0f, 1f)
                             val ny = ((pos.y - imgY) / imgH).coerceIn(0f, 1f)
-                            onEraseAtPoint(nx, ny)
+                            currentOnEraseAtPoint(nx, ny)
                             return true
                         }
                         awaitEachGesture {
@@ -341,8 +376,9 @@ internal fun UnwarpScreen(
                 .onSizeChanged { boxSize = it },
             contentAlignment = Alignment.TopStart
         ) {
+            val baseImage = remember(bitmap) { bitmap.asImageBitmap() }
             Image(
-                bitmap = bitmap.asImageBitmap(),
+                bitmap = baseImage,
                 contentDescription = "Unwarp Base",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
@@ -393,19 +429,31 @@ private fun UnwarpOverlay(
 
     val currentPoints by rememberUpdatedState(points)
     val currentOnUpdate by rememberUpdatedState(onUpdatePoints)
+    // The image's placement in the box is derived from the box size, so it can change without imgW /
+    // imgH doing so (the box moving or its sibling padding changing). The gesture coroutine started
+    // below lives across such changes, so it reads the placement through this rather than capturing
+    // the values of the composition that launched it.
+    val placement by rememberUpdatedState(floatArrayOf(imgX, imgY, imgW, imgH))
 
     var activePointIndex by remember { mutableIntStateOf(-1) }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(imgW, imgH) {
+            .pointerInput(Unit) {
+                // Points as of the latest drag step. Two drag events can arrive before the caller's
+                // new list has been recomposed into `currentPoints`; applying the second delta to
+                // that stale list would drop the first. Each step builds on this instead, which is
+                // reseeded from the latest state at every drag start.
+                var working: List<Offset> = emptyList()
                 detectDragGestures(
                     onDragStart = { pos ->
+                        val (px, py, pw, ph) = placement
+                        working = currentPoints
                         val thresholdPx = with(density) { 40.dp.toPx() }
-                        activePointIndex = currentPoints.indexOfFirst { p ->
-                            val sx = imgX + p.x * imgW
-                            val sy = imgY + p.y * imgH
+                        activePointIndex = working.indexOfFirst { p ->
+                            val sx = px + p.x * pw
+                            val sy = py + p.y * ph
                             val dist = Math.sqrt(
                                 ((pos.x - sx) * (pos.x - sx) + (pos.y - sy) * (pos.y - sy)).toDouble()
                             )
@@ -413,17 +461,20 @@ private fun UnwarpOverlay(
                         }
                     },
                     onDrag = { change, dragAmount ->
-                        if (activePointIndex != -1) {
+                        val index = activePointIndex
+                        if (index != -1 && index < working.size) {
                             change.consume()
-                            val nx = dragAmount.x / imgW
-                            val ny = dragAmount.y / imgH
+                            val (_, _, pw, ph) = placement
+                            val nx = dragAmount.x / pw
+                            val ny = dragAmount.y / ph
 
-                            val newList = currentPoints.toMutableList()
-                            val p = newList[activePointIndex]
-                            newList[activePointIndex] = Offset(
+                            val newList = working.toMutableList()
+                            val p = newList[index]
+                            newList[index] = Offset(
                                 (p.x + nx).coerceIn(0f, 1f),
                                 (p.y + ny).coerceIn(0f, 1f)
                             )
+                            working = newList
                             currentOnUpdate(newList)
                         }
                     },

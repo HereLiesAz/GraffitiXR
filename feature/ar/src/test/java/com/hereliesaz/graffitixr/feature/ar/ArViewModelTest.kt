@@ -194,20 +194,43 @@ class ArViewModelTest {
 
     // ==================== Capture Workflow Tests ====================
 
+    /** Drives a (non-tap) capture through onTargetCaptured and lets its off-thread preparation land. */
+    private fun captureBitmap(bitmap: Bitmap) {
+        viewModel.onTargetCaptured(
+            bitmap = bitmap, depthBuffer = null,
+            colorW = 100, colorH = 100,
+            depthBufW = 0, depthBufH = 0, depthBufStride = 0,
+            intrinsics = null, viewMatrix = FloatArray(16), displayRotation = 0, tapDistanceMeters = -1f,
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+    }
+
     @Test
-    fun `setTempCapture stores bitmap in state`() = runTest {
+    fun `onTargetCaptured stores the prepared capture in state`() = runTest {
         val mockBitmap = mockk<Bitmap>(relaxed = true)
 
         assertNull(viewModel.uiState.value.tempCaptureBitmap)
-        viewModel.setTempCapture(mockBitmap)
+        captureBitmap(mockBitmap)
 
         assertEquals(mockBitmap, viewModel.uiState.value.tempCaptureBitmap)
+        assertNotNull(viewModel.uiState.value.annotatedCaptureBitmap)
+    }
+
+    @Test
+    fun `awaitLatestTargetCapture returns the staged capture and mask`() = runTest {
+        val mockBitmap = mockk<Bitmap>(relaxed = true)
+        captureBitmap(mockBitmap)
+
+        val (raw, mask) = viewModel.awaitLatestTargetCapture()
+
+        assertEquals(mockBitmap, raw)
+        assertEquals(viewModel.uiState.value.annotatedCaptureBitmap, mask)
     }
 
     @Test
     fun `onCaptureConsumed clears temp capture`() = runTest {
         val mockBitmap = mockk<Bitmap>(relaxed = true)
-        viewModel.setTempCapture(mockBitmap)
+        captureBitmap(mockBitmap)
         assertNotNull(viewModel.uiState.value.tempCaptureBitmap)
 
         viewModel.onCaptureConsumed()
@@ -220,7 +243,7 @@ class ArViewModelTest {
         // the same instance. The reference is dropped (GC reclaims); recycle() must not be called.
         val mockBitmap = mockk<Bitmap>(relaxed = true)
         every { mockBitmap.isRecycled } returns false
-        viewModel.setTempCapture(mockBitmap)
+        captureBitmap(mockBitmap)
 
         viewModel.onCaptureConsumed()
 
@@ -276,7 +299,10 @@ class ArViewModelTest {
             tapDistanceMeters = -1f
         )
 
+        // The request flag drops at once (the renderer re-arms a capture every frame while it is up);
+        // the tap mark lands with the prepared capture, off the calling thread.
         assertFalse(viewModel.uiState.value.isCaptureRequested)
+        testDispatcher.scheduler.advanceUntilIdle()
         assertEquals(1, viewModel.uiState.value.tapMarks.size)
     }
 
@@ -673,6 +699,7 @@ class ArViewModelTest {
             depthBufW = 0, depthBufH = 0, depthBufStride = 0,
             intrinsics = null, viewMatrix = FloatArray(16), displayRotation = 0, tapDistanceMeters = -1f
         )
+        testDispatcher.scheduler.advanceUntilIdle()
 
         val state = viewModel.uiState.value
         // The tap path isolates markings on the raw capture; onUnwarpConfirm later reads this mask
