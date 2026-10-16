@@ -527,4 +527,54 @@ class PoseFusionTest {
         assertEquals(null, PoseFusion.solveViewOf(FloatArray(19)))
         assertEquals(null, PoseFusion.solveViewOf(FloatArray(35) { -1f }))
     }
+
+    /**
+     * A re-capture resets fusion, but native still latches the PRE-capture PnP result (same seq)
+     * until a new solve finishes. Resetting `lastSeq` to 0 made that old result look new: with the
+     * correction cleared and the cold flag re-armed, it hard-snapped the NEW anchor onto the old
+     * wall's pose. Resetting with the seq in hand adopts it as consumed.
+     */
+    @Test fun `reset then replay of the same seq must not correct`() {
+        val f = PoseFusion()
+        val stale = reloc(trans(10f,0f,0f), inliers = 90f, matches = 100f, seq = 7f)
+        val first = f.currentAnchor(trans(0f,0f,0f), identity(), stale, captureAtOrigin(), confGlobal = 1f)
+        assertEquals(10f, first[12], 1e-3f)
+
+        f.reset(consumedRelocSeq = 7f)
+        val replay = f.currentAnchor(trans(0f,0f,0f), identity(), stale, captureAtOrigin(), confGlobal = 1f)
+        assertEquals("stale pre-capture result must not move the new anchor", 0f, replay[12], 1e-3f)
+        assertEquals(com.hereliesaz.graffitixr.common.model.FusionState.WAITING_FOR_LOCK, f.diagnostics().state)
+        assertEquals(-1f, f.diagnostics().correctionMm, 0f)
+
+        // A solve that finishes AFTER the re-capture carries a different seq and does correct.
+        val fresh = reloc(trans(3f,0f,0f), inliers = 90f, matches = 100f, seq = 8f)
+        val after = f.currentAnchor(trans(0f,0f,0f), identity(), fresh, captureAtOrigin(), confGlobal = 1f)
+        assertEquals(3f, after[12], 1e-3f)
+    }
+
+    @Test fun `reset without a seq keeps the pre-existing behaviour`() {
+        val f = PoseFusion()
+        val r = reloc(trans(10f,0f,0f), inliers = 90f, matches = 100f, seq = 7f)
+        f.currentAnchor(trans(0f,0f,0f), identity(), r, captureAtOrigin(), confGlobal = 1f)
+        f.reset()
+        val out = f.currentAnchor(trans(0f,0f,0f), identity(), r, captureAtOrigin(), confGlobal = 1f)
+        assertEquals(10f, out[12], 1e-3f)
+    }
+
+    @Test fun `latencyCompensatedView is the live view when the reloc agrees with the solve view`() {
+        val solve = trans(1f, 2f, 3f)
+        val live = trans(4f, 0f, -1f)     // the camera moved since the solve
+        val r = PoseFusion.latencyCompensatedView(live, solve, relocView = solve)
+        live.forEachIndexed { i, e -> assertEquals("element $i", e, r[i], 1e-5f) }
+    }
+
+    @Test fun `latencyCompensatedView carries the reloc correction onto the live view, not the stale one`() {
+        val solve = trans(1f, 0f, 0f)
+        val reloc = trans(1.5f, 0f, 0f)   // reloc says the reference sits 0.5 m further along x
+        val live = trans(10f, 0f, 0f)     // hand motion since the solve: 9 m
+        val r = PoseFusion.latencyCompensatedView(live, solve, reloc)
+        // C = trans(0.5); live . C = trans(10.5). The raw reloc view (1.5) would have read the
+        // latency motion as drift.
+        assertEquals(10.5f, r[12], 1e-4f)
+    }
 }

@@ -209,7 +209,7 @@ camera ownership. Earlier 2026-09-04 update removed the fictional Persistent Vox
 
 ## Cross-backend co-op wall frame
 
-Co-op protocol v3 shares one **host wall-local coordinate object**, not either device's transient
+Co-op protocol v3 introduced, and later versions keep, one **host wall-local coordinate object**, not either device's transient
 ARCore/SphereSLAM world origin. The wire descriptor is
 `core/common/.../CoopSpatialFrame.kt`:
 
@@ -242,3 +242,8 @@ standalone peer because both consume the same page-relative coordinate object. I
 injected into ARCore's metre world. Protocol v3 rejects that pairing as `SpatialIncompatible`
 before bulk transfer. Protocol-v2 peers are rejected as `VersionMismatch`; retaining compatibility
 would recreate the frame ambiguity v3 exists to remove.
+
+The current protocol is **v5** (`wire/ProtocolVersion.kt`); v4 and older peers are rejected as
+`VersionMismatch`. v4 added guest→host edits (`GUEST_OP`/`GUEST_OP_ACK`: queued until acknowledged,
+deduped and applied by the host as undoable persisted edits); v5 added `Op.WallWidth` so Measure
+results are shared both ways. See `docs/FEATURE_REFERENCE.md` §8.

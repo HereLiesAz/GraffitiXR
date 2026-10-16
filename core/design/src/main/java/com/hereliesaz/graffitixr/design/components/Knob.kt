@@ -102,13 +102,18 @@ fun Knob(
                     range = valueRange
                 )
                 setProgress { targetValue ->
-                    val newValue = targetValue.coerceIn(valueRange.start, valueRange.endInclusive)
-                    if (newValue == value) {
-                        false
-                    } else {
-                        updatedOnValueChange(newValue)
-                        true
-                    }
+                    // Accessibility set-progress is a complete gesture of its own: bracket it with
+                    // start/finished exactly like the double-tap reset, or consumers that open an
+                    // undo transaction on start and save/emit on finish (pushHistory, saveProject,
+                    // co-op) would apply the change without recording or syncing it.
+                    applyKnobProgress(
+                        target = targetValue,
+                        current = updatedValue,
+                        range = updatedRange,
+                        onStart = updatedOnStart,
+                        onValueChange = updatedOnValueChange,
+                        onFinished = updatedOnFinished,
+                    )
                 }
             }
             .pointerInput(Unit) {
@@ -200,4 +205,26 @@ fun Knob(
         Spacer(modifier = Modifier.height(4.dp))
         Text(text = text, style = MaterialTheme.typography.labelSmall, color = labelColor)
     }
+}
+
+/**
+ * The accessibility `setProgress` action: clamps [target] to [range] and, when it differs from
+ * [current], applies it as one change gesture — [onStart], [onValueChange], [onFinished], in that
+ * order (the same bracket the double-tap reset uses). Returns whether anything changed; an
+ * unchanged value fires no callback at all, so a no-op action opens no empty undo step.
+ */
+internal fun applyKnobProgress(
+    target: Float,
+    current: Float,
+    range: ClosedFloatingPointRange<Float>,
+    onStart: (() -> Unit)?,
+    onValueChange: (Float) -> Unit,
+    onFinished: (() -> Unit)?,
+): Boolean {
+    val newValue = target.coerceIn(range.start, range.endInclusive)
+    if (newValue == current) return false
+    onStart?.invoke()
+    onValueChange(newValue)
+    onFinished?.invoke()
+    return true
 }

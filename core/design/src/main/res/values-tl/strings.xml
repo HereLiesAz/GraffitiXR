@@ -11,7 +11,6 @@
     <string name="nav_mockup_info">I-preview ang iyong disenyo na pinagsama-sama sa isang larawan ng isang pader. Walang kinakailangang camera o pag-scan.</string>
     <string name="nav_trace">Bakas</string>
     <string name="nav_trace_info">Gamitin ang iyong disenyo bilang light-table overlay upang masubaybayan ang mga reference na linya sa isang pisikal na ibabaw.</string>
-    <string name="nav_scan_mode_toggle_info">Lumipat sa pagitan ng Canvas (na-optimize para sa mas maliit na desk-scale art) at Mural (na-optimize para sa malalaking pader at Gaussian Splatting).</string>
     <string name="nav_grid">Target</string>
     <string name="nav_grid_info">Lumikha at pamahalaan ang mga target na AR anchor. Kuhanan ng larawan ang mga reference mark sa dingding upang i-lock ang projection sa lugar.</string>
     <string name="nav_create">Lumikha</string>
@@ -316,9 +315,9 @@
         <item>Pisilin para i-resize, i-drag para muling ilagay. Nananatiling nakapirmi sa iyong screen ang overlay — umatras para makita kung paano ito bumagay sa pader.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
-        <item>Hindi suportado ng device na ito ang ARCore, kaya hindi available ang AR Projection mode.</item>
-        <item>Magagamit mo pa rin ang Bakas, Mockup, at Live Overlay — gumagana nang walang ARCore ang lahat ng mode maliban sa AR.</item>
-        <item>Pindutin para i-dismiss.</item>
+        <item>Hindi sinusuportahan ng device na ito ang ARCore, kaya gumagamit ang AR mode ng hiwalay na pagsubaybay sa pader.</item>
+        <item>Sa AR mode, kukuha ka muna ng larawan ng may-texture na bahagi ng pader at ime-markahan ang apat na sulok nito. Pagkatapos, ila-lock ng pagsubaybay ang sarili sa target na iyon.</item>
+        <item>Gumagana gaya ng dati ang Bakas, Mockup at Overlay. I-tap para isara.</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>Photo Mockup — i-preview ang iyong disenyo sa isang larawan bago ka pa man humawak ng brush.</item>
@@ -347,4 +346,125 @@
     <string name="nav_gyro_info">Sa tripod, pinapanatiling nakapirmi ang disenyo sa pader laban sa maliliit na pag-uga gamit ang motion sensor. I-on kapag nakapuwesto na ang phone; bibitaw ito kapag ginalaw ang phone.</string>
     <string name="gyro_released_moved">Bumitaw ang Gyro: masyadong gumalaw ang phone.</string>
     <string name="gyro_unavailable">Kailangan ng Gyro ng rotation sensor na wala sa device na ito.</string>
+    <string name="export_failed">Nabigo ang pag-export: hindi na-save ang larawan sa iyong gallery.</string>
+    <string name="export_failed_permission">Hindi ma-save sa iyong gallery. Payagan ang GraffitiXR na ma-access ang storage at subukan ulit.</string>
+    <string name="export_ar_unavailable">Hindi pa handa ang pag-export: hindi tumatakbo ang AR camera view. Buksan ang AR view at subukan ulit.</string>
+    <string name="export_standalone_ar_unavailable">Hindi pa available ang pag-export sa standalone na AR.</string>
+    <string name="rail_checking_ar_backend">Sinusuri ang AR backend…</string>
+
+    <string name="settings_use_arcore">Gamitin ang ARCore</string>
+    <string name="settings_arcore_depth">Lalim ng ARCore</string>
+    <string name="settings_monocular_depth">Monocular depth (beta)</string>
+    <string name="settings_ambient_scan">Ambient scan</string>
+    <string name="settings_adaptive_rate">Adaptive rate (idle)</string>
+    <string name="settings_crash_reports">Mga ulat ng pag-crash</string>
+    <string name="settings_crash_reports_desc">Kapag nag-crash, ipadala ang modelo ng device at mga kamakailang log sa isang pampublikong ulat ng bug? Naka-off bilang default.</string>
+    <string name="settings_crash_token_label">Token ng ulat ng pag-crash</string>
+    <string name="settings_crash_token_set">Naitakda</string>
+    <string name="settings_crash_token_not_set">Hindi naitakda</string>
+    <string name="settings_crash_token_desc">Isang GitHub token na may Issues: write sa HereLiesAz/GraffitiXR. Nakaimbak lamang sa device na ito, hindi kailanman sa app. Iwanang blangko para i-disable ang mga upload.</string>
+    <string name="settings_crash_token_field">Token</string>
+    <string name="settings_canvas_color_black">Itim</string>
+    <string name="settings_canvas_color_dark">Madilim</string>
+    <string name="settings_canvas_color_grey">Abo</string>
+    <string name="settings_canvas_color_white">Puti</string>
+    <string name="settings_canvas_color_navy">Navy</string>
+    <string name="state_selected">Napili</string>
+    <string name="state_expanded">Nakabukas</string>
+    <string name="state_collapsed">Nakasara</string>
+    <string name="settings_fps_device_default">Default ng device</string>
+    <string name="settings_fps_device_max">Maximum ng device</string>
+    <string name="first_run_photo_title">Tingnan ito sa iyong pader</string>
+    <string name="first_run_photo_text">Pumili ng reference na larawan ng iyong obra at ipapakita namin kung ano ang hitsura nito sa totoong pader, sa AR.</string>
+    <string name="first_run_choose_photo">Pumili ng larawan</string>
+    <string name="first_run_not_now">Huwag muna</string>
+    <string name="first_run_draw_title">Iguhit ito sa iyong pader</string>
+    <string name="first_run_draw_hint">Gawing malaki — halos kasinlaki ng iyong obra. Kailangan lang itong makilala, hindi kailangang maayos.</string>
+    <string name="first_run_draw_done">Naiguhit ko na</string>
+    <string name="first_run_draw_skip">Laktawan — ako na ang maglalagay</string>
+    <string name="first_run_detect_title">Ngayon, itutok ang camera sa iginuhit mo</string>
+    <string name="first_run_detect_movement_hint">Dahan-dahang igalaw ang device nang pabilog</string>
+    <string name="design_instructions_title">Idisenyo ang iyong mural</string>
+    <string name="design_instructions_text">I-tap ang \'%1$s\' sa rail, pagkatapos ang \'%2$s\', para pumili ng larawan ng iyong obra.</string>
+    <string name="got_it_button">Naintindihan ko</string>
+    <string name="standalone_width_prompt">Sukatin ang tunay na lapad sa pagitan ng kaliwa at kanang gilid ng target.</string>
+    <string name="standalone_width_label_metric">Lapad ng target (metro)</string>
+    <string name="standalone_width_label_imperial">Lapad ng target (talampakan at pulgada)</string>
+    <string name="standalone_width_range_error">Maglagay ng lapad mula %1$s hanggang %2$s.</string>
+    <string name="standalone_use_measured_width">Gamitin ang sinukat na lapad</string>
+    <string name="standalone_continue_without_scale">Magpatuloy nang walang pisikal na sukat</string>
+    <string name="standalone_recapture">Kumuha muli</string>
+    <string name="standalone_capture_wall_target">Kunin ang target sa pader</string>
+    <string name="standalone_capture_failed">Hindi makuha ang target sa pader — subukan muli.</string>
+    <string name="standalone_rectify_failed">Hindi maituwid ang target na iyon — markahan ang apat na malinaw na sulok.</string>
+    <string name="standalone_target_too_weak">Masyadong kaunti ang masusubaybayang detalye ng target na iyon (%1$d KPM feature; kailangan ng %2$d). Kumuha ng mas detalyadong bahagi ng pader.</string>
+    <string name="standalone_new_target">Bagong target</string>
+    <string name="standalone_copy_diagnostics">Kopyahin ang diagnostics</string>
+    <string name="standalone_wall_target_lost">Nawala ang target sa pader</string>
+    <string name="standalone_recapture_target">Kunin muli ang target</string>
+    <string name="standalone_sweep_hint">Dahan-dahang umikot para imapa ang espasyo — %1$d%%</string>
+    <string name="standalone_failure_native_library_unavailable">Hindi available ang SphereSLAM sa build na ito.</string>
+    <string name="standalone_failure_camera_unavailable">Hindi available ang camera para sa standalone AR.</string>
+    <string name="standalone_failure_intrinsics_unavailable">Hindi available ang camera calibration para sa standalone AR.</string>
+    <string name="standalone_failure_reference_too_weak">Masyadong kaunti ang masusubaybayang detalye ng target sa pader na iyon. Kumuha ng mas detalyadong bahagi.</string>
+    <string name="standalone_failure_no_page_match">Panatilihin ang target sa pader sa view.</string>
+    <string name="standalone_failure_stale_observation">Nahuhuli ang tracking. Igalaw nang mas mabagal ang telepono.</string>
+    <string name="standalone_failure_reprojection_error">Hindi matatag ang tugma sa pader. I-frame muli ang target.</string>
+    <string name="standalone_failure_insufficient_inliers">Hindi sapat ang nakikitang detalye ng target.</string>
+    <string name="standalone_failure_pose_jump">Tinanggihan ang biglaang pagtalon ng tracking. Ihawak nang matatag sa target sa pader.</string>
+    <string name="standalone_failure_persisted_target_corrupt">Nawawala o hindi mabasa ang naka-save na target sa pader. Kumuha ng bagong target.</string>
+    <string name="standalone_failure_internal">Hindi na naipagpatuloy ng SphereSLAM ang pagsubaybay sa target na ito.</string>
+    <string name="standalone_tracking_stopped">Huminto ang tracking ng SphereSLAM. Kunin muli ang target para i-restart ito.</string>
+    <string name="standalone_status_mapping">Nagma-map ang SphereSLAM • i-tap ang Target para magdagdag ng fingerprint</string>
+    <string name="standalone_status_preparing">Inihahanda ang fingerprint target…</string>
+    <string name="standalone_status_finding">Hinahanap ang fingerprint target…</string>
+    <string name="standalone_quality_too_small">Masyadong maliit ang target sa pader na iyon pagkatapos ng pagtuwid. Kumuha ng mas malaking bahagi.</string>
+    <string name="standalone_quality_low_contrast">Masyadong mababa ang visual contrast ng target sa pader na iyon. Magsama ng mas maraming texture o detalye.</string>
+    <string name="standalone_quality_blurry">Masyadong malabo ang target sa pader na iyon para sa maaasahang tracking. Ihawak nang matatag at kunin muli.</string>
+    <string name="standalone_quality_not_strong_enough">Hindi sapat ang lakas ng target sa pader na iyon para sa maaasahang tracking.</string>
+    <string name="standalone_quality_too_dark">Lubhang kulang sa exposure ang target na ito; maaaring mas hindi maaasahan ang tracking.</string>
+    <string name="standalone_quality_too_bright">Lubhang sobra sa exposure ang target na ito; maaaring mas hindi maaasahan ang tracking.</string>
+    <string name="standalone_photosphere_no_sensor">Walang rotation sensor ang teleponong ito, kaya hindi makapaglagay ng target dito ang SphereSLAM.</string>
+    <string name="standalone_photosphere_compass_not_ready">Hindi pa handa ang compass — ihawak nang matatag ang telepono nang isang segundo, saka kumuha muli.</string>
+    <string name="standalone_photosphere_not_mapped">Hindi pa namamapa ng SphereSLAM ang view na ito — ihawak nang matatag ang camera nang isang segundo sa maliwanag at detalyadong bahagi ng ibabaw, saka kumuha muli.</string>
+    <string name="target_rectify_title">Ituwid ang ibabaw</string>
+    <string name="target_rectify_text">Ngayon, i-drag ang mga sulok para iayon ang cyan na frame sa patag na ibabaw ng iyong pader.</string>
+    <string name="target_remove_marks_title">Alisin ang mga marka</string>
+    <string name="target_erase_hint">I-tap ang isang marka para alisin ito, o mag-drag sa ibabaw ng ilang marka para alisin ang marami.</string>
+    <string name="target_cd_raw_capture">Hilaw na kuha</string>
+    <string name="target_cd_detected_marks">Mga natukoy na marka</string>
+    <string name="target_cd_confirm">Kumpirmahin</string>
+    <string name="target_cd_unwarp_base">Nakuhang larawan ng pader na may mga hawakan sa sulok</string>
+    <string name="guidance_open_via_design_overlay">I-tap ang \'Disenyo\' sa rail, pagkatapos ang \'Bukas\', para magdagdag ng layer — pumili ng larawan at lalabas ito rito, lumulutang sa ibabaw ng live na tanaw ng camera.</string>
+    <string name="guidance_open_via_design_mockup">I-tap ang \'Disenyo\' sa rail, pagkatapos ang \'Bukas\', para magdagdag ng layer sa ibabaw ng larawan ng pader. I-pinch at i-drag para itakda ang laki at posisyon nito.</string>
+    <string name="guidance_open_via_design_trace">I-tap ang \'Disenyo\' sa rail, pagkatapos ang \'Bukas\', para idagdag ang una mong layer. Kapag nailagay na, mag-pinch at mag-drag sa canvas para itakda ang laki at lugar nito.</string>
+    <string name="guidance_open_via_design_ar">I-tap ang \'Disenyo\' sa rail, pagkatapos ang \'Bukas\', para magdagdag ng design layer — ipo-project ito sa pader gamit ang anchor na katatakda mo lang.</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">Hindi maibabahagi sa host ang pagbabagong iyon — mananatili ito sa device na ito</string>
+    <string name="ar_feedback_backend_resolving">Tinutukoy pa ang AR backend — subukang mag-host ulit sa ilang saglit</string>
+    <string name="ar_feedback_open_project_first">Magbukas ng proyekto bago magbahagi — wala pang maipapadala sa bisita</string>
+    <string name="ar_feedback_host_need_target_arcore">Kumuha at i-lock ang kasalukuyang target sa pader bago mag-host</string>
+    <string name="ar_feedback_host_need_target_standalone">Kumuha ng standalone na Wall Target bago mag-host</string>
+    <string name="ar_feedback_fingerprint_not_ready">Hindi pa handa ang fingerprint ng pader — panatilihin ang target sa view at subukang mag-host ulit</string>
+    <string name="ar_feedback_package_failed">Hindi ma-package ang proyektong ito para ibahagi — subukan munang i-save ito</string>
+    <string name="ar_feedback_host_failed">Hindi masimulan ang pagbabahagi: %1$s</string>
+    <string name="ar_feedback_join_load_failed">Hindi ma-load ang proyekto ng host — natapos ang session.</string>
+    <string name="ar_feedback_join_no_geometry">Hindi nagbigay ang host ng geometry na maaaring pagtugmaan ng ARCore.</string>
+    <string name="ar_feedback_join_failed">Hindi nakasali: %1$s</string>
+    <string name="ar_feedback_wall_target_changed">Nagbago ang target sa pader — natapos ang pagbabahagi. Simulan muli ang Host para sa bagong pader.</string>
+    <string name="ar_feedback_backend_changed">Nagbago ang tracking backend — natapos ang pagbabahagi. Simulan muli ang pagbabahagi.</string>
+    <string name="ar_feedback_camera_busy">Abala o hindi available ang camera — isara ang iba pang camera app, saka muling pumasok sa AR</string>
+    <string name="ar_feedback_ar_start_failed">Hindi masimulan ang AR — maaaring ginagamit ng ibang app ang iyong camera</string>
+    <string name="ar_feedback_camera_setting_apply_failed">Hindi mailapat ang setting ng camera sa tumatakbong AR session — lumabas sa AR at muling pumasok</string>
+    <string name="ar_feedback_sphere_target_save_failed">Gumagana ang wall tracking sa session na ito, pero hindi na-save ang SphereSLAM target.</string>
+    <string name="ar_feedback_camera_not_resumed">Hindi nagpatuloy ang AR camera — subukang lumabas sa AR mode at muling pumasok</string>
+    <string name="ar_feedback_camera_permission">Hindi available ang camera — suriin ang permiso sa camera, saka muling pumasok sa AR</string>
+    <string name="ar_feedback_camera_not_paused">Hindi maayos na na-pause ang AR camera — maaari itong magpatuloy sa background</string>
+    <string name="ar_feedback_backbone_warning">Halos natatakpan ng likhang-sining ang buong pader na nakikita — %1$d na tracked feature lang ang nasa labas nito. Paliitin ito o umatras, kung hindi ay maaaring hindi mag-lock ang target.</string>
+    <string name="ar_feedback_legacy_target_geometry">Ang naka-save na target ng proyektong ito ay ginawa ng mas lumang bersyon at hindi maitatama ang 3D geometry nito. Gawin muli ang target para magamit ito.</string>
+    <string name="ar_feedback_camera_no_frames">Hindi nagpapadala ng mga frame ang camera — lumabas sa AR at subukan muli</string>
+    <string name="ar_feedback_camera_recovery_timeout">Ligtas na nag-time out ang pagbawi ng AR camera — lumabas sa AR at muling pumasok</string>
+    <string name="ar_feedback_target_prepare_failed">Hindi nahanda ang nakuhang target. Subukan muli.</string>
+    <string name="ar_feedback_wall_width_save_failed">Hindi na-save ang lapad ng pader. Subukang mag-save ulit.</string>
+    <string name="ar_feedback_unknown_error">hindi kilalang error</string>
 </resources>

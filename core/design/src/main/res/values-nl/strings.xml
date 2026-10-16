@@ -32,7 +32,6 @@
 
 
 
-    <string name="nav_scan_mode_toggle_info">Schakel tussen Canvas (geoptimaliseerd voor kleinere kunst op bureauschaal) en Mural (geoptimaliseerd voor grootschalige muren en Gaussiaanse splatting).</string>
 
 
 
@@ -606,9 +605,9 @@
         <item>Knijp om te schalen, sleep om te verplaatsen. De overlay blijft vast op je scherm — stap achteruit om te zien hoe hij op de muur past.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
-        <item>Dit apparaat ondersteunt geen ARCore, dus de AR-projectiemodus is niet beschikbaar.</item>
-        <item>Je kunt nog steeds Spoor, Mock-up en Live overlay gebruiken — elke modus behalve AR werkt zonder ARCore.</item>
-        <item>Tik om te sluiten.</item>
+        <item>Dit apparaat ondersteunt ARCore niet, dus de AR-modus gebruikt in plaats daarvan zelfstandige muurtracking.</item>
+        <item>In de AR-modus neem je eerst een foto op van een gestructureerd stuk muur en markeer je de vier hoeken. De tracking vergrendelt zich daarna op dat doel.</item>
+        <item>Spoor, Mock-up en Overlay werken zoals gewoonlijk. Tik om te sluiten.</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>Foto-mockup — bekijk een voorbeeld van je ontwerp op een foto voordat je ook maar een kwast oppakt.</item>
@@ -637,4 +636,125 @@
     <string name="nav_gyro_info">Houdt het ontwerp op een statief stil op de muur tegen kleine trillingen met de bewegingssensor. Zet aan zodra de telefoon staat; laat los als de telefoon wordt bewogen.</string>
     <string name="gyro_released_moved">Gyro losgelaten: de telefoon bewoog te veel.</string>
     <string name="gyro_unavailable">Gyro heeft een rotatiesensor nodig die dit apparaat niet biedt.</string>
+    <string name="export_failed">Exporteren mislukt: de afbeelding kon niet in je galerij worden opgeslagen.</string>
+    <string name="export_failed_permission">Opslaan in je galerij is niet gelukt. Geef GraffitiXR toegang tot de opslag en probeer het opnieuw.</string>
+    <string name="export_ar_unavailable">Exporteren is niet klaar: de AR-camerabeeld draait niet. Open de AR-weergave en probeer het opnieuw.</string>
+    <string name="export_standalone_ar_unavailable">Exporteren is nog niet beschikbaar in zelfstandige AR.</string>
+    <string name="rail_checking_ar_backend">AR-backend controleren…</string>
+
+    <string name="settings_use_arcore">ARCore gebruiken</string>
+    <string name="settings_arcore_depth">ARCore-diepte</string>
+    <string name="settings_monocular_depth">Monoculaire diepte (bèta)</string>
+    <string name="settings_ambient_scan">Omgevingsscan</string>
+    <string name="settings_adaptive_rate">Adaptieve snelheid (inactief)</string>
+    <string name="settings_crash_reports">Crashrapporten</string>
+    <string name="settings_crash_reports_desc">Bij een crash het apparaatmodel en recente logboeken naar een openbare bugmelding sturen? Standaard uit.</string>
+    <string name="settings_crash_token_label">Token voor crashrapporten</string>
+    <string name="settings_crash_token_set">Ingesteld</string>
+    <string name="settings_crash_token_not_set">Niet ingesteld</string>
+    <string name="settings_crash_token_desc">Een GitHub-token met \'Issues: write\' op HereLiesAz/GraffitiXR. Wordt alleen op dit apparaat bewaard, nooit in de app. Laat leeg om uploads uit te schakelen.</string>
+    <string name="settings_crash_token_field">Token</string>
+    <string name="settings_canvas_color_black">Zwart</string>
+    <string name="settings_canvas_color_dark">Donker</string>
+    <string name="settings_canvas_color_grey">Grijs</string>
+    <string name="settings_canvas_color_white">Wit</string>
+    <string name="settings_canvas_color_navy">Marineblauw</string>
+    <string name="state_selected">Geselecteerd</string>
+    <string name="state_expanded">Uitgevouwen</string>
+    <string name="state_collapsed">Ingeklapt</string>
+    <string name="settings_fps_device_default">Apparaatstandaard</string>
+    <string name="settings_fps_device_max">Apparaatmaximum</string>
+    <string name="first_run_photo_title">Zie het op je muur</string>
+    <string name="first_run_photo_text">Kies een referentiefoto van je kunstwerk en we laten zien hoe het eruitziet op een echte muur, in AR.</string>
+    <string name="first_run_choose_photo">Foto kiezen</string>
+    <string name="first_run_not_now">Niet nu</string>
+    <string name="first_run_draw_title">Teken dit op je muur</string>
+    <string name="first_run_draw_hint">Teken het groot, ongeveer zo groot als je kunstwerk. Het hoeft alleen herkenbaar te zijn, niet netjes.</string>
+    <string name="first_run_draw_done">Ik heb het getekend</string>
+    <string name="first_run_draw_skip">Overslaan – ik plaats het zelf</string>
+    <string name="first_run_detect_title">Richt je camera nu op wat je hebt getekend</string>
+    <string name="first_run_detect_movement_hint">Beweeg je apparaat langzaam in een cirkel</string>
+    <string name="design_instructions_title">Ontwerp je muurschildering</string>
+    <string name="design_instructions_text">Tik in de balk op \'%1$s\' en dan op \'%2$s\' om een foto van je kunstwerk te kiezen.</string>
+    <string name="got_it_button">Begrepen</string>
+    <string name="standalone_width_prompt">Meet de werkelijke breedte tussen de linker- en rechterrand van het doel.</string>
+    <string name="standalone_width_label_metric">Breedte van het doel (meter)</string>
+    <string name="standalone_width_label_imperial">Breedte van het doel (voet en duim)</string>
+    <string name="standalone_width_range_error">Voer een breedte in van %1$s tot %2$s.</string>
+    <string name="standalone_use_measured_width">Gemeten breedte gebruiken</string>
+    <string name="standalone_continue_without_scale">Doorgaan zonder fysieke schaal</string>
+    <string name="standalone_recapture">Opnieuw opnemen</string>
+    <string name="standalone_capture_wall_target">Muurdoel opnemen</string>
+    <string name="standalone_capture_failed">Het muurdoel kon niet worden opgenomen – probeer het opnieuw.</string>
+    <string name="standalone_rectify_failed">Dat doel kon niet worden rechtgezet – markeer vier duidelijke hoeken.</string>
+    <string name="standalone_target_too_weak">Dat doel heeft te weinig volgbare details (%1$d KPM-kenmerken; %2$d nodig). Neem een rijker stuk muur op.</string>
+    <string name="standalone_new_target">Nieuw doel</string>
+    <string name="standalone_copy_diagnostics">Diagnose kopiëren</string>
+    <string name="standalone_wall_target_lost">Muurdoel kwijt</string>
+    <string name="standalone_recapture_target">Doel opnieuw opnemen</string>
+    <string name="standalone_sweep_hint">Draai langzaam om de ruimte in kaart te brengen — %1$d%%</string>
+    <string name="standalone_failure_native_library_unavailable">SphereSLAM is niet beschikbaar in deze versie.</string>
+    <string name="standalone_failure_camera_unavailable">De camera is niet beschikbaar voor standalone AR.</string>
+    <string name="standalone_failure_intrinsics_unavailable">Camerakalibratie is niet beschikbaar voor standalone AR.</string>
+    <string name="standalone_failure_reference_too_weak">Dat muurdoel heeft te weinig volgbare details. Neem een rijkere plek op.</string>
+    <string name="standalone_failure_no_page_match">Houd het muurdoel in beeld.</string>
+    <string name="standalone_failure_stale_observation">De tracking loopt achter. Beweeg de telefoon langzamer.</string>
+    <string name="standalone_failure_reprojection_error">De muurmatch is onstabiel. Kader het doel opnieuw in.</string>
+    <string name="standalone_failure_insufficient_inliers">Er zijn niet genoeg details van het doel zichtbaar.</string>
+    <string name="standalone_failure_pose_jump">Trackingsprong geweigerd. Houd de telefoon stil op het muurdoel.</string>
+    <string name="standalone_failure_persisted_target_corrupt">Het opgeslagen muurdoel ontbreekt of is onleesbaar. Neem een nieuw doel op.</string>
+    <string name="standalone_failure_internal">SphereSLAM kon dit doel niet blijven volgen.</string>
+    <string name="standalone_tracking_stopped">De SphereSLAM-tracking is gestopt. Neem het doel opnieuw op om opnieuw te starten.</string>
+    <string name="standalone_status_mapping">SphereSLAM brengt in kaart • tik op Doel om een vingerafdruk toe te voegen</string>
+    <string name="standalone_status_preparing">Vingerafdrukdoel voorbereiden…</string>
+    <string name="standalone_status_finding">Vingerafdrukdoel zoeken…</string>
+    <string name="standalone_quality_too_small">Dat muurdoel is na het rechtzetten te klein. Neem een groter stuk op.</string>
+    <string name="standalone_quality_low_contrast">Dat muurdoel heeft te weinig visueel contrast. Neem meer textuur of detail mee.</string>
+    <string name="standalone_quality_blurry">Dat muurdoel is te onscherp voor betrouwbare tracking. Houd de telefoon stil en neem opnieuw op.</string>
+    <string name="standalone_quality_not_strong_enough">Dat muurdoel is niet sterk genoeg voor betrouwbare tracking.</string>
+    <string name="standalone_quality_too_dark">Dit doel is sterk onderbelicht; de tracking is mogelijk minder betrouwbaar.</string>
+    <string name="standalone_quality_too_bright">Dit doel is sterk overbelicht; de tracking is mogelijk minder betrouwbaar.</string>
+    <string name="standalone_photosphere_no_sensor">Deze telefoon heeft geen rotatiesensor, dus SphereSLAM kan hier geen doel plaatsen.</string>
+    <string name="standalone_photosphere_compass_not_ready">Het kompas is nog niet klaar – houd de telefoon een seconde stil en neem dan opnieuw op.</string>
+    <string name="standalone_photosphere_not_mapped">SphereSLAM heeft deze weergave nog niet in kaart gebracht – houd de camera een seconde stil op een verlicht, gedetailleerd deel van het oppervlak en neem dan opnieuw op.</string>
+    <string name="target_rectify_title">Oppervlak rechtzetten</string>
+    <string name="target_rectify_text">Sleep nu de hoeken om het cyaan kader uit te lijnen met het vlakke oppervlak van je muur.</string>
+    <string name="target_remove_marks_title">Markeringen verwijderen</string>
+    <string name="target_erase_hint">Tik op een markering om die te verwijderen, of sleep over meerdere markeringen.</string>
+    <string name="target_cd_raw_capture">Ruwe opname</string>
+    <string name="target_cd_detected_marks">Gedetecteerde markeringen</string>
+    <string name="target_cd_confirm">Bevestigen</string>
+    <string name="target_cd_unwarp_base">Opgenomen muurfoto met hoekgrepen</string>
+    <string name="guidance_open_via_design_overlay">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om een laag toe te voegen – kies een foto en die verschijnt hier, zwevend boven de live camerabeeld.</string>
+    <string name="guidance_open_via_design_mockup">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om een laag boven de muurfoto toe te voegen. Knijp en sleep om de grootte en positie aan te passen.</string>
+    <string name="guidance_open_via_design_trace">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om je eerste laag toe te voegen. Zodra die erin staat, knijp en sleep je op het canvas om de grootte en plaats te bepalen.</string>
+    <string name="guidance_open_via_design_ar">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om een ontwerplaag toe te voegen – die wordt op de muur geprojecteerd met het anker dat je net hebt gezet.</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">Die wijziging kan niet met de host worden gedeeld – ze blijft op dit apparaat</string>
+    <string name="ar_feedback_backend_resolving">De AR-backend wordt nog bepaald – probeer over een moment opnieuw te hosten</string>
+    <string name="ar_feedback_open_project_first">Open een project voordat je deelt – er is nog niets om naar een gast te sturen</string>
+    <string name="ar_feedback_host_need_target_arcore">Leg een actueel muurdoel vast en vergrendel het voordat je host</string>
+    <string name="ar_feedback_host_need_target_standalone">Leg een zelfstandig muurdoel vast voordat je host</string>
+    <string name="ar_feedback_fingerprint_not_ready">De muurvingerafdruk is nog niet klaar – houd het doel in beeld en probeer opnieuw te hosten</string>
+    <string name="ar_feedback_package_failed">Dit project kon niet worden ingepakt om te delen – sla het eerst op</string>
+    <string name="ar_feedback_host_failed">Delen starten is mislukt: %1$s</string>
+    <string name="ar_feedback_join_load_failed">Het project van de host kon niet worden geladen – de sessie is beëindigd.</string>
+    <string name="ar_feedback_join_no_geometry">De host heeft geen geometrie geleverd waarop ARCore zich kan uitlijnen.</string>
+    <string name="ar_feedback_join_failed">Deelnemen is mislukt: %1$s</string>
+    <string name="ar_feedback_wall_target_changed">Het muurdoel is gewijzigd – het delen is beëindigd. Start Hosten opnieuw voor de nieuwe muur.</string>
+    <string name="ar_feedback_backend_changed">De tracking-backend is gewijzigd – het delen is beëindigd. Start het delen opnieuw.</string>
+    <string name="ar_feedback_camera_busy">De camera is bezet of niet beschikbaar – sluit andere camera-apps en ga daarna opnieuw naar AR</string>
+    <string name="ar_feedback_ar_start_failed">AR starten is mislukt – je camera wordt mogelijk door een andere app gebruikt</string>
+    <string name="ar_feedback_camera_setting_apply_failed">De camera-instelling kon niet worden toegepast op de lopende AR-sessie – verlaat AR en ga opnieuw naar AR</string>
+    <string name="ar_feedback_sphere_target_save_failed">Muurtracking werkt voor deze sessie, maar het SphereSLAM-doel kon niet worden opgeslagen.</string>
+    <string name="ar_feedback_camera_not_resumed">De AR-camera is niet hervat – verlaat de AR-modus en ga er opnieuw in</string>
+    <string name="ar_feedback_camera_permission">Camera niet beschikbaar – controleer de cameratoestemming en ga daarna opnieuw naar AR</string>
+    <string name="ar_feedback_camera_not_paused">De AR-camera is niet netjes gepauzeerd – ze blijft mogelijk op de achtergrond actief</string>
+    <string name="ar_feedback_backbone_warning">Het kunstwerk bedekt bijna de hele zichtbare muur – slechts %1$d gevolgde kenmerken liggen erbuiten. Maak het kleiner of stap achteruit, anders vergrendelt het doel mogelijk niet.</string>
+    <string name="ar_feedback_legacy_target_geometry">Het opgeslagen doel van dit project is gemaakt met een oudere versie en de 3D-geometrie ervan kan niet worden gecorrigeerd. Maak het doel opnieuw aan om het te gebruiken.</string>
+    <string name="ar_feedback_camera_no_frames">De camera levert geen beelden – verlaat AR en probeer het opnieuw</string>
+    <string name="ar_feedback_camera_recovery_timeout">Het herstel van de AR-camera is veilig verlopen – verlaat AR en ga opnieuw naar AR</string>
+    <string name="ar_feedback_target_prepare_failed">Het vastgelegde doel kon niet worden voorbereid. Probeer het opnieuw.</string>
+    <string name="ar_feedback_wall_width_save_failed">De muurbreedte kon niet worden opgeslagen. Probeer opnieuw op te slaan.</string>
+    <string name="ar_feedback_unknown_error">onbekende fout</string>
 </resources>

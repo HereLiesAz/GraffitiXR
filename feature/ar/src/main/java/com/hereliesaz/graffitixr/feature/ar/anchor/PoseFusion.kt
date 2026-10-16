@@ -67,11 +67,19 @@ class PoseFusion {
      * a plain tracking loss keeps the standing anchor-local correction so a returning lock resumes
      * where it left off. A re-capture is different: the anchor-local frame itself changed, so a
      * correction expressed in the OLD anchor frame is now meaningless and must be cleared.
+     *
+     * @param consumedRelocSeq the native reloc result seq (`reloc[18]`) as of this reset. The result
+     *   it names was solved against the OLD fingerprint/anchor, so it is adopted as already
+     *   consumed: only a seq that DIFFERS from it (a solve that finished after the re-capture) can
+     *   correct. Resetting `lastSeq` to 0 instead made the still-latched pre-capture result look
+     *   brand new on the next frame, and — correction being null and the cold flag re-armed — it
+     *   cold-snapped the NEW anchor onto the old wall's pose. Pass `getRelocResultInto(buf)[18]`.
+     *   Zero (the default) is correct only when no result has ever been published.
      */
-    fun reset() {
+    fun reset(consumedRelocSeq: Float = 0f) {
         correction = null
         coldStart = true
-        lastSeq = 0f
+        lastSeq = consumedRelocSeq
         lastHybridTimestampNs = Long.MIN_VALUE
         lastState = FusionState.WAITING_FOR_LOCK
         lastAlpha = -1f
@@ -140,7 +148,6 @@ class PoseFusion {
 
         private fun identity() = floatArrayOf(1f,0f,0f,0f, 0f,1f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
 
-        /** Corrected anchor model matrix in the CURRENT world frame. All inputs rigid. */
         /**
          * `IMPLEMENTATION.md` **0.9** — the relocalized anchor pose in the live world frame.
          *
@@ -184,7 +191,6 @@ class PoseFusion {
             RigidMath.multiply(RigidMath.glViewToCv(pnpMat), captureAnchorCam),
         )
 
-        /** Smoothed interpolation between two rigid poses (translation lerp + quaternion nlerp). */
         /**
          * The view matrix of the frame a reloc result was solved on (`reloc[19..34]`), or null for a
          * legacy 19-float result or the no-engine sentinel. A rigid view's last element is exactly 1.
@@ -194,6 +200,20 @@ class PoseFusion {
         fun solveViewOf(reloc: FloatArray): FloatArray? =
             if (reloc.size >= 35 && reloc[34] == 1f) reloc.copyOfRange(19, 35) else null
 
+        /**
+         * A reloc fix expressed for the camera NOW rather than the camera at solve time.
+         *
+         * All three are `camera_from_fingerprint` GL views: [liveView] now, [solveView] the same
+         * quantity at the frame the reloc was solved on, and [relocView] what the reloc says it was
+         * at that frame. The fingerprint-local difference `C = solveView⁻¹ ∘ relocView` is the
+         * reloc's actual claim about the reference (it contains none of the hand motion between solve
+         * and now); the estimate for the live camera is `liveView ∘ C`. With no drift
+         * (`relocView == solveView`) this is exactly [liveView].
+         */
+        fun latencyCompensatedView(liveView: FloatArray, solveView: FloatArray, relocView: FloatArray): FloatArray =
+            RigidMath.multiply(liveView, RigidMath.multiply(RigidMath.rigidInverse(solveView), relocView))
+
+        /** Smoothed interpolation between two rigid poses (translation lerp + quaternion nlerp). */
         fun blend(current: FloatArray, target: FloatArray, alpha: Float): FloatArray {
             val t = RigidMath.lerp(RigidMath.translationOf(current), RigidMath.translationOf(target), alpha)
             val q = RigidMath.nlerpQuat(RigidMath.matrixToQuaternion(current), RigidMath.matrixToQuaternion(target), alpha)
@@ -215,7 +235,10 @@ class PoseFusion {
     /**
      * @param backbone ARCore-consensus model matrix (world frame), the smooth per-frame source
      * @param vCurrent current ARCore view matrix (fresh, GL thread)
-     * @param reloc    FloatArray(19): [0..15]=pnpMat, [16]=inlierCount, [17]=matchCount, [18]=seq
+     * @param reloc    `SlamManager.getRelocResult()` layout (35 floats): [0..15]=pnpMat,
+     *   [16]=inlierCount, [17]=matchCount, [18]=seq, [19..34]=view matrix of the solve frame (see
+     *   [solveViewOf]). A legacy 19-float result is still accepted. Read-only here and never
+     *   retained, so the caller may pass a reused buffer (`SlamManager.getRelocResultInto`).
      * @param captureAnchorCam `Fingerprint.captureAnchorCam` — the anchor's pose in the CAPTURE
      *   camera's CV frame, `V_cv(capture) · anchorModel`. Renamed from `fpAnchor` as part of 0.9:
      *   the old name and the old value were both a world-frame model matrix, which is the frame

@@ -49,10 +49,23 @@ object CameraTargetFps {
         return if (i < 0) CYCLE[0] else CYCLE[(i + 1) % CYCLE.size]
     }
 
-    /** Display text. Sentinels get names; real rates show the number. */
-    fun label(value: Int): String = when (value) {
-        DEVICE_DEFAULT -> "Device default"
-        DEVICE_MAX -> "Device max"
-        else -> value.toString()
+    /** How a stored value is shown. The UI maps each to a localized string; this module has none. */
+    enum class Display { DEVICE_DEFAULT, DEVICE_MAX, RATE }
+
+    /** Which [Display] form [value] takes: the two sentinels are named, real rates show the number. */
+    fun display(value: Int): Display = when (value) {
+        DEVICE_DEFAULT -> Display.DEVICE_DEFAULT
+        DEVICE_MAX -> Display.DEVICE_MAX
+        else -> Display.RATE
+    }
+
+    /**
+     * English text for logs and diagnostics ONLY. User-facing text must be localized from [display]
+     * (Settings does this); do not show this string in the UI.
+     */
+    fun label(value: Int): String = when (display(value)) {
+        Display.DEVICE_DEFAULT -> "Device default"
+        Display.DEVICE_MAX -> "Device max"
+        Display.RATE -> value.toString()
     }
 }

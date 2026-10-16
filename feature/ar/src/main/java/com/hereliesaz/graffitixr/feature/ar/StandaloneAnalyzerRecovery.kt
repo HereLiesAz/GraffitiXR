@@ -38,34 +38,33 @@ internal fun standaloneFatalRecovery(
  */
 internal fun shouldRestartAnalyzerOnRecapture(analyzerFatal: Boolean): Boolean = analyzerFatal
 
-/** Shown when a fatal analyzer has no more specific message. */
-internal const val STANDALONE_TRACKING_STOPPED_MESSAGE =
-    "SphereSLAM tracking stopped. Recapture the target to restart it."
-
 /**
- * Text of the top status pill while there is no usable lock (no registered target yet, or the
- * tracking state is still initializing). A fatal analyzer never shows the "Preparing…" /
- * "Finding…" progress text — nothing is in progress — but its real failure.
+ * What the top status pill says while there is no usable lock (no registered target yet, or the
+ * tracking state is still initializing), as a typed [StandaloneText] resolved at the UI edge. A fatal
+ * analyzer never shows the "Preparing…" / "Finding…" progress text — nothing is in progress — but its
+ * real failure, or [StandaloneTextKey.TRACKING_STOPPED] when it has none.
  */
 internal fun standaloneInitializingStatusText(
     analyzerFatal: Boolean,
-    fatalMessage: String?,
+    fatalMessage: StandaloneText?,
     currentFailure: StandaloneFailureEvent?,
     referenceReady: Boolean,
     hasReference: Boolean,
-): String {
+): StandaloneText {
     if (analyzerFatal) {
-        return fatalMessage ?: currentFailure?.userMessage ?: STANDALONE_TRACKING_STOPPED_MESSAGE
+        return fatalMessage ?: currentFailure?.userText ?: StandaloneText(StandaloneTextKey.TRACKING_STOPPED)
     }
     currentFailure
         ?.takeIf { it.severity != StandaloneFailureSeverity.FATAL }
-        ?.let { return it.userMessage }
-    return when {
-        !referenceReady && !hasReference -> "SphereSLAM mapping • tap Target to add fingerprint"
-        // SphereSLAM 0.24.3 builds the KPM matcher on its own background thread; until the build
-        // lands every frame carries no pose. That is not a failure and the target exists, so
-        // don't ask for a new one.
-        !referenceReady -> "Preparing fingerprint target…"
-        else -> "Finding fingerprint target…"
-    }
+        ?.let { return it.userText }
+    return StandaloneText(
+        when {
+            !referenceReady && !hasReference -> StandaloneTextKey.STATUS_MAPPING
+            // SphereSLAM 0.24.3 builds the KPM matcher on its own background thread; until the build
+            // lands every frame carries no pose. That is not a failure and the target exists, so
+            // don't ask for a new one.
+            !referenceReady -> StandaloneTextKey.STATUS_PREPARING
+            else -> StandaloneTextKey.STATUS_FINDING
+        }
+    )
 }

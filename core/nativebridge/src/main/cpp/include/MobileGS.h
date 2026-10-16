@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 #include <algorithm>
 #include <opencv2/opencv.hpp>
 #include <opencv2/geometry.hpp>
@@ -687,6 +688,9 @@ private:
      * background worker or inline from the caller in eval sync mode.
      */
     void runRelocPass(const cv::Mat& frame, const float* relocView, const float* relocAttitude = nullptr);
+    // mMutex held. The stored wall fingerprint is being replaced or cleared: advance
+    // mFingerprintGeneration and drop the latched PnP result that belongs to the old one.
+    void invalidateRelocResultLocked();
     // Teleological self-grow (gatekeeper stage): measure how much of the registered artwork base is now
     // corroborated by real wall content in the clean camera frame -> mPaintingProgress. Read-only on the
     // reloc fingerprint; the promotion step (adding validated new marks) is staged separately.
@@ -889,6 +893,15 @@ private:
     std::atomic<int> mPnpInlierCount{0};
     std::atomic<int> mPnpMatchCount{0};
     std::atomic<long> mPnpResultSeq{0};
+    // Identity of the stored wall fingerprint. Advanced (under mMutex) by every path that replaces or
+    // clears it, via invalidateRelocResultLocked(). runRelocPass snapshots it with the fingerprint
+    // and re-checks it under the same mutex before publishing, so a solve that was in flight when the
+    // fingerprint changed never latches a pose in the old wall's frame. Guarded by mMutex.
+    uint64_t mFingerprintGeneration = 0;
+    // Test seam, null in production: runs on the solving thread after the solve and before the
+    // publish critical section, so a host test can replace the fingerprint at exactly the moment the
+    // race window is open. Set only through MobileGSTestPeer.
+    std::function<void()> mBeforeRelocPublishHook;
     float mFingerprintAnchorMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     // fx,fy,cx,cy the wall fingerprint's 3D points were built with; {0,..} => unset (use a default).
     float mFingerprintIntrinsics[4] = {0,0,0,0};

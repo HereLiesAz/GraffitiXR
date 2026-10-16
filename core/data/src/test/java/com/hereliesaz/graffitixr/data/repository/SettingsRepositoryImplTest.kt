@@ -94,6 +94,15 @@ class SettingsRepositoryImplTest {
         repo.setCrashReportToken("") // restore the default (shared DataStore)
     }
 
+    @Test
+    fun `last open project id round-trips and clears`() = runTest {
+        val repo = newRepository()
+        repo.setLastOpenProjectId("project-1")
+        assertEquals("project-1", repo.lastOpenProjectId.first())
+        repo.setLastOpenProjectId(null) // restore the default (shared DataStore)
+        assertEquals(null, repo.lastOpenProjectId.first())
+    }
+
     // One test for the whole coverage-glow lifecycle: the DataStore instance can outlive a single
     // test, so the defaults are asserted BEFORE this test writes its own keys, never after.
     @Test

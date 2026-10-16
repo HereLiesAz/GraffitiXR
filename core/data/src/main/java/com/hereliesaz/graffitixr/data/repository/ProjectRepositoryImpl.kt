@@ -48,8 +48,9 @@ class ProjectRepositoryImpl @Inject constructor(
     }
 
     override suspend fun createProject(project: GraffitiProject) = saveMutex.withLock {
-        projectManager.saveProject(context, project)
-        _currentProject.value = project
+        // Publish what saveProject actually wrote (its preserve-merges and lastModified/thumbnail
+        // stamping), as replaceProject and updateProject do, so memory matches project.json.
+        _currentProject.value = projectManager.saveProject(context, project)
         refreshProjects()
     }
 
@@ -62,6 +63,8 @@ class ProjectRepositoryImpl @Inject constructor(
         projectManager.loadProjectMetadata(context, id)
     }
 
+    // loadProjectMetadata returns null for an unreadable manifest or one whose id does not match its
+    // folder name, so such folders are skipped here rather than listed under a second identity.
     override suspend fun getProjects(): List<GraffitiProject> = withContext(Dispatchers.IO) {
         projectManager.getProjectList(context).mapNotNull { id ->
             projectManager.loadProjectMetadata(context, id)
@@ -127,7 +130,13 @@ class ProjectRepositoryImpl @Inject constructor(
         // Atomic write: a half-written map.bin / fingerprint can crash native loaders.
         val tmp = File.createTempFile("${file.name}.", ".tmp", root)
         try {
-            tmp.writeBytes(data)
+            // Flushed to the device before the rename, like ProjectManager's writers: without the
+            // sync a power loss after the rename can leave an empty or partial file under the final name.
+            java.io.FileOutputStream(tmp).use { out ->
+                out.write(data)
+                out.flush()
+                out.fd.sync()
+            }
             check(tmp.renameTo(file)) { "Could not replace $filename" }
         } finally {
             tmp.delete()

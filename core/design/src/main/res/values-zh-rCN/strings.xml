@@ -32,7 +32,6 @@
 
 
 
-    <string name="nav_scan_mode_toggle_info">在画布（针对较小的桌面级艺术作品进行了优化）和壁画（针对大型墙壁和高斯泼溅进行了优化）扫描模式之间切换。</string>
 
 
 
@@ -618,9 +617,9 @@
         <item>双指缩放以调整大小，拖动以重新定位。叠加层会固定在屏幕上 — 后退一步查看它与墙面的贴合效果。</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
-        <item>此设备不支持ARCore，因此无法使用AR投影模式。</item>
-        <item>你仍可以使用追踪、效果图和实时叠加模式 — 除AR外的所有模式均可在没有ARCore的情况下使用。</item>
-        <item>点击以关闭。</item>
+        <item>此设备不支持 ARCore，因此 AR 模式将改用独立的墙面追踪。</item>
+        <item>在 AR 模式下，你需要先拍摄一块有纹理的墙面并标出它的四个角，之后追踪会锁定在该目标上。</item>
+        <item>追踪、效果图和覆盖模式可照常使用。点按即可关闭。</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>照片效果图 — 在动笔之前，先在照片上预览你的设计。</item>
@@ -649,4 +648,125 @@
     <string name="nav_gyro_info">使用三脚架时,借助运动传感器抵消细微震动,让设计稳定在墙面上。手机架好后再开启;手机被移动时会自动解除。</string>
     <string name="gyro_released_moved">陀螺仪已解除:手机移动幅度过大。</string>
     <string name="gyro_unavailable">陀螺仪需要旋转传感器,但此设备未提供。</string>
+    <string name="export_failed">导出失败：无法将图片保存到相册。</string>
+    <string name="export_failed_permission">无法保存到相册。请允许 GraffitiXR 访问存储空间后重试。</string>
+    <string name="export_ar_unavailable">导出尚未就绪：AR 相机视图未运行。请打开 AR 视图后重试。</string>
+    <string name="export_standalone_ar_unavailable">独立 AR 模式暂不支持导出。</string>
+    <string name="rail_checking_ar_backend">正在检查 AR 后端…</string>
+
+    <string name="settings_use_arcore">使用 ARCore</string>
+    <string name="settings_arcore_depth">ARCore 深度</string>
+    <string name="settings_monocular_depth">单目深度（测试版）</string>
+    <string name="settings_ambient_scan">环境扫描</string>
+    <string name="settings_adaptive_rate">自适应速率（空闲时）</string>
+    <string name="settings_crash_reports">崩溃报告</string>
+    <string name="settings_crash_reports_desc">发生崩溃时，是否将设备型号和最近的日志发送到公开的错误报告？默认关闭。</string>
+    <string name="settings_crash_token_label">崩溃报告令牌</string>
+    <string name="settings_crash_token_set">已设置</string>
+    <string name="settings_crash_token_not_set">未设置</string>
+    <string name="settings_crash_token_desc">一个对 HereLiesAz/GraffitiXR 具有 Issues: write 权限的 GitHub 令牌。仅保存在此设备上，绝不会放入应用中。留空即可停用上传。</string>
+    <string name="settings_crash_token_field">令牌</string>
+    <string name="settings_canvas_color_black">黑色</string>
+    <string name="settings_canvas_color_dark">深色</string>
+    <string name="settings_canvas_color_grey">灰色</string>
+    <string name="settings_canvas_color_white">白色</string>
+    <string name="settings_canvas_color_navy">藏青色</string>
+    <string name="state_selected">已选中</string>
+    <string name="state_expanded">已展开</string>
+    <string name="state_collapsed">已收起</string>
+    <string name="settings_fps_device_default">设备默认</string>
+    <string name="settings_fps_device_max">设备最大值</string>
+    <string name="first_run_photo_title">在你的墙上看效果</string>
+    <string name="first_run_photo_text">选择一张作品的参考照片，我们会用 AR 向你展示它在真实墙面上的样子。</string>
+    <string name="first_run_choose_photo">选择照片</string>
+    <string name="first_run_not_now">以后再说</string>
+    <string name="first_run_draw_title">把这个画在你的墙上</string>
+    <string name="first_run_draw_hint">画大一点，大致与你的作品一样大。只要能认出来就行，不必工整。</string>
+    <string name="first_run_draw_done">我画好了</string>
+    <string name="first_run_draw_skip">跳过 — 我自己来摆放</string>
+    <string name="first_run_detect_title">现在把相机对准你画的图案</string>
+    <string name="first_run_detect_movement_hint">请缓慢地沿圆形移动设备</string>
+    <string name="design_instructions_title">设计你的壁画</string>
+    <string name="design_instructions_text">点按导轨上的“%1$s”，再点按“%2$s”，选择一张你的作品照片。</string>
+    <string name="got_it_button">知道了</string>
+    <string name="standalone_width_prompt">请测量目标左右两边之间的实际宽度。</string>
+    <string name="standalone_width_label_metric">目标宽度（米）</string>
+    <string name="standalone_width_label_imperial">目标宽度（英尺和英寸）</string>
+    <string name="standalone_width_range_error">请输入 %1$s 到 %2$s 之间的宽度。</string>
+    <string name="standalone_use_measured_width">使用测得的宽度</string>
+    <string name="standalone_continue_without_scale">不使用实际尺寸，继续</string>
+    <string name="standalone_recapture">重新拍摄</string>
+    <string name="standalone_capture_wall_target">拍摄墙面目标</string>
+    <string name="standalone_capture_failed">无法拍摄墙面目标 — 请重试。</string>
+    <string name="standalone_rectify_failed">无法校正该目标 — 请标出四个清晰的角点。</string>
+    <string name="standalone_target_too_weak">该目标可追踪的细节太少（KPM 特征 %1$d 个，至少需要 %2$d 个）。请重新拍摄细节更丰富的墙面区域。</string>
+    <string name="standalone_new_target">新建目标</string>
+    <string name="standalone_copy_diagnostics">复制诊断信息</string>
+    <string name="standalone_wall_target_lost">墙面目标已丢失</string>
+    <string name="standalone_recapture_target">重新拍摄目标</string>
+    <string name="standalone_sweep_hint">请缓慢转动以建立空间地图 — %1$d%%</string>
+    <string name="standalone_failure_native_library_unavailable">此版本中无法使用 SphereSLAM。</string>
+    <string name="standalone_failure_camera_unavailable">独立 AR 无法使用相机。</string>
+    <string name="standalone_failure_intrinsics_unavailable">独立 AR 无法使用相机标定。</string>
+    <string name="standalone_failure_reference_too_weak">该墙面目标可追踪的细节太少。请拍摄细节更丰富的区域。</string>
+    <string name="standalone_failure_no_page_match">请让墙面目标保持在画面内。</string>
+    <string name="standalone_failure_stale_observation">追踪出现延迟。请更缓慢地移动手机。</string>
+    <string name="standalone_failure_reprojection_error">墙面匹配不稳定。请重新取景对准目标。</string>
+    <string name="standalone_failure_insufficient_inliers">可见的目标细节不足。</string>
+    <string name="standalone_failure_pose_jump">已拒绝追踪跳变。请将手机稳定对准墙面目标。</string>
+    <string name="standalone_failure_persisted_target_corrupt">已保存的墙面目标丢失或无法读取。请拍摄新的目标。</string>
+    <string name="standalone_failure_internal">SphereSLAM 无法继续追踪此目标。</string>
+    <string name="standalone_tracking_stopped">SphereSLAM 追踪已停止。请重新拍摄目标以重新启动。</string>
+    <string name="standalone_status_mapping">SphereSLAM 建图中 • 点按“目标”以添加指纹</string>
+    <string name="standalone_status_preparing">正在准备指纹目标…</string>
+    <string name="standalone_status_finding">正在查找指纹目标…</string>
+    <string name="standalone_quality_too_small">该墙面目标校正后太小。请拍摄更大的区域。</string>
+    <string name="standalone_quality_low_contrast">该墙面目标的视觉对比度太低。请包含更多纹理或细节。</string>
+    <string name="standalone_quality_blurry">该墙面目标太模糊，无法可靠追踪。请保持稳定后重新拍摄。</string>
+    <string name="standalone_quality_not_strong_enough">该墙面目标不够突出，无法可靠追踪。</string>
+    <string name="standalone_quality_too_dark">此目标严重曝光不足；追踪可能不够可靠。</string>
+    <string name="standalone_quality_too_bright">此目标严重曝光过度；追踪可能不够可靠。</string>
+    <string name="standalone_photosphere_no_sensor">此手机没有旋转传感器，因此 SphereSLAM 无法在此放置目标。</string>
+    <string name="standalone_photosphere_compass_not_ready">指南针尚未就绪 — 请将手机静止一秒钟，然后重新拍摄。</string>
+    <string name="standalone_photosphere_not_mapped">SphereSLAM 尚未对此视角建图 — 请将相机对准表面上光线充足、细节丰富的部分并保持稳定一秒钟，然后重新拍摄。</string>
+    <string name="target_rectify_title">校正表面</string>
+    <string name="target_rectify_text">现在拖动四个角，使青色边框对齐你墙面上的平整区域。</string>
+    <string name="target_remove_marks_title">移除标记</string>
+    <string name="target_erase_hint">点按标记即可移除，或在多个标记上滑动以一次移除多个。</string>
+    <string name="target_cd_raw_capture">原始拍摄图像</string>
+    <string name="target_cd_detected_marks">检测到的标记</string>
+    <string name="target_cd_confirm">确认</string>
+    <string name="target_cd_unwarp_base">带角点手柄的墙面照片</string>
+    <string name="guidance_open_via_design_overlay">点按导轨上的“设计”，再点按“打开”以添加图层 — 选择一张照片，它会显示在这里，悬浮在实时相机画面之上。</string>
+    <string name="guidance_open_via_design_mockup">点按导轨上的“设计”，再点按“打开”，在墙面照片上方添加图层。双指捏合并拖动以调整大小和位置。</string>
+    <string name="guidance_open_via_design_trace">点按导轨上的“设计”，再点按“打开”以添加你的第一个图层。添加后，在画布上双指捏合并拖动以调整大小和位置。</string>
+    <string name="guidance_open_via_design_ar">点按导轨上的“设计”，再点按“打开”以添加设计图层 — 它会借助你刚设置的锚点投影到墙上。</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">该更改无法与主机共享，只会保留在此设备上</string>
+    <string name="ar_feedback_backend_resolving">AR 后端仍在确定中，请稍后再次尝试托管</string>
+    <string name="ar_feedback_open_project_first">分享前请先打开一个项目，目前没有可发送给访客的内容</string>
+    <string name="ar_feedback_host_need_target_arcore">托管前请先捕获并锁定当前的墙面目标</string>
+    <string name="ar_feedback_host_need_target_standalone">托管前请先捕获独立的墙面目标</string>
+    <string name="ar_feedback_fingerprint_not_ready">墙面指纹尚未就绪，请让目标保持在画面中，然后再次尝试托管</string>
+    <string name="ar_feedback_package_failed">无法打包此项目以供分享，请先尝试保存</string>
+    <string name="ar_feedback_host_failed">无法开始分享：%1$s</string>
+    <string name="ar_feedback_join_load_failed">无法加载主机的项目，会话已结束。</string>
+    <string name="ar_feedback_join_no_geometry">主机未提供 ARCore 可用于对齐的几何数据。</string>
+    <string name="ar_feedback_join_failed">无法加入：%1$s</string>
+    <string name="ar_feedback_wall_target_changed">墙面目标已更改，分享已结束。请为新的墙面重新开始托管。</string>
+    <string name="ar_feedback_backend_changed">跟踪后端已更改，分享已结束。请重新开始分享。</string>
+    <string name="ar_feedback_camera_busy">相机正忙或不可用，请关闭其他相机应用，然后重新进入 AR</string>
+    <string name="ar_feedback_ar_start_failed">无法启动 AR，您的相机可能正被其他应用使用</string>
+    <string name="ar_feedback_camera_setting_apply_failed">无法将相机设置应用到正在运行的 AR 会话，请退出 AR 后重新进入</string>
+    <string name="ar_feedback_sphere_target_save_failed">此会话中墙面跟踪可用，但无法保存 SphereSLAM 目标。</string>
+    <string name="ar_feedback_camera_not_resumed">AR 相机未能恢复，请尝试退出 AR 模式后重新进入</string>
+    <string name="ar_feedback_camera_permission">相机不可用，请检查相机权限，然后重新进入 AR</string>
+    <string name="ar_feedback_camera_not_paused">AR 相机未能正常暂停，可能会在后台继续运行</string>
+    <string name="ar_feedback_backbone_warning">作品几乎遮住了视野中的整面墙，只有 %1$d 个跟踪特征位于其外。请将其缩小或后退一些，否则目标可能无法锁定。</string>
+    <string name="ar_feedback_legacy_target_geometry">此项目已保存的目标由旧版本创建，其 3D 几何数据无法校正。请重新创建目标后再使用。</string>
+    <string name="ar_feedback_camera_no_frames">相机没有输出画面，请退出 AR 后重试</string>
+    <string name="ar_feedback_camera_recovery_timeout">AR 相机恢复已安全超时，请退出 AR 后重新进入</string>
+    <string name="ar_feedback_target_prepare_failed">无法准备已捕获的目标，请重试。</string>
+    <string name="ar_feedback_wall_width_save_failed">无法保存墙面宽度，请再次尝试保存。</string>
+    <string name="ar_feedback_unknown_error">未知错误</string>
 </resources>

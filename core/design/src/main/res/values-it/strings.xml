@@ -32,7 +32,6 @@
     <!-- Label for Canvas mode, which is optimized for smaller, desk-scale artwork. -->
     <!-- Label for Mural mode, which is optimized for large-scale wall artwork. -->
     <!-- Description for the toggle between Canvas and Mural scanning modes. -->
-    <string name="nav_scan_mode_toggle_info">Passa tra Tela (ottimizzato per opere d\'arte più piccole su scrivania) e Murale (ottimizzato per muri di grandi dimensioni e Gaussian Splatting).</string>
 
     <!-- Label for the Stencil generation tool. -->
     <!-- Description of the Stencil tool, explaining how it creates multi-layer printable templates. -->
@@ -601,9 +600,9 @@
         <item>Pizzica per ridimensionare, trascina per riposizionare. L\'overlay resta fisso sullo schermo — allontanati per vedere come si adatta al muro.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
-        <item>Questo dispositivo non supporta ARCore, quindi la modalità Proiezione AR non è disponibile.</item>
-        <item>Puoi comunque usare Ricalco, Mockup e Overlay dal vivo — tutte le modalità tranne AR funzionano senza ARCore.</item>
-        <item>Tocca per chiudere.</item>
+        <item>Questo dispositivo non supporta ARCore, quindi la modalità AR usa invece un tracciamento del muro autonomo.</item>
+        <item>Nella modalità AR acquisirai prima una foto di una porzione di muro con texture e ne segnerai i quattro angoli. Il tracciamento si aggancia poi a quel bersaglio.</item>
+        <item>Ricalco, Mockup e Sovrapposizione funzionano come sempre. Tocca per chiudere.</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>Mockup fotografico — visualizza in anteprima il tuo design su una foto prima ancora di prendere un pennello.</item>
@@ -632,4 +631,125 @@
     <string name="nav_gyro_info">Su treppiede, tiene fermo il design sul muro contro le piccole vibrazioni usando il sensore di movimento. Attivalo a telefono posizionato; si sgancia se il telefono viene spostato.</string>
     <string name="gyro_released_moved">Giro rilasciato: il telefono si è mosso troppo.</string>
     <string name="gyro_unavailable">Giro richiede un sensore di rotazione che questo dispositivo non fornisce.</string>
+    <string name="export_failed">Esportazione non riuscita: non è stato possibile salvare l\'immagine nella galleria.</string>
+    <string name="export_failed_permission">Impossibile salvare nella galleria. Consenti a GraffitiXR l\'accesso all\'archiviazione e riprova.</string>
+    <string name="export_ar_unavailable">L\'esportazione non è pronta: la vista fotocamera AR non è attiva. Apri la vista AR e riprova.</string>
+    <string name="export_standalone_ar_unavailable">L\'esportazione non è ancora disponibile nell\'AR autonoma.</string>
+    <string name="rail_checking_ar_backend">Verifica del motore AR…</string>
+
+    <string name="settings_use_arcore">Usa ARCore</string>
+    <string name="settings_arcore_depth">Profondità ARCore</string>
+    <string name="settings_monocular_depth">Profondità monoculare (beta)</string>
+    <string name="settings_ambient_scan">Scansione ambientale</string>
+    <string name="settings_adaptive_rate">Frequenza adattiva (inattivo)</string>
+    <string name="settings_crash_reports">Rapporti di arresto anomalo</string>
+    <string name="settings_crash_reports_desc">In caso di arresto anomalo, inviare il modello del dispositivo e i log recenti in una segnalazione di bug pubblica? Disattivato per impostazione predefinita.</string>
+    <string name="settings_crash_token_label">Token dei rapporti di arresto anomalo</string>
+    <string name="settings_crash_token_set">Impostato</string>
+    <string name="settings_crash_token_not_set">Non impostato</string>
+    <string name="settings_crash_token_desc">Un token GitHub con «Issues: write» su HereLiesAz/GraffitiXR. Memorizzato solo su questo dispositivo, mai nell\'app. Lascia vuoto per disattivare gli invii.</string>
+    <string name="settings_crash_token_field">Token</string>
+    <string name="settings_canvas_color_black">Nero</string>
+    <string name="settings_canvas_color_dark">Scuro</string>
+    <string name="settings_canvas_color_grey">Grigio</string>
+    <string name="settings_canvas_color_white">Bianco</string>
+    <string name="settings_canvas_color_navy">Blu marino</string>
+    <string name="state_selected">Selezionato</string>
+    <string name="state_expanded">Espanso</string>
+    <string name="state_collapsed">Compresso</string>
+    <string name="settings_fps_device_default">Predefinito del dispositivo</string>
+    <string name="settings_fps_device_max">Massimo del dispositivo</string>
+    <string name="first_run_photo_title">Guardala sul tuo muro</string>
+    <string name="first_run_photo_text">Scegli una foto di riferimento della tua opera e ti mostreremo come appare su un muro vero, in AR.</string>
+    <string name="first_run_choose_photo">Scegli foto</string>
+    <string name="first_run_not_now">Non ora</string>
+    <string name="first_run_draw_title">Disegna questo sul tuo muro</string>
+    <string name="first_run_draw_hint">Fallo grande, più o meno come la tua opera. Basta che sia riconoscibile, non ordinato.</string>
+    <string name="first_run_draw_done">L\'ho disegnato</string>
+    <string name="first_run_draw_skip">Salta: lo posizionerò io</string>
+    <string name="first_run_detect_title">Ora inquadra con la fotocamera ciò che hai disegnato</string>
+    <string name="first_run_detect_movement_hint">Muovi lentamente il dispositivo in cerchio</string>
+    <string name="design_instructions_title">Progetta il tuo murale</string>
+    <string name="design_instructions_text">Tocca «%1$s» nella barra, poi «%2$s», per scegliere una foto della tua opera.</string>
+    <string name="got_it_button">Capito</string>
+    <string name="standalone_width_prompt">Misura la larghezza reale tra il bordo sinistro e quello destro del bersaglio.</string>
+    <string name="standalone_width_label_metric">Larghezza del bersaglio (metri)</string>
+    <string name="standalone_width_label_imperial">Larghezza del bersaglio (piedi e pollici)</string>
+    <string name="standalone_width_range_error">Inserisci una larghezza da %1$s a %2$s.</string>
+    <string name="standalone_use_measured_width">Usa la larghezza misurata</string>
+    <string name="standalone_continue_without_scale">Continua senza scala fisica</string>
+    <string name="standalone_recapture">Acquisisci di nuovo</string>
+    <string name="standalone_capture_wall_target">Acquisisci bersaglio a muro</string>
+    <string name="standalone_capture_failed">Impossibile acquisire il bersaglio a muro. Riprova.</string>
+    <string name="standalone_rectify_failed">Impossibile raddrizzare il bersaglio. Segna quattro angoli ben visibili.</string>
+    <string name="standalone_target_too_weak">Questo bersaglio ha troppi pochi dettagli tracciabili (%1$d caratteristiche KPM; ne servono %2$d). Acquisisci una porzione di muro più ricca.</string>
+    <string name="standalone_new_target">Nuovo bersaglio</string>
+    <string name="standalone_copy_diagnostics">Copia diagnostica</string>
+    <string name="standalone_wall_target_lost">Bersaglio a muro perso</string>
+    <string name="standalone_recapture_target">Riacquisisci bersaglio</string>
+    <string name="standalone_sweep_hint">Ruota lentamente per mappare lo spazio — %1$d%%</string>
+    <string name="standalone_failure_native_library_unavailable">SphereSLAM non è disponibile in questa versione.</string>
+    <string name="standalone_failure_camera_unavailable">La fotocamera non è disponibile per la AR autonoma.</string>
+    <string name="standalone_failure_intrinsics_unavailable">La calibrazione della fotocamera non è disponibile per la AR autonoma.</string>
+    <string name="standalone_failure_reference_too_weak">Questo bersaglio a muro ha troppi pochi dettagli tracciabili. Acquisisci una porzione più ricca.</string>
+    <string name="standalone_failure_no_page_match">Mantieni il bersaglio a muro nell\'inquadratura.</string>
+    <string name="standalone_failure_stale_observation">Il tracciamento è in ritardo. Muovi il telefono più lentamente.</string>
+    <string name="standalone_failure_reprojection_error">La corrispondenza con il muro è instabile. Reinquadra il bersaglio.</string>
+    <string name="standalone_failure_insufficient_inliers">Non sono visibili abbastanza dettagli del bersaglio.</string>
+    <string name="standalone_failure_pose_jump">Salto di tracciamento rifiutato. Tieni il telefono fermo sul bersaglio a muro.</string>
+    <string name="standalone_failure_persisted_target_corrupt">Il bersaglio a muro salvato manca o non è leggibile. Acquisisci un nuovo bersaglio.</string>
+    <string name="standalone_failure_internal">SphereSLAM non è riuscito a continuare a tracciare questo bersaglio.</string>
+    <string name="standalone_tracking_stopped">Il tracciamento di SphereSLAM si è interrotto. Acquisisci di nuovo il bersaglio per riavviarlo.</string>
+    <string name="standalone_status_mapping">Mappatura SphereSLAM • tocca Bersaglio per aggiungere un\'impronta</string>
+    <string name="standalone_status_preparing">Preparazione del bersaglio a impronta…</string>
+    <string name="standalone_status_finding">Ricerca del bersaglio a impronta…</string>
+    <string name="standalone_quality_too_small">Questo bersaglio a muro è troppo piccolo dopo il raddrizzamento. Acquisisci una porzione più grande.</string>
+    <string name="standalone_quality_low_contrast">Questo bersaglio a muro ha poco contrasto visivo. Includi più texture o dettagli.</string>
+    <string name="standalone_quality_blurry">Questo bersaglio a muro è troppo sfocato per un tracciamento affidabile. Tieni fermo e acquisisci di nuovo.</string>
+    <string name="standalone_quality_not_strong_enough">Questo bersaglio a muro non è abbastanza solido per un tracciamento affidabile.</string>
+    <string name="standalone_quality_too_dark">Questo bersaglio è molto sottoesposto; il tracciamento potrebbe essere meno affidabile.</string>
+    <string name="standalone_quality_too_bright">Questo bersaglio è molto sovraesposto; il tracciamento potrebbe essere meno affidabile.</string>
+    <string name="standalone_photosphere_no_sensor">Questo telefono non ha un sensore di rotazione, quindi SphereSLAM non può posizionare un bersaglio qui.</string>
+    <string name="standalone_photosphere_compass_not_ready">La bussola non è ancora pronta: tieni il telefono fermo per un secondo, poi riprova.</string>
+    <string name="standalone_photosphere_not_mapped">SphereSLAM non ha ancora mappato questa vista: tieni la fotocamera ferma per un secondo su una parte illuminata e ricca di dettagli della superficie, poi riprova.</string>
+    <string name="target_rectify_title">Raddrizza la superficie</string>
+    <string name="target_rectify_text">Ora trascina gli angoli per allineare la cornice ciano alla superficie piana del tuo muro.</string>
+    <string name="target_remove_marks_title">Rimuovi segni</string>
+    <string name="target_erase_hint">Tocca un segno per rimuoverlo, oppure trascina su più segni per rimuoverne diversi.</string>
+    <string name="target_cd_raw_capture">Acquisizione grezza</string>
+    <string name="target_cd_detected_marks">Segni rilevati</string>
+    <string name="target_cd_confirm">Conferma</string>
+    <string name="target_cd_unwarp_base">Foto del muro acquisita con maniglie agli angoli</string>
+    <string name="guidance_open_via_design_overlay">Tocca «Design» nella barra, poi «Apri», per aggiungere un livello: scegli una foto e apparirà qui, sospesa sulla vista dal vivo della fotocamera.</string>
+    <string name="guidance_open_via_design_mockup">Tocca «Design» nella barra, poi «Apri», per aggiungere un livello sopra la foto del muro. Pizzica e trascina per regolarne dimensioni e posizione.</string>
+    <string name="guidance_open_via_design_trace">Tocca «Design» nella barra, poi «Apri», per aggiungere il tuo primo livello. Una volta inserito, pizzica e trascina sulla tela per regolarne dimensioni e posizione.</string>
+    <string name="guidance_open_via_design_ar">Tocca «Design» nella barra, poi «Apri», per aggiungere un livello di design: viene proiettato sul muro usando l\'ancora appena impostata.</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">Questa modifica non può essere condivisa con l\'host: resta su questo dispositivo</string>
+    <string name="ar_feedback_backend_resolving">Il backend AR è ancora in fase di selezione: riprova a fare da host tra un attimo</string>
+    <string name="ar_feedback_open_project_first">Apri un progetto prima di condividere: non c\'è ancora nulla da inviare a un ospite</string>
+    <string name="ar_feedback_host_need_target_arcore">Acquisisci e blocca un target parete aggiornato prima di fare da host</string>
+    <string name="ar_feedback_host_need_target_standalone">Acquisisci un target parete standalone prima di fare da host</string>
+    <string name="ar_feedback_fingerprint_not_ready">L\'impronta della parete non è ancora pronta: tieni il target inquadrato e riprova a fare da host</string>
+    <string name="ar_feedback_package_failed">Impossibile preparare questo progetto per la condivisione: prova prima a salvarlo</string>
+    <string name="ar_feedback_host_failed">Impossibile avviare la condivisione: %1$s</string>
+    <string name="ar_feedback_join_load_failed">Impossibile caricare il progetto dell\'host: la sessione è stata terminata.</string>
+    <string name="ar_feedback_join_no_geometry">L\'host non ha fornito una geometria a cui ARCore possa allinearsi.</string>
+    <string name="ar_feedback_join_failed">Impossibile partecipare: %1$s</string>
+    <string name="ar_feedback_wall_target_changed">Il target parete è cambiato: la condivisione è terminata. Avvia di nuovo l\'host per la nuova parete.</string>
+    <string name="ar_feedback_backend_changed">Il backend di tracciamento è cambiato: la condivisione è terminata. Avvia di nuovo la condivisione.</string>
+    <string name="ar_feedback_camera_busy">La fotocamera è occupata o non disponibile: chiudi le altre app che la usano, poi rientra in AR</string>
+    <string name="ar_feedback_ar_start_failed">Impossibile avviare AR: la fotocamera potrebbe essere in uso da un\'altra app</string>
+    <string name="ar_feedback_camera_setting_apply_failed">Impossibile applicare l\'impostazione della fotocamera alla sessione AR in corso: esci da AR e rientra</string>
+    <string name="ar_feedback_sphere_target_save_failed">Il tracciamento della parete funziona per questa sessione, ma non è stato possibile salvare il target SphereSLAM.</string>
+    <string name="ar_feedback_camera_not_resumed">La fotocamera AR non è ripartita: prova a uscire dalla modalità AR e a rientrare</string>
+    <string name="ar_feedback_camera_permission">Fotocamera non disponibile: controlla l\'autorizzazione della fotocamera, poi rientra in AR</string>
+    <string name="ar_feedback_camera_not_paused">La fotocamera AR non si è messa in pausa correttamente: potrebbe restare attiva in background</string>
+    <string name="ar_feedback_backbone_warning">L\'opera copre quasi tutta la parete inquadrata: solo %1$d caratteristiche tracciate restano all\'esterno. Rimpiccioliscila o fai un passo indietro, altrimenti il target potrebbe non agganciarsi.</string>
+    <string name="ar_feedback_legacy_target_geometry">Il target salvato di questo progetto è stato creato da una versione precedente e la sua geometria 3D non può essere corretta. Crea di nuovo il target per usarlo.</string>
+    <string name="ar_feedback_camera_no_frames">La fotocamera non sta fornendo fotogrammi: esci da AR e riprova</string>
+    <string name="ar_feedback_camera_recovery_timeout">Il ripristino della fotocamera AR è scaduto in modo sicuro: esci da AR e rientra</string>
+    <string name="ar_feedback_target_prepare_failed">Impossibile preparare il target acquisito. Riprova.</string>
+    <string name="ar_feedback_wall_width_save_failed">Impossibile salvare la larghezza della parete. Riprova a salvare.</string>
+    <string name="ar_feedback_unknown_error">errore sconosciuto</string>
 </resources>

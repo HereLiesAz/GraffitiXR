@@ -19,11 +19,17 @@ class ProjectRepositoryImplTest {
 
     private val testDispatcher = StandardTestDispatcher()
 
+    /** Makes the whole-object save echo its input, like the real one minus the merge/timestamp. */
+    private fun echoSave(manager: ProjectManager) {
+        coEvery { manager.saveProject(any(), any(), any(), any()) } coAnswers { secondArg<GraffitiProject>() }
+    }
+
     @Test
     fun `failed persistence leaves the previously saved state intact`() = runTest {
         val manager = mockk<ProjectManager>(relaxed = true)
         val context = mockk<Context>(relaxed = true)
         val repo = ProjectRepositoryImpl(context, manager)
+        echoSave(manager)
         repo.createProject(GraffitiProject(id = "saved", name = "Original"))
         coEvery { manager.saveProjectExact(context, any()) } throws java.io.IOException("Full")
         try {
@@ -38,6 +44,7 @@ class ProjectRepositoryImplTest {
         val manager = mockk<ProjectManager>(relaxed = true)
         val context = mockk<Context>(relaxed = true)
         val repo = ProjectRepositoryImpl(context, manager)
+        echoSave(manager)
         repo.createProject(GraffitiProject(id = "merged", name = "Wall"))
         val stale = GraffitiProject(id = "merged", name = "Renamed")
         val merged = stale.copy(arDesignHalfWidthM = 1.25f)
@@ -47,10 +54,23 @@ class ProjectRepositoryImplTest {
     }
 
     @Test
+    fun `createProject publishes the project that was actually persisted`() = runTest {
+        val manager = mockk<ProjectManager>(relaxed = true)
+        val context = mockk<Context>(relaxed = true)
+        val repo = ProjectRepositoryImpl(context, manager)
+        val requested = GraffitiProject(id = "created", name = "Wall")
+        val written = requested.copy(arDesignHalfWidthM = 2f, lastModified = 7L)
+        coEvery { manager.saveProject(context, requested) } returns written
+        repo.createProject(requested)
+        assertEquals(written, repo.currentProject.value)
+    }
+
+    @Test
     fun `deletion waits for an active save and does not resurrect the project`() = runTest {
         val manager = mockk<ProjectManager>(relaxed = true)
         val context = mockk<Context>(relaxed = true)
         val repo = ProjectRepositoryImpl(context, manager)
+        echoSave(manager)
         repo.createProject(GraffitiProject(id = "saved"))
         val started = kotlinx.coroutines.CompletableDeferred<Unit>()
         val finish = kotlinx.coroutines.CompletableDeferred<Unit>()
@@ -109,6 +129,7 @@ class ProjectRepositoryImplTest {
     /** A manager whose exact save returns its input, like the real one minus the timestamp. */
     private fun echoingManager(): ProjectManager = mockk<ProjectManager>(relaxed = true).also { m ->
         coEvery { m.saveProjectExact(any(), any()) } coAnswers { secondArg<GraffitiProject>() }
+        echoSave(m)
     }
 
     @Test
@@ -116,6 +137,7 @@ class ProjectRepositoryImplTest {
         val manager = mockk<ProjectManager>(relaxed = true)
         val context = mockk<Context>(relaxed = true)
         val repo = ProjectRepositoryImpl(context, manager)
+        echoSave(manager)
         repo.createProject(GraffitiProject(id = "stamped", name = "Wall"))
         coEvery { manager.saveProjectExact(context, any()) } coAnswers {
             secondArg<GraffitiProject>().copy(lastModified = 42L)

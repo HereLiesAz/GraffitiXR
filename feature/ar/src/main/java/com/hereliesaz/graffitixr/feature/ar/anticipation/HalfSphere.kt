@@ -16,8 +16,10 @@ import kotlin.math.sqrt
 
 /**
  * The half-sphere of anticipated views of a target ([AnticipationSettings]): the target at the core,
- * the capture view at the pole, meridians (latitude) from the pole to the equator cut by circles
- * (longitude); a view at the pole and at every cut, aimed at the core, none on the equator; nested
+ * the capture view at the pole, meridians (`AnticipationSettings.latitude` of them — a historical name:
+ * meridians are lines of longitude) from the pole to the equator cut by circles
+ * (`AnticipationSettings.longitude` of them — circles of latitude); Settings labels the two by their
+ * geography, not their field names. A view at the pole and at every cut, aimed at the core, none on the equator; nested
  * half-spheres (distance) from the capture distance in toward the target (zooming in); each view
  * taken at every roll; a nearer half-sphere repeated over a grid of aim points across the target
  * (`AnticipationSettings.aimsPerSide`), so a close-up of any part of the wall is anticipated, not

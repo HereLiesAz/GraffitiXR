@@ -46,6 +46,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.hereliesaz.graffitixr.design.R as DesignR
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.IntSize
@@ -383,6 +385,11 @@ fun SphereSlamStandaloneOverlay(
      * inline here.
      */
     uiHost: StandaloneOverlayUiHost? = null,
+    /**
+     * Settings → Units. Only the target-width prompt reads it: imperial asks for (and validates)
+     * feet and inches, metric metres. Everything stored and passed on stays metres.
+     */
+    isImperialUnits: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -406,7 +413,7 @@ fun SphereSlamStandaloneOverlay(
 
     var rawCaptureBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var pendingReferenceBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var pendingReferenceWarning by remember { mutableStateOf<String?>(null) }
+    var pendingReferenceWarning by remember { mutableStateOf<StandaloneText?>(null) }
     var referenceNeedsPersistence by remember { mutableStateOf(false) }
     var previousReferenceBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var previousReferenceWidthMeters by remember { mutableStateOf(1f) }
@@ -432,7 +439,7 @@ fun SphereSlamStandaloneOverlay(
     var trackingState by remember {
         mutableStateOf(StandaloneTrackingState.INITIALIZING)
     }
-    var fatalMessage by remember { mutableStateOf<String?>(null) }
+    var fatalMessage by remember { mutableStateOf<StandaloneText?>(null) }
     // The current analyzer reported a fatal error. Its SphereSLAM session is terminal (it ignores
     // every later frame and never resets), so tracking resumes only through a NEW analyzer:
     // bumping analyzerRestartGeneration (a key of the analyzer effect) recreates it.
@@ -455,7 +462,7 @@ fun SphereSlamStandaloneOverlay(
             )
         }
         if (event.severity == StandaloneFailureSeverity.FATAL) {
-            fatalMessage = event.userMessage
+            fatalMessage = event.userText
         }
     }
 
@@ -579,7 +586,7 @@ fun SphereSlamStandaloneOverlay(
     if (reference == null && !peerOnlyTracking && !sharedTargetCapture) {
         val pending = pendingReferenceBitmap
         if (pending != null) {
-            val measuredWidth = StandaloneReferenceScale.parseMeters(referenceWidthInput)
+            val measuredWidth = StandaloneReferenceScale.parseMeters(referenceWidthInput, isImperialUnits)
             PublishOrDraw(uiHost) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(
@@ -589,28 +596,41 @@ fun SphereSlamStandaloneOverlay(
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text(
-                            "Measure the real width between the left and right edges of the target.",
+                            stringResource(DesignR.string.standalone_width_prompt),
                             color = Color.White,
                         )
                         OutlinedTextField(
                             value = referenceWidthInput,
                             onValueChange = { referenceWidthInput = it.take(12) },
-                            label = { Text("Target width (meters)") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            label = {
+                                Text(
+                                    stringResource(
+                                        if (isImperialUnits) DesignR.string.standalone_width_label_imperial
+                                        else DesignR.string.standalone_width_label_metric,
+                                    ),
+                                )
+                            },
+                            // Unit notation (12' 6", 2.5) is the same in every language: not translated.
+                            placeholder = { Text(if (isImperialUnits) "12' 6\"" else "2.5") },
+                            // Feet and inches need the ' and " marks, which the decimal pad lacks.
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = if (isImperialUnits) KeyboardType.Text else KeyboardType.Decimal,
+                            ),
                             singleLine = true,
                             isError = referenceWidthInput.isNotBlank() && measuredWidth == null,
                             modifier = Modifier.padding(top = 12.dp),
                         )
                         if (referenceWidthInput.isNotBlank() && measuredWidth == null) {
+                            val (rangeMin, rangeMax) = StandaloneReferenceScale.rangeLabels(isImperialUnits)
                             Text(
-                                "Enter a width from 0.05 m to 100 m.",
+                                stringResource(DesignR.string.standalone_width_range_error, rangeMin, rangeMax),
                                 color = Color.White,
                                 modifier = Modifier.padding(top = 6.dp),
                             )
                         }
                         pendingReferenceWarning?.let { warning ->
                             Text(
-                                warning,
+                                warning.resolve(),
                                 color = Color.White,
                                 modifier = Modifier.padding(top = 8.dp),
                             )
@@ -620,13 +640,13 @@ fun SphereSlamStandaloneOverlay(
                             enabled = measuredWidth != null,
                             modifier = Modifier.padding(top = 16.dp),
                         ) {
-                            Text("Use Measured Width")
+                            Text(stringResource(DesignR.string.standalone_use_measured_width))
                         }
                         TextButton(
                             onClick = { acceptReference(pending, 1f, false) },
                             modifier = Modifier.padding(top = 4.dp),
                         ) {
-                            Text("Continue Without Physical Scale")
+                            Text(stringResource(DesignR.string.standalone_continue_without_scale))
                         }
                         TextButton(
                             onClick = {
@@ -634,7 +654,7 @@ fun SphereSlamStandaloneOverlay(
                                 referenceWidthInput = ""
                             },
                         ) {
-                            Text("Recapture")
+                            Text(stringResource(DesignR.string.standalone_recapture))
                         }
                     }
                 }
@@ -649,7 +669,7 @@ fun SphereSlamStandaloneOverlay(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         fatalMessage?.let { message ->
                             Text(
-                                text = message,
+                                text = message.resolve(),
                                 color = Color.White,
                                 modifier = Modifier
                                     .padding(bottom = 12.dp)
@@ -665,14 +685,14 @@ fun SphereSlamStandaloneOverlay(
                                         cameraController.takePictureAsBitmap(context)
                                     }
                                     rawCaptureBitmap = result.getOrElse {
-                                        fatalMessage = "Couldn't capture the wall target — try again."
+                                        fatalMessage = StandaloneText(StandaloneTextKey.CAPTURE_FAILED)
                                         null
                                     }
                                 }
                             },
                             modifier = Modifier.padding(bottom = 32.dp),
                         ) {
-                            Text("Capture Wall Target")
+                            Text(stringResource(DesignR.string.standalone_capture_wall_target))
                         }
                     }
                 }
@@ -688,7 +708,7 @@ fun SphereSlamStandaloneOverlay(
                         val unwarped = PerspectiveProcessor.unwarpImage(raw, pixelPoints)
                         withContext(Dispatchers.Main) {
                             if (unwarped == null) {
-                                fatalMessage = "Couldn't rectify that target — mark four clear corners."
+                                fatalMessage = StandaloneText(StandaloneTextKey.RECTIFY_FAILED)
                                 rawCaptureBitmap = null
                             } else {
                                 val report = StandaloneTargetQuality.analyze(
@@ -696,13 +716,13 @@ fun SphereSlamStandaloneOverlay(
                                     width = unwarped.width,
                                     height = unwarped.height,
                                 )
-                                val blockingMessage = StandaloneTargetQuality.blockingMessage(report)
-                                if (blockingMessage != null) {
-                                    fatalMessage = blockingMessage
+                                val blockingText = StandaloneTargetQuality.blockingText(report)
+                                if (blockingText != null) {
+                                    fatalMessage = blockingText
                                     rawCaptureBitmap = null
                                 } else {
                                     pendingReferenceWarning =
-                                        StandaloneTargetQuality.warningMessage(report)
+                                        StandaloneTargetQuality.warningText(report)
                                     pendingReferenceBitmap = unwarped
                                     rawCaptureBitmap = null
                                 }
@@ -1421,15 +1441,18 @@ fun SphereSlamStandaloneOverlay(
                                 )
                             }
                             StandaloneFatalRecovery.REPORT_TOO_WEAK -> {
-                                fatalMessage =
-                                    "That target has too little trackable detail " +
-                                        "(${tooWeak?.featureCount} KPM features; need " +
-                                        "${tooWeak?.minimumFeatureCount}). Recapture a richer wall patch."
+                                fatalMessage = StandaloneText(
+                                    StandaloneTextKey.TARGET_TOO_WEAK,
+                                    listOf(
+                                        tooWeak?.featureCount ?: 0,
+                                        tooWeak?.minimumFeatureCount ?: 0,
+                                    ),
+                                )
                             }
                             StandaloneFatalRecovery.REPORT_FAILURE -> {
                                 val event = StandaloneFailureClassifier.fromThrowable(error)
                                 currentFailure = event
-                                fatalMessage = event.userMessage
+                                fatalMessage = event.userText
                             }
                         }
                     }
@@ -1517,7 +1540,7 @@ fun SphereSlamStandaloneOverlay(
                             currentFailure = currentFailure,
                             referenceReady = referenceReady,
                             hasReference = referenceImage != null,
-                        ),
+                        ).resolve(),
                         color = Color.White,
                         modifier = Modifier
                             .padding(top = 32.dp)
@@ -1531,12 +1554,12 @@ fun SphereSlamStandaloneOverlay(
                             onClick = { requestNewTarget() },
                             modifier = Modifier.padding(top = 12.dp),
                         ) {
-                            Text("New Target")
+                            Text(stringResource(DesignR.string.standalone_new_target))
                         }
                     }
                     if (currentFailure != null) {
                         TextButton(onClick = { copyDiagnostics() }) {
-                            Text("Copy Diagnostics")
+                            Text(stringResource(DesignR.string.standalone_copy_diagnostics))
                         }
                     }
                 }
@@ -1551,9 +1574,9 @@ fun SphereSlamStandaloneOverlay(
                     Text(
                         text = currentFailure
                             ?.takeIf { it.severity != StandaloneFailureSeverity.FATAL }
-                            ?.userMessage
+                            ?.userText?.resolve()
                             ?: if (trackingState == StandaloneTrackingState.LOST) {
-                                "Wall target lost"
+                                stringResource(DesignR.string.standalone_wall_target_lost)
                             } else {
                                 strings.ar.reacquiringTarget
                             },
@@ -1568,11 +1591,11 @@ fun SphereSlamStandaloneOverlay(
                             onClick = { requestNewTarget() },
                             modifier = Modifier.padding(top = 12.dp),
                         ) {
-                            Text("Recapture Target")
+                            Text(stringResource(DesignR.string.standalone_recapture_target))
                         }
                     }
                     TextButton(onClick = { copyDiagnostics() }) {
-                        Text("Copy Diagnostics")
+                        Text(stringResource(DesignR.string.standalone_copy_diagnostics))
                     }
                 }
             }
@@ -1597,7 +1620,7 @@ fun SphereSlamStandaloneOverlay(
                         .padding(horizontal = 20.dp, vertical = 10.dp),
                 ) {
                     Text(
-                        text = "Turn slowly to map the space — ${(coverage * 100f).toInt()}%",
+                        text = stringResource(DesignR.string.standalone_sweep_hint, (coverage * 100f).toInt()),
                         color = Color.White,
                     )
                     Box(
@@ -1626,17 +1649,17 @@ fun SphereSlamStandaloneOverlay(
                         .padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(message, color = Color.White)
+                    Text(message.resolve(), color = Color.White)
                     if (newTargetAvailable) {
                         Button(
                             onClick = { requestNewTarget() },
                             modifier = Modifier.padding(top = 12.dp),
                         ) {
-                            Text("Recapture Target")
+                            Text(stringResource(DesignR.string.standalone_recapture_target))
                         }
                     }
                     TextButton(onClick = { copyDiagnostics() }) {
-                        Text("Copy Diagnostics")
+                        Text(stringResource(DesignR.string.standalone_copy_diagnostics))
                     }
                 }
             }

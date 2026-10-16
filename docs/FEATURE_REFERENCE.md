@@ -67,6 +67,13 @@ adjustment/anchoring lens is active.
 A normalized standalone target width gives self-consistent registration but is **not physical metres**.
 Physical distance/size claims are valid only when the captured target width was explicitly measured.
 
+The measured-width dialog (standalone, used when this overlay owns capture) follows Settings → Units:
+metric asks for **metres**; imperial asks for **feet and inches** and accepts `12.5` (bare number =
+decimal feet), `12'`, `12' 6"`, `12'6`, `12 ft 6 in`, `78"`. The entry is converted to metres before
+the same 0.05 m – 100 m range check (shown as 2 in – 328 ft when imperial), and only metres are stored
+or passed on (`StandaloneReferenceScale.parseMeters(raw, imperial)`). Its prompt, labels, error and
+buttons are localized.
+
 As of this writing, DESIGN does not have its own dedicated entry in the mode-switcher host on the
 Rail; it's reached indirectly (e.g. importing an image via the top-level **Open** action switches
 into DESIGN as a side effect). TODO: confirm whether a direct DESIGN rail entry is added by other
@@ -405,7 +412,8 @@ descriptor will silently return null from `nativeSetWallFingerprint`. The contra
 Every persisted key, its default, and effect. Adaptive-throttle keys default **on**.
 
 **Settings screen layout:** General (language, hand, units, canvas background, reset tutorials) · AR
-(ARCore, ARCore depth, monocular depth, ambient scan, anchor boundary, camera fps) · Coverage glow ·
+(ARCore, ARCore depth, monocular depth, ambient scan, anchor boundary, camera fps — "Device default" /
+"Device max" are localized) · Coverage glow ·
 Power (Power saving, Adaptive rate) · Privacy (crash reports, token) · App information (version,
 releases page, camera permission) · Developer (the §7.4 overlays; starts collapsed). On/off settings
 are switches.
@@ -456,9 +464,9 @@ Settings screen:
 | Setting | Key | Default | Effect |
 |---|---|---|---|
 | Handedness | `is_right_handed` | — | Which side the AzNavRail sits (one-handed use). Also `ToggleHandedness` |
-| Units | `is_imperial_units` | — | Imperial vs metric for sizes/distances |
+| Units | `is_imperial_units` | — | Imperial vs metric for sizes/distances, including the standalone target-width entry |
 | Canvas background | `background_color` | — | `SetCanvasBackground` — colour behind the design in Design/editor |
-| Language | `language` | System | One of the 15 supported languages (§9) |
+| Language | `language` | System | One of the 16 options (§9). Applied only after the stored value has been read, so the locale AppCompat restored on a cold start is never overwritten by a placeholder |
 | Scan mode (removed/legacy) | `ar_scan_mode` | — | No longer a live setting; key is read once for legacy migration only (§1.2) |
 | Mural method (removed/legacy) | `mural_method` | — | No longer a live setting; named engines no longer exist (§1.2) |
 
@@ -535,8 +543,17 @@ Robust LAN peer-to-peer sync for collaborative painting — **no cloud, no accou
 
 ## 9. Languages (`AppLanguage`)
 
-Persisted `language`. 15 options: **System Default**, English, Nederlands, Norsk, Français, Svenska,
-Deutsch, Italiano, 日本語, Português, Magyar, Español, 简体中文, 繁體中文, Tagalog.
+Persisted `language`. 16 options: **System Default**, English, Nederlands, Norsk, Français, Svenska,
+Deutsch, Italiano, 日本語, Português, Magyar, Español, 简体中文, 繁體中文, Русский, Tagalog.
+The picker is a radio group (selected row = radio button + selected semantics). Every user-facing
+string in Settings, the first-run flow, the standalone overlay and target creation is a string
+resource present in all 15 `values*` directories.
+
+**ARCore-unavailable explainer.** A device without ARCore (with *Use ARCore* left on) sees a one-shot,
+tap-to-advance explainer the first time it is in the editor with no modal open: AR mode runs on
+standalone wall tracking (capture a textured wall patch and mark four corners), and Trace / Mockup /
+Overlay are unchanged. It persists the `ar_unavailable_explainer` tutorial key on dismissal and is
+never shown on ARCore devices, whose first-run walkthrough is unaffected.
 
 ---
 
@@ -560,12 +577,18 @@ Mode-aware; the Export rail item dispatches per mode.
 
 | Mode | Method | Result |
 |---|---|---|
-| AR (ARCore) | `glReadPixels` on the composited GL framebuffer | Camera + wall-anchored overlay (what you see, minus Compose UI) |
-| AR (standalone SphereSLAM) | Disabled for now | CameraX + transparent-GL compositing is not implemented yet; the rail explains this rather than exporting layers-only |
+| AR (ARCore) | `glReadPixels` on the composited GL framebuffer | Camera + wall-anchored overlay (what you see, minus Compose UI). With no AR renderer attached (e.g. no camera permission) nothing is exported and a localized message says so; it never falls back to a layers-only export, whose AR-space placement would be misapplied |
+| AR (standalone SphereSLAM) | Not available yet | CameraX + transparent-GL compositing is not implemented yet. Export stays on the rail; tapping it shows a localized explanation (`ArRailBackendPolicy.exportDisabledReason`) rather than exporting layers-only |
 | OVERLAY | CameraX `ImageCapture.takePicture` + composite layers at screen positions | Sensor still with layers on top |
 | MOCKUP | Standard composite | Flattened mockup |
 | TRACE | Transparent-background PNG | Line art with no backdrop fill |
 | Stencil | Tiled PDF with registration marks | Print-ready multi-sheet stencil |
+
+Every mode saves through MediaStore to Pictures/GraffitiXR (`saveBitmapToGallery`). On API 26-28 that
+needs `WRITE_EXTERNAL_STORAGE` (declared with `maxSdkVersion="28"`), which is requested right before
+the export starts; from API 29 nothing is asked. A refused write reports a permission-specific
+message, any other failure a generic one, and a gallery row whose image could not be written is
+deleted again.
 
 YUV→RGBA conversion for AR capture uses the native `nativebridge.YuvConverter` (OpenCV
 `cvtColor(COLOR_YUV2RGBA_NV21)` on ARM NEON, written into a caller-owned bitmap); the JNI descriptor is

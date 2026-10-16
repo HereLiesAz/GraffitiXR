@@ -231,6 +231,40 @@ class SlamManager @Inject constructor(
     @Volatile var captureAnchorCam: FloatArray? = null
 
     /**
+     * True from the moment a (re-)capture replaces the anchor until its NEW wall fingerprint and its
+     * NEW [captureAnchorCam] are both installed.
+     *
+     * In that window the native engine still holds the previous wall's fingerprint (and may solve
+     * against it, bumping the result seq) and the Kotlin side still describes the previous anchor, so
+     * any reloc result is in the OLD wall's frame: composed with the new anchor it cold-snaps the
+     * overlay onto the old wall. While this is set the renderer ignores reloc results and the
+     * correction-source arbiter never selects reloc. Native additionally drops a solve that was in
+     * flight when the fingerprint was replaced (its fingerprint generation).
+     *
+     * Raise it with [beginFingerprintReplacement]; lower it only through
+     * [completeFingerprintReplacement] (both halves installed), [clearWallFingerprint] (nothing left
+     * to be stale against) or a successful depth-path [setWallFingerprint].
+     */
+    @Volatile var awaitingNewFingerprint: Boolean = false
+        private set
+
+    /** A re-capture is replacing the anchor: forget the old capture pose and gate reloc. */
+    fun beginFingerprintReplacement() {
+        captureAnchorCam = null
+        awaitingNewFingerprint = true
+    }
+
+    /**
+     * The new fingerprint is already installed natively; publish its [newCaptureAnchorCam] (null for a
+     * fingerprint that has none, which leaves reloc uncorrected) and only THEN lower the gate, so a
+     * frame can never see the gate down beside a stale or missing pose.
+     */
+    fun completeFingerprintReplacement(newCaptureAnchorCam: FloatArray?) {
+        captureAnchorCam = newCaptureAnchorCam
+        awaitingNewFingerprint = false
+    }
+
+    /**
      * A no-op in the current native engine: neither [angularVel] nor [linearVel] is read by any
      * consumer there (there is no deblur or motion-compensation stage). Kept as a callable, logged
      * no-op (native logs a warning once) rather than removed so this doesn't need to change ahead of
@@ -363,7 +397,10 @@ class SlamManager @Inject constructor(
         viewMatrix: FloatArray
     ): Fingerprint? {
         if (!depthBuffer.isDirect) return null
-        return nativeSetWallFingerprint(bitmap, mask, depthBuffer, depthW, depthH, depthStride, intrinsics, viewMatrix)
+        val fp = nativeSetWallFingerprint(bitmap, mask, depthBuffer, depthW, depthH, depthStride, intrinsics, viewMatrix)
+        // A depth-path fingerprint is installed and carries no capture pose: nothing is left to wait for.
+        if (fp != null) awaitingNewFingerprint = false
+        return fp
     }
 
     fun restoreWallFingerprint(descriptorsData: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray) {
@@ -407,7 +444,11 @@ class SlamManager @Inject constructor(
      * (notably the marks built during first-run onboarding). Call it when loading a project that has
      * no saved fingerprint, alongside [clearWallFeatureMap].
      */
-    fun clearWallFingerprint() = nativeClearWallFingerprint()
+    fun clearWallFingerprint() {
+        nativeClearWallFingerprint()
+        // No fingerprint left to be stale against; reloc has nothing to match either way.
+        awaitingNewFingerprint = false
+    }
 
     /** Restore the persistent wall feature map into native (Phase 2a: stored; matched in Phase 2b). */
     fun restoreWallFeatureMap(map: WallFeatureMap) {
@@ -774,9 +815,25 @@ class SlamManager @Inject constructor(
      *  doing nothing. */
     fun setStageEnabled(stage: Int, enabled: Boolean) = nativeSetStageEnabled(stage, enabled)
 
-    /** Pose fusion (B): [0..15]=pnpMat, [16]=inlierCount, [17]=matchCount, [18]=seq. */
-    /** [0..15] PnP camera_from_fp, 16 inliers, 17 matches, 18 seq, [19..34] view matrix of the solve frame. */
-    fun getRelocResult(): FloatArray { val o = FloatArray(35); nativeGetRelocResult(o); return o }
+    /**
+     * Pose fusion (B): [0..15] PnP camera_from_fp, 16 inliers, 17 matches, 18 seq, [19..34] view
+     * matrix of the solve frame. Allocates a fresh array per call, which is fine off the render
+     * loop; the GL thread reads it up to three times a frame and uses [getRelocResultInto].
+     */
+    fun getRelocResult(): FloatArray = getRelocResultInto(FloatArray(RELOC_RESULT_SIZE))
+
+    /**
+     * [getRelocResult] into a caller-owned buffer of at least [RELOC_RESULT_SIZE] floats (same
+     * layout), returning [out] itself so a call site can index the result in one expression. The
+     * buffer is overwritten in full and must not be shared between threads; a consumer that keeps a
+     * result past the next call has to copy what it needs. A shorter array is refused rather than
+     * silently given the legacy 19-float layout (which has no solve view).
+     */
+    fun getRelocResultInto(out: FloatArray): FloatArray {
+        require(out.size >= RELOC_RESULT_SIZE) { "reloc buffer must hold $RELOC_RESULT_SIZE floats" }
+        nativeGetRelocResult(out)
+        return out
+    }
 
     /** Pose fusion (B): the anchor model matrix captured in the fingerprint world frame. */
     fun getFingerprintAnchor(): FloatArray { val o = FloatArray(16); nativeGetFingerprintAnchor(o); return o }
@@ -1016,8 +1073,11 @@ class SlamManager @Inject constructor(
     private external fun nativeDestroy()
     private external fun nativeAnnotateKeypoints(bitmap: Bitmap)
 
-    private companion object {
+    companion object {
         private const val TAG = "SlamManager"
+
+        /** Floats in a full reloc result: 19 pose/counter slots + the 16-float solve-frame view. */
+        const val RELOC_RESULT_SIZE = 35
 
         /**
          * How long a capture waits for the anchor to be established before giving up.
@@ -1027,6 +1087,6 @@ class SlamManager @Inject constructor(
          * dropped frame, not an expected duration, and timing out is a refusal rather than a
          * fallback. Recorded in `PARAMETERS.md` §6.
          */
-        const val ANCHOR_WAIT_MS = 2_000L
+        private const val ANCHOR_WAIT_MS = 2_000L
     }
 }

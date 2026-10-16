@@ -32,6 +32,13 @@ class SerializersTest {
     }
 
     @Test
+    fun `OffsetSerializer rejects non-finite components`() {
+        for (bad in listOf("\"NaN,1.0\"", "\"1.0,Infinity\"", "\"-Infinity,NaN\"")) {
+            assertEquals(bad, Offset.Zero, json.decodeFromString(OffsetSerializer, bad))
+        }
+    }
+
+    @Test
     fun `BlendModeSerializer serializes and deserializes correctly`() {
         val modes = listOf(
             BlendMode.SrcOver,

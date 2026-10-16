@@ -53,6 +53,15 @@ class CameraTargetFpsTest {
         assertEquals("Device max", CameraTargetFps.label(CameraTargetFps.DEVICE_MAX))
     }
 
+    /** The UI localizes from [CameraTargetFps.display]; every cycle value must map to a form. */
+    @Test
+    fun `display classifies the sentinels and real rates for the UI to localize`() {
+        assertEquals(CameraTargetFps.Display.RATE, CameraTargetFps.display(CameraTargetFps.FPS_30))
+        assertEquals(CameraTargetFps.Display.RATE, CameraTargetFps.display(CameraTargetFps.FPS_60))
+        assertEquals(CameraTargetFps.Display.DEVICE_DEFAULT, CameraTargetFps.display(CameraTargetFps.DEVICE_DEFAULT))
+        assertEquals(CameraTargetFps.Display.DEVICE_MAX, CameraTargetFps.display(CameraTargetFps.DEVICE_MAX))
+    }
+
     /** A value from a future build (or a corrupt preference) must not strand the cycle. */
     @Test
     fun `an unknown stored value re-enters the cycle`() {

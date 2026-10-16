@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Shared .gxr archives (cache/share/) and wall photos handed to the camera (cache root). -->
     <cache-path name="cache" path="." />
-    <external-path name="external_files" path="." />
-    <files-path name="files" path="." />
+    <!-- Only the diagnostic bundle (eval/ and eval/captures/) is ever shared from filesDir. The
+         projects themselves are never exposed: they are not handed out through the FileProvider. No
+         external-path entry: nothing is shared from shared storage. -->
+    <files-path name="eval" path="eval/" />
 </paths>

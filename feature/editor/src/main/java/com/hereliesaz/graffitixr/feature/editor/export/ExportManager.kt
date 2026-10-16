@@ -93,7 +93,10 @@ class ExportManager @Inject constructor() {
                 )
                 val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     // Nested alpha in the on-screen graphicsLayer is multiplicative (outer mode alpha
-                    // wrapping the inner layer alpha), so it is here too.
+                    // wrapping the inner layer alpha), so it is here too. The blend mode below acts
+                    // on the background drawn above, which is what the preview does: its outer
+                    // graphicsLayer uses CompositingStrategy.ModulateAlpha (MainScreen) precisely so
+                    // the mode opacity cannot isolate the blend in an offscreen buffer.
                     alpha = (layer.opacity * (modeAdj?.opacity ?: 1f) * 255).toInt().coerceIn(0, 255)
                     applyLayerBlendMode(layer.blendMode)
                     colorFilter = android.graphics.ColorMatrixColorFilter(

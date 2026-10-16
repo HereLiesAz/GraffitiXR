@@ -158,7 +158,8 @@ class ProjectManagerTest {
         val mockUri = Uri.parse("content://test/project.gxr")
         val mockResolver = mockk<android.content.ContentResolver>()
         every { mockContext.contentResolver } returns mockResolver
-        every { mockResolver.openInputStream(any()) } returns zipBytes.inputStream()
+        // A fresh stream per open: the import pre-scans the archive's expanded size, then extracts it.
+        every { mockResolver.openInputStream(any()) } answers { zipBytes.inputStream() }
         return manager.importProjectFromUri(mockContext, mockUri)
     }
 
@@ -722,6 +723,33 @@ class ProjectManagerTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun `the spectator copy appears with its re-keyed manifest already in place`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        try {
+            // The default test repository is a relaxed mock whose replaceProject saves NOTHING, so
+            // whatever project.json the folder carries came from the staged write, not from a save
+            // that lands after the folder is already visible.
+            val manifest = """{"id":"host_a","name":"Host","design":{"uri":"file:///host/files/projects/host_a/d.png"}}"""
+                .toByteArray()
+            assertTrue(manager.loadAsSpectator(zipOf("project.json" to manifest, "d.png" to byteArrayOf(1))))
+
+            val dir = File(tempFilesDir, "projects/coop_host_a")
+            val onDisk = File(dir, "project.json").readText()
+            assertTrue(onDisk, "\"id\":\"coop_host_a\"" in onDisk && "\"id\":\"host_a\"" !in onDisk)
+            val listed = manager.loadProjectMetadata(mockContext, "coop_host_a")
+            assertEquals("coop_host_a", listed?.id)
+            assertEquals(
+                File(dir, "d.png").canonicalFile,
+                File(requireNotNull(listed?.design?.uri?.path)).canonicalFile,
+            )
+            assertTrue(File(tempFilesDir, "coop_staging").listFiles().isNullOrEmpty())
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun `rejoining replaces the spectator copy instead of merging the previous join into it`() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         try {
@@ -832,6 +860,156 @@ class ProjectManagerTest {
                 leftoverTempFiles.joinToString { it.name },
             leftoverTempFiles.isEmpty(),
         )
+    }
+
+
+    @Test
+    fun `loadProjectMetadata repairs a manifest whose id differs from a valid folder name`() = runTest {
+        val projectDir = File(tempFilesDir, "projects/folder_name").also { it.mkdirs() }
+        File(projectDir, "design.png").writeBytes(byteArrayOf(1))
+        File(projectDir, "project.json").writeText(
+            """{"id":"other_id","name":"Mismatched","design":{"uri":"file:///data/files/projects/other_id/design.png"},""" +
+                """"thumbnailUri":"file:///data/files/projects/folder_name/thumb.png"}""",
+        )
+
+        val repaired = manager.loadProjectMetadata(mockContext, "folder_name")
+
+        assertNotNull("a mis-keyed folder must not be orphaned", repaired)
+        assertEquals("folder_name", repaired!!.id)
+        assertEquals("Mismatched", repaired.name)
+        // Id-derived paths follow the folder; references that already named it are untouched.
+        assertEquals("file:///data/files/projects/folder_name/design.png", repaired.design?.uri.toString())
+        assertEquals("file:///data/files/projects/folder_name/thumb.png", repaired.thumbnailUri.toString())
+        // The fix is persisted, atomically (no temp file left behind), so it is a one-time repair.
+        val onDisk = File(projectDir, "project.json").readText()
+        assertTrue(onDisk, "\"id\":\"folder_name\"" in onDisk && "other_id" !in onDisk)
+        assertTrue(projectDir.listFiles()!!.none { it.name.endsWith(".tmp") })
+        assertEquals("folder_name", manager.loadProjectMetadata(mockContext, "folder_name")?.id)
+        // It is listed, openable and deletable under the one id.
+        assertTrue("folder_name" in manager.getProjectList(mockContext))
+        manager.deleteProject(mockContext, "folder_name")
+        assertFalse(projectDir.exists())
+    }
+
+    @Test
+    fun `loadProjectMetadata still refuses a mismatched manifest in a folder that is not a valid project id`() = runTest {
+        val projectDir = File(tempFilesDir, "projects/not a valid id").also { it.mkdirs() }
+        val manifest = """{"id":"other_id","name":"Mismatched"}"""
+        File(projectDir, "project.json").writeText(manifest)
+        assertNull(manager.loadProjectMetadata(mockContext, "not a valid id"))
+        assertEquals("the refused manifest must be left untouched", manifest, File(projectDir, "project.json").readText())
+    }
+
+    @Test
+    fun `import stages outside projects and leaves no staging or foreign manifest behind`() = runTest {
+        manager.saveProject(mockContext, GraffitiProject(id = "taken", name = "Current work"))
+        val imported = importZip(zipOf("project.json" to projectJson("taken"), "design.png" to byteArrayOf(1)))
+        assertNotNull(imported)
+        // Only the existing project and the re-keyed import are library entries, and each folder's
+        // manifest carries its own folder's id (never the archive's).
+        assertEquals(setOf("taken", imported!!.id), manager.getProjectList(mockContext).toSet())
+        assertEquals(imported.id, manager.loadProjectMetadata(mockContext, imported.id)?.id)
+        val staging = File(tempFilesDir, "import_staging")
+        assertTrue(staging.listFiles().isNullOrEmpty())
+    }
+
+    @Test
+    fun `a failed import creates no project folder`() = runTest {
+        val manifest = """{"id":"broken","name":"Wall","design":{"uri":"file:///sender/files/projects/broken/gone.png"}}""".toByteArray()
+        assertNull(importZip(zipOf("project.json" to manifest)))
+        assertFalse(File(tempFilesDir, "projects/broken").exists())
+        assertTrue(manager.getProjectList(mockContext).isEmpty())
+        assertTrue(File(tempFilesDir, "import_staging").listFiles().isNullOrEmpty())
+    }
+
+    @Test
+    fun `import free-space check is sized from the expanded bytes, not the archive length`() {
+        val mb = 1024L * 1024
+        // Unknown size: only the 64 MB floor applies.
+        assertTrue(manager.hasRoomToImport(-1L, freeBytes = 64 * mb))
+        assertFalse(manager.hasRoomToImport(-1L, freeBytes = 63 * mb))
+        // 100 MB of content needs the floor plus two copies = 264 MB.
+        assertTrue(manager.hasRoomToImport(100 * mb, freeBytes = 264 * mb))
+        assertFalse("a small download that inflates to 100 MB passed on its compressed size",
+            manager.hasRoomToImport(100 * mb, freeBytes = 200 * mb))
+        // Past the import cap is refused no matter how much room there is.
+        assertFalse(manager.hasRoomToImport(513 * mb, freeBytes = Long.MAX_VALUE))
+        // The cap itself is allowed with enough room (two copies, never more than 2x the cap).
+        assertTrue(manager.hasRoomToImport(512 * mb, freeBytes = 1024 * mb))
+        assertFalse(manager.hasRoomToImport(512 * mb, freeBytes = 1023 * mb))
+    }
+
+    @Test
+    fun `a small highly compressible archive is measured by what it expands to`() = runTest {
+        val big = ByteArray(2 * 1024 * 1024) // zeros: ~2 KB deflated
+        val zip = zipOf("project.json" to projectJson("zeros"), "pad.bin" to big)
+        assertTrue("fixture must be much smaller than its content", zip.size < big.size / 100)
+        val sizeFn = ProjectManager::class.java.getDeclaredMethod("expandedArchiveSize", Uri::class.java)
+        sizeFn.isAccessible = true
+        val mockResolver = mockk<android.content.ContentResolver>()
+        every { mockContext.contentResolver } returns mockResolver
+        every { mockResolver.openInputStream(any()) } answers { zip.inputStream() }
+        val expanded = sizeFn.invoke(manager, Uri.parse("content://test/z.gxr")) as Long
+        assertEquals(big.size + projectJson("zeros").size.toLong(), expanded)
+        // And the import itself still goes through (the stream is opened afresh for extraction).
+        assertNotNull(importZip(zip))
+    }
+
+    @Test
+    fun `import free-space check passes for a small or unknown archive size`() {
+        assertTrue(manager.hasRoomToImport(-1L))
+        assertTrue(manager.hasRoomToImport(1024L))
+    }
+
+    @Test
+    fun `stale whole-object save keeps the wall normal and the capture environment`() = runTest {
+        val env = CaptureEnvironment(location = LocationFix(latitude = 1.0, longitude = 2.0))
+        manager.saveProjectExact(
+            mockContext,
+            GraffitiProject(
+                id = "env_stale", name = "Wall", fingerprint = fingerprint(2),
+                fingerprintWallNormalEnu = listOf(0f, 1f, 0f), captureEnvironment = env,
+            ),
+        )
+        manager.saveProject(mockContext, GraffitiProject(id = "env_stale", name = "Renamed"))
+        val loaded = manager.loadProjectMetadata(mockContext, "env_stale")
+        assertEquals(listOf(0f, 1f, 0f), loaded?.fingerprintWallNormalEnu)
+        assertEquals(1.0, loaded?.captureEnvironment?.location?.latitude ?: 0.0, 0.0)
+    }
+
+    @Test
+    fun `thumbnail and target writes install atomically and leave no temp files`() = runTest {
+        val bitmap = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
+        val saved = manager.saveProject(
+            mockContext,
+            GraffitiProject(id = "png_atomic", name = "Wall"),
+            targetImages = listOf(bitmap),
+            thumbnail = bitmap,
+        )
+        val root = File(tempFilesDir, "projects/png_atomic")
+        assertTrue(File(root, "thumbnail.png").isFile)
+        assertEquals(1, saved.targetImageUris.size)
+        assertTrue(File(requireNotNull(saved.targetImageUris[0].path)).isFile)
+        assertTrue(root.listFiles { f -> f.name.endsWith(".tmp") }.isNullOrEmpty())
+    }
+
+
+    @Test
+    fun `deleteUnreferencedDesignFiles removes only old unreferenced design files`() = runTest {
+        val root = File(tempFilesDir, "projects/gc").also { it.mkdirs() }
+        File(root, "project.json").writeText("""{"id":"gc","name":"Wall","design":{"uri":"file:///x/projects/gc/design_live.png"}}""")
+        val live = File(root, "design_live.png").apply { writeBytes(byteArrayOf(1)) }
+        val old = File(root, "design_old.png").apply { writeBytes(byteArrayOf(2)); setLastModified(1_000L) }
+        val fresh = File(root, "design_fresh.png").apply { writeBytes(byteArrayOf(3)) }
+        val other = File(root, "target_1.png").apply { writeBytes(byteArrayOf(4)); setLastModified(1_000L) }
+
+        val deleted = manager.deleteUnreferencedDesignFiles(mockContext, "gc", modifiedBeforeMs = 10_000L)
+
+        assertEquals(1, deleted)
+        assertFalse(old.exists())
+        assertTrue("referenced design must stay", live.exists())
+        assertTrue("a file newer than the session start may be an import in flight", fresh.exists())
+        assertTrue("only design_* files are candidates", other.exists())
     }
 
 }

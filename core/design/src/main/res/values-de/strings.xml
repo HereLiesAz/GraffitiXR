@@ -32,7 +32,6 @@
     <!-- Label for Canvas mode, which is optimized for smaller, desk-scale artwork. -->
     <!-- Label for Mural mode, which is optimized for large-scale wall artwork. -->
     <!-- Description for the toggle between Canvas and Mural scanning modes. -->
-    <string name="nav_scan_mode_toggle_info">Wechseln Sie zwischen Leinwand (optimiert für kleinere Kunstwerke im Schreibtischmaßstab) und Wandbild (optimiert für große Wände und Gaussian Splatting).</string>
 
     <!-- Label for the Stencil generation tool. -->
     <!-- Description of the Stencil tool, explaining how it creates multi-layer printable templates. -->
@@ -601,9 +600,9 @@
         <item>Zum Skalieren zusammenziehen, zum Verschieben ziehen. Das Overlay bleibt fest auf deinem Bildschirm — tritt zurück, um zu sehen, wie es zur Wand passt.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
-        <item>Dieses Gerät unterstützt ARCore nicht, daher ist der AR-Projektionsmodus nicht verfügbar.</item>
-        <item>Du kannst weiterhin Pause, Mockup und Live-Overlay nutzen — jeder Modus außer AR funktioniert ohne ARCore.</item>
-        <item>Zum Schließen tippen.</item>
+        <item>Dieses Gerät unterstützt ARCore nicht, daher nutzt der AR-Modus stattdessen ein eigenständiges Wand-Tracking.</item>
+        <item>Im AR-Modus nimmst du zuerst ein Foto eines strukturierten Wandstücks auf und markierst dessen vier Ecken. Das Tracking rastet dann auf dieses Ziel ein.</item>
+        <item>Pause, Mockup und Overlay funktionieren wie gewohnt. Tippe zum Schließen.</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>Foto-Mockup — sieh dir dein Design auf einem Foto an, bevor du auch nur zum Pinsel greifst.</item>
@@ -632,4 +631,125 @@
     <string name="nav_gyro_info">Hält das Design auf dem Stativ trotz kleiner Vibrationen mit dem Bewegungssensor ruhig auf der Wand. Einschalten, sobald das Gerät steht; bei Bewegung wird es gelöst.</string>
     <string name="gyro_released_moved">Gyro gelöst: Das Gerät wurde zu stark bewegt.</string>
     <string name="gyro_unavailable">Gyro benötigt einen Drehsensor, den dieses Gerät nicht meldet.</string>
+    <string name="export_failed">Export fehlgeschlagen: Das Bild konnte nicht in der Galerie gespeichert werden.</string>
+    <string name="export_failed_permission">Speichern in der Galerie nicht möglich. Erlaube GraffitiXR den Speicherzugriff und versuche es erneut.</string>
+    <string name="export_ar_unavailable">Export nicht bereit: Die AR-Kameraansicht läuft nicht. Öffne die AR-Ansicht und versuche es erneut.</string>
+    <string name="export_standalone_ar_unavailable">Der Export ist im eigenständigen AR noch nicht verfügbar.</string>
+    <string name="rail_checking_ar_backend">AR-Backend wird geprüft…</string>
+
+    <string name="settings_use_arcore">ARCore verwenden</string>
+    <string name="settings_arcore_depth">ARCore-Tiefe</string>
+    <string name="settings_monocular_depth">Monokulare Tiefe (Beta)</string>
+    <string name="settings_ambient_scan">Umgebungsscan</string>
+    <string name="settings_adaptive_rate">Adaptive Rate (Leerlauf)</string>
+    <string name="settings_crash_reports">Absturzberichte</string>
+    <string name="settings_crash_reports_desc">Bei einem Absturz Gerätemodell und aktuelle Protokolle an einen öffentlichen Fehlerbericht senden? Standardmäßig aus.</string>
+    <string name="settings_crash_token_label">Absturzbericht-Token</string>
+    <string name="settings_crash_token_set">Festgelegt</string>
+    <string name="settings_crash_token_not_set">Nicht festgelegt</string>
+    <string name="settings_crash_token_desc">Ein GitHub-Token mit „Issues: write“ für HereLiesAz/GraffitiXR. Wird nur auf diesem Gerät gespeichert, nie in der App. Leer lassen, um Uploads zu deaktivieren.</string>
+    <string name="settings_crash_token_field">Token</string>
+    <string name="settings_canvas_color_black">Schwarz</string>
+    <string name="settings_canvas_color_dark">Dunkel</string>
+    <string name="settings_canvas_color_grey">Grau</string>
+    <string name="settings_canvas_color_white">Weiß</string>
+    <string name="settings_canvas_color_navy">Marineblau</string>
+    <string name="state_selected">Ausgewählt</string>
+    <string name="state_expanded">Ausgeklappt</string>
+    <string name="state_collapsed">Eingeklappt</string>
+    <string name="settings_fps_device_default">Gerätestandard</string>
+    <string name="settings_fps_device_max">Geräte-Maximum</string>
+    <string name="first_run_photo_title">Sieh es an deiner Wand</string>
+    <string name="first_run_photo_text">Wähle ein Referenzfoto deines Kunstwerks, und wir zeigen dir in AR, wie es an einer echten Wand aussieht.</string>
+    <string name="first_run_choose_photo">Foto auswählen</string>
+    <string name="first_run_not_now">Nicht jetzt</string>
+    <string name="first_run_draw_title">Zeichne das an deine Wand</string>
+    <string name="first_run_draw_hint">Zeichne es groß – etwa so groß wie dein Kunstwerk. Es muss nur erkennbar sein, nicht ordentlich.</string>
+    <string name="first_run_draw_done">Ich habe es gezeichnet</string>
+    <string name="first_run_draw_skip">Überspringen – ich platziere es selbst</string>
+    <string name="first_run_detect_title">Richte die Kamera jetzt auf das Gezeichnete</string>
+    <string name="first_run_detect_movement_hint">Bewege dein Gerät langsam im Kreis</string>
+    <string name="design_instructions_title">Gestalte dein Wandbild</string>
+    <string name="design_instructions_text">Tippe in der Leiste auf „%1$s“ und dann auf „%2$s“, um ein Foto deines Kunstwerks auszuwählen.</string>
+    <string name="got_it_button">Verstanden</string>
+    <string name="standalone_width_prompt">Miss die tatsächliche Breite zwischen dem linken und dem rechten Rand des Ziels.</string>
+    <string name="standalone_width_label_metric">Zielbreite (Meter)</string>
+    <string name="standalone_width_label_imperial">Zielbreite (Fuß und Zoll)</string>
+    <string name="standalone_width_range_error">Gib eine Breite von %1$s bis %2$s ein.</string>
+    <string name="standalone_use_measured_width">Gemessene Breite verwenden</string>
+    <string name="standalone_continue_without_scale">Ohne physischen Maßstab fortfahren</string>
+    <string name="standalone_recapture">Neu aufnehmen</string>
+    <string name="standalone_capture_wall_target">Wandziel aufnehmen</string>
+    <string name="standalone_capture_failed">Das Wandziel konnte nicht aufgenommen werden – versuche es erneut.</string>
+    <string name="standalone_rectify_failed">Das Ziel konnte nicht entzerrt werden – markiere vier klare Ecken.</string>
+    <string name="standalone_target_too_weak">Dieses Ziel hat zu wenige verfolgbare Details (%1$d KPM-Merkmale; nötig sind %2$d). Nimm einen strukturreicheren Wandausschnitt auf.</string>
+    <string name="standalone_new_target">Neues Ziel</string>
+    <string name="standalone_copy_diagnostics">Diagnose kopieren</string>
+    <string name="standalone_wall_target_lost">Wandziel verloren</string>
+    <string name="standalone_recapture_target">Ziel neu aufnehmen</string>
+    <string name="standalone_sweep_hint">Drehe dich langsam, um den Raum zu erfassen – %1$d%%</string>
+    <string name="standalone_failure_native_library_unavailable">SphereSLAM ist in dieser Version nicht verfügbar.</string>
+    <string name="standalone_failure_camera_unavailable">Die Kamera ist für Standalone-AR nicht verfügbar.</string>
+    <string name="standalone_failure_intrinsics_unavailable">Die Kamerakalibrierung ist für Standalone-AR nicht verfügbar.</string>
+    <string name="standalone_failure_reference_too_weak">Dieses Wandziel hat zu wenige verfolgbare Details. Nimm einen strukturreicheren Ausschnitt auf.</string>
+    <string name="standalone_failure_no_page_match">Behalte das Wandziel im Blick.</string>
+    <string name="standalone_failure_stale_observation">Das Tracking hinkt hinterher. Bewege das Telefon langsamer.</string>
+    <string name="standalone_failure_reprojection_error">Der Wandabgleich ist instabil. Richte das Ziel neu aus.</string>
+    <string name="standalone_failure_insufficient_inliers">Es sind nicht genügend Zieldetails sichtbar.</string>
+    <string name="standalone_failure_pose_jump">Tracking-Sprung abgelehnt. Halte das Telefon ruhig auf das Wandziel.</string>
+    <string name="standalone_failure_persisted_target_corrupt">Das gespeicherte Wandziel fehlt oder ist nicht lesbar. Nimm ein neues Ziel auf.</string>
+    <string name="standalone_failure_internal">SphereSLAM konnte dieses Ziel nicht weiter verfolgen.</string>
+    <string name="standalone_tracking_stopped">Das SphereSLAM-Tracking wurde beendet. Nimm das Ziel erneut auf, um es neu zu starten.</string>
+    <string name="standalone_status_mapping">SphereSLAM kartiert • tippe auf „Ziel“, um einen Fingerabdruck hinzuzufügen</string>
+    <string name="standalone_status_preparing">Fingerabdruck-Ziel wird vorbereitet…</string>
+    <string name="standalone_status_finding">Fingerabdruck-Ziel wird gesucht…</string>
+    <string name="standalone_quality_too_small">Dieses Wandziel ist nach der Entzerrung zu klein. Nimm einen größeren Ausschnitt auf.</string>
+    <string name="standalone_quality_low_contrast">Dieses Wandziel hat zu wenig visuellen Kontrast. Beziehe mehr Textur oder Details ein.</string>
+    <string name="standalone_quality_blurry">Dieses Wandziel ist für zuverlässiges Tracking zu unscharf. Halte ruhig und nimm es erneut auf.</string>
+    <string name="standalone_quality_not_strong_enough">Dieses Wandziel ist für zuverlässiges Tracking nicht aussagekräftig genug.</string>
+    <string name="standalone_quality_too_dark">Dieses Ziel ist stark unterbelichtet; das Tracking ist möglicherweise weniger zuverlässig.</string>
+    <string name="standalone_quality_too_bright">Dieses Ziel ist stark überbelichtet; das Tracking ist möglicherweise weniger zuverlässig.</string>
+    <string name="standalone_photosphere_no_sensor">Dieses Telefon hat keinen Rotationssensor, daher kann SphereSLAM hier kein Ziel platzieren.</string>
+    <string name="standalone_photosphere_compass_not_ready">Der Kompass ist noch nicht bereit – halte das Telefon eine Sekunde ruhig und nimm dann erneut auf.</string>
+    <string name="standalone_photosphere_not_mapped">SphereSLAM hat diese Ansicht noch nicht kartiert – halte die Kamera eine Sekunde ruhig auf einen hellen, detailreichen Teil der Oberfläche und nimm dann erneut auf.</string>
+    <string name="target_rectify_title">Fläche entzerren</string>
+    <string name="target_rectify_text">Ziehe nun die Ecken, bis der cyanfarbene Rahmen an der ebenen Fläche deiner Wand ausgerichtet ist.</string>
+    <string name="target_remove_marks_title">Markierungen entfernen</string>
+    <string name="target_erase_hint">Tippe auf eine Markierung, um sie zu entfernen, oder wische über mehrere Markierungen.</string>
+    <string name="target_cd_raw_capture">Rohaufnahme</string>
+    <string name="target_cd_detected_marks">Erkannte Markierungen</string>
+    <string name="target_cd_confirm">Bestätigen</string>
+    <string name="target_cd_unwarp_base">Aufgenommenes Wandfoto mit Eckgriffen</string>
+    <string name="guidance_open_via_design_overlay">Tippe in der Leiste auf „Design“ und dann auf „Öffnen“, um eine Ebene hinzuzufügen – wähle ein Foto, und es erscheint hier und schwebt über der Live-Kameraansicht.</string>
+    <string name="guidance_open_via_design_mockup">Tippe in der Leiste auf „Design“ und dann auf „Öffnen“, um eine Ebene über dem Wandfoto hinzuzufügen. Zum Anpassen von Größe und Position zusammenziehen und ziehen.</string>
+    <string name="guidance_open_via_design_trace">Tippe in der Leiste auf „Design“ und dann auf „Öffnen“, um deine erste Ebene hinzuzufügen. Sobald sie drin ist, ziehe und zoome auf der Leinwand, um sie zu skalieren und zu platzieren.</string>
+    <string name="guidance_open_via_design_ar">Tippe in der Leiste auf „Design“ und dann auf „Öffnen“, um eine Design-Ebene hinzuzufügen – sie wird mithilfe des gerade gesetzten Ankers auf die Wand projiziert.</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">Diese Änderung kann nicht mit dem Host geteilt werden – sie bleibt auf diesem Gerät</string>
+    <string name="ar_feedback_backend_resolving">Das AR-Backend wird noch ermittelt – versuche es in einem Moment erneut mit „Hosten“</string>
+    <string name="ar_feedback_open_project_first">Öffne ein Projekt, bevor du teilst – es gibt noch nichts, was an einen Gast gesendet werden könnte</string>
+    <string name="ar_feedback_host_need_target_arcore">Erfasse und fixiere vor dem Hosten ein aktuelles Wandziel</string>
+    <string name="ar_feedback_host_need_target_standalone">Erfasse vor dem Hosten ein eigenständiges Wandziel</string>
+    <string name="ar_feedback_fingerprint_not_ready">Der Wand-Fingerabdruck ist noch nicht bereit – halte das Ziel im Bild und versuche es erneut mit „Hosten“</string>
+    <string name="ar_feedback_package_failed">Dieses Projekt konnte nicht zum Teilen gepackt werden – speichere es zuerst</string>
+    <string name="ar_feedback_host_failed">Das Teilen konnte nicht gestartet werden: %1$s</string>
+    <string name="ar_feedback_join_load_failed">Das Projekt des Hosts konnte nicht geladen werden – die Sitzung wurde beendet.</string>
+    <string name="ar_feedback_join_no_geometry">Der Host hat keine Geometrie bereitgestellt, an der ARCore sich ausrichten kann.</string>
+    <string name="ar_feedback_join_failed">Beitritt nicht möglich: %1$s</string>
+    <string name="ar_feedback_wall_target_changed">Das Wandziel hat sich geändert – das Teilen wurde beendet. Starte „Hosten“ für die neue Wand erneut.</string>
+    <string name="ar_feedback_backend_changed">Das Tracking-Backend hat sich geändert – das Teilen wurde beendet. Starte das Teilen erneut.</string>
+    <string name="ar_feedback_camera_busy">Die Kamera ist belegt oder nicht verfügbar – schließe andere Kamera-Apps und öffne AR dann erneut</string>
+    <string name="ar_feedback_ar_start_failed">AR konnte nicht gestartet werden – deine Kamera wird möglicherweise von einer anderen App verwendet</string>
+    <string name="ar_feedback_camera_setting_apply_failed">Die Kameraeinstellung konnte nicht auf die laufende AR-Sitzung angewendet werden – verlasse AR und öffne es erneut</string>
+    <string name="ar_feedback_sphere_target_save_failed">Die Wandverfolgung funktioniert in dieser Sitzung, aber das SphereSLAM-Ziel konnte nicht gespeichert werden.</string>
+    <string name="ar_feedback_camera_not_resumed">Die AR-Kamera wurde nicht fortgesetzt – verlasse den AR-Modus und öffne ihn erneut</string>
+    <string name="ar_feedback_camera_permission">Kamera nicht verfügbar – prüfe die Kameraberechtigung und öffne AR dann erneut</string>
+    <string name="ar_feedback_camera_not_paused">Die AR-Kamera wurde nicht sauber pausiert – sie läuft möglicherweise im Hintergrund weiter</string>
+    <string name="ar_feedback_backbone_warning">Das Kunstwerk deckt fast die gesamte sichtbare Wand ab – nur %1$d verfolgte Merkmale liegen außerhalb. Mach es kleiner oder tritt zurück, sonst rastet das Ziel möglicherweise nicht ein.</string>
+    <string name="ar_feedback_legacy_target_geometry">Das gespeicherte Ziel dieses Projekts stammt von einer älteren Version und seine 3D-Geometrie lässt sich nicht korrigieren. Erstelle das Ziel neu, um es zu verwenden.</string>
+    <string name="ar_feedback_camera_no_frames">Die Kamera liefert keine Bilder – verlasse AR und versuche es erneut</string>
+    <string name="ar_feedback_camera_recovery_timeout">Die Wiederherstellung der AR-Kamera ist sicher abgelaufen – verlasse AR und öffne es erneut</string>
+    <string name="ar_feedback_target_prepare_failed">Das erfasste Ziel konnte nicht vorbereitet werden. Versuche es erneut.</string>
+    <string name="ar_feedback_wall_width_save_failed">Die Wandbreite konnte nicht gespeichert werden. Versuche es erneut mit „Speichern“.</string>
+    <string name="ar_feedback_unknown_error">unbekannter Fehler</string>
 </resources>

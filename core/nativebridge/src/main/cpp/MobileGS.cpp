@@ -363,6 +363,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
     // The sensor turn's inputs: the wall's normal (East-North-Up) and this frame's attitude.
     bool hasWallNormal = false;
     cv::Vec3d wallNormal;
+    uint64_t solveFingerprintGeneration = 0;
     const bool hasAttitude = relocAttitude != nullptr;
     cv::Matx33d earthFromCam = cv::Matx33d::eye();
     if (hasAttitude) for (int i = 0; i < 9; ++i) earthFromCam.val[i] = relocAttitude[i];
@@ -381,6 +382,10 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
         mapKps3d = mMapPoints3D;
         memcpy(mapPriorPose, mPnpCamFromFpWorld, 16 * sizeof(float));
         mapPriorSeq = mPnpResultSeq.load(std::memory_order_relaxed);
+        // Which fingerprint every snapshot above belongs to. Checked again under the same mutex
+        // before this pass publishes: a fingerprint replaced or cleared while the (hundreds of ms)
+        // solve ran must not have its result latched as if it described the NEW wall.
+        solveFingerprintGeneration = mFingerprintGeneration;
     }
 
     // 2.11: reset the backbone counters BEFORE the early-outs below, so an attempt that never
@@ -914,51 +919,70 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
                     for(int j=0; j<3; ++j) pnpMat[j][i] = (float)R.at<double>(i,j);
                     pnpMat[3][i] = (float)tvec.at<double>(i);
                 }
+                if (mBeforeRelocPublishHook) mBeforeRelocPublishHook();
+                bool published = false;
                 {
                     std::lock_guard<std::mutex> lock(mMutex);
-                    memcpy(mPnpCamFromFpWorld, glm::value_ptr(pnpMat), 16 * sizeof(float));
-                    memcpy(mPnpSolveView, relocView, 16 * sizeof(float));
-                    // The camera this pose was solved with, published WITH it, so consumers never
-                    // pair this pose with another camera. Zeroed for the coarse default, which they
-                    // treat as "no intrinsics" (the old unset-fingerprint-K behaviour).
-                    for (int i = 0; i < 4; ++i) mPnpIntrinsics[i] = liveKReal ? (float)liveK[i] : 0.0f;
-                }
-                mPnpInlierCount.store((int)inliers.size(), std::memory_order_relaxed);
-                mPnpMatchCount.store((int)imgPts.size(), std::memory_order_relaxed);
-                mPnpResultSeq.fetch_add(1, std::memory_order_relaxed);
-                mLastRelocReject.store(kRelocOk, std::memory_order_relaxed);
-                LOGI("Relocalization: PnP match published (%zu/%zu inliers)", inliers.size(), imgPts.size());
-                // Learn the wall's normal in the earth's frame from a well-supported lock, for the
-                // sensor turn the next time the camera is lost. Averaged in, so one lock's noise
-                // moves it little; three disagreeing locks in a row mean it was wrong, and replace it.
-                if (hasAttitude && inliers.size() >= 12) {
-                    cv::Vec3d n;
-                    const cv::Matx33d Rm = (cv::Matx33d)R;
-                    const cv::Vec3d tv(tvec.at<double>(0), tvec.at<double>(1), tvec.at<double>(2));
-                    if (wallNormalFromLock(wallKps3d, Rm, tv, earthFromCam, n)) {
-                        std::lock_guard<std::mutex> lock(mMutex);
-                        const cv::Vec3d prev(mWallNormalEnu[0], mWallNormalEnu[1], mWallNormalEnu[2]);
-                        cv::Vec3d next = n;
-                        if (mHasWallNormalEnu) {
-                            if (prev.dot(n) > 0.5) {
-                                mWallNormalDisagree = 0;
-                                next = 0.8 * prev + 0.2 * n;
-                            } else if (++mWallNormalDisagree < 3) {
-                                next = prev;
-                            } else {
-                                mWallNormalDisagree = 0;
-                            }
-                        }
-                        const double len = cv::norm(next);
-                        if (len > 1e-9) {
-                            for (int i = 0; i < 3; ++i) mWallNormalEnu[i] = (float)(next[i] / len);
-                            mHasWallNormalEnu = true;
-                        }
+                    // The fingerprint this solve ran against is no longer the stored one (restored,
+                    // replaced by a re-capture, or cleared while the solve was in flight). Its pose is
+                    // in the OLD wall's frame; latching it would cold-snap the new anchor onto the old
+                    // wall. Dropped here, under the lock that publishes, so no ordering of the
+                    // replacement and the publish can leak it.
+                    if (solveFingerprintGeneration == mFingerprintGeneration) {
+                        memcpy(mPnpCamFromFpWorld, glm::value_ptr(pnpMat), 16 * sizeof(float));
+                        memcpy(mPnpSolveView, relocView, 16 * sizeof(float));
+                        // The camera this pose was solved with, published WITH it, so consumers never
+                        // pair this pose with another camera. Zeroed for the coarse default, which they
+                        // treat as "no intrinsics" (the old unset-fingerprint-K behaviour).
+                        for (int i = 0; i < 4; ++i) mPnpIntrinsics[i] = liveKReal ? (float)liveK[i] : 0.0f;
+                        // Counts and seq are published in the SAME critical section as the pose.
+                        // getRelocResult and the grow/corroboration readers snapshot all of them under
+                        // mMutex, so a reader can never pair this pose with the previous solve's
+                        // inliers/matches, or see the new seq before the pose that earned it. (They stay
+                        // atomics only because a few diagnostics read them without the lock.)
+                        mPnpInlierCount.store((int)inliers.size(), std::memory_order_relaxed);
+                        mPnpMatchCount.store((int)imgPts.size(), std::memory_order_relaxed);
+                        mPnpResultSeq.fetch_add(1, std::memory_order_relaxed);
+                        published = true;
                     }
                 }
-                // Phase 3 passive build: grow the feature map from this locked frame (default OFF).
-                if (mMapBuildEnabled.load(std::memory_order_relaxed))
-                    growMapFromReloc(pnpMat, baseKps, baseDescs, fx, fy, cx, cy);
+                if (!published) {
+                    LOGI("Relocalization: dropped a PnP solve made against a replaced fingerprint");
+                } else {
+                    mLastRelocReject.store(kRelocOk, std::memory_order_relaxed);
+                    LOGI("Relocalization: PnP match published (%zu/%zu inliers)", inliers.size(), imgPts.size());
+                    // Learn the wall's normal in the earth's frame from a well-supported lock, for the
+                    // sensor turn the next time the camera is lost. Averaged in, so one lock's noise
+                    // moves it little; three disagreeing locks in a row mean it was wrong, and replace it.
+                    if (hasAttitude && inliers.size() >= 12) {
+                        cv::Vec3d n;
+                        const cv::Matx33d Rm = (cv::Matx33d)R;
+                        const cv::Vec3d tv(tvec.at<double>(0), tvec.at<double>(1), tvec.at<double>(2));
+                        if (wallNormalFromLock(wallKps3d, Rm, tv, earthFromCam, n)) {
+                            std::lock_guard<std::mutex> lock(mMutex);
+                            const cv::Vec3d prev(mWallNormalEnu[0], mWallNormalEnu[1], mWallNormalEnu[2]);
+                            cv::Vec3d next = n;
+                            if (mHasWallNormalEnu) {
+                                if (prev.dot(n) > 0.5) {
+                                    mWallNormalDisagree = 0;
+                                    next = 0.8 * prev + 0.2 * n;
+                                } else if (++mWallNormalDisagree < 3) {
+                                    next = prev;
+                                } else {
+                                    mWallNormalDisagree = 0;
+                                }
+                            }
+                            const double len = cv::norm(next);
+                            if (len > 1e-9) {
+                                for (int i = 0; i < 3; ++i) mWallNormalEnu[i] = (float)(next[i] / len);
+                                mHasWallNormalEnu = true;
+                            }
+                        }
+                    }
+                    // Phase 3 passive build: grow the feature map from this locked frame (default OFF).
+                    if (mMapBuildEnabled.load(std::memory_order_relaxed))
+                        growMapFromReloc(pnpMat, baseKps, baseDescs, fx, fy, cx, cy);
+                }
             }
         }
     }
@@ -1847,8 +1871,33 @@ void MobileGS::setEvalSyncReloc(bool enabled, int everyN) {
     mEvalSyncReloc.store(enabled, std::memory_order_relaxed);
     LOGI("Eval sync-reloc %s (every %d frames)", enabled ? "ON" : "off", std::max(1, everyN));
 }
+// Called with mMutex held by every path that REPLACES or CLEARS the stored wall fingerprint.
+//
+// 1. The fingerprint generation advances, so a solve already in flight against the previous
+//    fingerprint (runRelocPass snapshots it at the start and re-checks under this same mutex before
+//    publishing) is dropped instead of latched as if it described the new wall.
+// 2. The last PnP result was solved against the OLD fingerprint. Left behind, a re-capture would hand
+//    Kotlin the old wall's pose with a seq it may not have consumed yet (PoseFusion cold-snapping the
+//    new anchor onto the old fix). Back to "no relock": identity pose, zero counts. The seq is
+//    deliberately NOT rewound -- it stays monotonic so a consumer holding the old value can never
+//    mistake a later, genuine result for one it has already seen. Zero inliers/matches also make any
+//    consumer that does treat the stale seq as new reject it (ratio 0 < MIN_INLIER_RATIO).
+// 3. The reject code returns to "no relock against the current fingerprint": a leftover kRelocOk
+//    would tell the corroboration pass that the (now identity) pose describes the current frame.
+void MobileGS::invalidateRelocResultLocked() {
+    static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    ++mFingerprintGeneration;
+    memcpy(mPnpCamFromFpWorld, kIdentity16, 16 * sizeof(float));
+    memcpy(mPnpSolveView, kIdentity16, 16 * sizeof(float));
+    memset(mPnpIntrinsics, 0, 4 * sizeof(float));
+    mPnpInlierCount.store(0, std::memory_order_relaxed);
+    mPnpMatchCount.store(0, std::memory_order_relaxed);
+    mLastRelocReject.store(kRelocNoFingerprint, std::memory_order_relaxed);
+}
+
 void MobileGS::restoreWallFingerprint(const cv::Mat& d, const std::vector<cv::Point3f>& p) {
     std::lock_guard<std::mutex> lock(mMutex);
+    invalidateRelocResultLocked();
     mWallDescriptors = d.clone();
     mWallKeypoints3D = p;
     // This path carries no partition, and the previous fingerprint's must not survive onto it: the
@@ -1884,6 +1933,13 @@ void MobileGS::restoreWallFingerprintMetric(const cv::Mat& d, const std::vector<
         d.cols == mWallDescriptors.cols && d.type() == mWallDescriptors.type() &&
         (d.empty() || cv::norm(d, mWallDescriptors, cv::NORM_INF) == 0.0);
     if (!sameFingerprint) mWallPatch.release();
+    // A re-push of the identical point set (repartition) keeps the standing result: the pose is still
+    // in this fingerprint's frame. Any other content is a different wall -- or a different anchor and
+    // view over the same points -- and the result and any in-flight solve belong to the old one.
+    const bool sameFrame = sameFingerprint &&
+        (!anchorMatrix16 || memcmp(anchorMatrix16, mFingerprintAnchorMatrix, 16 * sizeof(float)) == 0) &&
+        (!intrinsics4 || memcmp(intrinsics4, mFingerprintIntrinsics, 4 * sizeof(float)) == 0);
+    if (!sameFrame) invalidateRelocResultLocked();
     mWallDescriptors = d.clone();
     mWallKeypoints3D = p;
     // Belt and braces over the JNI-side length check: a partition that does not index the points it
@@ -1915,6 +1971,8 @@ void MobileGS::clearWallFingerprint() {
     // The wall's normal belongs to this wall; the next project may be another.
     mHasWallNormalEnu = false;
     mWallNormalDisagree = 0;
+    // The last PnP result was solved against THIS fingerprint; see invalidateRelocResultLocked.
+    invalidateRelocResultLocked();
 
     // The ARTWORK side has to go too. It used to survive, and there is no other path that clears it:
     // an un-fingerprinted project would then be validated against the PREVIOUS project's artwork by
@@ -2083,6 +2141,16 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
     if (depth < 0 || depth > CV_64F || channels < 1 || channels > 4) return;
     if (descRows == 0 || descCols == 0 || descRows > 100000 || descCols > 100000) return;
 
+    // Row i of the descriptors IS point i's descriptor; every other restore path refuses a set whose
+    // point and descriptor counts differ (the reloc thread indexes one by the other). A peer that
+    // sends a mismatched pair would otherwise install a fingerprint whose matches subscript past
+    // the points.
+    if (numPoints != descRows) {
+        LOGE("alignToFingerprint: rejecting peer fingerprint: %u points vs %u descriptor rows",
+             numPoints, descRows);
+        return;
+    }
+
     uint64_t descDataSize = static_cast<uint64_t>(descRows) * descCols * CV_ELEM_SIZE(descType);
     if (static_cast<uint64_t>(end - ptr) < descDataSize) return;
 
@@ -2091,6 +2159,7 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
 
     {
         std::lock_guard<std::mutex> lock(mMutex);
+        invalidateRelocResultLocked();
         mWallKeypoints3D = std::move(points3d);
         // A peer's fingerprint is a different frame; local paint marks do not transfer.
         mPaintDescriptors.release();
@@ -2550,6 +2619,7 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
 
     {
         std::lock_guard<std::mutex> lock(mMutex);
+        invalidateRelocResultLocked();
         mWallDescriptors  = fd.descriptors.clone();
         // New capture = new fingerprint frame; paint placed in the old one is meaningless here.
         mPaintDescriptors.release();

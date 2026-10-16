@@ -13,11 +13,12 @@ Its contents, all produced by `ProjectManager`:
 | File | Written by | Contents |
 | :--- | :--- | :--- |
 | `project.json` | `ProjectManager.saveProject` | The full `GraffitiProject` (see below), kotlinx.serialization JSON, pretty-printed. |
-| `thumbnail.png` | `saveProject` (when a thumbnail bitmap is passed) | PNG, quality 80. |
-| `target_<unique>.png` | `saveProject` / `ProjectManager.appendTargetImage` | One PNG per captured target image (quality 100). Filenames are unique per file (`File.createTempFile`), not sequentially numbered — nothing round-trips the filename itself, only the URI stored in `project.json`. |
+| `thumbnail.png` | `saveProject` (when a thumbnail bitmap is passed), editor thumbnail job via `saveArtifact` | PNG. Installed atomically (see below). |
+| `target_<uuid>.png` | `saveProject` / `ProjectManager.appendTargetImage` | One PNG per captured target image (quality 100), installed atomically. Filenames are unique per file (random UUID), not sequentially numbered — nothing round-trips the filename itself, only the URI stored in `project.json`. |
 | `sphereslam_reference_<uuid>.png` | `ProjectManager.saveSphereSlamReference` | Versioned canonical rectified wall page for ARCore-independent SphereSLAM/KPM tracking. `project.json` stores URI, scale, anchor generation/frame version, and placement generation; recapture installs a new file, bumps the anchor generation, invalidates old spatial placement, then deletes superseded page/atlas files best-effort. |
 | `sphereslam_page_<pageNo>_<uuid>.png` | `ProjectManager.saveSphereSlamAtlasPage` | Additional rectified KPM atlas pages. Each project record stores a stable page id plus `canonicalFromPage`, so every page matches back into page 0's immutable canonical wall frame. |
-| arbitrary filenames | `ProjectRepository.saveArtifact` | Design-layer image exports and other editor-written artifacts (e.g. `feature/editor`'s `EditorViewModel`), written as raw bytes under the same project directory. |
+| `design_<uuid>.png` | `EditorViewModel` via `ProjectRepository.saveArtifact` | The design image: one per import and per co-op pixel replacement. Only the one `project.json` references is live; superseded ones are deleted by the editor once nothing (saved project, live design, undo/redo history) points at them, and are left out of exports and co-op transfers (§2). |
+| arbitrary filenames | `ProjectRepository.saveArtifact` | Other editor-written artifacts (e.g. `map.bin`, the thumbnail), written as raw bytes under the same project directory. |
 
 There is **no separate binary map/voxel/splat file of any kind**. The persistent wall-feature map
 (`WallFeatureMap` — points, ORB/SuperPoint descriptor blob, confidence, anchor, intrinsics) lives
@@ -25,9 +26,16 @@ entirely as fields inside `project.json`, alongside everything else (see §2). L
 `Fingerprint`'s descriptor blob, GPS/sensor data, and `CaptureEnvironment` are all just fields of
 the one JSON document — nothing is broken out into its own file format.
 
-Writes to `project.json` are atomic: `ProjectManager.atomicWriteText` writes to a sibling `.tmp`
-file and renames it over the target, so a crash mid-write can never leave a truncated, unparseable
-`project.json`.
+Writes are atomic. `project.json` goes through `ProjectManager.atomicWriteText`, which writes a
+sibling `.tmp` file, fsyncs it and renames it over the target, so a crash mid-write can never leave
+a truncated, unparseable manifest. The PNGs follow the same discipline: `thumbnail.png`,
+`target_*.png`, the SphereSLAM reference/atlas pages and the hybrid KPM page are encoded into a
+sibling temp file (a failed encode throws instead of leaving a half-written image), fsynced, then
+renamed into place, and `ProjectRepository.saveArtifact` fsyncs its temp file before renaming too.
+
+A project folder's name is its identity: `loadProjectMetadata` refuses (and logs) a folder whose
+manifest `id` differs from the folder name, so it never appears in the library under one id and
+saves, deletes or opens under another.
 
 ## 2. The `.gxr` archive (export / import / co-op transfer)
 
@@ -39,15 +47,25 @@ referenced `sphereslam_reference_<uuid>.png`, any referenced `sphereslam_page_*.
 (plus any orphan left by interrupted cleanup), and artifact files, with no top-level folder wrapping
 them.
 
-- **Export** (`ProjectManager.exportProjectToUri`): zips the project directory as-is to a
-  user-chosen URI.
+- **Export** (`ProjectManager.exportProjectToUri`): zips the project directory to a user-chosen URI,
+  leaving out root-level `design_*` files that `project.json` no longer references (superseded
+  design images), so an archive carries only the designs the project uses. The same applies to the
+  co-op bulk transfer. Nothing is deleted by an export.
 - **Import** (`ProjectManager.importProjectFromUri`): the archive is untrusted — it may come from
   anywhere on the user's filesystem. Each entry is size-capped (512 MiB cumulative decompressed,
   `MAX_IMPORT_BYTES`) and streamed straight to a temp file (never fully buffered in memory) so a
   zip bomb can't exhaust the heap before the cap is checked; entry names are validated against
   path traversal ("Zip-Slip") before being written into the destination project directory; and the
   decoded `project.json`'s `id` field is validated (`isSafeProjectId`) before it's used as a path
-  segment.
+  segment. `MAX_IMPORT_BYTES` is sized as roughly 2.5x a heavily used project (a design, up to
+  `MAX_TARGET_IMAGES` camera-resolution target PNGs, evolution frames and the SphereSLAM/KPM pages
+  come to well under 200 MiB) and is also the most a co-op host can reasonably hold as one in-memory
+  zip. Before extracting, the import checks that the cache and files directories have free space
+  for the archive (`hasRoomToImport`: a 64 MiB floor plus twice the declared size, at most twice the
+  cap). The extracted files are staged in `filesDir/import_staging/<uuid>/` — outside `projects/`,
+  so nothing half-built is ever listed — their URIs are rewritten, the corrected manifest (new id
+  when the id was already taken) is written there, and only then is the staging directory renamed
+  to `projects/<id>`. A failure at any point deletes the staging directory.
 - **Co-op bulk transfer** (`ProjectManager.serializeCurrentProject` / `loadAsSpectator`): the exact
   same ZIP format, sent as raw bytes over the co-op session instead of through a `Uri`, with the
   same streaming/cap/Zip-Slip hardening applied on the receiving (spectator) end — the wire is just

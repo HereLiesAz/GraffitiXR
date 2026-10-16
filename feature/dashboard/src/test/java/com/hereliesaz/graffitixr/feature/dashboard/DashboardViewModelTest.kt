@@ -32,6 +32,7 @@ class DashboardViewModelTest {
 
     private lateinit var viewModel: DashboardViewModel
     private lateinit var repository: ProjectRepository
+    private lateinit var settingsRepository: com.hereliesaz.graffitixr.domain.repository.SettingsRepository
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
@@ -39,7 +40,9 @@ class DashboardViewModelTest {
         Dispatchers.setMain(testDispatcher)
         repository = mockk(relaxed = true)
         every { repository.currentProject } returns kotlinx.coroutines.flow.MutableStateFlow<GraffitiProject?>(null)
-        viewModel = DashboardViewModel(repository)
+        settingsRepository = mockk(relaxed = true)
+        every { settingsRepository.lastOpenProjectId } returns kotlinx.coroutines.flow.flowOf<String?>(null)
+        viewModel = DashboardViewModel(repository, settingsRepository)
 
         // The failure paths in openProject/importProject log via android.util.Log, which isn't
         // available in plain JVM unit tests (matches ProjectManagerTest's pattern).
@@ -234,6 +237,31 @@ class DashboardViewModelTest {
         
         coVerify { repository.deleteProject(projectId) }
         coVerify { repository.getProjects() } // loadAvailableProjects is called
+    }
+
+    @Test
+    fun `deleting the remembered project forgets it before the library reloads`() = runTest {
+        every { settingsRepository.lastOpenProjectId } returns kotlinx.coroutines.flow.flowOf<String?>("1")
+
+        viewModel.deleteProject("1")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        io.mockk.coVerifyOrder {
+            repository.deleteProject("1")
+            settingsRepository.setLastOpenProjectId(null)
+            repository.getProjects()
+        }
+    }
+
+    @Test
+    fun `deleting a different project leaves the remembered one alone`() = runTest {
+        every { settingsRepository.lastOpenProjectId } returns kotlinx.coroutines.flow.flowOf<String?>("keep")
+
+        viewModel.deleteProject("other")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify(exactly = 0) { settingsRepository.setLastOpenProjectId(any()) }
+        coVerify { repository.deleteProject("other") }
     }
 
     // ── Settings ▸ Updates: releases page ─────────────────────────────────────

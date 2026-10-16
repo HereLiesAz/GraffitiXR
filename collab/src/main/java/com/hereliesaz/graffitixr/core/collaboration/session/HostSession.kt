@@ -321,7 +321,28 @@ internal class HostSession(
         val input = socket.getInputStream()
         val output = socket.getOutputStream()
 
-        val helloFrame = Frame.read(input) ?: return socket.close()
+        // soTimeout is per read(): a peer trickling one byte every <5s would never trip it, so the
+        // whole HELLO read also runs under a total deadline that closes the socket, and its payload
+        // is capped to a few KB (a HELLO is a nonce, a 32-byte proof and a version) so a declared
+        // 16 MB frame cannot force a 16 MB allocation before authentication.
+        val helloTimedOut = java.util.concurrent.atomic.AtomicBoolean(false)
+        val helloWatchdog = scope.launch {
+            delay(HANDSHAKE_TOTAL_TIMEOUT_MS)
+            helloTimedOut.set(true)
+            try { socket.close() } catch (_: Exception) {}
+        }
+        val helloRead = try {
+            withContext(Dispatchers.IO) { Frame.read(input, HELLO_MAX_PAYLOAD_BYTES) }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            if (helloTimedOut.get()) {
+                throw java.io.IOException("HELLO not received within ${HANDSHAKE_TOTAL_TIMEOUT_MS}ms", e)
+            }
+            throw e
+        } finally {
+            helloWatchdog.cancel()
+        }
+        val helloFrame = helloRead ?: return socket.close()
         if (helloFrame.type != FrameType.HELLO) {
             sendBye(output, CoopSessionState.EndReason.ProtocolError, crypto = null)
             socket.close(); return
@@ -770,6 +791,12 @@ internal class HostSession(
         // blocks hosting for this long — kept short (5s) to limit that pre-auth stall, while the live
         // phase widens back to READ_TIMEOUT_MS.
         const val HANDSHAKE_READ_TIMEOUT_MS = 5_000
+
+        /** Total budget for the pre-auth HELLO frame, however slowly the peer trickles it. */
+        const val HANDSHAKE_TOTAL_TIMEOUT_MS = 8_000L
+
+        /** A HELLO is tiny; anything bigger pre-auth is hostile or broken. */
+        const val HELLO_MAX_PAYLOAD_BYTES = 4 * 1024
 
         // Plain java.net.Socket exposes no write-side timeout, so writeFrameTimed enforces one
         // itself. Mirrors READ_TIMEOUT_MS: a guest that stops reading for this long (backgrounded,
