@@ -669,9 +669,6 @@
     <string name="first_run_draw_skip">Überspringen – ich platziere es selbst</string>
     <string name="first_run_detect_title">Richte die Kamera jetzt auf das Gezeichnete</string>
     <string name="first_run_detect_movement_hint">Bewege dein Gerät langsam im Kreis</string>
-    <string name="design_instructions_title">Gestalte dein Wandbild</string>
-    <string name="design_instructions_text">Tippe in der Leiste auf „%1$s“ und dann auf „%2$s“, um ein Foto deines Kunstwerks auszuwählen.</string>
-    <string name="got_it_button">Verstanden</string>
     <string name="standalone_width_prompt">Miss die tatsächliche Breite zwischen dem linken und dem rechten Rand des Ziels.</string>
     <string name="standalone_width_label_metric">Zielbreite (Meter)</string>
     <string name="standalone_width_label_imperial">Zielbreite (Fuß und Zoll)</string>

@@ -82,3 +82,17 @@ The instruction overlay is mounted automatically by `AzHostActivityLayout`. The 
 
 ---
 *Documentation updated on 2026-06-28 for AzNavRail 10.18 and the reactive guidance framework.*
+
+### One tutorial surface at a time
+
+The guidance graph is the tutorial. Everything else that explains something yields or is gone:
+
+* **Capture step:** `TargetCreationUi`'s own card is the only instruction while a target is being captured; the guidance graph is suppressed (`azSuppressGuide { isCapturingTarget || ownTutorialActive }`). There is no separate in-capture hint.
+* **After the anchor lands:** the `gx.hasTarget -> gx.hasDesign` edge ("open a design via Design") is the only instruction. The old "Design your mural" dialog and "Target established" card were removed.
+* **First launch:** the photo explainer, the DRAW/DETECT walkthrough and the no-ARCore explainer are the app's own first-run surfaces; `MainActivity` reports them as `ownTutorialActive`, so the graph waits until they are done.
+
+`TargetIncompleteOverlay` ("Target not locked") is an error state, not a tutorial, and stays.
+
+### Where app UI goes (AzNavRail layout layers)
+
+Per `AZNAVRAIL_COMPLETE_GUIDE.md` ("Layout Layers"): `background()` is the camera feed and sits beneath the entire `onscreen` book; app UI such as the close-up progress bar lives in `onscreen { }`, which the host pads to the safe zones and the rail. GraffitiXR's close-up progress bar ("Learning the wall up close: n of m") is top-centre in `MainActivity`'s `onscreen` block.

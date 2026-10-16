@@ -669,9 +669,6 @@
     <string name="first_run_draw_skip">Hopp over – jeg plasserer det selv</string>
     <string name="first_run_detect_title">Rett nå kameraet mot det du tegnet</string>
     <string name="first_run_detect_movement_hint">Beveg enheten sakte i en sirkel</string>
-    <string name="design_instructions_title">Design veggmaleriet ditt</string>
-    <string name="design_instructions_text">Trykk på «%1$s» i raden, og deretter «%2$s», for å velge et bilde av kunstverket ditt.</string>
-    <string name="got_it_button">Greit</string>
     <string name="standalone_width_prompt">Mål den faktiske bredden mellom venstre og høyre kant av målet.</string>
     <string name="standalone_width_label_metric">Målets bredde (meter)</string>
     <string name="standalone_width_label_imperial">Målets bredde (fot og tommer)</string>

@@ -12,9 +12,9 @@ import com.hereliesaz.graffitixr.design.R as DesignR
 /**
  * Per-mode guidance goal ids. Each [azGoal] below auto-starts on entry to its mode (`autoStartWhen`
  * bound to that mode's `az.screen.*` status) — AzGuidanceController persists completed/dismissed
- * goals in SharedPreferences, so this is a one-time first-run tour per mode, not a repeat nag. AR
- * already had its own hard-coded first-run overlays (`TargetInstructionCard`,
- * `PostTargetInstructionOverlay`); Overlay/Mockup/Trace/Design had none — this wires the ~155 lines
+ * goals in SharedPreferences, so this is a one-time first-run tour per mode, not a repeat nag. AR's
+ * capture screen keeps its own card (`TargetCreationUi`); the old hard-coded post-target overlays are
+ * gone, so this graph is the tutorial. Overlay/Mockup/Trace/Design had none — this wires the ~155 lines
  * of authored, localized per-mode guidance below (previously declared and never reachable, since
  * the Help rail item opens AzNavRail's built-in help overlay instead of toggling this tour) to
  * actually reach a first-time user in every mode, matching AR's guided first run.
@@ -67,6 +67,7 @@ internal fun AzNavHostScope.ConfigureGuidance(
     editorUiState: EditorUiState,
     arUiState: ArUiState,
     isCapturingTarget: Boolean,
+    ownTutorialActive: Boolean,
     context: Context,
     strings: AppStrings,
 ) {
@@ -89,12 +90,12 @@ internal fun AzNavHostScope.ConfigureGuidance(
     azSuppressGuide(settleMs = 700L) {
         editorUiState.gestureInProgress || editorUiState.adjustmentInProgress
     }
-    // AR's own TargetCreationUi (TargetInstructionCard) is a full-screen capture modal with its
-    // own instructions; this reactive guidance overlay is rendered automatically by
-    // AzHostActivityLayout and isn't covered by MainActivity's anyModalActive gate (that only
-    // guards overlays mounted in its own onscreen{} block), so without this the AR goal's rail
-    // callout stayed stacked on top of the capture card for the whole scan-to-lock sequence.
-    azSuppressGuide(settleMs = 0L) { isCapturingTarget }
+    // One tutorial surface at a time. This reactive graph is rendered by AzHostActivityLayout and is
+    // not covered by MainActivity's anyModalActive gate, so it must yield explicitly to:
+    //  - the target-capture screen: TargetCreationUi's own card is the one instruction there;
+    //  - the app's own first-run surfaces (the photo explainer, the DRAW/DETECT walkthrough and the
+    //    no-ARCore explainer), which MainActivity reports through [ownTutorialActive].
+    azSuppressGuide(settleMs = 0L) { isCapturingTarget || ownTutorialActive }
 
     // --- Milestone statuses: the exact predicates rememberCoachStep derived steps from. ---
     azStatus("gx.hasDesign") { editorUiState.design != null }
@@ -180,8 +181,10 @@ internal fun AzNavHostScope.ConfigureGuidance(
         ),
     )
 
-    // --- AR: scan & lock a wall target, then add layers. The "just tap the screen" line (ar[2]) is
-    // shown by the in-capture hint in MainActivity, where the guidance overlay is suppressed. ---
+    // --- AR: scan & lock a wall target, then add layers. The capture step itself is explained by
+    // TargetCreationUi's card (this graph is suppressed there), so ar[2] ("just tap the screen") is
+    // not used. Once the anchor lands, the gx.hasTarget -> gx.hasDesign edge below is the ONLY
+    // "now open a design" instruction: the old modal dialog and "Target established" card are gone. ---
     azEdge(
         from = ar0,
         to = "gx.hasTarget",
