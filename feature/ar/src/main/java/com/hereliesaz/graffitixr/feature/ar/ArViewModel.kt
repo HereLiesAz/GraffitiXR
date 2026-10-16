@@ -1772,6 +1772,11 @@ class ArViewModel @Inject constructor(
     private var autoSaveJob: kotlinx.coroutines.Job? = null
     private var loadedProjectId: String? = null
 
+    // Whose state native MobileGS holds. `loadedProjectId` flips on emission, but native keeps the
+    // previous project's map until loadFingerprintIfExists finishes swapping it, so saves gate on
+    // THIS token instead (see NativeStateOwner).
+    private val nativeStateOwner = NativeStateOwner()
+
     @Volatile
     private var pendingTapPosition: Pair<Float, Float>? = null
 
@@ -1906,6 +1911,8 @@ class ArViewModel @Inject constructor(
                         // The yaw sweep and the COMPLETE latch describe the previous project's wall.
                         if (loadedProjectId != null) resetScanProgress()
                     }
+                    // BEFORE anything can be written: native still holds the previous project's state.
+                    nativeStateOwner.beginSwitch(project.id)
                     loadedProjectId = project.id
                     // Native MobileGS has exactly one active fingerprint frame. Standalone owns it
                     // on non-ARCore devices; an ARCore co-op GUEST also owns it once protocol-v3 peer
@@ -2174,6 +2181,7 @@ class ArViewModel @Inject constructor(
             // unavailable"; the standalone analyzer starts only after this state update and will then
             // install the centered page-frame fingerprint deterministically.
             loadedFingerprint = null
+            nativeStateOwner.clear()
             slamManager.clearWallFingerprint()
             slamManager.clearWallFeatureMap()
             slamManager.overlayMarkCenterLocal = null
@@ -3835,6 +3843,19 @@ class ArViewModel @Inject constructor(
         val ui = _uiState.value
         val standaloneBackend =
             ui.isArCoreAvailabilityResolved &&
+        // ARCore-frame state (wall normal, wall map, paint marks, grid) is what the loader swaps in;
+        // between a project switch and the end of that swap native still holds the PREVIOUS
+        // project's, and writing it here would put project A's map into project B. Skip until the
+        // loader has claimed ownership; the next autosave tick picks it up. The standalone branch
+        // below is installed by the standalone analyzer, not by that loader, and is guarded by its
+        // own reference-URI / map_from_fingerprint checks.
+        if (!standaloneBackend && !nativeStateOwner.owns(projectId)) {
+            Timber.d("Wall map save skipped: native state is not (yet) project $projectId's")
+            return
+        }
+        saveWallNormalIfChanged(projectId, currentProject)
+
+        val map = slamManager.getWallFeatureMap()?.takeIf { it.pointCount > 0 }
                 !ui.isArCoreAvailable &&
                 currentProject.sphereSlamReferenceUri != null &&
                 currentProject.sphereSlamFingerprint != null
@@ -4219,6 +4240,7 @@ class ArViewModel @Inject constructor(
      * sibling was missed. The refusal branch got the Kotlin half and not `clearWallFingerprint`, so
      * a project whose target was refused went on relocalizing against the PREVIOUS project's wall
      * and centring its overlay on the previous project's marks. Bundling the three operations means
+        nativeStateOwner.clear()
      * a future branch cannot get one and forget the others.
      */
     private fun dropLoadedFingerprint() {
@@ -4279,6 +4301,9 @@ class ArViewModel @Inject constructor(
             // FIRST load of a session there is no previous project, and the footprint present is the
             // one the renderer just published for the artwork now on screen; nulling it there wipes
             // exactly the value the partition is about to need. (Caught by
+            // Native is about to be rewritten for `project`; until the END of this load it holds a
+            // mixture, and no save may attribute it to this project.
+            nativeStateOwner.beginSwitch(project.id)
             // `ArViewModelTest.loading an unpartitioned fingerprint partitions it and writes exactly
             // once`, which is why that test exists.)
             if (current != null && current.projectId != project.id) latestDesignFootprint = null
@@ -4447,6 +4472,12 @@ class ArViewModel @Inject constructor(
             }
             lastSavedProgress = 0f
             // The wall's normal this project learned, for the sensor turn from the first attempt.
+            // Last step: native now holds this project's state. A load that was overtaken by a
+            // newer project (its coroutine ran long) must not claim ownership.
+            nativeStateOwner.markLoaded(
+                project.id,
+                stillCurrent = projectRepository.currentProject.value?.id == project.id,
+            )
             slamManager.setWallNormalEnu(
                 project.fingerprintWallNormalEnu.takeIf { it.size == 3 }?.toFloatArray(),
             )
@@ -5450,6 +5481,10 @@ class ArViewModel @Inject constructor(
         }
 
         val tapPos = pendingTapPosition
+        if (tapPos != null) pendingTapPosition = null
+        // Stop the capture request NOW, on this (GL) thread's call: the renderer re-arms a capture
+        // every frame while the flag is up, and the preparation below no longer happens inline.
+        _uiState.update { it.copy(isCaptureRequested = false) }
         val extent = computePhysicalExtent(
             depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics, depthBufStride, displayRotation,
         )
