@@ -724,4 +724,32 @@
     <string name="guidance_open_via_design_mockup">Tippe in der Leiste auf „Design“ und dann auf „Öffnen“, um eine Ebene über dem Wandfoto hinzuzufügen. Zum Anpassen von Größe und Position zusammenziehen und ziehen.</string>
     <string name="guidance_open_via_design_trace">Tippe in der Leiste auf „Design“ und dann auf „Öffnen“, um deine erste Ebene hinzuzufügen. Sobald sie drin ist, ziehe und zoome auf der Leinwand, um sie zu skalieren und zu platzieren.</string>
     <string name="guidance_open_via_design_ar">Tippe in der Leiste auf „Design“ und dann auf „Öffnen“, um eine Design-Ebene hinzuzufügen – sie wird mithilfe des gerade gesetzten Ankers auf die Wand projiziert.</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">Diese Änderung kann nicht mit dem Host geteilt werden – sie bleibt auf diesem Gerät</string>
+    <string name="ar_feedback_backend_resolving">Das AR-Backend wird noch ermittelt – versuche es in einem Moment erneut mit „Hosten“</string>
+    <string name="ar_feedback_open_project_first">Öffne ein Projekt, bevor du teilst – es gibt noch nichts, was an einen Gast gesendet werden könnte</string>
+    <string name="ar_feedback_host_need_target_arcore">Erfasse und fixiere vor dem Hosten ein aktuelles Wandziel</string>
+    <string name="ar_feedback_host_need_target_standalone">Erfasse vor dem Hosten ein eigenständiges Wandziel</string>
+    <string name="ar_feedback_fingerprint_not_ready">Der Wand-Fingerabdruck ist noch nicht bereit – halte das Ziel im Bild und versuche es erneut mit „Hosten“</string>
+    <string name="ar_feedback_package_failed">Dieses Projekt konnte nicht zum Teilen gepackt werden – speichere es zuerst</string>
+    <string name="ar_feedback_host_failed">Das Teilen konnte nicht gestartet werden: %1$s</string>
+    <string name="ar_feedback_join_load_failed">Das Projekt des Hosts konnte nicht geladen werden – die Sitzung wurde beendet.</string>
+    <string name="ar_feedback_join_no_geometry">Der Host hat keine Geometrie bereitgestellt, an der ARCore sich ausrichten kann.</string>
+    <string name="ar_feedback_join_failed">Beitritt nicht möglich: %1$s</string>
+    <string name="ar_feedback_wall_target_changed">Das Wandziel hat sich geändert – das Teilen wurde beendet. Starte „Hosten“ für die neue Wand erneut.</string>
+    <string name="ar_feedback_backend_changed">Das Tracking-Backend hat sich geändert – das Teilen wurde beendet. Starte das Teilen erneut.</string>
+    <string name="ar_feedback_camera_busy">Die Kamera ist belegt oder nicht verfügbar – schließe andere Kamera-Apps und öffne AR dann erneut</string>
+    <string name="ar_feedback_ar_start_failed">AR konnte nicht gestartet werden – deine Kamera wird möglicherweise von einer anderen App verwendet</string>
+    <string name="ar_feedback_camera_setting_apply_failed">Die Kameraeinstellung konnte nicht auf die laufende AR-Sitzung angewendet werden – verlasse AR und öffne es erneut</string>
+    <string name="ar_feedback_sphere_target_save_failed">Die Wandverfolgung funktioniert in dieser Sitzung, aber das SphereSLAM-Ziel konnte nicht gespeichert werden.</string>
+    <string name="ar_feedback_camera_not_resumed">Die AR-Kamera wurde nicht fortgesetzt – verlasse den AR-Modus und öffne ihn erneut</string>
+    <string name="ar_feedback_camera_permission">Kamera nicht verfügbar – prüfe die Kameraberechtigung und öffne AR dann erneut</string>
+    <string name="ar_feedback_camera_not_paused">Die AR-Kamera wurde nicht sauber pausiert – sie läuft möglicherweise im Hintergrund weiter</string>
+    <string name="ar_feedback_backbone_warning">Das Kunstwerk deckt fast die gesamte sichtbare Wand ab – nur %1$d verfolgte Merkmale liegen außerhalb. Mach es kleiner oder tritt zurück, sonst rastet das Ziel möglicherweise nicht ein.</string>
+    <string name="ar_feedback_legacy_target_geometry">Das gespeicherte Ziel dieses Projekts stammt von einer älteren Version und seine 3D-Geometrie lässt sich nicht korrigieren. Erstelle das Ziel neu, um es zu verwenden.</string>
+    <string name="ar_feedback_camera_no_frames">Die Kamera liefert keine Bilder – verlasse AR und versuche es erneut</string>
+    <string name="ar_feedback_camera_recovery_timeout">Die Wiederherstellung der AR-Kamera ist sicher abgelaufen – verlasse AR und öffne es erneut</string>
+    <string name="ar_feedback_target_prepare_failed">Das erfasste Ziel konnte nicht vorbereitet werden. Versuche es erneut.</string>
+    <string name="ar_feedback_wall_width_save_failed">Die Wandbreite konnte nicht gespeichert werden. Versuche es erneut mit „Speichern“.</string>
+    <string name="ar_feedback_unknown_error">unbekannter Fehler</string>
 </resources>

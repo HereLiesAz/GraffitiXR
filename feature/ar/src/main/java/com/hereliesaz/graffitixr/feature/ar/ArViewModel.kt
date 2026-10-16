@@ -328,7 +328,7 @@ class ArViewModel @Inject constructor(
                 reportedGuestEditDrop = true
                 _feedback.tryEmit(
                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                        "That change can't be shared with the host — it stays on this device"
+                        appContext.getString(DesignR.string.ar_feedback_guest_edit_dropped)
                     )
                 )
             }
@@ -345,7 +345,7 @@ class ArViewModel @Inject constructor(
                 if (!st.isArCoreAvailabilityResolved) {
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                            "AR backend is still being resolved — try Host again in a moment"
+                            appContext.getString(DesignR.string.ar_feedback_backend_resolving)
                         )
                     )
                     return@launch
@@ -354,7 +354,7 @@ class ArViewModel @Inject constructor(
                 if (project == null) {
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                            "Open a project before sharing — there's nothing to send to a guest yet"
+                            appContext.getString(DesignR.string.ar_feedback_open_project_first)
                         )
                     )
                     return@launch
@@ -365,9 +365,9 @@ class ArViewModel @Inject constructor(
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
                             if (st.isArCoreAvailable) {
-                                "Capture and lock a current wall target before hosting"
+                                appContext.getString(DesignR.string.ar_feedback_host_need_target_arcore)
                             } else {
-                                "Capture a standalone Wall Target before hosting"
+                                appContext.getString(DesignR.string.ar_feedback_host_need_target_standalone)
                             }
                         )
                     )
@@ -385,7 +385,7 @@ class ArViewModel @Inject constructor(
                 ) {
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                            "Wall fingerprint is not ready yet — keep the target in view and try Host again"
+                            appContext.getString(DesignR.string.ar_feedback_fingerprint_not_ready)
                         )
                     )
                     return@launch
@@ -394,7 +394,7 @@ class ArViewModel @Inject constructor(
                 if (projectManager.serializeCurrentProject().isEmpty()) {
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                            "Couldn't package this project to share — try saving it first"
+                            appContext.getString(DesignR.string.ar_feedback_package_failed)
                         )
                     )
                     return@launch
@@ -446,7 +446,7 @@ class ArViewModel @Inject constructor(
                 android.util.Log.e("ArViewModel", "Failed to start hosting", e)
                 _feedback.tryEmit(
                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                        "Couldn't start sharing: ${e.message ?: "unknown error"}", e
+                        appContext.getString(DesignR.string.ar_feedback_host_failed, e.message ?: appContext.getString(DesignR.string.ar_feedback_unknown_error)), e
                     )
                 )
                 return@launch
@@ -511,7 +511,7 @@ class ArViewModel @Inject constructor(
                         ) {
                             _feedback.tryEmit(
                                 com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                                    "Couldn't load the host's project — the session was ended.", null
+                                    appContext.getString(DesignR.string.ar_feedback_join_load_failed), null
                                 )
                             )
                             leaveSession()
@@ -523,7 +523,7 @@ class ArViewModel @Inject constructor(
                             if (fingerprint.isEmpty()) {
                                 _feedback.tryEmit(
                                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                                        "The host did not provide geometry ARCore can align to.", null
+                                        appContext.getString(DesignR.string.ar_feedback_join_no_geometry), null
                                     )
                                 )
                                 leaveSession()
@@ -572,7 +572,7 @@ class ArViewModel @Inject constructor(
                 android.util.Log.e("ArViewModel", "Failed to join session", e)
                 _feedback.tryEmit(
                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                        "Couldn't join: ${e.message ?: "unknown error"}", e
+                        appContext.getString(DesignR.string.ar_feedback_join_failed, e.message ?: appContext.getString(DesignR.string.ar_feedback_unknown_error)), e
                     )
                 )
             }
@@ -1896,7 +1896,7 @@ class ArViewModel @Inject constructor(
                         if (current != hosted) {
                             _feedback.tryEmit(
                                 com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                                    "Wall target changed — sharing ended. Start Host again for the new wall."
+                                    appContext.getString(DesignR.string.ar_feedback_wall_target_changed)
                                 )
                             )
                             leaveSession()
@@ -2202,7 +2202,7 @@ class ArViewModel @Inject constructor(
             if (_uiState.value.coopRole != com.hereliesaz.graffitixr.common.model.CoopRole.NONE) {
                 _feedback.tryEmit(
                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                        "Tracking backend changed — sharing ended. Start sharing again."
+                        appContext.getString(DesignR.string.ar_feedback_backend_changed)
                     )
                 )
                 leaveSession()
@@ -2718,7 +2718,7 @@ class ArViewModel @Inject constructor(
                         appendDiag("camera gate FAILED — refusing to open AR session on an unconfirmed camera")
                         _feedback.tryEmit(
                             com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                                "Camera is busy or unavailable — close other camera apps, then re-enter AR"
+                                appContext.getString(DesignR.string.ar_feedback_camera_busy)
                             )
                         )
                     }
@@ -2953,7 +2953,7 @@ class ArViewModel @Inject constructor(
             // Surface the failure instead of leaving the user on a frozen black AR screen.
             _isCameraInUseByAr.value = false
             _feedback.tryEmit(
-                com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error("Couldn't start AR — your camera may be in use by another app", e)
+                com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(appContext.getString(DesignR.string.ar_feedback_ar_start_failed), e)
             )
         }
     }
@@ -3094,7 +3094,7 @@ class ArViewModel @Inject constructor(
                     appendDiag("settings: GL thread still owns ARCore after 1500ms — live reconfigure aborted")
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                            "Couldn't apply the camera setting to the running AR session — exit and re-enter AR"
+                            appContext.getString(DesignR.string.ar_feedback_camera_setting_apply_failed)
                         )
                     )
                     return@withLock
@@ -3370,7 +3370,7 @@ class ArViewModel @Inject constructor(
                 Timber.e(e, "Failed to persist standalone SphereSLAM reference")
                 _feedback.tryEmit(
                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                        "Wall tracking works for this session, but the SphereSLAM target couldn't be saved.",
+                        appContext.getString(DesignR.string.ar_feedback_sphere_target_save_failed),
                         e,
                     ),
                 )
@@ -3645,7 +3645,7 @@ class ArViewModel @Inject constructor(
                     )
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                            "AR camera did not resume — try leaving and re-entering AR mode"
+                            appContext.getString(DesignR.string.ar_feedback_camera_not_resumed)
                         )
                     )
                 }
@@ -3656,7 +3656,7 @@ class ArViewModel @Inject constructor(
             // Permission revoked at runtime, or the camera is held elsewhere. Tell the user
             // rather than leaving a frozen preview.
             _feedback.tryEmit(
-                com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error("Camera unavailable — check the camera permission, then re-enter AR", e)
+                com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(appContext.getString(DesignR.string.ar_feedback_camera_permission), e)
             )
         } catch (e: Exception) {
             Timber.e(e, "Failed to resume ARCore session")
@@ -3688,7 +3688,7 @@ class ArViewModel @Inject constructor(
                     )
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                            "AR camera did not pause cleanly — it may keep running in the background"
+                            appContext.getString(DesignR.string.ar_feedback_camera_not_paused)
                         )
                     )
                 }
@@ -4016,9 +4016,7 @@ class ArViewModel @Inject constructor(
         if (tooSmall && !wasTooSmall) {
             _feedback.tryEmit(
                 com.hereliesaz.graffitixr.common.model.FeedbackEvent.Toast(
-                    "The artwork covers nearly all the wall in view — only $backbone tracked " +
-                        "features sit outside it. Make it smaller or step back, or the target " +
-                        "may not lock.",
+                    appContext.getString(DesignR.string.ar_feedback_backbone_warning, backbone),
                 ),
             )
         }
@@ -4401,8 +4399,7 @@ class ArViewModel @Inject constructor(
                         // like bad tracking.
                         _feedback.tryEmit(
                             com.hereliesaz.graffitixr.common.model.FeedbackEvent.Toast(
-                                "This project's saved target was made by an older version and its " +
-                                    "3D geometry can't be corrected. Create the target again to use it.",
+                                appContext.getString(DesignR.string.ar_feedback_legacy_target_geometry),
                             ),
                         )
                     }
@@ -5003,7 +5000,7 @@ class ArViewModel @Inject constructor(
             appendDiag("camera not feeding on mono — armed safe-config recovery; exit and re-enter AR to retry")
             _feedback.tryEmit(
                 com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                    "Camera isn't delivering frames — exit AR and try again"
+                    appContext.getString(DesignR.string.ar_feedback_camera_no_frames)
                 )
             )
             return
@@ -5043,7 +5040,7 @@ class ArViewModel @Inject constructor(
                     appendDiag("stereo recovery: GL thread still owns ARCore after 1500ms — aborting live reconfigure")
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                            "AR camera recovery timed out safely — exit and re-enter AR"
+                            appContext.getString(DesignR.string.ar_feedback_camera_recovery_timeout)
                         )
                     )
                     return@withLock
@@ -5480,7 +5477,7 @@ class ArViewModel @Inject constructor(
                 )
                 _feedback.tryEmit(
                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                        "Couldn't prepare the captured target. Try again.",
+                        appContext.getString(DesignR.string.ar_feedback_target_prepare_failed),
                         e,
                     )
                 )
@@ -5814,7 +5811,7 @@ class ArViewModel @Inject constructor(
                 cancelMeasure()
             } else {
                 _feedback.tryEmit(
-                    com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error("Couldn't save the wall width. Try Save again."),
+                    com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(appContext.getString(DesignR.string.ar_feedback_wall_width_save_failed)),
                 )
             }
         }

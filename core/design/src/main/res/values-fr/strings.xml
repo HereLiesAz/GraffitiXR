@@ -460,4 +460,32 @@
     <string name="guidance_open_via_design_mockup">Appuyez sur « Conception » dans la barre, puis sur « Ouvrir », pour ajouter un calque sur la photo du mur. Pincez et faites glisser pour le dimensionner et le positionner.</string>
     <string name="guidance_open_via_design_trace">Appuyez sur « Conception » dans la barre, puis sur « Ouvrir », pour ajouter votre premier calque. Une fois en place, pincez et faites glisser sur le canevas pour le dimensionner et le placer.</string>
     <string name="guidance_open_via_design_ar">Appuyez sur « Conception » dans la barre, puis sur « Ouvrir », pour ajouter un calque de conception : il se projette sur le mur à partir de l\'ancre que vous venez de définir.</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">Ce changement ne peut pas être partagé avec l\'hôte : il reste sur cet appareil</string>
+    <string name="ar_feedback_backend_resolving">Le moteur AR est encore en cours de sélection : réessayez d\'héberger dans un instant</string>
+    <string name="ar_feedback_open_project_first">Ouvrez un projet avant de partager : il n\'y a encore rien à envoyer à un invité</string>
+    <string name="ar_feedback_host_need_target_arcore">Capturez et verrouillez une cible murale à jour avant d\'héberger</string>
+    <string name="ar_feedback_host_need_target_standalone">Capturez une cible murale autonome avant d\'héberger</string>
+    <string name="ar_feedback_fingerprint_not_ready">L\'empreinte du mur n\'est pas encore prête : gardez la cible dans le champ et réessayez d\'héberger</string>
+    <string name="ar_feedback_package_failed">Impossible d\'empaqueter ce projet pour le partager : essayez d\'abord de l\'enregistrer</string>
+    <string name="ar_feedback_host_failed">Impossible de démarrer le partage : %1$s</string>
+    <string name="ar_feedback_join_load_failed">Impossible de charger le projet de l\'hôte : la session a été terminée.</string>
+    <string name="ar_feedback_join_no_geometry">L\'hôte n\'a pas fourni de géométrie sur laquelle ARCore puisse s\'aligner.</string>
+    <string name="ar_feedback_join_failed">Impossible de rejoindre : %1$s</string>
+    <string name="ar_feedback_wall_target_changed">La cible murale a changé : le partage est terminé. Relancez l\'hébergement pour le nouveau mur.</string>
+    <string name="ar_feedback_backend_changed">Le moteur de suivi a changé : le partage est terminé. Relancez le partage.</string>
+    <string name="ar_feedback_camera_busy">La caméra est occupée ou indisponible : fermez les autres applications de caméra, puis rouvrez l\'AR</string>
+    <string name="ar_feedback_ar_start_failed">Impossible de démarrer l\'AR : votre caméra est peut-être utilisée par une autre application</string>
+    <string name="ar_feedback_camera_setting_apply_failed">Impossible d\'appliquer le réglage de la caméra à la session AR en cours : quittez l\'AR puis rouvrez-la</string>
+    <string name="ar_feedback_sphere_target_save_failed">Le suivi du mur fonctionne pour cette session, mais la cible SphereSLAM n\'a pas pu être enregistrée.</string>
+    <string name="ar_feedback_camera_not_resumed">La caméra AR n\'a pas repris : essayez de quitter le mode AR puis d\'y revenir</string>
+    <string name="ar_feedback_camera_permission">Caméra indisponible : vérifiez l\'autorisation de la caméra, puis rouvrez l\'AR</string>
+    <string name="ar_feedback_camera_not_paused">La caméra AR ne s\'est pas mise en pause proprement : elle peut continuer à tourner en arrière-plan</string>
+    <string name="ar_feedback_backbone_warning">L\'œuvre couvre presque tout le mur visible : seuls %1$d points suivis se trouvent en dehors. Réduisez-la ou reculez, sinon la cible risque de ne pas se verrouiller.</string>
+    <string name="ar_feedback_legacy_target_geometry">La cible enregistrée de ce projet a été créée par une version plus ancienne et sa géométrie 3D ne peut pas être corrigée. Recréez la cible pour l\'utiliser.</string>
+    <string name="ar_feedback_camera_no_frames">La caméra ne fournit aucune image : quittez l\'AR et réessayez</string>
+    <string name="ar_feedback_camera_recovery_timeout">La récupération de la caméra AR a expiré sans risque : quittez l\'AR puis rouvrez-la</string>
+    <string name="ar_feedback_target_prepare_failed">Impossible de préparer la cible capturée. Réessayez.</string>
+    <string name="ar_feedback_wall_width_save_failed">Impossible d\'enregistrer la largeur du mur. Réessayez d\'enregistrer.</string>
+    <string name="ar_feedback_unknown_error">erreur inconnue</string>
 </resources>

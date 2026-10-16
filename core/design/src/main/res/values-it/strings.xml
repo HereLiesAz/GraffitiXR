@@ -724,4 +724,32 @@
     <string name="guidance_open_via_design_mockup">Tocca «Design» nella barra, poi «Apri», per aggiungere un livello sopra la foto del muro. Pizzica e trascina per regolarne dimensioni e posizione.</string>
     <string name="guidance_open_via_design_trace">Tocca «Design» nella barra, poi «Apri», per aggiungere il tuo primo livello. Una volta inserito, pizzica e trascina sulla tela per regolarne dimensioni e posizione.</string>
     <string name="guidance_open_via_design_ar">Tocca «Design» nella barra, poi «Apri», per aggiungere un livello di design: viene proiettato sul muro usando l\'ancora appena impostata.</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">Questa modifica non può essere condivisa con l\'host: resta su questo dispositivo</string>
+    <string name="ar_feedback_backend_resolving">Il backend AR è ancora in fase di selezione: riprova a fare da host tra un attimo</string>
+    <string name="ar_feedback_open_project_first">Apri un progetto prima di condividere: non c\'è ancora nulla da inviare a un ospite</string>
+    <string name="ar_feedback_host_need_target_arcore">Acquisisci e blocca un target parete aggiornato prima di fare da host</string>
+    <string name="ar_feedback_host_need_target_standalone">Acquisisci un target parete standalone prima di fare da host</string>
+    <string name="ar_feedback_fingerprint_not_ready">L\'impronta della parete non è ancora pronta: tieni il target inquadrato e riprova a fare da host</string>
+    <string name="ar_feedback_package_failed">Impossibile preparare questo progetto per la condivisione: prova prima a salvarlo</string>
+    <string name="ar_feedback_host_failed">Impossibile avviare la condivisione: %1$s</string>
+    <string name="ar_feedback_join_load_failed">Impossibile caricare il progetto dell\'host: la sessione è stata terminata.</string>
+    <string name="ar_feedback_join_no_geometry">L\'host non ha fornito una geometria a cui ARCore possa allinearsi.</string>
+    <string name="ar_feedback_join_failed">Impossibile partecipare: %1$s</string>
+    <string name="ar_feedback_wall_target_changed">Il target parete è cambiato: la condivisione è terminata. Avvia di nuovo l\'host per la nuova parete.</string>
+    <string name="ar_feedback_backend_changed">Il backend di tracciamento è cambiato: la condivisione è terminata. Avvia di nuovo la condivisione.</string>
+    <string name="ar_feedback_camera_busy">La fotocamera è occupata o non disponibile: chiudi le altre app che la usano, poi rientra in AR</string>
+    <string name="ar_feedback_ar_start_failed">Impossibile avviare AR: la fotocamera potrebbe essere in uso da un\'altra app</string>
+    <string name="ar_feedback_camera_setting_apply_failed">Impossibile applicare l\'impostazione della fotocamera alla sessione AR in corso: esci da AR e rientra</string>
+    <string name="ar_feedback_sphere_target_save_failed">Il tracciamento della parete funziona per questa sessione, ma non è stato possibile salvare il target SphereSLAM.</string>
+    <string name="ar_feedback_camera_not_resumed">La fotocamera AR non è ripartita: prova a uscire dalla modalità AR e a rientrare</string>
+    <string name="ar_feedback_camera_permission">Fotocamera non disponibile: controlla l\'autorizzazione della fotocamera, poi rientra in AR</string>
+    <string name="ar_feedback_camera_not_paused">La fotocamera AR non si è messa in pausa correttamente: potrebbe restare attiva in background</string>
+    <string name="ar_feedback_backbone_warning">L\'opera copre quasi tutta la parete inquadrata: solo %1$d caratteristiche tracciate restano all\'esterno. Rimpiccioliscila o fai un passo indietro, altrimenti il target potrebbe non agganciarsi.</string>
+    <string name="ar_feedback_legacy_target_geometry">Il target salvato di questo progetto è stato creato da una versione precedente e la sua geometria 3D non può essere corretta. Crea di nuovo il target per usarlo.</string>
+    <string name="ar_feedback_camera_no_frames">La fotocamera non sta fornendo fotogrammi: esci da AR e riprova</string>
+    <string name="ar_feedback_camera_recovery_timeout">Il ripristino della fotocamera AR è scaduto in modo sicuro: esci da AR e rientra</string>
+    <string name="ar_feedback_target_prepare_failed">Impossibile preparare il target acquisito. Riprova.</string>
+    <string name="ar_feedback_wall_width_save_failed">Impossibile salvare la larghezza della parete. Riprova a salvare.</string>
+    <string name="ar_feedback_unknown_error">errore sconosciuto</string>
 </resources>

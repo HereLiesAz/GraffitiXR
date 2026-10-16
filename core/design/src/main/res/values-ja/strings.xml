@@ -741,4 +741,32 @@
     <string name="guidance_open_via_design_mockup">レールの「デザイン」をタップし、続けて「開く」をタップして、壁の写真の上にレイヤーを追加します。ピンチとドラッグで大きさと位置を調整します。</string>
     <string name="guidance_open_via_design_trace">レールの「デザイン」をタップし、続けて「開く」をタップして、最初のレイヤーを追加します。追加後は、キャンバス上でピンチとドラッグをして大きさと位置を決めます。</string>
     <string name="guidance_open_via_design_ar">レールの「デザイン」をタップし、続けて「開く」をタップしてデザインレイヤーを追加します。設定したばかりのアンカーを使って壁に投影されます。</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">この変更はホストと共有できません。この端末にのみ残ります</string>
+    <string name="ar_feedback_backend_resolving">AR バックエンドを判定中です。しばらくしてからもう一度ホストを試してください</string>
+    <string name="ar_feedback_open_project_first">共有する前にプロジェクトを開いてください。ゲストに送るものがまだありません</string>
+    <string name="ar_feedback_host_need_target_arcore">ホストする前に、最新の壁ターゲットを撮影してロックしてください</string>
+    <string name="ar_feedback_host_need_target_standalone">ホストする前に、スタンドアロンの壁ターゲットを撮影してください</string>
+    <string name="ar_feedback_fingerprint_not_ready">壁のフィンガープリントの準備がまだできていません。ターゲットを画面内に保ったまま、もう一度ホストを試してください</string>
+    <string name="ar_feedback_package_failed">このプロジェクトを共有用にパッケージできませんでした。先に保存してみてください</string>
+    <string name="ar_feedback_host_failed">共有を開始できませんでした：%1$s</string>
+    <string name="ar_feedback_join_load_failed">ホストのプロジェクトを読み込めませんでした。セッションを終了しました。</string>
+    <string name="ar_feedback_join_no_geometry">ホストが ARCore で位置合わせできるジオメトリを提供しませんでした。</string>
+    <string name="ar_feedback_join_failed">参加できませんでした：%1$s</string>
+    <string name="ar_feedback_wall_target_changed">壁ターゲットが変わったため、共有を終了しました。新しい壁で、もう一度ホストを開始してください。</string>
+    <string name="ar_feedback_backend_changed">トラッキングバックエンドが変わったため、共有を終了しました。もう一度共有を開始してください。</string>
+    <string name="ar_feedback_camera_busy">カメラが使用中か利用できません。他のカメラアプリを閉じてから、AR にもう一度入ってください</string>
+    <string name="ar_feedback_ar_start_failed">AR を開始できませんでした。カメラが他のアプリで使用されている可能性があります</string>
+    <string name="ar_feedback_camera_setting_apply_failed">カメラ設定を実行中の AR セッションに適用できませんでした。AR を終了して、もう一度入ってください</string>
+    <string name="ar_feedback_sphere_target_save_failed">このセッションでは壁のトラッキングは機能しますが、SphereSLAM ターゲットを保存できませんでした。</string>
+    <string name="ar_feedback_camera_not_resumed">AR カメラが再開しませんでした。AR モードを終了して、もう一度入ってみてください</string>
+    <string name="ar_feedback_camera_permission">カメラを利用できません。カメラの権限を確認してから、AR にもう一度入ってください</string>
+    <string name="ar_feedback_camera_not_paused">AR カメラを正常に一時停止できませんでした。バックグラウンドで動き続ける可能性があります</string>
+    <string name="ar_feedback_backbone_warning">作品が視野内の壁のほぼ全体を覆っており、その外側にある追跡特徴は %1$d 個だけです。小さくするか、少し下がってください。そうしないとターゲットがロックされない場合があります。</string>
+    <string name="ar_feedback_legacy_target_geometry">このプロジェクトに保存されているターゲットは古いバージョンで作成されたもので、3D ジオメトリを補正できません。使用するにはターゲットを作成し直してください。</string>
+    <string name="ar_feedback_camera_no_frames">カメラからフレームが届いていません。AR を終了して、もう一度試してください</string>
+    <string name="ar_feedback_camera_recovery_timeout">AR カメラの復旧は安全にタイムアウトしました。AR を終了して、もう一度入ってください</string>
+    <string name="ar_feedback_target_prepare_failed">撮影したターゲットを準備できませんでした。もう一度お試しください。</string>
+    <string name="ar_feedback_wall_width_save_failed">壁の幅を保存できませんでした。もう一度保存をお試しください。</string>
+    <string name="ar_feedback_unknown_error">不明なエラー</string>
 </resources>

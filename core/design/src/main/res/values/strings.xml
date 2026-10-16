@@ -746,4 +746,32 @@
     <string name="target_cd_detected_marks">Detected marks</string>
     <string name="target_cd_confirm">Confirm</string>
     <string name="target_cd_unwarp_base">Captured wall photo with corner handles</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">That change can\'t be shared with the host — it stays on this device</string>
+    <string name="ar_feedback_backend_resolving">AR backend is still being resolved — try Host again in a moment</string>
+    <string name="ar_feedback_open_project_first">Open a project before sharing — there\'s nothing to send to a guest yet</string>
+    <string name="ar_feedback_host_need_target_arcore">Capture and lock a current wall target before hosting</string>
+    <string name="ar_feedback_host_need_target_standalone">Capture a standalone Wall Target before hosting</string>
+    <string name="ar_feedback_fingerprint_not_ready">Wall fingerprint is not ready yet — keep the target in view and try Host again</string>
+    <string name="ar_feedback_package_failed">Couldn\'t package this project to share — try saving it first</string>
+    <string name="ar_feedback_host_failed">Couldn\'t start sharing: %1$s</string>
+    <string name="ar_feedback_join_load_failed">Couldn\'t load the host\'s project — the session was ended.</string>
+    <string name="ar_feedback_join_no_geometry">The host did not provide geometry ARCore can align to.</string>
+    <string name="ar_feedback_join_failed">Couldn\'t join: %1$s</string>
+    <string name="ar_feedback_wall_target_changed">Wall target changed — sharing ended. Start Host again for the new wall.</string>
+    <string name="ar_feedback_backend_changed">Tracking backend changed — sharing ended. Start sharing again.</string>
+    <string name="ar_feedback_camera_busy">Camera is busy or unavailable — close other camera apps, then re-enter AR</string>
+    <string name="ar_feedback_ar_start_failed">Couldn\'t start AR — your camera may be in use by another app</string>
+    <string name="ar_feedback_camera_setting_apply_failed">Couldn\'t apply the camera setting to the running AR session — exit and re-enter AR</string>
+    <string name="ar_feedback_sphere_target_save_failed">Wall tracking works for this session, but the SphereSLAM target couldn\'t be saved.</string>
+    <string name="ar_feedback_camera_not_resumed">AR camera did not resume — try leaving and re-entering AR mode</string>
+    <string name="ar_feedback_camera_permission">Camera unavailable — check the camera permission, then re-enter AR</string>
+    <string name="ar_feedback_camera_not_paused">AR camera did not pause cleanly — it may keep running in the background</string>
+    <string name="ar_feedback_backbone_warning">The artwork covers nearly all the wall in view — only %1$d tracked features sit outside it. Make it smaller or step back, or the target may not lock.</string>
+    <string name="ar_feedback_legacy_target_geometry">This project\'s saved target was made by an older version and its 3D geometry can\'t be corrected. Create the target again to use it.</string>
+    <string name="ar_feedback_camera_no_frames">Camera isn\'t delivering frames — exit AR and try again</string>
+    <string name="ar_feedback_camera_recovery_timeout">AR camera recovery timed out safely — exit and re-enter AR</string>
+    <string name="ar_feedback_target_prepare_failed">Couldn\'t prepare the captured target. Try again.</string>
+    <string name="ar_feedback_wall_width_save_failed">Couldn\'t save the wall width. Try Save again.</string>
+    <string name="ar_feedback_unknown_error">unknown error</string>
 </resources>

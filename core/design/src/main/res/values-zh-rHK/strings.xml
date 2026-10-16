@@ -729,4 +729,32 @@
     <string name="guidance_open_via_design_mockup">點按導軌上的「設計」，再點按「打開」，在牆壁相片上方新增圖層。雙指捏合並拖曳以調整大小和位置。</string>
     <string name="guidance_open_via_design_trace">點按導軌上的「設計」，再點按「打開」以新增你的第一個圖層。加入後，在畫布上雙指捏合並拖曳以調整大小和位置。</string>
     <string name="guidance_open_via_design_ar">點按導軌上的「設計」，再點按「打開」以新增設計圖層 — 它會借助你剛設定的錨點投影到牆上。</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">該變更無法與主機共用，只會保留在此裝置上</string>
+    <string name="ar_feedback_backend_resolving">AR 後端仍在確定中，請稍後再次嘗試主持</string>
+    <string name="ar_feedback_open_project_first">分享前請先開啟一個專案，目前沒有可傳送給訪客的內容</string>
+    <string name="ar_feedback_host_need_target_arcore">主持前請先擷取並鎖定目前的牆面目標</string>
+    <string name="ar_feedback_host_need_target_standalone">主持前請先擷取獨立的牆面目標</string>
+    <string name="ar_feedback_fingerprint_not_ready">牆面指紋尚未就緒，請讓目標保持在畫面中，然後再次嘗試主持</string>
+    <string name="ar_feedback_package_failed">無法打包此專案以供分享，請先嘗試儲存</string>
+    <string name="ar_feedback_host_failed">無法開始分享：%1$s</string>
+    <string name="ar_feedback_join_load_failed">無法載入主機的專案，工作階段已結束。</string>
+    <string name="ar_feedback_join_no_geometry">主機未提供 ARCore 可用於對齊的幾何資料。</string>
+    <string name="ar_feedback_join_failed">無法加入：%1$s</string>
+    <string name="ar_feedback_wall_target_changed">牆面目標已變更，分享已結束。請為新的牆面重新開始主持。</string>
+    <string name="ar_feedback_backend_changed">追蹤後端已變更，分享已結束。請重新開始分享。</string>
+    <string name="ar_feedback_camera_busy">相機忙碌中或無法使用，請關閉其他相機應用程式，然後重新進入 AR</string>
+    <string name="ar_feedback_ar_start_failed">無法啟動 AR，您的相機可能正被其他應用程式使用</string>
+    <string name="ar_feedback_camera_setting_apply_failed">無法將相機設定套用到執行中的 AR 工作階段，請結束 AR 後重新進入</string>
+    <string name="ar_feedback_sphere_target_save_failed">此工作階段中牆面追蹤可用，但無法儲存 SphereSLAM 目標。</string>
+    <string name="ar_feedback_camera_not_resumed">AR 相機未能恢復，請嘗試結束 AR 模式後重新進入</string>
+    <string name="ar_feedback_camera_permission">相機無法使用，請檢查相機權限，然後重新進入 AR</string>
+    <string name="ar_feedback_camera_not_paused">AR 相機未能正常暫停，可能會在背景繼續執行</string>
+    <string name="ar_feedback_backbone_warning">作品幾乎遮住了視野中的整面牆，只有 %1$d 個追蹤特徵位於其外。請將其縮小或後退一些，否則目標可能無法鎖定。</string>
+    <string name="ar_feedback_legacy_target_geometry">此專案已儲存的目標由舊版本建立，其 3D 幾何資料無法校正。請重新建立目標後再使用。</string>
+    <string name="ar_feedback_camera_no_frames">相機沒有輸出畫面，請結束 AR 後重試</string>
+    <string name="ar_feedback_camera_recovery_timeout">AR 相機復原已安全逾時，請結束 AR 後重新進入</string>
+    <string name="ar_feedback_target_prepare_failed">無法準備已擷取的目標，請重試。</string>
+    <string name="ar_feedback_wall_width_save_failed">無法儲存牆面寬度，請再次嘗試儲存。</string>
+    <string name="ar_feedback_unknown_error">未知錯誤</string>
 </resources>

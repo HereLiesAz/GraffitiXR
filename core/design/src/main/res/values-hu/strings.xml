@@ -729,4 +729,32 @@
     <string name="guidance_open_via_design_mockup">Koppints a sávon a „Tervezés”, majd a „Megnyitás” elemre egy réteg hozzáadásához a falfotó fölé. Csípéssel és húzással állítsd be a méretét és a helyét.</string>
     <string name="guidance_open_via_design_trace">Koppints a sávon a „Tervezés”, majd a „Megnyitás” elemre az első réteg hozzáadásához. Ha bekerült, csípéssel és húzással méretezd és helyezd el a vásznon.</string>
     <string name="guidance_open_via_design_ar">Koppints a sávon a „Tervezés”, majd a „Megnyitás” elemre egy tervréteg hozzáadásához – az az imént beállított horgony segítségével vetül a falra.</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">Ezt a módosítást nem lehet megosztani a házigazdával – csak ezen az eszközön marad meg</string>
+    <string name="ar_feedback_backend_resolving">Az AR-háttér még kiválasztás alatt áll – próbáld újra a házigazdaként indítást egy pillanat múlva</string>
+    <string name="ar_feedback_open_project_first">Megosztás előtt nyiss meg egy projektet – még nincs mit küldeni a vendégnek</string>
+    <string name="ar_feedback_host_need_target_arcore">Házigazdaként indítás előtt rögzíts és zárolj egy aktuális falcélpontot</string>
+    <string name="ar_feedback_host_need_target_standalone">Házigazdaként indítás előtt rögzíts egy önálló falcélpontot</string>
+    <string name="ar_feedback_fingerprint_not_ready">A fal ujjlenyomata még nem áll készen – tartsd a célpontot a képben, és próbáld újra a házigazdaként indítást</string>
+    <string name="ar_feedback_package_failed">Nem sikerült becsomagolni a projektet a megosztáshoz – próbáld előbb elmenteni</string>
+    <string name="ar_feedback_host_failed">Nem sikerült elindítani a megosztást: %1$s</string>
+    <string name="ar_feedback_join_load_failed">Nem sikerült betölteni a házigazda projektjét – a munkamenet véget ért.</string>
+    <string name="ar_feedback_join_no_geometry">A házigazda nem adott meg olyan geometriát, amelyhez az ARCore igazodni tud.</string>
+    <string name="ar_feedback_join_failed">Nem sikerült csatlakozni: %1$s</string>
+    <string name="ar_feedback_wall_target_changed">A falcélpont megváltozott – a megosztás véget ért. Indítsd újra a házigazdaként indítást az új falhoz.</string>
+    <string name="ar_feedback_backend_changed">A követési háttér megváltozott – a megosztás véget ért. Indítsd újra a megosztást.</string>
+    <string name="ar_feedback_camera_busy">A kamera foglalt vagy nem érhető el – zárd be a többi kamera-alkalmazást, majd lépj be újra az AR-ba</string>
+    <string name="ar_feedback_ar_start_failed">Nem sikerült elindítani az AR-t – lehet, hogy a kamerát egy másik alkalmazás használja</string>
+    <string name="ar_feedback_camera_setting_apply_failed">Nem sikerült alkalmazni a kamerabeállítást a futó AR-munkamenetre – lépj ki az AR-ból, majd lépj be újra</string>
+    <string name="ar_feedback_sphere_target_save_failed">A falkövetés ebben a munkamenetben működik, de a SphereSLAM-célpontot nem sikerült elmenteni.</string>
+    <string name="ar_feedback_camera_not_resumed">Az AR-kamera nem indult újra – próbálj kilépni az AR módból, majd belépni újra</string>
+    <string name="ar_feedback_camera_permission">A kamera nem érhető el – ellenőrizd a kamera-engedélyt, majd lépj be újra az AR-ba</string>
+    <string name="ar_feedback_camera_not_paused">Az AR-kamera nem állt le tisztán – előfordulhat, hogy a háttérben tovább fut</string>
+    <string name="ar_feedback_backbone_warning">A műalkotás szinte az egész látható falat lefedi – csak %1$d követett jellemző esik rajta kívül. Kicsinyítsd le, vagy lépj hátrébb, különben a célpont lehet, hogy nem záródik be.</string>
+    <string name="ar_feedback_legacy_target_geometry">A projekt mentett célpontját egy régebbi verzió készítette, és a 3D-geometriája nem javítható. A használatához hozd létre újra a célpontot.</string>
+    <string name="ar_feedback_camera_no_frames">A kamera nem ad képkockákat – lépj ki az AR-ból, és próbáld újra</string>
+    <string name="ar_feedback_camera_recovery_timeout">Az AR-kamera helyreállítása biztonságosan időtúllépést kapott – lépj ki az AR-ból, majd lépj be újra</string>
+    <string name="ar_feedback_target_prepare_failed">Nem sikerült előkészíteni a rögzített célpontot. Próbáld újra.</string>
+    <string name="ar_feedback_wall_width_save_failed">Nem sikerült elmenteni a fal szélességét. Próbáld újra a mentést.</string>
+    <string name="ar_feedback_unknown_error">ismeretlen hiba</string>
 </resources>

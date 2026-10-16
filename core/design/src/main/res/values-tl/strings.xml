@@ -439,4 +439,32 @@
     <string name="guidance_open_via_design_mockup">I-tap ang \'Disenyo\' sa rail, pagkatapos ang \'Bukas\', para magdagdag ng layer sa ibabaw ng larawan ng pader. I-pinch at i-drag para itakda ang laki at posisyon nito.</string>
     <string name="guidance_open_via_design_trace">I-tap ang \'Disenyo\' sa rail, pagkatapos ang \'Bukas\', para idagdag ang una mong layer. Kapag nailagay na, mag-pinch at mag-drag sa canvas para itakda ang laki at lugar nito.</string>
     <string name="guidance_open_via_design_ar">I-tap ang \'Disenyo\' sa rail, pagkatapos ang \'Bukas\', para magdagdag ng design layer — ipo-project ito sa pader gamit ang anchor na katatakda mo lang.</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">Hindi maibabahagi sa host ang pagbabagong iyon — mananatili ito sa device na ito</string>
+    <string name="ar_feedback_backend_resolving">Tinutukoy pa ang AR backend — subukang mag-host ulit sa ilang saglit</string>
+    <string name="ar_feedback_open_project_first">Magbukas ng proyekto bago magbahagi — wala pang maipapadala sa bisita</string>
+    <string name="ar_feedback_host_need_target_arcore">Kumuha at i-lock ang kasalukuyang target sa pader bago mag-host</string>
+    <string name="ar_feedback_host_need_target_standalone">Kumuha ng standalone na Wall Target bago mag-host</string>
+    <string name="ar_feedback_fingerprint_not_ready">Hindi pa handa ang fingerprint ng pader — panatilihin ang target sa view at subukang mag-host ulit</string>
+    <string name="ar_feedback_package_failed">Hindi ma-package ang proyektong ito para ibahagi — subukan munang i-save ito</string>
+    <string name="ar_feedback_host_failed">Hindi masimulan ang pagbabahagi: %1$s</string>
+    <string name="ar_feedback_join_load_failed">Hindi ma-load ang proyekto ng host — natapos ang session.</string>
+    <string name="ar_feedback_join_no_geometry">Hindi nagbigay ang host ng geometry na maaaring pagtugmaan ng ARCore.</string>
+    <string name="ar_feedback_join_failed">Hindi nakasali: %1$s</string>
+    <string name="ar_feedback_wall_target_changed">Nagbago ang target sa pader — natapos ang pagbabahagi. Simulan muli ang Host para sa bagong pader.</string>
+    <string name="ar_feedback_backend_changed">Nagbago ang tracking backend — natapos ang pagbabahagi. Simulan muli ang pagbabahagi.</string>
+    <string name="ar_feedback_camera_busy">Abala o hindi available ang camera — isara ang iba pang camera app, saka muling pumasok sa AR</string>
+    <string name="ar_feedback_ar_start_failed">Hindi masimulan ang AR — maaaring ginagamit ng ibang app ang iyong camera</string>
+    <string name="ar_feedback_camera_setting_apply_failed">Hindi mailapat ang setting ng camera sa tumatakbong AR session — lumabas sa AR at muling pumasok</string>
+    <string name="ar_feedback_sphere_target_save_failed">Gumagana ang wall tracking sa session na ito, pero hindi na-save ang SphereSLAM target.</string>
+    <string name="ar_feedback_camera_not_resumed">Hindi nagpatuloy ang AR camera — subukang lumabas sa AR mode at muling pumasok</string>
+    <string name="ar_feedback_camera_permission">Hindi available ang camera — suriin ang permiso sa camera, saka muling pumasok sa AR</string>
+    <string name="ar_feedback_camera_not_paused">Hindi maayos na na-pause ang AR camera — maaari itong magpatuloy sa background</string>
+    <string name="ar_feedback_backbone_warning">Halos natatakpan ng likhang-sining ang buong pader na nakikita — %1$d na tracked feature lang ang nasa labas nito. Paliitin ito o umatras, kung hindi ay maaaring hindi mag-lock ang target.</string>
+    <string name="ar_feedback_legacy_target_geometry">Ang naka-save na target ng proyektong ito ay ginawa ng mas lumang bersyon at hindi maitatama ang 3D geometry nito. Gawin muli ang target para magamit ito.</string>
+    <string name="ar_feedback_camera_no_frames">Hindi nagpapadala ng mga frame ang camera — lumabas sa AR at subukan muli</string>
+    <string name="ar_feedback_camera_recovery_timeout">Ligtas na nag-time out ang pagbawi ng AR camera — lumabas sa AR at muling pumasok</string>
+    <string name="ar_feedback_target_prepare_failed">Hindi nahanda ang nakuhang target. Subukan muli.</string>
+    <string name="ar_feedback_wall_width_save_failed">Hindi na-save ang lapad ng pader. Subukang mag-save ulit.</string>
+    <string name="ar_feedback_unknown_error">hindi kilalang error</string>
 </resources>

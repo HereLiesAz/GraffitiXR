@@ -724,4 +724,32 @@
     <string name="guidance_open_via_design_mockup">Trykk på «Design» i raden, og deretter «Åpne», for å legge til et lag oppå veggbildet. Knip og dra for å justere størrelse og plassering.</string>
     <string name="guidance_open_via_design_trace">Trykk på «Design» i raden, og deretter «Åpne», for å legge til ditt første lag. Når det er på plass, knip og dra på lerretet for å justere størrelse og plassering.</string>
     <string name="guidance_open_via_design_ar">Trykk på «Design» i raden, og deretter «Åpne», for å legge til et designlag – det projiseres på veggen med ankeret du nettopp satte.</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">Denne endringen kan ikke deles med verten – den blir værende på denne enheten</string>
+    <string name="ar_feedback_backend_resolving">AR-motoren velges fortsatt – prøv å være vert igjen om litt</string>
+    <string name="ar_feedback_open_project_first">Åpne et prosjekt før du deler – det er ikke noe å sende til en gjest ennå</string>
+    <string name="ar_feedback_host_need_target_arcore">Ta opp og lås et oppdatert veggmål før du er vert</string>
+    <string name="ar_feedback_host_need_target_standalone">Ta opp et frittstående veggmål før du er vert</string>
+    <string name="ar_feedback_fingerprint_not_ready">Veggfingeravtrykket er ikke klart ennå – hold målet i bildet og prøv å være vert igjen</string>
+    <string name="ar_feedback_package_failed">Kunne ikke pakke dette prosjektet for deling – prøv å lagre det først</string>
+    <string name="ar_feedback_host_failed">Kunne ikke starte deling: %1$s</string>
+    <string name="ar_feedback_join_load_failed">Kunne ikke laste vertens prosjekt – økten ble avsluttet.</string>
+    <string name="ar_feedback_join_no_geometry">Verten ga ikke geometri som ARCore kan justere mot.</string>
+    <string name="ar_feedback_join_failed">Kunne ikke bli med: %1$s</string>
+    <string name="ar_feedback_wall_target_changed">Veggmålet ble endret – delingen er avsluttet. Start vertskap på nytt for den nye veggen.</string>
+    <string name="ar_feedback_backend_changed">Sporingsmotoren ble endret – delingen er avsluttet. Start deling på nytt.</string>
+    <string name="ar_feedback_camera_busy">Kameraet er opptatt eller utilgjengelig – lukk andre kameraapper og gå inn i AR igjen</string>
+    <string name="ar_feedback_ar_start_failed">Kunne ikke starte AR – kameraet kan være i bruk av en annen app</string>
+    <string name="ar_feedback_camera_setting_apply_failed">Kunne ikke bruke kamerainnstillingen på den pågående AR-økten – gå ut av AR og inn igjen</string>
+    <string name="ar_feedback_sphere_target_save_failed">Veggsporing fungerer i denne økten, men SphereSLAM-målet kunne ikke lagres.</string>
+    <string name="ar_feedback_camera_not_resumed">AR-kameraet startet ikke igjen – prøv å gå ut av AR-modus og inn igjen</string>
+    <string name="ar_feedback_camera_permission">Kameraet er utilgjengelig – sjekk kameratillatelsen og gå inn i AR igjen</string>
+    <string name="ar_feedback_camera_not_paused">AR-kameraet ble ikke satt ordentlig på pause – det kan fortsette å kjøre i bakgrunnen</string>
+    <string name="ar_feedback_backbone_warning">Kunstverket dekker nesten hele veggen i bildet – bare %1$d sporede kjennetegn ligger utenfor. Gjør det mindre eller gå bakover, ellers låser målet seg kanskje ikke.</string>
+    <string name="ar_feedback_legacy_target_geometry">Det lagrede målet i dette prosjektet ble laget av en eldre versjon, og 3D-geometrien kan ikke korrigeres. Opprett målet på nytt for å bruke det.</string>
+    <string name="ar_feedback_camera_no_frames">Kameraet leverer ingen bilder – gå ut av AR og prøv igjen</string>
+    <string name="ar_feedback_camera_recovery_timeout">Gjenopprettingen av AR-kameraet ble trygt tidsavbrutt – gå ut av AR og inn igjen</string>
+    <string name="ar_feedback_target_prepare_failed">Kunne ikke klargjøre det opptatte målet. Prøv igjen.</string>
+    <string name="ar_feedback_wall_width_save_failed">Kunne ikke lagre veggbredden. Prøv å lagre igjen.</string>
+    <string name="ar_feedback_unknown_error">ukjent feil</string>
 </resources>

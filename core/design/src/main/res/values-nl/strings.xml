@@ -729,4 +729,32 @@
     <string name="guidance_open_via_design_mockup">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om een laag boven de muurfoto toe te voegen. Knijp en sleep om de grootte en positie aan te passen.</string>
     <string name="guidance_open_via_design_trace">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om je eerste laag toe te voegen. Zodra die erin staat, knijp en sleep je op het canvas om de grootte en plaats te bepalen.</string>
     <string name="guidance_open_via_design_ar">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om een ontwerplaag toe te voegen – die wordt op de muur geprojecteerd met het anker dat je net hebt gezet.</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">Die wijziging kan niet met de host worden gedeeld – ze blijft op dit apparaat</string>
+    <string name="ar_feedback_backend_resolving">De AR-backend wordt nog bepaald – probeer over een moment opnieuw te hosten</string>
+    <string name="ar_feedback_open_project_first">Open een project voordat je deelt – er is nog niets om naar een gast te sturen</string>
+    <string name="ar_feedback_host_need_target_arcore">Leg een actueel muurdoel vast en vergrendel het voordat je host</string>
+    <string name="ar_feedback_host_need_target_standalone">Leg een zelfstandig muurdoel vast voordat je host</string>
+    <string name="ar_feedback_fingerprint_not_ready">De muurvingerafdruk is nog niet klaar – houd het doel in beeld en probeer opnieuw te hosten</string>
+    <string name="ar_feedback_package_failed">Dit project kon niet worden ingepakt om te delen – sla het eerst op</string>
+    <string name="ar_feedback_host_failed">Delen starten is mislukt: %1$s</string>
+    <string name="ar_feedback_join_load_failed">Het project van de host kon niet worden geladen – de sessie is beëindigd.</string>
+    <string name="ar_feedback_join_no_geometry">De host heeft geen geometrie geleverd waarop ARCore zich kan uitlijnen.</string>
+    <string name="ar_feedback_join_failed">Deelnemen is mislukt: %1$s</string>
+    <string name="ar_feedback_wall_target_changed">Het muurdoel is gewijzigd – het delen is beëindigd. Start Hosten opnieuw voor de nieuwe muur.</string>
+    <string name="ar_feedback_backend_changed">De tracking-backend is gewijzigd – het delen is beëindigd. Start het delen opnieuw.</string>
+    <string name="ar_feedback_camera_busy">De camera is bezet of niet beschikbaar – sluit andere camera-apps en ga daarna opnieuw naar AR</string>
+    <string name="ar_feedback_ar_start_failed">AR starten is mislukt – je camera wordt mogelijk door een andere app gebruikt</string>
+    <string name="ar_feedback_camera_setting_apply_failed">De camera-instelling kon niet worden toegepast op de lopende AR-sessie – verlaat AR en ga opnieuw naar AR</string>
+    <string name="ar_feedback_sphere_target_save_failed">Muurtracking werkt voor deze sessie, maar het SphereSLAM-doel kon niet worden opgeslagen.</string>
+    <string name="ar_feedback_camera_not_resumed">De AR-camera is niet hervat – verlaat de AR-modus en ga er opnieuw in</string>
+    <string name="ar_feedback_camera_permission">Camera niet beschikbaar – controleer de cameratoestemming en ga daarna opnieuw naar AR</string>
+    <string name="ar_feedback_camera_not_paused">De AR-camera is niet netjes gepauzeerd – ze blijft mogelijk op de achtergrond actief</string>
+    <string name="ar_feedback_backbone_warning">Het kunstwerk bedekt bijna de hele zichtbare muur – slechts %1$d gevolgde kenmerken liggen erbuiten. Maak het kleiner of stap achteruit, anders vergrendelt het doel mogelijk niet.</string>
+    <string name="ar_feedback_legacy_target_geometry">Het opgeslagen doel van dit project is gemaakt met een oudere versie en de 3D-geometrie ervan kan niet worden gecorrigeerd. Maak het doel opnieuw aan om het te gebruiken.</string>
+    <string name="ar_feedback_camera_no_frames">De camera levert geen beelden – verlaat AR en probeer het opnieuw</string>
+    <string name="ar_feedback_camera_recovery_timeout">Het herstel van de AR-camera is veilig verlopen – verlaat AR en ga opnieuw naar AR</string>
+    <string name="ar_feedback_target_prepare_failed">Het vastgelegde doel kon niet worden voorbereid. Probeer het opnieuw.</string>
+    <string name="ar_feedback_wall_width_save_failed">De muurbreedte kon niet worden opgeslagen. Probeer opnieuw op te slaan.</string>
+    <string name="ar_feedback_unknown_error">onbekende fout</string>
 </resources>

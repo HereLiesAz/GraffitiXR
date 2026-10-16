@@ -724,4 +724,32 @@
     <string name="guidance_open_via_design_mockup">Toca «Diseño» en la barra y luego «Abrir» para añadir una capa sobre la foto de la pared. Pellizca y arrastra para ajustar su tamaño y posición.</string>
     <string name="guidance_open_via_design_trace">Toca «Diseño» en la barra y luego «Abrir» para añadir tu primera capa. Una vez dentro, pellizca y arrastra sobre el lienzo para ajustar su tamaño y colocarla.</string>
     <string name="guidance_open_via_design_ar">Toca «Diseño» en la barra y luego «Abrir» para añadir una capa de diseño: se proyecta sobre la pared usando el ancla que acabas de fijar.</string>
+    <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
+    <string name="ar_feedback_guest_edit_dropped">Ese cambio no se puede compartir con el anfitrión: se queda en este dispositivo</string>
+    <string name="ar_feedback_backend_resolving">El motor de AR aún se está determinando: vuelve a probar Alojar en un momento</string>
+    <string name="ar_feedback_open_project_first">Abre un proyecto antes de compartir: todavía no hay nada que enviar a un invitado</string>
+    <string name="ar_feedback_host_need_target_arcore">Captura y bloquea un objetivo de pared actual antes de alojar</string>
+    <string name="ar_feedback_host_need_target_standalone">Captura un objetivo de pared independiente antes de alojar</string>
+    <string name="ar_feedback_fingerprint_not_ready">La huella de la pared aún no está lista: mantén el objetivo a la vista y vuelve a probar Alojar</string>
+    <string name="ar_feedback_package_failed">No se pudo empaquetar este proyecto para compartirlo: prueba a guardarlo primero</string>
+    <string name="ar_feedback_host_failed">No se pudo iniciar el uso compartido: %1$s</string>
+    <string name="ar_feedback_join_load_failed">No se pudo cargar el proyecto del anfitrión: se cerró la sesión.</string>
+    <string name="ar_feedback_join_no_geometry">El anfitrión no proporcionó geometría con la que ARCore pueda alinearse.</string>
+    <string name="ar_feedback_join_failed">No se pudo unir: %1$s</string>
+    <string name="ar_feedback_wall_target_changed">El objetivo de pared cambió: se terminó el uso compartido. Vuelve a iniciar Alojar para la nueva pared.</string>
+    <string name="ar_feedback_backend_changed">El motor de seguimiento cambió: se terminó el uso compartido. Vuelve a empezar a compartir.</string>
+    <string name="ar_feedback_camera_busy">La cámara está ocupada o no disponible: cierra otras apps de cámara y vuelve a entrar en AR</string>
+    <string name="ar_feedback_ar_start_failed">No se pudo iniciar AR: es posible que otra app esté usando la cámara</string>
+    <string name="ar_feedback_camera_setting_apply_failed">No se pudo aplicar el ajuste de cámara a la sesión de AR en curso: sal de AR y vuelve a entrar</string>
+    <string name="ar_feedback_sphere_target_save_failed">El seguimiento de la pared funciona en esta sesión, pero no se pudo guardar el objetivo de SphereSLAM.</string>
+    <string name="ar_feedback_camera_not_resumed">La cámara de AR no se reanudó: prueba a salir del modo AR y volver a entrar</string>
+    <string name="ar_feedback_camera_permission">Cámara no disponible: revisa el permiso de la cámara y vuelve a entrar en AR</string>
+    <string name="ar_feedback_camera_not_paused">La cámara de AR no se pausó correctamente: puede seguir funcionando en segundo plano</string>
+    <string name="ar_feedback_backbone_warning">La obra cubre casi toda la pared a la vista: solo %1$d características rastreadas quedan fuera. Hazla más pequeña o aléjate, o es posible que el objetivo no se bloquee.</string>
+    <string name="ar_feedback_legacy_target_geometry">El objetivo guardado de este proyecto se creó con una versión anterior y su geometría 3D no se puede corregir. Crea el objetivo de nuevo para usarlo.</string>
+    <string name="ar_feedback_camera_no_frames">La cámara no está entregando fotogramas: sal de AR e inténtalo de nuevo</string>
+    <string name="ar_feedback_camera_recovery_timeout">La recuperación de la cámara de AR agotó el tiempo de forma segura: sal de AR y vuelve a entrar</string>
+    <string name="ar_feedback_target_prepare_failed">No se pudo preparar el objetivo capturado. Inténtalo de nuevo.</string>
+    <string name="ar_feedback_wall_width_save_failed">No se pudo guardar el ancho de la pared. Vuelve a probar Guardar.</string>
+    <string name="ar_feedback_unknown_error">error desconocido</string>
 </resources>
