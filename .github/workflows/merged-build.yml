@@ -17,12 +17,11 @@ on:
   workflow_dispatch:
 
 concurrency:
-  # One run at a time per lane: the latest main push cancels the main run in progress (the newer
-  # commit republishes), and a PR push cancels only that PR's earlier run. A PR event must never
-  # share a lane with main: cancelling a main publish between `gh release upload` and the tag/notes
-  # update leaves the release carrying one commit's APK under another commit's tag.
+  # PR pushes cancel only their own earlier run (a newer commit supersedes it). Main pushes and
+  # manual dispatches share one lane and queue instead of cancelling each other, so every merged
+  # commit gets its own build verdict. A PR event never shares a lane with main.
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'main' }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
