@@ -4268,19 +4268,61 @@ class ArViewModel @Inject constructor(
 
     @Volatile private var loadedFingerprint: LoadedFingerprint? = null
 
+    /** Loader runs between their start and their `finally`; see [loadFingerprintIfExists]. */
+    private val fingerprintLoadsInFlight = java.util.concurrent.atomic.AtomicInteger(0)
+
     /**
      * Restore (or clear) the wall fingerprint for the current project.
      *
-     * **Single exit, and every state write in one place.** There are no early returns past the
-     * idempotence check: the branches decide an OUTCOME and the tail applies it. That shape is the
-     * actual fix for this function's history — the wall-feature-map block below used to be skipped
-     * by the refusal branch's `return`, so a refused project kept the previous project's map in
-     * native and then SAVED it into the refused project's file on teardown. Two branches, one
-     * `return`, and the sixth instance of the same family.
+     * **One place decides native-state ownership: the `finally` here.** Every exit path ends in it:
+     *
+     *  - [NativeStateOwner.LoadExit.LOADED] — [nativeStateOwner] is marked as the loader's last step (only
+     *    if the project is still current).
+     *  - [NativeStateOwner.LoadExit.UNCHANGED] — the idempotence early return in [applyProjectFingerprint]. It
+     *    used to skip the marking, so an A -> B -> A switch (the collector had dropped A's ownership
+     *    on B's emission, then A came back before B's loader changed anything) left ownership null
+     *    while native still held A's state, and [saveProjectWallMap] then refused every ARCore
+     *    wall-map autosave for A for the rest of the session. Native still describes the project, so
+     *    ownership is re-claimed — but only when no OTHER loader is mid-flight: a loader that is
+     *    still rewriting native (map, paint marks, grid) must be the one to claim it when it finishes.
+     *  - [NativeStateOwner.LoadExit.ABANDONED] after native was possibly touched (a throw, or cancellation
+     *    with the view model) — ownership is released, since native may hold a mixture.
+     *
+     * Inside [applyProjectFingerprint] the branches of the load decide an OUTCOME and the tail applies
+     * it, with a single early return (the idempotence check). That shape is the actual fix for this
+     * function's history — the wall-feature-map block used to be skipped by the refusal branch's
+     * `return`, so a refused project kept the previous project's map in native and then SAVED it into
+     * the refused project's file on teardown.
      */
     private fun loadFingerprintIfExists() {
         viewModelScope.launch(Dispatchers.IO) {
             val project = projectRepository.currentProject.value ?: return@launch
+            var exit = NativeStateOwner.LoadExit.ABANDONED
+            fingerprintLoadsInFlight.incrementAndGet()
+            try {
+                applyProjectFingerprint(project) { exit = it }
+            } finally {
+                nativeStateOwner.finishLoad(
+                    project.id,
+                    exit,
+                    // Read AFTER the loader's work: a load overtaken by a newer project must not claim.
+                    stillCurrent = projectRepository.currentProject.value?.id == project.id,
+                    othersInFlight = fingerprintLoadsInFlight.decrementAndGet() > 0,
+                )
+            }
+        }
+    }
+
+    /**
+     * The body of [loadFingerprintIfExists]. [reportExit] is called BEFORE the exit's last work (the
+     * unchanged path's partition) so that a throw there still leaves the caller knowing native was
+     * not touched; an exception anywhere else leaves the caller at [NativeStateOwner.LoadExit.ABANDONED].
+     */
+    private suspend fun applyProjectFingerprint(
+        project: com.hereliesaz.graffitixr.common.model.GraffitiProject,
+        reportExit: (NativeStateOwner.LoadExit) -> Unit,
+    ) {
+        run {
             val fp = project.fingerprint
             val incoming = LoadedFingerprint(project.id, fp)
             val current = loadedFingerprint
@@ -4291,8 +4333,9 @@ class ArViewModel @Inject constructor(
             // including the ones the partition itself causes — from re-pushing and, on the refusal
             // path, from re-wiping native's artwork registration every time a layer is saved.
             if (current == incoming) {
+                reportExit(NativeStateOwner.LoadExit.UNCHANGED)
                 partitionLiveFingerprintIfNeeded()
-                return@launch
+                return
             }
             // A different project — and `current != null` is load-bearing, not defensive. On the
             // FIRST load of a session there is no previous project, and the footprint present is the
@@ -4474,13 +4517,9 @@ class ArViewModel @Inject constructor(
             slamManager.setWallNormalEnu(
                 project.fingerprintWallNormalEnu.takeIf { it.size == 3 }?.toFloatArray(),
             )
-            // Last step: native now holds this project's state. A load that was overtaken by a
-            // newer project (its coroutine ran long) must not claim ownership.
-            nativeStateOwner.markLoaded(
-                project.id,
-                stillCurrent = projectRepository.currentProject.value?.id == project.id,
-            )
         }
+        // Last step: native now holds this project's state. The caller's `finally` claims ownership.
+        reportExit(NativeStateOwner.LoadExit.LOADED)
     }
 
     /**

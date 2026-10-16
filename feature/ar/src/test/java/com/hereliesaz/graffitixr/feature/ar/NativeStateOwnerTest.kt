@@ -45,4 +45,52 @@ class NativeStateOwnerTest {
         o.clear()
         assertFalse(o.owns("A"))
     }
+
+    // --- finishLoad: every loader exit settles ownership -------------------------------------------
+
+    @Test fun `A to B to A race - the unchanged early return re-claims ownership`() {
+        val o = NativeStateOwner()
+        // A fully loaded: native holds A.
+        o.beginSwitch("A")
+        o.finishLoad("A", NativeStateOwner.LoadExit.LOADED, stillCurrent = true, othersInFlight = false)
+        assertTrue(o.owns("A"))
+        // B becomes current: the collector drops ownership before B's loader touches native.
+        o.beginSwitch("B")
+        assertFalse(o.owns("A"))
+        // A comes back before B's loader changed anything, so A's loader finds loadedFingerprint == A
+        // and returns early. Native still holds A's state; ownership must come back or ARCore
+        // wall-map autosave (which requires owns(A)) is disabled for the rest of the session.
+        o.beginSwitch("A")
+        assertFalse(o.owns("A"))
+        o.finishLoad("A", NativeStateOwner.LoadExit.UNCHANGED, stillCurrent = true, othersInFlight = false)
+        assertTrue("early-return path must mark ownership", o.owns("A"))
+    }
+
+    @Test fun `an unchanged early return does not claim while another loader is still rewriting native`() {
+        val o = NativeStateOwner()
+        o.beginSwitch("B")
+        o.finishLoad("B", NativeStateOwner.LoadExit.UNCHANGED, stillCurrent = true, othersInFlight = true)
+        assertFalse(o.owns("B"))
+    }
+
+    @Test fun `an unchanged early return for a project already left does not claim`() {
+        val o = NativeStateOwner()
+        o.finishLoad("A", NativeStateOwner.LoadExit.UNCHANGED, stillCurrent = false, othersInFlight = false)
+        assertFalse(o.owns("A"))
+    }
+
+    @Test fun `an abandoned load releases ownership`() {
+        val o = NativeStateOwner()
+        o.markLoaded("A", true)
+        o.finishLoad("A", NativeStateOwner.LoadExit.ABANDONED, stillCurrent = true, othersInFlight = false)
+        assertFalse(o.owns("A"))
+    }
+
+    @Test fun `a loaded exit claims only while still current`() {
+        val o = NativeStateOwner()
+        o.finishLoad("A", NativeStateOwner.LoadExit.LOADED, stillCurrent = false, othersInFlight = false)
+        assertFalse(o.owns("A"))
+        o.finishLoad("A", NativeStateOwner.LoadExit.LOADED, stillCurrent = true, othersInFlight = true)
+        assertTrue(o.owns("A"))
+    }
 }
