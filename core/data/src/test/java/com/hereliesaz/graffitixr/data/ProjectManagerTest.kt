@@ -292,7 +292,10 @@ class ProjectManagerTest {
     fun `saveProject prunes target images beyond the cap and deletes their files`() = runTest {
         val projectRepositoryProvider = mockk<javax.inject.Provider<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>>(relaxed = true)
         val pruningManager = ProjectManager(mockContext, uriProvider, projectRepositoryProvider)
-        val bitmap = mockk<Bitmap>(relaxed = true)
+        val bitmap = mockk<Bitmap>(relaxed = true) {
+            // A working encoder: writePngAtomically refuses a bitmap whose compress() reports failure.
+            every { compress(any(), any(), any()) } returns true
+        }
 
         var project = GraffitiProject(id = "many_targets", name = "Many targets")
         // One capture at a time, as the real capture flow does — 35 captures against a cap of 30.
@@ -312,7 +315,10 @@ class ProjectManagerTest {
     fun `appendTargetImage prunes the list but leaves the files to the caller's commit`() = runTest {
         val projectRepositoryProvider = mockk<javax.inject.Provider<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>>(relaxed = true)
         val pruningManager = ProjectManager(mockContext, uriProvider, projectRepositoryProvider)
-        val bitmap = mockk<Bitmap>(relaxed = true)
+        val bitmap = mockk<Bitmap>(relaxed = true) {
+            // A working encoder: writePngAtomically refuses a bitmap whose compress() reports failure.
+            every { compress(any(), any(), any()) } returns true
+        }
 
         var uris = emptyList<Uri>()
         val dropped = mutableListOf<Uri>()
@@ -735,7 +741,7 @@ class ProjectManagerTest {
 
             val dir = File(tempFilesDir, "projects/coop_host_a")
             val onDisk = File(dir, "project.json").readText()
-            assertTrue(onDisk, "\"id\":\"coop_host_a\"" in onDisk && "\"id\":\"host_a\"" !in onDisk)
+            assertTrue(onDisk, idField("coop_host_a").containsMatchIn(onDisk) && !idField("host_a").containsMatchIn(onDisk))
             val listed = manager.loadProjectMetadata(mockContext, "coop_host_a")
             assertEquals("coop_host_a", listed?.id)
             assertEquals(
@@ -882,7 +888,7 @@ class ProjectManagerTest {
         assertEquals("file:///data/files/projects/folder_name/thumb.png", repaired.thumbnailUri.toString())
         // The fix is persisted, atomically (no temp file left behind), so it is a one-time repair.
         val onDisk = File(projectDir, "project.json").readText()
-        assertTrue(onDisk, "\"id\":\"folder_name\"" in onDisk && "other_id" !in onDisk)
+        assertTrue(onDisk, idField("folder_name").containsMatchIn(onDisk) && "other_id" !in onDisk)
         assertTrue(projectDir.listFiles()!!.none { it.name.endsWith(".tmp") })
         assertEquals("folder_name", manager.loadProjectMetadata(mockContext, "folder_name")?.id)
         // It is listed, openable and deletable under the one id.
@@ -1012,4 +1018,7 @@ class ProjectManagerTest {
         assertTrue("only design_* files are candidates", other.exists())
     }
 
+
+    /** The manifest is pretty-printed (`"id": "x"`), so match the field, not an exact substring. */
+    private fun idField(id: String) = Regex("\"id\"\\s*:\\s*\"" + Regex.escape(id) + "\"")
 }
