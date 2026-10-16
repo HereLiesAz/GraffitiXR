@@ -1,5 +1,8 @@
 package com.hereliesaz.graffitixr
 
+import androidx.annotation.StringRes
+import com.hereliesaz.graffitixr.design.R as DesignR
+
 internal data class ArRailBackendPolicy(
     val backendResolved: Boolean,
     val standalone: Boolean,
@@ -8,7 +11,11 @@ internal data class ArRailBackendPolicy(
     val coopCalibrationAvailable: Boolean,
     val coopDisabledReason: String?,
     val modePreviewExportAvailable: Boolean,
-    val exportDisabledReason: String?,
+    /**
+     * Localized string resource explaining why AR-mode Export is unavailable, or null when
+     * [modePreviewExportAvailable]. The rail shows it when Export is tapped in that state.
+     */
+    @StringRes val exportDisabledReason: Int?,
 )
 
 /**
@@ -36,7 +43,7 @@ internal fun arRailBackendPolicy(
             coopCalibrationAvailable = false,
             coopDisabledReason = "Checking AR backend…",
             modePreviewExportAvailable = false,
-            exportDisabledReason = "Checking AR backend…",
+            exportDisabledReason = DesignR.string.rail_checking_ar_backend,
         )
     }
     if (arCoreAvailable) {
@@ -69,7 +76,7 @@ internal fun arRailBackendPolicy(
             else -> null
         },
         modePreviewExportAvailable = false,
-        exportDisabledReason = "Standalone camera + overlay export is not implemented yet",
+        exportDisabledReason = DesignR.string.export_standalone_ar_unavailable,
     )
 }
 

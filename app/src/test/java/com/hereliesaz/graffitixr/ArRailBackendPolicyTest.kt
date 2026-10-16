@@ -1,5 +1,7 @@
 package com.hereliesaz.graffitixr
 
+import com.hereliesaz.graffitixr.design.R as DesignR
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -22,7 +24,7 @@ class ArRailBackendPolicyTest {
         assertFalse(p.modePreviewExportAvailable)
         assertNotNull(p.targetDisabledReason)
         assertNotNull(p.coopDisabledReason)
-        assertNotNull(p.exportDisabledReason)
+        assertEquals(DesignR.string.rail_checking_ar_backend, p.exportDisabledReason)
     }
 
     @Test
@@ -59,7 +61,7 @@ class ArRailBackendPolicyTest {
         assertTrue(p.coopCalibrationAvailable)
         assertFalse(p.modePreviewExportAvailable)
         assertNull(p.coopDisabledReason)
-        assertTrue(p.exportDisabledReason!!.contains("not implemented"))
+        assertEquals(DesignR.string.export_standalone_ar_unavailable, p.exportDisabledReason)
     }
 
     @Test

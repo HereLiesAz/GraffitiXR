@@ -218,8 +218,8 @@ class MainActivity : AppCompatActivity() {
     // Crash report captured on the previous run (native SIGSEGV and/or JVM), shown on launch.
     var pendingCrashReport by mutableStateOf<String?>(null)
 
-    // Interop: an image handed in via ACTION_SEND (e.g. an edited overlay returning from GraffiXR),
-    // consumed once by the editor as a new overlay layer. Set from the launch intent / onNewIntent.
+    // Interop: an image handed in via ACTION_SEND (e.g. an edited overlay returning from Graffux),
+    // consumed once by the editor as the project's design. Set from the launch intent / onNewIntent.
     private var incomingSharedImage by mutableStateOf<Uri?>(null)
 
     /**
@@ -288,6 +288,37 @@ class MainActivity : AppCompatActivity() {
             com.hereliesaz.graffitixr.common.LocationTracker.onPermissionsChanged()
         }
 
+    // Gallery export on API 26-28: a MediaStore insert into the shared Pictures collection needs
+    // WRITE_EXTERNAL_STORAGE there (declared with maxSdkVersion=28); from API 29 the app owns the
+    // rows it inserts and nothing is asked. The export waits here until the answer is in.
+    private var pendingGalleryExport: (() -> Unit)? = null
+    private val galleryPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            val pending = pendingGalleryExport
+            pendingGalleryExport = null
+            if (pending != null) {
+                if (granted) {
+                    pending()
+                } else {
+                    Toast.makeText(
+                        this, getString(DesignR.string.export_failed_permission), Toast.LENGTH_LONG,
+                    ).show()
+                }
+            }
+        }
+
+    /** Runs [export] now, or after the storage permission it needs on API 26-28 has been granted. */
+    private fun withGalleryWritePermission(export: () -> Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ||
+            isGranted(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        ) {
+            export()
+        } else {
+            pendingGalleryExport = export
+            galleryPermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
+    }
+
     private fun isGranted(permission: String): Boolean =
         ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
@@ -320,17 +351,14 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Extracts a single image [Uri] from an inbound share intent, or null if this launch isn't one.
-     * Handles ACTION_SEND (EXTRA_STREAM) and an image-typed ACTION_VIEW; anything without an image
-     * MIME type is ignored. The sender grants read permission on the Uri, so the editor's
-     * ContentResolver load succeeds.
+     * Handles ACTION_SEND (EXTRA_STREAM) only, the one image filter the manifest declares; anything
+     * without an image MIME type is ignored. The sender grants read permission on the Uri, so the
+     * editor's ContentResolver load succeeds.
      */
     private fun incomingImageUri(intent: Intent?): Uri? {
         if (intent == null || intent.type?.startsWith("image/") != true) return null
-        return when (intent.action) {
-            Intent.ACTION_SEND -> IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
-            Intent.ACTION_VIEW -> intent.data
-            else -> null
-        }
+        if (intent.action != Intent.ACTION_SEND) return null
+        return IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
     }
 
     // Trace ▸ Freeze's touch lock (mainUiState.isTouchLocked) used to fall to a 4-tap gesture to
@@ -485,6 +513,24 @@ class MainActivity : AppCompatActivity() {
 
 
                 val editorUiState by editorViewModel.uiState.collectAsState()
+                // After process death the NavController restores the editor route, but the open
+                // project lived only in memory. Reopen the one the user was in, once per process;
+                // if it can't be loaded, the editor would have nothing behind it, so go to the
+                // library. restoreLastOpenProject never replaces a project that is already open, so
+                // a normal New/Open (whose navigation follows the load) is unaffected. Deliberately
+                // `remember`, not rememberSaveable: the flag must reset with the process.
+                var lastProjectRestoreAttempted by remember { mutableStateOf(false) }
+                LaunchedEffect(showLibrary, editorUiState.projectId) {
+                    if (!showLibrary && editorUiState.projectId == null && !lastProjectRestoreAttempted) {
+                        lastProjectRestoreAttempted = true
+                        if (!editorViewModel.restoreLastOpenProject()) {
+                            navController.navigate(LIBRARY_ROUTE) {
+                                currentRoute?.let { popUpTo(it) { inclusive = true } }
+                                launchSingleTop = true
+                            }
+                        }
+                    }
+                }
                 val railExpansion by editorViewModel.railExpansion.collectAsState()
                 val mainUiState by mainViewModel.uiState.collectAsState()
                 // Own the whole AzNavRail drawer state so Trace -> Freeze can collapse it
@@ -516,7 +562,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 // Interop: an image shared in via ACTION_SEND (e.g. an edited overlay returning from
-                // GraffiXR) becomes a new overlay layer, consumed once.
+                // Graffux) becomes the project's design, consumed once.
                 //
                 // Gated on a loaded project: onAddLayer requires a projectId to save the artifact
                 // under, and on a cold start via ACTION_SEND there is none yet (the library screen is
@@ -753,10 +799,21 @@ class MainActivity : AppCompatActivity() {
                 // silently no-op — so stash the URI and add it once the project id is live (mirrors the
                 // firstRunPendingUri pattern below).
                 var pendingOverlayUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+                // The stash is only meant for the project that tap is creating. It is dropped when that
+                // creation fails (error surfaced below) and when the user goes back to the library,
+                // where a different project could be opened and would otherwise receive the image. A
+                // value restored after process death lands in the library first and is dropped too.
+                val projectCreationFailed = dashboardUiState.projectErrorMessage != null
+                LaunchedEffect(showLibrary, projectCreationFailed) {
+                    if (showLibrary || projectCreationFailed) pendingOverlayUri = null
+                }
                 val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                     if (uri != null) {
-                        if (editorUiState.projectId == null) pendingOverlayUri = uri
-                        else editorViewModel.onAddLayer(uri)
+                        if (editorUiState.projectId == null) {
+                            // A pick that lands after the user already left for the library has no
+                            // project to belong to.
+                            if (!showLibrary) pendingOverlayUri = uri
+                        } else editorViewModel.onAddLayer(uri)
                     }
                 }
                 LaunchedEffect(pendingOverlayUri, editorUiState.projectId) {
@@ -865,12 +922,8 @@ class MainActivity : AppCompatActivity() {
 
                 var showDesignInstructionsDialog by remember { mutableStateOf(false) }
 
-                // Auto-activate the first layer as soon as one exists — don't wait for
-                // AR anchor establishment. Drawing tools, stroke input, and gesture
-                // feedback all require an active layer; delaying activation forces the
-                // user through a needless intermediate state.
-
-                // Show design instructions when anchor is established with no layers.
+                // Show design instructions when the anchor is established and the project has no
+                // design yet.
                 LaunchedEffect(arUiState.isAnchorEstablished) {
                     if (arUiState.isAnchorEstablished && editorUiState.design == null) {
                         showDesignInstructionsDialog = true
@@ -1003,61 +1056,70 @@ class MainActivity : AppCompatActivity() {
                             //     editor composites layers on top at screen positions.
                             //   - Mockup / Trace / Design: no camera capture, editor composites
                             //     against per-mode background (backgroundBitmap / transparent).
-                            when (editorUiState.editorMode) {
-                                EditorMode.AR -> {
-                                    isExporting = true
-                                    // Guards against onExportCaptured never firing (see
-                                    // EXPORT_TIMEOUT_MS doc above) — cancelled below the moment the
-                                    // readback callback or the "not requested" fallback runs, so it
-                                    // never double-fires against a completed/failed export.
-                                    val timeoutJob = exportDispatchScope.launch {
-                                        kotlinx.coroutines.delay(EXPORT_TIMEOUT_MS)
-                                        if (isExporting) {
+                            withGalleryWritePermission {
+                                when (editorUiState.editorMode) {
+                                    EditorMode.AR -> {
+                                        isExporting = true
+                                        // Guards against onExportCaptured never firing (see
+                                        // EXPORT_TIMEOUT_MS doc above) — cancelled below the moment the
+                                        // readback callback or the "not requested" fallback runs, so it
+                                        // never double-fires against a completed/failed export.
+                                        val timeoutJob = exportDispatchScope.launch {
+                                            kotlinx.coroutines.delay(EXPORT_TIMEOUT_MS)
+                                            if (isExporting) {
+                                                isExporting = false
+                                                Toast.makeText(
+                                                    context,
+                                                    "Export timed out — try again",
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            }
+                                        }
+                                        val requested = arViewModel.requestExport { bmp ->
+                                            // The timeout job may have already fired and completed
+                                            // (isExporting=false, "timed out" toast shown) before this
+                                            // late readback lands — cancel() on a job that already ran
+                                            // to completion is a no-op, so check isCompleted explicitly
+                                            // and drop the stale callback rather than exporting twice /
+                                            // reporting success after a failure the user already saw.
+                                            if (timeoutJob.isCompleted) {
+                                                return@requestExport
+                                            }
+                                            timeoutJob.cancel()
+                                            isExporting = false
+                                            editorViewModel.exportImage(backgroundBitmap = bmp, skipLayerComposite = true)
+                                        }
+                                        if (!requested) {
+                                            // No renderer attached (e.g. AR mode without camera
+                                            // permission), so there is no framebuffer to read back.
+                                            // Do NOT fall back to a layers-only export: in AR the
+                                            // placement lives in AR space (modeAdjustments[AR]), which
+                                            // the flat composite would misapply and then report as a
+                                            // successful export. Say why nothing was exported instead.
+                                            timeoutJob.cancel()
                                             isExporting = false
                                             Toast.makeText(
                                                 context,
-                                                "Export timed out — try again",
-                                                Toast.LENGTH_SHORT,
+                                                context.getString(DesignR.string.export_ar_unavailable),
+                                                Toast.LENGTH_LONG,
                                             ).show()
                                         }
                                     }
-                                    val requested = arViewModel.requestExport { bmp ->
-                                        // The timeout job may have already fired and completed
-                                        // (isExporting=false, "timed out" toast shown) before this
-                                        // late readback lands — cancel() on a job that already ran
-                                        // to completion is a no-op, so check isCompleted explicitly
-                                        // and drop the stale callback rather than exporting twice /
-                                        // reporting success after a failure the user already saw.
-                                        if (timeoutJob.isCompleted) {
-                                            return@requestExport
-                                        }
-                                        timeoutJob.cancel()
-                                        isExporting = false
-                                        editorViewModel.exportImage(backgroundBitmap = bmp, skipLayerComposite = true)
-                                    }
-                                    if (!requested) {
-                                        // No renderer attached (e.g. AR mode without camera
-                                        // permission), so there is no framebuffer to read back.
-                                        // Export the layers alone rather than doing nothing.
-                                        timeoutJob.cancel()
-                                        isExporting = false
-                                        editorViewModel.exportImage()
-                                    }
-                                }
-                                EditorMode.OVERLAY -> {
-                                    exportDispatchScope.launch {
-                                        try {
-                                            val bmp = cameraController.takePictureAsBitmap(context)
-                                            editorViewModel.exportImage(backgroundBitmap = bmp)
-                                        } catch (t: Throwable) {
-                                            // Fall back to a layers-only export so the user
-                                            // still gets something rather than a silent failure.
-                                            android.util.Log.w("MainActivity", "Overlay capture failed; exporting layers only", t)
-                                            editorViewModel.exportImage()
+                                    EditorMode.OVERLAY -> {
+                                        exportDispatchScope.launch {
+                                            try {
+                                                val bmp = cameraController.takePictureAsBitmap(context)
+                                                editorViewModel.exportImage(backgroundBitmap = bmp)
+                                            } catch (t: Throwable) {
+                                                // Fall back to a layers-only export so the user
+                                                // still gets something rather than a silent failure.
+                                                android.util.Log.w("MainActivity", "Overlay capture failed; exporting layers only", t)
+                                                editorViewModel.exportImage()
+                                            }
                                         }
                                     }
+                                    else -> editorViewModel.exportImage()
                                 }
-                                else -> editorViewModel.exportImage()
                             }
                         },
                     )
@@ -1694,7 +1756,11 @@ class MainActivity : AppCompatActivity() {
 
                             if (mainUiState.isCapturingTarget) {
                                 TargetCreationUi(
-                                    uiState = arUiState,
+                                    rawBitmap = arUiState.tempCaptureBitmap,
+                                    annotatedBitmap = arUiState.annotatedCaptureBitmap,
+                                    // Confirm reads the mask AFTER the queued mark erases are applied,
+                                    // not from this composition's snapshot.
+                                    latestCapture = { arViewModel.awaitLatestTargetCapture() },
                                     captureStep = mainUiState.captureStep,
                                     isWaitingForTap = mainUiState.isWaitingForTap,
                                     strings = strings,
@@ -1804,10 +1870,10 @@ class MainActivity : AppCompatActivity() {
                                     onDismissRequest = { showDesignInstructionsDialog = false },
                                     title = { Text("Design Your Mural", color = Color.White) },
                                     // "Open" lives under the "mode.design" host, which
-                                    // expandWhen auto-collapses outside Design mode — this dialog can
-                                    // fire from AR (see showDesignInstructionsDialog's callers), where
-                                    // "tap Open" alone pointed at an invisible control. Route through
-                                    // Design first.
+                                    // expandWhen auto-collapses outside Design mode — this dialog
+                                    // fires from AR (the anchor-established effect above is its only
+                                    // trigger), where "tap Open" alone pointed at an invisible
+                                    // control. Route through Design first.
                                     text = { Text("Tap 'Design' on the rail, then 'Open', to choose a photo of your artwork.", color = Color.White) },
                                     containerColor = Color(0xEE1A1A1A),
                                     confirmButton = {
@@ -2522,12 +2588,16 @@ class MainActivity : AppCompatActivity() {
                 disabled = showLibrary,
                 onClick = { showSettings = false; showSaveDialog = true },
             )
-            val standaloneArExportBlocked =
-                editorUiState.editorMode == EditorMode.AR &&
-                    !arRailPolicy.modePreviewExportAvailable
-            // Omit Export when it can't act (standalone AR, no mode-preview export): no disabled,
-            // reason-labelled button. It stays present in every other mode.
-            if (!standaloneArExportBlocked) azRailSubItem(
+            // Why Export can't act, when it can't (standalone AR has no mode-preview export, and the
+            // backend may still be resolving). The item stays on the rail and tapping it says why,
+            // rather than vanishing or exporting something other than the mode's screenshot.
+            val exportBlockedReason: Int? =
+                if (editorUiState.editorMode == EditorMode.AR && !arRailPolicy.modePreviewExportAvailable) {
+                    arRailPolicy.exportDisabledReason
+                } else {
+                    null
+                }
+            azRailSubItem(
                 id = "proj.export",
                 hostId = railHostOf("proj.export"),
                 text = navStrings.export,
@@ -2537,10 +2607,14 @@ class MainActivity : AppCompatActivity() {
                 onClick = {
                     // Export is mode-dispatched by the caller so it has access to the CameraX
                     // controller (Overlay stills) and a coroutine scope (AR/Overlay both suspend on
-                    // asynchronous captures). Standalone AR is disabled here until CameraX + GL can
+                    // asynchronous captures). Standalone AR is blocked here until CameraX + GL can
                     // be composited; silently exporting "layers only" would violate the rail action's
                     // documented mode-screenshot contract.
-                    onExportRequested()
+                    if (exportBlockedReason != null) {
+                        Toast.makeText(context, context.getString(exportBlockedReason), Toast.LENGTH_LONG).show()
+                    } else {
+                        onExportRequested()
+                    }
                 },
             )
             azRailSubItem(

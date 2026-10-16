@@ -1546,9 +1546,9 @@ class ArViewModel @Inject constructor(
     /**
      * Where auto-captured screenshots land, beside the eval CSVs they are shared with.
      *
-     * They are reachable by `FileProvider` because `file_paths.xml` exposes the whole of `filesDir`
-     * (`<files-path path="."/>`), not because `eval/` is called out — worth stating plainly, since
-     * a reader who assumes a scoped entry would also assume moving this directory is safe.
+     * They are reachable by `FileProvider` only because `file_paths.xml` exposes `filesDir/eval/`
+     * (`<files-path path="eval/"/>`, which covers `eval/captures/` too) — moving this directory out
+     * of `eval/` would make the bundle's attachments fail to resolve, so change both together.
      *
      * **Purged once per view-model lifetime**, on first use. Without it the directory accumulates
      * across every session the app has ever run, and [writeDiagnosticBundle] — which globs the

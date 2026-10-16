@@ -945,6 +945,15 @@ fun MainScreen(
                         rotationZ = modeAdj.rotation
                         alpha = modeAdj.opacity
                         transformOrigin = TransformOrigin.Center
+                        // Fade each draw instead of rendering this whole group into an offscreen
+                        // buffer. The default (Auto) goes offscreen as soon as alpha < 1, which
+                        // isolates the design's blend mode inside a transparent buffer: Multiply,
+                        // Screen etc. then blend against nothing instead of the camera/mockup
+                        // behind, so the preview stopped matching ExportManager.composite (which
+                        // blends the design straight onto the background with the combined alpha).
+                        // There is a single design inside, so per-draw alpha is exact.
+                        compositingStrategy =
+                            androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
                     }
             ) {
                 uiState.design?.takeIf { it.isVisible }?.let { layer ->

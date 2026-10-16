@@ -560,12 +560,18 @@ Mode-aware; the Export rail item dispatches per mode.
 
 | Mode | Method | Result |
 |---|---|---|
-| AR (ARCore) | `glReadPixels` on the composited GL framebuffer | Camera + wall-anchored overlay (what you see, minus Compose UI) |
-| AR (standalone SphereSLAM) | Disabled for now | CameraX + transparent-GL compositing is not implemented yet; the rail explains this rather than exporting layers-only |
+| AR (ARCore) | `glReadPixels` on the composited GL framebuffer | Camera + wall-anchored overlay (what you see, minus Compose UI). With no AR renderer attached (e.g. no camera permission) nothing is exported and a localized message says so; it never falls back to a layers-only export, whose AR-space placement would be misapplied |
+| AR (standalone SphereSLAM) | Not available yet | CameraX + transparent-GL compositing is not implemented yet. Export stays on the rail; tapping it shows a localized explanation (`ArRailBackendPolicy.exportDisabledReason`) rather than exporting layers-only |
 | OVERLAY | CameraX `ImageCapture.takePicture` + composite layers at screen positions | Sensor still with layers on top |
 | MOCKUP | Standard composite | Flattened mockup |
 | TRACE | Transparent-background PNG | Line art with no backdrop fill |
 | Stencil | Tiled PDF with registration marks | Print-ready multi-sheet stencil |
+
+Every mode saves through MediaStore to Pictures/GraffitiXR (`saveBitmapToGallery`). On API 26-28 that
+needs `WRITE_EXTERNAL_STORAGE` (declared with `maxSdkVersion="28"`), which is requested right before
+the export starts; from API 29 nothing is asked. A refused write reports a permission-specific
+message, any other failure a generic one, and a gallery row whose image could not be written is
+deleted again.
 
 YUV→RGBA conversion for AR capture uses the native `nativebridge.YuvConverter` (OpenCV
 `cvtColor(COLOR_YUV2RGBA_NV21)` on ARM NEON, written into a caller-owned bitmap); the JNI descriptor is

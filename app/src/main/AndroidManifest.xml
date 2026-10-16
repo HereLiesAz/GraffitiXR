@@ -15,6 +15,13 @@
          app already has read access to, so neither needs a broad storage grant — and Play policy
          only permits these permissions where a system picker is technically insufficient, which
          here it is not. -->
+
+    <!-- Gallery export: MediaStore inserts into the shared Pictures collection need this on API 26-28
+         only; from API 29 the app owns the rows it inserts. Requested at runtime, just before an
+         export, on those releases (MainActivity.withGalleryWritePermission). -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
     <!-- Location: optional geotag on an AR target capture's record (CaptureEnvironment.location).
          Requested only when a target capture starts (MainActivity), never at launch. Both are
          declared because API 31+ ignores a FINE request made without COARSE. -->
