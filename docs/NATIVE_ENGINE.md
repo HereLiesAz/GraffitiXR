@@ -22,7 +22,7 @@ holds. While they build, a progress bar counts the crops down (`FingerprintBuild
 `MainScreen` in any mode).
 
 ### 2. Relocalization ("snap-back")
-A background thread (`relocThreadFunc`) continuously matches the live camera frame's descriptors against the stored fingerprint (Lowe ratio test, `kRelocLoweRatio = 0.75`) and solves the resulting 2D↔3D correspondences with `cv::solvePnPRansac` (100 iterations, 8px reprojection threshold, 0.99 confidence). A big lock (`kBigLockInliers = 20` inliers) is accepted outright; smaller locks go through additional consistency checks before the global anchor transform is corrected. This — not a mapping/rendering layer — is the actual mechanism behind the "Pocket-Ready" pitch: it needs no persistent map, just the one fingerprint.
+A background thread (`relocThreadFunc`) continuously matches the live camera frame's descriptors against the stored fingerprint (Lowe ratio test, `kRelocLoweRatio = 0.75`) and solves the resulting 2D↔3D correspondences with `cv::solvePnPRansac` (100 iterations, 8px reprojection threshold, 0.99 confidence). Every solve that clears PnP's own floors (at least 6 inliers, `FEW_INLIERS` otherwise) is published (pose, inlier/match counts, and a monotonically increasing `seq` — all under `mMutex` in one critical section, so a reader never sees a torn result); native applies no further accept/reject policy to the *anchor*. `kBigLockInliers = 20` only gates `growTrusted` — whether a relock is trusted enough to promote new marks into the fingerprint (a big lock still has to pass the inlier-spread gate); it does not accept a lock "outright". The anchor correction itself is **Kotlin-side**: `PoseFusion` reads the published result (`getRelocResult`), applies its inlier-ratio gate (`MIN_INLIER_RATIO = 0.5`) and cold-snap / blend policy, and keeps the standing anchor-local correction. `clearWallFingerprint` resets the published result's pose and counts to "no relock" but never rewinds the seq, so a consumer holding an old seq can't mistake a later result for one it has seen. The worker waits between attempts (`mRelocLockedBackoffMs`, default 200 ms once locked; `mRelocHuntBackoffMs`, default 60 ms while hunting; both clamped to 10–2000 ms and raised under thermal / power-save / low-battery pressure via `setRelocBackoffMs`). This — not a mapping/rendering layer — is the actual mechanism behind the "Pocket-Ready" pitch: it needs no persistent map, just the one fingerprint.
 
 ### 2a. Relationship to hybrid SphereSLAM/KPM
 
@@ -37,9 +37,13 @@ The ownership boundary is strict:
 - `HybridKpmCorrection` pairs a KPM observation with the ARCore sensor-view/backbone from the same
   timestamp and applies metric/quality gates;
 - an accepted KPM correction enters `PoseFusion` first;
-- if there is no accepted KPM correction that render frame, the existing MobileGS PnP correction is
-  the fallback;
-- if neither source is fresh, PoseFusion only re-applies its standing anchor-local correction.
+- while a KPM correction is *fresh* (accepted within `CorrectionSourceArbiter.HYBRID_FRESH_WINDOW_NS`,
+  3 s), frames with no new observation HOLD the standing correction — the MobileGS PnP result is not
+  consulted, so the two estimators never alternate frame by frame;
+- the MobileGS PnP correction drives only before KPM has first accepted, or once KPM has been silent
+  for the whole window (and a capture pose exists);
+- if neither source is available, PoseFusion only re-applies its standing anchor-local correction.
+See `TELEOLOGICAL_SLAM.md` ("Correction sources").
 
 MobileGS does not consume the hybrid KPM page frame and KPM does not mutate MobileGS fingerprint
 coordinates. The only shared downstream object is PoseFusion's **anchor-local correction**, which is
@@ -61,12 +65,12 @@ there for the first relocalization of the next session; a new target forgets it.
 ### 3. Teleological corroboration and self-grow (both off by default)
 Two optional, separately-gated mechanisms sit on top of relocalization:
 - **Corroboration**: compares descriptors from the design composite against the live wall to produce a confidence signal (Lowe ratio `kCorrobLoweRatio = 0.85`) — see `docs/TELEOLOGICAL_SLAM.md` for what it does and does not measure.
-- **Self-grow** (`mSelfGrowEnabled`, default **off**, `setSelfGrowEnabled`): lets validated new marks extend the fingerprint as the artist paints, so relocalization can survive the original reference being covered. Capped at `kMaxWallMarks = 5000` points.
+- **Self-grow** (`mSelfGrowEnabled`, default **off**, `setSelfGrowEnabled`): lets validated new marks extend the fingerprint as the artist paints, so relocalization can survive the original reference being covered. Capped at `kMaxWallMarks = 5000` points. Two further, independent 5000 caps exist: `kMaxPaintMarks = 5000` (painted-design reference marks) and `kMapCap = 5000` (the persistent feature map, which confidence-prunes when full).
 
 Both are reachable only from the diagnostic overlay (Settings > diagnostic overlay), not the artist-facing UI — see that doc for why, and for the open questions around self-grow's promotion gate.
 
 ### 4. Optional persistent wall feature map
-`WallFeatureMap` (`setMapRelocEnabled`/`setMapBuildEnabled`, `IMPLEMENTATION.md` phases 2b/3) is a second, longer-lived relocalization source that can be built and matched against across sessions. Off by default like the two mechanisms above.
+`WallFeatureMap` (`setMapRelocEnabled`/`setMapBuildEnabled`, `IMPLEMENTATION.md` phases 2b/3) is a second, longer-lived relocalization source that can be built and matched against across sessions. Off by default like the two mechanisms above. The **map path** of the reloc pass is additive and prior-gated: it needs a previous published pose (`mapPriorSeq > 0`, i.e. the fingerprint has locked at least once), frustum-gates the map to the points that pose says are in view (never a brute-force match of the whole map), and appends those correspondences to the fingerprint's before the single PnP solve.
 
 For standalone SphereSLAM, both self-grown fingerprint points and feature-map growth are written
 directly in the centered KPM-page fingerprint frame (+X right, +Y up, +Z wall normal). The
@@ -84,7 +88,7 @@ A representative subset of the real, currently-exported surface (see `SlamManage
 | Kotlin method | Description |
 |---|---|
 | `restoreWallFingerprintMetric(...)` | Ingests a captured fingerprint (descriptors + 3D points + capture pose/intrinsics). |
-| `updateAnchorTransform(mat)` | Relocalization correction — snaps the global mural alignment. |
+| `updateAnchorTransform(mat)` | Hands the engine the current ARCore anchor pose. (The relocalization correction itself is computed Kotlin-side by `PoseFusion` from `getRelocResult`.) |
 | `getRelocDiagnostics()` | Structured relocalization state (inliers, reprojection error, reject reason). |
 | `getCorroborationConfidence()` | Teleological corroboration's confidence signal (see `TELEOLOGICAL_SLAM.md`). |
 | `setSelfGrowEnabled(enabled)` | Toggles self-grow (default off). |

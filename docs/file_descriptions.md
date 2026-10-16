@@ -34,7 +34,9 @@ This document lists key files in the repository and their purposes.
     close-ups) or Both; what the next target's fingerprint is built from.
 *   `common/util/ImageExt.kt`: target-review helpers — `isolateMarkings` (adaptive threshold, whole
     marks highlighted, specks and marks touching the photo's edge excluded via `highlightWholeMarks`)
-    and `eraseColorBlob` (tap or drag removes a whole mark).
+    and mark erasing (tap or drag removes a whole mark): `MarkEraser` holds the mask's pixels and flood
+    queue for a gesture's many erases and publishes one bitmap per batch; `eraseColorBlob` is the
+    one-shot form (returns the same bitmap, allocation-free, when nothing was in reach).
 *   `common/util/ImageUtils.kt`: Bitmap loading/decoding helpers used across the editor and AR
     pickers. (There is no `ImageProcessingUtils.kt` — it was replaced by
     `core/nativebridge/.../YuvConverter.kt`, a direct native YUV→RGBA JNI binding, and deleted;
@@ -145,7 +147,11 @@ the real (non-stub) tracker is packaged.
     backbone. The MobileGS PnP path is its own; the timestamp-aligned hybrid KPM path delegates to
     SphereSLAM `sidecar.HybridAnchorFusion` (repeated-observation agreement before a large move)
     while keeping the shared correction and `FusionDiagnostics`. Neither path writes renderer
-    camera matrices.
+    camera matrices. `reset(consumedRelocSeq)` adopts the native reloc seq at a re-capture as
+    already consumed, so the pre-capture fix cannot cold-snap the new anchor.
+*   `anchor/CorrectionSourceArbiter.kt`: picks ONE correction source per render frame (hybrid KPM
+    applied / held while fresh / MobileGS reloc after a silent window) so the two never alternate;
+    see `docs/TELEOLOGICAL_SLAM.md` "Correction sources".
 *   `anticipation/HalfSphere.kt`: the half-sphere of anticipated views of a KPM page (poles and cuts,
     nested half-spheres zooming in, aim points tiling the target up close, rolls), rendered as the
     matching camera would see them (OpenCV, Kotlin fallback).
@@ -217,8 +223,12 @@ the real (non-stub) tracker is packaged.
     `GameRotationAttitudeSource`), publishes the per-frame pure-rotation screen homography
     (SphereSLAM `gyro.GyroCompensationMath`; screen intrinsics for the `FILL_CENTER` preview from
     SphereSLAM `camera.CameraFillCenter`) MainScreen draws the Overlay
-    design through, and auto-releases past 3°. No depth model runs (translation is not measured, so
-    depth would change nothing on screen).
+    design through, and auto-releases past 3°. The display rotation is tracked with a
+    `DisplayManager.DisplayListener` (a 90°<->270° flip is not a configuration change). No depth model
+    runs (translation is not measured, so depth would change nothing on screen).
+*   `NativeStateOwner.kt`: which project the process-global native MobileGS state belongs to; set
+    only after the project loader finishes swapping it, cleared at a project switch, and checked by
+    `ArViewModel.saveProjectWallMap` so an autosave never writes one project's wall map into another.
 *   `StandaloneAnalyzerRecovery.kt`: what the standalone overlay does after a fatal analyzer
     (restore the previous target and recreate the analyzer, or report) and the status-pill text.
 *   `StandaloneFrameAttitude.kt`: the capture-time `Frame.attitude` for the tracking session.
