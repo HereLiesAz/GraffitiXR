@@ -37,7 +37,7 @@ buildscript {
         // version numbers have been corrected to match current pins (Hilt 2.60.1 / Kotlin 2.4.20)
         // but whether the underlying incompatibility still reproduces at these versions has not
         // been re-verified — treat as a candidate to re-test before removing.
-        "org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.20"
+        "org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.21"
     )
 
     val protobufModules = listOf(
