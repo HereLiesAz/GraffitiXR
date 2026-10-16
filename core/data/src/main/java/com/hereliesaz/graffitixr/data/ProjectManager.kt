@@ -684,7 +684,9 @@ class ProjectManager @Inject constructor(
      * and its now-inaccurate comments have been removed rather than wired up, since nothing in the
      * app needs pre-loaded target-image bitmaps and re-migrating on every read is not a real cost.
      *
-     * Returns null (and logs) when the manifest's id does not match [projectId], the folder name.
+     * When the manifest's id does not match [projectId], the folder name, the manifest is repaired
+     * (re-keyed to the folder name and rewritten atomically, logged) if the folder name is a valid
+     * project id; otherwise this returns null and logs.
      */
     suspend fun loadProjectMetadata(context: Context, projectId: String): GraffitiProject? = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/$projectId")
@@ -697,13 +699,33 @@ class ProjectManager @Inject constructor(
             // The folder name is the project's identity everywhere else (saves, deletes, the file
             // URIs under it). A manifest whose id differs (a legacy half-finished import that kept
             // the archive's id, a hand-copied folder) would list under one id and then save, delete
-            // and open under another, so it is refused rather than served.
+            // and open under another. Refusing it would orphan the folder - listed nowhere it can be
+            // opened, undeletable from the app, its files leaking - so when the folder name is itself
+            // a valid project id the manifest is REPAIRED: re-keyed to the folder and written back
+            // atomically. Only a folder whose name cannot be a project id is refused.
             if (project.id != projectId) {
-                Log.e(
+                if (!isSafeProjectId(projectId)) {
+                    Log.e(
+                        "ProjectManager",
+                        "Refusing project folder '$projectId': its manifest id is '${project.id}' " +
+                            "and the folder name is not a valid project id",
+                    )
+                    return@withContext null
+                }
+                val repaired = rekeyProject(project, projectId)
+                Log.w(
                     "ProjectManager",
-                    "Refusing project folder '$projectId': its manifest id is '${project.id}'",
+                    "Repairing project folder '$projectId': manifest id '${project.id}' re-keyed to the folder name",
                 )
-                return@withContext null
+                try {
+                    atomicWriteText(projectFile, json.encodeToString(repaired))
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // The in-memory repair is still correct, and the next successful save writes it.
+                    Log.e("ProjectManager", "Could not write back the repaired manifest of '$projectId'", e)
+                }
+                return@withContext migrateInMemory(repaired)
             }
             migrateInMemory(project)
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -712,6 +734,34 @@ class ProjectManager @Inject constructor(
             Log.e("ProjectManager", "Failed to load project metadata", e)
             null
         }
+    }
+
+    /**
+     * [project] under a new id: the id itself, and every file reference that names the old id's
+     * folder (`/projects/<old>/`) re-pointed at the new one's. References that do not mention the old
+     * folder are left alone.
+     */
+    private fun rekeyProject(project: GraffitiProject, newId: String): GraffitiProject {
+        val oldMarker = "/projects/${project.id}/"
+        val newMarker = "/projects/$newId/"
+        fun path(p: String): String = p.replace(oldMarker, newMarker)
+        fun uri(u: Uri): Uri = u.toString().let { if (oldMarker in it) Uri.parse(path(it)) else u }
+        fun uri(u: Uri?): Uri? = u?.let { uri(it) }
+        return project.copy(
+            id = newId,
+            design = project.design?.let { it.copy(uri = uri(it.uri)) },
+            layers = project.layers.map { it.copy(uri = uri(it.uri)) },
+            backgroundImageUri = uri(project.backgroundImageUri),
+            overlayImageUri = uri(project.overlayImageUri),
+            originalOverlayImageUri = uri(project.originalOverlayImageUri),
+            thumbnailUri = uri(project.thumbnailUri),
+            targetImageUris = project.targetImageUris.map { uri(it) },
+            sphereSlamReferenceUri = uri(project.sphereSlamReferenceUri),
+            sphereSlamAtlasPages = project.sphereSlamAtlasPages.map { it.copy(referenceUri = uri(it.referenceUri)) },
+            evolutionImageUris = project.evolutionImageUris.map { uri(it) },
+            hybridKpmPageUri = uri(project.hybridKpmPageUri),
+            targetFingerprintPath = project.targetFingerprintPath?.let { path(it) },
+        )
     }
 
     /**
@@ -854,28 +904,62 @@ class ProjectManager @Inject constructor(
     }
 
     /**
-     * Whether the device has the free space to extract an archive of [declaredBytes] (the compressed
-     * size, or a negative number when the source could not report one).
+     * Whether the device has the free space to extract an archive that EXPANDS to [expandedBytes]
+     * (see [expandedArchiveSize]; negative when it could not be determined).
+     *
+     * Sized from the uncompressed bytes, not the archive's length: a few KB of highly compressible
+     * data inflates to hundreds of MB, and a check against the compressed length used to pass it.
      *
      * Extraction first streams every entry to a temp file under the cache dir (at most
      * [MAX_IMPORT_BYTES] in total) and then moves or, across filesystems, copies it into staging, so
      * the worst case holds the data twice. The requirement is [IMPORT_MIN_FREE_BYTES] plus twice the
-     * declared size, never more than twice [MAX_IMPORT_BYTES]. With no declared size only the floor
-     * applies; the cumulative cap in [streamEntryBounded] still bounds the rest, and a disk that
-     * fills mid-way fails the import cleanly.
+     * expanded size, never more than twice [MAX_IMPORT_BYTES]. An archive that expands past
+     * [MAX_IMPORT_BYTES] is refused outright (the cumulative cap would abort it part-way anyway).
+     * With an unknown size only the floor applies; the cap in [streamEntryBounded] still bounds the
+     * rest, and a disk that fills mid-way fails the import cleanly.
+     *
+     * [freeBytes] is the smaller of the cache and files dirs' usable space unless a test supplies one.
      */
-    internal fun hasRoomToImport(declaredBytes: Long): Boolean {
-        val needed = if (declaredBytes > 0) {
-            minOf(IMPORT_MIN_FREE_BYTES + 2 * declaredBytes, 2 * MAX_IMPORT_BYTES)
+    internal fun hasRoomToImport(
+        expandedBytes: Long,
+        freeBytes: Long = minOf(appContext.cacheDir.usableSpace, appContext.filesDir.usableSpace),
+    ): Boolean {
+        if (expandedBytes > MAX_IMPORT_BYTES) return false
+        val needed = if (expandedBytes > 0) {
+            minOf(IMPORT_MIN_FREE_BYTES + 2 * expandedBytes, 2 * MAX_IMPORT_BYTES)
         } else {
             IMPORT_MIN_FREE_BYTES
         }
-        return appContext.cacheDir.usableSpace >= needed && appContext.filesDir.usableSpace >= needed
+        return freeBytes >= needed
     }
 
-    /** Best-effort size of the archive behind [uri]; -1 when the provider does not report one. */
-    private fun declaredArchiveSize(uri: Uri): Long = try {
-        appContext.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
+    /**
+     * Total uncompressed size of the archive behind [uri], or -1 when it cannot be read.
+     *
+     * Counts the bytes each entry actually inflates to rather than trusting the entries' declared
+     * sizes: those are attacker-controlled, and absent (-1) for archives written as a stream. Reading
+     * stops once the total passes [MAX_IMPORT_BYTES], so a decompression bomb costs a bounded amount
+     * of work here and the returned value (> the cap) is enough for [hasRoomToImport] to refuse it.
+     */
+    private fun expandedArchiveSize(uri: Uri): Long = try {
+        appContext.contentResolver.openInputStream(uri)?.use { input ->
+            ZipInputStream(input).use { zis ->
+                val sink = ByteArray(64 * 1024)
+                var total = 0L
+                var entry = zis.nextEntry
+                while (entry != null && total <= MAX_IMPORT_BYTES) {
+                    if (!entry.isDirectory) {
+                        while (total <= MAX_IMPORT_BYTES) {
+                            val n = zis.read(sink)
+                            if (n < 0) break
+                            total += n
+                        }
+                    }
+                    entry = if (total > MAX_IMPORT_BYTES) null else zis.nextEntry
+                }
+                total
+            }
+        } ?: -1L
     } catch (e: kotlinx.coroutines.CancellationException) {
         throw e
     } catch (_: Exception) {
@@ -888,7 +972,7 @@ class ProjectManager @Inject constructor(
         val extractedFiles = mutableMapOf<String, File>()
         var stagingDir: File? = null
         return@withContext try {
-            if (!hasRoomToImport(declaredArchiveSize(uri))) {
+            if (!hasRoomToImport(expandedArchiveSize(uri))) {
                 Log.e("ProjectManager", "Import refused: not enough free storage to extract the archive")
                 return@withContext null
             }
@@ -1205,16 +1289,19 @@ class ProjectManager @Inject constructor(
                 }
 
                 // Validate against the staged copy first: every referenced asset must be in THIS
-                // archive. Only then retire the previous join's copy, whose leftover files could
-                // otherwise satisfy a reference the new archive no longer carries.
-                relocateProjectFiles(project, staging)
-                replaceDirectory(staging, destDir)
-                // Relocate against the HOST's id (the archive's paths carry it), then re-key.
-                val relocated = relocateProjectFiles(project, destDir).copy(id = localId)
+                // archive (so the previous join's leftover files can never satisfy a reference the new
+                // archive no longer carries), pointing every URI at the folder staging becomes.
+                // Relocated against the HOST's id (the archive's paths carry it), then re-keyed.
+                val relocated = relocateProjectFiles(project, staging, finalRoot = destDir).copy(id = localId)
                 val normalized = transform(relocated)
                 require(normalized.id == localId) {
                     "spectator transform must preserve isolated project id"
                 }
+                // The re-keyed manifest goes into staging BEFORE the folder becomes visible: swapping
+                // the archive's own project.json in first listed a folder whose manifest carried the
+                // host's id until the repository save below landed (and for ever, if it never did).
+                atomicWriteText(File(staging, "project.json"), json.encodeToString(normalized))
+                replaceDirectory(staging, destDir)
                 // Exact save: createProject's stale-writer merge would read the previous join's
                 // project.json and resurrect fields this snapshot deliberately lacks.
                 withContext(Dispatchers.Main) {

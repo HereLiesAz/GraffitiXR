@@ -158,7 +158,8 @@ class ProjectManagerTest {
         val mockUri = Uri.parse("content://test/project.gxr")
         val mockResolver = mockk<android.content.ContentResolver>()
         every { mockContext.contentResolver } returns mockResolver
-        every { mockResolver.openInputStream(any()) } returns zipBytes.inputStream()
+        // A fresh stream per open: the import pre-scans the archive's expanded size, then extracts it.
+        every { mockResolver.openInputStream(any()) } answers { zipBytes.inputStream() }
         return manager.importProjectFromUri(mockContext, mockUri)
     }
 
@@ -722,6 +723,33 @@ class ProjectManagerTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun `the spectator copy appears with its re-keyed manifest already in place`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        try {
+            // The default test repository is a relaxed mock whose replaceProject saves NOTHING, so
+            // whatever project.json the folder carries came from the staged write, not from a save
+            // that lands after the folder is already visible.
+            val manifest = """{"id":"host_a","name":"Host","design":{"uri":"file:///host/files/projects/host_a/d.png"}}"""
+                .toByteArray()
+            assertTrue(manager.loadAsSpectator(zipOf("project.json" to manifest, "d.png" to byteArrayOf(1))))
+
+            val dir = File(tempFilesDir, "projects/coop_host_a")
+            val onDisk = File(dir, "project.json").readText()
+            assertTrue(onDisk, "\"id\":\"coop_host_a\"" in onDisk && "\"id\":\"host_a\"" !in onDisk)
+            val listed = manager.loadProjectMetadata(mockContext, "coop_host_a")
+            assertEquals("coop_host_a", listed?.id)
+            assertEquals(
+                File(dir, "d.png").canonicalFile,
+                File(requireNotNull(listed?.design?.uri?.path)).canonicalFile,
+            )
+            assertTrue(File(tempFilesDir, "coop_staging").listFiles().isNullOrEmpty())
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun `rejoining replaces the spectator copy instead of merging the previous join into it`() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         try {
@@ -836,10 +864,40 @@ class ProjectManagerTest {
 
 
     @Test
-    fun `loadProjectMetadata refuses a manifest whose id differs from its folder`() = runTest {
+    fun `loadProjectMetadata repairs a manifest whose id differs from a valid folder name`() = runTest {
         val projectDir = File(tempFilesDir, "projects/folder_name").also { it.mkdirs() }
-        File(projectDir, "project.json").writeText("""{"id":"other_id","name":"Mismatched"}""")
-        assertNull(manager.loadProjectMetadata(mockContext, "folder_name"))
+        File(projectDir, "design.png").writeBytes(byteArrayOf(1))
+        File(projectDir, "project.json").writeText(
+            """{"id":"other_id","name":"Mismatched","design":{"uri":"file:///data/files/projects/other_id/design.png"},""" +
+                """"thumbnailUri":"file:///data/files/projects/folder_name/thumb.png"}""",
+        )
+
+        val repaired = manager.loadProjectMetadata(mockContext, "folder_name")
+
+        assertNotNull("a mis-keyed folder must not be orphaned", repaired)
+        assertEquals("folder_name", repaired!!.id)
+        assertEquals("Mismatched", repaired.name)
+        // Id-derived paths follow the folder; references that already named it are untouched.
+        assertEquals("file:///data/files/projects/folder_name/design.png", repaired.design?.uri.toString())
+        assertEquals("file:///data/files/projects/folder_name/thumb.png", repaired.thumbnailUri.toString())
+        // The fix is persisted, atomically (no temp file left behind), so it is a one-time repair.
+        val onDisk = File(projectDir, "project.json").readText()
+        assertTrue(onDisk, "\"id\":\"folder_name\"" in onDisk && "other_id" !in onDisk)
+        assertTrue(projectDir.listFiles()!!.none { it.name.endsWith(".tmp") })
+        assertEquals("folder_name", manager.loadProjectMetadata(mockContext, "folder_name")?.id)
+        // It is listed, openable and deletable under the one id.
+        assertTrue("folder_name" in manager.getProjectList(mockContext))
+        manager.deleteProject(mockContext, "folder_name")
+        assertFalse(projectDir.exists())
+    }
+
+    @Test
+    fun `loadProjectMetadata still refuses a mismatched manifest in a folder that is not a valid project id`() = runTest {
+        val projectDir = File(tempFilesDir, "projects/not a valid id").also { it.mkdirs() }
+        val manifest = """{"id":"other_id","name":"Mismatched"}"""
+        File(projectDir, "project.json").writeText(manifest)
+        assertNull(manager.loadProjectMetadata(mockContext, "not a valid id"))
+        assertEquals("the refused manifest must be left untouched", manifest, File(projectDir, "project.json").readText())
     }
 
     @Test
@@ -862,6 +920,39 @@ class ProjectManagerTest {
         assertFalse(File(tempFilesDir, "projects/broken").exists())
         assertTrue(manager.getProjectList(mockContext).isEmpty())
         assertTrue(File(tempFilesDir, "import_staging").listFiles().isNullOrEmpty())
+    }
+
+    @Test
+    fun `import free-space check is sized from the expanded bytes, not the archive length`() {
+        val mb = 1024L * 1024
+        // Unknown size: only the 64 MB floor applies.
+        assertTrue(manager.hasRoomToImport(-1L, freeBytes = 64 * mb))
+        assertFalse(manager.hasRoomToImport(-1L, freeBytes = 63 * mb))
+        // 100 MB of content needs the floor plus two copies = 264 MB.
+        assertTrue(manager.hasRoomToImport(100 * mb, freeBytes = 264 * mb))
+        assertFalse("a small download that inflates to 100 MB passed on its compressed size",
+            manager.hasRoomToImport(100 * mb, freeBytes = 200 * mb))
+        // Past the import cap is refused no matter how much room there is.
+        assertFalse(manager.hasRoomToImport(513 * mb, freeBytes = Long.MAX_VALUE))
+        // The cap itself is allowed with enough room (two copies, never more than 2x the cap).
+        assertTrue(manager.hasRoomToImport(512 * mb, freeBytes = 1024 * mb))
+        assertFalse(manager.hasRoomToImport(512 * mb, freeBytes = 1023 * mb))
+    }
+
+    @Test
+    fun `a small highly compressible archive is measured by what it expands to`() = runTest {
+        val big = ByteArray(2 * 1024 * 1024) // zeros: ~2 KB deflated
+        val zip = zipOf("project.json" to projectJson("zeros"), "pad.bin" to big)
+        assertTrue("fixture must be much smaller than its content", zip.size < big.size / 100)
+        val sizeFn = ProjectManager::class.java.getDeclaredMethod("expandedArchiveSize", Uri::class.java)
+        sizeFn.isAccessible = true
+        val mockResolver = mockk<android.content.ContentResolver>()
+        every { mockContext.contentResolver } returns mockResolver
+        every { mockResolver.openInputStream(any()) } answers { zip.inputStream() }
+        val expanded = sizeFn.invoke(manager, Uri.parse("content://test/z.gxr")) as Long
+        assertEquals(big.size + projectJson("zeros").size.toLong(), expanded)
+        // And the import itself still goes through (the stream is opened afresh for extraction).
+        assertNotNull(importZip(zip))
     }
 
     @Test
