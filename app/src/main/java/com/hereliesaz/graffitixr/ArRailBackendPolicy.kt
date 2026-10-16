@@ -7,9 +7,7 @@ internal data class ArRailBackendPolicy(
     val backendResolved: Boolean,
     val standalone: Boolean,
     val targetRailEnabled: Boolean,
-    val targetDisabledReason: String?,
     val coopCalibrationAvailable: Boolean,
-    val coopDisabledReason: String?,
     val modePreviewExportAvailable: Boolean,
     /**
      * Localized string resource explaining why AR-mode Export is unavailable, or null when
@@ -39,9 +37,7 @@ internal fun arRailBackendPolicy(
             backendResolved = false,
             standalone = false,
             targetRailEnabled = false,
-            targetDisabledReason = "Checking AR backend…",
             coopCalibrationAvailable = false,
-            coopDisabledReason = "Checking AR backend…",
             modePreviewExportAvailable = false,
             exportDisabledReason = DesignR.string.rail_checking_ar_backend,
         )
@@ -51,9 +47,7 @@ internal fun arRailBackendPolicy(
             backendResolved = true,
             standalone = false,
             targetRailEnabled = true,
-            targetDisabledReason = null,
             coopCalibrationAvailable = true,
-            coopDisabledReason = null,
             modePreviewExportAvailable = true,
             exportDisabledReason = null,
         )
@@ -64,17 +58,7 @@ internal fun arRailBackendPolicy(
         backendResolved = true,
         standalone = true,
         targetRailEnabled = standaloneRuntimeReady,
-        targetDisabledReason = when {
-            !sphereSlamAvailabilityResolved -> "Checking standalone wall tracker…"
-            !sphereSlamAvailable -> "Standalone wall tracking is unavailable on this build"
-            else -> null
-        },
         coopCalibrationAvailable = standaloneRuntimeReady,
-        coopDisabledReason = when {
-            !sphereSlamAvailabilityResolved -> "Checking standalone wall tracker…"
-            !sphereSlamAvailable -> "Standalone wall tracking is unavailable on this build"
-            else -> null
-        },
         modePreviewExportAvailable = false,
         exportDisabledReason = DesignR.string.export_standalone_ar_unavailable,
     )

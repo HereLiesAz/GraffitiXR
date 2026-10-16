@@ -3,7 +3,6 @@ package com.hereliesaz.graffitixr
 import com.hereliesaz.graffitixr.design.R as DesignR
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -22,8 +21,6 @@ class ArRailBackendPolicyTest {
         assertFalse(p.targetRailEnabled)
         assertFalse(p.coopCalibrationAvailable)
         assertFalse(p.modePreviewExportAvailable)
-        assertNotNull(p.targetDisabledReason)
-        assertNotNull(p.coopDisabledReason)
         assertEquals(DesignR.string.rail_checking_ar_backend, p.exportDisabledReason)
     }
 
@@ -40,8 +37,6 @@ class ArRailBackendPolicyTest {
         assertTrue(p.targetRailEnabled)
         assertTrue(p.coopCalibrationAvailable)
         assertTrue(p.modePreviewExportAvailable)
-        assertNull(p.targetDisabledReason)
-        assertNull(p.coopDisabledReason)
         assertNull(p.exportDisabledReason)
     }
 
@@ -57,10 +52,8 @@ class ArRailBackendPolicyTest {
         assertTrue(p.standalone)
         // Target is on the rail in standalone: it opens the shared capture flow.
         assertTrue(p.targetRailEnabled)
-        assertNull(p.targetDisabledReason)
         assertTrue(p.coopCalibrationAvailable)
         assertFalse(p.modePreviewExportAvailable)
-        assertNull(p.coopDisabledReason)
         assertEquals(DesignR.string.export_standalone_ar_unavailable, p.exportDisabledReason)
     }
 
@@ -75,7 +68,6 @@ class ArRailBackendPolicyTest {
         assertTrue(p.backendResolved)
         assertTrue(p.standalone)
         assertFalse(p.coopCalibrationAvailable)
-        assertTrue(p.coopDisabledReason!!.contains("unavailable"))
     }
 
     @Test
@@ -87,7 +79,6 @@ class ArRailBackendPolicyTest {
             sphereSlamAvailable = false,
         )
         assertFalse(p.coopCalibrationAvailable)
-        assertTrue(p.coopDisabledReason!!.contains("Checking"))
     }
     @Test
     fun `standalone Host readiness uses page target not ARCore anchor or cloud`() {

@@ -32,7 +32,6 @@
 
 
 
-    <string name="nav_scan_mode_toggle_info">Переключайтесь между холстом (оптимизировано для небольших произведений искусства на столе) и настенной росписью (оптимизировано для крупномасштабных стен и гауссовских брызг).</string>
 
 
 
@@ -606,9 +605,9 @@
         <item>Сведите пальцы для изменения масштаба, перетаскивайте для перемещения. Наложение остаётся зафиксированным на экране — отойдите назад, чтобы увидеть, как оно вписывается в стену.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
-        <item>Это устройство не поддерживает ARCore, поэтому режим AR-проекции недоступен.</item>
-        <item>Вы всё ещё можете использовать режимы След, Макет и Живое наложение — все режимы, кроме AR, работают без ARCore.</item>
-        <item>Нажмите, чтобы закрыть.</item>
+        <item>Это устройство не поддерживает ARCore, поэтому режим AR использует автономное отслеживание стены.</item>
+        <item>В режиме AR сначала вы снимаете фото текстурированного участка стены и отмечаете его четыре угла. Затем отслеживание фиксируется на этой цели.</item>
+        <item>Режимы «След», «Макет» и «Наложение» работают как обычно. Нажмите, чтобы закрыть.</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>Фотомакет — просмотрите свой дизайн на фотографии, прежде чем вообще браться за кисть.</item>
@@ -642,4 +641,68 @@
     <string name="export_ar_unavailable">Экспорт пока недоступен: камера AR не запущена. Откройте режим AR и повторите попытку.</string>
     <string name="export_standalone_ar_unavailable">Экспорт в автономном AR пока недоступен.</string>
     <string name="rail_checking_ar_backend">Проверка AR-движка…</string>
+
+    <string name="settings_use_arcore">Использовать ARCore</string>
+    <string name="settings_arcore_depth">Глубина ARCore</string>
+    <string name="settings_monocular_depth">Монокулярная глубина (бета)</string>
+    <string name="settings_ambient_scan">Сканирование окружения</string>
+    <string name="settings_adaptive_rate">Адаптивная частота (простой)</string>
+    <string name="settings_crash_reports">Отчёты о сбоях</string>
+    <string name="settings_crash_reports_desc">При сбое отправлять модель устройства и недавние журналы в публичный отчёт об ошибке? По умолчанию выключено.</string>
+    <string name="settings_crash_token_label">Токен отчётов о сбоях</string>
+    <string name="settings_crash_token_set">Задан</string>
+    <string name="settings_crash_token_not_set">Не задан</string>
+    <string name="settings_crash_token_desc">Токен GitHub с правом «Issues: write» в репозитории HereLiesAz/GraffitiXR. Хранится только на этом устройстве, никогда в приложении. Оставьте поле пустым, чтобы отключить отправку.</string>
+    <string name="settings_crash_token_field">Токен</string>
+    <string name="settings_canvas_color_black">Чёрный</string>
+    <string name="settings_canvas_color_dark">Тёмный</string>
+    <string name="settings_canvas_color_grey">Серый</string>
+    <string name="settings_canvas_color_white">Белый</string>
+    <string name="settings_canvas_color_navy">Тёмно-синий</string>
+    <string name="state_selected">Выбрано</string>
+    <string name="state_expanded">Развёрнуто</string>
+    <string name="state_collapsed">Свёрнуто</string>
+    <string name="settings_fps_device_default">По умолчанию для устройства</string>
+    <string name="settings_fps_device_max">Максимум устройства</string>
+    <string name="first_run_photo_title">Посмотрите на своей стене</string>
+    <string name="first_run_photo_text">Выберите опорное фото своей работы, и мы покажем в AR, как она выглядит на настоящей стене.</string>
+    <string name="first_run_choose_photo">Выбрать фото</string>
+    <string name="first_run_not_now">Не сейчас</string>
+    <string name="first_run_draw_title">Нарисуйте это на своей стене</string>
+    <string name="first_run_draw_hint">Рисуйте крупно — примерно с размер вашей работы. Достаточно, чтобы рисунок был узнаваем, аккуратность не нужна.</string>
+    <string name="first_run_draw_done">Я нарисовал(а)</string>
+    <string name="first_run_draw_skip">Пропустить — я размещу сам(а)</string>
+    <string name="first_run_detect_title">Теперь наведите камеру на нарисованное</string>
+    <string name="first_run_detect_movement_hint">Медленно двигайте устройство по кругу</string>
+    <string name="design_instructions_title">Создайте свой мурал</string>
+    <string name="design_instructions_text">Нажмите «%1$s» на панели, затем «%2$s», чтобы выбрать фото вашей работы.</string>
+    <string name="got_it_button">Понятно</string>
+    <string name="standalone_width_prompt">Измерьте реальную ширину между левым и правым краями цели.</string>
+    <string name="standalone_width_label_metric">Ширина цели (метры)</string>
+    <string name="standalone_width_label_imperial">Ширина цели (футы и дюймы)</string>
+    <string name="standalone_width_range_error">Введите ширину от %1$s до %2$s.</string>
+    <string name="standalone_use_measured_width">Использовать измеренную ширину</string>
+    <string name="standalone_continue_without_scale">Продолжить без физического масштаба</string>
+    <string name="standalone_recapture">Переснять</string>
+    <string name="standalone_capture_wall_target">Снять цель на стене</string>
+    <string name="standalone_capture_failed">Не удалось снять цель на стене — повторите попытку.</string>
+    <string name="standalone_rectify_failed">Не удалось выровнять эту цель — отметьте четыре чётких угла.</string>
+    <string name="standalone_target_too_weak">В этой цели слишком мало отслеживаемых деталей (признаков KPM: %1$d, нужно %2$d). Снимите более насыщенный участок стены.</string>
+    <string name="standalone_new_target">Новая цель</string>
+    <string name="standalone_copy_diagnostics">Копировать диагностику</string>
+    <string name="standalone_wall_target_lost">Цель на стене потеряна</string>
+    <string name="standalone_recapture_target">Переснять цель</string>
+    <string name="standalone_sweep_hint">Медленно поворачивайтесь, чтобы отсканировать пространство — %1$d%%</string>
+    <string name="target_rectify_title">Выровнять поверхность</string>
+    <string name="target_rectify_text">Теперь перетащите углы так, чтобы голубая рамка совпала с плоской поверхностью стены.</string>
+    <string name="target_remove_marks_title">Удалить метки</string>
+    <string name="target_erase_hint">Нажмите на метку, чтобы удалить её, или проведите пальцем по нескольким меткам.</string>
+    <string name="target_cd_raw_capture">Необработанный снимок</string>
+    <string name="target_cd_detected_marks">Обнаруженные метки</string>
+    <string name="target_cd_confirm">Подтвердить</string>
+    <string name="target_cd_unwarp_base">Снимок стены с маркерами по углам</string>
+    <string name="guidance_open_via_design_overlay">Нажмите «Дизайн» на панели, затем «Открыть», чтобы добавить слой: выберите фото, и оно появится здесь, поверх живого изображения с камеры.</string>
+    <string name="guidance_open_via_design_mockup">Нажмите «Дизайн» на панели, затем «Открыть», чтобы добавить слой поверх фото стены. Сведите и разведите пальцы и перетащите, чтобы задать размер и положение.</string>
+    <string name="guidance_open_via_design_trace">Нажмите «Дизайн» на панели, затем «Открыть», чтобы добавить первый слой. Когда он появится, сводите пальцы и перетаскивайте по холсту, чтобы задать размер и положение.</string>
+    <string name="guidance_open_via_design_ar">Нажмите «Дизайн» на панели, затем «Открыть», чтобы добавить слой дизайна: он проецируется на стену с помощью только что заданного якоря.</string>
 </resources>

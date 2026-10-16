@@ -345,6 +345,7 @@ fun MainScreen(
                         val sweepCoverageValue by arViewModel.sphereCoverageFraction.collectAsState()
                         com.hereliesaz.graffitixr.feature.ar.SphereSlamStandaloneOverlay(
                             uiHost = standaloneUiHost,
+                            isImperialUnits = arUiState.isImperialUnits,
                             cameraController = cameraController,
                             designBitmap = standaloneTexture,
                             slamManager = slamManager,

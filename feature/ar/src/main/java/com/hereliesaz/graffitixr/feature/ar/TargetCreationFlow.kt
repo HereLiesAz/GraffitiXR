@@ -29,6 +29,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
@@ -36,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import com.hereliesaz.graffitixr.common.model.CaptureStep
+import com.hereliesaz.graffitixr.design.R as DesignR
 import com.hereliesaz.graffitixr.design.theme.AppStrings
 import com.hereliesaz.graffitixr.design.theme.HotPink
 
@@ -134,12 +136,12 @@ private fun TargetInstructionCard(
     val data = when {
         isWaitingForTap -> Pair(strings.ar.targetCreationTitle, strings.ar.targetCreationText)
         captureStep == CaptureStep.RECTIFY -> Pair(
-            "RECTIFY SURFACE",
-            "Now, drag the corners to align the cyan frame with the flat surface of your wall."
+            stringResource(DesignR.string.target_rectify_title).uppercase(),
+            stringResource(DesignR.string.target_rectify_text)
         )
         captureStep == CaptureStep.MASK || captureStep == CaptureStep.REVIEW -> Pair(
-            "REMOVE MARKS",
-            "Tap a mark to remove it, or drag across marks to remove several."
+            stringResource(DesignR.string.target_remove_marks_title).uppercase(),
+            stringResource(DesignR.string.target_erase_hint)
         )
         else -> Pair("", "")
     }
@@ -176,14 +178,14 @@ private fun TargetInstructionCard(
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             AzButton(
-                text = "CANCEL",
+                text = strings.common.cancel.uppercase(),
                 onClick = onCancel,
                 color = HotPink,
                 shape = AzButtonShape.RECTANGLE
             )
             if (onNext != null) {
                 AzButton(
-                    text = "NEXT",
+                    text = strings.common.next.uppercase(),
                     onClick = onNext,
                     color = HotPink,
                     shape = AzButtonShape.RECTANGLE
@@ -231,7 +233,7 @@ private fun FeatureSelectionReview(
             val image = remember(bmp) { bmp.asImageBitmap() }
             Image(
                 bitmap = image,
-                contentDescription = "Raw Capture",
+                contentDescription = stringResource(DesignR.string.target_cd_raw_capture),
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
             )
@@ -247,7 +249,7 @@ private fun FeatureSelectionReview(
             val image = remember(bmp) { bmp.asImageBitmap() }
             Image(
                 bitmap = image,
-                contentDescription = "Detected marks",
+                contentDescription = stringResource(DesignR.string.target_cd_detected_marks),
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
             )
@@ -318,7 +320,7 @@ private fun FeatureSelectionReview(
 
         // -- Hint: tap/drag removes a whole mark --
         Text(
-            text = "Tap a mark to remove it, or drag across marks to remove several.",
+            text = stringResource(DesignR.string.target_erase_hint),
             color = Color.White,
             style = MaterialTheme.typography.labelMedium,
             textAlign = TextAlign.Center,
@@ -341,13 +343,13 @@ private fun FeatureSelectionReview(
                 onClick = onRetake,
                 containerColor = MaterialTheme.colorScheme.errorContainer
             ) {
-                Icon(Icons.Default.Refresh, contentDescription = "Retake")
+                Icon(Icons.Default.Refresh, contentDescription = strings.common.retake)
             }
             FloatingActionButton(
                 onClick = onConfirm,
                 containerColor = MaterialTheme.colorScheme.primaryContainer
             ) {
-                Icon(Icons.Default.Check, contentDescription = "Confirm")
+                Icon(Icons.Default.Check, contentDescription = stringResource(DesignR.string.target_cd_confirm))
             }
         }
     }
@@ -379,7 +381,7 @@ internal fun UnwarpScreen(
             val baseImage = remember(bitmap) { bitmap.asImageBitmap() }
             Image(
                 bitmap = baseImage,
-                contentDescription = "Unwarp Base",
+                contentDescription = stringResource(DesignR.string.target_cd_unwarp_base),
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
             )

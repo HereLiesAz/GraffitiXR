@@ -32,7 +32,6 @@
 
 
 
-    <string name="nav_scan_mode_toggle_info">在画布（针对较小的桌面级艺术作品进行了优化）和壁画（针对大型墙壁和高斯泼溅进行了优化）扫描模式之间切换。</string>
 
 
 
@@ -618,9 +617,9 @@
         <item>双指缩放以调整大小，拖动以重新定位。叠加层会固定在屏幕上 — 后退一步查看它与墙面的贴合效果。</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
-        <item>此设备不支持ARCore，因此无法使用AR投影模式。</item>
-        <item>你仍可以使用追踪、效果图和实时叠加模式 — 除AR外的所有模式均可在没有ARCore的情况下使用。</item>
-        <item>点击以关闭。</item>
+        <item>此设备不支持 ARCore，因此 AR 模式将改用独立的墙面追踪。</item>
+        <item>在 AR 模式下，你需要先拍摄一块有纹理的墙面并标出它的四个角，之后追踪会锁定在该目标上。</item>
+        <item>追踪、效果图和覆盖模式可照常使用。点按即可关闭。</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>照片效果图 — 在动笔之前，先在照片上预览你的设计。</item>
@@ -654,4 +653,68 @@
     <string name="export_ar_unavailable">导出尚未就绪：AR 相机视图未运行。请打开 AR 视图后重试。</string>
     <string name="export_standalone_ar_unavailable">独立 AR 模式暂不支持导出。</string>
     <string name="rail_checking_ar_backend">正在检查 AR 后端…</string>
+
+    <string name="settings_use_arcore">使用 ARCore</string>
+    <string name="settings_arcore_depth">ARCore 深度</string>
+    <string name="settings_monocular_depth">单目深度（测试版）</string>
+    <string name="settings_ambient_scan">环境扫描</string>
+    <string name="settings_adaptive_rate">自适应速率（空闲时）</string>
+    <string name="settings_crash_reports">崩溃报告</string>
+    <string name="settings_crash_reports_desc">发生崩溃时，是否将设备型号和最近的日志发送到公开的错误报告？默认关闭。</string>
+    <string name="settings_crash_token_label">崩溃报告令牌</string>
+    <string name="settings_crash_token_set">已设置</string>
+    <string name="settings_crash_token_not_set">未设置</string>
+    <string name="settings_crash_token_desc">一个对 HereLiesAz/GraffitiXR 具有 Issues: write 权限的 GitHub 令牌。仅保存在此设备上，绝不会放入应用中。留空即可停用上传。</string>
+    <string name="settings_crash_token_field">令牌</string>
+    <string name="settings_canvas_color_black">黑色</string>
+    <string name="settings_canvas_color_dark">深色</string>
+    <string name="settings_canvas_color_grey">灰色</string>
+    <string name="settings_canvas_color_white">白色</string>
+    <string name="settings_canvas_color_navy">藏青色</string>
+    <string name="state_selected">已选中</string>
+    <string name="state_expanded">已展开</string>
+    <string name="state_collapsed">已收起</string>
+    <string name="settings_fps_device_default">设备默认</string>
+    <string name="settings_fps_device_max">设备最大值</string>
+    <string name="first_run_photo_title">在你的墙上看效果</string>
+    <string name="first_run_photo_text">选择一张作品的参考照片，我们会用 AR 向你展示它在真实墙面上的样子。</string>
+    <string name="first_run_choose_photo">选择照片</string>
+    <string name="first_run_not_now">以后再说</string>
+    <string name="first_run_draw_title">把这个画在你的墙上</string>
+    <string name="first_run_draw_hint">画大一点，大致与你的作品一样大。只要能认出来就行，不必工整。</string>
+    <string name="first_run_draw_done">我画好了</string>
+    <string name="first_run_draw_skip">跳过 — 我自己来摆放</string>
+    <string name="first_run_detect_title">现在把相机对准你画的图案</string>
+    <string name="first_run_detect_movement_hint">请缓慢地沿圆形移动设备</string>
+    <string name="design_instructions_title">设计你的壁画</string>
+    <string name="design_instructions_text">点按导轨上的“%1$s”，再点按“%2$s”，选择一张你的作品照片。</string>
+    <string name="got_it_button">知道了</string>
+    <string name="standalone_width_prompt">请测量目标左右两边之间的实际宽度。</string>
+    <string name="standalone_width_label_metric">目标宽度（米）</string>
+    <string name="standalone_width_label_imperial">目标宽度（英尺和英寸）</string>
+    <string name="standalone_width_range_error">请输入 %1$s 到 %2$s 之间的宽度。</string>
+    <string name="standalone_use_measured_width">使用测得的宽度</string>
+    <string name="standalone_continue_without_scale">不使用实际尺寸，继续</string>
+    <string name="standalone_recapture">重新拍摄</string>
+    <string name="standalone_capture_wall_target">拍摄墙面目标</string>
+    <string name="standalone_capture_failed">无法拍摄墙面目标 — 请重试。</string>
+    <string name="standalone_rectify_failed">无法校正该目标 — 请标出四个清晰的角点。</string>
+    <string name="standalone_target_too_weak">该目标可追踪的细节太少（KPM 特征 %1$d 个，至少需要 %2$d 个）。请重新拍摄细节更丰富的墙面区域。</string>
+    <string name="standalone_new_target">新建目标</string>
+    <string name="standalone_copy_diagnostics">复制诊断信息</string>
+    <string name="standalone_wall_target_lost">墙面目标已丢失</string>
+    <string name="standalone_recapture_target">重新拍摄目标</string>
+    <string name="standalone_sweep_hint">请缓慢转动以建立空间地图 — %1$d%%</string>
+    <string name="target_rectify_title">校正表面</string>
+    <string name="target_rectify_text">现在拖动四个角，使青色边框对齐你墙面上的平整区域。</string>
+    <string name="target_remove_marks_title">移除标记</string>
+    <string name="target_erase_hint">点按标记即可移除，或在多个标记上滑动以一次移除多个。</string>
+    <string name="target_cd_raw_capture">原始拍摄图像</string>
+    <string name="target_cd_detected_marks">检测到的标记</string>
+    <string name="target_cd_confirm">确认</string>
+    <string name="target_cd_unwarp_base">带角点手柄的墙面照片</string>
+    <string name="guidance_open_via_design_overlay">点按导轨上的“设计”，再点按“打开”以添加图层 — 选择一张照片，它会显示在这里，悬浮在实时相机画面之上。</string>
+    <string name="guidance_open_via_design_mockup">点按导轨上的“设计”，再点按“打开”，在墙面照片上方添加图层。双指捏合并拖动以调整大小和位置。</string>
+    <string name="guidance_open_via_design_trace">点按导轨上的“设计”，再点按“打开”以添加你的第一个图层。添加后，在画布上双指捏合并拖动以调整大小和位置。</string>
+    <string name="guidance_open_via_design_ar">点按导轨上的“设计”，再点按“打开”以添加设计图层 — 它会借助你刚设置的锚点投影到墙上。</string>
 </resources>

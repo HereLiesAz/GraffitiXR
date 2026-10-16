@@ -32,7 +32,6 @@
 
 
 
-    <string name="nav_scan_mode_toggle_info">キャンバス（小規模なデスク上のアート向け）と壁画（大規模な壁とガウシアンスプラッティング向け）のスキャンモードを切り替えます。</string>
 
 
 
@@ -618,9 +617,9 @@
         <item>ピンチで拡大縮小、ドラッグで移動します。オーバーレイは画面に固定されたままです — 後ろに下がって、壁にどう収まるか確認しましょう。</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
-        <item>このデバイスはARCoreに対応していないため、AR投影モードは使用できません。</item>
-        <item>ライトボックス、モックアップ、ライブオーバーレイは引き続き使用できます — AR以外のすべてのモードはARCoreなしで動作します。</item>
-        <item>タップして閉じます。</item>
+        <item>この端末は ARCore に対応していないため、AR モードでは独立した壁トラッキングを使用します。</item>
+        <item>AR モードでは、まずテクスチャのある壁面を撮影し、その 4 つの角を指定します。その後、トラッキングがそのターゲットに固定されます。</item>
+        <item>ライトボックス、モックアップ、オーバーレイはいつもどおり使えます。タップして閉じます。</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>写真モックアップ — 筆を取る前に、写真の上でデザインをプレビューできます。</item>
@@ -654,4 +653,68 @@
     <string name="export_ar_unavailable">エクスポートの準備ができていません。ARカメラビューが動作していません。ARビューを開いてもう一度お試しください。</string>
     <string name="export_standalone_ar_unavailable">スタンドアロンARでは、まだエクスポートできません。</string>
     <string name="rail_checking_ar_backend">ARバックエンドを確認しています…</string>
+
+    <string name="settings_use_arcore">ARCore を使用</string>
+    <string name="settings_arcore_depth">ARCore 深度</string>
+    <string name="settings_monocular_depth">単眼深度（ベータ）</string>
+    <string name="settings_ambient_scan">周囲スキャン</string>
+    <string name="settings_adaptive_rate">アダプティブレート（アイドル時）</string>
+    <string name="settings_crash_reports">クラッシュレポート</string>
+    <string name="settings_crash_reports_desc">クラッシュ時に、端末のモデルと最近のログを公開バグ報告として送信しますか？初期設定ではオフです。</string>
+    <string name="settings_crash_token_label">クラッシュレポート用トークン</string>
+    <string name="settings_crash_token_set">設定済み</string>
+    <string name="settings_crash_token_not_set">未設定</string>
+    <string name="settings_crash_token_desc">HereLiesAz/GraffitiXR で「Issues: write」権限を持つ GitHub トークン。この端末にのみ保存され、アプリ内には保存されません。空欄にするとアップロードが無効になります。</string>
+    <string name="settings_crash_token_field">トークン</string>
+    <string name="settings_canvas_color_black">黒</string>
+    <string name="settings_canvas_color_dark">ダーク</string>
+    <string name="settings_canvas_color_grey">グレー</string>
+    <string name="settings_canvas_color_white">白</string>
+    <string name="settings_canvas_color_navy">ネイビー</string>
+    <string name="state_selected">選択中</string>
+    <string name="state_expanded">展開中</string>
+    <string name="state_collapsed">折りたたみ中</string>
+    <string name="settings_fps_device_default">端末の既定</string>
+    <string name="settings_fps_device_max">端末の最大</string>
+    <string name="first_run_photo_title">壁で確認しましょう</string>
+    <string name="first_run_photo_text">作品の参考写真を選ぶと、実際の壁でどう見えるかを AR で表示します。</string>
+    <string name="first_run_choose_photo">写真を選択</string>
+    <string name="first_run_not_now">今はしない</string>
+    <string name="first_run_draw_title">これを壁に描いてください</string>
+    <string name="first_run_draw_hint">作品と同じくらいの大きさで、大きく描いてください。きれいでなくても、見分けがつけば十分です。</string>
+    <string name="first_run_draw_done">描きました</string>
+    <string name="first_run_draw_skip">スキップ — 自分で配置します</string>
+    <string name="first_run_detect_title">描いたものにカメラを向けてください</string>
+    <string name="first_run_detect_movement_hint">端末をゆっくり円を描くように動かしてください</string>
+    <string name="design_instructions_title">壁画をデザインしましょう</string>
+    <string name="design_instructions_text">レールの「%1$s」をタップし、続けて「%2$s」をタップして、作品の写真を選択します。</string>
+    <string name="got_it_button">了解</string>
+    <string name="standalone_width_prompt">ターゲットの左端から右端までの実際の幅を測ってください。</string>
+    <string name="standalone_width_label_metric">ターゲットの幅（メートル）</string>
+    <string name="standalone_width_label_imperial">ターゲットの幅（フィートとインチ）</string>
+    <string name="standalone_width_range_error">幅を %1$s から %2$s の範囲で入力してください。</string>
+    <string name="standalone_use_measured_width">測定した幅を使用</string>
+    <string name="standalone_continue_without_scale">実寸なしで続行</string>
+    <string name="standalone_recapture">再撮影</string>
+    <string name="standalone_capture_wall_target">壁ターゲットを撮影</string>
+    <string name="standalone_capture_failed">壁ターゲットを撮影できませんでした。もう一度お試しください。</string>
+    <string name="standalone_rectify_failed">このターゲットを補正できませんでした。はっきりした 4 つの角を指定してください。</string>
+    <string name="standalone_target_too_weak">このターゲットは追跡できる特徴が少なすぎます（KPM 特徴 %1$d 個、必要数 %2$d 個）。より特徴の多い壁面を撮影し直してください。</string>
+    <string name="standalone_new_target">新しいターゲット</string>
+    <string name="standalone_copy_diagnostics">診断情報をコピー</string>
+    <string name="standalone_wall_target_lost">壁ターゲットを見失いました</string>
+    <string name="standalone_recapture_target">ターゲットを撮り直す</string>
+    <string name="standalone_sweep_hint">ゆっくり向きを変えて空間をマッピングしてください — %1$d%%</string>
+    <string name="target_rectify_title">面を補正</string>
+    <string name="target_rectify_text">角をドラッグして、シアンの枠を壁の平らな面に合わせてください。</string>
+    <string name="target_remove_marks_title">マークを削除</string>
+    <string name="target_erase_hint">マークをタップして削除するか、複数のマークをなぞって削除します。</string>
+    <string name="target_cd_raw_capture">未加工の撮影画像</string>
+    <string name="target_cd_detected_marks">検出されたマーク</string>
+    <string name="target_cd_confirm">確認</string>
+    <string name="target_cd_unwarp_base">角のハンドル付きで撮影した壁の写真</string>
+    <string name="guidance_open_via_design_overlay">レールの「デザイン」をタップし、続けて「開く」をタップしてレイヤーを追加します。写真を選ぶと、ライブカメラ映像の上に浮かんで表示されます。</string>
+    <string name="guidance_open_via_design_mockup">レールの「デザイン」をタップし、続けて「開く」をタップして、壁の写真の上にレイヤーを追加します。ピンチとドラッグで大きさと位置を調整します。</string>
+    <string name="guidance_open_via_design_trace">レールの「デザイン」をタップし、続けて「開く」をタップして、最初のレイヤーを追加します。追加後は、キャンバス上でピンチとドラッグをして大きさと位置を決めます。</string>
+    <string name="guidance_open_via_design_ar">レールの「デザイン」をタップし、続けて「開く」をタップしてデザインレイヤーを追加します。設定したばかりのアンカーを使って壁に投影されます。</string>
 </resources>

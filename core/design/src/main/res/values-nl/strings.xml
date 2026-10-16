@@ -32,7 +32,6 @@
 
 
 
-    <string name="nav_scan_mode_toggle_info">Schakel tussen Canvas (geoptimaliseerd voor kleinere kunst op bureauschaal) en Mural (geoptimaliseerd voor grootschalige muren en Gaussiaanse splatting).</string>
 
 
 
@@ -606,9 +605,9 @@
         <item>Knijp om te schalen, sleep om te verplaatsen. De overlay blijft vast op je scherm — stap achteruit om te zien hoe hij op de muur past.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
-        <item>Dit apparaat ondersteunt geen ARCore, dus de AR-projectiemodus is niet beschikbaar.</item>
-        <item>Je kunt nog steeds Spoor, Mock-up en Live overlay gebruiken — elke modus behalve AR werkt zonder ARCore.</item>
-        <item>Tik om te sluiten.</item>
+        <item>Dit apparaat ondersteunt ARCore niet, dus de AR-modus gebruikt in plaats daarvan zelfstandige muurtracking.</item>
+        <item>In de AR-modus neem je eerst een foto op van een gestructureerd stuk muur en markeer je de vier hoeken. De tracking vergrendelt zich daarna op dat doel.</item>
+        <item>Spoor, Mock-up en Overlay werken zoals gewoonlijk. Tik om te sluiten.</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>Foto-mockup — bekijk een voorbeeld van je ontwerp op een foto voordat je ook maar een kwast oppakt.</item>
@@ -642,4 +641,68 @@
     <string name="export_ar_unavailable">Exporteren is niet klaar: de AR-camerabeeld draait niet. Open de AR-weergave en probeer het opnieuw.</string>
     <string name="export_standalone_ar_unavailable">Exporteren is nog niet beschikbaar in zelfstandige AR.</string>
     <string name="rail_checking_ar_backend">AR-backend controleren…</string>
+
+    <string name="settings_use_arcore">ARCore gebruiken</string>
+    <string name="settings_arcore_depth">ARCore-diepte</string>
+    <string name="settings_monocular_depth">Monoculaire diepte (bèta)</string>
+    <string name="settings_ambient_scan">Omgevingsscan</string>
+    <string name="settings_adaptive_rate">Adaptieve snelheid (inactief)</string>
+    <string name="settings_crash_reports">Crashrapporten</string>
+    <string name="settings_crash_reports_desc">Bij een crash het apparaatmodel en recente logboeken naar een openbare bugmelding sturen? Standaard uit.</string>
+    <string name="settings_crash_token_label">Token voor crashrapporten</string>
+    <string name="settings_crash_token_set">Ingesteld</string>
+    <string name="settings_crash_token_not_set">Niet ingesteld</string>
+    <string name="settings_crash_token_desc">Een GitHub-token met \'Issues: write\' op HereLiesAz/GraffitiXR. Wordt alleen op dit apparaat bewaard, nooit in de app. Laat leeg om uploads uit te schakelen.</string>
+    <string name="settings_crash_token_field">Token</string>
+    <string name="settings_canvas_color_black">Zwart</string>
+    <string name="settings_canvas_color_dark">Donker</string>
+    <string name="settings_canvas_color_grey">Grijs</string>
+    <string name="settings_canvas_color_white">Wit</string>
+    <string name="settings_canvas_color_navy">Marineblauw</string>
+    <string name="state_selected">Geselecteerd</string>
+    <string name="state_expanded">Uitgevouwen</string>
+    <string name="state_collapsed">Ingeklapt</string>
+    <string name="settings_fps_device_default">Apparaatstandaard</string>
+    <string name="settings_fps_device_max">Apparaatmaximum</string>
+    <string name="first_run_photo_title">Zie het op je muur</string>
+    <string name="first_run_photo_text">Kies een referentiefoto van je kunstwerk en we laten zien hoe het eruitziet op een echte muur, in AR.</string>
+    <string name="first_run_choose_photo">Foto kiezen</string>
+    <string name="first_run_not_now">Niet nu</string>
+    <string name="first_run_draw_title">Teken dit op je muur</string>
+    <string name="first_run_draw_hint">Teken het groot, ongeveer zo groot als je kunstwerk. Het hoeft alleen herkenbaar te zijn, niet netjes.</string>
+    <string name="first_run_draw_done">Ik heb het getekend</string>
+    <string name="first_run_draw_skip">Overslaan – ik plaats het zelf</string>
+    <string name="first_run_detect_title">Richt je camera nu op wat je hebt getekend</string>
+    <string name="first_run_detect_movement_hint">Beweeg je apparaat langzaam in een cirkel</string>
+    <string name="design_instructions_title">Ontwerp je muurschildering</string>
+    <string name="design_instructions_text">Tik in de balk op \'%1$s\' en dan op \'%2$s\' om een foto van je kunstwerk te kiezen.</string>
+    <string name="got_it_button">Begrepen</string>
+    <string name="standalone_width_prompt">Meet de werkelijke breedte tussen de linker- en rechterrand van het doel.</string>
+    <string name="standalone_width_label_metric">Breedte van het doel (meter)</string>
+    <string name="standalone_width_label_imperial">Breedte van het doel (voet en duim)</string>
+    <string name="standalone_width_range_error">Voer een breedte in van %1$s tot %2$s.</string>
+    <string name="standalone_use_measured_width">Gemeten breedte gebruiken</string>
+    <string name="standalone_continue_without_scale">Doorgaan zonder fysieke schaal</string>
+    <string name="standalone_recapture">Opnieuw opnemen</string>
+    <string name="standalone_capture_wall_target">Muurdoel opnemen</string>
+    <string name="standalone_capture_failed">Het muurdoel kon niet worden opgenomen – probeer het opnieuw.</string>
+    <string name="standalone_rectify_failed">Dat doel kon niet worden rechtgezet – markeer vier duidelijke hoeken.</string>
+    <string name="standalone_target_too_weak">Dat doel heeft te weinig volgbare details (%1$d KPM-kenmerken; %2$d nodig). Neem een rijker stuk muur op.</string>
+    <string name="standalone_new_target">Nieuw doel</string>
+    <string name="standalone_copy_diagnostics">Diagnose kopiëren</string>
+    <string name="standalone_wall_target_lost">Muurdoel kwijt</string>
+    <string name="standalone_recapture_target">Doel opnieuw opnemen</string>
+    <string name="standalone_sweep_hint">Draai langzaam om de ruimte in kaart te brengen — %1$d%%</string>
+    <string name="target_rectify_title">Oppervlak rechtzetten</string>
+    <string name="target_rectify_text">Sleep nu de hoeken om het cyaan kader uit te lijnen met het vlakke oppervlak van je muur.</string>
+    <string name="target_remove_marks_title">Markeringen verwijderen</string>
+    <string name="target_erase_hint">Tik op een markering om die te verwijderen, of sleep over meerdere markeringen.</string>
+    <string name="target_cd_raw_capture">Ruwe opname</string>
+    <string name="target_cd_detected_marks">Gedetecteerde markeringen</string>
+    <string name="target_cd_confirm">Bevestigen</string>
+    <string name="target_cd_unwarp_base">Opgenomen muurfoto met hoekgrepen</string>
+    <string name="guidance_open_via_design_overlay">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om een laag toe te voegen – kies een foto en die verschijnt hier, zwevend boven de live camerabeeld.</string>
+    <string name="guidance_open_via_design_mockup">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om een laag boven de muurfoto toe te voegen. Knijp en sleep om de grootte en positie aan te passen.</string>
+    <string name="guidance_open_via_design_trace">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om je eerste laag toe te voegen. Zodra die erin staat, knijp en sleep je op het canvas om de grootte en plaats te bepalen.</string>
+    <string name="guidance_open_via_design_ar">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om een ontwerplaag toe te voegen – die wordt op de muur geprojecteerd met het anker dat je net hebt gezet.</string>
 </resources>

@@ -15,11 +15,17 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
  *  1. A hybrid observation accepted this frame is applied ([Source.HYBRID]).
  *  2. Otherwise, **while hybrid is fresh** — it was accepted within [HYBRID_FRESH_WINDOW_NS] — the
  *     standing correction is **held** ([Source.HOLD]). The reloc path is not consulted, even if it
- *     has a new result.
+ *     has a new result, and **even if the KPM page has just been unloaded**: the window, not the
+ *     page's presence, decides when the other estimator may take over.
  *  3. Otherwise (hybrid never accepted since the last reset, or silent for the whole window) reloc
- *     drives, if there is a capture pose ([Source.RELOC]); with only a hybrid page ready the
- *     correction is held ([Source.HOLD]); with neither source the raw backbone is used
- *     ([Source.NONE]).
+ *     drives, if there is a capture pose and the reloc path is not gated ([Source.RELOC]); with only
+ *     a hybrid page ready the correction is held ([Source.HOLD]); with neither source the raw
+ *     backbone is used ([Source.NONE]).
+ *
+ * **Reloc gate.** While a re-capture is replacing the wall fingerprint (`relocGated`) the reloc
+ * result and `captureAnchorCam` describe the PREVIOUS wall. The reloc path is then unusable no matter
+ * what else is true — [Source.RELOC] is never returned — so a later solve cannot cold-snap the new
+ * anchor onto the old wall. Hybrid still works (its page is independent of the fingerprint).
  *
  * So the handover is one-way and timed: reloc until hybrid first accepts, hybrid while it keeps
  * accepting, reloc again only after hybrid has been unavailable for the full window. No frame-by-frame
@@ -46,20 +52,23 @@ class CorrectionSourceArbiter {
      * @param hybridAccepted a hybrid observation passed its quality gates this frame
      * @param hybridFrameReady a metric KPM page is loaded and could produce observations
      * @param hasRelocCapturePose `captureAnchorCam` exists (the reloc path can compose a correction)
+     * @param relocGated the wall fingerprint is being replaced (a re-capture's anchor exists but its
+     *   new fingerprint and `captureAnchorCam` are not both installed yet): reloc must not drive
      */
     fun select(
         nowNs: Long,
         hybridAccepted: Boolean,
         hybridFrameReady: Boolean,
         hasRelocCapturePose: Boolean,
+        relocGated: Boolean = false,
     ): Source {
         if (hybridAccepted) {
             lastHybridAcceptedNs = nowNs
             return Source.HYBRID
         }
-        if (hybridFrameReady && hybridFresh(nowNs)) return Source.HOLD
+        if (hybridFresh(nowNs)) return Source.HOLD
         return when {
-            hasRelocCapturePose -> Source.RELOC
+            hasRelocCapturePose && !relocGated -> Source.RELOC
             hybridFrameReady -> Source.HOLD
             else -> Source.NONE
         }

@@ -32,7 +32,6 @@
 
 
 
-    <string name="nav_scan_mode_toggle_info">Växla mellan Canvas (optimerad för konst i mindre skrivbordsskala) och Mural (optimerad för storskaliga väggar och Gaussisk stänk).</string>
 
 
 
@@ -606,9 +605,9 @@
         <item>Nyp för att skala, dra för att flytta. Täckningen förblir fast på din skärm — kliv bakåt för att se hur den passar väggen.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
-        <item>Den här enheten stöder inte ARCore, så AR-projiceringsläget är inte tillgängligt.</item>
-        <item>Du kan fortfarande använda Spåra, Mockup och Live-täckning — alla lägen utom AR fungerar utan ARCore.</item>
-        <item>Tryck för att stänga.</item>
+        <item>Den här enheten stöder inte ARCore, så AR-läget använder i stället fristående väggspårning.</item>
+        <item>I AR-läget fångar du först ett foto av en strukturerad del av väggen och markerar dess fyra hörn. Spårningen låser sedan fast vid det målet.</item>
+        <item>Spåra, Mockup och Täcka över fungerar som vanligt. Tryck för att stänga.</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>Foto-mockup — förhandsgranska din design på ett foto innan du ens tar fram en pensel.</item>
@@ -642,4 +641,68 @@
     <string name="export_ar_unavailable">Exporten är inte redo: AR-kameravyn körs inte. Öppna AR-vyn och försök igen.</string>
     <string name="export_standalone_ar_unavailable">Export är inte tillgänglig i fristående AR ännu.</string>
     <string name="rail_checking_ar_backend">Kontrollerar AR-backend…</string>
+
+    <string name="settings_use_arcore">Använd ARCore</string>
+    <string name="settings_arcore_depth">ARCore-djup</string>
+    <string name="settings_monocular_depth">Monokulärt djup (beta)</string>
+    <string name="settings_ambient_scan">Omgivningsskanning</string>
+    <string name="settings_adaptive_rate">Adaptiv frekvens (inaktiv)</string>
+    <string name="settings_crash_reports">Kraschrapporter</string>
+    <string name="settings_crash_reports_desc">Vid en krasch, skicka enhetsmodell och senaste loggar till en offentlig felrapport? Av som standard.</string>
+    <string name="settings_crash_token_label">Token för kraschrapporter</string>
+    <string name="settings_crash_token_set">Angiven</string>
+    <string name="settings_crash_token_not_set">Inte angiven</string>
+    <string name="settings_crash_token_desc">En GitHub-token med ”Issues: write” på HereLiesAz/GraffitiXR. Lagras bara på den här enheten, aldrig i appen. Lämna tomt för att stänga av uppladdningar.</string>
+    <string name="settings_crash_token_field">Token</string>
+    <string name="settings_canvas_color_black">Svart</string>
+    <string name="settings_canvas_color_dark">Mörk</string>
+    <string name="settings_canvas_color_grey">Grå</string>
+    <string name="settings_canvas_color_white">Vit</string>
+    <string name="settings_canvas_color_navy">Marinblå</string>
+    <string name="state_selected">Vald</string>
+    <string name="state_expanded">Utfälld</string>
+    <string name="state_collapsed">Ihopfälld</string>
+    <string name="settings_fps_device_default">Enhetens standard</string>
+    <string name="settings_fps_device_max">Enhetens maximum</string>
+    <string name="first_run_photo_title">Se det på din vägg</string>
+    <string name="first_run_photo_text">Välj ett referensfoto av ditt konstverk så visar vi hur det ser ut på en riktig vägg, i AR.</string>
+    <string name="first_run_choose_photo">Välj foto</string>
+    <string name="first_run_not_now">Inte nu</string>
+    <string name="first_run_draw_title">Rita det här på din vägg</string>
+    <string name="first_run_draw_hint">Rita stort – ungefär lika stort som ditt konstverk. Det behöver bara vara igenkännligt, inte snyggt.</string>
+    <string name="first_run_draw_done">Jag har ritat det</string>
+    <string name="first_run_draw_skip">Hoppa över – jag placerar det själv</string>
+    <string name="first_run_detect_title">Rikta nu kameran mot det du ritade</string>
+    <string name="first_run_detect_movement_hint">Rör enheten långsamt i en cirkel</string>
+    <string name="design_instructions_title">Designa din väggmålning</string>
+    <string name="design_instructions_text">Tryck på ”%1$s” i fältet och sedan på ”%2$s” för att välja ett foto av ditt konstverk.</string>
+    <string name="got_it_button">Uppfattat</string>
+    <string name="standalone_width_prompt">Mät den verkliga bredden mellan målets vänstra och högra kant.</string>
+    <string name="standalone_width_label_metric">Målets bredd (meter)</string>
+    <string name="standalone_width_label_imperial">Målets bredd (fot och tum)</string>
+    <string name="standalone_width_range_error">Ange en bredd från %1$s till %2$s.</string>
+    <string name="standalone_use_measured_width">Använd uppmätt bredd</string>
+    <string name="standalone_continue_without_scale">Fortsätt utan fysisk skala</string>
+    <string name="standalone_recapture">Ta om</string>
+    <string name="standalone_capture_wall_target">Fånga väggmål</string>
+    <string name="standalone_capture_failed">Det gick inte att fånga väggmålet – försök igen.</string>
+    <string name="standalone_rectify_failed">Det gick inte att räta upp målet – markera fyra tydliga hörn.</string>
+    <string name="standalone_target_too_weak">Målet har för få spårbara detaljer (%1$d KPM-egenskaper; %2$d behövs). Fånga ett rikare vägguttag.</string>
+    <string name="standalone_new_target">Nytt mål</string>
+    <string name="standalone_copy_diagnostics">Kopiera diagnostik</string>
+    <string name="standalone_wall_target_lost">Väggmålet tappades</string>
+    <string name="standalone_recapture_target">Fånga målet igen</string>
+    <string name="standalone_sweep_hint">Vrid dig långsamt för att kartlägga rummet — %1$d%%</string>
+    <string name="target_rectify_title">Räta upp ytan</string>
+    <string name="target_rectify_text">Dra nu i hörnen så att den cyanfärgade ramen ligger längs väggens plana yta.</string>
+    <string name="target_remove_marks_title">Ta bort markeringar</string>
+    <string name="target_erase_hint">Tryck på en markering för att ta bort den, eller dra över flera markeringar.</string>
+    <string name="target_cd_raw_capture">Råbild</string>
+    <string name="target_cd_detected_marks">Upptäckta markeringar</string>
+    <string name="target_cd_confirm">Bekräfta</string>
+    <string name="target_cd_unwarp_base">Fångat väggfoto med hörnhandtag</string>
+    <string name="guidance_open_via_design_overlay">Tryck på ”Design” i fältet och sedan på ”Öppna” för att lägga till ett lager – välj ett foto så visas det här, svävande över kameravyn.</string>
+    <string name="guidance_open_via_design_mockup">Tryck på ”Design” i fältet och sedan på ”Öppna” för att lägga till ett lager ovanpå väggfotot. Nyp och dra för att ändra storlek och läge.</string>
+    <string name="guidance_open_via_design_trace">Tryck på ”Design” i fältet och sedan på ”Öppna” för att lägga till ditt första lager. När det är på plats nyper och drar du på duken för att ändra storlek och placera det.</string>
+    <string name="guidance_open_via_design_ar">Tryck på ”Design” i fältet och sedan på ”Öppna” för att lägga till ett designlager – det projiceras på väggen med ankaret du just satte.</string>
 </resources>

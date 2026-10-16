@@ -32,7 +32,6 @@
     <!-- Label for Canvas mode, which is optimized for smaller, desk-scale artwork. -->
     <!-- Label for Mural mode, which is optimized for large-scale wall artwork. -->
     <!-- Description for the toggle between Canvas and Mural scanning modes. -->
-    <string name="nav_scan_mode_toggle_info">Cambia entre Lienzo (optimizado para arte pequeño de escritorio) y Mural (optimizado para paredes grandes y Gaussian Splatting).</string>
 
     <!-- Label for the Stencil generation tool. -->
     <!-- Description of the Stencil tool, explaining how it creates multi-layer printable templates. -->
@@ -601,9 +600,9 @@
         <item>Pellizca para escalar, arrastra para reposicionar. La superposición permanece fija en tu pantalla — aléjate para ver cómo encaja en la pared.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
-        <item>Este dispositivo no admite ARCore, por lo que el modo de Proyección AR no está disponible.</item>
-        <item>Aún puedes usar Calco, Maqueta y Superposición en vivo — todos los modos excepto AR funcionan sin ARCore.</item>
-        <item>Toca para cerrar.</item>
+        <item>Este dispositivo no es compatible con ARCore, así que el modo AR usa un seguimiento de pared independiente.</item>
+        <item>En el modo AR primero capturarás una foto de una zona de pared con textura y marcarás sus cuatro esquinas. El seguimiento se fija después en ese objetivo.</item>
+        <item>Calco, Maqueta y Superposición funcionan con normalidad. Toca para cerrar.</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>Maqueta fotográfica — previsualiza tu diseño sobre una foto antes de siquiera coger un pincel.</item>
@@ -637,4 +636,68 @@
     <string name="export_ar_unavailable">La exportación no está lista: la vista de cámara AR no está activa. Abre la vista AR e inténtalo de nuevo.</string>
     <string name="export_standalone_ar_unavailable">La exportación aún no está disponible en AR independiente.</string>
     <string name="rail_checking_ar_backend">Comprobando el motor AR…</string>
+
+    <string name="settings_use_arcore">Usar ARCore</string>
+    <string name="settings_arcore_depth">Profundidad de ARCore</string>
+    <string name="settings_monocular_depth">Profundidad monocular (beta)</string>
+    <string name="settings_ambient_scan">Escaneo ambiental</string>
+    <string name="settings_adaptive_rate">Frecuencia adaptativa (inactivo)</string>
+    <string name="settings_crash_reports">Informes de fallos</string>
+    <string name="settings_crash_reports_desc">¿Enviar, tras un fallo, el modelo del dispositivo y los registros recientes a un informe de error público? Desactivado por defecto.</string>
+    <string name="settings_crash_token_label">Token de informes de fallos</string>
+    <string name="settings_crash_token_set">Definido</string>
+    <string name="settings_crash_token_not_set">No definido</string>
+    <string name="settings_crash_token_desc">Un token de GitHub con «Issues: write» en HereLiesAz/GraffitiXR. Se guarda solo en este dispositivo, nunca en la app. Déjalo en blanco para desactivar los envíos.</string>
+    <string name="settings_crash_token_field">Token</string>
+    <string name="settings_canvas_color_black">Negro</string>
+    <string name="settings_canvas_color_dark">Oscuro</string>
+    <string name="settings_canvas_color_grey">Gris</string>
+    <string name="settings_canvas_color_white">Blanco</string>
+    <string name="settings_canvas_color_navy">Azul marino</string>
+    <string name="state_selected">Seleccionado</string>
+    <string name="state_expanded">Expandido</string>
+    <string name="state_collapsed">Contraído</string>
+    <string name="settings_fps_device_default">Predeterminado del dispositivo</string>
+    <string name="settings_fps_device_max">Máximo del dispositivo</string>
+    <string name="first_run_photo_title">Velo en tu pared</string>
+    <string name="first_run_photo_text">Elige una foto de referencia de tu obra y te mostraremos cómo se ve en una pared real, en AR.</string>
+    <string name="first_run_choose_photo">Elegir foto</string>
+    <string name="first_run_not_now">Ahora no</string>
+    <string name="first_run_draw_title">Dibuja esto en tu pared</string>
+    <string name="first_run_draw_hint">Hazlo grande, más o menos del tamaño de tu obra. Solo tiene que ser reconocible, no pulcro.</string>
+    <string name="first_run_draw_done">Ya lo dibujé</string>
+    <string name="first_run_draw_skip">Omitir: lo colocaré yo mismo</string>
+    <string name="first_run_detect_title">Ahora apunta la cámara a lo que dibujaste</string>
+    <string name="first_run_detect_movement_hint">Mueve el dispositivo lentamente en círculo</string>
+    <string name="design_instructions_title">Diseña tu mural</string>
+    <string name="design_instructions_text">Toca «%1$s» en la barra y luego «%2$s» para elegir una foto de tu obra.</string>
+    <string name="got_it_button">Entendido</string>
+    <string name="standalone_width_prompt">Mide el ancho real entre los bordes izquierdo y derecho del objetivo.</string>
+    <string name="standalone_width_label_metric">Ancho del objetivo (metros)</string>
+    <string name="standalone_width_label_imperial">Ancho del objetivo (pies y pulgadas)</string>
+    <string name="standalone_width_range_error">Introduce un ancho entre %1$s y %2$s.</string>
+    <string name="standalone_use_measured_width">Usar el ancho medido</string>
+    <string name="standalone_continue_without_scale">Continuar sin escala física</string>
+    <string name="standalone_recapture">Volver a capturar</string>
+    <string name="standalone_capture_wall_target">Capturar objetivo de pared</string>
+    <string name="standalone_capture_failed">No se pudo capturar el objetivo de pared. Inténtalo de nuevo.</string>
+    <string name="standalone_rectify_failed">No se pudo rectificar ese objetivo. Marca cuatro esquinas claras.</string>
+    <string name="standalone_target_too_weak">Ese objetivo tiene muy pocos detalles rastreables (%1$d características KPM; se necesitan %2$d). Captura una zona de pared más rica.</string>
+    <string name="standalone_new_target">Nuevo objetivo</string>
+    <string name="standalone_copy_diagnostics">Copiar diagnóstico</string>
+    <string name="standalone_wall_target_lost">Objetivo de pared perdido</string>
+    <string name="standalone_recapture_target">Recapturar objetivo</string>
+    <string name="standalone_sweep_hint">Gira despacio para mapear el espacio — %1$d%%</string>
+    <string name="target_rectify_title">Rectificar superficie</string>
+    <string name="target_rectify_text">Ahora arrastra las esquinas para alinear el marco cian con la superficie plana de tu pared.</string>
+    <string name="target_remove_marks_title">Quitar marcas</string>
+    <string name="target_erase_hint">Toca una marca para quitarla o arrastra sobre varias marcas para quitarlas.</string>
+    <string name="target_cd_raw_capture">Captura sin procesar</string>
+    <string name="target_cd_detected_marks">Marcas detectadas</string>
+    <string name="target_cd_confirm">Confirmar</string>
+    <string name="target_cd_unwarp_base">Foto de la pared capturada con tiradores en las esquinas</string>
+    <string name="guidance_open_via_design_overlay">Toca «Diseño» en la barra y luego «Abrir» para añadir una capa: elige una foto y aparecerá aquí, flotando sobre la vista en vivo de la cámara.</string>
+    <string name="guidance_open_via_design_mockup">Toca «Diseño» en la barra y luego «Abrir» para añadir una capa sobre la foto de la pared. Pellizca y arrastra para ajustar su tamaño y posición.</string>
+    <string name="guidance_open_via_design_trace">Toca «Diseño» en la barra y luego «Abrir» para añadir tu primera capa. Una vez dentro, pellizca y arrastra sobre el lienzo para ajustar su tamaño y colocarla.</string>
+    <string name="guidance_open_via_design_ar">Toca «Diseño» en la barra y luego «Abrir» para añadir una capa de diseño: se proyecta sobre la pared usando el ancla que acabas de fijar.</string>
 </resources>

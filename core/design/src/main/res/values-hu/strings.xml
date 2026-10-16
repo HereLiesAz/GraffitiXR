@@ -32,7 +32,6 @@
 
 
 
-    <string name="nav_scan_mode_toggle_info">Váltás a Vászon (kisebb, asztali méretű művészetre optimalizálva) és a Falfestmény (nagy méretű falakra és Gauss-splattingra optimalizálva) között.</string>
 
 
 
@@ -606,9 +605,9 @@
         <item>Csippentéssel méretezhető, húzással áthelyezhető. A rétegzés a képernyődhöz rögzítve marad — lépj hátrébb, hogy lásd, hogyan illeszkedik a falhoz.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
-        <item>Ez az eszköz nem támogatja az ARCore-t, ezért az AR-vetítés mód nem érhető el.</item>
-        <item>A Rajzolás, a Makett és az Élő rétegzés módokat továbbra is használhatod — az AR kivételével minden mód működik ARCore nélkül.</item>
-        <item>Koppints az elvetéshez.</item>
+        <item>Ez az eszköz nem támogatja az ARCore-t, ezért az AR mód önálló falkövetést használ.</item>
+        <item>AR módban először fotót készítesz a fal egy texturált részéről, és megjelölöd a négy sarkát. A követés ezután erre a célpontra rögzül.</item>
+        <item>A Rajzolás, a Makett és a Rétegzés a szokásos módon működik. Koppints a bezáráshoz.</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>Fotómakett — nézd meg a terved egy fotón, mielőtt akár ecsetet is fognál.</item>
@@ -642,4 +641,68 @@
     <string name="export_ar_unavailable">Az exportálás nem áll készen: az AR kameranézet nem fut. Nyisd meg az AR nézetet, majd próbáld újra.</string>
     <string name="export_standalone_ar_unavailable">Az exportálás az önálló AR-ban még nem érhető el.</string>
     <string name="rail_checking_ar_backend">AR háttérrendszer ellenőrzése…</string>
+
+    <string name="settings_use_arcore">ARCore használata</string>
+    <string name="settings_arcore_depth">ARCore mélység</string>
+    <string name="settings_monocular_depth">Monokuláris mélység (béta)</string>
+    <string name="settings_ambient_scan">Környezeti letapogatás</string>
+    <string name="settings_adaptive_rate">Adaptív sebesség (tétlen)</string>
+    <string name="settings_crash_reports">Összeomlási jelentések</string>
+    <string name="settings_crash_reports_desc">Összeomláskor elküldjük az eszköz típusát és a legutóbbi naplókat egy nyilvános hibajelentésben? Alapértelmezés szerint kikapcsolva.</string>
+    <string name="settings_crash_token_label">Összeomlási jelentés tokenje</string>
+    <string name="settings_crash_token_set">Beállítva</string>
+    <string name="settings_crash_token_not_set">Nincs beállítva</string>
+    <string name="settings_crash_token_desc">Egy GitHub-token „Issues: write” jogosultsággal a HereLiesAz/GraffitiXR tárolóhoz. Csak ezen az eszközön tárolódik, az alkalmazásban soha. Hagyd üresen a feltöltések kikapcsolásához.</string>
+    <string name="settings_crash_token_field">Token</string>
+    <string name="settings_canvas_color_black">Fekete</string>
+    <string name="settings_canvas_color_dark">Sötét</string>
+    <string name="settings_canvas_color_grey">Szürke</string>
+    <string name="settings_canvas_color_white">Fehér</string>
+    <string name="settings_canvas_color_navy">Tengerészkék</string>
+    <string name="state_selected">Kiválasztva</string>
+    <string name="state_expanded">Kibontva</string>
+    <string name="state_collapsed">Összecsukva</string>
+    <string name="settings_fps_device_default">Eszköz alapértelmezett</string>
+    <string name="settings_fps_device_max">Eszköz maximuma</string>
+    <string name="first_run_photo_title">Nézd meg a falon</string>
+    <string name="first_run_photo_text">Válassz egy referenciafotót az alkotásodról, és megmutatjuk, hogyan mutat egy valódi falon, AR-ban.</string>
+    <string name="first_run_choose_photo">Fotó kiválasztása</string>
+    <string name="first_run_not_now">Most nem</string>
+    <string name="first_run_draw_title">Rajzold ezt a falra</string>
+    <string name="first_run_draw_hint">Rajzold nagyra – nagyjából az alkotásod méretére. Elég, ha felismerhető, nem kell szépnek lennie.</string>
+    <string name="first_run_draw_done">Megrajzoltam</string>
+    <string name="first_run_draw_skip">Kihagyás – magam helyezem el</string>
+    <string name="first_run_detect_title">Most irányítsd a kamerát arra, amit rajzoltál</string>
+    <string name="first_run_detect_movement_hint">Lassan mozgasd az eszközt körbe</string>
+    <string name="design_instructions_title">Tervezd meg a falfestményt</string>
+    <string name="design_instructions_text">Koppints a sávon a(z) „%1$s”, majd a(z) „%2$s” elemre, hogy kiválaszd az alkotásod fotóját.</string>
+    <string name="got_it_button">Értem</string>
+    <string name="standalone_width_prompt">Mérd meg a célpont bal és jobb széle közötti valódi szélességet.</string>
+    <string name="standalone_width_label_metric">Célpont szélessége (méter)</string>
+    <string name="standalone_width_label_imperial">Célpont szélessége (láb és hüvelyk)</string>
+    <string name="standalone_width_range_error">Adj meg %1$s és %2$s közötti szélességet.</string>
+    <string name="standalone_use_measured_width">Mért szélesség használata</string>
+    <string name="standalone_continue_without_scale">Folytatás fizikai méretarány nélkül</string>
+    <string name="standalone_recapture">Újrafelvétel</string>
+    <string name="standalone_capture_wall_target">Falcélpont rögzítése</string>
+    <string name="standalone_capture_failed">A falcélpontot nem sikerült rögzíteni – próbáld újra.</string>
+    <string name="standalone_rectify_failed">A célpontot nem sikerült kiegyenesíteni – jelölj meg négy jól látható sarkot.</string>
+    <string name="standalone_target_too_weak">Ebben a célpontban túl kevés a követhető részlet (%1$d KPM-jellemző; %2$d szükséges). Rögzíts egy gazdagabb falrészletet.</string>
+    <string name="standalone_new_target">Új célpont</string>
+    <string name="standalone_copy_diagnostics">Diagnosztika másolása</string>
+    <string name="standalone_wall_target_lost">Falcélpont elveszett</string>
+    <string name="standalone_recapture_target">Célpont újrafelvétele</string>
+    <string name="standalone_sweep_hint">Fordulj lassan a tér feltérképezéséhez — %1$d%%</string>
+    <string name="target_rectify_title">Felület kiegyenesítése</string>
+    <string name="target_rectify_text">Most húzd a sarkokat úgy, hogy a ciánkék keret illeszkedjen a fal sík felületéhez.</string>
+    <string name="target_remove_marks_title">Jelölések eltávolítása</string>
+    <string name="target_erase_hint">Koppints egy jelölésre az eltávolításához, vagy húzd át az ujjad több jelölésen.</string>
+    <string name="target_cd_raw_capture">Nyers felvétel</string>
+    <string name="target_cd_detected_marks">Észlelt jelölések</string>
+    <string name="target_cd_confirm">Megerősítés</string>
+    <string name="target_cd_unwarp_base">Rögzített falfotó sarokfogantyúkkal</string>
+    <string name="guidance_open_via_design_overlay">Koppints a sávon a „Tervezés”, majd a „Megnyitás” elemre egy réteg hozzáadásához – válassz egy fotót, és az itt jelenik meg, az élő kameranézet fölött lebegve.</string>
+    <string name="guidance_open_via_design_mockup">Koppints a sávon a „Tervezés”, majd a „Megnyitás” elemre egy réteg hozzáadásához a falfotó fölé. Csípéssel és húzással állítsd be a méretét és a helyét.</string>
+    <string name="guidance_open_via_design_trace">Koppints a sávon a „Tervezés”, majd a „Megnyitás” elemre az első réteg hozzáadásához. Ha bekerült, csípéssel és húzással méretezd és helyezd el a vásznon.</string>
+    <string name="guidance_open_via_design_ar">Koppints a sávon a „Tervezés”, majd a „Megnyitás” elemre egy tervréteg hozzáadásához – az az imént beállított horgony segítségével vetül a falra.</string>
 </resources>

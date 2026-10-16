@@ -32,7 +32,6 @@
     <!-- Label for Canvas mode, which is optimized for smaller, desk-scale artwork. -->
     <!-- Label for Mural mode, which is optimized for large-scale wall artwork. -->
     <!-- Description for the toggle between Canvas and Mural scanning modes. -->
-    <string name="nav_scan_mode_toggle_info">Bytt mellom Canvas (optimalisert for kunst i mindre skrivebordsskala) og Mural (optimalisert for storskala vegger og Gaussisk sprut).</string>
 
     <!-- Label for the Stencil generation tool. -->
     <!-- Description of the Stencil tool, explaining how it creates multi-layer printable templates. -->
@@ -601,9 +600,9 @@
         <item>Klyp for å skalere, dra for å flytte. Overlegget blir værende festet til skjermen din — gå bakover for å se hvordan det passer på veggen.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
-        <item>Denne enheten støtter ikke ARCore, så AR-projeksjonsmodus er ikke tilgjengelig.</item>
-        <item>Du kan fortsatt bruke Spor, Mockup og Live overlegg — alle moduser unntatt AR fungerer uten ARCore.</item>
-        <item>Trykk for å lukke.</item>
+        <item>Denne enheten støtter ikke ARCore, så AR-modus bruker i stedet uavhengig veggsporing.</item>
+        <item>I AR-modus tar du først et bilde av en strukturert del av veggen og merker de fire hjørnene. Sporingen låser seg deretter til dette målet.</item>
+        <item>Spor, Mockup og Overlegg fungerer som vanlig. Trykk for å lukke.</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>Fotomockup — forhåndsvis designet ditt på et bilde før du i det hele tatt tar frem en pensel.</item>
@@ -637,4 +636,68 @@
     <string name="export_ar_unavailable">Eksporten er ikke klar: AR-kamerabildet kjører ikke. Åpne AR-visningen og prøv igjen.</string>
     <string name="export_standalone_ar_unavailable">Eksport er ikke tilgjengelig i frittstående AR ennå.</string>
     <string name="rail_checking_ar_backend">Sjekker AR-backend…</string>
+
+    <string name="settings_use_arcore">Bruk ARCore</string>
+    <string name="settings_arcore_depth">ARCore-dybde</string>
+    <string name="settings_monocular_depth">Monokulær dybde (beta)</string>
+    <string name="settings_ambient_scan">Omgivelsesskanning</string>
+    <string name="settings_adaptive_rate">Adaptiv frekvens (inaktiv)</string>
+    <string name="settings_crash_reports">Krasjrapporter</string>
+    <string name="settings_crash_reports_desc">Ved krasj: send enhetsmodell og nylige logger til en offentlig feilrapport? Av som standard.</string>
+    <string name="settings_crash_token_label">Token for krasjrapporter</string>
+    <string name="settings_crash_token_set">Angitt</string>
+    <string name="settings_crash_token_not_set">Ikke angitt</string>
+    <string name="settings_crash_token_desc">Et GitHub-token med «Issues: write» på HereLiesAz/GraffitiXR. Lagres bare på denne enheten, aldri i appen. La feltet stå tomt for å slå av opplastinger.</string>
+    <string name="settings_crash_token_field">Token</string>
+    <string name="settings_canvas_color_black">Svart</string>
+    <string name="settings_canvas_color_dark">Mørk</string>
+    <string name="settings_canvas_color_grey">Grå</string>
+    <string name="settings_canvas_color_white">Hvit</string>
+    <string name="settings_canvas_color_navy">Marineblå</string>
+    <string name="state_selected">Valgt</string>
+    <string name="state_expanded">Utvidet</string>
+    <string name="state_collapsed">Skjult</string>
+    <string name="settings_fps_device_default">Enhetens standard</string>
+    <string name="settings_fps_device_max">Enhetens maksimum</string>
+    <string name="first_run_photo_title">Se det på veggen din</string>
+    <string name="first_run_photo_text">Velg et referansebilde av kunstverket ditt, så viser vi hvordan det ser ut på en ekte vegg, i AR.</string>
+    <string name="first_run_choose_photo">Velg bilde</string>
+    <string name="first_run_not_now">Ikke nå</string>
+    <string name="first_run_draw_title">Tegn dette på veggen din</string>
+    <string name="first_run_draw_hint">Tegn det stort – omtrent like stort som kunstverket ditt. Det trenger bare å være gjenkjennelig, ikke pent.</string>
+    <string name="first_run_draw_done">Jeg har tegnet det</string>
+    <string name="first_run_draw_skip">Hopp over – jeg plasserer det selv</string>
+    <string name="first_run_detect_title">Rett nå kameraet mot det du tegnet</string>
+    <string name="first_run_detect_movement_hint">Beveg enheten sakte i en sirkel</string>
+    <string name="design_instructions_title">Design veggmaleriet ditt</string>
+    <string name="design_instructions_text">Trykk på «%1$s» i raden, og deretter «%2$s», for å velge et bilde av kunstverket ditt.</string>
+    <string name="got_it_button">Greit</string>
+    <string name="standalone_width_prompt">Mål den faktiske bredden mellom venstre og høyre kant av målet.</string>
+    <string name="standalone_width_label_metric">Målets bredde (meter)</string>
+    <string name="standalone_width_label_imperial">Målets bredde (fot og tommer)</string>
+    <string name="standalone_width_range_error">Skriv inn en bredde fra %1$s til %2$s.</string>
+    <string name="standalone_use_measured_width">Bruk målt bredde</string>
+    <string name="standalone_continue_without_scale">Fortsett uten fysisk målestokk</string>
+    <string name="standalone_recapture">Ta på nytt</string>
+    <string name="standalone_capture_wall_target">Fotografer veggmål</string>
+    <string name="standalone_capture_failed">Kunne ikke fotografere veggmålet – prøv igjen.</string>
+    <string name="standalone_rectify_failed">Kunne ikke rette opp målet – merk fire tydelige hjørner.</string>
+    <string name="standalone_target_too_weak">Dette målet har for få sporbare detaljer (%1$d KPM-egenskaper; %2$d trengs). Ta et mer detaljrikt veggutsnitt.</string>
+    <string name="standalone_new_target">Nytt mål</string>
+    <string name="standalone_copy_diagnostics">Kopier diagnostikk</string>
+    <string name="standalone_wall_target_lost">Veggmål mistet</string>
+    <string name="standalone_recapture_target">Ta målet på nytt</string>
+    <string name="standalone_sweep_hint">Snu deg sakte for å kartlegge rommet — %1$d%%</string>
+    <string name="target_rectify_title">Rett opp flaten</string>
+    <string name="target_rectify_text">Dra nå i hjørnene til den turkise rammen ligger langs den flate veggoverflaten.</string>
+    <string name="target_remove_marks_title">Fjern merker</string>
+    <string name="target_erase_hint">Trykk på et merke for å fjerne det, eller dra over flere merker.</string>
+    <string name="target_cd_raw_capture">Råopptak</string>
+    <string name="target_cd_detected_marks">Oppdagede merker</string>
+    <string name="target_cd_confirm">Bekreft</string>
+    <string name="target_cd_unwarp_base">Fotografert veggbilde med hjørnehåndtak</string>
+    <string name="guidance_open_via_design_overlay">Trykk på «Design» i raden, og deretter «Åpne», for å legge til et lag – velg et bilde, så vises det her, svevende over kameravisningen.</string>
+    <string name="guidance_open_via_design_mockup">Trykk på «Design» i raden, og deretter «Åpne», for å legge til et lag oppå veggbildet. Knip og dra for å justere størrelse og plassering.</string>
+    <string name="guidance_open_via_design_trace">Trykk på «Design» i raden, og deretter «Åpne», for å legge til ditt første lag. Når det er på plass, knip og dra på lerretet for å justere størrelse og plassering.</string>
+    <string name="guidance_open_via_design_ar">Trykk på «Design» i raden, og deretter «Åpne», for å legge til et designlag – det projiseres på veggen med ankeret du nettopp satte.</string>
 </resources>

@@ -129,8 +129,8 @@ internal fun AzNavHostScope.ConfigureGuidance(
     // that fires outside Design mode highlights "mode.design" instead of "item.open" for the same
     // reason, and reads from the guidance_open_via_design_* resources (localized copy, not composed
     // English fragments) so translated locales aren't left with an English sentence spliced into an
-    // otherwise-translated tour — not yet translated into this app's other 14 locales (a known,
-    // documented gap; see BACKLOG.md), same as the pre-existing showDesignInstructionsDialog text.
+    // otherwise-translated tour. All 14 non-default locales carry a translation, naming the two rail
+    // items with their own nav_design / nav_open labels.
     fun res(id: Int) = context.resources.getString(id)
 
     // --- OVERLAY: add a layer. ---

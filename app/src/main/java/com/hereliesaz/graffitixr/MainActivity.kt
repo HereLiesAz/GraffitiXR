@@ -95,6 +95,7 @@ import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.hereliesaz.graffitixr.common.security.SecurityProviderState
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import com.hereliesaz.graffitixr.design.R as DesignR
 import com.hereliesaz.graffitixr.design.theme.Cyan
@@ -183,6 +184,9 @@ private const val STATE_PENDING_SHARED_IMAGE = "pending_shared_image"
  */
 private enum class FirstRunStage { NONE, DRAW, DETECT }
 
+/** Persisted key for the one-shot "this device has no ARCore" explainer (ArUnavailableOverlay). */
+private const val AR_UNAVAILABLE_EXPLAINER_KEY = "ar_unavailable_explainer"
+
 @AndroidEntryPoint
 /**
  * An [AppCompatActivity], not a plain ComponentActivity, because of the Language setting:
@@ -190,7 +194,10 @@ private enum class FirstRunStage { NONE, DRAW, DETECT }
  * the platform LocaleManager applies it to any activity). As a ComponentActivity the setting did
  * nothing on API 26–32. AppCompat recreates this activity with the new locale immediately, and the
  * manifest's `autoStoreLocales` service persists the choice so a cold start comes up in it before
- * the first frame (no flash of the system language, no extra recreate).
+ * the first frame. The DataStore-backed Language setting is applied only after its first read
+ * completes (`SettingsViewModel.language` is null until then), so that restored locale is never
+ * overwritten by a placeholder: a cold start does not flash or recreate, and a recreate happens
+ * only when the stored choice genuinely differs from the locale already in effect.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -552,10 +559,18 @@ class MainActivity : AppCompatActivity() {
                 val standaloneUiHost = remember { com.hereliesaz.graffitixr.feature.ar.StandaloneOverlayUiHost() }
                 val hostQr by arViewModel.hostQrPayload.collectAsState()
                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
-                val language by settingsViewModel.language.collectAsState()
+                // null until the stored value has actually been read (see SettingsViewModel.language).
+                val storedLanguage by settingsViewModel.language.collectAsState()
+                val language = storedLanguage ?: com.hereliesaz.graffitixr.common.model.AppLanguage.SYSTEM
 
-                LaunchedEffect(language) {
-                    val appLocales = LocaleListCompat.forLanguageTags(language.code)
+                // Apply the locale only once the stored choice is known. Before that the locale
+                // AppCompat restored from `autoStoreLocales` is already in effect; pushing a
+                // placeholder here would clear it and recreate the activity twice. After the load,
+                // setApplicationLocales is a no-op unless the stored choice differs from the
+                // current one (the Settings dialog changed it).
+                LaunchedEffect(storedLanguage) {
+                    val loaded = storedLanguage ?: return@LaunchedEffect
+                    val appLocales = LocaleListCompat.forLanguageTags(loaded.code)
                     if (AppCompatDelegate.getApplicationLocales() != appLocales) {
                         AppCompatDelegate.setApplicationLocales(appLocales)
                     }
@@ -858,7 +873,7 @@ class MainActivity : AppCompatActivity() {
                 // so a later key change can't re-fire it and spawn a duplicate project. Not persisted —
                 // a fresh launch re-offers onboarding until it's actually completed.
                 var firstRunTriggered by rememberSaveable { mutableStateOf(false) }
-                // Set on a successful pick; the effect below adds the layer once the project id exists.
+                // Set on a successful pick; the effect below sets it as the design once the project id exists.
                 var firstRunPendingUri by rememberSaveable { mutableStateOf<Uri?>(null) }
                 val firstRunScribble = remember { com.hereliesaz.graffitixr.onboarding.ScribbleGenerator.generate() }
                 // Gates firstRunImagePicker behind a one-or-two-sentence explainer so a brand-new user
@@ -866,11 +881,15 @@ class MainActivity : AppCompatActivity() {
                 // "Not now" action marks the tutorial complete (same mechanism as every other exit from
                 // this flow), so declining doesn't re-ambush the user on the next cold launch.
                 var showFirstRunPhotoExplainer by rememberSaveable { mutableStateOf(false) }
+                // The no-ARCore explainer (ArUnavailableOverlay). Local flag so it closes the instant
+                // it is dismissed, without waiting for the persisted key to round-trip the DataStore.
+                var arUnavailableExplainerDismissed by rememberSaveable { mutableStateOf(false) }
+                val completedTutorialsLoaded by mainViewModel.completedTutorialsLoaded.collectAsState()
 
                 val firstRunImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                     if (uri != null) {
                         // Create the project only now (on a real pick) so cancelling leaves no stray
-                        // untitled project. The layer is added by the effect below once the project id
+                        // untitled project. The design is set by the effect below once the project id
                         // has propagated — onAddLayer no-ops on a null projectId, so we can't add here.
                         dashboardViewModel.createAndOpenProject()
                         firstRunPendingUri = uri
@@ -881,8 +900,9 @@ class MainActivity : AppCompatActivity() {
                     // user lands on the library. No project was created.
                 }
 
-                // Add the picked layer once the auto-created project's id is live (avoids the
-                // create-vs-add race where onAddLayer would silently drop the layer).
+                // Set the picked image as the design once the auto-created project's id is live (avoids
+                // the create-vs-add race where onAddLayer, which applies it as the project's single
+                // design, would silently drop the image on a null projectId).
                 LaunchedEffect(firstRunPendingUri, editorUiState.projectId) {
                     val uri = firstRunPendingUri
                     if (uri != null && editorUiState.projectId != null) {
@@ -1196,9 +1216,36 @@ class MainActivity : AppCompatActivity() {
                         // ConfigureGuidance) is rendered automatically by AzHostActivityLayout; nothing
                         // needs to be mounted here.
 
-                        // ARCore absence is no longer an "AR unavailable" condition. The standalone
-                        // SphereSLAM target-capture UI appears inside AR mode instead, so the old
-                        // unavailable explainer must not tell these users that AR cannot run.
+                        // One-shot explainer for a device without ARCore (shown once, ever, in the
+                        // editor — never over the library or any other modal; see anyModalActive).
+                        // ARCore absence is NOT an "AR unavailable" condition: the standalone
+                        // SphereSLAM target-capture UI appears inside AR mode instead. The copy
+                        // (onboarding_ar_unavailable) therefore says what AR will do on this device
+                        // instead of claiming it can't run. Gated on the user having "Use ARCore" on,
+                        // so it never speaks to someone who chose the standalone path themselves, and
+                        // on the persisted set having actually loaded so a returning user is not
+                        // shown it for the frame before their dismissal is read.
+                        if (
+                            !anyModalActive &&
+                            firstRunStage == FirstRunStage.NONE &&
+                            !showFirstRunPhotoExplainer &&
+                            !arUnavailableExplainerDismissed &&
+                            completedTutorialsLoaded &&
+                            arUiState.isArCoreAvailabilityResolved &&
+                            !arUiState.isArCoreAvailable &&
+                            arUiState.arCoreEnabled &&
+                            AR_UNAVAILABLE_EXPLAINER_KEY !in completedTutorials
+                        ) {
+                            com.hereliesaz.graffitixr.onboarding.ArUnavailableOverlay(
+                                lines = stringArrayResource(DesignR.array.onboarding_ar_unavailable).toList(),
+                                advanceLabel = strings.common.next,
+                                dismissLabel = strings.common.done,
+                                onDismiss = {
+                                    arUnavailableExplainerDismissed = true
+                                    mainViewModel.markTutorialCompletePersistent(AR_UNAVAILABLE_EXPLAINER_KEY)
+                                },
+                            )
+                        }
 
                         // First-run photo explainer: shown once, before the OS photo picker ever
                         // appears, so a brand-new user isn't ambushed by an unexplained system dialog.
@@ -1211,17 +1258,17 @@ class MainActivity : AppCompatActivity() {
                                     showFirstRunPhotoExplainer = false
                                     mainViewModel.markTutorialCompletePersistent(firstRunDoodleKey)
                                 },
-                                title = { Text("See it on your wall", color = Color.White) },
+                                title = { Text(stringResource(DesignR.string.first_run_photo_title), color = Color.White) },
                                 text = {
                                     Text(
-                                        "Pick a reference photo of your artwork and we'll show you how it looks on a real wall, in AR.",
+                                        stringResource(DesignR.string.first_run_photo_text),
                                         color = Color.White
                                     )
                                 },
                                 containerColor = Color(0xEE1A1A1A),
                                 confirmButton = {
                                     AzButton(
-                                        text = "Choose Photo",
+                                        text = stringResource(DesignR.string.first_run_choose_photo),
                                         onClick = {
                                             showFirstRunPhotoExplainer = false
                                             firstRunImagePicker.launch(
@@ -1233,7 +1280,7 @@ class MainActivity : AppCompatActivity() {
                                 },
                                 dismissButton = {
                                     AzButton(
-                                        text = "Not now",
+                                        text = stringResource(DesignR.string.first_run_not_now),
                                         onClick = {
                                             showFirstRunPhotoExplainer = false
                                             mainViewModel.markTutorialCompletePersistent(firstRunDoodleKey)
@@ -1250,10 +1297,10 @@ class MainActivity : AppCompatActivity() {
                         if (firstRunStage == FirstRunStage.DRAW && !showSettings) {
                             com.hereliesaz.graffitixr.onboarding.ScribbleDrawScreen(
                                 scribble = firstRunScribble,
-                                title = "Draw this on your wall",
-                                hint = "Make it big — roughly the size of your artwork. It only has to be recognisable, not neat.",
-                                doneLabel = "I've drawn it",
-                                skipLabel = "Skip — I'll place it myself",
+                                title = stringResource(DesignR.string.first_run_draw_title),
+                                hint = stringResource(DesignR.string.first_run_draw_hint),
+                                doneLabel = stringResource(DesignR.string.first_run_draw_done),
+                                skipLabel = stringResource(DesignR.string.first_run_draw_skip),
                                 onDrawn = {
                                     firstRunStage = FirstRunStage.DETECT
                                     navController.navigate(EditorMode.AR.name) {
@@ -1287,8 +1334,8 @@ class MainActivity : AppCompatActivity() {
                             com.hereliesaz.graffitixr.onboarding.FirstRunOnboardingOverlay(
                                 isArReady = arUiState.isArReady,
                                 planeDetected = arUiState.planeDetected,
-                                title = "Now point your camera at what you drew",
-                                movementHint = arUiState.scanHint ?: "Slowly move your device in a circle",
+                                title = stringResource(DesignR.string.first_run_detect_title),
+                                movementHint = arUiState.scanHint ?: stringResource(DesignR.string.first_run_detect_movement_hint),
                             )
                         }
 
@@ -1868,16 +1915,25 @@ class MainActivity : AppCompatActivity() {
                             if (showDesignInstructionsDialog) {
                                 androidx.compose.material3.AlertDialog(
                                     onDismissRequest = { showDesignInstructionsDialog = false },
-                                    title = { Text("Design Your Mural", color = Color.White) },
+                                    title = { Text(stringResource(DesignR.string.design_instructions_title), color = Color.White) },
                                     // "Open" lives under the "mode.design" host, which
                                     // expandWhen auto-collapses outside Design mode — this dialog
                                     // fires from AR (the anchor-established effect above is its only
                                     // trigger), where "tap Open" alone pointed at an invisible
                                     // control. Route through Design first.
-                                    text = { Text("Tap 'Design' on the rail, then 'Open', to choose a photo of your artwork.", color = Color.White) },
+                                    text = {
+                                        Text(
+                                            stringResource(
+                                                DesignR.string.design_instructions_text,
+                                                navStrings.design,
+                                                navStrings.open,
+                                            ),
+                                            color = Color.White,
+                                        )
+                                    },
                                     containerColor = Color(0xEE1A1A1A),
                                     confirmButton = {
-                                        AzButton(text = "Got it", onClick = { showDesignInstructionsDialog = false }, shape = AzButtonShape.RECTANGLE)
+                                        AzButton(text = stringResource(DesignR.string.got_it_button), onClick = { showDesignInstructionsDialog = false }, shape = AzButtonShape.RECTANGLE)
                                     }
                                 )
                             }
