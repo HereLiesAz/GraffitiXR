@@ -17,9 +17,11 @@ on:
   workflow_dispatch:
 
 concurrency:
-  # One run of this workflow at a time across the whole repo: the latest trigger, from any
-  # branch, cancels whatever run is in progress.
-  group: ${{ github.workflow }}
+  # One run at a time per lane: the latest main push cancels the main run in progress (the newer
+  # commit republishes), and a PR push cancels only that PR's earlier run. A PR event must never
+  # share a lane with main: cancelling a main publish between `gh release upload` and the tag/notes
+  # update leaves the release carrying one commit's APK under another commit's tag.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'main' }}
   cancel-in-progress: true
 
 permissions:
