@@ -10,9 +10,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Characterization tests for two weaknesses in how [PoseFusion] trusts relocalization, found by the
- * teleological-SLAM audit. They pin the behaviour AS IT IS TODAY so a fix shows up as a deliberate
- * change to these tests rather than an unnoticed one; each says what the behaviour should become.
+ * [PoseFusion] must not be walked or swung by relocalization fixes it has no reason to trust. Found by
+ * the teleological-SLAM audit: a diverged fix with a middling inlier ratio used to be BLENDED however
+ * often it recurred (repeated texture, a symmetric design), and a clustered solve with a high ratio
+ * snapped the drawn pose through any rotation because only counts reached fusion.
  */
 class PoseFusionWeaknessTest {
     private fun identity() = floatArrayOf(1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f)
@@ -25,57 +26,86 @@ class PoseFusionWeaknessTest {
     /** Capture camera and anchor both at the origin: `V_cv · anchorModel = diag(1,-1,-1)`. */
     private fun captureAtOrigin() =
         floatArrayOf(1f, 0f, 0f, 0f, 0f, -1f, 0f, 0f, 0f, 0f, -1f, 0f, 0f, 0f, 0f, 1f)
-    private fun reloc(pnp: FloatArray, inliers: Float, matches: Float, seq: Float) =
-        FloatArray(19).also {
+    private fun reloc(pnp: FloatArray, inliers: Float, matches: Float, seq: Float, spread: Float? = null) =
+        FloatArray(if (spread == null) 19 else 36).also {
             System.arraycopy(pnp, 0, it, 0, 16); it[16] = inliers; it[17] = matches; it[18] = seq
+            if (spread != null) it[PoseFusion.RELOC_SPREAD_INDEX] = spread
         }
 
-    private fun fused(f: PoseFusion, pnp: FloatArray, inliers: Float, matches: Float, seq: Float) =
-        f.currentAnchor(identity(), identity(), reloc(pnp, inliers, matches, seq), captureAtOrigin(), confGlobal = 0f)
+    private fun fused(f: PoseFusion, pnp: FloatArray, inliers: Float, matches: Float, seq: Float, spread: Float? = null) =
+        f.currentAnchor(identity(), identity(), reloc(pnp, inliers, matches, seq, spread), captureAtOrigin(), confGlobal = 0f)
 
     private fun dist(m: FloatArray) = sqrt(m[12] * m[12] + m[13] * m[13] + m[14] * m[14])
 
-    /**
-     * WEAKNESS: a relocalization that diverges from the drawn pose, with a low-ish inlier ratio and
-     * few inliers (so not a cold snap), is BLENDED instead of refused. Repeated texture (brick,
-     * tile, a repeated motif) produces exactly this: ten false fixes a metre away, each blended at
-     * `BASE_ALPHA * ratio * CONF_FLOOR` = 0.0625, walk the overlay about 0.48 m toward the twin.
-     *
-     * SHOULD BECOME: a diverged fix that is not high-confidence is refused (RELOCK_REFUSED) unless
-     * several consecutive fixes agree, as the hybrid path already requires. When that lands, change
-     * the bounds below to "stays within a few centimetres".
-     */
-    @Test fun `repeated diverged low-confidence fixes walk the overlay toward a false twin`() {
+    /** Fixes that disagree with each other (a bouncing false match) are refused, not averaged in. */
+    @Test fun `inconsistent diverged low-confidence fixes are refused`() {
         val f = PoseFusion()
-        // A good lock at the origin: 30 inliers of 30, identity.
         fused(f, identity(), 30f, 30f, 1f)
         assertEquals(FusionState.COLD_SNAP, f.diagnostics().state)
 
         var out = identity()
-        for (seq in 2..11) out = fused(f, trans(1f, 0f, 0f), 10f, 20f, seq.toFloat())
-
-        assertEquals("each is blended, none refused", FusionState.BLENDING, f.diagnostics().state)
-        val moved = dist(out)
-        // 1 - (1 - 0.0625)^10 = 0.476 m of a 1 m disagreement.
-        assertTrue("moved $moved m; a fix refused would leave ~0", moved > 0.3f && moved < 0.7f)
+        for (seq in 2..11) {
+            val side = if (seq % 2 == 0) 1f else -1f
+            out = fused(f, trans(side, 0f, 0f), 10f, 20f, seq.toFloat())
+        }
+        assertEquals(FusionState.RELOCK_REFUSED, f.diagnostics().state)
+        assertTrue("the overlay moved ${dist(out)} m on fixes that never agreed", dist(out) < 0.01f)
     }
 
     /**
-     * WEAKNESS: fusion decides on counts only. The relocalization payload carries no measure of how
-     * the inliers are spread, so 25 inliers clustered in one corner (a well-fitting but badly
-     * constrained rotation) are as good as 25 spread across the wall and snap instantly, however
-     * far the rotation is from what is drawn.
-     *
-     * SHOULD BECOME: the payload carries the inlier spread and a cold snap requires it above the
-     * promotion floor; a clustered solve blends or is refused. Then this test should assert that.
+     * A STABLE false twin is still believed, but only after [PoseFusion.DIVERGED_AGREEMENT]
+     * consecutive agreeing fixes, and then blended: ten fixes used to move the overlay about 0.48 m,
+     * now about a third of that. (Stopping a perfectly consistent twin is the job of the orientation
+     * check and corroboration, not of fusion.)
      */
-    @Test fun `a high-ratio fix snaps to any rotation because inlier spread is not an input`() {
+    @Test fun `a consistent diverged fix needs agreement before it moves the overlay`() {
         val f = PoseFusion()
         fused(f, identity(), 30f, 30f, 1f)
-        val out = fused(f, rotZ(30.0), 25f, 30f, 2f)
+
+        // The first two agreeing fixes change nothing at all.
+        var out = fused(f, trans(1f, 0f, 0f), 10f, 20f, 2f)
+        assertEquals(FusionState.RELOCK_REFUSED, f.diagnostics().state)
+        assertTrue(dist(out) < 0.001f)
+        out = fused(f, trans(1f, 0f, 0f), 10f, 20f, 3f)
+        assertEquals(FusionState.RELOCK_REFUSED, f.diagnostics().state)
+        assertTrue(dist(out) < 0.001f)
+        // The third is believed and blended.
+        out = fused(f, trans(1f, 0f, 0f), 10f, 20f, 4f)
+        assertEquals(FusionState.BLENDING, f.diagnostics().state)
+        assertTrue("moved ${dist(out)} m", dist(out) in 0.03f..0.1f)
+
+        for (seq in 5..11) out = fused(f, trans(1f, 0f, 0f), 10f, 20f, seq.toFloat())
+        assertTrue("walked ${dist(out)} m", dist(out) < 0.3f)
+    }
+
+    /** A high ratio with the inliers clustered in one corner cannot swing the drawn pose. */
+    @Test fun `a clustered high-ratio fix does not snap`() {
+        val f = PoseFusion()
+        fused(f, identity(), 30f, 30f, 1f, spread = 0.5f)
+        val out = fused(f, rotZ(30.0), 25f, 30f, 2f, spread = 0.01f)
+        assertEquals(FusionState.RELOCK_REFUSED, f.diagnostics().state)
+        val turned = abs(Math.toDegrees(Math.atan2(out[1].toDouble(), out[0].toDouble())))
+        assertTrue("turned $turned deg on a clustered solve", turned < 1.0)
+    }
+
+    @Test fun `a well-spread high-ratio fix snaps as before`() {
+        val f = PoseFusion()
+        fused(f, identity(), 30f, 30f, 1f, spread = 0.5f)
+        val out = fused(f, rotZ(30.0), 25f, 30f, 2f, spread = 0.3f)
         assertEquals(FusionState.COLD_SNAP, f.diagnostics().state)
-        // The drawn pose was swung by about the full 30 degrees on the strength of counts alone.
         val turned = abs(Math.toDegrees(Math.atan2(out[1].toDouble(), out[0].toDouble())))
         assertTrue("turned $turned deg", turned > 20.0 && turned < 40.0)
+    }
+
+    /** A payload without the spread slot (legacy 19-float result) or with it unmeasured must not block a snap. */
+    @Test fun `an unmeasured spread does not block a snap`() {
+        val f = PoseFusion()
+        fused(f, identity(), 30f, 30f, 1f)
+        fused(f, rotZ(30.0), 25f, 30f, 2f)
+        assertEquals(FusionState.COLD_SNAP, f.diagnostics().state)
+        val g = PoseFusion()
+        fused(g, identity(), 30f, 30f, 1f, spread = 0.5f)
+        fused(g, rotZ(30.0), 25f, 30f, 2f, spread = -1f)
+        assertEquals(FusionState.COLD_SNAP, g.diagnostics().state)
     }
 }
