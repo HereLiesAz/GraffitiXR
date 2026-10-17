@@ -87,7 +87,8 @@ void gatedMatchSet(const cv::Mat& artDescs, const std::vector<cv::Point2f>& artP
                    const KeypointGrid& grid, const glm::mat4& camFromDesign,
                    float designHalfW, float designHalfH,
                    float pnpFx, float pnpFy, float pnpCx, float pnpCy,
-                   float radiusPx, float frameW, float frameH, float loweRatio,
+                   float radiusPx, float frameW, float frameH,
+                   float kCorrobLoweRatio /* MobileGS::kCorrobLoweRatio, passed by every caller */,
                    GatedMatch& out, std::vector<int>* validQuery,
                    const WallExclusion* wall = nullptr) {
     out.hit.assign((size_t)artDescs.rows, 0);
@@ -177,7 +178,7 @@ void gatedMatchSet(const cv::Mat& artDescs, const std::vector<cv::Point2f>& artP
             else if (d < second) { second = d; }
         }
         if (bestQ < 0) continue;
-        if (best < loweRatio * second) {
+        if (best < kCorrobLoweRatio * second) {
             // Bare wall explains this live feature at least as well as the design does: it is the
             // wall's own texture, not paint. Observed (so the confirmation count resets), not a hit.
             if (wall && !wall->uv.empty()) {
