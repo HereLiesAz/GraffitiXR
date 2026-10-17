@@ -520,6 +520,24 @@ Settings screen:
 | Scan mode (removed/legacy) | `ar_scan_mode` | — | No longer a live setting; key is read once for legacy migration only (§1.2) |
 | Mural method (removed/legacy) | `mural_method` | — | No longer a live setting; named engines no longer exist (§1.2) |
 
+### 7.3a `ARDIAG overlayBasis` (logcat)
+
+While an anchor is established, `ArRenderer.logOverlayBasisDiag` writes one line a second (and one straight
+after each new anchor). It changes nothing; it exists to answer "is the design mirrored, and why".
+
+~~~
+ARDIAG overlayBasis path=capturedPlane det=1.00 xRight=0.98 yUp=0.97 zToCam=0.99 nToCam=0.99 corrApplied=true corrPending=false
+~~~
+
+- `path`: which anchor branch placed it: `hit` (screen-centre hit), `capturedPlane` (the wall the target was
+  created against), `reloc` (return visit), `fallback` (no surface).
+- `det`: sign of the overlay axes' determinant. Negative means a reflection is in the basis.
+- `xRight`, `yUp`: cosine of the overlay's +X with camera-right and +Y with camera-up. The AR drag handler
+  passes the finger's x straight through as local +X, so a negative `xRight` makes horizontal drags run backwards.
+- `zToCam`, `nToCam`: cosine of the overlay's +Z and of the stored wall normal with the direction to the camera.
+  The renderer assumes both are positive.
+- `corrApplied` / `corrPending`: whether the one-time orientation correction has been accepted yet.
+
 ### 7.4 Diagnostic overlays (editor toggles)
 
 Runtime visualization toggles for debugging tracking, each independently settable from Settings ▸ Developer.
