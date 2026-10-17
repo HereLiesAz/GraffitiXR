@@ -757,4 +757,13 @@
     <string name="reloc_facing_it">Lo hai di fronte — muoviti lentamente da un lato all\'altro</string>
     <string name="reloc_recapture">Ricattura bersaglio</string>
     <string name="ar_feedback_capture_failed">Acquisizione del bersaglio non riuscita. Tocca per riprovare.</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">Stencil</string>
+    <string name="nav_stencil_info">Divide il disegno in tre fogli: nero, grigio e bianco. Tocca di nuovo per ripristinare l’originale.</string>
+    <string name="nav_stencil_view_all">Tutti</string>
+    <string name="nav_stencil_view_black">Nero</string>
+    <string name="nav_stencil_view_grey">Grigio</string>
+    <string name="nav_stencil_view_white">Bianco</string>
+    <string name="nav_stencil_view_info">Cambia quali fogli sono mostrati: tutti, nero, grigio o bianco.</string>
 </resources>

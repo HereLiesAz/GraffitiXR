@@ -774,4 +774,13 @@
     <string name="reloc_facing_it">您正对着它 — 请缓慢左右移动</string>
     <string name="reloc_recapture">重新捕获目标</string>
     <string name="ar_feedback_capture_failed">目标捕获失败。请点按重试。</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">模板</string>
+    <string name="nav_stencil_info">将设计拆分为黑、灰、白三张模板。再次点击可恢复原图。</string>
+    <string name="nav_stencil_view_all">全部</string>
+    <string name="nav_stencil_view_black">黑</string>
+    <string name="nav_stencil_view_grey">灰</string>
+    <string name="nav_stencil_view_white">白</string>
+    <string name="nav_stencil_view_info">切换显示的模板：全部、黑、灰或白。</string>
 </resources>

@@ -762,4 +762,13 @@
     <string name="reloc_facing_it">Вы смотрите на неё — медленно двигайтесь из стороны в сторону</string>
     <string name="reloc_recapture">Захватить цель заново</string>
     <string name="ar_feedback_capture_failed">Не удалось захватить цель. Нажмите, чтобы повторить.</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">Трафарет</string>
+    <string name="nav_stencil_info">Разделяет рисунок на три листа: чёрный, серый и белый. Нажмите ещё раз, чтобы вернуть оригинал.</string>
+    <string name="nav_stencil_view_all">Все</string>
+    <string name="nav_stencil_view_black">Чёрный</string>
+    <string name="nav_stencil_view_grey">Серый</string>
+    <string name="nav_stencil_view_white">Белый</string>
+    <string name="nav_stencil_view_info">Переключает показываемые листы трафарета: все, чёрный, серый или белый.</string>
 </resources>

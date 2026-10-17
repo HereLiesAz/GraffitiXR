@@ -493,4 +493,13 @@
     <string name="reloc_facing_it">Vous lui faites face — déplacez-vous lentement de côté</string>
     <string name="reloc_recapture">Recapturer la cible</string>
     <string name="ar_feedback_capture_failed">Échec de la capture de la cible. Touchez pour réessayer.</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">Pochoir</string>
+    <string name="nav_stencil_info">Divise le motif en trois pochoirs : noir, gris et blanc. Touchez à nouveau pour retrouver l’original.</string>
+    <string name="nav_stencil_view_all">Tous</string>
+    <string name="nav_stencil_view_black">Noir</string>
+    <string name="nav_stencil_view_grey">Gris</string>
+    <string name="nav_stencil_view_white">Blanc</string>
+    <string name="nav_stencil_view_info">Change les pochoirs affichés : tous, noir, gris ou blanc.</string>
 </resources>

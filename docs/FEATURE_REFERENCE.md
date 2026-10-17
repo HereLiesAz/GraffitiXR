@@ -229,9 +229,12 @@ Every layer carries the full property set below; all except the runtime `bitmap`
 | `isInverted` | `false` | Bool | Colour invert |
 | `isSketch` | `false` | Bool | **Outline** effect — render as a traceable pencil sketch (dark lines opaque, light areas transparent); re-derived from `uri` each time, not baked in |
 | `isSubjectIsolated` | `false` | Bool | **Subject isolation** — ML Kit segmentation drops everything but the subject to transparent (see §4) |
+| `isStencil` | `false` | Bool | **Stencil** — the design is split into three tonal sheets (black, grey, white); exclusive with `isSketch` (§5) |
+| `stencilView` | `ALL` | `ALL`/`BLACK`/`GREY`/`WHITE` | Which sheets are shown while `isStencil` is on |
 
-`warpMesh`, `stencilType`, `stencilSourceId`, and `textParams` do not exist on `Layer` — Liquify,
-stencil generation, and rasterized text layers have no implementing code (see §3.3, §5, §2.4).
+`warpMesh`, `stencilType`, `stencilSourceId`, and `textParams` do not exist on `Layer` — Liquify and
+rasterized text layers have no implementing code (see §3.3, §2.4). Stencil is the `isStencil` /
+`stencilView` pair above (§5), not the old multi-layer pipeline.
 
 ### 2.2 Setting/replacing the design
 
@@ -287,6 +290,8 @@ These act on the design (contrast with §1.1, which acts on the whole design **p
 | `ToggleInvert` | `false` | — | |
 | `onToggleOutline` | `isSketch = false` | — | The traceable-sketch effect (§2.1) |
 | `onToggleSubjectIsolation` | `isSubjectIsolated = false` | — | Drop everything but the ML Kit-segmented subject (§4) |
+| `onToggleStencil` | `isStencil = false` | — | Three tonal sheets; turns Outline off (§5) |
+| `onCycleStencilView` | `stencilView = ALL` | `ALL` → `BLACK` → `GREY` → `WHITE` → `ALL` | Only while a stencil exists (§5) |
 
 Colour maths run through `ColorMatrixUtils`.
 
@@ -345,15 +350,26 @@ the design's two toggleable rendering effects.
 
 ---
 
-## 5. Stencil generation — removed / no implementing code
+## 5. Stencil
 
-**There is no stencil feature in the current app.** `StencilWizardStep`, `StencilLayerCount`,
-`StencilLayerType`, `TonalPolarity`, `StencilOutputDimension`, `outputSizeMm`, `StencilProcessor`, and
-every other symbol this section previously documented do not exist anywhere in the source
-(`find . -iname "*stencil*" -not -path "*/build/*"` returns only `docs/STENCILS.md`, which describes
-this as a design document rather than shipped code). See README.md's changelog: stencil generation was
-removed as a documented feature because it has no implementing code. `docs/STENCILS.md` should not be
-read as describing a live pipeline in this app.
+The design can be split into three tonal sheets: black, grey and white.
+
+- **Rail**: `Stencil` (`design.stencil`) is a sub-item of the Design folder. Tap to generate, tap
+  again to bring the original back. While a stencil exists, a cycler (`design.stencil.view`) appears
+  directly beneath it and steps **All → Black → Grey → White**.
+- **State**: `Layer.isStencil` and `Layer.stencilView`. Like Outline and Isolate they are flags;
+  the shown bitmap is re-derived from the untouched import (`uri`), so turning it off is exact.
+  Stencil and Outline are exclusive.
+- **Pipeline** (`StencilProcessor`, `StencilTones`, `core/common`): the value channel (brightest
+  of R, G, B) is median-blurred (9x9), split into three tones by a deterministic 1-D K-means, and
+  the grey-or-lighter and white areas are closed 5x5 so cut edges are smooth. Transparent pixels
+  stay transparent, so Isolate then Stencil keeps the cut-out.
+- **Views**: All paints every tone (black, grey, white). A single sheet paints only its own tone
+  and leaves the rest transparent, so cycling shows where each colour goes.
+- The same method also drives the `stencil3` filter of the SLAM passes (`docs/PASSES.md`).
+
+Not rebuilt: the old multi-sheet PDF export and tiling (`docs/STENCILS.md` still describes that as a
+design document).
 
 ---
 

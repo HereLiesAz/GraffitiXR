@@ -54,7 +54,23 @@ data class Layer(
     val isSketch: Boolean = false,
     /** Subject isolation: everything but the segmented subject is made transparent. */
     val isSubjectIsolated: Boolean = false,
+    /**
+     * Stencil: the image is split into three tonal sheets (black, grey, white). While on, the design
+     * shows the sheets chosen by [stencilView]. Like the other effects it is a flag re-derived from
+     * [uri], so turning it off gives the original back exactly. Mutually exclusive with [isSketch].
+     */
+    val isStencil: Boolean = false,
+    val stencilView: StencilView = StencilView.ALL,
 )
+
+/** Which of the stencil's three sheets are shown. The rail cycler steps through these in order. */
+@Serializable
+enum class StencilView {
+    ALL, BLACK, GREY, WHITE;
+
+    /** The next view after this one, wrapping from [WHITE] back to [ALL]. */
+    fun next(): StencilView = entries[(ordinal + 1) % entries.size]
+}
 
 /**
  * The subset of the design's visual/aesthetic properties that can be changed without replacing

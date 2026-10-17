@@ -36,4 +36,7 @@ data class OverlayLayer(
     /** See [Layer.isSketch] — the effects persist as flags and are re-derived from [uri] on load. */
     val isSketch: Boolean = false,
     val isSubjectIsolated: Boolean = false,
+    /** See [Layer.isStencil]. */
+    val isStencil: Boolean = false,
+    val stencilView: StencilView = StencilView.ALL,
 )

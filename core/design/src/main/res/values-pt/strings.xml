@@ -757,4 +757,13 @@
     <string name="reloc_facing_it">Você está de frente para ele — mova-se devagar de um lado para o outro</string>
     <string name="reloc_recapture">Recapturar alvo</string>
     <string name="ar_feedback_capture_failed">Falha ao capturar o alvo. Toque para tentar novamente.</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">Estêncil</string>
+    <string name="nav_stencil_info">Divide o desenho em três folhas: preto, cinza e branco. Toque de novo para recuperar o original.</string>
+    <string name="nav_stencil_view_all">Todas</string>
+    <string name="nav_stencil_view_black">Preto</string>
+    <string name="nav_stencil_view_grey">Cinza</string>
+    <string name="nav_stencil_view_white">Branco</string>
+    <string name="nav_stencil_view_info">Alterna quais folhas do estêncil são exibidas: todas, preto, cinza ou branco.</string>
 </resources>

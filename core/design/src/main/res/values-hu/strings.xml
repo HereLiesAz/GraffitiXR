@@ -762,4 +762,13 @@
     <string name="reloc_facing_it">Szemben vagy vele — lassan mozogj oldalirányba</string>
     <string name="reloc_recapture">Célpont újrarögzítése</string>
     <string name="ar_feedback_capture_failed">A célpont rögzítése sikertelen. Érintsd meg az újrapróbáláshoz.</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">Sablon</string>
+    <string name="nav_stencil_info">A mintát három sablonra bontja: fekete, szürke és fehér. Koppints újra az eredeti visszaállításához.</string>
+    <string name="nav_stencil_view_all">Mind</string>
+    <string name="nav_stencil_view_black">Fekete</string>
+    <string name="nav_stencil_view_grey">Szürke</string>
+    <string name="nav_stencil_view_white">Fehér</string>
+    <string name="nav_stencil_view_info">Váltja, melyik sablonok láthatók: mind, fekete, szürke vagy fehér.</string>
 </resources>

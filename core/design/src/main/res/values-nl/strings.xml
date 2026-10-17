@@ -762,4 +762,13 @@
     <string name="reloc_facing_it">Je kijkt ernaar — beweeg langzaam heen en weer</string>
     <string name="reloc_recapture">Doel opnieuw vastleggen</string>
     <string name="ar_feedback_capture_failed">Doel vastleggen mislukt. Tik om het opnieuw te proberen.</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">Stencil</string>
+    <string name="nav_stencil_info">Splitst het ontwerp in drie vellen: zwart, grijs en wit. Tik nogmaals om het origineel terug te halen.</string>
+    <string name="nav_stencil_view_all">Alle</string>
+    <string name="nav_stencil_view_black">Zwart</string>
+    <string name="nav_stencil_view_grey">Grijs</string>
+    <string name="nav_stencil_view_white">Wit</string>
+    <string name="nav_stencil_view_info">Wisselt welke stencilvellen zichtbaar zijn: alle, zwart, grijs of wit.</string>
 </resources>

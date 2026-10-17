@@ -757,4 +757,13 @@
     <string name="reloc_facing_it">Du blickst darauf — bewege dich langsam hin und her</string>
     <string name="reloc_recapture">Ziel neu erfassen</string>
     <string name="ar_feedback_capture_failed">Die Zielerfassung ist fehlgeschlagen. Tippe, um es erneut zu versuchen.</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">Schablone</string>
+    <string name="nav_stencil_info">Teilt das Motiv in drei Schablonen: Schwarz, Grau und Weiß. Erneut tippen, um das Original zurückzubringen.</string>
+    <string name="nav_stencil_view_all">Alle</string>
+    <string name="nav_stencil_view_black">Schwarz</string>
+    <string name="nav_stencil_view_grey">Grau</string>
+    <string name="nav_stencil_view_white">Weiß</string>
+    <string name="nav_stencil_view_info">Wechselt, welche Schablonen angezeigt werden: alle, schwarz, grau oder weiß.</string>
 </resources>

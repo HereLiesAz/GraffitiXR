@@ -774,4 +774,13 @@
     <string name="reloc_facing_it">正面にあります — ゆっくり左右に動かしてください</string>
     <string name="reloc_recapture">ターゲットを再キャプチャ</string>
     <string name="ar_feedback_capture_failed">ターゲットのキャプチャに失敗しました。タップして再試行してください。</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">ステンシル</string>
+    <string name="nav_stencil_info">デザインを黒・グレー・白の3枚に分けます。もう一度タップすると元に戻ります。</string>
+    <string name="nav_stencil_view_all">すべて</string>
+    <string name="nav_stencil_view_black">黒</string>
+    <string name="nav_stencil_view_grey">グレー</string>
+    <string name="nav_stencil_view_white">白</string>
+    <string name="nav_stencil_view_info">表示するステンシルを切り替えます：すべて、黒、グレー、白。</string>
 </resources>

@@ -757,4 +757,13 @@
     <string name="reloc_facing_it">Du ser mot det — beveg deg sakte fra side til side</string>
     <string name="reloc_recapture">Ta opp målet på nytt</string>
     <string name="ar_feedback_capture_failed">Opptak av målet mislyktes. Trykk for å prøve igjen.</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">Sjablong</string>
+    <string name="nav_stencil_info">Deler motivet i tre ark: svart, grå og hvit. Trykk igjen for å få originalen tilbake.</string>
+    <string name="nav_stencil_view_all">Alle</string>
+    <string name="nav_stencil_view_black">Svart</string>
+    <string name="nav_stencil_view_grey">Grå</string>
+    <string name="nav_stencil_view_white">Hvit</string>
+    <string name="nav_stencil_view_info">Bytter hvilke sjablongark som vises: alle, svart, grå eller hvit.</string>
 </resources>

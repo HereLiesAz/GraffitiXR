@@ -779,4 +779,13 @@
     <string name="reloc_facing_it">You\'re facing it — move slowly side to side</string>
     <string name="reloc_recapture">Recapture target</string>
     <string name="ar_feedback_capture_failed">Target capture failed. Tap to try again.</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">Stencil</string>
+    <string name="nav_stencil_info">Split the design into three sheets: black, grey and white. Tap again to bring the original back.</string>
+    <string name="nav_stencil_view_all">All</string>
+    <string name="nav_stencil_view_black">Black</string>
+    <string name="nav_stencil_view_grey">Grey</string>
+    <string name="nav_stencil_view_white">White</string>
+    <string name="nav_stencil_view_info">Cycles which stencil sheets are shown: all, black, grey or white.</string>
 </resources>

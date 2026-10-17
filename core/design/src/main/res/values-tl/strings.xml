@@ -472,4 +472,13 @@
     <string name="reloc_facing_it">Nakaharap ka na rito — dahan-dahang gumalaw pakaliwa at pakanan</string>
     <string name="reloc_recapture">I-capture muli ang target</string>
     <string name="ar_feedback_capture_failed">Nabigo ang pagkuha ng target. I-tap para subukan muli.</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">Stencil</string>
+    <string name="nav_stencil_info">Hinahati ang disenyo sa tatlong sheet: itim, abo, at puti. I-tap muli para maibalik ang orihinal.</string>
+    <string name="nav_stencil_view_all">Lahat</string>
+    <string name="nav_stencil_view_black">Itim</string>
+    <string name="nav_stencil_view_grey">Abo</string>
+    <string name="nav_stencil_view_white">Puti</string>
+    <string name="nav_stencil_view_info">Pinapalitan kung aling mga stencil sheet ang ipinapakita: lahat, itim, abo, o puti.</string>
 </resources>

@@ -2277,6 +2277,35 @@ class MainActivity : AppCompatActivity() {
                     overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
             )
+            // Stencil — splits the design into three tonal sheets (black, grey, white). Tap to
+            // generate, tap again to get the original back. Once a stencil exists, the cycler right
+            // beneath it steps which sheets are shown: all, black, grey, white.
+            azRailSubItem(
+                id = "design.stencil",
+                hostId = railHostOf("design.stencil"),
+                text = navStrings.stencil,
+                color = navItemColor,
+                classifiers = setOf("toggle", "effect"),
+                shape = AzButtonShape.NONE,
+                disabled = showLibrary,
+                onClick = { editorViewModel.onToggleStencil() }
+            )
+            if (editorUiState.design?.isStencil == true) {
+                val stencilLabels = listOf(
+                    navStrings.stencilViewAll, navStrings.stencilViewBlack,
+                    navStrings.stencilViewGrey, navStrings.stencilViewWhite,
+                )
+                azRailSubCycler(
+                    id = "design.stencil.view",
+                    hostId = railHostOf("design.stencil.view"),
+                    options = stencilLabels,
+                    selectedOption = stencilLabels[editorUiState.design?.stencilView?.ordinal ?: 0],
+                    color = navItemColor,
+                    shape = AzButtonShape.NONE,
+                    disabled = showLibrary,
+                    onClick = { editorViewModel.onCycleStencilView() }
+                )
+            }
             // Adjust ▸ the per-design controls. Every one of these drives an EditorViewModel action
             // that was already implemented and tested but had no way to be invoked: the layer list had
             // no opener (so add-a-layer was one-way — nothing could remove, rename, reorder or hide
@@ -2779,6 +2808,7 @@ class MainActivity : AppCompatActivity() {
             if (editorUiState.design?.isInverted == true) azHighlight("design.invert", active = Cyan)
             if (editorUiState.design?.isSketch == true) azHighlight("design.outline", active = Cyan)
             if (editorUiState.design?.isSubjectIsolated == true) azHighlight("design.isolate", active = Cyan)
+            if (editorUiState.design?.isStencil == true) azHighlight("design.stencil", active = Cyan)
             if (editorUiState.design?.isImageLocked == true) azHighlight("design.lock", active = Cyan)
 
             // State badges: surface important conditions as rail-item alerts.

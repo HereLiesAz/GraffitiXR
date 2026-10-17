@@ -14,6 +14,7 @@ import com.hereliesaz.graffitixr.common.coop.OpEmitter
 import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.common.util.ImageUtils
 import com.hereliesaz.graffitixr.common.util.SketchProcessor
+import com.hereliesaz.graffitixr.common.util.StencilProcessor
 import com.hereliesaz.graffitixr.common.util.computeAutoTune
 import com.hereliesaz.graffitixr.common.util.imageStats
 import com.hereliesaz.graffitixr.common.util.GallerySaveResult
@@ -520,7 +521,9 @@ class EditorViewModel @Inject constructor(
         val imageChanged = command.oldDesign?.uri != _uiState.value.design?.uri
         val restored = command.oldDesign?.copy(bitmap = if (imageChanged) null else _uiState.value.design?.bitmap)
         val effectsChanged = restored?.isSketch != _uiState.value.design?.isSketch ||
-            restored?.isSubjectIsolated != _uiState.value.design?.isSubjectIsolated
+            restored?.isSubjectIsolated != _uiState.value.design?.isSubjectIsolated ||
+            restored?.isStencil != _uiState.value.design?.isStencil ||
+            restored?.stencilView != _uiState.value.design?.stencilView
         dispatch(EditorIntent.RestoreDesign(restored))
         // Restore the mode adjustment the snapshot was taken alongside, if any — without this, an
         // outside-DESIGN Undo restored an (unchanged) design and left modeAdjustments exactly where
@@ -685,6 +688,13 @@ class EditorViewModel @Inject constructor(
             if (sketched != null) out = sketched
             else failure = "Couldn't generate an outline for this image."
         }
+        // Outline and Stencil are exclusive (the toggles keep it so); a stored design with both
+        // flags set, e.g. from a hand-edited project, gets the outline.
+        if (design.isStencil && !design.isSketch) {
+            val stencilled = StencilProcessor.stencil(out, design.stencilView)
+            if (stencilled != null) out = stencilled
+            else failure = "Couldn't make a stencil from this image."
+        }
         return out to failure
     }
 
@@ -728,7 +738,7 @@ class EditorViewModel @Inject constructor(
             return
         }
         pushHistory()
-        updateDesign { it.copy(isSketch = !it.isSketch) }
+        updateDesign { it.copy(isSketch = !it.isSketch, isStencil = if (it.isSketch) it.isStencil else false) }
         recomputeDesignEffects()
     }
 
@@ -741,6 +751,30 @@ class EditorViewModel @Inject constructor(
         }
         pushHistory()
         updateDesign { it.copy(isSubjectIsolated = !it.isSubjectIsolated) }
+        recomputeDesignEffects()
+    }
+
+    /** Stencil: three tonal sheets (black, grey, white) the artist can cycle through. */
+    override fun onToggleStencil() {
+        if (_uiState.value.design == null) return
+        if (designSourceBitmap == null) {
+            _uiState.update { it.copy(effectFailureMessage = "Couldn't make a stencil from this image.") }
+            return
+        }
+        pushHistory()
+        // Turning it on starts from all three sheets, and takes Outline off: both rewrite the pixels.
+        updateDesign {
+            if (it.isStencil) it.copy(isStencil = false)
+            else it.copy(isStencil = true, stencilView = StencilView.ALL, isSketch = false)
+        }
+        recomputeDesignEffects()
+    }
+
+    override fun onCycleStencilView() {
+        val design = _uiState.value.design ?: return
+        if (!design.isStencil) return
+        pushHistory()
+        updateDesign { it.copy(stencilView = it.stencilView.next()) }
         recomputeDesignEffects()
     }
 
