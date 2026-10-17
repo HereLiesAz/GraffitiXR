@@ -1714,7 +1714,10 @@ class ArRenderer(
                             val pose = com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion
                                 .composeCorrected(v, r.copyOf(16), cac)
                             val prev = relocAnchorCandidate
-                            if (prev != null &&
+                            if (wallOrientationRejects(frame, pose)) {
+                                // Right marks, wrong wall: not the saved wall's orientation.
+                                relocAnchorCandidate = null
+                            } else if (prev != null &&
                                 !com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion.diverged(prev, pose)
                             ) {
                                 relocAnchorCandidate = null
@@ -3448,6 +3451,41 @@ class ArRenderer(
             // a pause request, not in this frame body.
             lastStep = "frameDone"
         }
+    }
+
+    /**
+     * True when [anchorPose] (a column-major world anchor pose, +Y = the wall normal) is a wall of
+     * the wrong orientation for the saved target: see [WallOrientationCheck]. False when nothing can
+     * be compared (no saved normal, or an anchor whose +Y is not a usable normal).
+     */
+    private fun wallOrientationRejects(frame: com.google.ar.core.Frame, anchorPose: FloatArray): Boolean {
+        val saved = slamManager.getWallNormalEnu() ?: return false
+        val cam = frame.camera.pose
+        val toCam = floatArrayOf(cam.tx() - anchorPose[12], cam.ty() - anchorPose[13], cam.tz() - anchorPose[14])
+        val toCamLen = Math.sqrt((toCam[0] * toCam[0] + toCam[1] * toCam[1] + toCam[2] * toCam[2]).toDouble()).toFloat()
+        val normal = floatArrayOf(anchorPose[4], anchorPose[5], anchorPose[6])
+        // A legacy fallback anchor has identity rotation, so its +Y is not a wall normal.
+        if (!(toCamLen > 1e-4f) ||
+            kotlin.math.abs((normal[0] * toCam[0] + normal[1] * toCam[1] + normal[2] * toCam[2]) / toCamLen) <= 0.5f
+        ) return false
+        var worldFromEarth: FloatArray? = null
+        val att = relocAttitude?.invoke()
+            ?.takeIf { it.ageNs(android.os.SystemClock.elapsedRealtimeNanos()) <= com.hereliesaz.graffitixr.feature.ar.RelocAttitude.MAX_AGE_NS }
+        if (att != null) {
+            val earthFromCv = com.hereliesaz.graffitixr.feature.ar.RelocAttitude.earthFromCvCamera(
+                att.quaternion,
+                com.hereliesaz.sphereslam.attitude.DeviceCameraRotation.cameraFromDeviceForDisplayFrame(displayRotation * 90),
+            )
+            val m = FloatArray(16)
+            cam.toMatrix(m, 0)
+            val glRot = FloatArray(9) { i -> m[(i % 3) * 4 + i / 3] } // row-major 3x3 of the column-major 4x4
+            worldFromEarth = com.hereliesaz.graffitixr.feature.ar.WallOrientationCheck.worldFromEarth(glRot, earthFromCv)
+        }
+        val verdict = com.hereliesaz.graffitixr.feature.ar.WallOrientationCheck.check(saved, normal, worldFromEarth)
+        val rejected = verdict == com.hereliesaz.graffitixr.feature.ar.WallOrientationCheck.Verdict.TILT_MISMATCH ||
+            verdict == com.hereliesaz.graffitixr.feature.ar.WallOrientationCheck.Verdict.TURN_MISMATCH
+        if (rejected) Timber.w("ARDIAG return-visit anchor refused: wall orientation $verdict")
+        return rejected
     }
 
     /** A pose at the plane point `[0..2]` whose local +Y is the plane normal `[3..5]` (a plane pose's convention). */
