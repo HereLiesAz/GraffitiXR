@@ -360,8 +360,10 @@ class ArRenderer(
     // and make it ride the screen. Default ON: without it a saved target never pulls the overlay onto
     // the wall; the artist can switch it off from the diagnostics overlay.
     @Volatile var fusionEnabled: Boolean = true
-    // Whether the ARCore Depth API is actually enabled this session. Off by default — it starves VIO
-    // on this hardware; metric depth comes from triangulation/stereo instead. Set from ArViewModel.
+    // Whether the ARCore Depth API is enabled this session. Mirrors the user's "ARCore depth" setting
+    // (default on) minus safe mode; ArViewModel.applyArCoreDepthMode writes it on every session
+    // configure. The `false` here is only the pre-attach value. Depth can be switched off per device
+    // because on some hardware the ML depth graph errors and starves VIO (see initArSessionLocked).
     @Volatile var depthApiEnabled: Boolean = false
 
     /** Whether the 360-degree ambient sweep is required. See ArUiState.ambientScanEnabled. */

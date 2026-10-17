@@ -1804,10 +1804,10 @@ class MainActivity : AppCompatActivity() {
                             )
 
                             // Tap-to-distance (Sub-project C): live center reticle + a distance chip
-                            // pinned at each tapped wall mark. `isDepthApiSupported` is hardcoded
-                            // false (the ARCore Depth API starved VIO on target hardware, see
-                            // ArViewModel.initArSessionLocked comment). Depth is still available
-                            // from hardware stereo (isHardwareStereoActive) and from VIO-baseline
+                            // pinned at each tapped wall mark. `isDepthApiSupported` follows the
+                            // "ARCore depth" setting and is false when the artist or safe mode
+                            // disabled it (see ArViewModel.applyArCoreDepthMode). Depth is also
+                            // available from hardware stereo (isHardwareStereoActive) and from VIO-baseline
                             // triangulation (currentCenterDepth > 0f populated in ArRenderer),
                             // both of which reach ArUiState, so gate on those instead.
                             //
