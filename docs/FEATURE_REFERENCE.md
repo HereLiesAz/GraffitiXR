@@ -364,8 +364,9 @@ The design can be split into three tonal sheets: black, grey and white.
   Stencil and Outline are exclusive.
 - **Pipeline** (`StencilProcessor`, `StencilTones`, `core/common`), restored from the old tool: it
   first tries to **remove the background** (the same segmenter as Isolate; if no subject is found it
-  carries on with the whole image, and Isolate's own flag is not touched), and only then judges the image **dark or light** (mean luminance 0.299R + 0.587G + 0.114B over the opaque
-  pixels; dark at 0.5 or below), which picks the **base sheet**: black for a dark image, white for
+  carries on with the whole image, and Isolate's own flag is not touched), and only then judges the image **dark or light**: the isolated subject's luminance (0.299R + 0.587G +
+  0.114B) is turned down by 40 levels and its contrast doubled about mid-grey, which leaves each pixel
+  clearly dark or light, and whichever covers more **area** wins (a tie is dark). That picks the **base sheet**: black for a dark image, white for
   a light one. The value channel (brightest of R, G, B) is median-blurred (9x9), split into three
   tones by a deterministic 1-D K-means, and the two sheets laid over the base are closed 5x5 so cut
   edges are smooth. Transparent pixels stay transparent, so Isolate then Stencil keeps the cut-out.

@@ -20,8 +20,9 @@ import timber.log.Timber
  * smooth.
  *
  * Callers cut the background out first when they can (the editor tries; see EditorViewModel), so
- * this sees the subject alone. It then decides whether the image is dark or light (mean luminance, 0.299R + 0.587G + 0.114B
- * over the opaque pixels; dark at 0.5 or below), and that picks the BASE sheet, the one covering
+ * this sees the subject alone. It then decides whether the image is dark or light: the subject's
+ * brightness is turned down and its contrast turned up, and the call goes to whichever of dark and
+ * light covers more area ([StencilTones.isDarkByArea]). That picks the BASE sheet, the one covering
  * the whole subject: black for a dark image, white for a light one. The other two sheets are laid
  * over it, sequentially, as paint is (see [StencilTones.render]).
  *
@@ -98,19 +99,18 @@ object StencilProcessor {
             val bBytes = ByteArray(w * h).also { channels[2].get(0, 0, it) }
 
             val histogram = IntArray(256)
-            var lumaSum = 0.0
-            var opaque = 0
+            val lumaHistogram = IntArray(256)
             for (i in valueBytes.indices) {
                 if ((alphaBytes[i].toInt() and 0xFF) > 0) {
                     histogram[valueBytes[i].toInt() and 0xFF]++
-                    lumaSum += StencilTones.luma(
+                    val luma = StencilTones.luma(
                         rBytes[i].toInt() and 0xFF, gBytes[i].toInt() and 0xFF, bBytes[i].toInt() and 0xFF,
                     )
-                    opaque++
+                    lumaHistogram[(luma * 255.0).toInt().coerceIn(0, 255)]++
                 }
             }
             val (lo, hi) = StencilTones.thresholds(histogram) ?: return null
-            val dark = StencilTones.isDark(if (opaque == 0) 0.0 else lumaSum / opaque)
+            val dark = StencilTones.isDarkByArea(lumaHistogram)
 
             // The two sheets laid over the base, closed so their edges are smooth. A dark image grows
             // outwards from black (grey-or-lighter, then the lightest); a light one from white

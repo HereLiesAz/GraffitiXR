@@ -45,11 +45,34 @@ class StencilTonesTest {
     private val grey = 0xFF808080.toInt()
     private val white = 0xFFFFFFFF.toInt()
 
+    private fun lumaHistogram(vararg v: Pair<Int, Int>): IntArray {
+        val h = IntArray(256)
+        for ((level, n) in v) h[level] += n
+        return h
+    }
+
     @Test
-    fun `a dark image is judged dark and a light one light`() {
-        assertTrue(StencilTones.isDark(0.5))
-        assertTrue(StencilTones.isDark(0.1))
-        assertFalse(StencilTones.isDark(0.51))
+    fun `the call goes to whichever of dark and light covers more area`() {
+        assertTrue(StencilTones.isDarkByArea(lumaHistogram(20 to 700, 240 to 300)))
+        assertFalse(StencilTones.isDarkByArea(lumaHistogram(20 to 300, 240 to 700)))
+    }
+
+    @Test
+    fun `a tie, and an empty subject, are dark`() {
+        assertTrue(StencilTones.isDarkByArea(lumaHistogram(20 to 500, 240 to 500)))
+        assertTrue(StencilTones.isDarkByArea(IntArray(256)))
+    }
+
+    @Test
+    fun `turning brightness down and contrast up makes a mid-bright image dark`() {
+        // Mid-grey 150 averages "light" by mean luminance, but dimmed and contrast-pushed it is dark.
+        assertTrue(StencilTones.isDarkByArea(lumaHistogram(150 to 1000)))
+        // Genuinely bright stays light.
+        assertFalse(StencilTones.isDarkByArea(lumaHistogram(230 to 1000)))
+    }
+
+    @Test
+    fun `luminance uses the old weights`() {
         assertEquals(0.0, StencilTones.luma(0, 0, 0), 1e-9)
         assertEquals(1.0, StencilTones.luma(255, 255, 255), 1e-9)
         assertTrue("green outweighs blue", StencilTones.luma(0, 255, 0) > StencilTones.luma(0, 0, 255))

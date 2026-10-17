@@ -101,8 +101,33 @@ object StencilTones {
     /** Luminance of an RGB pixel in 0..1, the weights the old stencil tool used. */
     fun luma(r: Int, g: Int, b: Int): Double = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
 
-    /** The old tool's light-or-dark call: mean luminance of 0.5 or below is dark. */
-    fun isDark(meanLuma: Double): Boolean = meanLuma <= 0.5
+    /** Brightness taken off before the contrast push, in luminance levels (0..255). */
+    const val DARK_CALL_BRIGHTNESS = -40
+
+    /** Contrast gain about mid-grey for the dark-or-light call. */
+    const val DARK_CALL_CONTRAST = 2.0
+
+    /**
+     * The dark-or-light call, which picks the base sheet. Made on the isolated subject: its
+     * luminance is turned down by [DARK_CALL_BRIGHTNESS] and the contrast turned up by
+     * [DARK_CALL_CONTRAST] about mid-grey, which leaves each pixel clearly dark or clearly light, and
+     * then the call goes to whichever has the greater AREA. A tie is dark.
+     *
+     * [lumaHistogram] is a 256-bin histogram of the subject's luminance (0.299R + 0.587G + 0.114B,
+     * scaled to 0..255), opaque pixels only.
+     */
+    fun isDarkByArea(lumaHistogram: IntArray): Boolean {
+        require(lumaHistogram.size == 256) { "a luminance histogram has 256 bins" }
+        var dark = 0L
+        var light = 0L
+        for (level in 0..255) {
+            val n = lumaHistogram[level]
+            if (n == 0) continue
+            val adjusted = (level + DARK_CALL_BRIGHTNESS - 128) * DARK_CALL_CONTRAST + 128
+            if (adjusted >= 128.0) light += n else dark += n
+        }
+        return dark >= light
+    }
 
     /**
      * ARGB pixels for [ranks] (one of [NONE], [BLACK], [GREY], [WHITE] per pixel) as [view] shows
