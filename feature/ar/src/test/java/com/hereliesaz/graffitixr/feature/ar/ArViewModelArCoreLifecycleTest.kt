@@ -208,6 +208,10 @@ class ArViewModelArCoreLifecycleTest {
         val vm = newViewModel()
         currentProject.value = GraffitiProject(id = "p1")
         testDispatcher.scheduler.advanceUntilIdle()
+        // The fingerprint loader claims native-state ownership on the real IO dispatcher, which
+        // advanceUntilIdle cannot wait for, and the save is (rightly) skipped until it has. Exiting
+        // before that made this test a race.
+        awaitNativeOwnership(vm, "p1")
         val session: Session = mockk(relaxed = true)
         setPrivateField(vm, "session", session)
 
@@ -279,6 +283,17 @@ class ArViewModelArCoreLifecycleTest {
         val m = ArViewModel::class.java.getDeclaredMethod("onCleared")
         m.isAccessible = true
         m.invoke(vm)
+    }
+
+    /** Wait (real time, bounded) for the IO-dispatched fingerprint loader to claim native state for [projectId]. */
+    private fun awaitNativeOwnership(vm: ArViewModel, projectId: String) {
+        val owner = getPrivateField(vm, "nativeStateOwner") as NativeStateOwner
+        val deadline = System.nanoTime() + 5_000_000_000L
+        while (!owner.owns(projectId) && System.nanoTime() < deadline) {
+            Thread.sleep(10)
+            testDispatcher.scheduler.advanceUntilIdle()
+        }
+        assertTrue("native state was never claimed for $projectId", owner.owns(projectId))
     }
 
     private fun setPrivateField(obj: Any, fieldName: String, value: Any?) {
