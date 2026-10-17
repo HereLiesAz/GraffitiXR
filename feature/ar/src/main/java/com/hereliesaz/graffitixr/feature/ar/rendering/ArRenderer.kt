@@ -1882,11 +1882,6 @@ class ArRenderer(
                             haveNormal = true
                         }
                     }
-                    // No hit landed in range: the nearest real VERTICAL plane along the view ray, before
-                    // resorting to a free point two metres out in the air.
-                    if (anchor == null && relocPose == null) {
-                        wallPlaneAlongView(activeSession, camera)?.let { placeOnPlane(it) }
-                    }
                     if (anchor == null) {
                         anchorModelMatrix = fallbackMatrix
                         anchor = activeSession.createAnchor(
@@ -3470,37 +3465,6 @@ class ArRenderer(
             floatArrayOf(qx / ql, 0f, qz / ql, w / ql)
         }
         return com.google.ar.core.Pose(floatArrayOf(plane[0], plane[1], plane[2]), q)
-    }
-
-    /**
-     * Where the view ray through the screen centre meets the nearest tracked, non-merged VERTICAL
-     * plane (its extent plus half a metre of slack), as a plane pose at the hit; null if there is none
-     * between 0.1 and 10 m.
-     */
-    private fun wallPlaneAlongView(session: com.google.ar.core.Session, camera: com.google.ar.core.Camera): com.google.ar.core.Pose? {
-        val cp = camera.pose
-        val o = floatArrayOf(cp.tx(), cp.ty(), cp.tz())
-        val d = FloatArray(3)
-        cp.getTransformedAxis(2, -1f, d, 0) // camera looks down -Z
-        var best: com.google.ar.core.Pose? = null
-        var bestT = Float.MAX_VALUE
-        for (pl in session.getAllTrackables(com.google.ar.core.Plane::class.java)) {
-            if (pl.trackingState != TrackingState.TRACKING || pl.subsumedBy != null) continue
-            if (pl.type != com.google.ar.core.Plane.Type.VERTICAL) continue
-            val c = pl.centerPose
-            val n = FloatArray(3)
-            c.getTransformedAxis(1, 1f, n, 0)
-            val denom = n[0] * d[0] + n[1] * d[1] + n[2] * d[2]
-            if (kotlin.math.abs(denom) < 0.1f) continue // looking along the plane
-            val t = ((c.tx() - o[0]) * n[0] + (c.ty() - o[1]) * n[1] + (c.tz() - o[2]) * n[2]) / denom
-            if (t < 0.1f || t > 10f || t >= bestT) continue
-            val hit = floatArrayOf(o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t)
-            val local = c.inverse().transformPoint(hit)
-            if (kotlin.math.abs(local[0]) > pl.extentX / 2f + 0.5f || kotlin.math.abs(local[2]) > pl.extentZ / 2f + 0.5f) continue
-            bestT = t
-            best = com.google.ar.core.Pose(hit, c.rotationQuaternion)
-        }
-        return best
     }
 
     fun setPrimaryAnchor(anchor: com.google.ar.core.Anchor) {
