@@ -112,6 +112,11 @@ internal fun AzNavHostScope.ConfigureGuidance(
     // why those three keep the shared target as a documented, real, un-fixed gap rather than a
     // guessed-at one.
     azStatus("gx.mockupReady") { editorUiState.backgroundBitmap != null && editorUiState.design != null }
+    // AR's goal target, for the same reason: the goal used to end at gx.hasTarget, so the controller
+    // completed (and persisted) it the moment the anchor landed and the gx.hasTarget -> design edge
+    // below never ran. A first-time user who confirmed a target with no design open was told nothing
+    // about adding one. Ending at "target and design" keeps the goal alive through that edge.
+    azStatus("gx.arReady") { arUiState.isAnchorEstablished && editorUiState.design != null }
 
     // --- DESIGN: add a layer, then tap it to open its tools. ---
     azEdge(
@@ -183,7 +188,7 @@ internal fun AzNavHostScope.ConfigureGuidance(
 
     // --- AR: scan & lock a wall target, then add layers. The capture step itself is explained by
     // TargetCreationUi's card (this graph is suppressed there), so ar[2] ("just tap the screen") is
-    // not used. Once the anchor lands, the gx.hasTarget -> gx.hasDesign edge below is the ONLY
+    // not used. Once the anchor lands, the gx.hasTarget -> gx.arReady edge below is the ONLY
     // "now open a design" instruction: the old modal dialog and "Target established" card are gone. ---
     azEdge(
         from = ar0,
@@ -197,7 +202,7 @@ internal fun AzNavHostScope.ConfigureGuidance(
     )
     azEdge(
         from = "gx.hasTarget",
-        to = "gx.hasDesign",
+        to = "gx.arReady",
         text = res(DesignR.string.guidance_open_via_design_ar),
         highlightItemId = "mode.design",
     )
@@ -206,10 +211,11 @@ internal fun AzNavHostScope.ConfigureGuidance(
     // to that mode's screen status) and routes from the current screen to that mode's milestone.
     // AzGuidanceController tracks completed/dismissed goals in SharedPreferences, so a goal the
     // user already finished or dismissed does not restart on a later visit. Mockup's target is
-    // gx.mockupReady, not the shared gx.hasDesign — see that status's own comment above for why. ---
+    // gx.mockupReady and AR's gx.arReady, not the shared gx.hasDesign / gx.hasTarget — see those statuses'
+    // own comments above for why. ---
     azGoal(id = "gx.design", target = "gx.hasDesign", label = nav.design, autoStartWhen = design0)
     azGoal(id = "gx.overlay", target = "gx.hasDesign", label = nav.overlay, autoStartWhen = overlay0)
     azGoal(id = "gx.mockup", target = "gx.mockupReady", label = nav.mockup, autoStartWhen = mockup0)
     azGoal(id = "gx.trace", target = "gx.hasDesign", label = nav.trace, autoStartWhen = trace0)
-    azGoal(id = "gx.ar", target = "gx.hasTarget", label = nav.arMode, autoStartWhen = ar0)
+    azGoal(id = "gx.ar", target = "gx.arReady", label = nav.arMode, autoStartWhen = ar0)
 }

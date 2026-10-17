@@ -86,6 +86,11 @@ import timber.log.Timber
 /** Prefix of PhotosphereTrackingSession's periodic per-window KPM metrics/timing diagnostic. */
 private const val KPM_METRICS_PREFIX = "SphereSLAM standalone KPM "
 
+// The status panel's distance from the top of the onscreen layer. The host's top badge row (distance chip,
+// close-up build progress, relocalization badge) sits at 16 dp and is about 40 dp tall; at 32 dp this panel's
+// text drew over the close-up progress pill during an initial standalone build. 72 dp clears that row.
+private val STATUS_TOP_PADDING = 72.dp
+
 private val SPHERESLAM_DEFAULT_UNWARP_POINTS = listOf(
     Offset(0.25f, 0.25f),
     Offset(0.75f, 0.25f),
@@ -1543,7 +1548,7 @@ fun SphereSlamStandaloneOverlay(
                         ).resolve(),
                         color = Color.White,
                         modifier = Modifier
-                            .padding(top = 32.dp)
+                            .padding(top = STATUS_TOP_PADDING)
                             .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                     )
@@ -1582,7 +1587,7 @@ fun SphereSlamStandaloneOverlay(
                             },
                         color = Color.White,
                         modifier = Modifier
-                            .padding(top = 32.dp)
+                            .padding(top = STATUS_TOP_PADDING)
                             .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                     )

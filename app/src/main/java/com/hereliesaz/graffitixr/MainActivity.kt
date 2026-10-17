@@ -1267,7 +1267,7 @@ class MainActivity : AppCompatActivity() {
                             dashboardUiState.showNewProjectDialog
 
                         // The wall's close-ups are being learned ("Learning the wall up close: 17 of 49"). Per
-                        // the AzNavRail layout rules (docs/AZNAVRAIL_COMPLETE_GUIDE.md, "Layout Layers"),
+                        // AzNavRail's host layout (its upstream documentation, "Layout Layers"),
                         // app UI belongs in `onscreen { }`, which the host pads to the safe zones and the
                         // rail; a `background()` layer is the camera feed and sits beneath the whole onscreen
                         // book. Top-centre keeps it clear of the artwork and the knobs, and narrow enough
@@ -1552,7 +1552,7 @@ class MainActivity : AppCompatActivity() {
                                 )
                             }
                             // With a fingerprint there is nothing to add here: the rail's guidance callout
-                            // (gx.hasTarget -> gx.hasDesign) is the one "now open a design" instruction.
+                            // (gx.hasTarget -> gx.arReady) is the one "now open a design" instruction.
 
                             val showProgress = editorUiState.editorMode == EditorMode.AR
                                     && arUiState.isAnchorEstablished
