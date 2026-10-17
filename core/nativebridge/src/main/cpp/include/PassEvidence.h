@@ -27,13 +27,15 @@ enum PassId : int {
     kPassFeatures = 0,   //!< design features confirmed on the wall (descriptor corroboration)
     kPassColour = 1,     //!< left the bare wall and matches the paint its design colour was painted with
     kPassFilterBase = 2,   //!< pass kPassFilterBase + f looks where design filter f (DesignFilters.h) points
-    kPassCount = kPassFilterBase + designfilters::kCount,
+    kPassChange = kPassFilterBase + designfilters::kCount,   //!< changed since the clean-wall photo, in the shape of a design patch
+    kPassCount = kPassChange + 1,
 };
 
 inline const char* passName(int id) {
     switch (id) {
         case kPassFeatures: return "features";
         case kPassColour:   return "colour";
+        case kPassChange:   return "change";
         default:
             if (id >= kPassFilterBase && id < kPassCount) return designfilters::name(id - kPassFilterBase);
             return "unknown";

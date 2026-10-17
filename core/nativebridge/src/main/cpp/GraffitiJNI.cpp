@@ -1384,6 +1384,48 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetCaptureImage(
     }
 }
 
+// Pass B: the bare wall BEFORE it was marked or painted. Returns whether it is registered to the
+// capture photo now (false while waiting for that photo, or if registration failed).
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetCleanWallImage(
+        JNIEnv* env, jobject thiz, jobject bitmap) {
+    if (!bitmap) return JNI_FALSE;
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return JNI_FALSE;
+    cv::Mat img;
+    bitmapToMat(env, bitmap, img);
+    if (img.empty()) return JNI_FALSE;
+    try {
+        return gSlamEngine->setCleanWallImage(img) ? JNI_TRUE : JNI_FALSE;
+    } catch (const std::exception& e) {
+        LOGE("nativeSetCleanWallImage: exception: %s", e.what());
+    } catch (...) {
+        LOGE("nativeSetCleanWallImage: unknown exception");
+    }
+    return JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearCleanWallImage(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (gSlamEngine) gSlamEngine->clearCleanWallImage();
+}
+
+// 0 none, 1 pending (waiting for the capture photo), 2 registered, 3 failed (MobileGS::CleanWallStatus).
+JNIEXPORT jint JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCleanWallStatus(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    return gSlamEngine ? gSlamEngine->cleanWallStatus() : 0;
+}
+
+// The Settings switch for pass B. Off unless the user turned it on.
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetChangePassEnabled(
+        JNIEnv* env, jobject thiz, jboolean enabled) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (gSlamEngine) gSlamEngine->setChangePassEnabled(enabled == JNI_TRUE);
+}
+
 JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAutoFitDesign(JNIEnv* env, jobject thiz) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);

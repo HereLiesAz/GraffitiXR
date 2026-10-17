@@ -515,6 +515,32 @@ class SlamManager @Inject constructor(
     fun setCaptureImage(bitmap: Bitmap, intrinsics: FloatArray) = nativeSetCaptureImage(bitmap, intrinsics)
 
     /**
+     * Pass B. The clean-wall photo: the bare wall before it was marked or painted. It is registered to
+     * the capture photo by feature matching; if that photo has not been set yet it waits for it. Returns
+     * whether it is registered now. See [CleanWallStatus] for what became of it otherwise.
+     */
+    fun setCleanWallImage(bitmap: Bitmap): Boolean = nativeSetCleanWallImage(bitmap)
+
+    fun clearCleanWallImage() = nativeClearCleanWallImage()
+
+    /** What became of the clean-wall photo: [CleanWallStatus]. */
+    fun cleanWallStatus(): CleanWallStatus = CleanWallStatus.fromNative(nativeGetCleanWallStatus())
+
+    /**
+     * Pass B on or off. Off unless the user turned it on in Settings; this is the only caller that may
+     * switch it. Even on, the pass judges nothing without a registered clean-wall photo.
+     */
+    fun setChangePassEnabled(enabled: Boolean) = nativeSetChangePassEnabled(enabled)
+
+    enum class CleanWallStatus {
+        NONE, PENDING, REGISTERED, FAILED;
+
+        companion object {
+            fun fromNative(code: Int): CleanWallStatus = entries.getOrElse(code) { NONE }
+        }
+    }
+
+    /**
      * Fit the registered design to paint already on the wall, from the capture photo. Returns
      * [dx, dy (m), dTheta (rad, CCW), scale ratio, inliers] in the current design's local frame, or
      * null when there is no confident fit. Blocking (feature detection); call off the main thread.
@@ -1027,6 +1053,10 @@ class SlamManager @Inject constructor(
     private external fun nativeClearPaintMarks()
     private external fun nativeGetPaintMarkCount(): Int
     private external fun nativeSetCaptureImage(bitmap: Bitmap, intrinsics: FloatArray)
+    private external fun nativeSetCleanWallImage(bitmap: Bitmap): Boolean
+    private external fun nativeClearCleanWallImage()
+    private external fun nativeGetCleanWallStatus(): Int
+    private external fun nativeSetChangePassEnabled(enabled: Boolean)
     private external fun nativeExportPaintGrid(): ByteArray?
     private external fun nativeAutoFitDesign(): FloatArray?
     private external fun nativeRestorePaintGrid(state: ByteArray)

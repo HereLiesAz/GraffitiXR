@@ -7,6 +7,8 @@
 #include <jni.h>
 #include "MobileGS.h"
 #include "MobileGSTestPeer.h"
+#include "ShapeMatch.h"
+#include <algorithm>
 
 extern JavaVM* gJvm;
 
@@ -489,5 +491,190 @@ TEST(MobileGSTeleological, ARepeatingDesignFailsTheBaselineMargin) {
     ASSERT_GT(g.corrobPredicted(), 50);
     EXPECT_EQ(0, g.corrobMatched()) << "a design that matches itself at displaced placements counted as evidence";
     g.setEvalSyncReloc(false, 1);
+    g.destroy();
+}
+
+// ---- Pass B: change against the clean wall, judged by shape ------------------------------------------
+
+namespace {
+// An 8 x 4 grid whose left half is design patch 0 and right half patch 1; nothing is outside the design.
+const int kCols = 8, kRows = 4;
+std::vector<int> twoPatches() {
+    std::vector<int> p((size_t)kCols * kRows);
+    for (int i = 0; i < kCols * kRows; ++i) p[(size_t)i] = (i % kCols) < kCols / 2 ? 0 : 1;
+    return p;
+}
+std::vector<uint8_t> allJudged() { return std::vector<uint8_t>((size_t)kCols * kRows, 1); }
+std::vector<uint8_t> cellsWhere(bool (*pred)(int x, int y)) {
+    std::vector<uint8_t> v((size_t)kCols * kRows, 0);
+    for (int i = 0; i < kCols * kRows; ++i) v[(size_t)i] = pred(i % kCols, i / kCols) ? 1 : 0;
+    return v;
+}
+int presentCount(const std::vector<uint8_t>& v) {
+    return (int)std::count(v.begin(), v.end(), (uint8_t)passes::kPresent);
+}
+} // namespace
+
+TEST(ShapeMatch, LabelsConnectedCellsOfTheSameKey) {
+    // 0 0 1 1
+    // 0 2 1 1   key 2 touches nothing of its own kind; -1 is outside
+    // 0 0 -1 0
+    const std::vector<int> key = {0, 0, 1, 1,  0, 2, 1, 1,  0, 0, -1, 0};
+    const auto l = shapematch::label(key, 4, 3);
+    EXPECT_EQ(l[0], l[1]);
+    EXPECT_EQ(l[0], l[4]);
+    EXPECT_EQ(l[0], l[8]);
+    EXPECT_EQ(l[2], l[3]);
+    EXPECT_NE(l[0], l[2]);
+    EXPECT_NE(l[5], l[0]);
+    EXPECT_EQ(-1, l[10]);
+    EXPECT_NE(l[11], l[0]) << "a same-key cell cut off by an outside cell is its own patch";
+}
+
+TEST(ShapeMatch, ACompletePatchIsPaintAndTheUntouchedOneIsNot) {
+    const auto v = shapematch::verdicts(cellsWhere([](int x, int) { return x < kCols / 2; }), allJudged(), twoPatches(), kCols, kRows);
+    EXPECT_EQ(kRows * kCols / 2, presentCount(v));
+    for (int i = 0; i < kCols * kRows; ++i)
+        EXPECT_EQ((i % kCols) < kCols / 2 ? passes::kPresent : passes::kAbsent, v[(size_t)i]) << "cell " << i;
+}
+
+TEST(ShapeMatch, TheWholeDesignPaintedAtOnceIsPaint) {
+    const auto v = shapematch::verdicts(cellsWhere([](int, int) { return true; }), allJudged(), twoPatches(), kCols, kRows);
+    EXPECT_EQ(kCols * kRows, presentCount(v));
+}
+
+TEST(ShapeMatch, PaintInProgressIsPaint) {
+    // The right patch complete, the left half done (one partial patch).
+    const auto v = shapematch::verdicts(
+        cellsWhere([](int x, int y) { return x >= kCols / 2 || y < kRows / 2; }), allJudged(), twoPatches(), kCols, kRows);
+    EXPECT_EQ(kCols * kRows - kCols / 2 * (kRows / 2), presentCount(v));
+}
+
+TEST(ShapeMatch, ABandCuttingAcrossManyPatchesIsNotPaint) {
+    // Four column patches; a band over the top half of every one is four partial patches: a shadow.
+    std::vector<int> patch((size_t)kCols * kRows);
+    for (int i = 0; i < kCols * kRows; ++i) patch[(size_t)i] = (i % kCols) / 2;
+    const auto v = shapematch::verdicts(cellsWhere([](int, int y) { return y < kRows / 2; }), allJudged(), patch, kCols, kRows);
+    EXPECT_EQ(0, presentCount(v));
+}
+
+TEST(ShapeMatch, AChangeOutsideTheDesignIsNotPaint) {
+    // The right half is not design at all (patch -1); a hand over it, plus a sliver of the left patch.
+    auto patch = twoPatches();
+    for (int i = 0; i < kCols * kRows; ++i) if ((i % kCols) >= kCols / 2) patch[(size_t)i] = -1;
+    const auto v = shapematch::verdicts(cellsWhere([](int x, int y) { return x >= kCols / 2 - 1 && y < kRows / 2; }),
+                                        allJudged(), patch, kCols, kRows);
+    EXPECT_EQ(0, presentCount(v));
+}
+
+TEST(ShapeMatch, ASingleChangedCellInABigPatchIsNoise) {
+    const auto v = shapematch::verdicts(cellsWhere([](int x, int y) { return x == 0 && y == 0; }),
+                                        allJudged(), twoPatches(), kCols, kRows);
+    EXPECT_EQ(0, presentCount(v));
+}
+
+TEST(ShapeMatch, CellsThatCouldNotBeComparedHaveNoVerdict) {
+    auto judged = allJudged();
+    judged[0] = 0;
+    const auto v = shapematch::verdicts(cellsWhere([](int, int) { return true; }), judged, twoPatches(), kCols, kRows);
+    EXPECT_EQ(passes::kNoData, v[0]);
+    EXPECT_EQ(passes::kPresent, v[1]);
+}
+
+// The pass reads the clean-wall photo, so it needs one registered, and the Settings switch on.
+namespace {
+struct ChangeRig {
+    MobileGS g;
+    cv::Mat bare, live;
+    float K[4] = {700.f, 700.f, 400.f, 300.f};
+    bool registered = false;
+    long judged = 0, seen = 0;
+
+    void build(bool enable, bool paintLeftHalf, bool giveCleanPhoto) {
+        g.initialize(0, 0);
+        bare = makeWall(800, 600, 0x51de);
+        // Two colour fields, left red and right blue, each with a few small dark and light marks (a
+        // design needs corners to register at all); the marks barely move a cell's mean colour.
+        cv::Mat design(600, 800, CV_8UC3);
+        design(cv::Rect(0, 0, 400, 600)).setTo(cv::Scalar(30, 30, 200));
+        design(cv::Rect(400, 0, 400, 600)).setTo(cv::Scalar(200, 60, 30));
+        cv::RNG rng(0x9e1);
+        for (int i = 0; i < 90; ++i) {
+            const int x = rng.uniform(10, 770), y = rng.uniform(10, 570);
+            cv::rectangle(design, cv::Rect(x, y, 9, 9), (i % 2) ? cv::Scalar(20, 20, 20) : cv::Scalar(235, 235, 235), cv::FILLED);
+        }
+        fingerprintFrontalWall(g, bare, K);
+        g.setCaptureImage(bare, K);
+        g.setArtworkFingerprint(design, nullptr, 0, 0, 0, nullptr, nullptr);
+        const float hw = 800.f / (2.0f * K[0]), hh = 600.f / (2.0f * K[1]);
+        const float place[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0.0f, 0.0f, 1.0f, 1};
+        g.setDesignPlacement(place, hw, hh);
+        if (giveCleanPhoto) registered = g.setCleanWallImage(bare);
+        g.setChangePassEnabled(enable);
+        live = bare.clone();
+        // Paint the left half in a colour the design does NOT use: the pass cares about shape only.
+        if (paintLeftHalf) live(cv::Rect(0, 0, 400, 600)).setTo(cv::Scalar(40, 200, 40));
+        g.setLiveIntrinsics(K);
+        g.setEvalSyncReloc(true, 1);
+        for (int i = 0; i < 4; ++i) g.scheduleRelocCheck(live);
+        long st[5];
+        g.getPassStats(passes::kPassChange, st);
+        judged = st[1]; seen = st[2];
+    }
+    ~ChangeRig() { g.setEvalSyncReloc(false, 1); g.destroy(); }
+};
+} // namespace
+
+TEST(MobileGSTeleological, TheChangePassIsOffUntilTheSwitchIsOn) {
+    MobileGS g;
+    EXPECT_FALSE(g.changePassEnabled());
+    ChangeRig rig; rig.build(/*enable=*/false, /*paint=*/true, /*clean=*/true);
+    EXPECT_TRUE(rig.registered);
+    EXPECT_EQ(0, rig.judged) << "the pass ran with its switch off";
+}
+
+TEST(MobileGSTeleological, TheChangePassCannotRunWithoutTheCleanWallPhoto) {
+    ChangeRig rig; rig.build(/*enable=*/true, /*paint=*/true, /*clean=*/false);
+    EXPECT_EQ(MobileGS::kCleanNone, rig.g.cleanWallStatus());
+    EXPECT_EQ(0, rig.judged) << "the pass ran with no clean-wall photo";
+}
+
+TEST(MobileGSTeleological, ThePassSeesAPatchPaintedInAColourTheDesignDoesNotUse) {
+    ChangeRig rig; rig.build(true, true, true);
+    ASSERT_EQ(MobileGS::kRelocOk, rig.g.lastRelocReject());
+    ASSERT_TRUE(rig.registered);
+    std::fprintf(stderr, "change pass: judged %ld seen %ld\n", rig.judged, rig.seen);
+    EXPECT_GT(rig.judged, 0);
+    EXPECT_GT(rig.seen, 0) << "a whole patch painted, in the wrong colour, was not seen";
+}
+
+TEST(MobileGSTeleological, ThePassSeesNothingOnTheBareWall) {
+    ChangeRig rig; rig.build(true, false, true);
+    ASSERT_EQ(MobileGS::kRelocOk, rig.g.lastRelocReject());
+    EXPECT_GT(rig.judged, 0);
+    EXPECT_EQ(0, rig.seen) << "the unpainted wall looked like paint";
+}
+
+TEST(MobileGSTeleological, AClutterOfNonsenseFailsRegistrationAndTheStatusSaysSo) {
+    MobileGS g;
+    g.initialize(0, 0);
+    const float K[4] = {700.f, 700.f, 400.f, 300.f};
+    g.setCaptureImage(makeWall(800, 600, 0x51de), K);
+    EXPECT_FALSE(g.setCleanWallImage(cv::Mat(600, 800, CV_8UC3, cv::Scalar(90, 90, 90))));
+    EXPECT_EQ(MobileGS::kCleanFailed, g.cleanWallStatus());
+    g.clearCleanWallImage();
+    EXPECT_EQ(MobileGS::kCleanNone, g.cleanWallStatus());
+    g.destroy();
+}
+
+TEST(MobileGSTeleological, ACleanWallPhotoGivenBeforeTheCapturePhotoWaitsForIt) {
+    MobileGS g;
+    g.initialize(0, 0);
+    const float K[4] = {700.f, 700.f, 400.f, 300.f};
+    const cv::Mat wall = makeWall(800, 600, 0x51de);
+    EXPECT_FALSE(g.setCleanWallImage(wall));
+    EXPECT_EQ(MobileGS::kCleanPending, g.cleanWallStatus());
+    g.setCaptureImage(wall, K);
+    EXPECT_EQ(MobileGS::kCleanRegistered, g.cleanWallStatus());
     g.destroy();
 }
