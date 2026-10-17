@@ -46,6 +46,15 @@ The filtered picture is then thrown away: descriptors are computed on the UNFILT
 design at those places (SuperPoint `describe`, or ORB with the orientation ORB would give), so they
 match against the raw live frame's own features. A filter decides where to look, nothing else.
 
+**Built cheapest first, off the calling thread.** Making the targets takes time, so design
+registration returns at once and a worker builds them in `designfilters::kBuildOrder`: invert,
+posterize 2, posterize 4, warm-luma, mosaic, sketch, cartoon, blobs, stencil3 (measured: the first
+ones cost a millisecond or two, the stencil about 70 ms). Each filter's targets are installed the
+moment they are ready, and a pass whose targets are not there yet has no data. Filters run on a copy
+at most 800 px on the long side. With SuperPoint, ONE forward pass over the design serves every
+filter (`describeField` once, `sampleField` per filter). A newer design, or a clear, makes a running
+build stand down before it installs anything.
+
 Each filter's places form a target set (`MobileGS::TargetSet`) that corroborates like the artwork's:
 the same pose-gated match (`gatedMatchSet`), consecutive confirmations, reset when the design moves
 or is replaced. A cell's vote is "present" when at least half of that filter's places inside it are

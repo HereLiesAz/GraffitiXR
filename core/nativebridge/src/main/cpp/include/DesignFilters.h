@@ -26,6 +26,17 @@ enum Id : int {
     kCount
 };
 
+/**
+ * The order the filters' targets are built in: cheapest first, so the quick passes come on line
+ * while the slow ones are still being made. Measured on 800 px and 2000 px designs (filter plus
+ * place picking): invert and the posterizes cost a millisecond or two, warm-luma a few, mosaic and
+ * sketch up to tens, cartoon and blobs more, and the stencil (median blur, K-means) is the slowest
+ * by a long way. A permutation of every [Id]; a test pins that.
+ */
+constexpr int kBuildOrder[kCount] = {
+    kInvert, kPosterize2, kPosterize4, kWarmLuma, kMosaic, kSketch, kCartoon, kBlobs, kStencil3,
+};
+
 inline const char* name(int id) {
     switch (id) {
         case kSketch:     return "sketch";

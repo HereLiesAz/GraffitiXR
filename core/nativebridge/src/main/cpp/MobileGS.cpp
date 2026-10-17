@@ -2150,6 +2150,8 @@ void MobileGS::destroy() {
         mRelocCv.notify_all();
     }
     if (mRelocThread.joinable()) mRelocThread.join();
+    mFilterCancel.store(true, std::memory_order_relaxed);
+    joinFilterBuild();
 }
 
 void MobileGS::setViewportSize(int w, int h) {
@@ -2687,6 +2689,82 @@ bool MobileGS::loadLowLightEnhancer(const std::vector<uchar>& onnxBytes) { retur
 // which new real paint-marks to promote into the live fingerprint as the original marks get covered.
 // Mirrors generateFingerprint's detect + depth back-projection, stored into mArtwork* (no mask: the
 // whole target is the reference).
+int MobileGS::readyFilterTargets() const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    int ready = 0;
+    for (const auto& ts : mTargetSets) if (!ts.descs.empty()) ++ready;
+    return ready;
+}
+
+void MobileGS::joinFilterBuild() {
+    if (mFilterThread.joinable()) mFilterThread.join();
+}
+
+// The design filter bank: each filter picks places on the design worth looking at; the descriptors are
+// the UNFILTERED design's there (same normalised grey, same descriptor type as the artwork). Built on a
+// worker, cheapest filter first, each installed the moment it is ready. A newer design (or a clear)
+// makes a running build stand down: it checks the artwork generation before installing anything.
+void MobileGS::startFilterBuild(cv::Mat composite, cv::Mat gray, int descType, long generation) {
+    mFilterCancel.store(true, std::memory_order_relaxed);
+    joinFilterBuild();
+    mFilterCancel.store(false, std::memory_order_relaxed);
+    mFilterThread = std::thread([this, composite, gray, descType, generation]() {
+        try {
+            // Filters work on a copy no larger than 800 px on its long side: place picking does not need
+            // more, and the slow filters scale with the pixel count. Places are scaled back up.
+            const double s = std::min(1.0, 800.0 / (double)std::max(composite.cols, composite.rows));
+            cv::Mat work = composite;
+            if (s < 1.0) cv::resize(composite, work, cv::Size(), s, s, cv::INTER_AREA);
+
+            // One SuperPoint forward pass serves every filter; sampling it is cheap.
+            SuperPointDetector::DescriptorField field;
+            if (descType == CV_32F && (!mSuperPoint.isLoaded() || !mSuperPoint.describeField(gray, field))) return;
+
+            for (int f : designfilters::kBuildOrder) {
+                if (mFilterCancel.load(std::memory_order_relaxed)) return;
+                const cv::Mat filtered = designfilters::apply(f, work);
+                std::vector<cv::Point2f> pts = designfilters::locations(filtered, kMaxFilterTargets);
+                for (auto& p : pts) { p.x = (float)(p.x / s); p.y = (float)(p.y / s); }
+                if (pts.empty()) continue;
+                cv::Mat d;
+                if (descType == CV_32F) {
+                    mSuperPoint.sampleField(field, pts, d);
+                } else {
+                    std::vector<cv::KeyPoint> ks;
+                    for (const auto& p : pts) {
+                        // ORB uses the angle it is given. Orient each place as ORB itself would.
+                        ks.emplace_back(p, 31.0f, intensityCentroidAngle(gray, p), 0.0f, 0);
+                    }
+                    cv::ORB::create(kMaxFilterTargets)->compute(gray, ks, d);   // drops border keypoints
+                    pts.clear();
+                    for (const auto& k : ks) pts.push_back(k.pt);
+                }
+                if (d.empty() || d.rows != (int)pts.size()) continue;
+
+                TargetSet ts;
+                ts.descs = d;
+                ts.pts = std::move(pts);
+                ts.corrob.assign((size_t)d.rows, 0);
+                std::lock_guard<std::mutex> lock(mMutex);
+                if (mArtworkGeneration != generation || (size_t)f >= mTargetSets.size()) return;   // superseded
+                ts.cellRows.assign((size_t)mGrid.cols * mGrid.rows, {});
+                if (mGrid.cols > 0 && mGrid.rows > 0) {
+                    for (int r = 0; r < (int)ts.pts.size(); ++r) {
+                        const int c = std::min(mGrid.cols - 1, std::max(0, (int)(ts.pts[(size_t)r].x * mGrid.cols / composite.cols)));
+                        const int w = std::min(mGrid.rows - 1, std::max(0, (int)(ts.pts[(size_t)r].y * mGrid.rows / composite.rows)));
+                        ts.cellRows[(size_t)w * mGrid.cols + c].push_back(r);
+                    }
+                }
+                mTargetSets[(size_t)f] = std::move(ts);
+            }
+        } catch (const std::exception& e) {
+            LOGE("filter build: exception: %s", e.what());
+        } catch (...) {
+            LOGE("filter build: unknown exception");
+        }
+    });
+}
+
 void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* depthData,
                                      int depthW, int depthH, int depthStride,
                                      const float* intr, const float* /*viewMat*/) {
@@ -2763,32 +2841,7 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
         }
     }
 
-    // The design filter bank: each filter picks places on the design worth looking at; the descriptors
-    // are the UNFILTERED design's there (same normalised grey, same descriptor type as the artwork).
-    std::vector<TargetSet> sets((size_t)designfilters::kCount);
-    for (int f = 0; f < designfilters::kCount; ++f) {
-        const cv::Mat filtered = designfilters::apply(f, composite);
-        std::vector<cv::Point2f> pts = designfilters::locations(filtered, kMaxFilterTargets);
-        if (pts.empty()) continue;
-        cv::Mat d;
-        if (keepDescs.type() == CV_32F) {
-            if (!mSuperPoint.isLoaded() || !mSuperPoint.describe(gray, pts, d)) continue;
-        } else {
-            std::vector<cv::KeyPoint> ks;
-            for (const auto& p : pts) {
-                // ORB uses the angle it is given. Orient each place as ORB itself would.
-                ks.emplace_back(p, 31.0f, intensityCentroidAngle(gray, p), 0.0f, 0);
-            }
-            cv::ORB::create(kMaxFilterTargets)->compute(gray, ks, d);   // drops border keypoints
-            if (d.empty()) continue;
-            pts.clear();
-            for (const auto& k : ks) pts.push_back(k.pt);
-        }
-        if (d.rows != (int)pts.size()) continue;
-        sets[(size_t)f].descs = d;
-        sets[(size_t)f].pts = std::move(pts);
-        sets[(size_t)f].corrob.assign((size_t)d.rows, 0);
-    }
+    const int artworkType = keepDescs.type();
 
     int storedRows = 0; size_t storedPts = 0;
     {
@@ -2803,16 +2856,8 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
         mArtworkCorroborated.assign((size_t)mArtworkDescriptors.rows, 0);
         mArtworkPromoted.assign((size_t)mArtworkDescriptors.rows, 0);
         buildPaintGridLocked(composite, mArtworkKeypoints2D);
-        for (auto& ts : sets) {
-            ts.cellRows.assign((size_t)mGrid.cols * mGrid.rows, {});
-            if (mGrid.cols <= 0 || mGrid.rows <= 0) continue;
-            for (int r = 0; r < (int)ts.pts.size(); ++r) {
-                const int c = std::min(mGrid.cols - 1, std::max(0, (int)(ts.pts[(size_t)r].x * mGrid.cols / composite.cols)));
-                const int w = std::min(mGrid.rows - 1, std::max(0, (int)(ts.pts[(size_t)r].y * mGrid.rows / composite.rows)));
-                ts.cellRows[(size_t)w * mGrid.cols + c].push_back(r);
-            }
-        }
-        mTargetSets = std::move(sets);
+        // Empty until the worker installs each filter's targets (startFilterBuild below).
+        mTargetSets.assign((size_t)designfilters::kCount, TargetSet());
         ++mArtworkGeneration;
         mCorrobPredicted.store(-1, std::memory_order_relaxed);
         mCorrobMatched.store(-1, std::memory_order_relaxed);
@@ -2826,6 +2871,9 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
         storedRows = mArtworkDescriptors.rows;
         storedPts = mArtworkKeypoints3D.size();
     }
+    long generation;
+    { std::lock_guard<std::mutex> lock(mMutex); generation = mArtworkGeneration; }
+    startFilterBuild(composite.clone(), gray.clone(), artworkType, generation);
     LOGI("setArtworkFingerprint: stored %d validator features (%zu with 3D)", storedRows, storedPts);
 }
 

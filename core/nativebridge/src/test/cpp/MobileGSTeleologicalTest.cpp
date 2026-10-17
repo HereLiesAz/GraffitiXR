@@ -244,6 +244,7 @@ int paintMarksAfterThreeLocks(bool selfGrow) {
     const float K[4] = {700.f, 700.f, 400.f, 300.f};
     fingerprintFrontalWall(g, full, K);
     g.setArtworkFingerprint(full, nullptr, 0, 0, 0, nullptr, nullptr);
+    g.awaitFilterTargets();   // the filters' targets are built on a worker
     const float hw = (float)full.cols / (2.0f * K[0]);
     const float hh = (float)full.rows / (2.0f * K[1]);
     const float place[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0,
@@ -344,6 +345,37 @@ TEST(DesignFilters, StencilLayersHaveAtMostTheRequestedTonesAndAreRepeatable) {
     }
     EXPECT_TRUE(designfilters::stencilLayers(design, 1).empty());
     EXPECT_TRUE(designfilters::stencilLayers(cv::Mat(), 3).empty());
+}
+
+TEST(DesignFilters, TheBuildOrderIsEveryFilterOnceAndTheCheapOnesFirst) {
+    std::set<int> seen(std::begin(designfilters::kBuildOrder), std::end(designfilters::kBuildOrder));
+    EXPECT_EQ((size_t)designfilters::kCount, seen.size());
+    for (int f = 0; f < designfilters::kCount; ++f) EXPECT_EQ(1u, seen.count(f)) << designfilters::name(f);
+    auto position = [](int id) {
+        return (int)(std::find(std::begin(designfilters::kBuildOrder), std::end(designfilters::kBuildOrder), id) -
+                     std::begin(designfilters::kBuildOrder));
+    };
+    EXPECT_LT(position(designfilters::kInvert), position(designfilters::kSketch));
+    EXPECT_LT(position(designfilters::kPosterize2), position(designfilters::kCartoon));
+    EXPECT_EQ(designfilters::kCount - 1, position(designfilters::kStencil3)) << "the stencil is the slowest, so it is last";
+}
+
+TEST(MobileGSTeleological, FilterTargetsAreBuiltOffTheCallingThreadAndSupersededBuildsStandDown) {
+    MobileGS g;
+    g.initialize(0, 0);
+    const float K[4] = {700.f, 700.f, 400.f, 300.f};
+    const cv::Mat wall = makeWall(800, 600, 0x51de);
+    fingerprintFrontalWall(g, wall, K);
+    // Two designs in a row: the first build must stand down for the second, never install its places.
+    g.setArtworkFingerprint(makeWall(800, 600, 0x1111), nullptr, 0, 0, 0, nullptr, nullptr);
+    g.setArtworkFingerprint(makeWall(800, 600, 0x2222), nullptr, 0, 0, 0, nullptr, nullptr);
+    g.awaitFilterTargets();
+    EXPECT_GE(g.readyFilterTargets(), 4);
+    // Clearing the wall drops the targets with the design.
+    g.clearWallFingerprint();
+    g.awaitFilterTargets();
+    EXPECT_EQ(0, g.readyFilterTargets());
+    g.destroy();
 }
 
 TEST(DesignFilters, InvertIsTheNegative) {
@@ -606,6 +638,7 @@ struct ChangeRig {
         fingerprintFrontalWall(g, bare, K);
         g.setCaptureImage(bare, K);
         g.setArtworkFingerprint(design, nullptr, 0, 0, 0, nullptr, nullptr);
+        g.awaitFilterTargets();
         const float hw = 800.f / (2.0f * K[0]), hh = 600.f / (2.0f * K[1]);
         const float place[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0.0f, 0.0f, 1.0f, 1};
         g.setDesignPlacement(place, hw, hh);

@@ -805,6 +805,12 @@ private:
         std::vector<std::vector<int>> cellRows;     // per paint-grid cell: rows inside it
     };
     std::vector<TargetSet> mTargetSets;
+    // The filters' targets are made on a worker thread, cheapest first (designfilters::kBuildOrder), each
+    // installed as soon as it is ready; a pass whose targets are not there yet simply has no data.
+    std::thread mFilterThread;
+    std::atomic<bool> mFilterCancel{false};
+    void startFilterBuild(cv::Mat composite, cv::Mat gray, int descType, long generation);
+    void joinFilterBuild();
     /**
      * How many rows at the front of mWallDescriptors / mWallKeypoints3D are the wall as captured
      * (the bare wall, before any paint). Self-grow only appends, so everything after is grown. The
@@ -870,6 +876,10 @@ public:
      * in the design plane), scale ratio, inliers}. Returns false when there is no confident fit.
      */
     bool autoFitDesign(float* out5);
+    /** Waits for the filter targets of the registered design to finish building (tests; shutdown does it too). */
+    void awaitFilterTargets() { joinFilterBuild(); }
+    /** How many filters' targets are installed and usable right now. */
+    int readyFilterTargets() const;
     void setCaptureImage(const cv::Mat& rgb, const float* intr4);
 
     /** What became of the clean-wall photo. */
