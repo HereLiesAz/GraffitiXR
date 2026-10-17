@@ -743,6 +743,11 @@ class ArRenderer(
     // (x,y,z); zero-length until an anchor is established, in which case the raw anchor frame is used.
     private val anchorSurfaceNormal = FloatArray(3)
 
+    // ARDIAG overlay-basis line (diagnostic only; changes no behavior). Which branch of the anchor
+    // establishment placed the current anchor, and when the basis was last logged.
+    @Volatile private var anchorPathTag = "none"
+    private var lastOverlayDiagMs = 0L
+
     // Set true the frame an anchor is established; consumed (and cleared) the moment anchorMatrix is
     // next computed, to capture [overlayRotationCorrection] against that frame's rotation. Deferred
     // because anchorMatrix (the consensus/fused pose) isn't available yet inside the establishment
@@ -1824,6 +1829,7 @@ class ArRenderer(
                         return true
                     }
                     if (relocPose != null) {
+                        anchorPathTag = "reloc"
                         // The saved wall's pose in this session's world. Its rotation is the day-one
                         // anchor's: a plane hit's local +Y is the wall normal; a fallback anchor has
                         // identity rotation and faced the camera. Take +Y when it plausibly faces the
@@ -1854,7 +1860,9 @@ class ArRenderer(
                         haveNormal = true
                     } else if (capturedPlane != null && placeOnPlane(poseOnPlane(capturedPlane))) {
                         // Anchored on the very surface the target was created against.
+                        anchorPathTag = "capturedPlane"
                     } else if (chosen != null) {
+                        anchorPathTag = "hit"
                         relocWallUnconfirmed = false
                         val pose = chosen.hitPose
                         val dx = pose.tx() - camPosX
@@ -1908,6 +1916,7 @@ class ArRenderer(
                         }
                     }
                     if (anchor == null) {
+                        anchorPathTag = "fallback"
                         anchorModelMatrix = fallbackMatrix
                         anchor = activeSession.createAnchor(
                             com.google.ar.core.Pose(
@@ -1950,6 +1959,7 @@ class ArRenderer(
                     overlayRotationCorrectionPending = true
                     overlayRotationCorrectionApplied = false
                     overlayRotationCorrectionRetryFrames = 0
+                    lastOverlayDiagMs = 0L // log the new anchor's basis on the next frame
                     slamManager.updateAnchorTransform(anchorModelMatrix)
                     // Doodle demo: publish the wall plane (anchor point + surface normal) so the
                     // ViewModel can build a fingerprint from the drawing and relocalize against it.
@@ -3228,6 +3238,8 @@ class ArRenderer(
                 // Translation stays the live anchor position (cols 12-14 already copied above).
             }
 
+            logOverlayBasisDiag(overlayBaseScratch, viewMatrix)
+
             // Measure taps: the overlay base frame's local z = 0 is the wall the design is drawn on —
             // but only when its normal came from the wall itself and the rotation correction has
             // been applied (see [anchorNormalIsWall]). With tracking paused, the view is the frozen
@@ -3511,6 +3523,49 @@ class ArRenderer(
             // a pause request, not in this frame body.
             lastStep = "frameDone"
         }
+    }
+
+    /**
+     * ARDIAG: once a second while an anchor is established (and straight after each new anchor), logs how
+     * the overlay's drawing axes sit against the camera. Diagnostic only.
+     *
+     *  - `det`: sign of the axes' determinant. Negative means a REFLECTION is in the basis (a mirror), which
+     *    no rotation can produce.
+     *  - `xRight`, `yUp`, `zToCam`: cosines of the overlay's +X with camera-right, +Y with camera-up and
+     *    +Z with the direction to the camera. The AR drag handler assumes xRight is positive (it passes the
+     *    finger's x straight through as local +X), and the renderer assumes zToCam is positive.
+     *  - `nToCam`: the same for the stored wall normal.
+     */
+    private fun logOverlayBasisDiag(base: FloatArray, view: FloatArray) {
+        if (!anchorEstablished) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastOverlayDiagMs < 1000L) return
+        lastOverlayDiagMs = now
+        fun len(x: Float, y: Float, z: Float) = Math.sqrt((x * x + y * y + z * z).toDouble()).toFloat().coerceAtLeast(1e-6f)
+        val xx = base[0]; val xy = base[1]; val xz = base[2]
+        val yx = base[4]; val yy = base[5]; val yz = base[6]
+        val zx = base[8]; val zy = base[9]; val zz = base[10]
+        val det = xx * (yy * zz - yz * zy) - xy * (yx * zz - yz * zx) + xz * (yx * zy - yy * zx)
+        // View matrix is column-major: camera right/up/back in world are its rows.
+        val rx = view[0]; val ry = view[4]; val rz = view[8]
+        val ux = view[1]; val uy = view[5]; val uz = view[9]
+        // Camera position = -Rᵀ·t.
+        val cx = -(view[0] * view[12] + view[1] * view[13] + view[2] * view[14])
+        val cy = -(view[4] * view[12] + view[5] * view[13] + view[6] * view[14])
+        val cz = -(view[8] * view[12] + view[9] * view[13] + view[10] * view[14])
+        val tx = cx - base[12]; val ty = cy - base[13]; val tz = cz - base[14]
+        val tl = len(tx, ty, tz)
+        val xl = len(xx, xy, xz); val yl = len(yx, yy, yz); val zl = len(zx, zy, zz)
+        val xRight = (xx * rx + xy * ry + xz * rz) / xl
+        val yUp = (yx * ux + yy * uy + yz * uz) / yl
+        val zToCam = (zx * tx + zy * ty + zz * tz) / (zl * tl)
+        val n = anchorSurfaceNormal
+        val nToCam = (n[0] * tx + n[1] * ty + n[2] * tz) / tl
+        Timber.i(
+            "ARDIAG overlayBasis path=%s det=%.2f xRight=%.2f yUp=%.2f zToCam=%.2f nToCam=%.2f corrApplied=%b corrPending=%b",
+            anchorPathTag, det / (xl * yl * zl), xRight, yUp, zToCam, nToCam,
+            overlayRotationCorrectionApplied, overlayRotationCorrectionPending,
+        )
     }
 
     /**
