@@ -15,7 +15,9 @@ project(graffitixr_native_host_tests CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(OpenCV REQUIRED COMPONENTS core imgproc features2d calib3d dnn)
+# No COMPONENTS list: OpenCV 5 renamed modules (features2d -> features, calib3d -> calib), so naming
+# them would pick one version. Every module the install has is linked, which covers both.
+find_package(OpenCV REQUIRED)
 find_package(GTest REQUIRED)
 find_package(Threads REQUIRED)
 
