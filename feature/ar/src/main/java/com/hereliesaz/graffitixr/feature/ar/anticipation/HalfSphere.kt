@@ -260,20 +260,34 @@ internal object HalfSphere {
      * [plans] reordered so every prefix covers the views evenly: starting from the reference itself
      * ([Pose.REFERENCE]), each next plan is the one farthest from all chosen so far, by [cost]
      * (`AnticipationFeeder.priorityCost`). Ties keep [plans]' order.
+     *
+     * Plans for which [rare] holds come after every other plan (none are dropped): the build can stop
+     * early, or be slow, without having spent its time on views the camera is unlikely to take. Within
+     * each group the order is the same farthest-first, and the rare group continues from the common one
+     * (its views are measured against everything already chosen), so the whole order stays even.
      */
-    fun prioritized(plans: List<Plan>, cost: (Pose, Pose) -> Double): List<Plan> {
+    fun prioritized(plans: List<Plan>, cost: (Pose, Pose) -> Double, rare: (Plan) -> Boolean = { false }): List<Plan> {
         val left = plans.toMutableList()
         val chosen = ArrayList<Plan>(plans.size)
         // Distance from each remaining plan to its nearest chosen view (the reference to start).
         val nearest = left.map { cost(it.pose, Pose.REFERENCE) }.toMutableList()
-        while (left.isNotEmpty()) {
-            var best = 0
-            for (i in 1 until left.size) if (nearest[i] > nearest[best] + 1e-9) best = i
-            val pick = left.removeAt(best)
-            nearest.removeAt(best)
-            chosen += pick
-            val picked = pick.pose
-            for (i in left.indices) nearest[i] = minOf(nearest[i], cost(left[i].pose, picked))
+        val isRare = left.map(rare).toMutableList()
+        // Common views first, then the rare ones.
+        for (rarePhase in booleanArrayOf(false, true)) {
+            while (true) {
+                var best = -1
+                for (i in left.indices) {
+                    if (isRare[i] != rarePhase) continue
+                    if (best < 0 || nearest[i] > nearest[best] + 1e-9) best = i
+                }
+                if (best < 0) break
+                val pick = left.removeAt(best)
+                nearest.removeAt(best)
+                isRare.removeAt(best)
+                chosen += pick
+                val picked = pick.pose
+                for (i in left.indices) nearest[i] = minOf(nearest[i], cost(left[i].pose, picked))
+            }
         }
         return chosen
     }

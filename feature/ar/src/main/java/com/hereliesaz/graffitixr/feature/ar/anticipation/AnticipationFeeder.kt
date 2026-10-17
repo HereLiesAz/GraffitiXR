@@ -9,6 +9,7 @@ import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 import kotlin.math.acos
+import kotlin.math.atan2
 import kotlin.math.hypot
 import kotlin.math.ln
 
@@ -166,12 +167,12 @@ internal class AnticipationFeeder(
         sink.setSearchable(ids)
     }
 
-    /** [p]'s plans for [max] and [cam], farthest first. */
+    /** [p]'s plans for [max] and [cam], farthest first, views from steeply above or below last. */
     private fun planFor(p: Page, max: AnticipationSettings, cam: CameraIntrinsics) {
         val key = max to cam
         if (p.planKey == key) return
         p.planKey = key
-        p.plans = HalfSphere.prioritized(HalfSphere.plans(p.width, p.height, cam, max), ::priorityCost)
+        p.plans = HalfSphere.prioritized(HalfSphere.plans(p.width, p.height, cam, max), ::priorityCost, ::isSteepVertical)
     }
 
     private fun submit(task: () -> Unit) {
@@ -201,6 +202,24 @@ internal class AnticipationFeeder(
 
         /** Degrees of view angle that weigh as much as aims a whole frame apart (no overlap). */
         const val DEG_PER_FRAME = 30.0
+
+        /**
+         * How steeply a view looks up or down the wall before it counts as rare, in degrees: the angle,
+         * in the vertical plane, between the camera's direction from the target and the wall's normal.
+         * Standing at a wall the camera is level with the work or a little above or below it, and
+         * walks along it far more than it climbs; 45 is a camera as far up as it is out. Sideways
+         * angles are not affected: someone moving along the wall sees it at a slant.
+         */
+        const val RARE_VERTICAL_DEG = 45.0
+
+        /** True for a view from more than [RARE_VERTICAL_DEG] above or below the wall's normal: built last. */
+        fun isSteepVertical(plan: HalfSphere.Plan): Boolean {
+            // cameraFromPage's third row is the camera's forward axis in the page frame (x right, y up,
+            // z out of the wall); the camera sits opposite to it, so its up/out components are -f.
+            val up = -plan.cameraFromPage[7]
+            val out = -plan.cameraFromPage[8]
+            return Math.toDegrees(atan2(abs(up), out)) > RARE_VERTICAL_DEG
+        }
 
         fun viewId(pageNo: Int, label: String) = "p$pageNo $label"
 
