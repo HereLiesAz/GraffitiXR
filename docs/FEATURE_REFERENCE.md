@@ -60,7 +60,7 @@ adjustment/anchoring lens is active.
 | Perception debug | ARCore planes, feature points, accumulated scan cloud | KPM page/inliers/reprojection error/age/match-time/tracking-state diagnostics |
 | Target rail action | ARCore tap-to-target flow | disabled; use the on-screen **Wall Target** capture |
 | Co-op Host/Join | protocol-v3 host wall frame + peer fingerprint | protocol-v3 host wall frame; standalone↔standalone may use normalized page units, cross-backend requires metric scale + peer fingerprint |
-| Drift correction | Off-by-default PoseFusion: accepted metric KPM observation first, MobileGS fallback, otherwise hold standing anchor-local correction | KPM is the primary wall pose while visible; MobileGS corroboration/self-grow use the same centered page frame, not ARCore PoseFusion |
+| Drift correction | PoseFusion (on by default): accepted metric KPM observation first, MobileGS fallback, otherwise hold standing anchor-local correction | KPM is the primary wall pose while visible; MobileGS corroboration/self-grow use the same centered page frame, not ARCore PoseFusion |
 | AR preview export | composited GL framebuffer | disabled until CameraX + transparent GL can be composited correctly |
 | Pan/scale/rotation/tone/lock | `modeAdjustments[AR]` | `sphereSlamModeAdjustment`; the same controls/undo UI swap to the active backend's persisted adjustment, and standalone spatial placement is generation-bound to its canonical wall |
 
@@ -377,7 +377,7 @@ Detailed math in `RELOC_MAP_DESIGN.md`, `SELF_GROWING_FINGERPRINT.md`,
   reference marks being painted over, tightening the lock instead of degrading it.
 - **These are A/B switches.** `ArViewModel.evalSetFusionEnabled`
   (drift correction, default **on**) and `evalSetSelfGrowEnabled` (teleological self-grow, default
-  off) are both persisted (`SettingsRepository.driftCorrectionEnabled` /
+  **on**) are both persisted (`SettingsRepository.driftCorrectionEnabled` /
   `.selfGrowEnabled`), and are surfaced as "Drift correction: ON/OFF" and "Self-grow: ON/OFF"
   toggles in the AR diagnostics overlay — see §7.4a. With drift correction enabled, a fresh accepted
   physically-metric KPM observation has first priority; MobileGS PnP is the fallback correction
@@ -385,9 +385,8 @@ Detailed math in `RELOC_MAP_DESIGN.md`, `SELF_GROWING_FINGERPRINT.md`,
   consensus. KPM never replaces ARCore camera view/projection. A third switch, **feature map** (`featureMapEnabled`, also
   default `false`), gates the persistent wall feature map (build + match); before it existed the
   underlying native flags (`SlamManager.setMapRelocEnabled`/`setMapBuildEnabled`) had no caller at all,
-  so the map — and the `.gxr` project field for it — could never do anything. Turn all three on
-  deliberately if you want them; out of the box, relocalization runs on the raw ARCore anchor without
-  drift correction, and the fingerprint does not self-grow.
+  so the map — and the `.gxr` project field for it — could never do anything. All three now
+  default on; switch any off from the diagnostics overlay.
 - **Depth sources on the ARCore path.** The ARCore Depth API (`DepthMode.AUTOMATIC`) is the
   Settings **ARCore depth** switch (default on, dropped in camera safe mode, still gated by
   `isDepthModeSupported`). The hardware-stereo camera config is adopted only after the one-time
@@ -478,7 +477,7 @@ Settings screen:
 | Setting | Key | Default | Effect |
 |---|---|---|---|
 | Drift correction | `drift_correction_enabled` | on | "Fusion" — pulls the overlay back onto each accepted relocalization instead of riding the raw ARCore anchor |
-| Self-grow | `self_grow_enabled` | off | Promotes newly validated marks into the reloc fingerprint as you paint; writes the map, so is colour-coded amber rather than green |
+| Self-grow | `self_grow_enabled` | on | Promotes newly validated marks into the reloc fingerprint as you paint; writes the map, so is colour-coded amber rather than green |
 | Feature map | `feature_map_enabled` | on | Builds and matches against the persistent wall feature map (`WallFeatureMap`); also writes, also amber |
 
 ### 7.3 Interface / locale / canvas

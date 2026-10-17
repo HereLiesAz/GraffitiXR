@@ -172,7 +172,7 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override val selfGrowEnabled: Flow<Boolean> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { preferences -> preferences[SELF_GROW_ENABLED] ?: false }
+        .map { preferences -> preferences[SELF_GROW_ENABLED] ?: true }
 
     override suspend fun setSelfGrowEnabled(on: Boolean) {
         context.dataStore.edit { preferences ->

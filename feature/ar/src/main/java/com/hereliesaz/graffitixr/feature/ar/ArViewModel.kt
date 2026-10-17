@@ -930,7 +930,7 @@ class ArViewModel @Inject constructor(
             renderer?.fusionEnabled = _evalFusionEnabled.value
         }
         viewModelScope.launch {
-            _evalSelfGrowEnabled.value = settingsRepository.selfGrowEnabled.firstOrNull() ?: false
+            _evalSelfGrowEnabled.value = settingsRepository.selfGrowEnabled.firstOrNull() ?: true
             slamManager.setSelfGrowEnabled(_evalSelfGrowEnabled.value)
         }
         viewModelScope.launch {
@@ -988,7 +988,7 @@ class ArViewModel @Inject constructor(
      */
     val evalFusionEnabled: StateFlow<Boolean> = _evalFusionEnabled.asStateFlow()
 
-    private val _evalSelfGrowEnabled = MutableStateFlow(false)
+    private val _evalSelfGrowEnabled = MutableStateFlow(true)
 
     /** Same arrangement for self-grow, which had the identical shadowing problem. */
     val evalSelfGrowEnabled: StateFlow<Boolean> = _evalSelfGrowEnabled.asStateFlow()

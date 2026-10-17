@@ -68,9 +68,8 @@ interface SettingsRepository {
     /**
      * Whether self-grow may promote validated new marks into the reloc fingerprint.
      *
-     * Persisted for the same reason, and still default-off for a stronger one: it is the only
-     * mechanism that permanently rewrites the map. Persistence remembers an explicit choice; it does
-     * not make one.
+     * On by default: it is the stage that keeps the lock alive as the original marks are painted
+     * over, and promotion is gated (`MobileGS::growTrusted`). Persisted so an explicit choice survives.
      */
     val selfGrowEnabled: Flow<Boolean>
 
