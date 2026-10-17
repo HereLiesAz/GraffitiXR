@@ -226,6 +226,23 @@ class CollaborationManager @Inject constructor() {
         if (!guest.sendOp(op)) _guestEditDropped.tryEmit(Unit)
     }
 
+    // ── Protocol v7: the tripod stream ───────────────────────────────────────────────────────
+
+    /**
+     * Host: true while the connected display guest wants the tripod stream — capture and [offerVideo]
+     * only then. False when not hosting.
+     */
+    val videoWanted: StateFlow<Boolean> get() = hostSession?.videoWanted ?: kotlinx.coroutines.flow.MutableStateFlow(false)
+
+    /** Host: offer one JPEG of the composited view; dropped unless a guest is live and wants it. */
+    fun offerVideo(jpeg: ByteArray): Boolean = hostSession?.offerVideo(jpeg) ?: false
+
+    /** Guest: start or stop the host's stream. No-op when not a guest. */
+    fun setVideoWanted(wanted: Boolean) { guestSession?.setVideoWanted(wanted) }
+
+    /** Guest: the latest streamed JPEG, null when none. Empty flow when not a guest. */
+    val video: StateFlow<ByteArray?> get() = guestSession?.video ?: kotlinx.coroutines.flow.MutableStateFlow(null)
+
     private fun observe(stateFlow: StateFlow<CoopSessionState>) {
         observeJob?.cancel()
         observeJob = scope.launch {

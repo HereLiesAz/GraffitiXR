@@ -22,6 +22,7 @@ import com.hereliesaz.graffitixr.core.collaboration.wire.Limits
 import com.hereliesaz.graffitixr.core.collaboration.wire.OpCodec
 import com.hereliesaz.graffitixr.core.collaboration.wire.PingPayload
 import com.hereliesaz.graffitixr.core.collaboration.wire.SessionCrypto
+import com.hereliesaz.graffitixr.core.collaboration.wire.VideoWantPayload
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +34,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -63,6 +66,38 @@ internal class HostSession(
     // Injectable so tests can use a short window instead of the production 30s.
     private val reconnectWindowMs: Long = 30_000L,
 ) : Session() {
+
+    // ── Protocol v7: the tripod stream ───────────────────────────────────────────────────────
+    private val _videoWanted = MutableStateFlow(false)
+
+    /** True while the connected guest has asked for the stream; the owner captures frames only then. */
+    val videoWanted: StateFlow<Boolean> get() = _videoWanted
+
+    // Latest wins: a frame the guest hasn't been sent yet is replaced, never queued behind.
+    private val videoFrames = kotlinx.coroutines.channels.Channel<ByteArray>(kotlinx.coroutines.channels.Channel.CONFLATED)
+
+    /**
+     * Offer one JPEG of the host's composited view. Dropped (false) unless the guest is live, wants
+     * the stream, and the frame fits a sealed frame; otherwise it replaces any frame still waiting.
+     */
+    fun offerVideo(jpeg: ByteArray): Boolean {
+        if (phase != Phase.Live || !_videoWanted.value) return false
+        if (jpeg.size > Frame.MAX_PAYLOAD_BYTES - SessionCrypto.SEAL_OVERHEAD_BYTES) return false
+        return videoFrames.trySend(jpeg).isSuccess
+    }
+
+    private suspend fun videoLoop(output: OutputStream, crypto: SessionCrypto) {
+        for (jpeg in videoFrames) {
+            if (!_videoWanted.value) continue
+            try {
+                writeSecure(output, crypto, FrameType.VIDEO, jpeg)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                enterReconnecting()
+                return
+            }
+        }
+    }
 
     /** Spatial identity fixed for the lifetime of this host session. */
     private val hostedSpatialFrame: CoopSpatialFrame
@@ -463,6 +498,9 @@ internal class HostSession(
 
         // Handshake done — widen the read timeout for the live phase.
         socket.soTimeout = READ_TIMEOUT_MS
+        // A new connection never inherits the last one's stream request; the guest asks again.
+        _videoWanted.value = false
+        videoFrames.tryReceive()
         _state.value = CoopSessionState.Connected(peerName = hello.deviceName)
         phase = Phase.Live
         liveGeneration++
@@ -475,6 +513,7 @@ internal class HostSession(
                 launch { outboundLoop(output, crypto) }
                 launch { inboundLoop(input, output, crypto) }
                 launch { heartbeatLoop(output, crypto) }
+                launch { videoLoop(output, crypto) }
             }
         }
     }
@@ -633,6 +672,9 @@ internal class HostSession(
                         }
                     }
                     FrameType.BULK_ACK -> { /* bulk done; ignore */ }
+                    FrameType.VIDEO_WANT -> {
+                        _videoWanted.value = OpCodec.decode<VideoWantPayload>(frame.payload).wanted
+                    }
                     FrameType.GUEST_OP -> {
                         val guestOp = OpCodec.decode<GuestOpPayload>(frame.payload)
                         handleGuestOp(guestOp)

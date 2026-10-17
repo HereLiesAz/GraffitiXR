@@ -23,7 +23,10 @@ package com.hereliesaz.graffitixr.core.collaboration.wire
  * and `stencilDark`. A v5 peer's decoder drops them and rebuilds the untouched source image while the
  * host shows the stencil, so the two would silently display different artwork — hence another hard
  * version break.
+ *
+ * v7 adds the tripod stream: VIDEO and VIDEO_WANT frames. A v6 peer's loops ignore unknown frame
+ * types, so a display guest would wait on a stream that never comes — hence another hard version break.
  */
 internal object ProtocolVersion {
-    const val CURRENT: Int = 6
+    const val CURRENT: Int = 7
 }
