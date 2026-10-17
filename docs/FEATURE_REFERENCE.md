@@ -360,12 +360,17 @@ The design can be split into three tonal sheets: black, grey and white.
 - **State**: `Layer.isStencil` and `Layer.stencilView`. Like Outline and Isolate they are flags;
   the shown bitmap is re-derived from the untouched import (`uri`), so turning it off is exact.
   Stencil and Outline are exclusive.
-- **Pipeline** (`StencilProcessor`, `StencilTones`, `core/common`): the value channel (brightest
-  of R, G, B) is median-blurred (9x9), split into three tones by a deterministic 1-D K-means, and
-  the grey-or-lighter and white areas are closed 5x5 so cut edges are smooth. Transparent pixels
-  stay transparent, so Isolate then Stencil keeps the cut-out.
-- **Views**: All paints every tone (black, grey, white). A single sheet paints only its own tone
-  and leaves the rest transparent, so cycling shows where each colour goes.
+- **Pipeline** (`StencilProcessor`, `StencilTones`, `core/common`), restored from the old tool: it
+  first judges the image **dark or light** (mean luminance 0.299R + 0.587G + 0.114B over the opaque
+  pixels; dark at 0.5 or below), which picks the **base sheet**: black for a dark image, white for
+  a light one. The value channel (brightest of R, G, B) is median-blurred (9x9), split into three
+  tones by a deterministic 1-D K-means, and the two sheets laid over the base are closed 5x5 so cut
+  edges are smooth. Transparent pixels stay transparent, so Isolate then Stencil keeps the cut-out.
+- **Sheets** are sequential, as paint is. Dark image: black = the whole subject, grey = grey and
+  lighter, white = the lightest. Light image: white = the whole subject, grey = grey and darker,
+  black = the darkest.
+- **Views**: All stacks the sheets (every pixel in its own tone). Black, Grey or White shows that one
+  sheet in its colour and leaves the rest transparent.
 - The same method also drives the `stencil3` filter of the SLAM passes (`docs/PASSES.md`).
 
 Not rebuilt: the old multi-sheet PDF export and tiling (`docs/STENCILS.md` still describes that as a

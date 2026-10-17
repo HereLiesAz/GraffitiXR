@@ -11,14 +11,15 @@ import org.opencv.imgproc.Imgproc
 import timber.log.Timber
 
 /**
- * The stencil tool: splits a design into three tonal sheets (black, grey, white) and renders the
- * ones asked for. It is the app's old StencilProcessor in a smaller form: the value channel is
- * simplified with a median blur, clustered into three tones, and each sheet's edge is closed 5x5 so
- * the cuts are smooth.
+ * The stencil tool: splits a design into three sheets (black, grey, white) and renders the ones
+ * asked for. It is the app's old StencilProcessor, restored: the value channel is simplified with
+ * a median blur, clustered into three tones, and each sheet's edge is closed 5x5 so the cuts are
+ * smooth.
  *
- * The sheets are sequential, as paint is: the black sheet covers the whole subject, the grey sheet
- * everything grey or lighter, the white sheet the lightest. What the view SHOWS is each tone's own
- * area ([StencilTones.shade]), so cycling through them shows where each colour goes.
+ * It decides first whether the image is dark or light (mean luminance, 0.299R + 0.587G + 0.114B
+ * over the opaque pixels; dark at 0.5 or below), and that picks the BASE sheet, the one covering
+ * the whole subject: black for a dark image, white for a light one. The other two sheets are laid
+ * over it, sequentially, as paint is (see [StencilTones.render]).
  *
  * Transparent pixels of the source stay transparent (an isolated subject keeps its cut-out).
  */
@@ -57,37 +58,58 @@ object StencilProcessor {
             v.get(0, 0, valueBytes)
             val alphaBytes = ByteArray(w * h) { 0xFF.toByte() }
             if (channels.size >= 4) channels[3].get(0, 0, alphaBytes)
+            // bitmapToMat gives RGBA channel order.
+            val rBytes = ByteArray(w * h).also { channels[0].get(0, 0, it) }
+            val gBytes = ByteArray(w * h).also { channels[1].get(0, 0, it) }
+            val bBytes = ByteArray(w * h).also { channels[2].get(0, 0, it) }
 
             val histogram = IntArray(256)
+            var lumaSum = 0.0
+            var opaque = 0
             for (i in valueBytes.indices) {
-                if ((alphaBytes[i].toInt() and 0xFF) > 0) histogram[valueBytes[i].toInt() and 0xFF]++
+                if ((alphaBytes[i].toInt() and 0xFF) > 0) {
+                    histogram[valueBytes[i].toInt() and 0xFF]++
+                    lumaSum += StencilTones.luma(
+                        rBytes[i].toInt() and 0xFF, gBytes[i].toInt() and 0xFF, bBytes[i].toInt() and 0xFF,
+                    )
+                    opaque++
+                }
             }
             val (lo, hi) = StencilTones.thresholds(histogram) ?: return null
+            val dark = StencilTones.isDark(if (opaque == 0) 0.0 else lumaSum / opaque)
 
-            // Sheets laid bottom to top: "grey or lighter" and "white".
+            // The two sheets laid over the base, closed so their edges are smooth. A dark image grows
+            // outwards from black (grey-or-lighter, then the lightest); a light one from white
+            // (grey-or-darker, then the darkest).
             val kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(CLOSE_KERNEL.toDouble(), CLOSE_KERNEL.toDouble()))
                 .also { mats.add(it) }
-            val greyUp = Mat().also { mats.add(it) }
-            val whiteUp = Mat().also { mats.add(it) }
-            Imgproc.threshold(v, greyUp, lo.toDouble(), 255.0, Imgproc.THRESH_BINARY)
-            Imgproc.threshold(v, whiteUp, hi.toDouble(), 255.0, Imgproc.THRESH_BINARY)
-            Imgproc.morphologyEx(greyUp, greyUp, Imgproc.MORPH_CLOSE, kernel)
-            Imgproc.morphologyEx(whiteUp, whiteUp, Imgproc.MORPH_CLOSE, kernel)
-            val greyBytes = ByteArray(w * h)
-            val whiteBytes = ByteArray(w * h)
-            greyUp.get(0, 0, greyBytes)
-            whiteUp.get(0, 0, whiteBytes)
+            val middle = Mat().also { mats.add(it) }
+            val top = Mat().also { mats.add(it) }
+            if (dark) {
+                Imgproc.threshold(v, middle, lo.toDouble(), 255.0, Imgproc.THRESH_BINARY)
+                Imgproc.threshold(v, top, hi.toDouble(), 255.0, Imgproc.THRESH_BINARY)
+            } else {
+                Imgproc.threshold(v, middle, hi.toDouble(), 255.0, Imgproc.THRESH_BINARY_INV)
+                Imgproc.threshold(v, top, lo.toDouble(), 255.0, Imgproc.THRESH_BINARY_INV)
+            }
+            Imgproc.morphologyEx(middle, middle, Imgproc.MORPH_CLOSE, kernel)
+            Imgproc.morphologyEx(top, top, Imgproc.MORPH_CLOSE, kernel)
+            val middleBytes = ByteArray(w * h)
+            val topBytes = ByteArray(w * h)
+            middle.get(0, 0, middleBytes)
+            top.get(0, 0, topBytes)
 
             val ranks = IntArray(w * h) { i ->
+                val onTop = topBytes[i].toInt() != 0
+                val onMiddle = onTop || middleBytes[i].toInt() != 0
                 when {
                     (alphaBytes[i].toInt() and 0xFF) == 0 -> StencilTones.NONE
-                    whiteBytes[i].toInt() != 0 -> StencilTones.WHITE
-                    greyBytes[i].toInt() != 0 -> StencilTones.GREY
-                    else -> StencilTones.BLACK
+                    dark -> if (onTop) StencilTones.WHITE else if (onMiddle) StencilTones.GREY else StencilTones.BLACK
+                    else -> if (onTop) StencilTones.BLACK else if (onMiddle) StencilTones.GREY else StencilTones.WHITE
                 }
             }
             val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-            out.setPixels(StencilTones.render(ranks, view), 0, w, 0, 0, w, h)
+            out.setPixels(StencilTones.render(ranks, view, dark), 0, w, 0, 0, w, h)
             out
         } catch (e: Exception) {
             Timber.e(e, "StencilProcessor: stencil failed")

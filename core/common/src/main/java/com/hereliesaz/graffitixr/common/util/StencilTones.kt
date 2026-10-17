@@ -63,23 +63,42 @@ object StencilTones {
         return lo to hi
     }
 
+    /** Luminance of an RGB pixel in 0..1, the weights the old stencil tool used. */
+    fun luma(r: Int, g: Int, b: Int): Double = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+
+    /** The old tool's light-or-dark call: mean luminance of 0.5 or below is dark. */
+    fun isDark(meanLuma: Double): Boolean = meanLuma <= 0.5
+
     /**
      * ARGB pixels for [ranks] (one of [NONE], [BLACK], [GREY], [WHITE] per pixel) as [view] shows
-     * them: ALL paints every tone; a single sheet paints only its own tone and leaves the rest
-     * transparent. [NONE] is always transparent.
+     * them, for an image judged [dark] or light.
+     *
+     * The sheets are laid sequentially, as paint is, starting from the BASE sheet that covers the
+     * whole subject: black for a dark image, white for a light one. Each later sheet covers the
+     * pixels of its tone and everything toward the far end:
+     *  - dark:  black = whole subject, grey = grey and lighter, white = the lightest;
+     *  - light: white = whole subject, grey = grey and darker, black = the darkest.
+     * ALL shows them stacked (every pixel in its own tone). A single view shows that one sheet, in
+     * its colour, and leaves the rest transparent. [NONE] is always transparent.
      */
-    fun render(ranks: IntArray, view: StencilView): IntArray = IntArray(ranks.size) { i ->
+    fun render(ranks: IntArray, view: StencilView, dark: Boolean): IntArray = IntArray(ranks.size) { i ->
         val rank = ranks[i]
+        val covered = rank != NONE
         val shown = when (view) {
-            StencilView.ALL -> rank != NONE
-            StencilView.BLACK -> rank == BLACK
-            StencilView.GREY -> rank == GREY
-            StencilView.WHITE -> rank == WHITE
+            StencilView.ALL -> covered
+            StencilView.BLACK -> covered && (if (dark) true else rank == BLACK)
+            StencilView.GREY -> covered && (if (dark) rank >= GREY else rank <= GREY)
+            StencilView.WHITE -> covered && (if (dark) rank == WHITE else true)
         }
-        if (!shown) 0 else when (rank) {
-            BLACK -> ARGB_BLACK
-            GREY -> ARGB_GREY
-            else -> ARGB_WHITE
+        if (!shown) 0 else when (view) {
+            StencilView.ALL -> when (rank) {
+                BLACK -> ARGB_BLACK
+                GREY -> ARGB_GREY
+                else -> ARGB_WHITE
+            }
+            StencilView.BLACK -> ARGB_BLACK
+            StencilView.GREY -> ARGB_GREY
+            StencilView.WHITE -> ARGB_WHITE
         }
     }
 }

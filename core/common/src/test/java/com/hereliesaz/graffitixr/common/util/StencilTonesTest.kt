@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.common.util
 import com.hereliesaz.graffitixr.common.model.StencilView
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -45,15 +46,40 @@ class StencilTonesTest {
     private val white = 0xFFFFFFFF.toInt()
 
     @Test
-    fun `all paints every tone and leaves cut-outs transparent`() {
-        assertArrayEquals(intArrayOf(0, black, grey, white), StencilTones.render(ranks, StencilView.ALL))
+    fun `a dark image is judged dark and a light one light`() {
+        assertTrue(StencilTones.isDark(0.5))
+        assertTrue(StencilTones.isDark(0.1))
+        assertFalse(StencilTones.isDark(0.51))
+        assertEquals(0.0, StencilTones.luma(0, 0, 0), 1e-9)
+        assertEquals(1.0, StencilTones.luma(255, 255, 255), 1e-9)
+        assertTrue("green outweighs blue", StencilTones.luma(0, 255, 0) > StencilTones.luma(0, 0, 255))
     }
 
     @Test
-    fun `each sheet paints only its own tone`() {
-        assertArrayEquals(intArrayOf(0, black, 0, 0), StencilTones.render(ranks, StencilView.BLACK))
-        assertArrayEquals(intArrayOf(0, 0, grey, 0), StencilTones.render(ranks, StencilView.GREY))
-        assertArrayEquals(intArrayOf(0, 0, 0, white), StencilTones.render(ranks, StencilView.WHITE))
+    fun `all stacks every tone and leaves cut-outs transparent either way`() {
+        val expected = intArrayOf(0, black, grey, white)
+        assertArrayEquals(expected, StencilTones.render(ranks, StencilView.ALL, dark = true))
+        assertArrayEquals(expected, StencilTones.render(ranks, StencilView.ALL, dark = false))
+    }
+
+    @Test
+    fun `a dark image starts from a black base then grey then white`() {
+        assertArrayEquals("black: the whole subject", intArrayOf(0, black, black, black),
+            StencilTones.render(ranks, StencilView.BLACK, dark = true))
+        assertArrayEquals("grey: grey and lighter", intArrayOf(0, 0, grey, grey),
+            StencilTones.render(ranks, StencilView.GREY, dark = true))
+        assertArrayEquals("white: the lightest", intArrayOf(0, 0, 0, white),
+            StencilTones.render(ranks, StencilView.WHITE, dark = true))
+    }
+
+    @Test
+    fun `a light image starts from a white base then grey then black`() {
+        assertArrayEquals("white: the whole subject", intArrayOf(0, white, white, white),
+            StencilTones.render(ranks, StencilView.WHITE, dark = false))
+        assertArrayEquals("grey: grey and darker", intArrayOf(0, grey, grey, 0),
+            StencilTones.render(ranks, StencilView.GREY, dark = false))
+        assertArrayEquals("black: the darkest", intArrayOf(0, black, 0, 0),
+            StencilTones.render(ranks, StencilView.BLACK, dark = false))
     }
 
     @Test
