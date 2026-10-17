@@ -245,6 +245,15 @@ public:
 
     /** Hard ceiling on stored wall marks — a memory guard on the self-grow append. */
     static constexpr size_t kMaxWallMarks = 5000;
+    // Fewer OUTSIDE marks than this and the partition is ignored for reloc matching: with almost no
+    // backbone nothing could localize, and paint marks (which only appear after a lock) could never
+    // bootstrap. Every stored mark is used instead until real backbone returns.
+    static constexpr int kMinBackboneMarks = 12;
+    // solvePnPRansac budget. 100 iterations at 0.99 fails a solvable frame about 4% of the time at a
+    // 50% inlier ratio and about a third of the time at 40%; the point sets here are small enough
+    // that more iterations are cheap.
+    static constexpr int kPnpRansacIterations = 300;
+    static constexpr double kPnpRansacConfidence = 0.995;
     // Teleological reference set: design features the wall has confirmed (painted), placed in the
     // fingerprint frame through the design's placement. Matched by the reloc PnP alongside the
     // backbone, so the more of the mural exists, the more the wall has to lock onto — and snap-back
@@ -458,7 +467,9 @@ public:
     void getAnchorTransform(float* outMat16) const;
     // [0..15]=pnpMat,16=inliers,17=matches,18=seq; with withSolveView, [19..34]=the GL view matrix
     // of the frame the PnP was solved on (published atomically with pnpMat under mMutex).
-    void getRelocResult(float* out, bool withSolveView) const;
+    // With withSpread, [35]=the inlier spread of that solve (fraction of the frame's area, or negative
+    // when not measured), published with the pose under the same lock.
+    void getRelocResult(float* out, bool withSolveView, bool withSpread = false) const;
     // Painted-design reference set (see kMaxPaintMarks). Blob: int32 rows, cols, type, then rows*3
     // floats (points), then the descriptor bytes. Empty vector when there are none.
     std::vector<uint8_t> exportPaintMarks() const;
@@ -893,6 +904,8 @@ private:
     std::atomic<int> mPnpInlierCount{0};
     std::atomic<int> mPnpMatchCount{0};
     std::atomic<long> mPnpResultSeq{0};
+    // Inlier spread of the published solve; written with the pose under mMutex. Negative = not measured.
+    float mPnpInlierSpread = -1.0f;
     // Identity of the stored wall fingerprint. Advanced (under mMutex) by every path that replaces or
     // clears it, via invalidateRelocResultLocked(). runRelocPass snapshots it with the fingerprint
     // and re-checks it under the same mutex before publishing, so a solve that was in flight when the
@@ -922,11 +935,11 @@ private:
     // Teleological self-grow: default OFF + the last reloc seq we grew from (only grow on a fresh,
     // confident relock so promoted marks are placed with a current pose, never a stale one).
     //
-    // OFF, not ON. This is the only mechanism in the engine that permanently mutates the
-    // authoritative reloc fingerprint, so a bad promotion is not a transient error — it is written
-    // into the map and compounds. tryUpdateFingerprint's own comment says it "stays OFF unless
-    // explicitly enabled"; the initializer said otherwise and the header won, which meant every
-    // release build promoted unsupervised with no user-facing switch to stop it.
+    // The ENGINE starts with it off: nothing is promoted until the app has restored the user's
+    // persisted choice and pushed it (SlamManager.setSelfGrowEnabled). The APP's default for that
+    // choice is ON (SettingsRepository.selfGrowEnabled): self-grow is what keeps relocalization
+    // alive as the original marks are painted over, and each promotion is gated (growTrusted) and
+    // reaches the reloc set. It can be switched off from the diagnostics overlay.
     std::atomic<bool> mSelfGrowEnabled{false};
 
     /**

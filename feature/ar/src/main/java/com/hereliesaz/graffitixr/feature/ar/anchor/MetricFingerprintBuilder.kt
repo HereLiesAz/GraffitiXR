@@ -268,7 +268,7 @@ object MetricFingerprintBuilder {
                 while (i + 1 < pos.size) { pixels.add(Pixel(pos[i], pos[i + 1])); i += 2 }
                 val (basePixels, baseDescs) = applyMask(mask, bitmap, pixels, descs)
                 val early = EarlyInstall(slam, cvView, intr, planePointWorld, planeNormalWorld, anchorModel,
-                    minPoints, glView, rotationDeg)
+                    minPoints, glView, rotationDeg, mask, bitmap.width, bitmap.height)
                 // Install the photo's own features straight away so relocalization starts now; the
                 // close-ups below only add to it.
                 if (features.closeUps) early.installBase(basePixels, baseDescs, bitmap)
@@ -280,7 +280,8 @@ object MetricFingerprintBuilder {
                 val fp = try {
                     ingestSingle(slam, mDescs, mPixels, cvView, intr,
                         planePointWorld, planeNormalWorld, anchorModel, minPoints, glView, rotationDeg,
-                        markCenterOverride = early.markCenter)
+                        markCenterOverride = early.markCenter,
+                        pinMask = mask, photoW = bitmap.width, photoH = bitmap.height)
                 } finally {
                     if (mDescs !== descs) mDescs.release()
                 }
@@ -308,7 +309,7 @@ object MetricFingerprintBuilder {
             val pixels = kp.toArray().map { Pixel(it.pt.x.toFloat(), it.pt.y.toFloat()) }
             val (basePixels, baseDescs) = applyMask(mask, bitmap, pixels, d)
             val early = EarlyInstall(slam, cvView, intr, planePointWorld, planeNormalWorld, anchorModel,
-                minPoints, glView, rotationDeg)
+                minPoints, glView, rotationDeg, mask, bitmap.width, bitmap.height)
             if (features.closeUps) early.installBase(basePixels, baseDescs, bitmap)
             val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps,
                 onQuickSet = { p, dd -> early.install(p, dd) }, firstStage = 2, stages = 3, stepsBefore = 1) { view, n ->
@@ -318,7 +319,8 @@ object MetricFingerprintBuilder {
             try {
                 return ingestSingle(slam, mDescs, mPixels, cvView, intr,
                     planePointWorld, planeNormalWorld, anchorModel, minPoints, glView, rotationDeg,
-                    markCenterOverride = early.markCenter)
+                    markCenterOverride = early.markCenter,
+                    pinMask = mask, photoW = bitmap.width, photoH = bitmap.height)
             } finally {
                 if (mDescs !== d) mDescs.release()
             }
@@ -339,6 +341,7 @@ object MetricFingerprintBuilder {
         private val planePointWorld: FloatArray, private val planeNormalWorld: FloatArray,
         private val anchorModel: FloatArray, private val minPoints: Int,
         private val glView: FloatArray, private val rotationDeg: Int,
+        private val pinMask: Bitmap?, private val photoW: Int, private val photoH: Int,
     ) {
         var markCenter: FloatArray? = null
             private set
@@ -354,7 +357,8 @@ object MetricFingerprintBuilder {
         fun install(pixels: List<Pixel>, descs: Mat) {
             val savedRefusal = lastRefusalReason
             val fp = ingestSingle(slam, descs, pixels, cvView, intr, planePointWorld, planeNormalWorld,
-                anchorModel, minPoints, glView, rotationDeg, markCenterOverride = markCenter)
+                anchorModel, minPoints, glView, rotationDeg, markCenterOverride = markCenter,
+                pinMask = pinMask, photoW = photoW, photoH = photoH)
             // A short first install is not a refusal: the final pass reports the real outcome.
             if (fp == null) lastRefusalReason = savedRefusal
             else if (markCenter == null) markCenter = fp.markCenterLocal.takeIf { it.isNotEmpty() }?.toFloatArray()
@@ -434,6 +438,23 @@ object MetricFingerprintBuilder {
         return keep.map { pixels[it] } to out
     }
 
+    /**
+     * Per feature, 1 where the artist's [mask] marks the pixel (alpha > 0): a tapped reference mark.
+     * All zero when there is no mask, since with nothing tapped there is nothing to pin.
+     */
+    private fun pinFlags(mask: Bitmap?, photoW: Int, photoH: Int, pixels: List<Pixel>): ByteArray {
+        val out = ByteArray(pixels.size)
+        if (mask == null || photoW <= 0 || photoH <= 0 || mask.width <= 0 || mask.height <= 0) return out
+        val sx = mask.width.toFloat() / photoW
+        val sy = mask.height.toFloat() / photoH
+        for (i in pixels.indices) {
+            val mx = (pixels[i].u * sx).toInt().coerceIn(0, mask.width - 1)
+            val my = (pixels[i].v * sy).toInt().coerceIn(0, mask.height - 1)
+            if (android.graphics.Color.alpha(mask.getPixel(mx, my)) > 0) out[i] = 1
+        }
+        return out
+    }
+
     /** Back-project the detected pixels onto the plane, keep the descriptors that hit, ingest. */
     private fun ingestSingle(
         slam: SlamManager,
@@ -449,6 +470,10 @@ object MetricFingerprintBuilder {
         rotationDeg: Int = 0,
         /** Overlay centre from an earlier partial install of this same capture; reused, not recomputed. */
         markCenterOverride: FloatArray? = null,
+        /** The artist's tapped marks, in the capture photo's pixels; recorded as [Fingerprint.pinned]. */
+        pinMask: Bitmap? = null,
+        photoW: Int = 0,
+        photoH: Int = 0,
     ): Fingerprint? {
         val res = MetricMarks.backProjectToPlane(
             pixelArray(pixels), cvView, planePointWorld, planeNormalWorld,
@@ -476,7 +501,20 @@ object MetricFingerprintBuilder {
         val anchorCam = RigidMath.multiply(cvView, anchorModel)
 
         // Center the AR overlay on the marks (their centroid), not the screen-center anchor.
-        val markCenterLocal = markCenterOverride ?: marksCentroidLocal(res.points, cvView, anchorModel)
+        // Which kept features are tapped reference marks (all of them, when the capture was masked to
+        // the tapped marks). The overlay is centred on them, as before.
+        val pinFlag = pinFlags(pinMask, photoW, photoH, pixels)
+        val pinnedKept = ByteArray(res.count) { i -> pinFlag[res.kept[i]] }
+        val pinnedPoints = FloatArray(pinnedKept.count { it.toInt() != 0 } * 3)
+        run {
+            var o = 0
+            for (i in 0 until res.count) if (pinnedKept[i].toInt() != 0) {
+                pinnedPoints[o] = res.points[i * 3]; pinnedPoints[o + 1] = res.points[i * 3 + 1]
+                pinnedPoints[o + 2] = res.points[i * 3 + 2]; o += 3
+            }
+        }
+        val markCenterLocal = markCenterOverride
+            ?: marksCentroidLocal(if (pinnedPoints.isNotEmpty()) pinnedPoints else res.points, cvView, anchorModel)
         slam.overlayMarkCenterLocal = markCenterLocal
 
         val keptDesc = Mat(res.count, descAll.cols(), descAll.type())
@@ -536,6 +574,7 @@ object MetricFingerprintBuilder {
             // IMPLEMENTATION.md 2.4 — the durable bridge from these points to wherever the artwork
             // ends up. Without it this fingerprint could never be partitioned at all.
             captureAnchorCam = anchorCam.toList(),
+            pinned = if (pinnedKept.any { it.toInt() != 0 }) pinnedKept else ByteArray(0),
         )
     }
 

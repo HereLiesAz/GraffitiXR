@@ -98,6 +98,17 @@ data class Fingerprint(
      * being permanently unpartitionable.
      */
     val captureAnchorCam: List<Float> = emptyList(),
+    /**
+     * Per point, `1` for a REFERENCE MARK the artist tapped at target creation, `0` for any other
+     * feature of the capture; empty when unknown (older projects, a capture with no tapped marks).
+     * 1:1 with the points when present.
+     *
+     * The partition forces these OUTSIDE (the backbone) wherever the design is placed, because they
+     * are the marks the artist chose to relocalize against, even when the design is laid over
+     * them. A capture is still masked to the tapped marks, so every stored point is normally
+     * pinned; any point that is not is classified by where the design falls, as before.
+     */
+    val pinned: ByteArray = ByteArray(0),
 ) {
     init {
         // Defensive: a corrupt or truncated project file must never construct a Fingerprint whose
@@ -133,6 +144,10 @@ data class Fingerprint(
         require(regions.isEmpty() || regions.size == points3d.size / 3) {
             "regions holds ${regions.size} tags but ${points3d.size / 3} points were supplied; " +
                 "the partition is indexed per point, so they must be 1:1 (or regions empty for legacy)"
+        }
+        require(pinned.isEmpty() || pinned.size == points3d.size / 3) {
+            "pinned holds ${pinned.size} flags but ${points3d.size / 3} points were supplied; " +
+                "it is indexed per point, so they must be 1:1 (or empty when unknown)"
         }
         // A 4x4 or nothing. A short list here would be read as a matrix by every consumer and index
         // past its end; a long one silently ignores whatever follows. Neither should reach a
@@ -193,6 +208,7 @@ data class Fingerprint(
         if (captureHalfW != other.captureHalfW) return false
         if (captureHalfH != other.captureHalfH) return false
         if (captureAnchorCam != other.captureAnchorCam) return false
+        if (!pinned.contentEquals(other.pinned)) return false
         return true
     }
 
@@ -210,6 +226,7 @@ data class Fingerprint(
         result = 31 * result + captureHalfW.hashCode()
         result = 31 * result + captureHalfH.hashCode()
         result = 31 * result + captureAnchorCam.hashCode()
+        result = 31 * result + pinned.contentHashCode()
         return result
     }
 

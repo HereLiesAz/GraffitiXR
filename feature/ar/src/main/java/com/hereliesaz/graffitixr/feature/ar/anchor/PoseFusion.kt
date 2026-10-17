@@ -46,6 +46,13 @@ class PoseFusion {
     // True until the first HARD relock after a (re)start or tracking loss, so a cold relock — out of a
     // pocket, screen back on — snaps instantly instead of easing in.
     private var coldStart = true
+    // A fix that diverges from what is drawn, without the confidence for a cold snap, is not trusted
+    // alone: repeated texture (brick, tile, a repeated motif) produces exactly these, and blending
+    // each one walked the overlay toward a false twin. It must be repeated, in agreement, by
+    // DIVERGED_AGREEMENT consecutive fixes before it is believed. [pendingDivergent] is the latest
+    // such fix (world-frame corrected anchor) and [divergentAgree] how many in a row agree with it.
+    private var pendingDivergent: FloatArray? = null
+    private var divergentAgree = 0
 
     // The KPM sidecar's fusion (agreement gating + anchor-local blend/snap). Shares [correction]:
     // false once the reloc path has written a correction the sidecar has not been handed yet.
@@ -79,6 +86,8 @@ class PoseFusion {
     fun reset(consumedRelocSeq: Float = 0f) {
         correction = null
         coldStart = true
+        pendingDivergent = null
+        divergentAgree = 0
         lastSeq = consumedRelocSeq
         lastHybridTimestampNs = Long.MIN_VALUE
         lastState = FusionState.WAITING_FOR_LOCK
@@ -145,6 +154,17 @@ class PoseFusion {
         const val COLD_SNAP_DIST_M = 0.20f
         /** Rotation gap (deg) that counts as a relock. */
         const val COLD_SNAP_ANGLE_DEG = 15f
+        /** Slot in the reloc payload holding the solve's inlier spread (fraction of the frame's area). */
+        const val RELOC_SPREAD_INDEX = 35
+        /**
+         * A cold snap also needs the inliers spread across at least this much of the frame (same value
+         * as native `kMinInlierSpread`). Inliers clustered in one corner can fit well and still leave
+         * the rotation badly constrained, so counts alone are not enough to swing the drawn pose.
+         * Negative (not measured, or a legacy payload without the slot) does not block.
+         */
+        const val MIN_SNAP_SPREAD = 0.04f
+        /** Consecutive agreeing fixes needed before a diverged, not-high-confidence fix is believed. */
+        const val DIVERGED_AGREEMENT = 3
 
         private fun identity() = floatArrayOf(1f,0f,0f,0f, 0f,1f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
 
@@ -284,9 +304,27 @@ class PoseFusion {
             // CURRENT world frame by carrying the stored local correction through the live backbone.
             val applied = correction?.let { RigidMath.multiply(backbone, it) }
             val cold = coldStart || applied == null || diverged(applied, corrected)
-            val highConf = inlierRatio >= COLD_SNAP_INLIER_RATIO && inliers >= COLD_SNAP_MIN_INLIERS
+            val spread = if (reloc.size > RELOC_SPREAD_INDEX) reloc[RELOC_SPREAD_INDEX] else -1f
+            val spreadOk = !(spread >= 0f) || spread >= MIN_SNAP_SPREAD   // unmeasured does not block
+            val highConf = inlierRatio >= COLD_SNAP_INLIER_RATIO && inliers >= COLD_SNAP_MIN_INLIERS && spreadOk
 
-            correction = if (cold && highConf) {
+            // A fix that diverges from the standing correction but lacks the confidence to snap: hold
+            // it until enough consecutive fixes agree. The first lock (no correction yet) and a
+            // tracking-loss relock (coldStart) are exempt, they have nothing to disagree with.
+            val needsAgreement = !coldStart && applied != null && cold && !highConf
+            var agreed = true
+            if (needsAgreement) {
+                val pending = pendingDivergent
+                if (pending != null && !diverged(pending, corrected)) divergentAgree++
+                else { pendingDivergent = corrected.copyOf(); divergentAgree = 1 }
+                agreed = divergentAgree >= DIVERGED_AGREEMENT
+            }
+            if (!needsAgreement || agreed) { pendingDivergent = null; divergentAgree = 0 }
+
+            correction = if (!agreed) {
+                lastState = FusionState.RELOCK_REFUSED
+                correction              // the standing correction is unchanged
+            } else if (cold && highConf) {
                 coldStart = false
                 lastState = FusionState.COLD_SNAP
                 lastAlpha = -1f          // a snap has no blend rate; -1 says so rather than 1.0
@@ -298,8 +336,10 @@ class PoseFusion {
                 lastAlpha = alpha
                 blend(correction ?: identity(), newLocal, alpha)
             }
-            hybridInSync = false
-            snapsAccepted++
+            if (agreed) {
+                hybridInSync = false
+                snapsAccepted++
+            }
         } else if (isNew && correction != null) {
             // A relock reached fusion THIS tick and was refused by MIN_INLIER_RATIO (above), but a
             // standing correction from an earlier accepted relock already exists. Distinct from the

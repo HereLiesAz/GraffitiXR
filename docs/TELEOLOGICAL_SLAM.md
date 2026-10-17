@@ -26,12 +26,18 @@ on top of the OpenCV relocalizer:
      `ArViewModel` loads it unconditionally on every AR session
      (`slamManager.loadDistortionHead`). When it is loaded — which is the
      default, out-of-the-box state — `MobileGS::runRelocPass` (the block
-     guarded by `mDistortionHead.isLoaded()`) is the sole producer of both
-     `mPaintingProgress` and `mCorroborationConfidence`: it crops the live
-     frame around the coarse match centroid, runs it against the wall's
-     canonical patch, and reads `coverage`/`matchability` straight off the
-     model's output (`dist[12]`/`dist[11]`), gated at `matchability > 0.5f`.
-     See `docs/DISTORTION_HEAD.md`.
+     guarded by `mDistortionHead.isLoaded()`) crops the live frame around the
+     coarse match centroid, runs it against the wall's canonical patch, and
+     reads `matchability` (`dist[11]`) off the model's output as the
+     corroboration confidence, gated at `matchability > 0.5f`. Its `coverage`
+     output is discarded (`(void)clampedCoverage`): it is the visible fraction
+     of the ORIGINAL marks, which falls as they are painted over, so it is not
+     progress. Progress always comes from `tryUpdateFingerprint`. Because
+     matchability is measured against those same original marks, it too falls
+     as they are covered; `tryUpdateFingerprint` therefore also computes the
+     design-based descriptor ratio (matched / predicted-visible) on a gated
+     attempt, and the published confidence is the stronger of the two. See
+     `docs/DISTORTION_HEAD.md`.
    - `MobileGS::tryUpdateFingerprint`'s descriptor-similarity test (below,
      "What matching the image does and does not mean") is the fallback: it
      only runs — and only then, via the `!mDistortionHead.isLoaded()` guard
@@ -58,9 +64,10 @@ on top of the OpenCV relocalizer:
    nothing else and correction strength was identical at 0% and 100% painted.)
 
 4. **Self-grow.** Live features that pass the same corroboration test are
-   promoted into the reloc fingerprint (`mSelfGrowEnabled`, default **on**; switchable from the
-   diagnostic overlay), so
-   relocalization survives the original marks being painted over. The promotion
+   promoted into the reloc fingerprint (`mSelfGrowEnabled`: the engine starts with it off and
+   the app pushes the persisted setting, default **on**, switchable from the diagnostic overlay).
+   Promoted marks are placed where they were SEEN and tagged OUTSIDE, so the reloc filter uses
+   them, and relocalization survives the original marks being painted over. The promotion
    gate is `MobileGS::growTrusted` — a strong inlier ratio qualifies at a lower
    absolute count, because a half-covered wall rarely reaches a large raw inlier
    count and the old flat `inliers >= 20` meant the fingerprint could only grow
@@ -230,3 +237,26 @@ using the wall's normal learned at earlier locks and saved with the project.
 
 ---
 *Documentation updated on 2026-10-12: added Anticipation (half-sphere views of the KPM page, close-ups first). Earlier: 2026-09-04 (later pass): corrected the mechanism section — the bundled ONNX distortion head, not the descriptor-similarity test, is the producer of `mPaintingProgress`/`mCorroborationConfidence` in a normal (asset-present) install; the descriptor test only runs as a fallback when that asset is stripped. Earlier same-day pass corrected the confGlobal formula's input (corroboration confidence, not painting progress), self-grow's actual default (off, not on), the corroboration Lowe ratio (0.85, not 0.75), and removed a stale reference to the deleted voxel/splat map. Prior update: 2026-06-22, SLAM right-size and documentation-accuracy pass.*
+
+## The reference marks and the design (current flow)
+
+The artist taps their painted reference marks and the capture is masked to them, as before. Those
+tapped marks are recorded per point as `Fingerprint.pinned`. When the design is placed,
+`FingerprintPartition` forces the pinned marks OUTSIDE (the backbone the relocalizer matches against)
+wherever the design falls, instead of classifying them INSIDE just because the design is laid over
+them. Any point that is not pinned is classified by where the design falls. If the backbone is still
+tiny (fewer than `kMinBackboneMarks` OUTSIDE marks) native ignores the partition for matching rather
+than sitting at FEW_MATCHES forever.
+
+Other behaviour worth knowing:
+- A repartition (design nudged) keeps marks self-grow appended and the distortion head's patch: the
+  Kotlin copy it re-pushes is only the base, and native treats "base is a prefix of what I hold" as
+  the same fingerprint.
+- Corroboration needs `kCorrobConfirmations` CONSECUTIVE hits for a feature predicted in view;
+  an observed miss resets an unconfirmed feature. Moving the design resets corroboration; paint marks
+  already on the wall are kept. Paint marks store the LIVE descriptor that corroborated them.
+- `PoseFusion` believes a diverged, not-high-confidence fix only after three consecutive agreeing
+  fixes, and a cold snap needs the inliers spread across the frame (`reloc[35]`, published with the
+  pose).
+- Return-visit anchors are refused when the solved wall's orientation disagrees with the saved wall
+  normal (`WallOrientationCheck`).
