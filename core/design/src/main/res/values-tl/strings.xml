@@ -492,4 +492,8 @@
     <string name="nav_cv_view">CV view</string>
     <string name="nav_cv_view_info">Ipinapakita ang lahat ng hinahanap ng computer vision, iginuhit sa ibabaw ng disenyo mo. Bawat kulay ay isang paraan ng paghahanap; ang guwang na singsing ay naghihintay pa ng sagot ng pader at ang puno na tuldok ay nahanap na. I-tap muli para itago.</string>
     <string name="nav_cv_legend_title">Hinahanap</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">Hindi ma-save ang larawan ng malinis na pader. Kunan ulit.</string>
+    <string name="ar_feedback_clean_wall_register_failed">Hindi tugma ang larawang iyon ng malinis na pader sa pader na ito. Kunan ulit mula sa lugar na halos kung saan ka tatayo.</string>
 </resources>

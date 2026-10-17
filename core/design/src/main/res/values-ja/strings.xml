@@ -794,4 +794,8 @@
     <string name="nav_cv_view">CVビュー</string>
     <string name="nav_cv_view_info">コンピュータビジョンが探しているものをすべて、デザインの上に表示します。色は探し方ごとに異なり、中が空の輪は壁からの応答待ち、塗りつぶしの点は見つかったものです。もう一度タップすると隠します。</string>
     <string name="nav_cv_legend_title">探しているもの</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">きれいな壁の写真を保存できませんでした。もう一度撮影してください。</string>
+    <string name="ar_feedback_clean_wall_register_failed">このきれいな壁の写真は、この壁と一致しません。作業する位置あたりから撮り直してください。</string>
 </resources>

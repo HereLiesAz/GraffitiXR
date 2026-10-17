@@ -777,4 +777,8 @@
     <string name="nav_cv_view">CV-Ansicht</string>
     <string name="nav_cv_view_info">Zeigt alles, wonach das Computer-Sehen sucht, über deinem Motiv. Jede Farbe ist eine Art des Suchens; ein hohler Ring wartet noch auf die Antwort der Wand, ein gefüllter Punkt wurde gefunden. Erneut tippen zum Ausblenden.</string>
     <string name="nav_cv_legend_title">Gesucht</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">Das Foto der sauberen Wand konnte nicht gespeichert werden. Nimm es erneut auf.</string>
+    <string name="ar_feedback_clean_wall_register_failed">Das Foto der sauberen Wand passt nicht zu dieser Wand. Nimm es ungefähr von dort auf, wo du stehen wirst.</string>
 </resources>

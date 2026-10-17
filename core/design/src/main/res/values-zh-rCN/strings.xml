@@ -794,4 +794,8 @@
     <string name="nav_cv_view">CV 视图</string>
     <string name="nav_cv_view_info">在设计上叠加显示计算机视觉正在寻找的一切。每种颜色代表一种查找方式；空心圆环表示仍在等待墙面回应，实心圆点表示已找到。再次点击可隐藏。</string>
     <string name="nav_cv_legend_title">正在寻找</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">无法保存干净墙面的照片。请重新拍摄。</string>
+    <string name="ar_feedback_clean_wall_register_failed">这张干净墙面的照片与当前墙面对不上。请从大致你将要站的位置重新拍摄。</string>
 </resources>

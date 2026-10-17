@@ -777,4 +777,8 @@
     <string name="nav_cv_view">Vista CV</string>
     <string name="nav_cv_view_info">Muestra todo lo que busca la visión por computadora, dibujado sobre tu diseño. Cada color es una forma de buscar; un anillo hueco aún espera la respuesta de la pared y un punto lleno ya se encontró. Toca de nuevo para ocultarla.</string>
     <string name="nav_cv_legend_title">Buscando</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">No se pudo guardar la foto de la pared limpia. Vuelve a tomarla.</string>
+    <string name="ar_feedback_clean_wall_register_failed">Esa foto de la pared limpia no coincide con esta pared. Repítela desde donde vas a estar.</string>
 </resources>

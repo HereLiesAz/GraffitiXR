@@ -777,4 +777,8 @@
     <string name="nav_cv_view">Vista CV</string>
     <string name="nav_cv_view_info">Mostra tutto ciò che la visione artificiale sta cercando, disegnato sul tuo disegno. Ogni colore è un modo di cercare; un anello vuoto attende ancora la risposta del muro e un punto pieno è stato trovato. Tocca di nuovo per nasconderla.</string>
     <string name="nav_cv_legend_title">In cerca di</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">Impossibile salvare la foto del muro pulito. Scattala di nuovo.</string>
+    <string name="ar_feedback_clean_wall_register_failed">Quella foto del muro pulito non coincide con questo muro. Rifalla più o meno da dove starai.</string>
 </resources>

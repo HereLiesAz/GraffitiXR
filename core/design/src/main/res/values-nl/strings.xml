@@ -782,4 +782,8 @@
     <string name="nav_cv_view">CV-weergave</string>
     <string name="nav_cv_view_info">Toont alles waar de computervisie naar zoekt, over je ontwerp heen. Elke kleur is een manier van zoeken; een holle ring wacht nog op antwoord van de muur en een gevulde stip is gevonden. Tik nogmaals om te verbergen.</string>
     <string name="nav_cv_legend_title">Zoekt naar</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">De foto van de schone muur kon niet worden bewaard. Maak hem opnieuw.</string>
+    <string name="ar_feedback_clean_wall_register_failed">Die foto van de schone muur sluit niet aan op deze muur. Maak hem opnieuw vanaf ongeveer waar je gaat staan.</string>
 </resources>

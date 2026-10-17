@@ -513,4 +513,8 @@
     <string name="nav_cv_view">Vue CV</string>
     <string name="nav_cv_view_info">Affiche tout ce que la vision par ordinateur recherche, dessiné sur votre motif. Chaque couleur est une façon de chercher ; un anneau vide attend encore la réponse du mur et un point plein a été trouvé. Touchez à nouveau pour la masquer.</string>
     <string name="nav_cv_legend_title">Recherché</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">Impossible d’enregistrer la photo du mur propre. Reprenez-la.</string>
+    <string name="ar_feedback_clean_wall_register_failed">Cette photo du mur propre ne correspond pas à ce mur. Reprenez-la à peu près d’où vous serez.</string>
 </resources>

@@ -677,7 +677,7 @@ class MainActivity : AppCompatActivity() {
                 val pendingCleanWall = arUiState.cleanWallBitmap
                 LaunchedEffect(pendingCleanWall) {
                     if (pendingCleanWall != null) {
-                        mainViewModel.saveCleanWallPhoto(pendingCleanWall) { arViewModel.onCleanWallPhotoPersisted() }
+                        mainViewModel.saveCleanWallPhoto(pendingCleanWall) { saved -> arViewModel.onCleanWallPhotoPersisted(saved) }
                     }
                 }
 

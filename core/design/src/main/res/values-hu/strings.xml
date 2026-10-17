@@ -782,4 +782,8 @@
     <string name="nav_cv_view">CV nézet</string>
     <string name="nav_cv_view_info">Megmutatja mindazt, amit a számítógépes látás keres, a mintád fölé rajzolva. Minden szín egy keresési mód; az üres gyűrű még várja a fal válaszát, a teli pont már megvan. Koppints újra az elrejtéshez.</string>
     <string name="nav_cv_legend_title">Keresett</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">Nem sikerült menteni a tiszta fal fotóját. Készítsd el újra.</string>
+    <string name="ar_feedback_clean_wall_register_failed">Ez a tiszta fal fotó nem illik ehhez a falhoz. Készítsd el újra nagyjából onnan, ahol majd állni fogsz.</string>
 </resources>

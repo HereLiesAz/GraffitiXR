@@ -782,4 +782,8 @@
     <string name="nav_cv_view">CV-vy</string>
     <string name="nav_cv_view_info">Visar allt datorseendet letar efter, ritat över motivet. Varje färg är ett sätt att leta; en ihålig ring väntar fortfarande på väggens svar och en fylld prick har hittats. Tryck igen för att dölja.</string>
     <string name="nav_cv_legend_title">Letar efter</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">Det gick inte att spara fotot av den rena väggen. Ta det igen.</string>
+    <string name="ar_feedback_clean_wall_register_failed">Fotot av den rena väggen passar inte den här väggen. Ta det igen ungefär därifrån du kommer att stå.</string>
 </resources>

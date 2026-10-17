@@ -88,6 +88,13 @@ region has the shape of the design. Colour plays no part in the second question.
 - **The switch** is in **Settings** (not the diagnostics overlay), **off by default**, and nothing
   but the user turns it on (`SettingsRepository.changePassEnabled`). Even on, the pass judges
   nothing without a registered clean-wall photo.
+- **Where it can run**: it needs the capture photo and a fingerprint whose frame is the capture
+  camera's (an ARCore target made by the metric/plane path, or a project reloaded with its capture
+  photo). A standalone SphereSLAM target, or an ARCore target made by a path that never installs the
+  capture photo, has neither, so the pass judges nothing there; the clean-wall photo is still kept.
+  A photo that cannot be registered (too few features, too different a view) is reported at once so
+  it can be retaken. The part of the capture photo the registered clean-wall photo does not reach is
+  no-data, never a repeat of its edge colour.
 - **Shape rule** (`ShapeMatch.h`, unit-tested): a connected region of changed cells is paint when it
   lies inside the design (at most a quarter of its cells outside) and the design patches it touches
   are complete (nearly all seen cells changed), untouched, or few: at most two partial, or less than

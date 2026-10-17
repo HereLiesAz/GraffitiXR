@@ -782,4 +782,8 @@
     <string name="nav_cv_view">Вид CV</string>
     <string name="nav_cv_view_info">Показывает всё, что ищет компьютерное зрение, поверх вашего рисунка. Каждый цвет — это один способ поиска; пустое кольцо всё ещё ждёт ответа стены, закрашенная точка уже найдена. Нажмите ещё раз, чтобы скрыть.</string>
     <string name="nav_cv_legend_title">Ищем</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">Не удалось сохранить фото чистой стены. Снимите его заново.</string>
+    <string name="ar_feedback_clean_wall_register_failed">Это фото чистой стены не совпадает с этой стеной. Переснимите примерно с того места, где будете стоять.</string>
 </resources>

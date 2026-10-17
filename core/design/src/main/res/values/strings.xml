@@ -799,4 +799,8 @@
     <string name="nav_cv_view">CV view</string>
     <string name="nav_cv_view_info">Shows everything the computer vision is looking for, drawn over your design. Each colour is one way of looking; a hollow ring is still waiting for the wall to answer and a filled dot has been found. Tap again to hide it.</string>
     <string name="nav_cv_legend_title">Looking for</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">Couldn\'t save the clean-wall photo. Take it again.</string>
+    <string name="ar_feedback_clean_wall_register_failed">That clean-wall photo doesn\'t line up with this wall. Retake it from about where you will stand.</string>
 </resources>

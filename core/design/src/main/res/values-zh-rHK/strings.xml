@@ -782,4 +782,8 @@
     <string name="nav_cv_view">CV 檢視</string>
     <string name="nav_cv_view_info">喺設計上疊加顯示電腦視覺正在尋找嘅一切。每種顏色代表一種尋找方式；空心圓環代表仍在等牆面回應，實心圓點代表已經搵到。再點按一次可隱藏。</string>
     <string name="nav_cv_legend_title">尋找中</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">無法儲存乾淨牆面嘅相片。請重新影過。</string>
+    <string name="ar_feedback_clean_wall_register_failed">呢張乾淨牆面嘅相片同而家嘅牆面對唔上。請喺大約你會企嘅位置重新影過。</string>
 </resources>

@@ -5573,6 +5573,7 @@ class ArViewModel @Inject constructor(
 
     // The next frame captured is the clean-wall photo, not a target (see requestCleanWallPhoto).
     @Volatile private var cleanWallPending = false
+    @Volatile private var cleanWallRequestedAtMs = 0L
 
     /**
      * One tap: photograph the bare wall as it is now. The next captured frame becomes the clean-wall
@@ -5581,12 +5582,24 @@ class ArViewModel @Inject constructor(
     fun requestCleanWallPhoto() {
         if (_uiState.value.coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) return
         cleanWallPending = true
+        cleanWallRequestedAtMs = android.os.SystemClock.elapsedRealtime()
         requestCapture()
     }
 
-    /** The app layer has saved [ArUiState.cleanWallBitmap] to the project. */
-    fun onCleanWallPhotoPersisted() {
-        _uiState.update { it.copy(cleanWallBitmap = null) }
+    /**
+     * The app layer has tried to save [ArUiState.cleanWallBitmap] to the project. On failure the photo
+     * is not kept and the artist is told, so nothing claims a reference that will vanish on restart.
+     */
+    fun onCleanWallPhotoPersisted(saved: Boolean = true) {
+        _uiState.update { it.copy(cleanWallBitmap = null, hasCleanWall = if (saved) it.hasCleanWall else false) }
+        if (!saved) {
+            slamManager.clearCleanWallImage()
+            _feedback.tryEmit(
+                com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                    appContext.getString(DesignR.string.ar_feedback_clean_wall_save_failed),
+                ),
+            )
+        }
     }
 
     fun onTargetCaptured(
@@ -5609,8 +5622,12 @@ class ArViewModel @Inject constructor(
         environment: com.hereliesaz.graffitixr.common.model.CaptureEnvironment =
             com.hereliesaz.graffitixr.common.model.CaptureEnvironment(),
     ) {
-        if (cleanWallPending) {
-            cleanWallPending = false
+        // The latch belongs to ONE request: a capture that failed or was cancelled must not leave it up to
+        // swallow the next ordinary target capture, so it only counts shortly after the tap.
+        val cleanWallRequested = cleanWallPending &&
+            android.os.SystemClock.elapsedRealtime() - cleanWallRequestedAtMs < CLEAN_WALL_REQUEST_WINDOW_MS
+        cleanWallPending = false
+        if (cleanWallRequested) {
             onCaptureRequestHandled()
             slamManager.setMappingPaused(false)
             viewModelScope.launch(dispatchers.default) {
@@ -5620,6 +5637,15 @@ class ArViewModel @Inject constructor(
                 } else bitmap
                 slamManager.setCleanWallImage(upright)
                 _uiState.update { it.copy(cleanWallBitmap = upright, hasCleanWall = true) }
+                // Registered against the capture photo straight away only when one exists; if it could not
+                // be registered, say so while the artist can still retake it.
+                if (slamManager.cleanWallStatus() == SlamManager.CleanWallStatus.FAILED) {
+                    _feedback.tryEmit(
+                        com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                            appContext.getString(DesignR.string.ar_feedback_clean_wall_register_failed),
+                        ),
+                    )
+                }
             }
             return
         }
@@ -5748,6 +5774,7 @@ class ArViewModel @Inject constructor(
      * erases and release the eraser's pixel buffers, so none of it lands on the NEXT capture's mask.
      */
     private fun resetCapturePipeline() {
+        cleanWallPending = false
         captureComputeJob?.cancel()
         captureComputeJob = null
         // FIRST: from here every sample queued for the discarded capture (including a batch a drain
@@ -6160,6 +6187,8 @@ class ArViewModel @Inject constructor(
 
     // --- Doodle demo: headless fingerprint build ---
     internal companion object {
+        /** A clean-wall photo request counts only for the capture that follows it this closely. */
+        private const val CLEAN_WALL_REQUEST_WINDOW_MS = 5_000L
         /** cos 2°: a learned wall normal is saved again only once it has moved more than this. */
         private const val WALL_NORMAL_RESAVE_COS = 0.99939f
         /** How long a Measure tap waits for the GL thread to resolve it. */
