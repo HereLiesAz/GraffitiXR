@@ -84,6 +84,46 @@ class StencilTonesTest {
         assertEquals(listOf(StencilTones.WHITE, StencilTones.GREY, StencilTones.BLACK), StencilTones.sheetOrder(false))
     }
 
+    private fun flags(vararg v: Int) = BooleanArray(v.size) { v[it] != 0 }
+
+    @Test
+    fun `the base is the complete silhouette, holes included, and nothing outside it`() {
+        // pixel 0 outside, 1 a hole in the cut-out (not observed, inside the silhouette), 2 and 3 subject
+        val silhouette = flags(0, 1, 1, 1)
+        val observed = flags(0, 0, 1, 1)
+        val none = flags(0, 0, 0, 0)
+        for (dark in listOf(true, false)) {
+            val r = StencilTones.ranks(silhouette, observed, none, none, dark)
+            val base = if (dark) StencilTones.BLACK else StencilTones.WHITE
+            assertArrayEquals(intArrayOf(StencilTones.NONE, base, base, base), r)
+            // The base sheet shows exactly the silhouette.
+            val shown = StencilTones.render(r, StencilView.BASE, dark).map { it != 0 }
+            assertEquals(listOf(false, true, true, true), shown)
+        }
+    }
+
+    @Test
+    fun `an uncut image has the whole frame as its silhouette`() {
+        val all = flags(1, 1, 1, 1)
+        val r = StencilTones.ranks(all, all, flags(0, 0, 1, 1), flags(0, 0, 0, 1), dark = true)
+        assertTrue(r.all { it != StencilTones.NONE })
+    }
+
+    @Test
+    fun `the midtone covers at least as much as the secondary, even if its own mask says otherwise`() {
+        // The secondary mask has a pixel (index 3) the midtone mask lacks.
+        val all = flags(1, 1, 1, 1)
+        val middle = flags(0, 1, 1, 0)
+        val top = flags(0, 0, 1, 1)
+        for (dark in listOf(true, false)) {
+            val r = StencilTones.ranks(all, all, middle, top, dark)
+            val mid = StencilTones.render(r, StencilView.MIDTONE, dark).map { it != 0 }
+            val sec = StencilTones.render(r, StencilView.SECONDARY, dark).map { it != 0 }
+            for (i in sec.indices) assertTrue("pixel $i is secondary but not midtone (dark=$dark)", !sec[i] || mid[i])
+            assertTrue(mid.count { it } >= sec.count { it })
+        }
+    }
+
     @Test
     fun `the cycler steps all, base, midtone, secondary and wraps`() {
         assertEquals(StencilView.BASE, StencilView.ALL.next())

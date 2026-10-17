@@ -5,7 +5,10 @@ import android.graphics.Bitmap
 import com.hereliesaz.graffitixr.common.model.StencilView
 import org.opencv.android.Utils
 import org.opencv.core.Core
+import org.opencv.core.CvType
 import org.opencv.core.Mat
+import org.opencv.core.Point
+import org.opencv.core.Scalar
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 import timber.log.Timber
@@ -31,6 +34,33 @@ object StencilProcessor {
 
     private const val MEDIAN_KERNEL = 9
     private const val CLOSE_KERNEL = 5
+
+    /**
+     * [observed] (the pixels the cut-out kept) with its gaps closed and its enclosed holes filled:
+     * the subject's complete silhouette. Holes are what the flood from the frame's edge cannot reach.
+     */
+    private fun filledSilhouette(observed: BooleanArray, w: Int, h: Int, mats: MutableList<Mat>): BooleanArray {
+        val mask = Mat(h, w, CvType.CV_8UC1).also { mats.add(it) }
+        mask.put(0, 0, ByteArray(w * h) { if (observed[it]) 0xFF.toByte() else 0 })
+        val kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(CLOSE_KERNEL.toDouble(), CLOSE_KERNEL.toDouble()))
+            .also { mats.add(it) }
+        Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, kernel)
+        // A one-pixel border of background, so the flood from the corner reaches around the subject.
+        val padded = Mat().also { mats.add(it) }
+        Core.copyMakeBorder(mask, padded, 1, 1, 1, 1, Core.BORDER_CONSTANT, Scalar(0.0))
+        val floodMask = Mat.zeros(h + 4, w + 4, CvType.CV_8UC1).also { mats.add(it) }
+        Imgproc.floodFill(padded, floodMask, Point(0.0, 0.0), Scalar(255.0))
+        val flooded = ByteArray((w + 2) * (h + 2))
+        padded.get(0, 0, flooded)
+        val closed = ByteArray(w * h)
+        mask.get(0, 0, closed)
+        return BooleanArray(w * h) { i ->
+            val x = i % w
+            val y = i / w
+            // Not reached by the flood from outside = inside the silhouette.
+            closed[i].toInt() != 0 || flooded[(y + 1) * (w + 2) + (x + 1)].toInt() == 0
+        }
+    }
 
     /**
      * @return the design rendered as [view], an ARGB_8888 bitmap the size of [bitmap] together with
@@ -103,15 +133,18 @@ object StencilProcessor {
             middle.get(0, 0, middleBytes)
             top.get(0, 0, topBytes)
 
-            val ranks = IntArray(w * h) { i ->
-                val onTop = topBytes[i].toInt() != 0
-                val onMiddle = onTop || middleBytes[i].toInt() != 0
-                when {
-                    (alphaBytes[i].toInt() and 0xFF) == 0 -> StencilTones.NONE
-                    dark -> if (onTop) StencilTones.WHITE else if (onMiddle) StencilTones.GREY else StencilTones.BLACK
-                    else -> if (onTop) StencilTones.BLACK else if (onMiddle) StencilTones.GREY else StencilTones.WHITE
-                }
-            }
+            // The base is the complete silhouette of the subject: every pixel the cut-out kept, plus
+            // any hole inside it filled in. With no cut-out (background removal found nothing) the
+            // image is fully opaque and the silhouette is the whole frame.
+            val observed = BooleanArray(w * h) { (alphaBytes[it].toInt() and 0xFF) > 0 }
+            val silhouette = filledSilhouette(observed, w, h, mats)
+            val ranks = StencilTones.ranks(
+                silhouette = silhouette,
+                observed = observed,
+                middle = BooleanArray(w * h) { middleBytes[it].toInt() != 0 },
+                top = BooleanArray(w * h) { topBytes[it].toInt() != 0 },
+                dark = dark,
+            )
             val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
             out.setPixels(StencilTones.render(ranks, view, dark), 0, w, 0, 0, w, h)
             StencilResult(out, dark)

@@ -63,6 +63,41 @@ object StencilTones {
         return lo to hi
     }
 
+    /**
+     * The tone of every pixel, from the three masks the processor builds. Two rules are enforced
+     * here, not left to how the masks happen to overlap:
+     *  - the BASE is the complete silhouette: every pixel of [silhouette] gets at least the base
+     *    tone, and none outside it is covered. A silhouette pixel that was not in [observed] (a hole
+     *    in the cut-out, filled in) has no colour of its own, so it takes the base tone and nothing
+     *    else;
+     *  - the MIDTONE covers at least the secondary: a pixel on [top] is also in the midtone, whatever
+     *    [middle] says, so the midtone's area is never smaller than the secondary's.
+     * [middle] and [top] follow the base's direction: for a dark image they are the grey-or-lighter
+     * and the lightest areas; for a light one, the grey-or-darker and the darkest.
+     */
+    fun ranks(
+        silhouette: BooleanArray,
+        observed: BooleanArray,
+        middle: BooleanArray,
+        top: BooleanArray,
+        dark: Boolean,
+    ): IntArray {
+        require(silhouette.size == observed.size && silhouette.size == middle.size && silhouette.size == top.size) {
+            "all masks must cover the same pixels"
+        }
+        val baseTone = if (dark) BLACK else WHITE
+        val secondaryTone = if (dark) WHITE else BLACK
+        return IntArray(silhouette.size) { i ->
+            when {
+                !silhouette[i] -> NONE
+                !observed[i] -> baseTone
+                top[i] -> secondaryTone
+                middle[i] -> GREY
+                else -> baseTone
+            }
+        }
+    }
+
     /** Luminance of an RGB pixel in 0..1, the weights the old stencil tool used. */
     fun luma(r: Int, g: Int, b: Int): Double = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
 

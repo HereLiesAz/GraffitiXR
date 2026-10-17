@@ -372,6 +372,10 @@ The design can be split into three tonal sheets: black, grey and white.
 - **Sheets** are sequential, as paint is. Dark image: black = the whole subject, grey = grey and
   lighter, white = the lightest. Light image: white = the whole subject, grey = grey and darker,
   black = the darkest.
+- **Invariants** (`StencilTones.ranks`, unit-tested): the base is always the complete silhouette of
+  the isolated subject, holes in the cut-out filled in; if the background could not be removed, the
+  silhouette is the whole frame. The midtone always covers at least the secondary: a secondary
+  pixel is a midtone pixel, so the midtone's area is never smaller.
 - **Views**: All stacks the sheets (every pixel in its own tone). Base, Midtone or Secondary shows that
   one sheet in its colour and leaves the rest transparent.
 - The same method also drives the `stencil3` filter of the SLAM passes (`docs/PASSES.md`).
