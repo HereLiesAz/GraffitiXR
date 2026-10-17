@@ -538,6 +538,23 @@ ARDIAG overlayBasis path=capturedPlane det=1.00 xRight=0.98 yUp=0.97 zToCam=0.99
   The renderer assumes both are positive.
 - `corrApplied` / `corrPending`: whether the one-time orientation correction has been accepted yet.
 
+### 7.3b `ARDIAG perf` (logcat)
+
+Two log-only lines, once a minute, for tracing a battery or heat complaint. They change nothing.
+
+~~~
+ARDIAG perf reloc: passes=292 avgPassMs=41.3 avgMatchMs=6.2 busy=20% locked=1 backoffMs=200
+ARDIAG perf anticipation: frames=1760 avgWorkMs=11.4 searchable=246 builtThisMinute=0 renderMs=0
+~~~
+
+- `reloc` (native, the relocalization thread): `passes` per minute, `avgPassMs` for a whole pass (detect, solve,
+  match), `avgMatchMs` for the progress matching inside it (the passes' gated matching and the paint grid),
+  `busy` the share of the minute the thread spent inside a pass, and whether it is locked (the longer back-off) with
+  the back-off in use.
+- `anticipation` (Kotlin, the tracking thread): `frames` seen, `avgWorkMs` the tracking work per frame, `searchable`
+  the anticipated views the tracker is searching, `builtThisMinute` and `renderMs` the views rendered this minute and
+  the time that took (non-zero only while the build is running).
+
 ### 7.4 Diagnostic overlays (editor toggles)
 
 Runtime visualization toggles for debugging tracking, each independently settable from Settings ▸ Developer.
