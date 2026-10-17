@@ -808,6 +808,7 @@ private:
     // The filters' targets are made on a worker thread, cheapest first (designfilters::kBuildOrder), each
     // installed as soon as it is ready; a pass whose targets are not there yet simply has no data.
     std::thread mFilterThread;
+    std::mutex mFilterThreadMutex;   // guards mFilterThread: two registrations must not start/join it at once
     std::atomic<bool> mFilterCancel{false};
     void startFilterBuild(cv::Mat composite, cv::Mat gray, int descType, long generation);
     void joinFilterBuild();

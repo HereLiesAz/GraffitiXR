@@ -2787,6 +2787,7 @@ int MobileGS::readyFilterTargets() const {
 }
 
 void MobileGS::joinFilterBuild() {
+    std::lock_guard<std::mutex> lock(mFilterThreadMutex);
     if (mFilterThread.joinable()) mFilterThread.join();
 }
 
@@ -2795,8 +2796,11 @@ void MobileGS::joinFilterBuild() {
 // worker, cheapest filter first, each installed the moment it is ready. A newer design (or a clear)
 // makes a running build stand down: it checks the artwork generation before installing anything.
 void MobileGS::startFilterBuild(cv::Mat composite, cv::Mat gray, int descType, long generation) {
+    // Held across stopping the old worker and starting the new one. The worker never takes this mutex
+    // (it uses mMutex), so joining under it cannot deadlock.
+    std::lock_guard<std::mutex> threadLock(mFilterThreadMutex);
     mFilterCancel.store(true, std::memory_order_relaxed);
-    joinFilterBuild();
+    if (mFilterThread.joinable()) mFilterThread.join();
     mFilterCancel.store(false, std::memory_order_relaxed);
     mFilterThread = std::thread([this, composite, gray, descType, generation]() {
         try {
