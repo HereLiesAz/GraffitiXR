@@ -41,9 +41,15 @@ collects each pass's verdict per opaque design cell and combines them; the conse
    supplies a null baseline.
 3. **Baseline margin check**: a pass counts only when its true alignment beats displaced alignments
    by a clear margin.
-4. **Change against the bare-wall photo** (optional, off by default): the stored clean-wall photo,
-   registered to the capture, compared with the live frame through the pose. The painted mask's shapes
-   are matched against the design's patch shapes, whatever the colour.
+4. **Change against the bare-wall photo** (optional): the stored clean-wall photo, registered to the
+   capture, compared with the live frame through the pose. The painted mask's shapes are matched
+   against the design's patch shapes, whatever the colour.
+   - A switch in **Settings** (not the diagnostics overlay), off by default: it is never turned on
+     automatically.
+   - It cannot run without the clean-wall photo, whatever the switch says.
+   - The target-creation instructions ALWAYS carry the clean-wall step, switch or no switch: if the
+     surface has not been marked (gridded) yet, take a photo of the bare wall first (one tap), then
+     mark it; if the marks already exist, just continue by tapping them.
 5. Per-pass diagnostics in the overlay.
 
 Passes judge progress and how much to trust a lock. They do not localize until one has earned trust
