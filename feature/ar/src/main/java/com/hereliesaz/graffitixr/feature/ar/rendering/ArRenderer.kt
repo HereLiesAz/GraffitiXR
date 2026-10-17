@@ -3474,7 +3474,7 @@ class ArRenderer(
         if (att != null) {
             val earthFromCv = com.hereliesaz.graffitixr.feature.ar.RelocAttitude.earthFromCvCamera(
                 att.quaternion,
-                com.hereliesaz.sphereslam.attitude.DeviceCameraRotation.cameraFromDeviceForDisplayFrame(displayRotation * 90),
+                com.hereliesaz.sphereslam.attitude.DeviceCameraRotation.cameraFromDeviceForDisplayFrame(displayRotationHelper.getRotation() * 90),
             )
             val m = FloatArray(16)
             cam.toMatrix(m, 0)
