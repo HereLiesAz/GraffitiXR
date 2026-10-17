@@ -22,10 +22,7 @@ enum Id : int {
     kBlobs,           //!< filled silhouettes of the colour patches, small specks removed
     kInvert,          //!< the negative
     kWarmLuma,        //!< red-weighted luminance: separates what plain grey merges
-    kStencil2,        //!< stencil layers (the old StencilProcessor): 2 tones, see stencilLayers
-    kStencil3,
-    kStencil4,
-    kStencil5,
+    kStencil3,        //!< stencil layers (the old StencilProcessor): black, grey, white; see stencilLayers
     kCount
 };
 
@@ -39,10 +36,7 @@ inline const char* name(int id) {
         case kBlobs:      return "blobs";
         case kInvert:     return "invert";
         case kWarmLuma:   return "warm-luma";
-        case kStencil2:   return "stencil2";
         case kStencil3:   return "stencil3";
-        case kStencil4:   return "stencil4";
-        case kStencil5:   return "stencil5";
         default:          return "unknown";
     }
 }

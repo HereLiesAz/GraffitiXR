@@ -145,10 +145,7 @@ cv::Mat applyUnchecked(int id, const cv::Mat& design) {
         out.convertTo(out, CV_8U);
         return out;
     }
-    case kStencil2: return stencilLayers(design, 2);
     case kStencil3: return stencilLayers(design, 3);
-    case kStencil4: return stencilLayers(design, 4);
-    case kStencil5: return stencilLayers(design, 5);
     default: break;
     }
     return cv::Mat();
