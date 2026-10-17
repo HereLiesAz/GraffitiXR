@@ -31,9 +31,13 @@ collects each pass's verdict per opaque design cell and combines them; the conse
 | 0 | `features` | design features confirmed on the wall: descriptors from the design composite matched near their predicted position (`tryUpdateFingerprint`, gated by the lock's pose) |
 | 1 | `colour` | a cell that has left the bare wall and matches the paint its design colour was painted with. Hue-free: purple in the design may be yellow on the wall. The bare wall comes from the capture photo, or the first AR sighting |
 
-| 2 to 9 | `sketch`, `mosaic`, `posterize2`, `posterize4`, `cartoon`, `blobs`, `invert`, `warm-luma` | design features at places the matching design filter points to (below) |
+| 2 to 13 | `sketch`, `mosaic`, `posterize2`, `posterize4`, `cartoon`, `blobs`, `invert`, `warm-luma`, `stencil2` to `stencil5` | design features at places the matching design filter points to (below) |
 
 ### Filter passes
+
+The `stencilN` filters are the app's old stencil tool (`StencilProcessor`, removed with the design
+surface in 49710f90e), ported: median-blur the value channel, K-means it into N tones, close each
+layer 5x5 as a cut sheet would be. N is 2 to 5.
 
 `DesignFilters.h` holds the bank. Each filter turns the design (offscreen, once, when it is
 registered) into another picture of itself, and `locations` picks up to 300 corner-like places on it.
@@ -61,7 +65,7 @@ reloc marks: they judge progress only.
 
 ## Planned
 
-1. **More filters**: watercolor, Kuwahara, halftone, stencil layers of 2 to 5 tones, Voronoi, colour
+1. **More filters**: watercolor, Kuwahara, halftone, Voronoi, colour
    shifts. (The first eight are in; see above.)
 2. **Change against the bare-wall photo** (optional): the stored clean-wall photo, registered to the
    capture, compared with the live frame through the pose. The painted mask's shapes are matched

@@ -22,6 +22,10 @@ enum Id : int {
     kBlobs,           //!< filled silhouettes of the colour patches, small specks removed
     kInvert,          //!< the negative
     kWarmLuma,        //!< red-weighted luminance: separates what plain grey merges
+    kStencil2,        //!< stencil layers (the old StencilProcessor): 2 tones, see stencilLayers
+    kStencil3,
+    kStencil4,
+    kStencil5,
     kCount
 };
 
@@ -35,9 +39,22 @@ inline const char* name(int id) {
         case kBlobs:      return "blobs";
         case kInvert:     return "invert";
         case kWarmLuma:   return "warm-luma";
+        case kStencil2:   return "stencil2";
+        case kStencil3:   return "stencil3";
+        case kStencil4:   return "stencil4";
+        case kStencil5:   return "stencil5";
         default:          return "unknown";
     }
 }
+
+/**
+ * The stencil tool this app used to have (StencilProcessor, removed with the design surface), as a
+ * filter: the value channel (HSV V) is simplified with a median blur, clustered by K-means into
+ * [tones] groups, and each group is closed morphologically (5x5) so cut edges are smooth, as a
+ * stencil sheet would be. Returns [tones] evenly spread grey levels, darkest group first. Work is
+ * done on a copy no larger than 640 px on its long side; the result is the design's size.
+ */
+cv::Mat stencilLayers(const cv::Mat& design, int tones, float influence = 0.5f);
 
 /**
  * Applies filter [id] to the design [design] (1, 3 or 4 channels, 8-bit; alpha, when present, is

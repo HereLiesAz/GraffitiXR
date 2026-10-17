@@ -28,6 +28,55 @@ cv::Mat quantise(const cv::Mat& gray, int n) {
 
 } // namespace
 
+cv::Mat stencilLayers(const cv::Mat& design, int tones, float influence) {
+    if (design.empty() || design.depth() != CV_8U || tones < 2 || tones > 8) return cv::Mat();
+    const cv::Mat bgr = toBgr(design);
+    const double down = std::min(1.0, 640.0 / std::max(bgr.cols, bgr.rows));
+    cv::Mat small;
+    if (down < 1.0) cv::resize(bgr, small, cv::Size(), down, down, cv::INTER_AREA); else small = bgr;
+
+    // V = max(R,G,B), as HSV's value channel.
+    cv::Mat v(small.size(), CV_8UC1);
+    for (int y = 0; y < small.rows; ++y) {
+        const cv::Vec3b* s = small.ptr<cv::Vec3b>(y);
+        uchar* d = v.ptr<uchar>(y);
+        for (int x = 0; x < small.cols; ++x) d[x] = std::max(s[x][0], std::max(s[x][1], s[x][2]));
+    }
+    // Detail simplification (the old tool's, at its default influence 0.5 -> 9) and tonal bias.
+    int ksize = 15 - (int)(influence * 14);
+    if (ksize % 2 == 0) ++ksize;
+    if (ksize > 1) cv::medianBlur(v, v, ksize);
+    v.convertTo(v, -1, 1.0, (influence - 0.5) * 80.0);
+
+    cv::Mat samples;
+    v.reshape(1, (int)v.total()).convertTo(samples, CV_32F);
+    if ((int)samples.rows < tones) return cv::Mat();
+    cv::Mat labels, centers;
+    cv::theRNG().state = 0x57e4c11ULL;   // the same design always yields the same layers
+    cv::kmeans(samples, tones, labels,
+               cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::COUNT, 10, 1.0),
+               3, cv::KMEANS_PP_CENTERS, centers);
+
+    // Groups in ascending order of their centre; group g becomes tone (g + 0.5) / tones.
+    std::vector<int> order(tones);
+    for (int i = 0; i < tones; ++i) order[i] = i;
+    std::sort(order.begin(), order.end(), [&](int a, int b) { return centers.at<float>(a) < centers.at<float>(b); });
+    std::vector<int> rank(tones);
+    for (int r = 0; r < tones; ++r) rank[order[r]] = r;
+
+    cv::Mat out(small.size(), CV_8UC1, cv::Scalar((int)(255.0 * 0.5 / tones)));
+    const cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
+    for (int r = 1; r < tones; ++r) {
+        // Each layer is the pixels at its tone or above (sheets are laid bottom to top), closed.
+        cv::Mat mask(small.size(), CV_8UC1);
+        for (int i = 0; i < (int)small.total(); ++i) mask.data[i] = rank[labels.at<int>(i)] >= r ? 255 : 0;
+        cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel);
+        out.setTo((int)(255.0 * (r + 0.5) / tones), mask);
+    }
+    if (down < 1.0) cv::resize(out, out, bgr.size(), 0, 0, cv::INTER_NEAREST);
+    return out;
+}
+
 cv::Mat applyUnchecked(int id, const cv::Mat& design) {
     if (design.empty() || design.depth() != CV_8U || design.cols < 16 || design.rows < 16) return cv::Mat();
     if (id < 0 || id >= kCount) return cv::Mat();
@@ -95,6 +144,10 @@ cv::Mat applyUnchecked(int id, const cv::Mat& design) {
         out.convertTo(out, CV_8U);
         return out;
     }
+    case kStencil2: return stencilLayers(design, 2);
+    case kStencil3: return stencilLayers(design, 3);
+    case kStencil4: return stencilLayers(design, 4);
+    case kStencil5: return stencilLayers(design, 5);
     default: break;
     }
     return cv::Mat();

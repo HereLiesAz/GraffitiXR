@@ -327,6 +327,23 @@ TEST(DesignFilters, PosterizeKeepsTwoAndFourTones) {
     }
 }
 
+TEST(DesignFilters, StencilLayersHaveAtMostTheRequestedTonesAndAreRepeatable) {
+    const cv::Mat design = makeWall(640, 480, 0x31);
+    for (int tones = 2; tones <= 5; ++tones) {
+        const cv::Mat a = designfilters::stencilLayers(design, tones);
+        const cv::Mat b = designfilters::stencilLayers(design, tones);
+        ASSERT_FALSE(a.empty());
+        EXPECT_EQ(design.size(), a.size());
+        EXPECT_EQ(0, cv::countNonZero(a != b)) << "same design, different layers (tones=" << tones << ")";
+        std::set<int> seen;
+        for (int y = 0; y < a.rows; ++y) for (int x = 0; x < a.cols; ++x) seen.insert(a.at<uchar>(y, x));
+        EXPECT_LE((int)seen.size(), tones);
+        EXPECT_GE((int)seen.size(), 2);
+    }
+    EXPECT_TRUE(designfilters::stencilLayers(design, 1).empty());
+    EXPECT_TRUE(designfilters::stencilLayers(cv::Mat(), 3).empty());
+}
+
 TEST(DesignFilters, InvertIsTheNegative) {
     const cv::Mat design = makeWall(160, 120, 0x12);
     cv::Mat grey;
