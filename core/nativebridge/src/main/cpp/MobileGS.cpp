@@ -601,7 +601,8 @@ void relocPerfMaybeLog(bool locked, int backoffMs) {
     const long long passUs = gRelocPerf.passUs.exchange(0);
     const long long matchUs = gRelocPerf.matchUs.exchange(0);
     const double elapsedMs = (double)(now - start);
-    LOGI("ARDIAG perf reloc: passes=%d avgPassMs=%.1f avgMatchMs=%.1f busy=%.0f%% locked=%d backoffMs=%d "
+    // Tagged with the package name (not "MobileGS") so a logcat capture filtered on "graffitixr" includes it.
+    __android_log_print(ANDROID_LOG_INFO, "graffitixr.MobileGS", "ARDIAG perf reloc: passes=%d avgPassMs=%.1f avgMatchMs=%.1f busy=%.0f%% locked=%d backoffMs=%d "
          "corrobGate=%d predicted=%d matched=%d relocReject=%d",
          n, n ? passUs / 1000.0 / n : 0.0, n ? matchUs / 1000.0 / n : 0.0,
          elapsedMs > 0 ? 100.0 * (passUs / 1000.0) / elapsedMs : 0.0, locked ? 1 : 0, backoffMs,

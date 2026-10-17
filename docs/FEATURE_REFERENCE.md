@@ -540,7 +540,7 @@ ARDIAG overlayBasis path=capturedPlane det=1.00 xRight=0.98 yUp=0.97 zToCam=0.99
 
 ### 7.3b `ARDIAG perf` (logcat)
 
-Two log-only lines, once a minute, for tracing a battery or heat complaint. They change nothing.
+Two log-only lines, once a minute, for tracing a battery or heat complaint. They change nothing. They print in release builds too, tagged `graffitixr` (Kotlin) and `graffitixr.MobileGS` (native), so a capture filtered on `graffitixr` includes them; release builds print no other Timber output.
 
 ~~~
 ARDIAG perf reloc: passes=292 avgPassMs=41.3 avgMatchMs=6.2 busy=20% locked=1 backoffMs=200 corrobGate=0 predicted=212 matched=57 relocReject=0
