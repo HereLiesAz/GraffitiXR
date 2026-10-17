@@ -60,6 +60,19 @@ struct MobileGSTestPeer {
             if (!g.mWallRegions.empty()) g.mWallRegions.push_back(region);
         }
     }
+    static void setMap(MobileGS& g, const std::vector<cv::Point3f>& p, const cv::Mat& d,
+                       const std::vector<float>& conf, const std::vector<int>& obs) {
+        std::lock_guard<std::mutex> lock(g.mMutex);
+        g.mMapPoints3D = p; g.mMapDescriptors = d.clone(); g.mMapConfidence = conf; g.mMapObs = obs;
+    }
+    static std::vector<float> mapConfidence(MobileGS& g) {
+        std::lock_guard<std::mutex> lock(g.mMutex);
+        return g.mMapConfidence;
+    }
+    static std::vector<int> mapObs(MobileGS& g) {
+        std::lock_guard<std::mutex> lock(g.mMutex);
+        return g.mMapObs;
+    }
     static void setPnpSpread(MobileGS& g, float v) {
         std::lock_guard<std::mutex> lock(g.mMutex);
         g.mPnpInlierSpread = v;

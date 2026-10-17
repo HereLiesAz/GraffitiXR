@@ -5079,6 +5079,29 @@ class ArViewModel @Inject constructor(
     private val artworkRegInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
 
     /**
+     * The newest design registration requested while another was in flight. It used to be dropped
+     * ("the next stable design state registers once the in-flight one finishes"), but nothing ever
+     * retried and the effect that calls this does not fire again for the same design, so progress and
+     * paint promotion then validated against the PREVIOUS layer stack. Only the latest is kept; it is
+     * run when the in-flight registration finishes. The bitmap is copied because the caller may
+     * recycle its own before then.
+     */
+    private class PendingArtworkGuide(val bitmap: Bitmap, val key: String?, val standalone: Boolean)
+    private val pendingArtworkGuide = java.util.concurrent.atomic.AtomicReference<PendingArtworkGuide?>(null)
+
+    private fun deferArtworkGuide(bitmap: Bitmap, key: String?, standalone: Boolean) {
+        val copy = runCatching { bitmap.copy(Bitmap.Config.ARGB_8888, false) }.getOrNull() ?: bitmap
+        pendingArtworkGuide.set(PendingArtworkGuide(copy, key, standalone))
+    }
+
+    /** Runs the deferred registration, if any, now that the in-flight one has released the flag. */
+    private fun drainPendingArtworkGuide() {
+        val p = pendingArtworkGuide.getAndSet(null) ?: return
+        if (p.standalone) updateStandalonePaintingGuide(p.bitmap, p.key)
+        else updatePaintingGuide(p.bitmap, p.key)
+    }
+
+    /**
      * Auto-fit result for the editor to apply to the AR mode adjustment: the design's move in its own
      * current local frame — [dx, dy] metres, [dThetaRad] CCW, [scale] ratio. See SlamManager.autoFitDesign.
      */
@@ -5112,9 +5135,12 @@ class ArViewModel @Inject constructor(
         // understanding": the registered overlay the clean wall frame is validated against. Re-register
         // it as the artwork base whenever the design changes so painting-progress (and the staged
         // self-grow) track the current design. Descriptors-only here (no capture depth); the
-        // 3D-dependent promotion step is staged. compareAndSet drops overlapping registrations — the
-        // next stable design state registers once the in-flight one finishes.
-        if (!artworkRegInFlight.compareAndSet(false, true)) return
+        // 3D-dependent promotion step is staged. An overlapping registration is deferred (only the
+        // newest is kept) and run when the in-flight one finishes.
+        if (!artworkRegInFlight.compareAndSet(false, true)) {
+            deferArtworkGuide(bitmap, designKey, standalone = false)
+            return
+        }
         val intr = _uiState.value.targetIntrinsics ?: FloatArray(4)
         val view = _uiState.value.targetCaptureViewMatrix ?: FloatArray(16)
         viewModelScope.launch(Dispatchers.IO) {
@@ -5123,6 +5149,7 @@ class ArViewModel @Inject constructor(
             } finally {
                 artworkRegInFlight.set(false)
             }
+            drainPendingArtworkGuide()
             tryAutoFit()
         }
     }
@@ -5146,7 +5173,10 @@ class ArViewModel @Inject constructor(
      */
     fun updateStandalonePaintingGuide(bitmap: Bitmap, designKey: String? = null) {
         if (designKey != null && designKey == lastStandaloneGuideKey) return
-        if (!artworkRegInFlight.compareAndSet(false, true)) return
+        if (!artworkRegInFlight.compareAndSet(false, true)) {
+            deferArtworkGuide(bitmap, designKey, standalone = true)
+            return
+        }
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -5167,6 +5197,7 @@ class ArViewModel @Inject constructor(
             } finally {
                 artworkRegInFlight.set(false)
             }
+            drainPendingArtworkGuide()
         }
     }
 

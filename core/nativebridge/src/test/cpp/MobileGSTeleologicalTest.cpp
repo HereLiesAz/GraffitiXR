@@ -158,3 +158,111 @@ TEST(MobileGSTeleological, ADesignMoveResetsCorroborationButARepushDoesNot) {
     EXPECT_EQ((std::vector<uint8_t>{0, 0, 0, 0}), MobileGSTestPeer::corroborated(g));
     EXPECT_EQ((std::vector<uint8_t>{0, 0, 0, 0}), MobileGSTestPeer::promoted(g));
 }
+
+// ---- The persistent feature map ------------------------------------------------------------------
+
+namespace {
+// A map of [n] points on the z = 1 wall at distinct positions with distinct random descriptors.
+void fillMap(MobileGS& g, int n, float conf, int obs, std::vector<cv::Point3f>& pts, cv::Mat& descs) {
+    cv::RNG rng(0x5eed);
+    descs = cv::Mat(n, 32, CV_8U);
+    cv::randu(descs, 0, 256);
+    pts.clear();
+    for (int i = 0; i < n; ++i) pts.emplace_back(0.001f * (i % 100) - 0.05f, 0.001f * (i / 100) - 0.05f, 1.f);
+    MobileGSTestPeer::setMap(g, pts, descs, std::vector<float>((size_t)n, conf), std::vector<int>((size_t)n, obs));
+    (void)rng;
+}
+} // namespace
+
+// A map point the camera predicts is in view but does not see again loses confidence. It used to
+// only ever go up, so painted-over points stayed at their old confidence forever.
+TEST(MobileGSTeleological, AMapPointInViewThatIsNotReSeenLosesConfidence) {
+    MobileGS g;
+    g.initialize(0, 0);   // creates the descriptor matchers the map association uses
+    std::vector<cv::Point3f> wall;
+    for (int i = 0; i <= 6; ++i) for (int j = 0; j <= 6; ++j) wall.emplace_back(-0.3f + 0.1f * i, -0.3f + 0.1f * j, 1.f);
+    MobileGSTestPeer::setWallPoints(g, wall);
+    std::vector<cv::Point3f> pts; cv::Mat descs;
+    fillMap(g, 10, 0.8f, 3, pts, descs);
+    // Features whose descriptors match nothing in the map.
+    std::vector<cv::KeyPoint> kps{cv::KeyPoint(cv::Point2f(100.f, 100.f), 8.f), cv::KeyPoint(cv::Point2f(200.f, 120.f), 8.f)};
+    cv::Mat live(2, 32, CV_8U);
+    cv::randu(live, 0, 256);
+    live.row(0).setTo(255); live.row(1).setTo(0);                  // far from the map's random rows
+    MobileGSTestPeer::grow(g, glm::mat4(1.f), kps, live, 500, 500, 320, 240);
+    const auto conf = MobileGSTestPeer::mapConfidence(g);
+    ASSERT_GE(conf.size(), 10u);
+    for (int i = 0; i < 10; ++i) EXPECT_LT(conf[(size_t)i], 0.8f) << "point " << i << " was in view and not re-seen";
+    g.destroy();
+}
+
+// At the cap, fresh paint (a point seen once) must not be the first thing evicted, and points whose
+// confidence has decayed to nothing must go first.
+TEST(MobileGSTeleological, AtTheCapDeadPointsGoFirstAndFreshPaintIsKept) {
+    MobileGS g;
+    g.initialize(0, 0);
+    MobileGSTestPeer::setWallPoints(g, std::vector<cv::Point3f>(20, cv::Point3f(0, 0, 1)));
+    const int n = 5000;
+    std::vector<cv::Point3f> pts; cv::Mat descs;
+    fillMap(g, n, 0.9f, 4, pts, descs);                            // established points
+    auto conf = MobileGSTestPeer::mapConfidence(g);
+    auto obs = MobileGSTestPeer::mapObs(g);
+    for (int i = 0; i < 100; ++i) { conf[(size_t)i] = 0.0f; }      // 100 dead
+    for (int i = 100; i < 200; ++i) { conf[(size_t)i] = 0.1f; obs[(size_t)i] = 1; }   // 100 fresh
+    MobileGSTestPeer::setMap(g, pts, descs, conf, obs);
+
+    std::vector<cv::KeyPoint> kps{cv::KeyPoint(cv::Point2f(100.f, 100.f), 8.f), cv::KeyPoint(cv::Point2f(200.f, 120.f), 8.f)};
+    cv::Mat live(2, 32, CV_8U);
+    live.row(0).setTo(255); live.row(1).setTo(0);
+    MobileGSTestPeer::grow(g, glm::mat4(1.f), kps, live, 500, 500, 320, 240);
+
+    const auto after = MobileGSTestPeer::mapConfidence(g);
+    const auto aobs = MobileGSTestPeer::mapObs(g);
+    int fresh = 0, dead = 0;
+    for (size_t i = 0; i < after.size(); ++i) {
+        if (after[i] <= 0.02f) ++dead;
+        if (aobs[i] == 1 && after[i] > 0.02f && after[i] < 0.2f) ++fresh;
+    }
+    EXPECT_EQ(0, dead) << "dead points should have been evicted";
+    EXPECT_GE(fresh, 100) << "fresh paint was evicted ahead of established points";
+    EXPECT_LE(after.size(), 5000u);
+    g.destroy();
+}
+
+// ---- Paint-mark promotion --------------------------------------------------------------------------
+
+namespace {
+// Locks on the captured wall three times with the design placed exactly on it, which is enough
+// for every design feature in view to be confirmed twice.
+int paintMarksAfterThreeLocks(bool selfGrow) {
+    MobileGS g;
+    g.initialize(0, 0);
+    const cv::Mat full = makeWall(800, 600, 0x51de);
+    const float K[4] = {700.f, 700.f, 400.f, 300.f};
+    fingerprintFrontalWall(g, full, K);
+    g.setArtworkFingerprint(full, nullptr, 0, 0, 0, nullptr, nullptr);
+    const float hw = (float)full.cols / (2.0f * K[0]);
+    const float hh = (float)full.rows / (2.0f * K[1]);
+    const float place[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0,
+                             (full.cols * 0.5f - K[2]) / K[0], (full.rows * 0.5f - K[3]) / K[1], 1.0f, 1};
+    g.setDesignPlacement(place, hw, hh);
+    g.setSelfGrowEnabled(selfGrow);
+    g.setLiveIntrinsics(K);
+    g.setEvalSyncReloc(true, 1);
+    for (int i = 0; i < 3; ++i) g.scheduleRelocCheck(full);
+    const int marks = g.getPaintMarkCount();
+    g.setEvalSyncReloc(false, 1);
+    g.destroy();
+    return marks;
+}
+} // namespace
+
+// Paint-mark promotion rewrites the reloc set, so it answers to the self-grow switch. It used to run
+// ahead of the switch and of the trust gate.
+TEST(MobileGSTeleological, PaintMarksAreNotPromotedWhileSelfGrowIsOff) {
+    EXPECT_EQ(0, paintMarksAfterThreeLocks(false));
+}
+
+TEST(MobileGSTeleological, PaintMarksArePromotedFromAWellSpreadLockWhenSelfGrowIsOn) {
+    EXPECT_GT(paintMarksAfterThreeLocks(true), 0);
+}

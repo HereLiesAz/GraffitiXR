@@ -1028,6 +1028,38 @@ class ArViewModelTest {
         assertFalse(viewModel.evalFusionEnabled.value)
     }
 
+    /**
+     * A design registered while another registration is in flight was DROPPED (nothing retried, and
+     * the caller does not fire again for the same design), so progress validated against the previous
+     * layer stack. It is now deferred and applied when the in-flight one finishes.
+     */
+    @Test
+    fun `a design registered while another is in flight is applied afterwards, not dropped`() {
+        val started = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val a = mockk<Bitmap>(relaxed = true)
+        val b = mockk<Bitmap>(relaxed = true)
+        // The registration ends by trying an auto-fit on another IO thread. A relaxed mock would return
+        // an empty array there and the resulting exception would surface in a LATER test
+        // (UncaughtExceptionsBeforeTest), so say plainly that there is no fit.
+        every { slamManager.autoFitDesign() } returns null
+        every { slamManager.setArtworkFingerprint(a, any(), any(), any(), any(), any(), any()) } answers {
+            started.countDown()
+            release.await(5, java.util.concurrent.TimeUnit.SECONDS)
+            Unit
+        }
+
+        viewModel.updatePaintingGuide(a, "A")
+        assertTrue("the first registration never started", started.await(5, java.util.concurrent.TimeUnit.SECONDS))
+        viewModel.updatePaintingGuide(b, "B")           // arrives while A is still registering
+        release.countDown()
+
+        // A, then the deferred B (a copy of it, since the caller may recycle its bitmap).
+        verify(exactly = 2, timeout = 5_000) {
+            slamManager.setArtworkFingerprint(any(), any(), any(), any(), any(), any(), any())
+        }
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun enableArCore() {
         // setArMode(true) early-returns unless ARCore is reported available; flip the flag on the
