@@ -237,6 +237,58 @@ class ArViewModel @Inject constructor(
                 handler?.invoke(op)
             }
         }
+        // Tripod stream (Link): read the composited view back only while a display guest wants it.
+        viewModelScope.launch {
+            collaborationManager.videoWanted.collect { applyTripodSink(it) }
+        }
+        // Display device: decode each streamed JPEG off the main thread into the state the view draws.
+        viewModelScope.launch(Dispatchers.Default) {
+            collaborationManager.video.collect { jpeg ->
+                val frame = jpeg?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) }
+                _uiState.update { if (it.tripodView) it.copy(tripodFrame = frame) else it }
+            }
+        }
+    }
+
+    /**
+     * Guest: switch between this device's own AR view and the tripod's streamed view. Asking the host
+     * for frames only while the tripod view is up keeps the host from encoding for nobody.
+     */
+    fun toggleTripodView() {
+        if (_uiState.value.coopRole != com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) return
+        val show = !_uiState.value.tripodView
+        collaborationManager.setVideoWanted(show)
+        _uiState.update { it.copy(tripodView = show, tripodFrame = null) }
+    }
+
+    private val tripodEncoding = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    private fun applyTripodSink(wanted: Boolean) {
+        renderer?.streamSink = if (wanted) { bmp -> encodeTripodFrame(bmp) } else null
+    }
+
+    /**
+     * Runs on the GL thread, so it only hands the bitmap off: downscale and JPEG on a worker, one
+     * frame in flight (a frame arriving while the last is still encoding is dropped, latest wins).
+     */
+    private fun encodeTripodFrame(bmp: Bitmap) {
+        if (!tripodEncoding.compareAndSet(false, true)) { bmp.recycle(); return }
+        viewModelScope.launch(Dispatchers.Default) {
+            try {
+                val edge = maxOf(bmp.width, bmp.height)
+                val scaled = if (edge > TRIPOD_MAX_EDGE_PX) {
+                    val k = TRIPOD_MAX_EDGE_PX.toFloat() / edge
+                    Bitmap.createScaledBitmap(bmp, (bmp.width * k).toInt().coerceAtLeast(1), (bmp.height * k).toInt().coerceAtLeast(1), true)
+                } else bmp
+                val out = java.io.ByteArrayOutputStream()
+                scaled.compress(Bitmap.CompressFormat.JPEG, TRIPOD_JPEG_QUALITY, out)
+                if (scaled !== bmp) scaled.recycle()
+                collaborationManager.offerVideo(out.toByteArray())
+            } finally {
+                bmp.recycle()
+                tripodEncoding.set(false)
+            }
+        }
     }
 
     /**
@@ -595,6 +647,8 @@ class ArViewModel @Inject constructor(
                     coopPeerSpatialFrame = null,
                     coopPeerFingerprint = null,
                     guestEditWasDropped = false,
+                    tripodView = false,
+                    tripodFrame = null,
                 )
             }
             _hostQrPayload.value = null
@@ -4753,6 +4807,7 @@ class ArViewModel @Inject constructor(
         // TOCTOU) instead created a worse race: it could run AFTER performFullCleanupLocked nulled
         // `renderer`, resurrecting a reference to an already-destroyed renderer.
         renderer = r
+        applyTripodSink(collaborationManager.videoWanted.value)
         renderer?.onCameraNotFeeding = { cameraEverStreamed -> onCameraNotFeeding(cameraEverStreamed) }
         // The renderer assembles the capture record on the GL thread; these hand it the two pieces
         // whose lifecycles live here. Lambdas rather than direct references so the renderer never
@@ -6187,6 +6242,10 @@ class ArViewModel @Inject constructor(
 
     // --- Doodle demo: headless fingerprint build ---
     internal companion object {
+        /** Tripod stream (Link): longest edge and JPEG quality of each streamed frame. */
+        const val TRIPOD_MAX_EDGE_PX = 960
+        const val TRIPOD_JPEG_QUALITY = 70
+
         /** A clean-wall photo request counts only for the capture that follows it this closely. */
         private const val CLEAN_WALL_REQUEST_WINDOW_MS = 5_000L
         /** cos 2°: a learned wall normal is saved again only once it has moved more than this. */

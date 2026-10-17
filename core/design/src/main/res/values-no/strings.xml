@@ -550,6 +550,10 @@
     <string name="nav_join_coop_info">Bli med i en kobling i nærheten for å justere AR-visningen din etter vertsenheten.</string>
     <string name="nav_leave_coop">Forlat</string>
     <string name="nav_leave_coop_info">Forlat den gjeldende koblingen.</string>
+    <string name="nav_link_view_own">Egen visning</string>
+    <string name="nav_link_view_tripod">Stativvisning</string>
+    <string name="nav_link_view_info">Bytt mellom denne enhetens egen AR-visning og kameravisningen fra stativet.</string>
+    <string name="link_tripod_waiting">Venter på stativet…</string>
     <string name="nav_wearable">Wearable</string>
     <string name="nav_wearable_info">Koble til smartbriller for en håndfri AR-opplevelse med kamerainndata justert etter perspektivet ditt.</string>
     <string name="nav_wall_clear">Fjern</string>

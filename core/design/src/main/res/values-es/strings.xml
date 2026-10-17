@@ -550,6 +550,10 @@
     <string name="nav_join_coop_info">Únete a un enlace cercano para alinear tu vista AR con la del dispositivo anfitrión.</string>
     <string name="nav_leave_coop">Salir</string>
     <string name="nav_leave_coop_info">Abandona el enlace actual.</string>
+    <string name="nav_link_view_own">Vista propia</string>
+    <string name="nav_link_view_tripod">Vista del trípode</string>
+    <string name="nav_link_view_info">Alterna entre la vista AR de este dispositivo y la vista de la cámara del trípode.</string>
+    <string name="link_tripod_waiting">Esperando al trípode…</string>
     <string name="nav_wearable">Dispositivo</string>
     <string name="nav_wearable_info">Conéctate a unas gafas inteligentes para una experiencia AR manos libres con entrada de cámara alineada a tu perspectiva.</string>
     <string name="nav_wall_clear">Quitar</string>

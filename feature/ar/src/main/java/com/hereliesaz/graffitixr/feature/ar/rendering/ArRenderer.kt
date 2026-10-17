@@ -821,6 +821,14 @@ class ArRenderer(
     @Volatile var exportRequested: Boolean = false
     var onExportCaptured: ((Bitmap) -> Unit)? = null
 
+    /**
+     * Tripod stream (Link): while set, the composited framebuffer is read back about [STREAM_INTERVAL_MS]
+     * apart and handed here as a bitmap this renderer no longer owns. Called on the GL thread, so the
+     * receiver must move the encode off it. Null (the default) costs nothing.
+     */
+    @Volatile var streamSink: ((Bitmap) -> Unit)? = null
+    private var lastStreamMs = 0L
+
     // Pre-allocated buffers for Surface Mesh updates (32x32 grid)
     private val meshVerticesBuffer = FloatArray(32 * 32 * 3)
     private val meshWeightsBuffer = FloatArray(32 * 32)
@@ -3474,6 +3482,30 @@ class ArRenderer(
                 }
             }
 
+            lastStep = "stream"
+            val streamSinkNow = streamSink
+            if (streamSinkNow != null && !exportThisFrame) {
+                val nowMs = android.os.SystemClock.elapsedRealtime()
+                val w = surfaceWidth
+                val h = surfaceHeight
+                if (nowMs - lastStreamMs >= STREAM_INTERVAL_MS && w > 0 && h > 0) {
+                    lastStreamMs = nowMs
+                    try {
+                        // Same readback as the export above (GL origin is bottom-left, hence the flip).
+                        val buf = ByteBuffer.allocateDirect(w * h * 4).order(java.nio.ByteOrder.nativeOrder())
+                        GLES30.glReadPixels(0, 0, w, h, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, buf)
+                        buf.rewind()
+                        val source = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                        source.copyPixelsFromBuffer(buf)
+                        val flipped = Bitmap.createBitmap(source, 0, 0, w, h, android.graphics.Matrix().apply { postScale(1f, -1f) }, false)
+                        if (flipped !== source) source.recycle()
+                        streamSinkNow(flipped)
+                    } catch (e: Exception) {
+                        Timber.e(e, "Failed to capture stream frame")
+                    }
+                }
+            }
+
             // A stall reported at "frameDone" means onDrawFrame COMPLETED and the GL thread never
             // came back for the next frame — wedge is in eglSwapBuffers / the GLThread scheduler /
             // a pause request, not in this frame body.
@@ -3871,6 +3903,9 @@ class ArRenderer(
     }
 
     private companion object {
+        // Tripod stream cadence: ~5 frames a second is smooth enough to aim a brush by and cheap to read back.
+        const val STREAM_INTERVAL_MS = 200L
+
         // KPM is a relocalization sidecar, not the primary frame-to-frame tracker. 10 Hz at a
         // typical 60-fps render cadence is enough for wall reacquisition while ARCore stays full-rate.
         const val SPHERESLAM_FEED_DIVISOR = 6

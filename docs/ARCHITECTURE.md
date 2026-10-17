@@ -247,9 +247,10 @@ would recreate the frame ambiguity v3 exists to remove.
 The feature is called **Link** in the app (one person with two devices is as likely as two people); the
 code, protocol and these docs still say co-op/host/guest.
 
-The current protocol is **v6** (`wire/ProtocolVersion.kt`); v5 and older peers are rejected as
+The current protocol is **v7** (`wire/ProtocolVersion.kt`); v6 and older peers are rejected as
 `VersionMismatch`. v4 added guest→host edits (`GUEST_OP`/`GUEST_OP_ACK`: queued until acknowledged,
 deduped and applied by the host as undoable persisted edits); v5 added `Op.WallWidth` so Measure
 results are shared both ways; v6 added the shared `Layer` fields `isStencil`, `stencilView` and
 `stencilDark`, because an older peer drops them and would show the artwork unstencilled while the host
-shows the stencil. See `docs/FEATURE_REFERENCE.md` §8.
+shows the stencil; v7 added the tripod stream (`VIDEO` host→guest, `VIDEO_WANT` guest→host). See
+`docs/FEATURE_REFERENCE.md` §8.

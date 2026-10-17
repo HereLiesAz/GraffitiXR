@@ -110,6 +110,7 @@ import com.hereliesaz.graffitixr.common.model.CoopRole
 import com.hereliesaz.graffitixr.ui.coop.CoopHostQrOverlay
 import com.hereliesaz.graffitixr.ui.coop.CoopJoinQrScannerOverlay
 import com.hereliesaz.graffitixr.ui.coop.CoopSpectatorBanner
+import com.hereliesaz.graffitixr.ui.coop.CoopTripodView
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
 import com.hereliesaz.graffitixr.feature.ar.rememberCameraController
 import com.hereliesaz.graffitixr.feature.ar.takePictureAsBitmap
@@ -2126,6 +2127,12 @@ class MainActivity : AppCompatActivity() {
                                     onCancelled = { showJoinScanner = false },
                                 )
                             }
+                            if (arUiState.coopRole == CoopRole.GUEST && arUiState.tripodView) {
+                                CoopTripodView(
+                                    frame = arUiState.tripodFrame,
+                                    waiting = stringResource(DesignR.string.link_tripod_waiting),
+                                )
+                            }
                             if (arUiState.coopRole == CoopRole.GUEST &&
                                 (coopState is CoopSessionState.Connected || coopState is CoopSessionState.Reconnecting)) {
                                 CoopSpectatorBanner(
@@ -2572,6 +2579,19 @@ class MainActivity : AppCompatActivity() {
                                     if (hasCameraPermission) onShowJoinScanner() else requestPermissions()
                                 }
                             },
+                        )
+                    }
+                    if (arUiState.coopRole == CoopRole.GUEST) {
+                        val linkViews = listOf(navStrings.linkViewOwn, navStrings.linkViewTripod)
+                        azRailSubCycler(
+                            id = "coop.view",
+                            hostId = railHostOf("coop.view"),
+                            options = linkViews,
+                            selectedOption = linkViews[if (arUiState.tripodView) 1 else 0],
+                            color = navItemColor,
+                            shape = AzButtonShape.NONE,
+                            disabled = showLibrary,
+                            onClick = { arViewModel.toggleTripodView() },
                         )
                     }
                     if (arUiState.coopRole != CoopRole.NONE) {

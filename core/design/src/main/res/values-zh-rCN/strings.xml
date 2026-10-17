@@ -567,6 +567,10 @@
     <string name="nav_join_coop_info">加入附近的连接，使你的 AR 视图与主机设备对齐。</string>
     <string name="nav_leave_coop">离开</string>
     <string name="nav_leave_coop_info">退出当前连接。</string>
+    <string name="nav_link_view_own">本机视图</string>
+    <string name="nav_link_view_tripod">三脚架视图</string>
+    <string name="nav_link_view_info">在本设备的 AR 视图与三脚架相机视图之间切换。</string>
+    <string name="link_tripod_waiting">正在等待三脚架…</string>
     <string name="nav_wearable">可穿戴设备</string>
     <string name="nav_wearable_info">连接智能眼镜，获得与视角对齐的摄像头输入，实现免提AR体验。</string>
     <string name="nav_wall_clear">清除</string>

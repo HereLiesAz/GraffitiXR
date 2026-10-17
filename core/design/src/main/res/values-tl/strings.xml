@@ -262,6 +262,10 @@
     <string name="nav_join_coop_info">Sumali sa isang link sa malapit para i-align ang AR view mo sa host device.</string>
     <string name="nav_leave_coop">Umalis</string>
     <string name="nav_leave_coop_info">Umalis sa kasalukuyang link.</string>
+    <string name="nav_link_view_own">Sariling view</string>
+    <string name="nav_link_view_tripod">View ng tripod</string>
+    <string name="nav_link_view_info">Magpalit sa pagitan ng sariling AR view ng device na ito at ng camera view ng tripod.</string>
+    <string name="link_tripod_waiting">Naghihintay sa tripod…</string>
     <string name="nav_wearable">Wearable</string>
     <string name="nav_wearable_info">Kumonekta sa smart glasses para sa hands-free na AR na karanasan na may camera input na naka-align sa iyong perspektibo.</string>
     <string name="nav_wall_clear">Alisin</string>

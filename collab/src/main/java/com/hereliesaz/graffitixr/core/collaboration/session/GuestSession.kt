@@ -60,6 +60,33 @@ internal class GuestSession(
     @Volatile private var lastSentGuestSeq: Long = 0L
     @Volatile private var lastAckedGuestSeq: Long = 0L
     private val flushMutex = Mutex()
+
+    // ── Protocol v7: the tripod stream ───────────────────────────────────────────────────────
+    // Whether this guest wants the host's VIDEO frames. Re-sent on every (re)connection, because the
+    // host forgets the request with the connection that made it.
+    @Volatile private var wantVideo = false
+    private val _video = kotlinx.coroutines.flow.MutableStateFlow<ByteArray?>(null)
+
+    /** The latest JPEG the host streamed, or null before the first (and after the stream is switched off). */
+    val video: kotlinx.coroutines.flow.StateFlow<ByteArray?> get() = _video
+
+    /** Ask the host to start or stop streaming its view. Takes effect immediately if live, else on connect. */
+    fun setVideoWanted(wanted: Boolean) {
+        wantVideo = wanted
+        if (!wanted) _video.value = null
+        scope.launch { sendVideoWant() }
+    }
+
+    private suspend fun sendVideoWant() {
+        val output = liveOutput ?: return
+        val crypto = liveCrypto ?: return
+        if (phase != Phase.Live) return
+        try {
+            writeSecure(output, crypto, FrameType.VIDEO_WANT, OpCodec.encode(VideoWantPayload(wantVideo)))
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e // the read loop notices the dead socket and reconnects
+        }
+    }
     // True once a host snapshot is installed locally (Live reached). Until then the local project is
     // whatever the guest had open before joining — or, after a host restart, a baseline about to be
     // replaced — so an edit made against it must not be queued for the host.
@@ -380,6 +407,7 @@ internal class GuestSession(
                 lastSentGuestSeq = lastAckedGuestSeq
             }
             flushOutbox()
+            if (wantVideo) sendVideoWant()
         }
         scope.launch {
             var pending = firstFrame
@@ -422,6 +450,7 @@ internal class GuestSession(
                                 outbox.ackUpTo(ack.lastGuestSeq)
                             }
                         }
+                        FrameType.VIDEO -> if (wantVideo) _video.value = frame.payload
                         else -> { /* ignore */ }
                     }
                 } catch (e: kotlinx.coroutines.CancellationException) {

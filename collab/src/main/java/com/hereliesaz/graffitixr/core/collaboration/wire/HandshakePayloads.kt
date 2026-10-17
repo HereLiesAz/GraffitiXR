@@ -112,6 +112,10 @@ internal data class GuestOpPayload(val guestInstance: String, val guestSeq: Long
 @Serializable
 internal data class GuestOpAckPayload(val lastGuestSeq: Long)
 
+/** Guest → host (v7): start ([wanted] true) or stop the host's VIDEO stream. Off on every new connection. */
+@Serializable
+internal data class VideoWantPayload(val wanted: Boolean)
+
 @Serializable
 internal data class BulkAckPayload(val lastSeq: Long)
 

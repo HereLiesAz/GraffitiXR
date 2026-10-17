@@ -550,6 +550,10 @@
     <string name="nav_join_coop_info">Entre em uma conexão próxima para alinhar sua visão AR com a do dispositivo anfitrião.</string>
     <string name="nav_leave_coop">Sair</string>
     <string name="nav_leave_coop_info">Saia da conexão atual.</string>
+    <string name="nav_link_view_own">Vista própria</string>
+    <string name="nav_link_view_tripod">Vista do tripé</string>
+    <string name="nav_link_view_info">Alterna entre a vista AR deste dispositivo e a vista da câmara do tripé.</string>
+    <string name="link_tripod_waiting">A aguardar o tripé…</string>
     <string name="nav_wearable">Vestível</string>
     <string name="nav_wearable_info">Conecte-se a óculos inteligentes para uma experiência AR sem as mãos, com entrada de câmera alinhada à sua perspectiva.</string>
     <string name="nav_wall_clear">Remover</string>

@@ -56,7 +56,12 @@ class ArViewModelLiveSettingsTest {
     private val settingsRepository: SettingsRepository = mockk(relaxed = true)
     private val projectManager: com.hereliesaz.graffitixr.data.ProjectManager = mockk(relaxed = true)
     private val collaborationManager: com.hereliesaz.graffitixr.core.collaboration.CollaborationManager =
-        mockk(relaxed = true)
+        mockk(relaxed = true) {
+        // A relaxed mock's StateFlow.collect returns Unit where Nothing is required, so the tripod
+        // collectors in ArViewModel.init would throw; give them real flows.
+        io.mockk.every { videoWanted } returns kotlinx.coroutines.flow.MutableStateFlow(false)
+        io.mockk.every { video } returns kotlinx.coroutines.flow.MutableStateFlow<ByteArray?>(null)
+    }
     private val wearableManager: WearableManager = mockk(relaxed = true)
     private val context: Context = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()

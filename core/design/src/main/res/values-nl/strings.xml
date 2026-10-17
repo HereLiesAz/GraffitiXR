@@ -555,6 +555,10 @@
     <string name="nav_join_coop_info">Sluit je aan bij een koppeling in de buurt om je AR-weergave af te stemmen op het hostapparaat.</string>
     <string name="nav_leave_coop">Verlaten</string>
     <string name="nav_leave_coop_info">Verlaat de huidige koppeling.</string>
+    <string name="nav_link_view_own">Eigen weergave</string>
+    <string name="nav_link_view_tripod">Statiefweergave</string>
+    <string name="nav_link_view_info">Wissel tussen de eigen AR-weergave van dit apparaat en het camerabeeld van het statief.</string>
+    <string name="link_tripod_waiting">Wachten op het statief…</string>
     <string name="nav_wearable">Wearable</string>
     <string name="nav_wearable_info">Maak verbinding met een smartbril voor een handsfree AR-ervaring met camera-invoer die is afgestemd op je perspectief.</string>
     <string name="nav_wall_clear">Wissen</string>

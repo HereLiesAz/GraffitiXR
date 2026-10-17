@@ -165,6 +165,7 @@ class CollaborationManager @Inject constructor() {
         guestSession = null
         hostSession?.close(CoopSessionState.EndReason.UserLeft)
         hostSession = null
+        bindVideo()
         _state.value = CoopSessionState.Idle
     }
 
@@ -226,8 +227,43 @@ class CollaborationManager @Inject constructor() {
         if (!guest.sendOp(op)) _guestEditDropped.tryEmit(Unit)
     }
 
+    // ── Protocol v7: the tripod stream ───────────────────────────────────────────────────────
+
+    private val _videoWanted = MutableStateFlow(false)
+    private val _video = MutableStateFlow<ByteArray?>(null)
+    @Volatile private var videoJob: Job? = null
+
+    /**
+     * Host: true while the connected display guest wants the tripod stream — capture and [offerVideo]
+     * only then. False when not hosting.
+     */
+    val videoWanted: StateFlow<Boolean> get() = _videoWanted
+
+    /** Re-point the stream flows at the current session (or clear them when there is none). */
+    private fun bindVideo() {
+        videoJob?.cancel()
+        _videoWanted.value = false
+        _video.value = null
+        val host = hostSession
+        val guest = guestSession
+        videoJob = scope.launch {
+            if (host != null) launch { host.videoWanted.collect { _videoWanted.value = it } }
+            if (guest != null) launch { guest.video.collect { _video.value = it } }
+        }
+    }
+
+    /** Host: offer one JPEG of the composited view; dropped unless a guest is live and wants it. */
+    fun offerVideo(jpeg: ByteArray): Boolean = hostSession?.offerVideo(jpeg) ?: false
+
+    /** Guest: start or stop the host's stream. No-op when not a guest. */
+    fun setVideoWanted(wanted: Boolean) { guestSession?.setVideoWanted(wanted) }
+
+    /** Guest: the latest streamed JPEG, null when none. */
+    val video: StateFlow<ByteArray?> get() = _video
+
     private fun observe(stateFlow: StateFlow<CoopSessionState>) {
         observeJob?.cancel()
+        bindVideo()
         observeJob = scope.launch {
             stateFlow.collect {
                 _state.value = it
@@ -240,6 +276,7 @@ class CollaborationManager @Inject constructor() {
                 if (it is CoopSessionState.Ended) {
                     hostSession = null
                     guestSession = null
+                    bindVideo()
                 }
             }
         }

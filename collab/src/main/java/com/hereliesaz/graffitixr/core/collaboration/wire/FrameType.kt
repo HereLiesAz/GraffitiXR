@@ -14,6 +14,10 @@ internal enum class FrameType(val code: Byte) {
     // v4: a guest's own edit, and the host's acknowledgement of it (see GuestOpPayload).
     GUEST_OP(0x32),
     GUEST_OP_ACK(0x33),
+    // v7: the tripod stream. VIDEO is host→guest (a JPEG of the host's composited view); VIDEO_WANT is
+    // guest→host and switches it on or off (see VideoWantPayload).
+    VIDEO(0x34),
+    VIDEO_WANT(0x35),
     PING(0x40),
     PONG(0x41),
     BYE(0x50),

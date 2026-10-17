@@ -565,6 +565,14 @@ Robust LAN peer-to-peer sync for collaborative painting — **no cloud, no accou
   pre-handler spectator-op buffering. Import/spectator load is hardened against Zip-Slip.
 - **Ops:** design replace/transform/props/bitmap, per-mode adjustments and the measured wall width
   (`Op.WallWidth`, protocol v5) stream as `Op`s and apply with no active-layer side effects.
+- **Tripod stream (protocol v7):** the host is the camera device (tripod) and keeps all tracking and
+  progress detection. A guest can act as its display: Link ▸ view (rail cycler, guest only) switches
+  between the guest's own AR view and the tripod's. Choosing the tripod sends `VIDEO_WANT(true)`; the
+  host's renderer then reads its composited framebuffer back about five times a second
+  (`ArRenderer.streamSink`), `ArViewModel` downscales it to 960 px and JPEG-encodes it (q70) on a worker
+  (one frame in flight, latest wins) and `HostSession.offerVideo` sends it as a `VIDEO` frame. Nothing
+  is read back, encoded or sent while no guest wants it, and a new connection forgets the request (the
+  guest re-sends it on reconnect). Transport is the same encrypted LAN link as everything else.
 - **Bidirectional (protocol v4):** a guest's edits go to the host as `GUEST_OP` frames (own
   sequence, queued in `GuestOutbox` until `GUEST_OP_ACK`, resent once after a reconnect, deduped by
   the host per GuestSession instance). The host applies each as an undoable, persisted edit and

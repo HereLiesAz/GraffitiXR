@@ -555,6 +555,10 @@
     <string name="nav_join_coop_info">Gå med i en länk i närheten för att justera din AR-vy efter värdenheten.</string>
     <string name="nav_leave_coop">Lämna</string>
     <string name="nav_leave_coop_info">Lämna den aktuella länken.</string>
+    <string name="nav_link_view_own">Egen vy</string>
+    <string name="nav_link_view_tripod">Stativvy</string>
+    <string name="nav_link_view_info">Växla mellan enhetens egen AR-vy och kameravyn från stativet.</string>
+    <string name="link_tripod_waiting">Väntar på stativet…</string>
     <string name="nav_wearable">Bärbar enhet</string>
     <string name="nav_wearable_info">Anslut till smarta glasögon för en handsfree AR-upplevelse med kamerainmatning anpassad efter ditt perspektiv.</string>
     <string name="nav_wall_clear">Ta bort</string>

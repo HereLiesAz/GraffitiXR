@@ -52,6 +52,10 @@
     <string name="nav_join_coop_info">Join a nearby link to align your AR view with the host device.</string>
     <string name="nav_leave_coop">Leave</string>
     <string name="nav_leave_coop_info">Leave the current link.</string>
+    <string name="nav_link_view_own">Own view</string>
+    <string name="nav_link_view_tripod">Tripod view</string>
+    <string name="nav_link_view_info">Switch between this device\'s own AR view and the tripod\'s camera view.</string>
+    <string name="link_tripod_waiting">Waiting for the tripod…</string>
 
     <string name="nav_wearable">Wearable</string>
     <string name="nav_wearable_info">Connect to smart glasses for a hands-free AR experience and perspective-aligned camera input.</string>

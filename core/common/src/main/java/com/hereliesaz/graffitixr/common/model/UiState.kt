@@ -333,6 +333,10 @@ data class ArUiState(
 
     val coopRole: CoopRole = CoopRole.NONE,
     val coopSessionState: CoopSessionState = CoopSessionState.Idle,
+    /** Guest only: showing the tripod's streamed view instead of this device's own AR view. */
+    val tripodView: Boolean = false,
+    /** Guest only: the latest frame the tripod streamed; null until the first arrives. */
+    val tripodFrame: Bitmap? = null,
     /**
      * Transient v3 co-op geometry for a guest. Never persisted into the local project: the project
      * archive contains the host's durable assets, while these bytes/metadata describe the active

@@ -555,6 +555,10 @@
     <string name="nav_join_coop_info">Подключитесь к ближайшей связи, чтобы выровнять ваш AR-вид по устройству-хосту.</string>
     <string name="nav_leave_coop">Выйти</string>
     <string name="nav_leave_coop_info">Выйти из текущей связи.</string>
+    <string name="nav_link_view_own">Свой вид</string>
+    <string name="nav_link_view_tripod">Вид со штатива</string>
+    <string name="nav_link_view_info">Переключение между собственным AR-видом этого устройства и видом камеры на штативе.</string>
+    <string name="link_tripod_waiting">Ожидание штатива…</string>
     <string name="nav_wearable">Носимое устройство</string>
     <string name="nav_wearable_info">Подключитесь к смарт-очкам для AR-опыта без использования рук с вводом камеры, согласованным с вашей перспективой.</string>
     <string name="nav_wall_clear">Очистить</string>
