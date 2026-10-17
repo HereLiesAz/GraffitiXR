@@ -880,6 +880,22 @@ public:
     void awaitFilterTargets() { joinFilterBuild(); }
     /** How many filters' targets are installed and usable right now. */
     int readyFilterTargets() const;
+
+    /**
+     * The CV preview: everything the passes are looking for, composited in the design's own pixel space
+     * (so it lays over the design exactly). Transparent RGBA, no larger than [maxSide] on the long side:
+     * each pass's targets as dots in that pass's colour ([passes::passRgb]), a ring while unconfirmed
+     * and a filled dot once the wall has answered, and the design cells already judged painted tinted
+     * green. False when no design is registered.
+     */
+    bool renderCvPreview(cv::Mat& rgba, int maxSide) const;
+
+    /**
+     * One row per pass, [kPassCount] rows of {colour (0xRRGGBB as a float), targets, confirmed}:
+     * features and the filters count their target places; colour counts opaque design cells and the
+     * ones painted. Passes with nothing to look for yet have 0 targets.
+     */
+    void getPassLegend(float* out) const;
     void setCaptureImage(const cv::Mat& rgb, const float* intr4);
 
     /** What became of the clean-wall photo. */

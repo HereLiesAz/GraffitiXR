@@ -2693,6 +2693,88 @@ bool MobileGS::loadLowLightEnhancer(const std::vector<uchar>& onnxBytes) { retur
 // which new real paint-marks to promote into the live fingerprint as the original marks get covered.
 // Mirrors generateFingerprint's detect + depth back-projection, stored into mArtwork* (no mask: the
 // whole target is the reference).
+bool MobileGS::renderCvPreview(cv::Mat& rgba, int maxSide) const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (mArtworkImageW <= 0 || mArtworkImageH <= 0 || maxSide < 16) return false;
+    const double s = std::min(1.0, (double)maxSide / (double)std::max(mArtworkImageW, mArtworkImageH));
+    const int w = std::max(1, (int)std::lround(mArtworkImageW * s));
+    const int h = std::max(1, (int)std::lround(mArtworkImageH * s));
+    rgba = cv::Mat(h, w, CV_8UC4, cv::Scalar(0, 0, 0, 0));
+    auto colour = [](int pass, int alpha) {
+        const uint32_t c = passes::passRgb(pass);
+        return cv::Scalar((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF, alpha);
+    };
+
+    // The area progress: design cells already judged painted are tinted, the rest outlined.
+    const PaintGrid& g = mGrid;
+    if (g.cols > 0 && g.rows > 0 && g.painted.size() == (size_t)g.cols * g.rows) {
+        for (int r = 0; r < g.rows; ++r) for (int c = 0; c < g.cols; ++c) {
+            const int i = r * g.cols + c;
+            if (g.weight[(size_t)i] <= 0) continue;
+            const cv::Rect cell(c * w / g.cols, r * h / g.rows, (c + 1) * w / g.cols - c * w / g.cols,
+                                (r + 1) * h / g.rows - r * h / g.rows);
+            if (g.painted[(size_t)i]) cv::rectangle(rgba, cell, cv::Scalar(60, 220, 90, 70), cv::FILLED);
+            cv::rectangle(rgba, cell, cv::Scalar(255, 255, 255, 40), 1);
+        }
+    }
+
+    const int radius = std::max(3, std::min(w, h) / 120);
+    auto dots = [&](const std::vector<cv::Point2f>& pts, const std::vector<uint8_t>& corrob, int pass) {
+        for (size_t i = 0; i < pts.size(); ++i) {
+            const cv::Point centre((int)std::lround(pts[i].x * s), (int)std::lround(pts[i].y * s));
+            const bool confirmed = i < corrob.size() && corrob[i] >= kCorrobConfirmations;
+            if (confirmed) {
+                cv::circle(rgba, centre, radius + 1, cv::Scalar(255, 255, 255, 230), cv::FILLED);
+                cv::circle(rgba, centre, radius, colour(pass, 255), cv::FILLED);
+            } else {
+                cv::circle(rgba, centre, radius, colour(pass, 200), 1);
+            }
+        }
+    };
+    // Slowest layers first, so the cheap, plentiful ones are not hidden under them.
+    for (int f = designfilters::kCount - 1; f >= 0; --f) {
+        if ((size_t)f < mTargetSets.size()) dots(mTargetSets[(size_t)f].pts, mTargetSets[(size_t)f].corrob, passes::kPassFilterBase + f);
+    }
+    dots(mArtworkKeypoints2D, mArtworkCorroborated, passes::kPassFeatures);
+    // An Android Bitmap holds premultiplied alpha; drawn here straight, a translucent pixel would show
+    // brighter than it should.
+    for (int y = 0; y < rgba.rows; ++y) {
+        cv::Vec4b* row = rgba.ptr<cv::Vec4b>(y);
+        for (int x = 0; x < rgba.cols; ++x) {
+            const int a = row[x][3];
+            if (a == 0 || a == 255) continue;
+            for (int c = 0; c < 3; ++c) row[x][c] = (uchar)((row[x][c] * a + 127) / 255);
+        }
+    }
+    return true;
+}
+
+void MobileGS::getPassLegend(float* out) const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    for (int p = 0; p < passes::kPassCount; ++p) {
+        float total = 0, confirmed = 0;
+        if (p == passes::kPassFeatures) {
+            total = (float)mArtworkKeypoints2D.size();
+            for (uint8_t c : mArtworkCorroborated) if (c >= kCorrobConfirmations) confirmed += 1;
+        } else if (p == passes::kPassColour) {
+            for (size_t i = 0; i < mGrid.weight.size(); ++i) {
+                if (mGrid.weight[i] <= 0) continue;
+                total += 1;
+                if (i < mGrid.painted.size() && mGrid.painted[i]) confirmed += 1;
+            }
+        } else if (p >= passes::kPassFilterBase && p < passes::kPassChange) {
+            const size_t f = (size_t)(p - passes::kPassFilterBase);
+            if (f < mTargetSets.size()) {
+                total = (float)mTargetSets[f].pts.size();
+                for (uint8_t c : mTargetSets[f].corrob) if (c >= kCorrobConfirmations) confirmed += 1;
+            }
+        }
+        out[3 * p] = (float)passes::passRgb(p);
+        out[3 * p + 1] = total;
+        out[3 * p + 2] = confirmed;
+    }
+}
+
 int MobileGS::readyFilterTargets() const {
     std::lock_guard<std::mutex> lock(mMutex);
     int ready = 0;

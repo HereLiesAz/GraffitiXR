@@ -523,6 +523,39 @@ class SlamManager @Inject constructor(
 
     fun clearCleanWallImage() = nativeClearCleanWallImage()
 
+    /** One pass in the CV preview's legend: its name, colour (0xRRGGBB), and how many of its targets the wall has answered. */
+    data class PassLegendRow(val name: String, val rgb: Int, val targets: Int, val confirmed: Int)
+
+    /**
+     * The CV preview: everything the passes are looking for, composited in the design's own pixel space
+     * (transparent where nothing is drawn), so it lays over the design exactly. Null when no design is
+     * registered. Off the main thread: it draws a few thousand dots.
+     */
+    fun renderCvPreview(maxSide: Int = 1024): Bitmap? {
+        val raw = nativeRenderCvPreview(maxSide) ?: return null
+        if (raw.size < 8) return null
+        val buf = java.nio.ByteBuffer.wrap(raw).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        val w = buf.getInt(0)
+        val h = buf.getInt(4)
+        if (w <= 0 || h <= 0 || raw.size < 8 + w * h * 4) return null
+        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        buf.position(8)
+        bitmap.copyPixelsFromBuffer(buf)
+        return bitmap
+    }
+
+    /** The legend of the CV preview: only passes that have something to look for. */
+    fun getPassLegend(): List<PassLegendRow> {
+        val rows = nativeGetPassLegend() ?: return emptyList()
+        val names = nativeGetPassNames() ?: return emptyList()
+        return names.indices.mapNotNull { i ->
+            if (3 * i + 2 >= rows.size) return@mapNotNull null
+            val targets = rows[3 * i + 1].toInt()
+            if (targets <= 0) null
+            else PassLegendRow(names[i], rows[3 * i].toInt() or (0xFF shl 24), targets, rows[3 * i + 2].toInt())
+        }
+    }
+
     /** What became of the clean-wall photo: [CleanWallStatus]. */
     fun cleanWallStatus(): CleanWallStatus = CleanWallStatus.fromNative(nativeGetCleanWallStatus())
 
@@ -1055,6 +1088,9 @@ class SlamManager @Inject constructor(
     private external fun nativeSetCaptureImage(bitmap: Bitmap, intrinsics: FloatArray)
     private external fun nativeSetCleanWallImage(bitmap: Bitmap): Boolean
     private external fun nativeClearCleanWallImage()
+    private external fun nativeRenderCvPreview(maxSide: Int): ByteArray?
+    private external fun nativeGetPassLegend(): FloatArray?
+    private external fun nativeGetPassNames(): Array<String>?
     private external fun nativeGetCleanWallStatus(): Int
     private external fun nativeSetChangePassEnabled(enabled: Boolean)
     private external fun nativeExportPaintGrid(): ByteArray?

@@ -711,3 +711,48 @@ TEST(MobileGSTeleological, ACleanWallPhotoGivenBeforeTheCapturePhotoWaitsForIt) 
     EXPECT_EQ(MobileGS::kCleanRegistered, g.cleanWallStatus());
     g.destroy();
 }
+
+// ---- CV preview ----------------------------------------------------------------------------------------
+
+TEST(PassEvidence, EachPassHasItsOwnColour) {
+    std::set<uint32_t> seen;
+    for (int p = 0; p < passes::kPassCount; ++p) {
+        const uint32_t c = passes::passRgb(p);
+        EXPECT_EQ(0u, c >> 24) << "colour is packed 0xRRGGBB";
+        EXPECT_TRUE(seen.insert(c).second) << "pass " << p << " shares a colour";
+    }
+}
+
+TEST(MobileGSTeleological, TheCvPreviewDrawsEveryPassesTargetsInTheDesignsOwnPixels) {
+    MobileGS g;
+    g.initialize(0, 0);
+    cv::Mat none;
+    EXPECT_FALSE(g.renderCvPreview(none, 512)) << "no design, no preview";
+
+    const cv::Mat full = makeWall(800, 600, 0x51de);
+    const float K[4] = {700.f, 700.f, 400.f, 300.f};
+    fingerprintFrontalWall(g, full, K);
+    g.setArtworkFingerprint(full, nullptr, 0, 0, 0, nullptr, nullptr);
+    g.awaitFilterTargets();
+
+    cv::Mat rgba;
+    ASSERT_TRUE(g.renderCvPreview(rgba, 400));
+    EXPECT_EQ(CV_8UC4, rgba.type());
+    EXPECT_EQ(400, rgba.cols) << "scaled so the long side is the cap";
+    EXPECT_EQ(300, rgba.rows) << "aspect kept";
+    std::vector<cv::Mat> ch; cv::split(rgba, ch);
+    EXPECT_GT(cv::countNonZero(ch[3]), 50) << "nothing was drawn";
+
+    float legend[3 * passes::kPassCount];
+    g.getPassLegend(legend);
+    EXPECT_GT(legend[3 * passes::kPassFeatures + 1], 0.0f) << "the features pass has targets";
+    int filtersWithTargets = 0;
+    for (int f = 0; f < designfilters::kCount; ++f)
+        if (legend[3 * (passes::kPassFilterBase + f) + 1] > 0.0f) ++filtersWithTargets;
+    EXPECT_EQ(g.readyFilterTargets(), filtersWithTargets);
+    for (int p = 0; p < passes::kPassCount; ++p) {
+        EXPECT_EQ((float)passes::passRgb(p), legend[3 * p]);
+        EXPECT_LE(legend[3 * p + 2], legend[3 * p + 1]) << "more confirmed than targets, pass " << p;
+    }
+    g.destroy();
+}
