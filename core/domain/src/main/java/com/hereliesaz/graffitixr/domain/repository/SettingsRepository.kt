@@ -107,7 +107,7 @@ interface SettingsRepository {
      * The persistent wall FEATURE MAP (`IMPLEMENTATION.md` phases 2b/3): grow it from
      * relocalization-locked frames, and match against it as a second relocalization source.
      *
-     * Off by default, like the other two experiment switches, and persisted for the same reason.
+     * On by default (it only adds a relocalization source), and persisted so an explicit choice survives.
      * Until this existed, `SlamManager.setMapRelocEnabled`/`setMapBuildEnabled` had no caller at
      * all: the native flags stayed at their `false` defaults for the process lifetime, so the map
      * was never built, never matched, and the `WallFeatureMap` the project record persists for it

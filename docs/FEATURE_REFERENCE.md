@@ -479,7 +479,7 @@ Settings screen:
 |---|---|---|---|
 | Drift correction | `drift_correction_enabled` | on | "Fusion" — pulls the overlay back onto each accepted relocalization instead of riding the raw ARCore anchor |
 | Self-grow | `self_grow_enabled` | off | Promotes newly validated marks into the reloc fingerprint as you paint; writes the map, so is colour-coded amber rather than green |
-| Feature map | `feature_map_enabled` | off | Builds and matches against the persistent wall feature map (`WallFeatureMap`); also writes, also amber |
+| Feature map | `feature_map_enabled` | on | Builds and matches against the persistent wall feature map (`WallFeatureMap`); also writes, also amber |
 
 ### 7.3 Interface / locale / canvas
 

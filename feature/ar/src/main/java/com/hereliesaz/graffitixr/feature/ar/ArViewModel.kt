@@ -934,7 +934,7 @@ class ArViewModel @Inject constructor(
             slamManager.setSelfGrowEnabled(_evalSelfGrowEnabled.value)
         }
         viewModelScope.launch {
-            _evalFeatureMapEnabled.value = settingsRepository.featureMapEnabled.firstOrNull() ?: false
+            _evalFeatureMapEnabled.value = settingsRepository.featureMapEnabled.firstOrNull() ?: true
             applyFeatureMapSwitch(_evalFeatureMapEnabled.value)
         }
         viewModelScope.launch {
@@ -1000,7 +1000,7 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.setSelfGrowEnabled(on) }
     }
 
-    private val _evalFeatureMapEnabled = MutableStateFlow(false)
+    private val _evalFeatureMapEnabled = MutableStateFlow(true)
 
     /** Same arrangement again for the persistent wall feature map (phases 2b/3). */
     val evalFeatureMapEnabled: StateFlow<Boolean> = _evalFeatureMapEnabled.asStateFlow()

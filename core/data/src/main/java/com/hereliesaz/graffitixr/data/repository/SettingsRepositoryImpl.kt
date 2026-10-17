@@ -205,7 +205,7 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override val featureMapEnabled: Flow<Boolean> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { preferences -> preferences[FEATURE_MAP_ENABLED] ?: false }
+        .map { preferences -> preferences[FEATURE_MAP_ENABLED] ?: true }
 
     override suspend fun setFeatureMapEnabled(on: Boolean) {
         context.dataStore.edit { preferences ->
