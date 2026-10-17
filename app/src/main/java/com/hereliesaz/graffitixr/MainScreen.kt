@@ -695,6 +695,9 @@ fun MainScreen(
                                     onDiag = { text ->
                                         arViewModel.appendDiag(text)
                                     },
+                                    onCaptureFailed = { e ->
+                                        arViewModel.onCaptureFailed(e)
+                                    },
                                     onAnchorEstablished = {
                                         arViewModel.onPrimaryAnchorEstablished()
                                     },

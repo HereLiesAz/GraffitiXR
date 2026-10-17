@@ -53,6 +53,10 @@ class ArRenderer(
     private val onTrackingUpdated: (Boolean, Int, Boolean, Float, Float, Triple<Float, Float, Float>?, Boolean, Float) -> Unit,
     private val onLightUpdated: (Float) -> Unit,
     private val onDiag: (String) -> Unit = {},
+    // Fired on the GL thread when a requested target capture threw before reaching onTargetCaptured,
+    // so the ViewModel can drop the request (otherwise isCaptureRequested stays up forever and no
+    // later tap can re-arm it) and tell the artist.
+    private val onCaptureFailed: (Throwable) -> Unit = {},
     // Fired once on the GL thread immediately after the primary anchor is
     // created. The ViewModel uses this to flip ArUiState.isAnchorEstablished,
     // which in turn unlocks the Design rail and advances scanPhase to COMPLETE.
@@ -2866,6 +2870,7 @@ class ArRenderer(
                     }
                 } catch (e: Exception) {
                     Timber.e(e, "Failed to capture target frame")
+                    onCaptureFailed(e)
                 }
             }
 
