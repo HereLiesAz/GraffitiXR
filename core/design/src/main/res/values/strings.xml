@@ -771,4 +771,12 @@
     <string name="ar_feedback_target_prepare_failed">Couldn\'t prepare the captured target. Try again.</string>
     <string name="ar_feedback_wall_width_save_failed">Couldn\'t save the wall width. Try Save again.</string>
     <string name="ar_feedback_unknown_error">unknown error</string>
+    <string name="reloc_looking">Looking for your target…</string>
+    <string name="reloc_turn_right">Turn right %1$d°</string>
+    <string name="reloc_turn_left">Turn left %1$d°</string>
+    <string name="reloc_tilt_up">Tilt up %1$d°</string>
+    <string name="reloc_tilt_down">Tilt down %1$d°</string>
+    <string name="reloc_facing_it">You\'re facing it — move slowly side to side</string>
+    <string name="reloc_recapture">Recapture target</string>
+    <string name="ar_feedback_capture_failed">Target capture failed. Tap to try again.</string>
 </resources>

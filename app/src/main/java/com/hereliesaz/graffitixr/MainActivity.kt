@@ -123,6 +123,10 @@ import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.common.model.RelocDiagnostics
 import com.hereliesaz.graffitixr.common.model.RelocReject
 import com.hereliesaz.graffitixr.common.model.RelocState
+import com.hereliesaz.graffitixr.feature.ar.TargetSearchHint
+import com.hereliesaz.graffitixr.feature.ar.TargetSearchHintMath
+import com.hereliesaz.graffitixr.feature.ar.TargetSearchPhase
+import com.hereliesaz.graffitixr.feature.ar.TargetSearchPhaseTracker
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import javax.inject.Inject
@@ -1626,14 +1630,37 @@ class MainActivity : AppCompatActivity() {
                             // `!isAnchorEstablished` made every branch but IDLE dead (the badge always
                             // returned immediately, per RelocStatusBadge's own state machine below).
                             if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && arUiState.isAnchorEstablished) {
-                                RelocStatusBadge(
-                                    isAnchorEstablished = arUiState.isAnchorEstablished,
-                                    paintingProgress = arUiState.paintingProgress,
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(top = 16.dp, end = 16.dp),
-                                    strings = strings
-                                )
+                                if (mainUiState.hasArCoreTarget == true && arUiState.paintingProgress <= 0f) {
+                                    // A saved target exists but is not matched: say so, point the
+                                    // artist the way the saved compass attitude says, and after a
+                                    // while offer to recapture. Sensors run only while this is shown.
+                                    SavedTargetSearchStatus(
+                                        savedQuaternion = mainUiState.savedTargetQuaternion,
+                                        savedMagneticAccuracy = mainUiState.savedTargetMagneticAccuracy,
+                                        targetKey = mainUiState.loadedProjectId,
+                                        canRecapture = !mainUiState.isConfirmingTarget &&
+                                            !mainUiState.isCapturingTarget && !mainUiState.isWaitingForTap,
+                                        onRecapture = {
+                                            // Same effect as the rail's Target item.
+                                            arViewModel.clearCaptureForRetry()
+                                            arViewModel.cancelMeasure()
+                                            mainViewModel.startTargetCapture()
+                                        },
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(top = 16.dp, end = 16.dp),
+                                        strings = strings
+                                    )
+                                } else {
+                                    RelocStatusBadge(
+                                        isAnchorEstablished = arUiState.isAnchorEstablished,
+                                        paintingProgress = arUiState.paintingProgress,
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(top = 16.dp, end = 16.dp),
+                                        strings = strings
+                                    )
+                                }
                             }
 
                             if (editorUiState.editorMode == EditorMode.AR && editorUiState.showDiagOverlay && !arUiState.isAnchorEstablished) {
@@ -3686,6 +3713,107 @@ private fun MeasurePanel(
                     androidx.compose.material3.TextButton(onClick = onRedo) { Text(nav.measureRedo, color = Color.White) }
                     androidx.compose.material3.TextButton(onClick = onSave) { Text(nav.measureSave, color = Color.Cyan) }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Status for "this project has a saved ARCore target but it is not matched yet".
+ *
+ * "Looking for your target..." first; after [TargetSearchPhase.HINT] a second line with a coarse
+ * turn/tilt hint from the compass attitude saved with the target (a sensor prior only; it cannot
+ * place the overlay); after [TargetSearchPhase.OFFER_RECAPTURE] a Recapture button. The
+ * TYPE_ROTATION_VECTOR listener is registered only while this composable is shown and updates state
+ * at most ~5 Hz, and only when the (5-degree-rounded) hint changes.
+ */
+@Composable
+private fun SavedTargetSearchStatus(
+    savedQuaternion: List<Float>?,
+    savedMagneticAccuracy: Int,
+    targetKey: String?,
+    canRecapture: Boolean,
+    onRecapture: () -> Unit,
+    modifier: Modifier = Modifier,
+    strings: AppStrings
+) {
+    val context = LocalContext.current
+    var hint by remember(targetKey) {
+        mutableStateOf<TargetSearchHint>(TargetSearchHint.Unknown(TargetSearchHint.Reason.NO_LIVE_ATTITUDE))
+    }
+    var phase by remember(targetKey) { mutableStateOf(TargetSearchPhase.LOOKING) }
+
+    DisposableEffect(context, savedQuaternion, savedMagneticAccuracy) {
+        val sm = context.getSystemService(android.content.Context.SENSOR_SERVICE) as? android.hardware.SensorManager
+        val sensor = sm?.getDefaultSensor(android.hardware.Sensor.TYPE_ROTATION_VECTOR)
+        var lastMs = 0L
+        val listener = object : android.hardware.SensorEventListener {
+            override fun onSensorChanged(event: android.hardware.SensorEvent) {
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (now - lastMs < 200L) return
+                lastMs = now
+                val live = TargetSearchHintMath.quaternionFromSensorValues(event.values)
+                val next = TargetSearchHintMath.compute(savedQuaternion, savedMagneticAccuracy, live, event.accuracy)
+                if (next != hint) hint = next
+            }
+            override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) {}
+        }
+        if (sm != null && sensor != null) {
+            sm.registerListener(listener, sensor, android.hardware.SensorManager.SENSOR_DELAY_UI)
+        }
+        onDispose { sm?.unregisterListener(listener) }
+    }
+
+    LaunchedEffect(targetKey) {
+        val tracker = TargetSearchPhaseTracker({ android.os.SystemClock.elapsedRealtime() })
+        while (true) {
+            phase = tracker.update(searching = true, targetKey = targetKey)
+            kotlinx.coroutines.delay(500L)
+        }
+    }
+
+    val hintText: String? = if (phase == TargetSearchPhase.LOOKING) null else when (val h = hint) {
+        is TargetSearchHint.Unknown -> null
+        is TargetSearchHint.Aligned -> strings.ar.relocFacingIt
+        is TargetSearchHint.Adjust -> listOfNotNull(
+            when {
+                h.turnDeg > 0 -> strings.ar.relocTurnRight(h.turnDeg)
+                h.turnDeg < 0 -> strings.ar.relocTurnLeft(-h.turnDeg)
+                else -> null
+            },
+            when {
+                h.tiltDeg > 0 -> strings.ar.relocTiltUp(h.tiltDeg)
+                h.tiltDeg < 0 -> strings.ar.relocTiltDown(-h.tiltDeg)
+                else -> null
+            },
+        ).joinToString(" \u00B7 ").ifEmpty { null }
+    }
+
+    val infinite = rememberInfiniteTransition(label = "saved_target_search")
+    val pulse by infinite.animateFloat(
+        initialValue = 0.4f, targetValue = 1f, label = "pulse",
+        animationSpec = infiniteRepeatable(animation = tween(700, easing = LinearEasing), repeatMode = RepeatMode.Reverse)
+    )
+
+    // Grows downward from the pill's top-right corner; the width cap keeps it clear of the
+    // top-start distance badge and the centred title row.
+    Column(
+        modifier = modifier
+            .widthIn(max = 220.dp)
+            .background(Color(0xCC000000), RoundedCornerShape(16.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(Modifier.size(8.dp).alpha(pulse).background(Color(0xFFFFCA28), CircleShape))
+            Text(strings.ar.relocLooking, fontSize = 12.sp, color = Color.White)
+        }
+        if (hintText != null) {
+            Text(hintText, fontSize = 12.sp, color = Color(0xFFE0E0E0))
+        }
+        if (phase == TargetSearchPhase.OFFER_RECAPTURE) {
+            androidx.compose.material3.TextButton(onClick = onRecapture, enabled = canRecapture) {
+                Text(strings.ar.relocRecapture, fontSize = 12.sp, color = Color.Cyan)
             }
         }
     }

@@ -754,4 +754,12 @@
     <string name="ar_feedback_target_prepare_failed">Nem sikerült előkészíteni a rögzített célpontot. Próbáld újra.</string>
     <string name="ar_feedback_wall_width_save_failed">Nem sikerült elmenteni a fal szélességét. Próbáld újra a mentést.</string>
     <string name="ar_feedback_unknown_error">ismeretlen hiba</string>
+    <string name="reloc_looking">A célpont keresése…</string>
+    <string name="reloc_turn_right">Fordulj jobbra %1$d°-kal</string>
+    <string name="reloc_turn_left">Fordulj balra %1$d°-kal</string>
+    <string name="reloc_tilt_up">Döntsd felfelé %1$d°-kal</string>
+    <string name="reloc_tilt_down">Döntsd lefelé %1$d°-kal</string>
+    <string name="reloc_facing_it">Szemben vagy vele — lassan mozogj oldalirányba</string>
+    <string name="reloc_recapture">Célpont újrarögzítése</string>
+    <string name="ar_feedback_capture_failed">A célpont rögzítése sikertelen. Érintsd meg az újrapróbáláshoz.</string>
 </resources>

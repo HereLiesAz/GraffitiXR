@@ -754,4 +754,12 @@
     <string name="ar_feedback_target_prepare_failed">無法準備已擷取的目標，請重試。</string>
     <string name="ar_feedback_wall_width_save_failed">無法儲存牆面寬度，請再次嘗試儲存。</string>
     <string name="ar_feedback_unknown_error">未知錯誤</string>
+    <string name="reloc_looking">正在尋找您的目標…</string>
+    <string name="reloc_turn_right">向右轉 %1$d°</string>
+    <string name="reloc_turn_left">向左轉 %1$d°</string>
+    <string name="reloc_tilt_up">向上傾斜 %1$d°</string>
+    <string name="reloc_tilt_down">向下傾斜 %1$d°</string>
+    <string name="reloc_facing_it">您正對著它 — 請緩慢左右移動</string>
+    <string name="reloc_recapture">重新擷取目標</string>
+    <string name="ar_feedback_capture_failed">目標擷取失敗。請輕按以重試。</string>
 </resources>

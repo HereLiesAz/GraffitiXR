@@ -180,6 +180,13 @@ fun rememberAppStrings(): AppStrings {
             looksCorrect = stringResource(R.string.looks_correct),
             redetect = stringResource(R.string.redetect),
             scanning = stringResource(R.string.scanning_dots),
+            relocLooking = stringResource(R.string.reloc_looking),
+            relocTurnRight = { deg -> context.getString(R.string.reloc_turn_right, deg) },
+            relocTurnLeft = { deg -> context.getString(R.string.reloc_turn_left, deg) },
+            relocTiltUp = { deg -> context.getString(R.string.reloc_tilt_up, deg) },
+            relocTiltDown = { deg -> context.getString(R.string.reloc_tilt_down, deg) },
+            relocFacingIt = stringResource(R.string.reloc_facing_it),
+            relocRecapture = stringResource(R.string.reloc_recapture),
             anchorLocked = stringResource(R.string.anchor_locked),
             matchedPercent = { pct -> context.getString(R.string.matched_percent, pct) },
             scanHintRecover = stringResource(R.string.scan_hint_recover),
@@ -448,6 +455,14 @@ data class AppStrings(
         val looksCorrect: String,
         val redetect: String,
         val scanning: String,
+        /** Saved target not yet matched: "Looking for your target…". */
+        val relocLooking: String,
+        val relocTurnRight: (Int) -> String,
+        val relocTurnLeft: (Int) -> String,
+        val relocTiltUp: (Int) -> String,
+        val relocTiltDown: (Int) -> String,
+        val relocFacingIt: String,
+        val relocRecapture: String,
         val anchorLocked: String,
         val matchedPercent: (Int) -> String,
         val scanHintRecover: String,
@@ -482,6 +497,9 @@ data class AppStrings(
                 looksCorrect == other.looksCorrect &&
                 redetect == other.redetect &&
                 scanning == other.scanning &&
+                relocLooking == other.relocLooking &&
+                relocFacingIt == other.relocFacingIt &&
+                relocRecapture == other.relocRecapture &&
                 anchorLocked == other.anchorLocked &&
                 scanHintRecover == other.scanHintRecover &&
                 scanHintTooDark == other.scanHintTooDark &&
@@ -513,6 +531,9 @@ data class AppStrings(
             result = 31 * result + looksCorrect.hashCode()
             result = 31 * result + redetect.hashCode()
             result = 31 * result + scanning.hashCode()
+            result = 31 * result + relocLooking.hashCode()
+            result = 31 * result + relocFacingIt.hashCode()
+            result = 31 * result + relocRecapture.hashCode()
             result = 31 * result + anchorLocked.hashCode()
             result = 31 * result + scanHintRecover.hashCode()
             result = 31 * result + scanHintTooDark.hashCode()

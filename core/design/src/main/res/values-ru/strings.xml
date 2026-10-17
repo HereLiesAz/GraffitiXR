@@ -754,4 +754,12 @@
     <string name="ar_feedback_target_prepare_failed">Не удалось подготовить снятую цель. Повторите попытку.</string>
     <string name="ar_feedback_wall_width_save_failed">Не удалось сохранить ширину стены. Повторите сохранение.</string>
     <string name="ar_feedback_unknown_error">неизвестная ошибка</string>
+    <string name="reloc_looking">Поиск вашей цели…</string>
+    <string name="reloc_turn_right">Повернитесь вправо на %1$d°</string>
+    <string name="reloc_turn_left">Повернитесь влево на %1$d°</string>
+    <string name="reloc_tilt_up">Наклоните вверх на %1$d°</string>
+    <string name="reloc_tilt_down">Наклоните вниз на %1$d°</string>
+    <string name="reloc_facing_it">Вы смотрите на неё — медленно двигайтесь из стороны в сторону</string>
+    <string name="reloc_recapture">Захватить цель заново</string>
+    <string name="ar_feedback_capture_failed">Не удалось захватить цель. Нажмите, чтобы повторить.</string>
 </resources>

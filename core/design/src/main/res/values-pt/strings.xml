@@ -749,4 +749,12 @@
     <string name="ar_feedback_target_prepare_failed">Não foi possível preparar o alvo capturado. Tente novamente.</string>
     <string name="ar_feedback_wall_width_save_failed">Não foi possível salvar a largura da parede. Tente salvar novamente.</string>
     <string name="ar_feedback_unknown_error">erro desconhecido</string>
+    <string name="reloc_looking">Procurando seu alvo…</string>
+    <string name="reloc_turn_right">Vire %1$d° para a direita</string>
+    <string name="reloc_turn_left">Vire %1$d° para a esquerda</string>
+    <string name="reloc_tilt_up">Incline %1$d° para cima</string>
+    <string name="reloc_tilt_down">Incline %1$d° para baixo</string>
+    <string name="reloc_facing_it">Você está de frente para ele — mova-se devagar de um lado para o outro</string>
+    <string name="reloc_recapture">Recapturar alvo</string>
+    <string name="ar_feedback_capture_failed">Falha ao capturar o alvo. Toque para tentar novamente.</string>
 </resources>

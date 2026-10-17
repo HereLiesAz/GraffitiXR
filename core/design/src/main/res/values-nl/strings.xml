@@ -754,4 +754,12 @@
     <string name="ar_feedback_target_prepare_failed">Het vastgelegde doel kon niet worden voorbereid. Probeer het opnieuw.</string>
     <string name="ar_feedback_wall_width_save_failed">De muurbreedte kon niet worden opgeslagen. Probeer opnieuw op te slaan.</string>
     <string name="ar_feedback_unknown_error">onbekende fout</string>
+    <string name="reloc_looking">Je doel zoeken…</string>
+    <string name="reloc_turn_right">Draai %1$d° naar rechts</string>
+    <string name="reloc_turn_left">Draai %1$d° naar links</string>
+    <string name="reloc_tilt_up">Kantel %1$d° omhoog</string>
+    <string name="reloc_tilt_down">Kantel %1$d° omlaag</string>
+    <string name="reloc_facing_it">Je kijkt ernaar — beweeg langzaam heen en weer</string>
+    <string name="reloc_recapture">Doel opnieuw vastleggen</string>
+    <string name="ar_feedback_capture_failed">Doel vastleggen mislukt. Tik om het opnieuw te proberen.</string>
 </resources>

@@ -464,4 +464,12 @@
     <string name="ar_feedback_target_prepare_failed">Hindi nahanda ang nakuhang target. Subukan muli.</string>
     <string name="ar_feedback_wall_width_save_failed">Hindi na-save ang lapad ng pader. Subukang mag-save ulit.</string>
     <string name="ar_feedback_unknown_error">hindi kilalang error</string>
+    <string name="reloc_looking">Hinahanap ang iyong target…</string>
+    <string name="reloc_turn_right">Lumiko pakanan nang %1$d°</string>
+    <string name="reloc_turn_left">Lumiko pakaliwa nang %1$d°</string>
+    <string name="reloc_tilt_up">Itagilid pataas nang %1$d°</string>
+    <string name="reloc_tilt_down">Itagilid pababa nang %1$d°</string>
+    <string name="reloc_facing_it">Nakaharap ka na rito — dahan-dahang gumalaw pakaliwa at pakanan</string>
+    <string name="reloc_recapture">I-capture muli ang target</string>
+    <string name="ar_feedback_capture_failed">Nabigo ang pagkuha ng target. I-tap para subukan muli.</string>
 </resources>
