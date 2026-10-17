@@ -2,7 +2,6 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlin.math.sqrt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -10,8 +9,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TargetSearchHintTest {
-
-    private val s2 = sqrt(0.5).toFloat()
 
     /** Quaternion [x,y,z,w] for rotation of [deg] about unit axis. */
     private fun q(deg: Double, ax: Double, ay: Double, az: Double): List<Float> {
