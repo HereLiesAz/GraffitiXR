@@ -572,6 +572,43 @@ bool MobileGS::fingerprintFrameIsCaptureCamera(const std::vector<cv::Point3f>& p
  *
  * @param relocView the VIO view matrix snapshotted alongside the frame, for the rectifying warp.
  */
+namespace {
+// ARDIAG perf: how much of the wall clock the relocalization thread spends working, logged once a minute.
+// Diagnostic only; touches no MobileGS member, so it needs no engine lock.
+struct RelocPerf {
+    std::atomic<long long> passUs{0};     // whole runRelocPass
+    std::atomic<long long> matchUs{0};    // the progress matching inside it (tryUpdateFingerprint + updatePaintGrid)
+    std::atomic<int> passes{0};
+    std::atomic<long long> windowStartMs{0};
+    // The last pass's progress-matching verdict (MobileGS::CorrobGate ordinal, RelocDiagnostics.kt), how many
+    // design features it predicted in view and matched, and why the last relocalization was or was not accepted
+    // (MobileGS::RelocReject ordinal). Answers "why is there no painting progress".
+    std::atomic<int> gate{-1}, predicted{0}, matched{0}, reject{-1};
+};
+RelocPerf gRelocPerf;
+
+long long steadyMs() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+void relocPerfMaybeLog(bool locked, int backoffMs) {
+    const long long now = steadyMs();
+    long long start = gRelocPerf.windowStartMs.load(std::memory_order_relaxed);
+    if (start == 0) { gRelocPerf.windowStartMs.store(now, std::memory_order_relaxed); return; }
+    if (now - start < 60000) return;
+    if (!gRelocPerf.windowStartMs.compare_exchange_strong(start, now)) return;
+    const int n = gRelocPerf.passes.exchange(0);
+    const long long passUs = gRelocPerf.passUs.exchange(0);
+    const long long matchUs = gRelocPerf.matchUs.exchange(0);
+    const double elapsedMs = (double)(now - start);
+    LOGI("ARDIAG perf reloc: passes=%d avgPassMs=%.1f avgMatchMs=%.1f busy=%.0f%% locked=%d backoffMs=%d "
+         "corrobGate=%d predicted=%d matched=%d relocReject=%d",
+         n, n ? passUs / 1000.0 / n : 0.0, n ? matchUs / 1000.0 / n : 0.0,
+         elapsedMs > 0 ? 100.0 * (passUs / 1000.0) / elapsedMs : 0.0, locked ? 1 : 0, backoffMs,
+         gRelocPerf.gate.load(), gRelocPerf.predicted.load(), gRelocPerf.matched.load(), gRelocPerf.reject.load());
+}
+}  // namespace
+
 void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const float* relocAttitude) {
     cv::Mat wallDescs;
     std::vector<cv::Point3f> wallKps3d;
@@ -1231,8 +1268,15 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
     // Teleological gatekeeper: update painting-progress from how much of the artwork base the clean
     // frame now corroborates. No-op until an artwork is registered; read-only on the reloc set.
     // Hands over this frame's detection so it isn't recomputed (see tryUpdateFingerprint).
+    const auto matchStart = std::chrono::steady_clock::now();
     tryUpdateFingerprint(gray, &baseKps, &baseDescs);
     updatePaintGrid(frame);
+    gRelocPerf.matchUs.fetch_add(std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::steady_clock::now() - matchStart).count(), std::memory_order_relaxed);
+    gRelocPerf.gate.store(mCorrobGate.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    gRelocPerf.predicted.store(mCorrobPredicted.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    gRelocPerf.matched.store(mCorrobMatched.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    gRelocPerf.reject.store(mLastRelocReject.load(std::memory_order_relaxed), std::memory_order_relaxed);
 }
 
 void MobileGS::relocThreadFunc() {
@@ -1258,7 +1302,11 @@ void MobileGS::relocThreadFunc() {
         // the pass on the caller's thread and never sets mRelocRequested, so the wait above simply
         // parks. (Switching modes mid-run can let one already-queued request through; the flag is an
         // eval affordance set before a run starts, not a live toggle.)
+        const auto passStart = std::chrono::steady_clock::now();
         runRelocPass(frame, relocView, relocHasAttitude ? relocAttitude : nullptr);
+        gRelocPerf.passUs.fetch_add(std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::steady_clock::now() - passStart).count(), std::memory_order_relaxed);
+        gRelocPerf.passes.fetch_add(1, std::memory_order_relaxed);
 
         // Back off only once locked. A flat 200 ms capped every state at 5 Hz, including the one that
         // matters most — hunting for the first lock, or re-acquiring after the artist looks away —
@@ -1269,6 +1317,7 @@ void MobileGS::relocThreadFunc() {
         const bool locked = mLastRelocReject.load(std::memory_order_relaxed) == kRelocOk;
         const int backoffMs = locked ? mRelocLockedBackoffMs.load(std::memory_order_relaxed)
                                      : mRelocHuntBackoffMs.load(std::memory_order_relaxed);
+        relocPerfMaybeLog(locked, backoffMs);
         std::unique_lock<std::mutex> lock(mRelocMutex);
         mRelocCv.wait_for(lock, std::chrono::milliseconds(backoffMs), [this] { return !mRelocRunning; });
     }

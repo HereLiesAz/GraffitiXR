@@ -158,7 +158,8 @@ the real (non-stub) tracker is packaged.
 *   `anticipation/AnticipationGovernor.kt`: device pressure (battery, heat) and the tracker's load
     throttle the anticipation through nested subsets — far half-spheres first, close-ups last.
 *   `anticipation/AnticipationFeeder.kt`: renders the allowed views off the camera thread, farthest
-    first, four at a time, into a `PhotosphereTrackingSession` (standalone) or `SphereSlamTracker`
+    first (views from more than 45° above or below the wall's normal, which a camera at a wall rarely
+    takes, last; none dropped), four at a time, into a `PhotosphereTrackingSession` (standalone) or `SphereSlamTracker`
     (ARCore), and tells it which to search.
 *   `anchor/CloseUpFeatures.kt`: the fingerprint's close-ups — square-on crops of the capture photo
     at zooms 6×, 3×, 2× over the aim grid, detected with the base detector, mapped back to its pixels.

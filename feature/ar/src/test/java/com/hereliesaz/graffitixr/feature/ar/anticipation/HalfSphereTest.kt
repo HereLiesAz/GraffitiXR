@@ -195,4 +195,47 @@ class HalfSphereTest {
         val corners = all.filter { it.site.shell == 0 && it.site.circle == 0 && it.site.roll == 0 && it.site.aim in setOf(0, 8) }
         assertTrue(AnticipationFeeder.priorityCost(corners[0].pose, corners[1].pose) >= AnticipationFeeder.DEG_PER_FRAME)
     }
+
+    private fun steepLabelled(all: List<HalfSphere.Plan>, label: String) =
+        AnticipationFeeder.isSteepVertical(all.first { it.site.roll == 0 && it.site.aim == 0 && it.label.contains(label) })
+
+    @Test
+    fun `views from steeply above or below are rare, sideways and square-on ones are not`() {
+        val all = plans(AnticipationSettings(3, 8, 3, roll = 2))
+        assertTrue(!AnticipationFeeder.isSteepVertical(all.first { it.kind == HalfSphere.Kind.POLE }))
+        // Azimuth 90 is toward the page's top (the camera above the work), 270 toward its bottom.
+        assertTrue(steepLabelled(all, "tilt 67.5° toward 90°"))
+        assertTrue(steepLabelled(all, "tilt 67.5° toward 270°"))
+        assertTrue(steepLabelled(all, "tilt 67.5° toward 45°")) // a slant that is mostly vertical
+        // Along the wall: as steep as it gets, but sideways.
+        assertTrue(!steepLabelled(all, "tilt 67.5° toward 0°"))
+        assertTrue(!steepLabelled(all, "tilt 67.5° toward 180°"))
+        // Shallow views are common whichever way they lean.
+        assertTrue(!steepLabelled(all, "tilt 22.5° toward 90°"))
+        assertTrue(!steepLabelled(all, "tilt 22.5° toward 270°"))
+    }
+
+    @Test
+    fun `steep vertical views are built last and none are dropped`() {
+        val all = plans(AnticipationSettings(3, 8, 3, roll = 2))
+        val ordered = HalfSphere.prioritized(all, AnticipationFeeder::priorityCost, AnticipationFeeder::isSteepVertical)
+        assertEquals(all.size, ordered.size)
+        assertEquals(all.toSet(), ordered.toSet())
+        val rareCount = all.count(AnticipationFeeder::isSteepVertical)
+        assertTrue("some views are rare", rareCount in 1 until all.size)
+        val firstRare = ordered.indexOfFirst(AnticipationFeeder::isSteepVertical)
+        assertEquals(all.size - rareCount, firstRare)
+        assertTrue(ordered.drop(firstRare).all(AnticipationFeeder::isSteepVertical))
+        // The common views are still built farthest first: the first is a steep sideways cut, not a rare one.
+        assertEquals(HalfSphere.Kind.CUT, ordered.first().kind)
+        assertTrue(ordered.first().label, ordered.first().label.contains("tilt 67.5°"))
+    }
+
+    @Test
+    fun `without a rarity test the order is unchanged`() {
+        val all = plans(AnticipationSettings(3, 8, 3, roll = 2))
+        val plain = HalfSphere.prioritized(all, AnticipationFeeder::priorityCost)
+        val explicit = HalfSphere.prioritized(all, AnticipationFeeder::priorityCost) { false }
+        assertEquals(plain.map { it.label }, explicit.map { it.label })
+    }
 }

@@ -7,8 +7,10 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
 import kotlin.math.acos
+import kotlin.math.atan2
 import kotlin.math.hypot
 import kotlin.math.ln
 
@@ -55,6 +57,15 @@ internal class AnticipationFeeder(
 
     /** Views handed to the sink so far, all pages. */
     @Volatile var viewsAdded = 0
+
+    // ARDIAG perf (diagnostic only): once a minute, how heavy the tracking frames are and how many views are
+    // being searched, so a battery complaint can be traced to the anticipation (building or searching) or not.
+    private var perfStartMs = 0L
+    private var perfFrames = 0
+    private var perfWorkMs = 0.0
+    private var perfViewsAtStart = 0
+    private val perfRenderMs = AtomicLong(0)
+    @Volatile private var searchableCount = 0
         private set
 
     private val closed = AtomicBoolean(false)
@@ -104,6 +115,7 @@ internal class AnticipationFeeder(
         if (closed.get()) return
         governor.onFrame(workMs, timestampNs)
         val status = governor.update(nowMs)
+        logPerf(nowMs, workMs)
         if (camera == null) return
         val key = status.max.grid() to status.decimation
         if (camera == this.camera && key == applied) return
@@ -115,6 +127,19 @@ internal class AnticipationFeeder(
                 extend()
             }
         }
+    }
+
+    private fun logPerf(nowMs: Long, workMs: Float) {
+        if (perfStartMs == 0L) { perfStartMs = nowMs; perfViewsAtStart = viewsAdded; return }
+        perfFrames++
+        perfWorkMs += workMs
+        if (nowMs - perfStartMs < 60_000L) return
+        timber.log.Timber.i(
+            "ARDIAG perf anticipation: frames=%d avgWorkMs=%.1f searchable=%d builtThisMinute=%d renderMs=%d",
+            perfFrames, if (perfFrames > 0) perfWorkMs / perfFrames else 0.0, searchableCount,
+            viewsAdded - perfViewsAtStart, perfRenderMs.getAndSet(0),
+        )
+        perfStartMs = nowMs; perfFrames = 0; perfWorkMs = 0.0; perfViewsAtStart = viewsAdded
     }
 
     /** Executor: hand over the allowed views not yet built, [BATCH] at a time, then set the search. */
@@ -137,6 +162,7 @@ internal class AnticipationFeeder(
                 }
             }
             val target = page ?: break
+            val renderStartNs = System.nanoTime()
             val views = batch.map { plan ->
                 val preview = HalfSphere.render(target.luma, target.width, target.height, plan, useOpenCv)
                 target.built[plan.label] = plan.site
@@ -150,6 +176,7 @@ internal class AnticipationFeeder(
                     scale = preview.scale.toFloat(),
                 )
             }
+            perfRenderMs.addAndGet((System.nanoTime() - renderStartNs) / 1_000_000L)
             if (gen != generation) return
             sink.addViews(target.pageNo, views)
             viewsAdded += views.size
@@ -163,15 +190,16 @@ internal class AnticipationFeeder(
             val current = p.plans.associateBy { it.label }
             for ((label, site) in p.built) if (label in current && status.decimation.keeps(site, max)) ids += viewId(p.pageNo, label)
         }
+        searchableCount = ids.size
         sink.setSearchable(ids)
     }
 
-    /** [p]'s plans for [max] and [cam], farthest first. */
+    /** [p]'s plans for [max] and [cam], farthest first, views from steeply above or below last. */
     private fun planFor(p: Page, max: AnticipationSettings, cam: CameraIntrinsics) {
         val key = max to cam
         if (p.planKey == key) return
         p.planKey = key
-        p.plans = HalfSphere.prioritized(HalfSphere.plans(p.width, p.height, cam, max), ::priorityCost)
+        p.plans = HalfSphere.prioritized(HalfSphere.plans(p.width, p.height, cam, max), ::priorityCost, ::isSteepVertical)
     }
 
     private fun submit(task: () -> Unit) {
@@ -201,6 +229,24 @@ internal class AnticipationFeeder(
 
         /** Degrees of view angle that weigh as much as aims a whole frame apart (no overlap). */
         const val DEG_PER_FRAME = 30.0
+
+        /**
+         * How steeply a view looks up or down the wall before it counts as rare, in degrees: the angle,
+         * in the vertical plane, between the camera's direction from the target and the wall's normal.
+         * Standing at a wall the camera is level with the work or a little above or below it, and
+         * walks along it far more than it climbs; 45 is a camera as far up as it is out. Sideways
+         * angles are not affected: someone moving along the wall sees it at a slant.
+         */
+        const val RARE_VERTICAL_DEG = 45.0
+
+        /** True for a view from more than [RARE_VERTICAL_DEG] above or below the wall's normal: built last. */
+        fun isSteepVertical(plan: HalfSphere.Plan): Boolean {
+            // cameraFromPage's third row is the camera's forward axis in the page frame (x right, y up,
+            // z out of the wall); the camera sits opposite to it, so its up/out components are -f.
+            val up = -plan.cameraFromPage[7]
+            val out = -plan.cameraFromPage[8]
+            return Math.toDegrees(atan2(abs(up), out)) > RARE_VERTICAL_DEG
+        }
 
         fun viewId(pageNo: Int, label: String) = "p$pageNo $label"
 

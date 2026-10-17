@@ -38,6 +38,10 @@ fingerprint — the teleological layer's anticipated appearance of the wall.
 - [x] Throttling (`AnticipationGovernor`): far half-spheres go first, outermost in; the nearest one's
   warps go last, and its aims never. Lowering builds nothing; relief waits 10 s.
 - [x] Built off the camera thread, farthest first, four at a time (`AnticipationFeeder`).
+- [x] Views from steeply above or below the wall (more than `RARE_VERTICAL_DEG` = 45° from its normal in the
+  vertical plane) are built after all the others, farthest first among themselves; none are dropped. Sideways
+  angles are not demoted. There is no canvas/floor-work signal in the app, so the demotion always applies;
+  those views still get built, just last.
 - [x] Fingerprint review: a highlighted mark touching the photo's edge is excluded automatically.
 
 Device checks owed for 0.26.6:
