@@ -266,3 +266,58 @@ TEST(MobileGSTeleological, PaintMarksAreNotPromotedWhileSelfGrowIsOff) {
 TEST(MobileGSTeleological, PaintMarksArePromotedFromAWellSpreadLockWhenSelfGrowIsOn) {
     EXPECT_GT(paintMarksAfterThreeLocks(true), 0);
 }
+
+// ---- Pass evidence ---------------------------------------------------------------------------------
+
+// The cell is confirmed when ANY pass sees paint: the passes fail differently, so a dissenting pass
+// must not veto another's evidence.
+TEST(PassEvidence, AnyPresentVoteConfirmsAndNoDataOrAbsentDoesNot) {
+    using namespace passes;
+    const uint8_t none[2] = {kNoData, kNoData};
+    const uint8_t absent[2] = {kAbsent, kAbsent};
+    const uint8_t mixed[2] = {kAbsent, kPresent};
+    const uint8_t one[2] = {kPresent, kNoData};
+    EXPECT_FALSE(combineVotes(none, 2));
+    EXPECT_FALSE(combineVotes(absent, 2));
+    EXPECT_TRUE(combineVotes(mixed, 2)) << "a dissenting pass vetoed another's evidence";
+    EXPECT_TRUE(combineVotes(one, 2));
+    EXPECT_FALSE(combineVotes(none, 0));
+}
+
+TEST(PassEvidence, EveryPassHasAStableName) {
+    EXPECT_STREQ("features", passes::passName(passes::kPassFeatures));
+    EXPECT_STREQ("colour", passes::passName(passes::kPassColour));
+    EXPECT_STREQ("unknown", passes::passName(99));
+}
+
+// With the design laid exactly on the captured wall, the feature pass judges cells and sees paint in
+// them, and the numbers show up in the per-pass stats. An unknown pass is refused.
+TEST(MobileGSTeleological, ThePassStatsCountWhatEachPassJudged) {
+    MobileGS g;
+    g.initialize(0, 0);
+    const cv::Mat full = makeWall(800, 600, 0x51de);
+    const float K[4] = {700.f, 700.f, 400.f, 300.f};
+    fingerprintFrontalWall(g, full, K);
+    g.setArtworkFingerprint(full, nullptr, 0, 0, 0, nullptr, nullptr);
+    const float hw = (float)full.cols / (2.0f * K[0]);
+    const float hh = (float)full.rows / (2.0f * K[1]);
+    const float place[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0,
+                             (full.cols * 0.5f - K[2]) / K[0], (full.rows * 0.5f - K[3]) / K[1], 1.0f, 1};
+    g.setDesignPlacement(place, hw, hh);
+    g.setLiveIntrinsics(K);
+    g.setEvalSyncReloc(true, 1);
+    for (int i = 0; i < 3; ++i) g.scheduleRelocCheck(full);
+
+    long st[5];
+    ASSERT_TRUE(g.getPassStats(passes::kPassFeatures, st));
+    EXPECT_GT(st[0], 0) << "the feature pass never judged a tick";
+    EXPECT_GT(st[1], 0) << "the feature pass never judged a cell";
+    EXPECT_GT(st[2], 0) << "the feature pass never saw paint on a wall that matches the design";
+    EXPECT_LE(st[2], st[1]);
+    long colour[5];
+    ASSERT_TRUE(g.getPassStats(passes::kPassColour, colour));
+    EXPECT_FALSE(g.getPassStats(passes::kPassCount, st));
+    EXPECT_FALSE(g.getPassStats(-1, st));
+    g.setEvalSyncReloc(false, 1);
+    g.destroy();
+}

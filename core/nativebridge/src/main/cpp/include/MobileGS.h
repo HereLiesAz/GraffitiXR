@@ -7,6 +7,7 @@
 #include "SuperPointDetector.h"
 #include "DistortionHead.h"
 #include "LowLightEnhancer.h"
+#include "PassEvidence.h"
 #include <cmath>
 #include <limits>
 #include <mutex>
@@ -825,6 +826,8 @@ private:
         bool baseGroupsBuilt = false;
     };
     PaintGrid mGrid;
+    // Per-pass diagnostics (see PassEvidence.h), guarded by mMutex.
+    passes::Stats mPassStats[passes::kPassCount];
     cv::Mat mCaptureRgb;                           // capture photo (fingerprint frame = its camera)
     float mCaptureIntr[4] = {0,0,0,0};
     std::vector<uint8_t> mPendingGridRestore;      // applied when a grid of matching shape is built
@@ -842,6 +845,8 @@ public:
     std::vector<uint8_t> exportPaintGrid() const;
     void restorePaintGrid(const std::vector<uint8_t>& blob);
     float getFeatureProgress() const { return mFeatureProgress.load(std::memory_order_relaxed); }
+    /** Running numbers for pass [pass]: {ticks, observed, present, lastObserved, lastPresent}. False for an unknown pass. */
+    bool getPassStats(int pass, long out5[5]) const;
 private:
     // -1 = never measured, which is NOT the same as 0.0 = measured and found nothing. Zero is a
     // legitimate reading here, so it cannot double as the "no data yet" sentinel.
