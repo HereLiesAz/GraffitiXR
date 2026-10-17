@@ -5874,6 +5874,7 @@ class ArViewModel @Inject constructor(
      * the captured wall plane, and clears the on-image markers.
      */
     fun clearCaptureForRetry() {
+        slamManager.abortFingerprintReplacement()
         pendingTapPosition = null
         pendingStandaloneFingerprintPlacement = null
         resetCapturePipeline()

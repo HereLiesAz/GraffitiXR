@@ -250,8 +250,23 @@ class SlamManager @Inject constructor(
 
     /** A re-capture is replacing the anchor: forget the old capture pose and gate reloc. */
     fun beginFingerprintReplacement() {
+        previousCaptureAnchorCam = captureAnchorCam
         captureAnchorCam = null
         awaitingNewFingerprint = true
+    }
+
+    private var previousCaptureAnchorCam: FloatArray? = null
+
+    /**
+     * A replacement that never completed (build failed, capture abandoned): native still holds the
+     * previous fingerprint, so restore its pose and lower the gate. A no-op once the gate is down,
+     * so it is safe in every `finally`. Without this a failed re-capture silences relocalization
+     * of the still-valid saved target for the rest of the session.
+     */
+    fun abortFingerprintReplacement() {
+        if (!awaitingNewFingerprint) return
+        captureAnchorCam = previousCaptureAnchorCam
+        awaitingNewFingerprint = false
     }
 
     /**
