@@ -2536,7 +2536,11 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
         mPaintDescriptors.release();
         mPaintPoints3D.clear();
         mWallDescriptors = descs.clone();
-        mBareWallCount = (size_t)mWallDescriptors.rows;
+        // A peer's blob is the host's set INCLUDING anything self-grow appended, with no boundary between
+        // the captured wall and the grown tail. Treating all of it as bare wall would exclude learned
+        // (painted) features from the evidence, so this device has no exclusion list for a peer's
+        // fingerprint: the pass loses its guard here rather than gaining a wrong one.
+        mBareWallCount = 0;
         // A peer's fingerprint carries no partition, and the local one indexes a different point
         // set. Empty = all backbone, i.e. pre-Phase-2 behaviour, which is the right default for a
         // map whose design footprint this device never saw.

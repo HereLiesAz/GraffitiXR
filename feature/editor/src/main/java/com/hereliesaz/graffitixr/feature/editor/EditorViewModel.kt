@@ -680,7 +680,7 @@ class EditorViewModel @Inject constructor(
         var failure: String? = null
         var stencilDark: Boolean? = null
         if (design.isSubjectIsolated) {
-            val isolated = subjectIsolator.isolate(out).getOrNull()?.isolatedBitmap
+            val isolated = isolateCached(out)
             if (isolated != null) out = isolated
             else failure = "Couldn't isolate a subject in this image."
         }
@@ -697,7 +697,7 @@ class EditorViewModel @Inject constructor(
             // the whole image. Only then does the stencil decide whether the image is light or dark
             // and choose its base sheet. Segmentation is the slow part and cycling the view repeats
             // this, so the result for a given source is kept.
-            val forStencil = if (design.isSubjectIsolated) out else stencilBackgroundRemoved(out)
+            val forStencil = if (design.isSubjectIsolated) out else (isolateCached(out) ?: out)
             val result = StencilProcessor.stencil(forStencil, design.stencilView)
             if (result != null) {
                 out = result.bitmap
@@ -713,16 +713,17 @@ class EditorViewModel @Inject constructor(
         operator fun component2() = failure
     }
 
-    // The stencil's background-removed image for one source bitmap (null inside = no subject found).
-    private var stencilBaseFor: Bitmap? = null
-    private var stencilBase: Bitmap? = null
+    // Subject isolation of one source bitmap (null inside = no subject found), kept so toggling Isolate
+    // or cycling the Stencil view does not repeat the slow ML Kit segmentation for the same image.
+    private var isolatedFor: Bitmap? = null
+    private var isolatedResult: Bitmap? = null
 
-    private suspend fun stencilBackgroundRemoved(source: Bitmap): Bitmap {
-        if (stencilBaseFor === source) return stencilBase ?: source
+    private suspend fun isolateCached(source: Bitmap): Bitmap? {
+        if (isolatedFor === source) return isolatedResult
         val isolated = subjectIsolator.isolate(source).getOrNull()?.isolatedBitmap
-        stencilBaseFor = source
-        stencilBase = isolated
-        return isolated ?: source
+        isolatedFor = source
+        isolatedResult = isolated
+        return isolated
     }
 
     /**
