@@ -39,6 +39,16 @@ class GraffitiApplication : Application() {
         // 1. Initialize Logging
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
+        } else {
+            // Release builds keep only the ARDIAG diagnostic lines (overlay basis, perf, hybrid KPM),
+            // so a field report can be captured from the build people actually run. Tagged with the
+            // package name so a logcat capture filtered on "graffitixr" picks them up.
+            Timber.plant(object : Timber.Tree() {
+                override fun isLoggable(tag: String?, priority: Int) = priority >= android.util.Log.INFO
+                override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
+                    if (message.startsWith("ARDIAG")) android.util.Log.println(priority, "graffitixr", message)
+                }
+            })
         }
 
         // 1.1. Load Native Libraries (OpenCV + GraffitiXR)
