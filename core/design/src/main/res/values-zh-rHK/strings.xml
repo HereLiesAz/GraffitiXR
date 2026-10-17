@@ -555,6 +555,10 @@
     <string name="nav_join_coop_info">加入附近嘅連線，令你嘅 AR 視圖同主機裝置對齊。</string>
     <string name="nav_leave_coop">離開</string>
     <string name="nav_leave_coop_info">退出目前嘅連線。</string>
+    <string name="nav_link_view_own">本機檢視</string>
+    <string name="nav_link_view_tripod">三腳架檢視</string>
+    <string name="nav_link_view_info">在本裝置的 AR 檢視與三腳架相機檢視之間切換。</string>
+    <string name="link_tripod_waiting">正在等候三腳架…</string>
     <string name="nav_wearable">穿戴裝置</string>
     <string name="nav_wearable_info">連接智能眼鏡，透過與視角對齊的鏡頭輸入，獲得免持AR體驗。</string>
     <string name="nav_wall_clear">清除</string>

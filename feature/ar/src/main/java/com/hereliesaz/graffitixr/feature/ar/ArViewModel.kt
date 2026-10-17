@@ -241,6 +241,24 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch {
             collaborationManager.videoWanted.collect { applyTripodSink(it) }
         }
+        // Display device: decode each streamed JPEG off the main thread into the state the view draws.
+        viewModelScope.launch(Dispatchers.Default) {
+            collaborationManager.video.collect { jpeg ->
+                val frame = jpeg?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) }
+                _uiState.update { if (it.tripodView) it.copy(tripodFrame = frame) else it }
+            }
+        }
+    }
+
+    /**
+     * Guest: switch between this device's own AR view and the tripod's streamed view. Asking the host
+     * for frames only while the tripod view is up keeps the host from encoding for nobody.
+     */
+    fun toggleTripodView() {
+        if (_uiState.value.coopRole != com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) return
+        val show = !_uiState.value.tripodView
+        collaborationManager.setVideoWanted(show)
+        _uiState.update { it.copy(tripodView = show, tripodFrame = null) }
     }
 
     private val tripodEncoding = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -629,6 +647,8 @@ class ArViewModel @Inject constructor(
                     coopPeerSpatialFrame = null,
                     coopPeerFingerprint = null,
                     guestEditWasDropped = false,
+                    tripodView = false,
+                    tripodFrame = null,
                 )
             }
             _hostQrPayload.value = null

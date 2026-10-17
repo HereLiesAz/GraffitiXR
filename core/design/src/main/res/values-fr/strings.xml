@@ -286,6 +286,10 @@
     <string name="nav_join_coop_info">Rejoignez un lien à proximité pour aligner votre vue AR sur celle de l’appareil hôte.</string>
     <string name="nav_leave_coop">Quitter</string>
     <string name="nav_leave_coop_info">Quittez le lien en cours.</string>
+    <string name="nav_link_view_own">Vue propre</string>
+    <string name="nav_link_view_tripod">Vue du trépied</string>
+    <string name="nav_link_view_info">Bascule entre la vue AR de cet appareil et la vue de la caméra sur trépied.</string>
+    <string name="link_tripod_waiting">En attente du trépied…</string>
     <string name="nav_wearable">Objet connecté</string>
     <string name="nav_wearable_info">Connectez-vous à des lunettes connectées pour une expérience AR mains libres avec une entrée caméra alignée sur votre perspective.</string>
     <string name="nav_wall_clear">Effacer</string>

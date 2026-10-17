@@ -550,6 +550,10 @@
     <string name="nav_join_coop_info">Unisciti a un collegamento vicino per allineare la tua vista AR a quella del dispositivo host.</string>
     <string name="nav_leave_coop">Esci</string>
     <string name="nav_leave_coop_info">Esci dal collegamento corrente.</string>
+    <string name="nav_link_view_own">Vista propria</string>
+    <string name="nav_link_view_tripod">Vista treppiede</string>
+    <string name="nav_link_view_info">Passa tra la vista AR di questo dispositivo e la vista della fotocamera sul treppiede.</string>
+    <string name="link_tripod_waiting">In attesa del treppiede…</string>
     <string name="nav_wearable">Indossabile</string>
     <string name="nav_wearable_info">Connettiti a un visore smart per un\'esperienza AR a mani libere con input della fotocamera allineato alla tua prospettiva.</string>
     <string name="nav_wall_clear">Rimuovi</string>

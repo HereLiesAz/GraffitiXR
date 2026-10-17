@@ -555,6 +555,10 @@
     <string name="nav_join_coop_info">Csatlakozz egy közeli kapcsolathoz, hogy az AR nézeted igazodjon a gazdaeszközhöz.</string>
     <string name="nav_leave_coop">Kilépés</string>
     <string name="nav_leave_coop_info">Lépj ki az aktuális kapcsolatból.</string>
+    <string name="nav_link_view_own">Saját nézet</string>
+    <string name="nav_link_view_tripod">Állvány nézete</string>
+    <string name="nav_link_view_info">Váltás a készülék saját AR-nézete és az állvány kameranézete között.</string>
+    <string name="link_tripod_waiting">Várakozás az állványra…</string>
     <string name="nav_wearable">Viselhető eszköz</string>
     <string name="nav_wearable_info">Csatlakozz egy okosszemüveghez a kéz nélküli AR-élményhez és a nézőponthoz igazított kamerabemenethez.</string>
     <string name="nav_wall_clear">Törlés</string>

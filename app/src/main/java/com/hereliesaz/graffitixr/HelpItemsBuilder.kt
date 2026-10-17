@@ -39,6 +39,7 @@ internal fun buildHelpItems(strings: AppStrings): Map<String, Any> = mapOf(
     "coop.host" to strings.nav.hostCoopInfo,
     "coop.join" to strings.nav.joinCoopInfo,
     "coop.leave" to strings.nav.leaveCoopInfo,
+    "coop.view" to strings.nav.linkViewInfo,
 
     // Overlay tools
     "mode.overlay.light" to strings.help.flashlight,
