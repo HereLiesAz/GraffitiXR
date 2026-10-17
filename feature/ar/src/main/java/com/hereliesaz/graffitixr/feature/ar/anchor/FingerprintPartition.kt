@@ -114,9 +114,15 @@ object FingerprintPartition {
         composed: Boolean = false,
         innerMargin: Float = DEFAULT_INNER_MARGIN,
         outerMargin: Float = DEFAULT_OUTER_MARGIN,
+        /**
+         * Per point, nonzero for a reference mark the artist tapped ([Fingerprint.pinned]): forced
+         * OUTSIDE wherever the design falls. Ignored unless 1:1 with the points.
+         */
+        pinned: ByteArray = ByteArray(0),
     ): ByteArray {
         val count = points.size / 3
         if (count == 0) return ByteArray(0)
+        val pin = pinned.size == count
         // Hoist the inverse: Footprint.of/ofComposed each allocate a FloatArray(16) per call, and
         // ofComposed also does a sqrt to recover a scale that is constant across the capture. Over a
         // 1500-feature capture that dominates everything else this function does.
@@ -127,7 +133,8 @@ object FingerprintPartition {
         for (i in 0 until count) {
             val o = i * 3
             Footprint.ofInverted(inv, halfW, halfH, points[o], points[o + 1], points[o + 2], uv)
-            out[i] = Footprint.classify(uv, innerMargin, outerMargin).ordinal.toByte()
+            out[i] = if (pin && pinned[i].toInt() != 0) Footprint.Region.OUTSIDE.ordinal.toByte()
+            else Footprint.classify(uv, innerMargin, outerMargin).ordinal.toByte()
         }
         return out
     }
@@ -174,6 +181,7 @@ object FingerprintPartition {
             regions = classify(
                 fingerprint.points3d.toFloatArray(), designInPointFrame, design.halfW, design.halfH,
                 composed = false, innerMargin = innerMargin, outerMargin = outerMargin,
+                pinned = fingerprint.pinned,
             ),
             captureHalfW = design.halfW,
             captureHalfH = design.halfH,
