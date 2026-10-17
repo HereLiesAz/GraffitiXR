@@ -58,9 +58,8 @@ on top of the OpenCV relocalizer:
    nothing else and correction strength was identical at 0% and 100% painted.)
 
 4. **Self-grow.** Live features that pass the same corroboration test are
-   promoted into the reloc fingerprint (`mSelfGrowEnabled`, default **off** —
-   reachable only from the diagnostic overlay, not the artist-facing UI; see
-   the note at the end of this document), so
+   promoted into the reloc fingerprint (`mSelfGrowEnabled`, default **on**; switchable from the
+   diagnostic overlay), so
    relocalization survives the original marks being painted over. The promotion
    gate is `MobileGS::growTrusted` — a strong inlier ratio qualifies at a lower
    absolute count, because a half-covered wall rarely reaches a large raw inlier
@@ -226,10 +225,8 @@ using the wall's normal learned at earlier locks and saved with the project.
   relocalization and this teleological correction on top of ARCore's poses.
   There is no persistent voxel or splat map — see `NATIVE_ENGINE.md`.
 - Pose smoothing/fusion lives in the Kotlin `PoseFusion` layer, not in C++.
-- **Drift correction and self-grow both ship off by default**, reachable only
-  from the diagnostic overlay (Settings > diagnostic overlay), not the
-  artist-facing UI. Everything above describes what these mechanisms DO when
-  enabled, not what a normal install experiences out of the box.
+- **Drift correction, self-grow and the feature map ship on by default**; each can be
+  switched off from the diagnostic overlay (Settings > diagnostic overlay).
 
 ---
 *Documentation updated on 2026-10-12: added Anticipation (half-sphere views of the KPM page, close-ups first). Earlier: 2026-09-04 (later pass): corrected the mechanism section — the bundled ONNX distortion head, not the descriptor-similarity test, is the producer of `mPaintingProgress`/`mCorroborationConfidence` in a normal (asset-present) install; the descriptor test only runs as a fallback when that asset is stripped. Earlier same-day pass corrected the confGlobal formula's input (corroboration confidence, not painting progress), self-grow's actual default (off, not on), the corroboration Lowe ratio (0.85, not 0.75), and removed a stale reference to the deleted voxel/splat map. Prior update: 2026-06-22, SLAM right-size and documentation-accuracy pass.*

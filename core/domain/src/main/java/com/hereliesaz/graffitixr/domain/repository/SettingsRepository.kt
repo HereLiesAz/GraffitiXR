@@ -58,7 +58,7 @@ interface SettingsRepository {
      * relocalization correction computed while it was off is discarded, so the overlay drifts
      * exactly as if nothing worked, with nothing in the UI to say why.
      *
-     * Off by default still: it is unvalidated on a device. But a switch the artist has to remember
+     * On by default: without it a saved target never pulls the overlay onto the wall. A switch the artist has to remember
      * to find and re-flip on every launch is not a switch they have.
      */
     val driftCorrectionEnabled: Flow<Boolean>
@@ -68,9 +68,8 @@ interface SettingsRepository {
     /**
      * Whether self-grow may promote validated new marks into the reloc fingerprint.
      *
-     * Persisted for the same reason, and still default-off for a stronger one: it is the only
-     * mechanism that permanently rewrites the map. Persistence remembers an explicit choice; it does
-     * not make one.
+     * On by default: it is the stage that keeps the lock alive as the original marks are painted
+     * over, and promotion is gated (`MobileGS::growTrusted`). Persisted so an explicit choice survives.
      */
     val selfGrowEnabled: Flow<Boolean>
 
@@ -107,7 +106,7 @@ interface SettingsRepository {
      * The persistent wall FEATURE MAP (`IMPLEMENTATION.md` phases 2b/3): grow it from
      * relocalization-locked frames, and match against it as a second relocalization source.
      *
-     * Off by default, like the other two experiment switches, and persisted for the same reason.
+     * On by default (it only adds a relocalization source), and persisted so an explicit choice survives.
      * Until this existed, `SlamManager.setMapRelocEnabled`/`setMapBuildEnabled` had no caller at
      * all: the native flags stayed at their `false` defaults for the process lifetime, so the map
      * was never built, never matched, and the `WallFeatureMap` the project record persists for it

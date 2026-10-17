@@ -112,7 +112,7 @@ Cause: no wall fingerprint was captured, or relocalization is failing its RANSAC
 Fix: confirm a target was actually captured and locked; for a low-texture wall, capture the fingerprint over a patch with more visible variation (an edge, a stain, a fixture) rather than the flattest part of the surface.
 
 **"The overlay is placed correctly at capture but drifts off over a session"**
-Cause: drift correction (`driftCorrectionEnabled`) is off by default — see `docs/TELEOLOGICAL_SLAM.md` for how to enable it from the diagnostic overlay, and its own caveats before doing so.
+Cause: drift correction (`driftCorrectionEnabled`) can be switched off — see `docs/TELEOLOGICAL_SLAM.md` for how to enable it from the diagnostic overlay, and its own caveats before doing so.
 
 **"The geometry looks skewed after rotating the phone"**
 Cause: the fingerprint's stored intrinsics were captured at one display rotation and the live frame is being matched at another — see `MobileGS.cpp`'s `restoreWallFingerprintMetric`/reloc PnP path and `ArRenderer`'s `cvRotateCode` handling.

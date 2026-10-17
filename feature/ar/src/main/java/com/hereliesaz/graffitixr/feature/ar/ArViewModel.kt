@@ -926,15 +926,15 @@ class ArViewModel @Inject constructor(
         // down at construction. A store with nothing in it means "never chosen", which is the
         // default — not an error.
         viewModelScope.launch {
-            _evalFusionEnabled.value = settingsRepository.driftCorrectionEnabled.firstOrNull() ?: false
+            _evalFusionEnabled.value = settingsRepository.driftCorrectionEnabled.firstOrNull() ?: true
             renderer?.fusionEnabled = _evalFusionEnabled.value
         }
         viewModelScope.launch {
-            _evalSelfGrowEnabled.value = settingsRepository.selfGrowEnabled.firstOrNull() ?: false
+            _evalSelfGrowEnabled.value = settingsRepository.selfGrowEnabled.firstOrNull() ?: true
             slamManager.setSelfGrowEnabled(_evalSelfGrowEnabled.value)
         }
         viewModelScope.launch {
-            _evalFeatureMapEnabled.value = settingsRepository.featureMapEnabled.firstOrNull() ?: false
+            _evalFeatureMapEnabled.value = settingsRepository.featureMapEnabled.firstOrNull() ?: true
             applyFeatureMapSwitch(_evalFeatureMapEnabled.value)
         }
         viewModelScope.launch {
@@ -970,7 +970,7 @@ class ArViewModel @Inject constructor(
         )
     }
 
-    private val _evalFusionEnabled = MutableStateFlow(false)
+    private val _evalFusionEnabled = MutableStateFlow(true)
 
     /**
      * The A/B switch's ACTUAL position, mirrored rather than shadowed.
@@ -988,7 +988,7 @@ class ArViewModel @Inject constructor(
      */
     val evalFusionEnabled: StateFlow<Boolean> = _evalFusionEnabled.asStateFlow()
 
-    private val _evalSelfGrowEnabled = MutableStateFlow(false)
+    private val _evalSelfGrowEnabled = MutableStateFlow(true)
 
     /** Same arrangement for self-grow, which had the identical shadowing problem. */
     val evalSelfGrowEnabled: StateFlow<Boolean> = _evalSelfGrowEnabled.asStateFlow()
@@ -1000,7 +1000,7 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.setSelfGrowEnabled(on) }
     }
 
-    private val _evalFeatureMapEnabled = MutableStateFlow(false)
+    private val _evalFeatureMapEnabled = MutableStateFlow(true)
 
     /** Same arrangement again for the persistent wall feature map (phases 2b/3). */
     val evalFeatureMapEnabled: StateFlow<Boolean> = _evalFeatureMapEnabled.asStateFlow()
