@@ -34,6 +34,7 @@ internal fun buildHelpItems(strings: AppStrings): Map<String, Any> = mapOf(
     "mode.ar.lock" to strings.nav.lockInfo,
     "mode.ar.magic" to strings.adj.magicAlign,
     "mode.ar.measure" to strings.nav.measureInfo,
+    "mode.ar.cv" to strings.nav.cvViewInfo,
     "coop" to strings.nav.coop,
     "coop.host" to strings.nav.hostCoopInfo,
     "coop.join" to strings.nav.joinCoopInfo,

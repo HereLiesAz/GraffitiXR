@@ -789,4 +789,9 @@
     <string name="target_clean_wall_text">还没有做标记？请先用下方按钮拍一张干净的墙面，然后再画上标记。已经做了标记？直接点击标记即可。</string>
     <string name="target_clean_wall_photo">干净墙面照片</string>
     <string name="target_clean_wall_saved">干净墙面照片已保存。重拍</string>
+
+    <!-- The CV view: a preview of everything the computer vision is looking for. -->
+    <string name="nav_cv_view">CV 视图</string>
+    <string name="nav_cv_view_info">在设计上叠加显示计算机视觉正在寻找的一切。每种颜色代表一种查找方式；空心圆环表示仍在等待墙面回应，实心圆点表示已找到。再次点击可隐藏。</string>
+    <string name="nav_cv_legend_title">正在寻找</string>
 </resources>

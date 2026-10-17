@@ -4809,6 +4809,7 @@ class ArViewModel @Inject constructor(
         // means one place re-establishes every experiment switch instead of two rules to remember.
         slamManager.setSelfGrowEnabled(_evalSelfGrowEnabled.value)
         slamManager.setChangePassEnabled(_uiState.value.changePassEnabled)
+        renderer?.cvPreviewVisible = _uiState.value.cvPreviewOn
         applyFeatureMapSwitch(_evalFeatureMapEnabled.value)
         renderer?.updateAutoFocus(effectiveAutoFocus)
         // A renderer attached while a teardown is in flight must not receive the session being
@@ -5537,6 +5538,35 @@ class ArViewModel @Inject constructor(
                         e,
                     )
                 )
+            }
+        }
+    }
+
+    private var cvPreviewJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * The CV preview: shows everything the passes are looking for, over the design, with a legend of
+     * what each colour is and how much of it the wall has answered. Re-composited about once a
+     * second while on, since the answers change as the artist paints.
+     */
+    fun toggleCvPreview() {
+        val turnOn = !_uiState.value.cvPreviewOn
+        cvPreviewJob?.cancel()
+        cvPreviewJob = null
+        _uiState.update { it.copy(cvPreviewOn = turnOn, cvPassLegend = if (turnOn) it.cvPassLegend else emptyList()) }
+        if (!turnOn) {
+            renderer?.cvPreviewVisible = false
+            renderer?.setCvPreview(null)
+            return
+        }
+        renderer?.cvPreviewVisible = true
+        cvPreviewJob = viewModelScope.launch(dispatchers.default) {
+            while (isActive) {
+                val bitmap = slamManager.renderCvPreview()
+                val legend = slamManager.getPassLegend()
+                renderer?.setCvPreview(bitmap)
+                _uiState.update { it.copy(cvPassLegend = legend) }
+                kotlinx.coroutines.delay(1000)
             }
         }
     }

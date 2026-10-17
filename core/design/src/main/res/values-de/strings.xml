@@ -772,4 +772,9 @@
     <string name="target_clean_wall_text">Noch nicht markiert? Fotografiere zuerst die leere Wand mit der Schaltfläche unten und male dann deine Markierungen. Schon markiert? Tippe einfach auf deine Markierungen.</string>
     <string name="target_clean_wall_photo">Foto der sauberen Wand</string>
     <string name="target_clean_wall_saved">Foto der sauberen Wand gespeichert. Neu aufnehmen</string>
+
+    <!-- The CV view: a preview of everything the computer vision is looking for. -->
+    <string name="nav_cv_view">CV-Ansicht</string>
+    <string name="nav_cv_view_info">Zeigt alles, wonach das Computer-Sehen sucht, über deinem Motiv. Jede Farbe ist eine Art des Suchens; ein hohler Ring wartet noch auf die Antwort der Wand, ein gefüllter Punkt wurde gefunden. Erneut tippen zum Ausblenden.</string>
+    <string name="nav_cv_legend_title">Gesucht</string>
 </resources>

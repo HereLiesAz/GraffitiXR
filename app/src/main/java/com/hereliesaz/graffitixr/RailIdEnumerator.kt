@@ -48,7 +48,7 @@ internal fun enumerateRailItemIdRegistrations(mode: EditorMode): List<String> {
     if (mode == EditorMode.AR) {
         // mode.ar.measure registers only with an established anchor on the ARCore backend; it is
         // listed here unconditionally because this enumerates every id the AR mode CAN register.
-        ids += listOf("target.create", "mode.ar.light", "mode.ar.lock", "mode.ar.measure", "mode.ar.magic")
+        ids += listOf("target.create", "mode.ar.light", "mode.ar.lock", "mode.ar.measure", "mode.ar.magic", "mode.ar.cv")
         ids += listOf("coop", "coop.host", "coop.join", "coop.leave")
     }
     if (mode == EditorMode.OVERLAY) {
@@ -115,6 +115,7 @@ internal val RAIL_ITEM_HOST_ID: Map<String, String> = mapOf(
     "mode.ar.lock" to "mode.ar",
     "mode.ar.magic" to "mode.ar",
     "mode.ar.measure" to "mode.ar",
+    "mode.ar.cv" to "mode.ar",
     "coop" to "mode.ar",
     "coop.host" to "coop",
     "coop.join" to "coop",

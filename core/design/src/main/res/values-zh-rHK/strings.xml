@@ -777,4 +777,9 @@
     <string name="target_clean_wall_text">仲未做標記？請先用下面按鈕影一張乾淨嘅牆面，然後再畫上標記。已經做咗標記？直接點按標記就得。</string>
     <string name="target_clean_wall_photo">乾淨牆面相片</string>
     <string name="target_clean_wall_saved">乾淨牆面相片已儲存。重影</string>
+
+    <!-- The CV view: a preview of everything the computer vision is looking for. -->
+    <string name="nav_cv_view">CV 檢視</string>
+    <string name="nav_cv_view_info">喺設計上疊加顯示電腦視覺正在尋找嘅一切。每種顏色代表一種尋找方式；空心圓環代表仍在等牆面回應，實心圓點代表已經搵到。再點按一次可隱藏。</string>
+    <string name="nav_cv_legend_title">尋找中</string>
 </resources>

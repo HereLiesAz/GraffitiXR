@@ -94,6 +94,16 @@ region has the shape of the design. Colour plays no part in the second question.
   40% of the region in partial ones. A shadow or a hand cuts across many patches and spills outside
   the design, so it is not paint. Whatever colour the paint is.
 
+## The CV view
+
+`AR ▸ CV view` (`mode.ar.cv`) draws everything the passes are looking for over the design, so the
+artist can see it. `MobileGS::renderCvPreview` composites it in the design's own pixel space: each
+pass's targets as dots in that pass's colour (`passes::passRgb`), a ring while the wall has not yet
+answered and a filled dot once it has, and the design cells already judged painted tinted green. A
+second overlay quad in `ArRenderer`, with the design's placement and warp, textures it; a legend
+(name, colour, found / looking for) sits at the top right. It is re-composited about once a second
+while on. Passes whose targets are still being built simply have no dots yet.
+
 ## Planned
 
 1. **More filters**: watercolor, Kuwahara, halftone, Voronoi, colour

@@ -71,6 +71,9 @@ data class ArUiState(
     val cleanWallBitmap: Bitmap? = null,
     /** Whether this project has a clean-wall photo (just taken, or loaded with the project). */
     val hasCleanWall: Boolean = false,
+    /** The CV preview is on: everything the passes look for, drawn over the design, with a legend. */
+    val cvPreviewOn: Boolean = false,
+    val cvPassLegend: List<CvPassLegendRow> = emptyList(),
     // Grayscale + ORB keypoint overlay computed after capture so the artist can
     // judge whether the surface has enough visual texture before confirming.
     val annotatedCaptureBitmap: Bitmap? = null,

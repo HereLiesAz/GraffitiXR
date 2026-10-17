@@ -1636,6 +1636,20 @@ class MainActivity : AppCompatActivity() {
                                 )
                             }
 
+                            // The CV view's legend: one row per way of looking, in the colour its dots have on the
+                            // design, with how many of its targets the wall has answered.
+                            if (editorUiState.editorMode == EditorMode.AR && arUiState.cvPreviewOn &&
+                                arUiState.cvPassLegend.isNotEmpty() && !showLibrary && !showSettings
+                            ) {
+                                CvPreviewLegend(
+                                    title = strings.nav.cvLegendTitle,
+                                    rows = arUiState.cvPassLegend,
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(top = 16.dp, end = 16.dp)
+                                )
+                            }
+
                             // RelocState.IDLE means "target not yet confirmed" (UiState.kt) — SEARCHING/
                             // TRACKING both require the fingerprint to be active, i.e. an established
                             // anchor. This badge is therefore only meaningful once anchored; gating it on
@@ -2501,6 +2515,19 @@ class MainActivity : AppCompatActivity() {
                         disabled = showLibrary,
                         onClick = { editorViewModel.onMagicClicked() },
                     )
+                    // CV view — a composited preview of everything the computer vision is looking for,
+                    // drawn over the design, with a legend of what each colour is and how much of it
+                    // the wall has answered.
+                    azRailSubItem(
+                        id = "mode.ar.cv",
+                        hostId = railHostOf("mode.ar.cv"),
+                        text = navStrings.cvView,
+                        color = navItemColor,
+                        classifiers = setOf("toggle"),
+                        shape = AzButtonShape.NONE,
+                        disabled = showLibrary,
+                        onClick = { arViewModel.toggleCvPreview() },
+                    )
                     // Co-op requires an explicit shared coordinate frame. Protocol v3 now supplies
                     // that host wall-frame/backend/scale contract for both ARCore and standalone.
                     // The policy still gates unresolved capability; incompatible peers are rejected
@@ -2827,6 +2854,7 @@ class MainActivity : AppCompatActivity() {
             if (editorUiState.design?.isSketch == true) azHighlight("design.outline", active = Cyan)
             if (editorUiState.design?.isSubjectIsolated == true) azHighlight("design.isolate", active = Cyan)
             if (editorUiState.design?.isStencil == true) azHighlight("design.stencil", active = Cyan)
+            if (arUiState.cvPreviewOn) azHighlight("mode.ar.cv", active = Cyan)
             if (editorUiState.design?.isImageLocked == true) azHighlight("design.lock", active = Cyan)
 
             // State badges: surface important conditions as rail-item alerts.
@@ -3667,6 +3695,35 @@ private fun TargetIncompleteOverlay(modifier: Modifier = Modifier) {
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center
             )
+        }
+    }
+}
+
+/** The CV view's legend (see [ArViewModel.toggleCvPreview]): a colour swatch, the pass, found / looking for. */
+@Composable
+private fun CvPreviewLegend(
+    title: String,
+    rows: List<com.hereliesaz.graffitixr.common.model.CvPassLegendRow>,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .background(Color(0xCC000000), RoundedCornerShape(16.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Text(text = title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(4.dp))
+        rows.forEach { row ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .size(10.dp)
+                        .background(Color(row.argb), CircleShape)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(text = row.name, color = Color.White, fontSize = 11.sp, modifier = Modifier.width(78.dp))
+                Text(text = "${row.confirmed}/${row.targets}", color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
+            }
         }
     }
 }

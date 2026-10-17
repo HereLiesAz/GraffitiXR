@@ -508,4 +508,9 @@
     <string name="target_clean_wall_text">Pas encore marqué ? Photographiez d’abord le mur nu avec le bouton ci-dessous, puis peignez vos repères. Déjà marqué ? Touchez simplement vos repères.</string>
     <string name="target_clean_wall_photo">Photo du mur propre</string>
     <string name="target_clean_wall_saved">Photo du mur propre enregistrée. Reprendre</string>
+
+    <!-- The CV view: a preview of everything the computer vision is looking for. -->
+    <string name="nav_cv_view">Vue CV</string>
+    <string name="nav_cv_view_info">Affiche tout ce que la vision par ordinateur recherche, dessiné sur votre motif. Chaque couleur est une façon de chercher ; un anneau vide attend encore la réponse du mur et un point plein a été trouvé. Touchez à nouveau pour la masquer.</string>
+    <string name="nav_cv_legend_title">Recherché</string>
 </resources>

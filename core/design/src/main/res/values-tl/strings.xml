@@ -487,4 +487,9 @@
     <string name="target_clean_wall_text">Hindi pa namamarkahan? Kunan muna ng larawan ang hubad na pader gamit ang button sa ibaba, saka ipinta ang iyong mga marka. Namarkahan na? I-tap lang ang iyong mga marka.</string>
     <string name="target_clean_wall_photo">Larawan ng malinis na pader</string>
     <string name="target_clean_wall_saved">Na-save ang larawan ng malinis na pader. Ulitin</string>
+
+    <!-- The CV view: a preview of everything the computer vision is looking for. -->
+    <string name="nav_cv_view">CV view</string>
+    <string name="nav_cv_view_info">Ipinapakita ang lahat ng hinahanap ng computer vision, iginuhit sa ibabaw ng disenyo mo. Bawat kulay ay isang paraan ng paghahanap; ang guwang na singsing ay naghihintay pa ng sagot ng pader at ang puno na tuldok ay nahanap na. I-tap muli para itago.</string>
+    <string name="nav_cv_legend_title">Hinahanap</string>
 </resources>

@@ -777,4 +777,9 @@
     <string name="target_clean_wall_text">Ещё нет отметок? Сначала сфотографируйте чистую стену кнопкой ниже, затем нарисуйте отметки. Отметки уже есть? Просто нажмите на них.</string>
     <string name="target_clean_wall_photo">Фото чистой стены</string>
     <string name="target_clean_wall_saved">Фото чистой стены сохранено. Переснять</string>
+
+    <!-- The CV view: a preview of everything the computer vision is looking for. -->
+    <string name="nav_cv_view">Вид CV</string>
+    <string name="nav_cv_view_info">Показывает всё, что ищет компьютерное зрение, поверх вашего рисунка. Каждый цвет — это один способ поиска; пустое кольцо всё ещё ждёт ответа стены, закрашенная точка уже найдена. Нажмите ещё раз, чтобы скрыть.</string>
+    <string name="nav_cv_legend_title">Ищем</string>
 </resources>

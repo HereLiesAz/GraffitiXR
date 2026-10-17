@@ -772,4 +772,9 @@
     <string name="target_clean_wall_text">Ainda sem marcas? Primeiro fotografe a parede limpa com o botão abaixo e depois pinte suas marcas. Já marcada? Toque nas suas marcas.</string>
     <string name="target_clean_wall_photo">Foto da parede limpa</string>
     <string name="target_clean_wall_saved">Foto da parede limpa salva. Refazer</string>
+
+    <!-- The CV view: a preview of everything the computer vision is looking for. -->
+    <string name="nav_cv_view">Visão CV</string>
+    <string name="nav_cv_view_info">Mostra tudo o que a visão computacional procura, desenhado sobre o seu desenho. Cada cor é uma forma de procurar; um anel vazio ainda espera a resposta da parede e um ponto cheio foi encontrado. Toque de novo para ocultar.</string>
+    <string name="nav_cv_legend_title">Procurando</string>
 </resources>

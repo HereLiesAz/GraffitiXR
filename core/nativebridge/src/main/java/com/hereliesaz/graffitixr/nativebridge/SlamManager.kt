@@ -523,9 +523,6 @@ class SlamManager @Inject constructor(
 
     fun clearCleanWallImage() = nativeClearCleanWallImage()
 
-    /** One pass in the CV preview's legend: its name, colour (0xRRGGBB), and how many of its targets the wall has answered. */
-    data class PassLegendRow(val name: String, val rgb: Int, val targets: Int, val confirmed: Int)
-
     /**
      * The CV preview: everything the passes are looking for, composited in the design's own pixel space
      * (transparent where nothing is drawn), so it lays over the design exactly. Null when no design is
@@ -545,14 +542,16 @@ class SlamManager @Inject constructor(
     }
 
     /** The legend of the CV preview: only passes that have something to look for. */
-    fun getPassLegend(): List<PassLegendRow> {
+    fun getPassLegend(): List<com.hereliesaz.graffitixr.common.model.CvPassLegendRow> {
         val rows = nativeGetPassLegend() ?: return emptyList()
         val names = nativeGetPassNames() ?: return emptyList()
         return names.indices.mapNotNull { i ->
             if (3 * i + 2 >= rows.size) return@mapNotNull null
             val targets = rows[3 * i + 1].toInt()
             if (targets <= 0) null
-            else PassLegendRow(names[i], rows[3 * i].toInt() or (0xFF shl 24), targets, rows[3 * i + 2].toInt())
+            else com.hereliesaz.graffitixr.common.model.CvPassLegendRow(
+                names[i], rows[3 * i].toInt() or (0xFF shl 24), targets, rows[3 * i + 2].toInt(),
+            )
         }
     }
 

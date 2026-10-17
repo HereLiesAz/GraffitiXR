@@ -777,4 +777,9 @@
     <string name="target_clean_wall_text">Inte markerad än? Fotografera först den bara väggen med knappen nedan och måla sedan dina markeringar. Redan markerad? Tryck bara på dina markeringar.</string>
     <string name="target_clean_wall_photo">Foto av ren vägg</string>
     <string name="target_clean_wall_saved">Foto av ren vägg sparat. Ta om</string>
+
+    <!-- The CV view: a preview of everything the computer vision is looking for. -->
+    <string name="nav_cv_view">CV-vy</string>
+    <string name="nav_cv_view_info">Visar allt datorseendet letar efter, ritat över motivet. Varje färg är ett sätt att leta; en ihålig ring väntar fortfarande på väggens svar och en fylld prick har hittats. Tryck igen för att dölja.</string>
+    <string name="nav_cv_legend_title">Letar efter</string>
 </resources>

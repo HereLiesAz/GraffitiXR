@@ -777,4 +777,9 @@
     <string name="target_clean_wall_text">Nog niet gemarkeerd? Fotografeer eerst de kale muur met de knop hieronder en schilder dan je markeringen. Al gemarkeerd? Tik gewoon op je markeringen.</string>
     <string name="target_clean_wall_photo">Foto van schone muur</string>
     <string name="target_clean_wall_saved">Foto van schone muur bewaard. Opnieuw</string>
+
+    <!-- The CV view: a preview of everything the computer vision is looking for. -->
+    <string name="nav_cv_view">CV-weergave</string>
+    <string name="nav_cv_view_info">Toont alles waar de computervisie naar zoekt, over je ontwerp heen. Elke kleur is een manier van zoeken; een holle ring wacht nog op antwoord van de muur en een gevulde stip is gevonden. Tik nogmaals om te verbergen.</string>
+    <string name="nav_cv_legend_title">Zoekt naar</string>
 </resources>

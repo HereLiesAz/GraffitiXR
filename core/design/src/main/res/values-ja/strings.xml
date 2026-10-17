@@ -789,4 +789,9 @@
     <string name="target_clean_wall_text">まだ印をつけていませんか？ まず下のボタンで何もない壁を撮影し、そのあと印を描いてください。すでに印がある場合は、その印をタップしてください。</string>
     <string name="target_clean_wall_photo">きれいな壁の写真</string>
     <string name="target_clean_wall_saved">きれいな壁の写真を保存しました。撮り直す</string>
+
+    <!-- The CV view: a preview of everything the computer vision is looking for. -->
+    <string name="nav_cv_view">CVビュー</string>
+    <string name="nav_cv_view_info">コンピュータビジョンが探しているものをすべて、デザインの上に表示します。色は探し方ごとに異なり、中が空の輪は壁からの応答待ち、塗りつぶしの点は見つかったものです。もう一度タップすると隠します。</string>
+    <string name="nav_cv_legend_title">探しているもの</string>
 </resources>
