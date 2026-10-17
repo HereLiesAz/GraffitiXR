@@ -447,7 +447,7 @@
     <string name="target_review_desc">抽出されたターゲットの確認</string>
     <string name="target_unwarp_hint">コーナーをドラッグして歪みを修正</string>
     <string name="target_review_title">抽出されたマークの確認</string>
-    <string name="fingerprint_closeups_progress">壁を近くから学習中: %1$d / %2$d</string>
+    <string name="fingerprint_closeups_progress">壁を学習中: ステージ %1$d / %2$d · ステップ %3$d / %4$d</string>
 
     <string name="target_exclude">除外</string>
     <string name="target_include">含める</string>

@@ -35,6 +35,15 @@ class CloseUpFeaturesTest {
     }
 
     @Test
+    fun `coarsest crops come first and the quick set is a leading prefix`() {
+        val views = CloseUpFeatures.views(w, h)
+        assertEquals(views.sortedBy { it.zoom }.map { it.zoom }, views.map { it.zoom })
+        val quick = views.count { it.zoom <= CloseUpFeatures.QUICK_MAX_ZOOM }
+        assertEquals(13, quick)
+        assertTrue(views.take(quick).all { it.zoom <= CloseUpFeatures.QUICK_MAX_ZOOM })
+    }
+
+    @Test
     fun `close-ups are about a live frame's size, and their features land back on the photo's pixels`() {
         val v = CloseUpFeatures.View(400, 300, 267, 200, 6f)
         val (outW, outH) = CloseUpFeatures.outputSize(v, w, h)
@@ -73,8 +82,9 @@ class CloseUpFeaturesTest {
 
     @Test
     fun `progress counts close-ups done of the total`() {
-        assertEquals(0.5f, FingerprintBuildProgress.Step(2, 4).fraction, 0f)
-        assertEquals(0f, FingerprintBuildProgress.Step(0, 0).fraction, 0f)
+        // The bar is the current stage's progress, not the whole build's.
+        assertEquals(0.5f, FingerprintBuildProgress.Step(2, 3, 2, 4, 15, 50).fraction, 0f)
+        assertEquals(0f, FingerprintBuildProgress.Step(1, 3, 0, 0, 0, 0).fraction, 0f)
         assertNull(FingerprintBuildProgress.state.value)
     }
 }

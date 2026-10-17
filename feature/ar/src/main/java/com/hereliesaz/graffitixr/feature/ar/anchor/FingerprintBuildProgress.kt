@@ -5,13 +5,22 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * How far the fingerprint's close-ups ([CloseUpFeatures]) are along, for the progress bar shown
- * while a target is built: [Step.done] of [Step.total] close-ups, or null when none is being built.
+ * How far the fingerprint's close-ups ([CloseUpFeatures]) are along, for the progress pill shown
+ * while a target is built: which stage, and how far through it, or null when none is being built.
  * Process-wide like the native engine the fingerprint goes to; one build at a time.
  */
 object FingerprintBuildProgress {
-    data class Step(val done: Int, val total: Int) {
-        val fraction: Float get() = if (total <= 0) 0f else done.toFloat() / total
+    /**
+     * The build runs in [stages]; this is [stage] (1-based) of them with [stageDone] of [stageTotal]
+     * of that stage's steps done, and [done] of [total] steps done across all stages. [fraction] is
+     * the CURRENT stage's progress, not the whole build's.
+     */
+    data class Step(
+        val stage: Int, val stages: Int,
+        val stageDone: Int, val stageTotal: Int,
+        val done: Int, val total: Int,
+    ) {
+        val fraction: Float get() = if (stageTotal <= 0) 0f else stageDone.toFloat() / stageTotal
     }
 
     private val _state = MutableStateFlow<Step?>(null)

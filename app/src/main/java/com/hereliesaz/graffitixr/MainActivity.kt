@@ -1262,34 +1262,6 @@ class MainActivity : AppCompatActivity() {
                         // rail; a `background()` layer is the camera feed and sits beneath the whole onscreen
                         // book. Top-centre keeps it clear of the artwork and the knobs, and narrow enough
                         // (150 dp) to fit between the logo/readout and the status pill. Display-only.
-                        val closeUpProgress by com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintBuildProgress.state
-                            .collectAsState()
-                        closeUpProgress?.let { step ->
-                            if (!showLibrary && !showSettings) {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-                                    Column(
-                                        modifier = Modifier
-                                            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
-                                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                    ) {
-                                        Text(
-                                            text = strings.ar.fingerprintCloseUpsProgress(step.done, step.total),
-                                            color = Color.White,
-                                            style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
-                                        )
-                                        Spacer(Modifier.height(4.dp))
-                                        androidx.compose.material3.LinearProgressIndicator(
-                                            progress = { step.fraction },
-                                            modifier = Modifier.width(150.dp),
-                                            color = Color.White,
-                                            trackColor = Color.White.copy(alpha = 0.25f),
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
                         // Standalone (no-ARCore) tracking status and its actions — Copy Diagnostics,
                         // Recapture / New Target, the sweep hint — published by the overlay. Hidden
                         // while a confirmed target is still saving, so no second capture can start.
@@ -1608,6 +1580,36 @@ class MainActivity : AppCompatActivity() {
                                         .align(Alignment.TopCenter)
                                         .padding(top = 64.dp),
                                 )
+                            }
+
+                            // Close-up build progress: same row, height and pill style as the distance
+                            // chip (TopStart) and the relocalization badge (TopEnd).
+                            val closeUpProgress by com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintBuildProgress.state
+                                .collectAsState()
+                            closeUpProgress?.let { step ->
+                                if (!showLibrary && !showSettings) {
+                                    Column(
+                                        modifier = Modifier
+                                            .align(Alignment.TopCenter)
+                                            .padding(top = 16.dp)
+                                            .background(Color(0xCC000000), RoundedCornerShape(20.dp))
+                                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        Text(
+                                            text = strings.ar.fingerprintCloseUpsProgress(step.stage, step.stages, step.done, step.total),
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                        )
+                                        Spacer(Modifier.height(4.dp))
+                                        androidx.compose.material3.LinearProgressIndicator(
+                                            progress = { step.fraction },
+                                            modifier = Modifier.width(150.dp),
+                                            color = Color.White,
+                                            trackColor = Color.White.copy(alpha = 0.25f),
+                                        )
+                                    }
+                                }
                             }
 
                             val distanceM = arUiState.distanceToAnchorMeters

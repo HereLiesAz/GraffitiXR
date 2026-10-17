@@ -237,13 +237,14 @@ class CorroborationTranslitTest {
     }
 
     /**
-     * `IMPLEMENTATION.md` **3.6** — self-grow stays OFF, in the native initializer AND in the eval
-     * overlay's toggle. Pinned because these disagreed with the header's own comment for months: the
-     * comment said "stays OFF unless explicitly enabled" while the initializer shipped ON, so every
-     * release build promoted unsupervised with no user-facing switch to stop it.
+     * `IMPLEMENTATION.md` **3.6** — the native initializer stays false (self-grow is only ever turned
+     * on by the app writing the setting), and the Kotlin default is now ON: the app restores the
+     * persisted choice (default on) at start, and the overlay toggle has a switch to turn it off.
+     * Pinned because the native side and the Kotlin side once disagreed with the header's own comment
+     * for months, so a change to either default trips this rather than drifting.
      */
     @Test
-    fun `self-grow is defaulted off on both sides`() {
+    fun `self-grow native initializer is off and the app default is on`() {
         assertTrue(
             "the native initializer must be false",
             source("core/nativebridge/src/main/cpp/include/MobileGS.h").readText()
@@ -256,10 +257,10 @@ class CorroborationTranslitTest {
         // else, so a change to the default trips this test rather than a search that happens to
         // match something.
         assertTrue(
-            "the overlay toggle's backing field must start false",
+            "the overlay toggle's backing field must start true (the shipped default)",
             source("feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/ArViewModel.kt")
                 .readText()
-                .contains("private val _evalSelfGrowEnabled = MutableStateFlow(false)"),
+                .contains("private val _evalSelfGrowEnabled = MutableStateFlow(true)"),
         )
     }
 

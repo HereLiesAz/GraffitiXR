@@ -121,7 +121,7 @@
     <string name="target_review_desc">Examiner la cible extraite</string>
     <string name="target_unwarp_hint">Faites glisser les coins pour déformer</string>
     <string name="target_review_title">Examiner les marquages extraits</string>
-    <string name="fingerprint_closeups_progress">Apprentissage du mur de près : %1$d sur %2$d</string>
+    <string name="fingerprint_closeups_progress">Apprentissage du mur : étape %1$d sur %2$d · %3$d sur %4$d</string>
 
     <string name="target_exclude">Exclure</string>
     <string name="target_include">Inclure</string>
