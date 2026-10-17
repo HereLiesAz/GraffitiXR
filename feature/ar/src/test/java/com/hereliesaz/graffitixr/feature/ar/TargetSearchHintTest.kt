@@ -144,10 +144,10 @@ class TargetSearchHintTest {
         assertEquals(TargetSearchPhase.LOOKING, tr.update(false, "p")) // locked
         t = 26_000
         assertEquals(TargetSearchPhase.LOOKING, tr.update(true, "p")) // restarts
-        t = 40_000
+        t = 47_000
         assertEquals(TargetSearchPhase.OFFER_RECAPTURE, tr.update(true, "p"))
         assertEquals(TargetSearchPhase.LOOKING, tr.update(true, "other")) // target changed
-        t = 47_000
+        t = 54_000
         assertEquals(TargetSearchPhase.HINT, tr.update(true, "other"))
     }
 }

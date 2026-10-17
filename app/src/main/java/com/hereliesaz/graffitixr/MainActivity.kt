@@ -121,6 +121,7 @@ import com.hereliesaz.graffitixr.feature.editor.EditorUi
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.common.model.RelocDiagnostics
+import com.hereliesaz.graffitixr.common.model.FusionState
 import com.hereliesaz.graffitixr.common.model.RelocReject
 import com.hereliesaz.graffitixr.common.model.RelocState
 import com.hereliesaz.graffitixr.feature.ar.TargetSearchHint
@@ -1630,7 +1631,14 @@ class MainActivity : AppCompatActivity() {
                             // `!isAnchorEstablished` made every branch but IDLE dead (the badge always
                             // returned immediately, per RelocStatusBadge's own state machine below).
                             if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && arUiState.isAnchorEstablished) {
-                                if (mainUiState.hasArCoreTarget == true && arUiState.paintingProgress <= 0f) {
+                                // Locked = relocalization has actually matched the saved target. Painting
+                                // progress is NOT a lock signal: it is 0 on an unpainted wall.
+                                val relocLocked = arUiState.paintingProgress > 0f ||
+                                    arUiState.relocDiagnostics.reject == RelocReject.OK ||
+                                    arUiState.fusionDiagnostics.state in setOf(
+                                        FusionState.COLD_SNAP, FusionState.BLENDING, FusionState.HOLDING
+                                    )
+                                if (mainUiState.hasArCoreTarget == true && !relocLocked) {
                                     // A saved target exists but is not matched: say so, point the
                                     // artist the way the saved compass attitude says, and after a
                                     // while offer to recapture. Sensors run only while this is shown.
@@ -1655,6 +1663,7 @@ class MainActivity : AppCompatActivity() {
                                     RelocStatusBadge(
                                         isAnchorEstablished = arUiState.isAnchorEstablished,
                                         paintingProgress = arUiState.paintingProgress,
+                                        locked = relocLocked,
                                         modifier = Modifier
                                             .align(Alignment.TopEnd)
                                             .padding(top = 16.dp, end = 16.dp),
@@ -3823,12 +3832,13 @@ private fun SavedTargetSearchStatus(
 private fun RelocStatusBadge(
     isAnchorEstablished: Boolean,
     paintingProgress: Float,
+    locked: Boolean,
     modifier: Modifier = Modifier,
     strings: AppStrings
 ) {
     val relocState = when {
         !isAnchorEstablished -> RelocState.IDLE
-        paintingProgress > 0f -> RelocState.TRACKING
+        locked -> RelocState.TRACKING
         else -> RelocState.SEARCHING
     }
     if (relocState == RelocState.IDLE) return

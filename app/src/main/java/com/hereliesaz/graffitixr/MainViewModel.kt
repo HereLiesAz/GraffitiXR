@@ -430,6 +430,8 @@ class MainViewModel @Inject constructor(
                     ).show()
                 }
             } finally {
+                // A build that failed or was abandoned leaves the replacement gate up; restore the old pair.
+                slamManager.abortFingerprintReplacement()
                 _uiState.update { it.copy(isConfirmingTarget = false) }
             }
         }
@@ -685,6 +687,8 @@ class MainViewModel @Inject constructor(
             // gone) used to escape this viewModelScope coroutine and take the whole app down.
             onTargetSaveFailed(e)
         } finally {
+            // A build that failed or was abandoned leaves the replacement gate up; restore the old pair.
+            slamManager.abortFingerprintReplacement()
             _uiState.update { it.copy(isConfirmingTarget = false) }
         } }
     }
@@ -891,6 +895,8 @@ class MainViewModel @Inject constructor(
             // gone) used to escape this viewModelScope coroutine and take the whole app down.
             onTargetSaveFailed(e)
         } finally {
+            // A build that failed or was abandoned leaves the replacement gate up; restore the old pair.
+            slamManager.abortFingerprintReplacement()
             _uiState.update { it.copy(isConfirmingTarget = false) }
         } }
     }
