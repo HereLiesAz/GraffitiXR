@@ -5952,6 +5952,8 @@ class ArViewModel @Inject constructor(
         // makes the renderer ignore reloc and the arbiter never pick it until the builder (or a
         // project load) installs the new fingerprint AND the new pose.
         slamManager.beginFingerprintReplacement()
+        // Anchor on the wall plane the artist tapped, not wherever the centre hit test happens to land.
+        renderer?.pendingCapturedWallPlane = _uiState.value.targetWallPlane?.copyOf()
         renderer?.pendingAnchorEstablishment = true
     }
 

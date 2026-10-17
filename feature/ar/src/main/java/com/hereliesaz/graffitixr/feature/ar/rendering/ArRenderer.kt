@@ -715,6 +715,11 @@ class ArRenderer(
     @Volatile private var smoothedCenterDepth: Float = -1f
     @Volatile var isCapturingTarget: Boolean = false
     @Volatile var pendingAnchorEstablishment: Boolean = false
+    // The wall plane the artist tapped to create this target, [px,py,pz, nx,ny,nz] in world space.
+    // The anchor is placed ON it: that is the surface the fingerprint is back-projected onto, so an
+    // anchor anywhere else (a stray hit-test point, or a free point in the air) is co-registered with
+    // a different surface than the marks. Consumed by the next establishment.
+    @Volatile var pendingCapturedWallPlane: FloatArray? = null
     // Return-visit anchoring. A reopened project (or a co-op guest) restores its fingerprint and the
     // native reloc thread solves PnP against it, but nothing used to turn that solve into an anchor:
     // the only anchor sources were a fresh capture (which overwrites the saved target) and the doodle
@@ -1731,6 +1736,8 @@ class ArRenderer(
                 // a later capture-confirm establishment falls through to the hit-test path.
                 val relocPose = pendingRelocAnchor
                 pendingRelocAnchor = null
+                val capturedPlane = pendingCapturedWallPlane
+                pendingCapturedWallPlane = null
                 try {
                     val camera = frame.camera
                     val viewMat = FloatArray(16)
@@ -1774,6 +1781,23 @@ class ArRenderer(
                     // below from the chosen surface; left as the anchor→camera direction by default.
                     var nrmX = 0f; var nrmY = 0f; var nrmZ = 0f
                     var haveNormal = false
+                    // Anchors at [pose] (a plane pose: local +Y is the surface normal). False if the
+                    // pose is null or implausibly far, leaving everything untouched.
+                    fun placeOnPlane(pose: com.google.ar.core.Pose?): Boolean {
+                        if (pose == null) return false
+                        val ddx = pose.tx() - camPosX; val ddy = pose.ty() - camPosY; val ddz = pose.tz() - camPosZ
+                        val dd = Math.sqrt((ddx * ddx + ddy * ddy + ddz * ddz).toDouble())
+                        if (dd !in 0.1..10.0) return false
+                        pose.toMatrix(anchorModelMatrix, 0)
+                        anchor = activeSession.createAnchor(pose) // a fixed world pose, see the hit branch
+                        val axis = FloatArray(3)
+                        pose.getTransformedAxis(1, 1f, axis, 0)
+                        nrmX = axis[0]; nrmY = axis[1]; nrmZ = axis[2]
+                        anchorNormalIsWall = kotlin.math.abs(axis[1]) < 0.3f // horizontal normal = a wall
+                        relocWallUnconfirmed = false
+                        haveNormal = true
+                        return true
+                    }
                     if (relocPose != null) {
                         // The saved wall's pose in this session's world. Its rotation is the day-one
                         // anchor's: a plane hit's local +Y is the wall normal; a fallback anchor has
@@ -1803,6 +1827,8 @@ class ArRenderer(
                             relocWallUnconfirmed = false
                         }
                         haveNormal = true
+                    } else if (capturedPlane != null && placeOnPlane(poseOnPlane(capturedPlane))) {
+                        // Anchored on the very surface the target was created against.
                     } else if (chosen != null) {
                         relocWallUnconfirmed = false
                         val pose = chosen.hitPose
@@ -1855,6 +1881,11 @@ class ArRenderer(
                             }
                             haveNormal = true
                         }
+                    }
+                    // No hit landed in range: the nearest real VERTICAL plane along the view ray, before
+                    // resorting to a free point two metres out in the air.
+                    if (anchor == null && relocPose == null) {
+                        wallPlaneAlongView(activeSession, camera)?.let { placeOnPlane(it) }
                     }
                     if (anchor == null) {
                         anchorModelMatrix = fallbackMatrix
@@ -1926,7 +1957,7 @@ class ArRenderer(
                             null
                         }
                     }
-                    setPrimaryAnchor(anchor) // non-null: the fallback branch always creates one
+                    setPrimaryAnchor(checkNotNull(anchor)) // the fallback branch always creates one
                     // A new anchor/fingerprint reference point exists now. PoseFusion's standing
                     // `correction` was solved against the OLD anchor's drift (if this is a re-capture
                     // within the same session, not the session's first anchor) and is now WRONG, not
@@ -3422,6 +3453,54 @@ class ArRenderer(
             // a pause request, not in this frame body.
             lastStep = "frameDone"
         }
+    }
+
+    /** A pose at the plane point `[0..2]` whose local +Y is the plane normal `[3..5]` (a plane pose's convention). */
+    private fun poseOnPlane(plane: FloatArray): com.google.ar.core.Pose? {
+        val nx = plane[3]; val ny = plane[4]; val nz = plane[5]
+        val len = Math.sqrt((nx * nx + ny * ny + nz * nz).toDouble()).toFloat()
+        if (!(len > 1e-4f) || !len.isFinite()) return null
+        val ux = nx / len; val uy = ny / len; val uz = nz / len
+        // Shortest rotation taking +Y to the normal: axis = Y x n, w = 1 + Y.n.
+        val w = 1f + uy
+        val q = if (w < 1e-4f) floatArrayOf(1f, 0f, 0f, 0f) // normal is -Y: half-turn about X
+        else {
+            val qx = uz; val qz = -ux // Y x n = (uz, 0, -ux)
+            val ql = Math.sqrt((qx * qx + qz * qz + w * w).toDouble()).toFloat()
+            floatArrayOf(qx / ql, 0f, qz / ql, w / ql)
+        }
+        return com.google.ar.core.Pose(floatArrayOf(plane[0], plane[1], plane[2]), q)
+    }
+
+    /**
+     * Where the view ray through the screen centre meets the nearest tracked, non-merged VERTICAL
+     * plane (its extent plus half a metre of slack), as a plane pose at the hit; null if there is none
+     * between 0.1 and 10 m.
+     */
+    private fun wallPlaneAlongView(session: com.google.ar.core.Session, camera: com.google.ar.core.Camera): com.google.ar.core.Pose? {
+        val cp = camera.pose
+        val o = floatArrayOf(cp.tx(), cp.ty(), cp.tz())
+        val d = FloatArray(3)
+        cp.getTransformedAxis(2, -1f, d, 0) // camera looks down -Z
+        var best: com.google.ar.core.Pose? = null
+        var bestT = Float.MAX_VALUE
+        for (pl in session.getAllTrackables(com.google.ar.core.Plane::class.java)) {
+            if (pl.trackingState != TrackingState.TRACKING || pl.subsumedBy != null) continue
+            if (pl.type != com.google.ar.core.Plane.Type.VERTICAL) continue
+            val c = pl.centerPose
+            val n = FloatArray(3)
+            c.getTransformedAxis(1, 1f, n, 0)
+            val denom = n[0] * d[0] + n[1] * d[1] + n[2] * d[2]
+            if (kotlin.math.abs(denom) < 0.1f) continue // looking along the plane
+            val t = ((c.tx() - o[0]) * n[0] + (c.ty() - o[1]) * n[1] + (c.tz() - o[2]) * n[2]) / denom
+            if (t < 0.1f || t > 10f || t >= bestT) continue
+            val hit = floatArrayOf(o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t)
+            val local = c.inverse().transformPoint(hit)
+            if (kotlin.math.abs(local[0]) > pl.extentX / 2f + 0.5f || kotlin.math.abs(local[2]) > pl.extentZ / 2f + 0.5f) continue
+            bestT = t
+            best = com.google.ar.core.Pose(hit, c.rotationQuaternion)
+        }
+        return best
     }
 
     fun setPrimaryAnchor(anchor: com.google.ar.core.Anchor) {
