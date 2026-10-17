@@ -271,9 +271,9 @@ object MetricFingerprintBuilder {
                     minPoints, glView, rotationDeg)
                 // Install the photo's own features straight away so relocalization starts now; the
                 // close-ups below only add to it.
-                if (features.closeUps) early.install(basePixels, baseDescs)
+                if (features.closeUps) early.installBase(basePixels, baseDescs, bitmap)
                 val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps,
-                    onQuickSet = { p, d -> early.install(p, d) }) { view, _ ->
+                    onQuickSet = { p, d -> early.install(p, d) }, firstStage = 2, stages = 3, stepsBefore = 1) { view, _ ->
                     StandaloneFingerprintBuilder.detectSuperPoint(slam, view)
                 }
                 if (baseDescs !== descs && baseDescs !== mDescs) baseDescs.release()
@@ -309,9 +309,9 @@ object MetricFingerprintBuilder {
             val (basePixels, baseDescs) = applyMask(mask, bitmap, pixels, d)
             val early = EarlyInstall(slam, cvView, intr, planePointWorld, planeNormalWorld, anchorModel,
                 minPoints, glView, rotationDeg)
-            if (features.closeUps) early.install(basePixels, baseDescs)
+            if (features.closeUps) early.installBase(basePixels, baseDescs, bitmap)
             val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps,
-                onQuickSet = { p, dd -> early.install(p, dd) }) { view, n ->
+                onQuickSet = { p, dd -> early.install(p, dd) }, firstStage = 2, stages = 3, stepsBefore = 1) { view, n ->
                 StandaloneFingerprintBuilder.detectOrb(view, null, n)
             }
             if (baseDescs !== d && baseDescs !== mDescs) baseDescs.release()
@@ -343,6 +343,14 @@ object MetricFingerprintBuilder {
         var markCenter: FloatArray? = null
             private set
 
+        /** Stage 1 of 3: the photo's own features. Reports itself, since the close-ups report the rest. */
+        fun installBase(pixels: List<Pixel>, descs: Mat, photo: Bitmap) {
+            val total = 1 + CloseUpFeatures.views(photo.width, photo.height).size
+            FingerprintBuildProgress.set(FingerprintBuildProgress.Step(1, 3, 0, 1, 0, total))
+            install(pixels, descs)
+            FingerprintBuildProgress.set(FingerprintBuildProgress.Step(1, 3, 1, 1, 1, total))
+        }
+
         fun install(pixels: List<Pixel>, descs: Mat) {
             val savedRefusal = lastRefusalReason
             val fp = ingestSingle(slam, descs, pixels, cvView, intr, planePointWorld, planeNormalWorld,
@@ -365,6 +373,7 @@ object MetricFingerprintBuilder {
          * the finer ones are; the Mat is released after the call returns. See [CloseUpFeatures.detect].
          */
         onQuickSet: ((List<Pixel>, Mat) -> Unit)? = null,
+        firstStage: Int = 1, stages: Int = 2, stepsBefore: Int = 0,
         detect: (Bitmap, Int) -> StandaloneFingerprintBuilder.DetectedFeatures?,
     ): Pair<List<Pixel>, Mat> {
         if (!enabled || pixels.isEmpty() || descs.empty()) return pixels to descs
@@ -375,7 +384,7 @@ object MetricFingerprintBuilder {
                 }
             }
         }
-        val extra = CloseUpFeatures.detect(bitmap, pixels.size, quick, detect)
+        val extra = CloseUpFeatures.detect(bitmap, pixels.size, quick, firstStage, stages, stepsBefore, detect)
         return mergeCloseUps(bitmap, mask, pixels, descs, extra) ?: (pixels to descs)
     }
 

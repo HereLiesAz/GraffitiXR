@@ -430,7 +430,7 @@
     <string name="target_review_desc">Gjennomgå uttrukket mål</string>
     <string name="target_unwarp_hint">Dra hjørnene for å løsne</string>
     <string name="target_review_title">Gjennomgå ekstraherte markeringer</string>
-    <string name="fingerprint_closeups_progress">Lærer veggen på nært hold: %1$d av %2$d</string>
+    <string name="fingerprint_closeups_progress">Lærer veggen: trinn %1$d av %2$d · steg %3$d av %4$d</string>
 
     <string name="target_exclude">Utelukke</string>
     <string name="target_include">Inkludere</string>

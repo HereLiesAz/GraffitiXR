@@ -172,7 +172,7 @@ fun rememberAppStrings(): AppStrings {
             targetCreationTitle = stringResource(R.string.target_creation_title),
             targetCreationText = stringResource(R.string.target_creation_text),
             targetReviewTitle = stringResource(R.string.target_review_title),
-            fingerprintCloseUpsProgress = { done, total -> context.getString(R.string.fingerprint_closeups_progress, done, total) },
+            fingerprintCloseUpsProgress = { stage, stages, done, total -> context.getString(R.string.fingerprint_closeups_progress, stage, stages, done, total) },
             diagCopied = stringResource(R.string.diag_copied),
             diagTitle = stringResource(R.string.diag_title),
             diagWaiting = stringResource(R.string.diag_waiting),
@@ -446,8 +446,9 @@ data class AppStrings(
         val targetCreationTitle: String,
         val targetCreationText: String,
         val targetReviewTitle: String,
-        /** "Learning the wall up close: [done] of [total]" while the fingerprint's close-ups build. */
-        val fingerprintCloseUpsProgress: (done: Int, total: Int) -> String = { done, total -> "$done / $total" },
+        /** "Learning the wall: stage [stage] of [stages] · step [done] of [total]" while the fingerprint builds. */
+        val fingerprintCloseUpsProgress: (stage: Int, stages: Int, done: Int, total: Int) -> String =
+            { stage, stages, done, total -> "$stage/$stages \u00B7 $done/$total" },
         val diagCopied: String,
         val diagTitle: String,
         val diagWaiting: String,

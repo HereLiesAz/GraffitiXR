@@ -430,7 +430,7 @@
     <string name="target_review_desc">Rivedi Bersaglio Estratto</string>
     <string name="target_unwarp_hint">Trascina gli angoli per distorcere</string>
     <string name="target_review_title">Rivedi Segni Estratti</string>
-    <string name="fingerprint_closeups_progress">Studio del muro da vicino: %1$d di %2$d</string>
+    <string name="fingerprint_closeups_progress">Studio del muro: fase %1$d di %2$d · passo %3$d di %4$d</string>
 
     <string name="target_exclude">Escludi</string>
     <string name="target_include">Includi</string>

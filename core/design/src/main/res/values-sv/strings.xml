@@ -435,7 +435,7 @@
     <string name="target_review_desc">Granska extraherade mål</string>
     <string name="target_unwarp_hint">Dra i hörnen för att avvika</string>
     <string name="target_review_title">Granska extraherade markeringar</string>
-    <string name="fingerprint_closeups_progress">Lär sig väggen på nära håll: %1$d av %2$d</string>
+    <string name="fingerprint_closeups_progress">Lär sig väggen: steg %1$d av %2$d · moment %3$d av %4$d</string>
 
     <string name="target_exclude">Utesluta</string>
     <string name="target_include">Omfatta</string>

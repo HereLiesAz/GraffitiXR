@@ -480,7 +480,7 @@
     <string name="target_review_desc">Review Extracted Target</string>
     <string name="target_unwarp_hint">Drag corners to unwarp</string>
     <string name="target_review_title">TARGET LOCKED</string>
-    <string name="fingerprint_closeups_progress">Learning the wall up close: %1$d of %2$d</string>
+    <string name="fingerprint_closeups_progress">Learning the wall: stage %1$d of %2$d · step %3$d of %4$d</string>
 
     <string name="target_exclude">Exclude</string>
     <string name="target_include">Include</string>

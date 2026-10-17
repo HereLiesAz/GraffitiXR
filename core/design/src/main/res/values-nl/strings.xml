@@ -435,7 +435,7 @@
     <string name="target_review_desc">Bekijk het geëxtraheerde doel</string>
     <string name="target_unwarp_hint">Versleep hoeken om de vervorming te herstellen</string>
     <string name="target_review_title">Bekijk de geëxtraheerde markeringen</string>
-    <string name="fingerprint_closeups_progress">De muur van dichtbij leren: %1$d van %2$d</string>
+    <string name="fingerprint_closeups_progress">De muur leren: fase %1$d van %2$d · stap %3$d van %4$d</string>
 
     <string name="target_exclude">Uitsluiten</string>
     <string name="target_include">Erbij betrekken</string>

@@ -435,7 +435,7 @@
     <string name="target_review_desc">Kinyert célpont áttekintése</string>
     <string name="target_unwarp_hint">Húzd a sarkokat a kiegyenesítéshez</string>
     <string name="target_review_title">Kinyert jelölések áttekintése</string>
-    <string name="fingerprint_closeups_progress">A fal megismerése közelről: %1$d / %2$d</string>
+    <string name="fingerprint_closeups_progress">A fal megismerése: %1$d. szakasz / %2$d · %3$d. lépés / %4$d</string>
 
     <string name="target_exclude">Kizárás</string>
     <string name="target_include">Belefoglalás</string>

@@ -138,6 +138,12 @@ internal object CloseUpFeatures {
          * crops are still being learned. Null when the quick set found nothing.
          */
         onQuickSet: ((DetectedFeatures?) -> Unit)? = null,
+        /** Stage number of the quick set; the fine crops are the next one. */
+        firstStage: Int = 1,
+        /** Stages in the whole build, for "stage n of N" (the caller may have stages of its own before this). */
+        stages: Int = 2,
+        /** Steps the caller already finished (counted in the overall done/total). */
+        stepsBefore: Int = 0,
         detect: (Bitmap, Int) -> DetectedFeatures?,
     ): DetectedFeatures? {
         val views = views(photo.width, photo.height)
@@ -145,7 +151,20 @@ internal object CloseUpFeatures {
         val per = perViewBudget(baseRows, views.size)
         val parts = ArrayList<DetectedFeatures>(views.size)
         // The slow part of building a target: the artist sees it count down.
-        FingerprintBuildProgress.set(FingerprintBuildProgress.Step(0, views.size))
+        val total = stepsBefore + views.size
+        fun report(i: Int) {
+            val inQuick = i < quickCount || quickCount == views.size
+            val stageTotal = if (inQuick) quickCount else views.size - quickCount
+            val stageDone = if (inQuick) i else i - quickCount
+            FingerprintBuildProgress.set(
+                FingerprintBuildProgress.Step(
+                    stage = if (inQuick) firstStage else firstStage + 1, stages = stages,
+                    stageDone = stageDone, stageTotal = stageTotal,
+                    done = stepsBefore + i, total = total,
+                )
+            )
+        }
+        report(0)
         try {
             for ((i, v) in views.withIndex()) {
                 val crop = Bitmap.createBitmap(photo, v.x, v.y, v.w, v.h)
@@ -157,8 +176,17 @@ internal object CloseUpFeatures {
                     if (view !== crop) view.recycle()
                     if (crop !== photo) crop.recycle()
                 }
-                FingerprintBuildProgress.set(FingerprintBuildProgress.Step(i + 1, views.size))
                 if (i + 1 == quickCount && i + 1 < views.size) onQuickSet?.invoke(concat(parts))
+                // After the quick set's hand-off, so the pill moves to stage 2/3 as its crops start.
+                if (i + 1 < views.size) report(i + 1)
+                else FingerprintBuildProgress.set(
+                    FingerprintBuildProgress.Step(
+                        stage = if (quickCount == views.size) firstStage else firstStage + 1, stages = stages,
+                        stageDone = if (quickCount == views.size) views.size else views.size - quickCount,
+                        stageTotal = if (quickCount == views.size) views.size else views.size - quickCount,
+                        done = total, total = total,
+                    )
+                )
             }
         } finally {
             FingerprintBuildProgress.set(null)

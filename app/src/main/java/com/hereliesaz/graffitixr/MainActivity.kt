@@ -1597,7 +1597,7 @@ class MainActivity : AppCompatActivity() {
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                     ) {
                                         Text(
-                                            text = strings.ar.fingerprintCloseUpsProgress(step.done, step.total),
+                                            text = strings.ar.fingerprintCloseUpsProgress(step.stage, step.stages, step.done, step.total),
                                             color = Color.White,
                                             fontSize = 12.sp,
                                         )
