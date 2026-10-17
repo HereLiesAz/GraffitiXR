@@ -30,6 +30,7 @@ add_executable(native_host_tests
     FrameBufferGuardTest.cpp
     DepthScaleFitTest.cpp
     ${SRC}/MobileGS.cpp
+    ${SRC}/DesignFilters.cpp
     ${SRC}/SuperPointDetector.cpp
     ${SRC}/DistortionHead.cpp
     ${SRC}/LowLightEnhancer.cpp

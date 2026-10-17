@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include "DesignFilters.h"
 
 /**
  * Passes: independent ways of deciding that a part of the design has been painted.
@@ -25,14 +26,17 @@ enum Verdict : uint8_t {
 enum PassId : int {
     kPassFeatures = 0,   //!< design features confirmed on the wall (descriptor corroboration)
     kPassColour = 1,     //!< left the bare wall and matches the paint its design colour was painted with
-    kPassCount = 2,
+    kPassFilterBase = 2,   //!< pass kPassFilterBase + f looks where design filter f (DesignFilters.h) points
+    kPassCount = kPassFilterBase + designfilters::kCount,
 };
 
 inline const char* passName(int id) {
     switch (id) {
         case kPassFeatures: return "features";
         case kPassColour:   return "colour";
-        default:            return "unknown";
+        default:
+            if (id >= kPassFilterBase && id < kPassCount) return designfilters::name(id - kPassFilterBase);
+            return "unknown";
     }
 }
 

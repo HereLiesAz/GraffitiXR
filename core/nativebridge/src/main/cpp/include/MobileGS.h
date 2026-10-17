@@ -790,6 +790,21 @@ private:
     std::vector<cv::Point3f> mPaintPoints3D;
     // Per artwork row, for the current generation: already promoted into the paint set.
     std::vector<uint8_t> mArtworkPromoted;
+    /**
+     * Pass targets (docs/PASSES.md): one per design filter. A filter chooses WHERE to look (corner
+     * places on the filtered design); the descriptors are the UNFILTERED design's at those places,
+     * so they match against the raw live frame like any other design feature. They corroborate
+     * exactly as the primary artwork's do (consecutive confirmations, gated by the pose) and feed
+     * the per-cell votes of pass kPassFilterBase + filter. They never become reloc marks.
+     * Guarded by mMutex; replaced together with the artwork, so mArtworkGeneration covers them.
+     */
+    struct TargetSet {
+        cv::Mat descs;                              // CV_32F (SuperPoint) or CV_8U (ORB), as the artwork's
+        std::vector<cv::Point2f> pts;               // composite pixels, 1:1 with descs
+        std::vector<uint8_t> corrob;                // consecutive gated confirmations, capped
+        std::vector<std::vector<int>> cellRows;     // per paint-grid cell: rows inside it
+    };
+    std::vector<TargetSet> mTargetSets;
     // Bumped whenever the artwork is replaced or cleared. tryUpdateFingerprint snapshots the
     // descriptors under the lock, spends milliseconds matching outside it, and then merges its
     // result back in; without this it would merge into whatever artwork is registered by then. The

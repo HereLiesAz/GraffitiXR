@@ -31,12 +31,26 @@ collects each pass's verdict per opaque design cell and combines them; the conse
 | 0 | `features` | design features confirmed on the wall: descriptors from the design composite matched near their predicted position (`tryUpdateFingerprint`, gated by the lock's pose) |
 | 1 | `colour` | a cell that has left the bare wall and matches the paint its design colour was painted with. Hue-free: purple in the design may be yellow on the wall. The bare wall comes from the capture photo, or the first AR sighting |
 
+| 2 to 9 | `sketch`, `mosaic`, `posterize2`, `posterize4`, `cartoon`, `blobs`, `invert`, `warm-luma` | design features at places the matching design filter points to (below) |
+
+### Filter passes
+
+`DesignFilters.h` holds the bank. Each filter turns the design (offscreen, once, when it is
+registered) into another picture of itself, and `locations` picks up to 300 corner-like places on it.
+The filtered picture is then thrown away: descriptors are computed on the UNFILTERED, normalised
+design at those places (SuperPoint `describe`, or ORB with the orientation ORB would give), so they
+match against the raw live frame's own features. A filter decides where to look, nothing else.
+
+Each filter's places form a target set (`MobileGS::TargetSet`) that corroborates like the artwork's:
+the same pose-gated match (`gatedMatchSet`), consecutive confirmations, reset when the design moves
+or is replaced. A cell's vote is "present" when at least half of that filter's places inside it are
+confirmed, "absent" when some are not, and no data when it has none. Filter targets never become
+reloc marks: they judge progress only.
+
 ## Planned
 
-1. **Design filter bank** (offscreen, design only): sketch, mosaic, posterize at 2 and 4 levels,
-   cartoon, blob silhouette, invert, channel-weighted luminance; later watercolor, Kuwahara, halftone,
-   stencil layers of 2 to 5 tones. A filter decides WHERE to look; descriptors come from the
-   unfiltered design at those locations and are matched against the raw frame's own features.
+1. **More filters**: watercolor, Kuwahara, halftone, stencil layers of 2 to 5 tones, Voronoi, colour
+   shifts. (The first eight are in; see above.)
 2. **Wall exclusion list**: features known to be bare wall do not count as paint, and the same list
    supplies a null baseline.
 3. **Baseline margin check**: a pass counts only when its true alignment beats displaced alignments

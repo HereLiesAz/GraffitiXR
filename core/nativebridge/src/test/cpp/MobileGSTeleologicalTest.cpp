@@ -1,5 +1,6 @@
 // Host tests for the teleological-SLAM fixes: the partition fallback, growth surviving a
 // repartition, the inlier spread riding with the pose, and a design move resetting corroboration.
+#include <set>
 #include <gtest/gtest.h>
 #include <opencv2/opencv.hpp>
 #include <cstring>
@@ -288,6 +289,65 @@ TEST(PassEvidence, EveryPassHasAStableName) {
     EXPECT_STREQ("features", passes::passName(passes::kPassFeatures));
     EXPECT_STREQ("colour", passes::passName(passes::kPassColour));
     EXPECT_STREQ("unknown", passes::passName(99));
+    for (int f = 0; f < designfilters::kCount; ++f)
+        EXPECT_STREQ(designfilters::name(f), passes::passName(passes::kPassFilterBase + f));
+}
+
+// ---- Design filter bank ------------------------------------------------------------------------------
+
+TEST(DesignFilters, EveryFilterReturnsAGreyPictureTheSizeOfTheDesign) {
+    const cv::Mat wall = makeWall(640, 480, 0x77);
+    cv::Mat design;
+    if (wall.channels() == 1) design = wall; else cv::cvtColor(wall, design, wall.channels() == 4 ? cv::COLOR_RGBA2GRAY : cv::COLOR_RGB2GRAY);
+    for (int ch : {1, 3, 4}) {
+        cv::Mat d;
+        if (ch == 1) d = design;
+        else if (ch == 3) cv::cvtColor(design, d, cv::COLOR_GRAY2RGB);
+        else cv::cvtColor(design, d, cv::COLOR_GRAY2RGBA);
+        for (int f = 0; f < designfilters::kCount; ++f) {
+            const cv::Mat out = designfilters::apply(f, d);
+            ASSERT_FALSE(out.empty()) << designfilters::name(f) << " ch=" << ch;
+            EXPECT_EQ(CV_8UC1, out.type()) << designfilters::name(f);
+            EXPECT_EQ(d.size(), out.size()) << designfilters::name(f);
+        }
+    }
+    EXPECT_TRUE(designfilters::apply(designfilters::kCount, design).empty());
+    EXPECT_TRUE(designfilters::apply(-1, design).empty());
+    EXPECT_TRUE(designfilters::apply(designfilters::kSketch, cv::Mat()).empty());
+}
+
+TEST(DesignFilters, PosterizeKeepsTwoAndFourTones) {
+    const cv::Mat design = makeWall(320, 240, 0x31);
+    for (auto [id, tones] : {std::pair{designfilters::kPosterize2, 2}, std::pair{designfilters::kPosterize4, 4}}) {
+        const cv::Mat out = designfilters::apply(id, design);
+        std::set<int> seen;
+        for (int y = 0; y < out.rows; ++y) for (int x = 0; x < out.cols; ++x) seen.insert(out.at<uchar>(y, x));
+        EXPECT_LE((int)seen.size(), tones) << designfilters::name(id);
+        EXPECT_GE((int)seen.size(), 2) << designfilters::name(id);
+    }
+}
+
+TEST(DesignFilters, InvertIsTheNegative) {
+    const cv::Mat design = makeWall(160, 120, 0x12);
+    cv::Mat grey;
+    if (design.channels() == 1) grey = design; else cv::cvtColor(design, grey, cv::COLOR_RGB2GRAY);
+    const cv::Mat out = designfilters::apply(designfilters::kInvert, design);
+    EXPECT_EQ(0, cv::countNonZero(out + grey - 255));
+}
+
+TEST(DesignFilters, LocationsStayInsideTheBorderAndWithinTheCap) {
+    const cv::Mat design = makeWall(640, 480, 0x77);
+    for (int f = 0; f < designfilters::kCount; ++f) {
+        const cv::Mat out = designfilters::apply(f, design);
+        const auto pts = designfilters::locations(out, 100, 32);
+        EXPECT_LE(pts.size(), 100u) << designfilters::name(f);
+        for (const auto& p : pts) {
+            EXPECT_GE(p.x, 32.f); EXPECT_GE(p.y, 32.f);
+            EXPECT_LT(p.x, 640.f - 32.f); EXPECT_LT(p.y, 480.f - 32.f);
+        }
+    }
+    EXPECT_TRUE(designfilters::locations(cv::Mat(), 10).empty());
+    EXPECT_TRUE(designfilters::locations(cv::Mat(40, 40, CV_8UC1, cv::Scalar(0)), 10, 32).empty());
 }
 
 // With the design laid exactly on the captured wall, the feature pass judges cells and sees paint in
@@ -316,6 +376,19 @@ TEST(MobileGSTeleological, ThePassStatsCountWhatEachPassJudged) {
     EXPECT_LE(st[2], st[1]);
     long colour[5];
     ASSERT_TRUE(g.getPassStats(passes::kPassColour, colour));
+    // The filter passes run too, all the time, beside the first two.
+    long filterJudged = 0, filterSeen = 0;
+    int setsWithRows = 0;
+    for (int f = 0; f < designfilters::kCount; ++f) {
+        if (MobileGSTestPeer::targetSetRows(g, f) > 0) ++setsWithRows;
+        long fs[5];
+        ASSERT_TRUE(g.getPassStats(passes::kPassFilterBase + f, fs));
+        filterJudged += fs[1]; filterSeen += fs[2];
+        EXPECT_LE(fs[2], fs[1]);
+    }
+    EXPECT_GE(setsWithRows, 4) << "most design filters found nothing to look at on a textured design";
+    EXPECT_GT(filterJudged, 0) << "no filter pass ever judged a cell";
+    EXPECT_GT(filterSeen, 0) << "no filter pass saw paint on a wall that matches the design";
     EXPECT_FALSE(g.getPassStats(passes::kPassCount, st));
     EXPECT_FALSE(g.getPassStats(-1, st));
     g.setEvalSyncReloc(false, 1);

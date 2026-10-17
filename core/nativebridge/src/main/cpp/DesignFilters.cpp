@@ -1,0 +1,124 @@
+#include "include/DesignFilters.h"
+#include <opencv2/imgproc.hpp>
+#include <algorithm>
+
+namespace designfilters {
+
+namespace {
+
+cv::Mat toBgr(const cv::Mat& m) {
+    cv::Mat out;
+    if (m.channels() == 4)      cv::cvtColor(m, out, cv::COLOR_RGBA2BGR);
+    else if (m.channels() == 3) cv::cvtColor(m, out, cv::COLOR_RGB2BGR);
+    else                        cv::cvtColor(m, out, cv::COLOR_GRAY2BGR);
+    return out;
+}
+
+// Equal-width tone bands over [0,255], levels evenly spread: n=2 -> {64,191}, n=4 -> {32,96,160,224}.
+cv::Mat quantise(const cv::Mat& gray, int n) {
+    cv::Mat out(gray.size(), CV_8U);
+    const int band = 256 / n;
+    for (int y = 0; y < gray.rows; ++y) {
+        const uchar* s = gray.ptr<uchar>(y);
+        uchar* d = out.ptr<uchar>(y);
+        for (int x = 0; x < gray.cols; ++x) d[x] = (uchar)(std::min(n - 1, s[x] / band) * band + band / 2);
+    }
+    return out;
+}
+
+} // namespace
+
+cv::Mat applyUnchecked(int id, const cv::Mat& design) {
+    if (design.empty() || design.depth() != CV_8U || design.cols < 16 || design.rows < 16) return cv::Mat();
+    if (id < 0 || id >= kCount) return cv::Mat();
+    const cv::Mat bgr = toBgr(design);
+    cv::Mat gray;
+    cv::cvtColor(bgr, gray, cv::COLOR_BGR2GRAY);
+    const int minSide = std::min(gray.cols, gray.rows);
+
+    switch (id) {
+    case kSketch: {
+        cv::Mat inv, blur;
+        cv::bitwise_not(gray, inv);
+        cv::GaussianBlur(inv, blur, cv::Size(0, 0), std::max(2.0, minSide / 100.0));
+        cv::Mat out;
+        cv::divide(gray, cv::Scalar(255) - blur, out, 256.0);
+        return out;
+    }
+    case kMosaic: {
+        const int tile = std::max(8, minSide / 24);
+        cv::Mat small, out;
+        cv::resize(bgr, small, cv::Size(std::max(1, gray.cols / tile), std::max(1, gray.rows / tile)), 0, 0, cv::INTER_AREA);
+        cv::resize(small, out, gray.size(), 0, 0, cv::INTER_NEAREST);
+        cv::cvtColor(out, out, cv::COLOR_BGR2GRAY);
+        return out;
+    }
+    case kPosterize2: {
+        cv::Mat out;
+        cv::threshold(gray, out, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+        return out;
+    }
+    case kPosterize4:
+        return quantise(gray, 4);
+    case kCartoon: {
+        cv::Mat small, smooth, g, edges;
+        const double s = std::min(1.0, 400.0 / std::max(gray.cols, gray.rows));
+        cv::resize(bgr, small, cv::Size(), s, s, cv::INTER_AREA);
+        for (int i = 0; i < 2; ++i) { cv::bilateralFilter(small, smooth, 7, 40, 7); small = smooth.clone(); }
+        cv::cvtColor(small, g, cv::COLOR_BGR2GRAY);
+        g = quantise(g, 6);
+        cv::Canny(g, edges, 40, 120);
+        g.setTo(0, edges);
+        cv::resize(g, g, gray.size(), 0, 0, cv::INTER_NEAREST);
+        return g;
+    }
+    case kBlobs: {
+        cv::Mat bin;
+        cv::threshold(gray, bin, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+        const int k = std::max(3, minSide / 60) | 1;
+        const cv::Mat el = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(k, k));
+        cv::morphologyEx(bin, bin, cv::MORPH_OPEN, el);
+        cv::morphologyEx(bin, bin, cv::MORPH_CLOSE, el);
+        return bin;
+    }
+    case kInvert: {
+        cv::Mat out;
+        cv::bitwise_not(gray, out);
+        return out;
+    }
+    case kWarmLuma: {
+        // BGR weights: red-heavy. Colours plain grey renders alike (a red and a green of equal
+        // luminance) come out as different tones here.
+        const cv::Matx13f w(0.10f, 0.30f, 0.60f);
+        cv::Mat out;
+        cv::transform(bgr, out, w);
+        out.convertTo(out, CV_8U);
+        return out;
+    }
+    default: break;
+    }
+    return cv::Mat();
+}
+
+cv::Mat apply(int id, const cv::Mat& design) {
+    // A filter is only a hint about where to look: whatever goes wrong inside OpenCV, the design
+    // registration it rides on must not.
+    try { return applyUnchecked(id, design); } catch (const cv::Exception&) { return cv::Mat(); }
+}
+
+std::vector<cv::Point2f> locations(const cv::Mat& filtered, int maxPoints, int border) {
+    std::vector<cv::Point2f> pts;
+    if (filtered.empty() || filtered.type() != CV_8UC1 || maxPoints <= 0) return pts;
+    if (filtered.cols <= 2 * border || filtered.rows <= 2 * border) return pts;
+    std::vector<cv::Point2f> raw;
+    const double minDist = std::max(8.0, std::min(filtered.cols, filtered.rows) / 40.0);
+    cv::goodFeaturesToTrack(filtered, raw, maxPoints * 2, 0.02, minDist, cv::noArray(), 5);
+    for (const auto& p : raw) {
+        if (p.x < border || p.y < border || p.x >= filtered.cols - border || p.y >= filtered.rows - border) continue;
+        pts.push_back(p);
+        if ((int)pts.size() >= maxPoints) break;
+    }
+    return pts;
+}
+
+} // namespace designfilters

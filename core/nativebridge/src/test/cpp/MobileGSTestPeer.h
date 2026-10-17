@@ -31,6 +31,10 @@ struct MobileGSTestPeer {
         std::lock_guard<std::mutex> lock(g.mMutex);
         return g.mFingerprintGeneration;
     }
+    static size_t targetSetRows(MobileGS& g, int filter) {
+        std::lock_guard<std::mutex> lock(g.mMutex);
+        return (size_t)filter < g.mTargetSets.size() ? g.mTargetSets[(size_t)filter].pts.size() : 0;
+    }
     static long pnpSeq(MobileGS& g) { return g.mPnpResultSeq.load(); }
     static long long evalFrameCounter(MobileGS& g) { return g.mEvalSyncFrameCounter.load(); }
     static void setWallPoints(MobileGS& g, const std::vector<cv::Point3f>& p) { g.mWallKeypoints3D = p; }
