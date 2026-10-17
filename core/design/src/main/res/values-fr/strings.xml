@@ -279,13 +279,13 @@
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
-    <string name="nav_coop">Coop</string>
+    <string name="nav_coop">Lien</string>
     <string name="nav_host_coop">Héberger</string>
-    <string name="nav_host_coop_info">Hébergez une session coopérative pour partager votre système de coordonnées AR avec des utilisateurs à proximité.</string>
+    <string name="nav_host_coop_info">Créez un lien pour partager votre système de coordonnées AR avec un autre appareil à proximité.</string>
     <string name="nav_join_coop">Rejoindre</string>
-    <string name="nav_join_coop_info">Rejoignez une session coopérative à proximité pour aligner votre vue AR sur celle de l\'hôte.</string>
+    <string name="nav_join_coop_info">Rejoignez un lien à proximité pour aligner votre vue AR sur celle de l’appareil hôte.</string>
     <string name="nav_leave_coop">Quitter</string>
-    <string name="nav_leave_coop_info">Quittez la session coopérative en cours.</string>
+    <string name="nav_leave_coop_info">Quittez le lien en cours.</string>
     <string name="nav_wearable">Objet connecté</string>
     <string name="nav_wearable_info">Connectez-vous à des lunettes connectées pour une expérience AR mains libres avec une entrée caméra alignée sur votre perspective.</string>
     <string name="nav_wall_clear">Effacer</string>
@@ -517,4 +517,18 @@
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">Impossible d’enregistrer la photo du mur propre. Reprenez-la.</string>
     <string name="ar_feedback_clean_wall_register_failed">Cette photo du mur propre ne correspond pas à ce mur. Reprenez-la à peu près d’où vous serez.</string>
+
+    <!-- The CV view legend: the name of each way of looking. -->
+    <string name="cv_pass_features">Repères</string>
+    <string name="cv_pass_colour">Couleur</string>
+    <string name="cv_pass_sketch">Croquis</string>
+    <string name="cv_pass_mosaic">Mosaïque</string>
+    <string name="cv_pass_posterize2">2 tons</string>
+    <string name="cv_pass_posterize4">4 tons</string>
+    <string name="cv_pass_cartoon">Dessin animé</string>
+    <string name="cv_pass_blobs">Taches</string>
+    <string name="cv_pass_invert">Inversé</string>
+    <string name="cv_pass_warm_luma">Lumière chaude</string>
+    <string name="cv_pass_stencil3">Pochoir</string>
+    <string name="cv_pass_change">Changement</string>
 </resources>

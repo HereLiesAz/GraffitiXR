@@ -560,13 +560,13 @@
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
-    <string name="nav_coop">コープ</string>
+    <string name="nav_coop">リンク</string>
     <string name="nav_host_coop">ホスト</string>
-    <string name="nav_host_coop_info">近くのユーザーとARの座標系を共有するために、コープセッションをホストします。</string>
+    <string name="nav_host_coop_info">リンクを開始して、AR座標系を近くの別のデバイスと共有します。</string>
     <string name="nav_join_coop">参加</string>
-    <string name="nav_join_coop_info">近くのコープセッションに参加して、AR表示をホストに合わせます。</string>
+    <string name="nav_join_coop_info">近くのリンクに参加して、AR表示をホストデバイスに合わせます。</string>
     <string name="nav_leave_coop">退出</string>
-    <string name="nav_leave_coop_info">現在のコープセッションから退出します。</string>
+    <string name="nav_leave_coop_info">現在のリンクから退出します。</string>
     <string name="nav_wearable">ウェアラブル</string>
     <string name="nav_wearable_info">スマートグラスに接続して、視点に合わせたカメラ入力によるハンズフリーのAR体験を実現します。</string>
     <string name="nav_wall_clear">消去</string>
@@ -798,4 +798,18 @@
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">きれいな壁の写真を保存できませんでした。もう一度撮影してください。</string>
     <string name="ar_feedback_clean_wall_register_failed">このきれいな壁の写真は、この壁と一致しません。作業する位置あたりから撮り直してください。</string>
+
+    <!-- The CV view legend: the name of each way of looking. -->
+    <string name="cv_pass_features">特徴点</string>
+    <string name="cv_pass_colour">色</string>
+    <string name="cv_pass_sketch">スケッチ</string>
+    <string name="cv_pass_mosaic">モザイク</string>
+    <string name="cv_pass_posterize2">2階調</string>
+    <string name="cv_pass_posterize4">4階調</string>
+    <string name="cv_pass_cartoon">カートゥーン</string>
+    <string name="cv_pass_blobs">塊</string>
+    <string name="cv_pass_invert">反転</string>
+    <string name="cv_pass_warm_luma">暖色輝度</string>
+    <string name="cv_pass_stencil3">ステンシル</string>
+    <string name="cv_pass_change">変化</string>
 </resources>

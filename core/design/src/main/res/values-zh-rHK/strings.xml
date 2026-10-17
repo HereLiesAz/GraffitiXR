@@ -548,13 +548,13 @@
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
-    <string name="nav_coop">協作</string>
+    <string name="nav_coop">連線</string>
     <string name="nav_host_coop">主持</string>
-    <string name="nav_host_coop_info">主持協作工作階段，與附近使用者共享您的AR座標系統。</string>
+    <string name="nav_host_coop_info">發起連線，將你嘅 AR 座標系同附近另一部裝置共享。</string>
     <string name="nav_join_coop">加入</string>
-    <string name="nav_join_coop_info">加入附近的協作工作階段，將您的AR視圖與主持人對齊。</string>
+    <string name="nav_join_coop_info">加入附近嘅連線，令你嘅 AR 視圖同主機裝置對齊。</string>
     <string name="nav_leave_coop">離開</string>
-    <string name="nav_leave_coop_info">離開目前的協作工作階段。</string>
+    <string name="nav_leave_coop_info">退出目前嘅連線。</string>
     <string name="nav_wearable">穿戴裝置</string>
     <string name="nav_wearable_info">連接智能眼鏡，透過與視角對齊的鏡頭輸入，獲得免持AR體驗。</string>
     <string name="nav_wall_clear">清除</string>
@@ -786,4 +786,18 @@
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">無法儲存乾淨牆面嘅相片。請重新影過。</string>
     <string name="ar_feedback_clean_wall_register_failed">呢張乾淨牆面嘅相片同而家嘅牆面對唔上。請喺大約你會企嘅位置重新影過。</string>
+
+    <!-- The CV view legend: the name of each way of looking. -->
+    <string name="cv_pass_features">特徵</string>
+    <string name="cv_pass_colour">顏色</string>
+    <string name="cv_pass_sketch">草圖</string>
+    <string name="cv_pass_mosaic">馬賽克</string>
+    <string name="cv_pass_posterize2">2 色調</string>
+    <string name="cv_pass_posterize4">4 色調</string>
+    <string name="cv_pass_cartoon">卡通</string>
+    <string name="cv_pass_blobs">色塊</string>
+    <string name="cv_pass_invert">反相</string>
+    <string name="cv_pass_warm_luma">暖光</string>
+    <string name="cv_pass_stencil3">模板</string>
+    <string name="cv_pass_change">變化</string>
 </resources>

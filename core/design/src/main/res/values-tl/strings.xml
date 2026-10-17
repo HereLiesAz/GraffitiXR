@@ -255,13 +255,13 @@
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
-    <string name="nav_coop">Coop</string>
+    <string name="nav_coop">Link</string>
     <string name="nav_host_coop">I-host</string>
-    <string name="nav_host_coop_info">Mag-host ng coop session para ibahagi ang iyong AR coordinate system sa mga taong malapit.</string>
+    <string name="nav_host_coop_info">Magsimula ng link para ibahagi ang AR coordinate system mo sa isa pang device sa malapit.</string>
     <string name="nav_join_coop">Sumali</string>
-    <string name="nav_join_coop_info">Sumali sa isang malapit na coop session para i-align ang iyong AR view sa host.</string>
+    <string name="nav_join_coop_info">Sumali sa isang link sa malapit para i-align ang AR view mo sa host device.</string>
     <string name="nav_leave_coop">Umalis</string>
-    <string name="nav_leave_coop_info">Umalis sa kasalukuyang coop session.</string>
+    <string name="nav_leave_coop_info">Umalis sa kasalukuyang link.</string>
     <string name="nav_wearable">Wearable</string>
     <string name="nav_wearable_info">Kumonekta sa smart glasses para sa hands-free na AR na karanasan na may camera input na naka-align sa iyong perspektibo.</string>
     <string name="nav_wall_clear">Alisin</string>
@@ -496,4 +496,18 @@
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">Hindi ma-save ang larawan ng malinis na pader. Kunan ulit.</string>
     <string name="ar_feedback_clean_wall_register_failed">Hindi tugma ang larawang iyon ng malinis na pader sa pader na ito. Kunan ulit mula sa lugar na halos kung saan ka tatayo.</string>
+
+    <!-- The CV view legend: the name of each way of looking. -->
+    <string name="cv_pass_features">Mga tampok</string>
+    <string name="cv_pass_colour">Kulay</string>
+    <string name="cv_pass_sketch">Sketch</string>
+    <string name="cv_pass_mosaic">Mosaic</string>
+    <string name="cv_pass_posterize2">2 tono</string>
+    <string name="cv_pass_posterize4">4 tono</string>
+    <string name="cv_pass_cartoon">Cartoon</string>
+    <string name="cv_pass_blobs">Mga batik</string>
+    <string name="cv_pass_invert">Baligtad</string>
+    <string name="cv_pass_warm_luma">Mainit na liwanag</string>
+    <string name="cv_pass_stencil3">Stencil</string>
+    <string name="cv_pass_change">Pagbabago</string>
 </resources>

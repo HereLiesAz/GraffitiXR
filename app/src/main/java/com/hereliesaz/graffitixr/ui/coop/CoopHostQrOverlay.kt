@@ -41,7 +41,7 @@ fun CoopHostQrOverlay(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text("Scan to join", color = Color.White)
-            bitmap?.let { Image(bitmap = it.asImageBitmap(), contentDescription = "co-op QR") }
+            bitmap?.let { Image(bitmap = it.asImageBitmap(), contentDescription = "link QR") }
             Button(onClick = onStopSharing) { Text("Stop sharing") }
         }
     }

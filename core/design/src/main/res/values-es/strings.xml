@@ -543,13 +543,13 @@
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
-    <string name="nav_coop">Cooperativo</string>
+    <string name="nav_coop">Enlace</string>
     <string name="nav_host_coop">Anfitrión</string>
-    <string name="nav_host_coop_info">Aloja una sesión cooperativa para compartir tu sistema de coordenadas AR con usuarios cercanos.</string>
+    <string name="nav_host_coop_info">Inicia un enlace para compartir tu sistema de coordenadas AR con otro dispositivo cercano.</string>
     <string name="nav_join_coop">Unirse</string>
-    <string name="nav_join_coop_info">Únete a una sesión cooperativa cercana para alinear tu vista AR con la del anfitrión.</string>
+    <string name="nav_join_coop_info">Únete a un enlace cercano para alinear tu vista AR con la del dispositivo anfitrión.</string>
     <string name="nav_leave_coop">Salir</string>
-    <string name="nav_leave_coop_info">Abandona la sesión cooperativa actual.</string>
+    <string name="nav_leave_coop_info">Abandona el enlace actual.</string>
     <string name="nav_wearable">Dispositivo</string>
     <string name="nav_wearable_info">Conéctate a unas gafas inteligentes para una experiencia AR manos libres con entrada de cámara alineada a tu perspectiva.</string>
     <string name="nav_wall_clear">Quitar</string>
@@ -781,4 +781,18 @@
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">No se pudo guardar la foto de la pared limpia. Vuelve a tomarla.</string>
     <string name="ar_feedback_clean_wall_register_failed">Esa foto de la pared limpia no coincide con esta pared. Repítela desde donde vas a estar.</string>
+
+    <!-- The CV view legend: the name of each way of looking. -->
+    <string name="cv_pass_features">Rasgos</string>
+    <string name="cv_pass_colour">Color</string>
+    <string name="cv_pass_sketch">Boceto</string>
+    <string name="cv_pass_mosaic">Mosaico</string>
+    <string name="cv_pass_posterize2">2 tonos</string>
+    <string name="cv_pass_posterize4">4 tonos</string>
+    <string name="cv_pass_cartoon">Caricatura</string>
+    <string name="cv_pass_blobs">Manchas</string>
+    <string name="cv_pass_invert">Invertido</string>
+    <string name="cv_pass_warm_luma">Luz cálida</string>
+    <string name="cv_pass_stencil3">Plantilla</string>
+    <string name="cv_pass_change">Cambio</string>
 </resources>

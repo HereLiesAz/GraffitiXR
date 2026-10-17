@@ -244,6 +244,9 @@ injected into ARCore's metre world. Protocol v3 rejects that pairing as `Spatial
 before bulk transfer. Protocol-v2 peers are rejected as `VersionMismatch`; retaining compatibility
 would recreate the frame ambiguity v3 exists to remove.
 
+The feature is called **Link** in the app (one person with two devices is as likely as two people); the
+code, protocol and these docs still say co-op/host/guest.
+
 The current protocol is **v6** (`wire/ProtocolVersion.kt`); v5 and older peers are rejected as
 `VersionMismatch`. v4 added guest→host edits (`GUEST_OP`/`GUEST_OP_ACK`: queued until acknowledged,
 deduped and applied by the host as undoable persisted edits); v5 added `Op.WallWidth` so Measure

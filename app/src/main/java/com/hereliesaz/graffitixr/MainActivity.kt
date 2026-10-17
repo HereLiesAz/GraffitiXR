@@ -3699,6 +3699,23 @@ private fun TargetIncompleteOverlay(modifier: Modifier = Modifier) {
     }
 }
 
+/** The localized name of a pass, by the name the native engine reports; null for one this app does not know. */
+internal fun cvPassLabelRes(name: String): Int? = when (name) {
+    "features" -> DesignR.string.cv_pass_features
+    "colour" -> DesignR.string.cv_pass_colour
+    "sketch" -> DesignR.string.cv_pass_sketch
+    "mosaic" -> DesignR.string.cv_pass_mosaic
+    "posterize2" -> DesignR.string.cv_pass_posterize2
+    "posterize4" -> DesignR.string.cv_pass_posterize4
+    "cartoon" -> DesignR.string.cv_pass_cartoon
+    "blobs" -> DesignR.string.cv_pass_blobs
+    "invert" -> DesignR.string.cv_pass_invert
+    "warm-luma" -> DesignR.string.cv_pass_warm_luma
+    "stencil3" -> DesignR.string.cv_pass_stencil3
+    "change" -> DesignR.string.cv_pass_change
+    else -> null
+}
+
 /** The CV view's legend (see [ArViewModel.toggleCvPreview]): a colour swatch, the pass, found / looking for. */
 @Composable
 private fun CvPreviewLegend(
@@ -3721,7 +3738,10 @@ private fun CvPreviewLegend(
                         .background(Color(row.argb), CircleShape)
                 )
                 Spacer(Modifier.width(6.dp))
-                Text(text = row.name, color = Color.White, fontSize = 11.sp, modifier = Modifier.width(78.dp))
+                Text(
+                    text = cvPassLabelRes(row.name)?.let { stringResource(it) } ?: row.name,
+                    color = Color.White, fontSize = 11.sp, modifier = Modifier.width(96.dp),
+                )
                 Text(text = "${row.confirmed}/${row.targets}", color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
             }
         }

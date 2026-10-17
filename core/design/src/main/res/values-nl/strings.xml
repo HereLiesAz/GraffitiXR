@@ -548,13 +548,13 @@
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
-    <string name="nav_coop">Coop</string>
+    <string name="nav_coop">Koppeling</string>
     <string name="nav_host_coop">Hosten</string>
-    <string name="nav_host_coop_info">Host een coöperatieve sessie om je AR-coördinatensysteem te delen met mensen in de buurt.</string>
+    <string name="nav_host_coop_info">Start een koppeling om je AR-coördinatensysteem te delen met een ander apparaat in de buurt.</string>
     <string name="nav_join_coop">Deelnemen</string>
-    <string name="nav_join_coop_info">Sluit je aan bij een coöperatieve sessie in de buurt om je AR-weergave af te stemmen op de host.</string>
+    <string name="nav_join_coop_info">Sluit je aan bij een koppeling in de buurt om je AR-weergave af te stemmen op het hostapparaat.</string>
     <string name="nav_leave_coop">Verlaten</string>
-    <string name="nav_leave_coop_info">Verlaat de huidige coöperatieve sessie.</string>
+    <string name="nav_leave_coop_info">Verlaat de huidige koppeling.</string>
     <string name="nav_wearable">Wearable</string>
     <string name="nav_wearable_info">Maak verbinding met een smartbril voor een handsfree AR-ervaring met camera-invoer die is afgestemd op je perspectief.</string>
     <string name="nav_wall_clear">Wissen</string>
@@ -786,4 +786,18 @@
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">De foto van de schone muur kon niet worden bewaard. Maak hem opnieuw.</string>
     <string name="ar_feedback_clean_wall_register_failed">Die foto van de schone muur sluit niet aan op deze muur. Maak hem opnieuw vanaf ongeveer waar je gaat staan.</string>
+
+    <!-- The CV view legend: the name of each way of looking. -->
+    <string name="cv_pass_features">Kenmerken</string>
+    <string name="cv_pass_colour">Kleur</string>
+    <string name="cv_pass_sketch">Schets</string>
+    <string name="cv_pass_mosaic">Mozaïek</string>
+    <string name="cv_pass_posterize2">2 tinten</string>
+    <string name="cv_pass_posterize4">4 tinten</string>
+    <string name="cv_pass_cartoon">Cartoon</string>
+    <string name="cv_pass_blobs">Vlekken</string>
+    <string name="cv_pass_invert">Omgekeerd</string>
+    <string name="cv_pass_warm_luma">Warm licht</string>
+    <string name="cv_pass_stencil3">Stencil</string>
+    <string name="cv_pass_change">Verandering</string>
 </resources>
