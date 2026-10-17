@@ -766,4 +766,12 @@
     <string name="ar_feedback_target_prepare_failed">无法准备已捕获的目标，请重试。</string>
     <string name="ar_feedback_wall_width_save_failed">无法保存墙面宽度，请再次尝试保存。</string>
     <string name="ar_feedback_unknown_error">未知错误</string>
+    <string name="reloc_looking">正在寻找您的目标…</string>
+    <string name="reloc_turn_right">向右转 %1$d°</string>
+    <string name="reloc_turn_left">向左转 %1$d°</string>
+    <string name="reloc_tilt_up">向上倾斜 %1$d°</string>
+    <string name="reloc_tilt_down">向下倾斜 %1$d°</string>
+    <string name="reloc_facing_it">您正对着它 — 请缓慢左右移动</string>
+    <string name="reloc_recapture">重新捕获目标</string>
+    <string name="ar_feedback_capture_failed">目标捕获失败。请点按重试。</string>
 </resources>

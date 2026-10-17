@@ -749,4 +749,12 @@
     <string name="ar_feedback_target_prepare_failed">Impossibile preparare il target acquisito. Riprova.</string>
     <string name="ar_feedback_wall_width_save_failed">Impossibile salvare la larghezza della parete. Riprova a salvare.</string>
     <string name="ar_feedback_unknown_error">errore sconosciuto</string>
+    <string name="reloc_looking">Ricerca del tuo bersaglio…</string>
+    <string name="reloc_turn_right">Gira a destra di %1$d°</string>
+    <string name="reloc_turn_left">Gira a sinistra di %1$d°</string>
+    <string name="reloc_tilt_up">Inclina in alto di %1$d°</string>
+    <string name="reloc_tilt_down">Inclina in basso di %1$d°</string>
+    <string name="reloc_facing_it">Lo hai di fronte — muoviti lentamente da un lato all\'altro</string>
+    <string name="reloc_recapture">Ricattura bersaglio</string>
+    <string name="ar_feedback_capture_failed">Acquisizione del bersaglio non riuscita. Tocca per riprovare.</string>
 </resources>

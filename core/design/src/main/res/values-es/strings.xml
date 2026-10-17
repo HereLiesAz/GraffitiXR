@@ -749,4 +749,12 @@
     <string name="ar_feedback_target_prepare_failed">No se pudo preparar el objetivo capturado. Inténtalo de nuevo.</string>
     <string name="ar_feedback_wall_width_save_failed">No se pudo guardar el ancho de la pared. Vuelve a probar Guardar.</string>
     <string name="ar_feedback_unknown_error">error desconocido</string>
+    <string name="reloc_looking">Buscando tu objetivo…</string>
+    <string name="reloc_turn_right">Gira a la derecha %1$d°</string>
+    <string name="reloc_turn_left">Gira a la izquierda %1$d°</string>
+    <string name="reloc_tilt_up">Inclina hacia arriba %1$d°</string>
+    <string name="reloc_tilt_down">Inclina hacia abajo %1$d°</string>
+    <string name="reloc_facing_it">Lo tienes enfrente — muévete despacio de lado a lado</string>
+    <string name="reloc_recapture">Volver a capturar objetivo</string>
+    <string name="ar_feedback_capture_failed">Falló la captura del objetivo. Toca para intentarlo de nuevo.</string>
 </resources>

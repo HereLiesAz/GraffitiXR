@@ -407,6 +407,28 @@ descriptor will silently return null from `nativeSetWallFingerprint`. The contra
 
 ---
 
+### Saved-target search status and direction hint
+
+When the project already has a saved ARCore target (`project.fingerprint != null`) but the live view is
+not matched yet (anchor established, `paintingProgress == 0`), the top-right pill reads **"Looking for
+your target..."** instead of the generic "Scanning...". Once the target locks it becomes "Matched n%".
+
+- **After 6 s** a second line gives a coarse direction hint, e.g. "Turn right 40", "Turn left 25 . Tilt up
+  10", or "You're facing it - move slowly side to side".
+- **After 20 s** a **Recapture target** button appears (same effect as the rail's Target item; disabled
+  while a target is saving or a capture is in progress).
+- The timer resets when the target locks or the project changes.
+
+The hint compares the rear-camera look direction saved with the target
+(`CaptureEnvironment.attitude.rotationVector`, a `TYPE_ROTATION_VECTOR` quaternion, body to
+East-North-Up) with the live one (a rotation-vector listener registered only while this status is
+visible, ~5 Hz, hint rounded to 5 degrees). Within 20 degrees on both axes it counts as "facing it".
+If either the saved or live magnetometer accuracy is UNRELIABLE or LOW, or no attitude was saved, no
+hint is shown (a wrong "turn right 90" is worse than none). It is a coarse compass/gravity prior
+only: it cannot place the overlay and does not influence relocalization or tracking. ARCore's world
+frame resets every session, so the ARCore poses saved at capture cannot be reused; only the
+compass/attitude survives between sessions. Logic: `feature/ar/.../TargetSearchHint.kt`.
+
 ## 7. Settings (persisted — `core/data` DataStore)
 
 Every persisted key, its default, and effect. Adaptive-throttle keys default **on**.

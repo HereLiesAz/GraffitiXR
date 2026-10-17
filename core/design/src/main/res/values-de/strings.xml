@@ -749,4 +749,12 @@
     <string name="ar_feedback_target_prepare_failed">Das erfasste Ziel konnte nicht vorbereitet werden. Versuche es erneut.</string>
     <string name="ar_feedback_wall_width_save_failed">Die Wandbreite konnte nicht gespeichert werden. Versuche es erneut mit „Speichern“.</string>
     <string name="ar_feedback_unknown_error">unbekannter Fehler</string>
+    <string name="reloc_looking">Suche nach deinem Ziel…</string>
+    <string name="reloc_turn_right">%1$d° nach rechts drehen</string>
+    <string name="reloc_turn_left">%1$d° nach links drehen</string>
+    <string name="reloc_tilt_up">%1$d° nach oben neigen</string>
+    <string name="reloc_tilt_down">%1$d° nach unten neigen</string>
+    <string name="reloc_facing_it">Du blickst darauf — bewege dich langsam hin und her</string>
+    <string name="reloc_recapture">Ziel neu erfassen</string>
+    <string name="ar_feedback_capture_failed">Die Zielerfassung ist fehlgeschlagen. Tippe, um es erneut zu versuchen.</string>
 </resources>

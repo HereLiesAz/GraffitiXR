@@ -749,4 +749,12 @@
     <string name="ar_feedback_target_prepare_failed">Kunne ikke klargjøre det opptatte målet. Prøv igjen.</string>
     <string name="ar_feedback_wall_width_save_failed">Kunne ikke lagre veggbredden. Prøv å lagre igjen.</string>
     <string name="ar_feedback_unknown_error">ukjent feil</string>
+    <string name="reloc_looking">Leter etter målet ditt…</string>
+    <string name="reloc_turn_right">Snu %1$d° til høyre</string>
+    <string name="reloc_turn_left">Snu %1$d° til venstre</string>
+    <string name="reloc_tilt_up">Vipp %1$d° opp</string>
+    <string name="reloc_tilt_down">Vipp %1$d° ned</string>
+    <string name="reloc_facing_it">Du ser mot det — beveg deg sakte fra side til side</string>
+    <string name="reloc_recapture">Ta opp målet på nytt</string>
+    <string name="ar_feedback_capture_failed">Opptak av målet mislyktes. Trykk for å prøve igjen.</string>
 </resources>

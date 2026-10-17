@@ -754,4 +754,12 @@
     <string name="ar_feedback_target_prepare_failed">Det gick inte att förbereda det fångade målet. Försök igen.</string>
     <string name="ar_feedback_wall_width_save_failed">Det gick inte att spara väggbredden. Försök spara igen.</string>
     <string name="ar_feedback_unknown_error">okänt fel</string>
+    <string name="reloc_looking">Letar efter ditt mål…</string>
+    <string name="reloc_turn_right">Vrid %1$d° åt höger</string>
+    <string name="reloc_turn_left">Vrid %1$d° åt vänster</string>
+    <string name="reloc_tilt_up">Luta %1$d° uppåt</string>
+    <string name="reloc_tilt_down">Luta %1$d° nedåt</string>
+    <string name="reloc_facing_it">Du tittar mot det — rör dig långsamt från sida till sida</string>
+    <string name="reloc_recapture">Fånga målet igen</string>
+    <string name="ar_feedback_capture_failed">Det gick inte att fånga målet. Tryck för att försöka igen.</string>
 </resources>

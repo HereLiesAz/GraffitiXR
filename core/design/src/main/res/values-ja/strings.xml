@@ -766,4 +766,12 @@
     <string name="ar_feedback_target_prepare_failed">撮影したターゲットを準備できませんでした。もう一度お試しください。</string>
     <string name="ar_feedback_wall_width_save_failed">壁の幅を保存できませんでした。もう一度保存をお試しください。</string>
     <string name="ar_feedback_unknown_error">不明なエラー</string>
+    <string name="reloc_looking">ターゲットを探しています…</string>
+    <string name="reloc_turn_right">右に%1$d°回してください</string>
+    <string name="reloc_turn_left">左に%1$d°回してください</string>
+    <string name="reloc_tilt_up">%1$d°上に傾けてください</string>
+    <string name="reloc_tilt_down">%1$d°下に傾けてください</string>
+    <string name="reloc_facing_it">正面にあります — ゆっくり左右に動かしてください</string>
+    <string name="reloc_recapture">ターゲットを再キャプチャ</string>
+    <string name="ar_feedback_capture_failed">ターゲットのキャプチャに失敗しました。タップして再試行してください。</string>
 </resources>

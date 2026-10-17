@@ -53,6 +53,12 @@ the auto-start trigger was dormant — `GuidanceDefinitions.kt` registers `autoS
 does auto-start on mode entry; and marked "The Lazy Grid" as a removed feature, consistent with
 `docs/en/screens.md`.*
 
+### Saved-target search status
+In AR with a saved target that is not matched yet, the top-right pill says "Looking for your target...";
+after 6 s it adds a turn/tilt hint from the compass attitude saved with the target (coarse prior only,
+cannot place the overlay; omitted when the heading is unreliable), and after 20 s a "Recapture target"
+button. See FEATURE_REFERENCE.md, "Saved-target search status and direction hint".
+
 ## Project dialogs (2026-09-06)
 
 Settings uses a modal window so its covered rail cannot open another action. Project creation

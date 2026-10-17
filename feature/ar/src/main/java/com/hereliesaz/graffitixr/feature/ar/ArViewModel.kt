@@ -5538,6 +5538,7 @@ class ArViewModel @Inject constructor(
         // result is never written.
         captureComputeJob?.cancel()
         captureComputeJob = viewModelScope.launch(dispatchers.default) {
+          try {
             val rotatedBmp = if (displayRotation != 0) {
                 val matrix = android.graphics.Matrix().apply { postRotate(displayRotation.toFloat()) }
                 Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
@@ -5598,7 +5599,27 @@ class ArViewModel @Inject constructor(
                     )
                 }
             }
+          } catch (e: Exception) {
+              if (e is kotlinx.coroutines.CancellationException) throw e
+              onCaptureFailed(e)
+          }
         }
+    }
+
+    /**
+     * A target capture failed (the renderer threw before reaching [onTargetCaptured], or preparing
+     * the frame did). Drops the request so the capture button / tap re-arms (a request left up
+     * blocks every later tap), logs it, and tells the artist to try again. Safe from any thread.
+     */
+    fun onCaptureFailed(e: Throwable) {
+        pendingTapPosition = null
+        onCaptureRequestHandled()
+        appendDiag("Target capture failed: ${e.javaClass.simpleName}: ${e.message}")
+        _feedback.tryEmit(
+            com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                appContext.getString(DesignR.string.ar_feedback_capture_failed), e
+            )
+        )
     }
 
     // The in-flight rotate + isolateMarkings of the latest capture (see onTargetCaptured).

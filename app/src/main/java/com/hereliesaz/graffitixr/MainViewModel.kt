@@ -39,6 +39,13 @@ data class MainUiState(
     val hasExistingTarget: Boolean? = null,
     val hasArCoreTarget: Boolean? = null,
     val hasSphereSlamTarget: Boolean? = null,
+    // Compass/attitude saved with the ARCore target (TYPE_ROTATION_VECTOR quaternion [x,y,z,w],
+    // body->ENU) and its magnetometer accuracy, for the coarse "which way was it?" search hint.
+    // Null when the project has no ARCore target or it was captured without a usable sensor.
+    val savedTargetQuaternion: List<Float>? = null,
+    val savedTargetMagneticAccuracy: Int = -1,
+    // Identity of the loaded project, so the search-status timer restarts when it changes.
+    val loadedProjectId: String? = null,
     // True once the user has successfully created a target in this app session.
     // Prevents auto-starting target capture on AR re-entry within the same process.
     val targetCapturedThisSession: Boolean = false,
@@ -108,6 +115,13 @@ class MainViewModel @Inject constructor(
                             hasExistingTarget = hasArCoreTarget || hasSphereSlamTarget,
                             hasArCoreTarget = hasArCoreTarget,
                             hasSphereSlamTarget = hasSphereSlamTarget,
+                            savedTargetQuaternion = if (hasArCoreTarget) {
+                                project.captureEnvironment?.attitude?.rotationVector
+                                    ?.takeIf { q -> q.size == 4 }
+                            } else null,
+                            savedTargetMagneticAccuracy =
+                                project.captureEnvironment?.attitude?.magneticAccuracy ?: -1,
+                            loadedProjectId = project.id.toString(),
                         )
                     }
                     // targetCapturedThisSession is meant to read "has THIS project (in this session)

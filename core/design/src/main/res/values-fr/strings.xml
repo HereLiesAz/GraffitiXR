@@ -485,4 +485,12 @@
     <string name="ar_feedback_target_prepare_failed">Impossible de préparer la cible capturée. Réessayez.</string>
     <string name="ar_feedback_wall_width_save_failed">Impossible d\'enregistrer la largeur du mur. Réessayez d\'enregistrer.</string>
     <string name="ar_feedback_unknown_error">erreur inconnue</string>
+    <string name="reloc_looking">Recherche de votre cible…</string>
+    <string name="reloc_turn_right">Tournez à droite de %1$d°</string>
+    <string name="reloc_turn_left">Tournez à gauche de %1$d°</string>
+    <string name="reloc_tilt_up">Inclinez vers le haut de %1$d°</string>
+    <string name="reloc_tilt_down">Inclinez vers le bas de %1$d°</string>
+    <string name="reloc_facing_it">Vous lui faites face — déplacez-vous lentement de côté</string>
+    <string name="reloc_recapture">Recapturer la cible</string>
+    <string name="ar_feedback_capture_failed">Échec de la capture de la cible. Touchez pour réessayer.</string>
 </resources>

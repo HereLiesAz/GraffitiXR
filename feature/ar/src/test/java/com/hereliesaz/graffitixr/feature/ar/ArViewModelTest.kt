@@ -271,6 +271,18 @@ class ArViewModelTest {
     }
 
     @Test
+    fun `onCaptureFailed drops the request so the next one can re-arm`() = runTest {
+        viewModel.requestCapture()
+        assertTrue(viewModel.uiState.value.isCaptureRequested)
+
+        viewModel.onCaptureFailed(IllegalStateException("boom"))
+        assertFalse(viewModel.uiState.value.isCaptureRequested)
+
+        viewModel.requestCapture()
+        assertTrue(viewModel.uiState.value.isCaptureRequested)
+    }
+
+    @Test
     fun `onCaptureRequestHandled clears isCaptureRequested flag`() = runTest {
         viewModel.requestCapture()
         assertTrue(viewModel.uiState.value.isCaptureRequested)
