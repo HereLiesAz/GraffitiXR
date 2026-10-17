@@ -2135,6 +2135,7 @@ void MobileGS::clearWallFingerprint() {
     mPaintDescriptors.release();
     mPaintPoints3D.clear();
     mGrid = PaintGrid();
+    for (auto& st : mPassStats) st = passes::Stats();
     mPendingGridRestore.clear();
     mCaptureRgb.release();
     ++mArtworkGeneration;
@@ -3196,7 +3197,10 @@ void MobileGS::updatePaintGrid(const cv::Mat& colorFrame) {
         changed[j] = colourDist(cur[j], ref) > kGridChange;
     }
 
-    // 5. Verdicts per opaque design cell.
+    // 5. Verdicts per opaque design cell. Each pass votes (see PassEvidence.h); the cell is confirmed
+    //    when any pass sees paint. A cell with nothing to judge it by gets no verdict from that pass.
+    long judged[passes::kPassCount] = {0, 0};
+    long seen[passes::kPassCount] = {0, 0};
     std::vector<cv::Vec3f> paintMean(g.k);
     for (int k = 0; k < g.k; ++k) if (g.paintN[k] > 0) paintMean[k] = g.paintSum[k] * (1.0f / g.paintN[k]);
     for (size_t j = 0; j < vis.size(); ++j) {
@@ -3207,17 +3211,20 @@ void MobileGS::updatePaintGrid(const cv::Mat& colorFrame) {
         const int k = g.cluster[i];
         // Feature evidence: at least half of the cell's design features confirmed on the wall.
         bool byFeatures = false;
+        uint8_t featureVote = passes::kNoData;
         if (!g.features[i].empty() && mArtworkCorroborated.size() == (size_t)mArtworkDescriptors.rows) {
             int ok = 0;
             for (int a : g.features[i])
                 if (a < (int)mArtworkCorroborated.size() && mArtworkCorroborated[a] >= kCorrobConfirmations) ++ok;
             byFeatures = ok * 2 >= (int)g.features[i].size();
+            featureVote = byFeatures ? passes::kPresent : passes::kAbsent;
         }
         // Colour relationship: left the bare wall, and matches the paint its design colour has been
         // painted with (hue-free: purple in the design may be yellow on the wall), and no other
         // design colour's paint better. Before any is learned, another changed cell of the same
         // design colour, painted alike, confirms both.
         bool byColour = false;
+        const bool colourJudged = g.hasBase[e] && g.baseGroup[e] >= 0 && k >= 0;
         if (changed[j] && k >= 0) {
             if (g.paintN[k] > 0) {
                 const float dk = colourDist(cur[j], paintMean[k]);
@@ -3232,7 +3239,15 @@ void MobileGS::updatePaintGrid(const cv::Mat& colorFrame) {
                 }
             }
         }
-        if (byFeatures || byColour) {
+        uint8_t votes[passes::kPassCount];
+        votes[passes::kPassFeatures] = featureVote;
+        votes[passes::kPassColour] = !colourJudged ? passes::kNoData : (byColour ? passes::kPresent : passes::kAbsent);
+        for (int pidx = 0; pidx < passes::kPassCount; ++pidx) {
+            if (votes[pidx] == passes::kNoData) continue;
+            ++judged[pidx];
+            if (votes[pidx] == passes::kPresent) ++seen[pidx];
+        }
+        if (passes::combineVotes(votes, passes::kPassCount)) {
             if (++g.pending[i] >= kGridConfirm) {
                 g.painted[i] = 1;
                 if (k >= 0) { g.paintSum[k] += cur[j]; g.paintN[k] += 1; }
@@ -3242,9 +3257,27 @@ void MobileGS::updatePaintGrid(const cv::Mat& colorFrame) {
         }
     }
 
+    for (int pidx = 0; pidx < passes::kPassCount; ++pidx) {
+        passes::Stats& st = mPassStats[pidx];
+        if (judged[pidx] > 0) ++st.ticks;
+        st.observed += judged[pidx];
+        st.present += seen[pidx];
+        st.lastObserved = judged[pidx];
+        st.lastPresent = seen[pidx];
+    }
+
     float total = 0, done = 0;
     for (int i = 0; i < n; ++i) { total += g.weight[i]; if (g.painted[i]) done += g.weight[i]; }
     if (total > 0) mPaintingProgress.store(done / total, std::memory_order_relaxed);
+}
+
+bool MobileGS::getPassStats(int pass, long out5[5]) const {
+    if (pass < 0 || pass >= passes::kPassCount) return false;
+    std::lock_guard<std::mutex> lock(mMutex);
+    const passes::Stats& st = mPassStats[pass];
+    out5[0] = st.ticks; out5[1] = st.observed; out5[2] = st.present;
+    out5[3] = st.lastObserved; out5[4] = st.lastPresent;
+    return true;
 }
 
 std::vector<uint8_t> MobileGS::exportPaintGrid() const {
