@@ -189,6 +189,36 @@ class MainViewModel @Inject constructor(
         if (!cameraShowing) _uiState.update { it.copy(isOverlayGyroActive = false) }
     }
 
+    /**
+     * Saves a clean-wall photo (pass B's reference) into the current project, replacing any earlier
+     * one. The native side already has it; this makes it survive a restart.
+     */
+    fun saveCleanWallPhoto(bitmap: android.graphics.Bitmap, onResult: (saved: Boolean) -> Unit = {}) {
+        val projectId = projectRepository.currentProject.value?.id
+        if (projectId == null) { onResult(false); return }
+        viewModelScope.launch(Dispatchers.IO) {
+            val path = runCatching {
+                projectRepository.saveArtifact(
+                    projectId, "clean_wall.png",
+                    com.hereliesaz.graffitixr.common.util.ImageUtils.bitmapToByteArray(bitmap),
+                )
+            }.getOrNull()
+            var committed = false
+            if (path != null) {
+                runCatching {
+                    projectRepository.updateProject { current ->
+                        if (current.id != projectId) current
+                        else {
+                            committed = true
+                            current.copy(cleanWallUri = android.net.Uri.parse("file://$path"))
+                        }
+                    }
+                }
+            }
+            withContext(Dispatchers.Main) { onResult(path != null && committed) }
+        }
+    }
+
     fun startTargetCapture() {
         _uiState.update {
             it.copy(
@@ -842,6 +872,13 @@ class MainViewModel @Inject constructor(
             val updatedTargetUris = projectManager.appendTargetImage(context, currentProject.id, baseTargetUris, bitmap)
             // Area progress samples each design cell's bare-wall colour from this photo.
             slamManager.setCaptureImage(bitmap, intr)
+            // A clean-wall photo taken earlier registers against this capture photo just now. If it could
+            // not, say so while the artist is still at the wall and can retake it.
+            if (slamManager.cleanWallStatus() == com.hereliesaz.graffitixr.nativebridge.SlamManager.CleanWallStatus.FAILED) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, context.getString(com.hereliesaz.graffitixr.design.R.string.ar_feedback_clean_wall_register_failed), Toast.LENGTH_LONG).show()
+                }
+            }
             // Guarded on id: see the depth path above.
             var committed = false
             projectRepository.updateProject { current ->

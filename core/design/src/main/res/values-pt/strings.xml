@@ -543,13 +543,13 @@
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
-    <string name="nav_coop">Coop</string>
+    <string name="nav_coop">Conexão</string>
     <string name="nav_host_coop">Hospedar</string>
-    <string name="nav_host_coop_info">Hospede uma sessão cooperativa para compartilhar seu sistema de coordenadas AR com pessoas próximas.</string>
+    <string name="nav_host_coop_info">Inicie uma conexão para compartilhar seu sistema de coordenadas AR com outro dispositivo próximo.</string>
     <string name="nav_join_coop">Entrar</string>
-    <string name="nav_join_coop_info">Entre em uma sessão cooperativa próxima para alinhar sua visão AR com a do anfitrião.</string>
+    <string name="nav_join_coop_info">Entre em uma conexão próxima para alinhar sua visão AR com a do dispositivo anfitrião.</string>
     <string name="nav_leave_coop">Sair</string>
-    <string name="nav_leave_coop_info">Sai da sessão cooperativa atual.</string>
+    <string name="nav_leave_coop_info">Saia da conexão atual.</string>
     <string name="nav_wearable">Vestível</string>
     <string name="nav_wearable_info">Conecte-se a óculos inteligentes para uma experiência AR sem as mãos, com entrada de câmera alinhada à sua perspectiva.</string>
     <string name="nav_wall_clear">Remover</string>
@@ -757,4 +757,42 @@
     <string name="reloc_facing_it">Você está de frente para ele — mova-se devagar de um lado para o outro</string>
     <string name="reloc_recapture">Recapturar alvo</string>
     <string name="ar_feedback_capture_failed">Falha ao capturar o alvo. Toque para tentar novamente.</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">Estêncil</string>
+    <string name="nav_stencil_info">Divide o desenho em três folhas: preto, cinza e branco. Toque de novo para recuperar o original.</string>
+    <string name="nav_stencil_view_all">Todas</string>
+    <string name="nav_stencil_view_black">Preto</string>
+    <string name="nav_stencil_view_grey">Cinza</string>
+    <string name="nav_stencil_view_white">Branco</string>
+    <string name="nav_stencil_view_info">Alterna quais folhas do estêncil são exibidas: todas, preto, cinza ou branco.</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">Detecção de mudanças (precisa de uma foto da parede limpa)</string>
+    <string name="target_clean_wall_text">Ainda sem marcas? Primeiro fotografe a parede limpa com o botão abaixo e depois pinte suas marcas. Já marcada? Toque nas suas marcas.</string>
+    <string name="target_clean_wall_photo">Foto da parede limpa</string>
+    <string name="target_clean_wall_saved">Foto da parede limpa salva. Refazer</string>
+
+    <!-- The CV view: a preview of everything the computer vision is looking for. -->
+    <string name="nav_cv_view">Visão CV</string>
+    <string name="nav_cv_view_info">Mostra tudo o que a visão computacional procura, desenhado sobre o seu desenho. Cada cor é uma forma de procurar; um anel vazio ainda espera a resposta da parede e um ponto cheio foi encontrado. Toque de novo para ocultar.</string>
+    <string name="nav_cv_legend_title">Procurando</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">Não foi possível salvar a foto da parede limpa. Tire-a de novo.</string>
+    <string name="ar_feedback_clean_wall_register_failed">Essa foto da parede limpa não combina com esta parede. Refaça-a de onde você vai ficar.</string>
+
+    <!-- The CV view legend: the name of each way of looking. -->
+    <string name="cv_pass_features">Características</string>
+    <string name="cv_pass_colour">Cor</string>
+    <string name="cv_pass_sketch">Esboço</string>
+    <string name="cv_pass_mosaic">Mosaico</string>
+    <string name="cv_pass_posterize2">2 tons</string>
+    <string name="cv_pass_posterize4">4 tons</string>
+    <string name="cv_pass_cartoon">Cartum</string>
+    <string name="cv_pass_blobs">Manchas</string>
+    <string name="cv_pass_invert">Invertido</string>
+    <string name="cv_pass_warm_luma">Luz quente</string>
+    <string name="cv_pass_stencil3">Estêncil</string>
+    <string name="cv_pass_change">Mudança</string>
 </resources>

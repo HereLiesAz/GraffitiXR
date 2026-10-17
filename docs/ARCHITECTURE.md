@@ -60,8 +60,9 @@ composites the AR overlay; it does **not** render any persistent 3D map — ther
 ### `:feature:editor`
 Placement and legibility tools for the one design image being traced: transform (pan/scale/rotate),
 lock, opacity/brightness/contrast/saturation/colour-balance/invert, plus Outline and subject
-isolation. Authoring (multi-layer compositing, painting, stencil generation, warp/Liquify) does not
-live here — see [`FEATURE_REFERENCE.md`](FEATURE_REFERENCE.md) for what was removed and why.
+isolation, plus the three-sheet Stencil (its view state lives here; the processing, `StencilProcessor`
+and `StencilTones`, is in `:core:common` beside `SketchProcessor`). Authoring (multi-layer compositing,
+painting, warp/Liquify) does not live here — see [`FEATURE_REFERENCE.md`](FEATURE_REFERENCE.md) for what was removed and why.
 
 ### `:core:nativebridge`
 C++17 `MobileGS` engine and JNI boundary (`GraffitiJNI.cpp`). Handles fingerprint-based
@@ -243,7 +244,12 @@ injected into ARCore's metre world. Protocol v3 rejects that pairing as `Spatial
 before bulk transfer. Protocol-v2 peers are rejected as `VersionMismatch`; retaining compatibility
 would recreate the frame ambiguity v3 exists to remove.
 
-The current protocol is **v5** (`wire/ProtocolVersion.kt`); v4 and older peers are rejected as
+The feature is called **Link** in the app (one person with two devices is as likely as two people); the
+code, protocol and these docs still say co-op/host/guest.
+
+The current protocol is **v6** (`wire/ProtocolVersion.kt`); v5 and older peers are rejected as
 `VersionMismatch`. v4 added guest→host edits (`GUEST_OP`/`GUEST_OP_ACK`: queued until acknowledged,
 deduped and applied by the host as undoable persisted edits); v5 added `Op.WallWidth` so Measure
-results are shared both ways. See `docs/FEATURE_REFERENCE.md` §8.
+results are shared both ways; v6 added the shared `Layer` fields `isStencil`, `stencilView` and
+`stencilDark`, because an older peer drops them and would show the artwork unstencilled while the host
+shows the stencil. See `docs/FEATURE_REFERENCE.md` §8.

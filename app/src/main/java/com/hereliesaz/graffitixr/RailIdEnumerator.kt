@@ -48,7 +48,7 @@ internal fun enumerateRailItemIdRegistrations(mode: EditorMode): List<String> {
     if (mode == EditorMode.AR) {
         // mode.ar.measure registers only with an established anchor on the ARCore backend; it is
         // listed here unconditionally because this enumerates every id the AR mode CAN register.
-        ids += listOf("target.create", "mode.ar.light", "mode.ar.lock", "mode.ar.measure", "mode.ar.magic")
+        ids += listOf("target.create", "mode.ar.light", "mode.ar.lock", "mode.ar.measure", "mode.ar.magic", "mode.ar.cv")
         ids += listOf("coop", "coop.host", "coop.join", "coop.leave")
     }
     if (mode == EditorMode.OVERLAY) {
@@ -66,6 +66,9 @@ internal fun enumerateRailItemIdRegistrations(mode: EditorMode): List<String> {
     ids += listOf(
         "mode.design", "host.design", "design.adjust", "design.balance", "design.invert",
         "design.blend", "design.outline", "design.isolate", "design.lock",
+        // The stencil item always; its view cycler only once a stencil has been generated (included
+        // here unconditionally, like wall.clear, because this is the universe of legal ids).
+        "design.stencil", "design.stencil.view",
     )
 
     // Project menu
@@ -103,6 +106,8 @@ internal val RAIL_ITEM_HOST_ID: Map<String, String> = mapOf(
     "design.blend" to "host.design",
     "design.outline" to "host.design",
     "design.isolate" to "host.design",
+    "design.stencil" to "mode.design",
+    "design.stencil.view" to "mode.design",
     "design.lock" to "host.design",
     // mode.ar / mode.overlay / mode.mockup / mode.trace are top-level host items (no hostId).
     "target.create" to "mode.ar",
@@ -110,6 +115,7 @@ internal val RAIL_ITEM_HOST_ID: Map<String, String> = mapOf(
     "mode.ar.lock" to "mode.ar",
     "mode.ar.magic" to "mode.ar",
     "mode.ar.measure" to "mode.ar",
+    "mode.ar.cv" to "mode.ar",
     "coop" to "mode.ar",
     "coop.host" to "coop",
     "coop.join" to "coop",

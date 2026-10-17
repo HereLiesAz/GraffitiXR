@@ -1,0 +1,165 @@
+// FILE: core/common/src/main/java/com/hereliesaz/graffitixr/common/util/StencilTones.kt
+package com.hereliesaz.graffitixr.common.util
+
+import com.hereliesaz.graffitixr.common.model.StencilView
+
+/**
+ * The parts of the stencil that need no OpenCV or Android, so they run (and are tested) on the JVM.
+ */
+object StencilTones {
+    const val NONE = -1
+    const val BLACK = 0
+    const val GREY = 1
+    const val WHITE = 2
+
+    private const val ARGB_BLACK = 0xFF000000.toInt()
+    private const val ARGB_GREY = 0xFF808080.toInt()
+    private const val ARGB_WHITE = 0xFFFFFFFF.toInt()
+
+    /**
+     * Two thresholds splitting a 256-bin value histogram into three tones: 1-D K-means, K = 3,
+     * started at the histogram's 1/6, 3/6, 5/6 quantiles, so the same image always gives the same
+     * split. A value is black up to and including the first threshold, grey up to and including the
+     * second, white above. Null when the histogram is empty.
+     */
+    fun thresholds(histogram: IntArray): Pair<Int, Int>? {
+        require(histogram.size == 256) { "a value histogram has 256 bins" }
+        val total = histogram.sum()
+        if (total == 0) return null
+        fun quantile(fraction: Double): Double {
+            val target = fraction * total
+            var seen = 0
+            for (v in 0..255) {
+                seen += histogram[v]
+                if (seen >= target) return v.toDouble()
+            }
+            return 255.0
+        }
+        val centres = doubleArrayOf(quantile(1.0 / 6), quantile(3.0 / 6), quantile(5.0 / 6))
+        repeat(50) {
+            val sum = DoubleArray(3)
+            val count = IntArray(3)
+            for (v in 0..255) {
+                val n = histogram[v]
+                if (n == 0) continue
+                var best = 0
+                for (k in 1..2) if (kotlin.math.abs(v - centres[k]) < kotlin.math.abs(v - centres[best])) best = k
+                sum[best] += v.toDouble() * n
+                count[best] += n
+            }
+            var moved = false
+            for (k in 0..2) {
+                if (count[k] == 0) continue
+                val next = sum[k] / count[k]
+                if (kotlin.math.abs(next - centres[k]) > 1e-6) moved = true
+                centres[k] = next
+            }
+            if (!moved) return@repeat
+        }
+        centres.sort()
+        // Boundaries sit halfway between neighbouring centres; clamped so the thresholds stay ordered.
+        val lo = ((centres[0] + centres[1]) / 2).toInt().coerceIn(0, 254)
+        val hi = ((centres[1] + centres[2]) / 2).toInt().coerceIn(lo + 1, 255)
+        return lo to hi
+    }
+
+    /**
+     * The tone of every pixel, from the three masks the processor builds. Two rules are enforced
+     * here, not left to how the masks happen to overlap:
+     *  - the BASE is the complete silhouette: every pixel of [silhouette] gets at least the base
+     *    tone, and none outside it is covered. A silhouette pixel that was not in [observed] (a hole
+     *    in the cut-out, filled in) has no colour of its own, so it takes the base tone and nothing
+     *    else;
+     *  - the MIDTONE covers at least the secondary: a pixel on [top] is also in the midtone, whatever
+     *    [middle] says, so the midtone's area is never smaller than the secondary's.
+     * [middle] and [top] follow the base's direction: for a dark image they are the grey-or-lighter
+     * and the lightest areas; for a light one, the grey-or-darker and the darkest.
+     */
+    fun ranks(
+        silhouette: BooleanArray,
+        observed: BooleanArray,
+        middle: BooleanArray,
+        top: BooleanArray,
+        dark: Boolean,
+    ): IntArray {
+        require(silhouette.size == observed.size && silhouette.size == middle.size && silhouette.size == top.size) {
+            "all masks must cover the same pixels"
+        }
+        val baseTone = if (dark) BLACK else WHITE
+        val secondaryTone = if (dark) WHITE else BLACK
+        return IntArray(silhouette.size) { i ->
+            when {
+                !silhouette[i] -> NONE
+                !observed[i] -> baseTone
+                top[i] -> secondaryTone
+                middle[i] -> GREY
+                else -> baseTone
+            }
+        }
+    }
+
+    /** Luminance of an RGB pixel in 0..1, the weights the old stencil tool used. */
+    fun luma(r: Int, g: Int, b: Int): Double = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+
+    /** Brightness taken off before the contrast push, in luminance levels (0..255). */
+    const val DARK_CALL_BRIGHTNESS = -40
+
+    /** Contrast gain about mid-grey for the dark-or-light call. */
+    const val DARK_CALL_CONTRAST = 2.0
+
+    /**
+     * The dark-or-light call, which picks the base sheet. Made on the isolated subject: its
+     * luminance is turned down by [DARK_CALL_BRIGHTNESS] and the contrast turned up by
+     * [DARK_CALL_CONTRAST] about mid-grey, which leaves each pixel clearly dark or clearly light, and
+     * then the call goes to whichever has the greater AREA. A tie is dark.
+     *
+     * [lumaHistogram] is a 256-bin histogram of the subject's luminance (0.299R + 0.587G + 0.114B,
+     * scaled to 0..255), opaque pixels only.
+     */
+    fun isDarkByArea(lumaHistogram: IntArray): Boolean {
+        require(lumaHistogram.size == 256) { "a luminance histogram has 256 bins" }
+        var dark = 0L
+        var light = 0L
+        for (level in 0..255) {
+            val n = lumaHistogram[level]
+            if (n == 0) continue
+            val adjusted = (level + DARK_CALL_BRIGHTNESS - 128) * DARK_CALL_CONTRAST + 128
+            if (adjusted >= 128.0) light += n else dark += n
+        }
+        return dark >= light
+    }
+
+    /**
+     * ARGB pixels for [ranks] (one of [NONE], [BLACK], [GREY], [WHITE] per pixel) as [view] shows
+     * them, for an image judged [dark] or light.
+     *
+     * The sheets are laid sequentially, as paint is, from the BASE sheet that covers the whole
+     * subject to the midtone and then the secondary:
+     *  - dark:  base black = whole subject, midtone grey = grey and lighter, secondary white = lightest;
+     *  - light: base white = whole subject, midtone grey = grey and darker, secondary black = darkest.
+     * ALL shows them stacked (every pixel in its own tone). A single view shows that one sheet, in its
+     * colour, and leaves the rest transparent. [NONE] is always transparent.
+     */
+    fun render(ranks: IntArray, view: StencilView, dark: Boolean): IntArray {
+        val baseColor = if (dark) ARGB_BLACK else ARGB_WHITE
+        val secondaryColor = if (dark) ARGB_WHITE else ARGB_BLACK
+        val secondaryRank = if (dark) WHITE else BLACK
+        return IntArray(ranks.size) { i ->
+            val rank = ranks[i]
+            if (rank == NONE) return@IntArray 0
+            when (view) {
+                StencilView.ALL -> when (rank) {
+                    BLACK -> ARGB_BLACK
+                    GREY -> ARGB_GREY
+                    else -> ARGB_WHITE
+                }
+                StencilView.BASE -> baseColor
+                StencilView.MIDTONE -> if (if (dark) rank >= GREY else rank <= GREY) ARGB_GREY else 0
+                StencilView.SECONDARY -> if (rank == secondaryRank) secondaryColor else 0
+            }
+        }
+    }
+
+    /** The colours of the sheets in cycler order after ALL: base, midtone, secondary. */
+    fun sheetOrder(dark: Boolean): List<Int> = if (dark) listOf(BLACK, GREY, WHITE) else listOf(WHITE, GREY, BLACK)
+}

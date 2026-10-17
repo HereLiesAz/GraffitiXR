@@ -18,7 +18,12 @@ package com.hereliesaz.graffitixr.core.collaboration.wire
  * v5 adds [com.hereliesaz.graffitixr.common.model.Op.WallWidth] (Measure results, sent by host and
  * guest alike). A v4 peer cannot decode that sealed-class variant, so the width would be lost
  * mid-session — hence another hard version break.
+ *
+ * v6 adds the shared [com.hereliesaz.graffitixr.common.model.Layer] fields `isStencil`, `stencilView`
+ * and `stencilDark`. A v5 peer's decoder drops them and rebuilds the untouched source image while the
+ * host shows the stencil, so the two would silently display different artwork — hence another hard
+ * version break.
  */
 internal object ProtocolVersion {
-    const val CURRENT: Int = 5
+    const val CURRENT: Int = 6
 }

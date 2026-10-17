@@ -543,13 +543,13 @@
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
-    <string name="nav_coop">Koop</string>
+    <string name="nav_coop">Kopplung</string>
     <string name="nav_host_coop">Hosten</string>
-    <string name="nav_host_coop_info">Starte eine Koop-Sitzung, um dein AR-Koordinatensystem mit Personen in der Nähe zu teilen.</string>
+    <string name="nav_host_coop_info">Starte eine Kopplung, um dein AR-Koordinatensystem mit einem weiteren Gerät in der Nähe zu teilen.</string>
     <string name="nav_join_coop">Beitreten</string>
-    <string name="nav_join_coop_info">Tritt einer Koop-Sitzung in der Nähe bei, um deine AR-Ansicht mit dem Host abzugleichen.</string>
+    <string name="nav_join_coop_info">Tritt einer Kopplung in der Nähe bei, um deine AR-Ansicht am Host-Gerät auszurichten.</string>
     <string name="nav_leave_coop">Verlassen</string>
-    <string name="nav_leave_coop_info">Verlasse die aktuelle Koop-Sitzung.</string>
+    <string name="nav_leave_coop_info">Verlasse die aktuelle Kopplung.</string>
     <string name="nav_wearable">Wearable</string>
     <string name="nav_wearable_info">Verbinde dich mit einer Datenbrille für eine freihändige AR-Erfahrung mit perspektivisch abgestimmter Kameraeingabe.</string>
     <string name="nav_wall_clear">Entfernen</string>
@@ -757,4 +757,42 @@
     <string name="reloc_facing_it">Du blickst darauf — bewege dich langsam hin und her</string>
     <string name="reloc_recapture">Ziel neu erfassen</string>
     <string name="ar_feedback_capture_failed">Die Zielerfassung ist fehlgeschlagen. Tippe, um es erneut zu versuchen.</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">Schablone</string>
+    <string name="nav_stencil_info">Teilt das Motiv in drei Schablonen: Schwarz, Grau und Weiß. Erneut tippen, um das Original zurückzubringen.</string>
+    <string name="nav_stencil_view_all">Alle</string>
+    <string name="nav_stencil_view_black">Schwarz</string>
+    <string name="nav_stencil_view_grey">Grau</string>
+    <string name="nav_stencil_view_white">Weiß</string>
+    <string name="nav_stencil_view_info">Wechselt, welche Schablonen angezeigt werden: alle, schwarz, grau oder weiß.</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">Änderungserkennung (braucht ein Foto der sauberen Wand)</string>
+    <string name="target_clean_wall_text">Noch nicht markiert? Fotografiere zuerst die leere Wand mit der Schaltfläche unten und male dann deine Markierungen. Schon markiert? Tippe einfach auf deine Markierungen.</string>
+    <string name="target_clean_wall_photo">Foto der sauberen Wand</string>
+    <string name="target_clean_wall_saved">Foto der sauberen Wand gespeichert. Neu aufnehmen</string>
+
+    <!-- The CV view: a preview of everything the computer vision is looking for. -->
+    <string name="nav_cv_view">CV-Ansicht</string>
+    <string name="nav_cv_view_info">Zeigt alles, wonach das Computer-Sehen sucht, über deinem Motiv. Jede Farbe ist eine Art des Suchens; ein hohler Ring wartet noch auf die Antwort der Wand, ein gefüllter Punkt wurde gefunden. Erneut tippen zum Ausblenden.</string>
+    <string name="nav_cv_legend_title">Gesucht</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">Das Foto der sauberen Wand konnte nicht gespeichert werden. Nimm es erneut auf.</string>
+    <string name="ar_feedback_clean_wall_register_failed">Das Foto der sauberen Wand passt nicht zu dieser Wand. Nimm es ungefähr von dort auf, wo du stehen wirst.</string>
+
+    <!-- The CV view legend: the name of each way of looking. -->
+    <string name="cv_pass_features">Merkmale</string>
+    <string name="cv_pass_colour">Farbe</string>
+    <string name="cv_pass_sketch">Skizze</string>
+    <string name="cv_pass_mosaic">Mosaik</string>
+    <string name="cv_pass_posterize2">2 Töne</string>
+    <string name="cv_pass_posterize4">4 Töne</string>
+    <string name="cv_pass_cartoon">Cartoon</string>
+    <string name="cv_pass_blobs">Flecken</string>
+    <string name="cv_pass_invert">Invertiert</string>
+    <string name="cv_pass_warm_luma">Warmlicht</string>
+    <string name="cv_pass_stencil3">Schablone</string>
+    <string name="cv_pass_change">Änderung</string>
 </resources>

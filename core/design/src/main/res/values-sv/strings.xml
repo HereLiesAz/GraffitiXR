@@ -548,13 +548,13 @@
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
-    <string name="nav_coop">Samarbete</string>
+    <string name="nav_coop">Länk</string>
     <string name="nav_host_coop">Vara värd</string>
-    <string name="nav_host_coop_info">Var värd för en samarbetssession för att dela ditt AR-koordinatsystem med personer i närheten.</string>
+    <string name="nav_host_coop_info">Starta en länk för att dela ditt AR-koordinatsystem med en annan enhet i närheten.</string>
     <string name="nav_join_coop">Gå med</string>
-    <string name="nav_join_coop_info">Gå med i en samarbetssession i närheten för att justera din AR-vy efter värden.</string>
+    <string name="nav_join_coop_info">Gå med i en länk i närheten för att justera din AR-vy efter värdenheten.</string>
     <string name="nav_leave_coop">Lämna</string>
-    <string name="nav_leave_coop_info">Lämna den aktuella samarbetssessionen.</string>
+    <string name="nav_leave_coop_info">Lämna den aktuella länken.</string>
     <string name="nav_wearable">Bärbar enhet</string>
     <string name="nav_wearable_info">Anslut till smarta glasögon för en handsfree AR-upplevelse med kamerainmatning anpassad efter ditt perspektiv.</string>
     <string name="nav_wall_clear">Ta bort</string>
@@ -762,4 +762,42 @@
     <string name="reloc_facing_it">Du tittar mot det — rör dig långsamt från sida till sida</string>
     <string name="reloc_recapture">Fånga målet igen</string>
     <string name="ar_feedback_capture_failed">Det gick inte att fånga målet. Tryck för att försöka igen.</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">Stencil</string>
+    <string name="nav_stencil_info">Delar motivet i tre ark: svart, grått och vitt. Tryck igen för att få tillbaka originalet.</string>
+    <string name="nav_stencil_view_all">Alla</string>
+    <string name="nav_stencil_view_black">Svart</string>
+    <string name="nav_stencil_view_grey">Grå</string>
+    <string name="nav_stencil_view_white">Vit</string>
+    <string name="nav_stencil_view_info">Växlar vilka stencilark som visas: alla, svart, grå eller vit.</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">Ändringsdetektering (kräver ett foto av den rena väggen)</string>
+    <string name="target_clean_wall_text">Inte markerad än? Fotografera först den bara väggen med knappen nedan och måla sedan dina markeringar. Redan markerad? Tryck bara på dina markeringar.</string>
+    <string name="target_clean_wall_photo">Foto av ren vägg</string>
+    <string name="target_clean_wall_saved">Foto av ren vägg sparat. Ta om</string>
+
+    <!-- The CV view: a preview of everything the computer vision is looking for. -->
+    <string name="nav_cv_view">CV-vy</string>
+    <string name="nav_cv_view_info">Visar allt datorseendet letar efter, ritat över motivet. Varje färg är ett sätt att leta; en ihålig ring väntar fortfarande på väggens svar och en fylld prick har hittats. Tryck igen för att dölja.</string>
+    <string name="nav_cv_legend_title">Letar efter</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">Det gick inte att spara fotot av den rena väggen. Ta det igen.</string>
+    <string name="ar_feedback_clean_wall_register_failed">Fotot av den rena väggen passar inte den här väggen. Ta det igen ungefär därifrån du kommer att stå.</string>
+
+    <!-- The CV view legend: the name of each way of looking. -->
+    <string name="cv_pass_features">Särdrag</string>
+    <string name="cv_pass_colour">Färg</string>
+    <string name="cv_pass_sketch">Skiss</string>
+    <string name="cv_pass_mosaic">Mosaik</string>
+    <string name="cv_pass_posterize2">2 toner</string>
+    <string name="cv_pass_posterize4">4 toner</string>
+    <string name="cv_pass_cartoon">Tecknad</string>
+    <string name="cv_pass_blobs">Fläckar</string>
+    <string name="cv_pass_invert">Inverterad</string>
+    <string name="cv_pass_warm_luma">Varmt ljus</string>
+    <string name="cv_pass_stencil3">Stencil</string>
+    <string name="cv_pass_change">Förändring</string>
 </resources>

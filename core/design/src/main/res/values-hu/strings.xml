@@ -548,13 +548,13 @@
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
-    <string name="nav_coop">Koop</string>
+    <string name="nav_coop">Kapcsolat</string>
     <string name="nav_host_coop">Hoszt</string>
-    <string name="nav_host_coop_info">Indíts egy közös munkamenetet, hogy megoszd az AR-koordinátarendszeredet a közelben lévőkkel.</string>
+    <string name="nav_host_coop_info">Hozz létre egy kapcsolatot, hogy megoszd az AR koordinátarendszeredet egy másik közeli eszközzel.</string>
     <string name="nav_join_coop">Csatlakozás</string>
-    <string name="nav_join_coop_info">Csatlakozz egy közeli közös munkamenethez, hogy összehangold az AR-nézetedet a hosztéval.</string>
+    <string name="nav_join_coop_info">Csatlakozz egy közeli kapcsolathoz, hogy az AR nézeted igazodjon a gazdaeszközhöz.</string>
     <string name="nav_leave_coop">Kilépés</string>
-    <string name="nav_leave_coop_info">Kilépés az aktuális közös munkamenetből.</string>
+    <string name="nav_leave_coop_info">Lépj ki az aktuális kapcsolatból.</string>
     <string name="nav_wearable">Viselhető eszköz</string>
     <string name="nav_wearable_info">Csatlakozz egy okosszemüveghez a kéz nélküli AR-élményhez és a nézőponthoz igazított kamerabemenethez.</string>
     <string name="nav_wall_clear">Törlés</string>
@@ -762,4 +762,42 @@
     <string name="reloc_facing_it">Szemben vagy vele — lassan mozogj oldalirányba</string>
     <string name="reloc_recapture">Célpont újrarögzítése</string>
     <string name="ar_feedback_capture_failed">A célpont rögzítése sikertelen. Érintsd meg az újrapróbáláshoz.</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">Sablon</string>
+    <string name="nav_stencil_info">A mintát három sablonra bontja: fekete, szürke és fehér. Koppints újra az eredeti visszaállításához.</string>
+    <string name="nav_stencil_view_all">Mind</string>
+    <string name="nav_stencil_view_black">Fekete</string>
+    <string name="nav_stencil_view_grey">Szürke</string>
+    <string name="nav_stencil_view_white">Fehér</string>
+    <string name="nav_stencil_view_info">Váltja, melyik sablonok láthatók: mind, fekete, szürke vagy fehér.</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">Változásészlelés (tiszta fal fotó kell hozzá)</string>
+    <string name="target_clean_wall_text">Még nincs megjelölve? Előbb fotózd le a tiszta falat az alábbi gombbal, aztán fesd fel a jeleket. Már meg van jelölve? Koppints a jelekre.</string>
+    <string name="target_clean_wall_photo">Tiszta fal fotó</string>
+    <string name="target_clean_wall_saved">Tiszta fal fotó elmentve. Újra</string>
+
+    <!-- The CV view: a preview of everything the computer vision is looking for. -->
+    <string name="nav_cv_view">CV nézet</string>
+    <string name="nav_cv_view_info">Megmutatja mindazt, amit a számítógépes látás keres, a mintád fölé rajzolva. Minden szín egy keresési mód; az üres gyűrű még várja a fal válaszát, a teli pont már megvan. Koppints újra az elrejtéshez.</string>
+    <string name="nav_cv_legend_title">Keresett</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">Nem sikerült menteni a tiszta fal fotóját. Készítsd el újra.</string>
+    <string name="ar_feedback_clean_wall_register_failed">Ez a tiszta fal fotó nem illik ehhez a falhoz. Készítsd el újra nagyjából onnan, ahol majd állni fogsz.</string>
+
+    <!-- The CV view legend: the name of each way of looking. -->
+    <string name="cv_pass_features">Jellemzők</string>
+    <string name="cv_pass_colour">Szín</string>
+    <string name="cv_pass_sketch">Vázlat</string>
+    <string name="cv_pass_mosaic">Mozaik</string>
+    <string name="cv_pass_posterize2">2 tónus</string>
+    <string name="cv_pass_posterize4">4 tónus</string>
+    <string name="cv_pass_cartoon">Rajzfilm</string>
+    <string name="cv_pass_blobs">Foltok</string>
+    <string name="cv_pass_invert">Negatív</string>
+    <string name="cv_pass_warm_luma">Meleg fény</string>
+    <string name="cv_pass_stencil3">Sablon</string>
+    <string name="cv_pass_change">Változás</string>
 </resources>

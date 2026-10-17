@@ -548,13 +548,13 @@
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
-    <string name="nav_coop">Совместная работа</string>
+    <string name="nav_coop">Связь</string>
     <string name="nav_host_coop">Хост</string>
-    <string name="nav_host_coop_info">Организуйте совместный сеанс, чтобы поделиться своей системой координат AR с пользователями поблизости.</string>
+    <string name="nav_host_coop_info">Создайте связь, чтобы поделиться своей системой координат AR с другим устройством поблизости.</string>
     <string name="nav_join_coop">Присоединиться</string>
-    <string name="nav_join_coop_info">Присоединитесь к ближайшему совместному сеансу, чтобы согласовать свой вид AR с хостом.</string>
+    <string name="nav_join_coop_info">Подключитесь к ближайшей связи, чтобы выровнять ваш AR-вид по устройству-хосту.</string>
     <string name="nav_leave_coop">Выйти</string>
-    <string name="nav_leave_coop_info">Выйти из текущего совместного сеанса.</string>
+    <string name="nav_leave_coop_info">Выйти из текущей связи.</string>
     <string name="nav_wearable">Носимое устройство</string>
     <string name="nav_wearable_info">Подключитесь к смарт-очкам для AR-опыта без использования рук с вводом камеры, согласованным с вашей перспективой.</string>
     <string name="nav_wall_clear">Очистить</string>
@@ -762,4 +762,42 @@
     <string name="reloc_facing_it">Вы смотрите на неё — медленно двигайтесь из стороны в сторону</string>
     <string name="reloc_recapture">Захватить цель заново</string>
     <string name="ar_feedback_capture_failed">Не удалось захватить цель. Нажмите, чтобы повторить.</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">Трафарет</string>
+    <string name="nav_stencil_info">Разделяет рисунок на три листа: чёрный, серый и белый. Нажмите ещё раз, чтобы вернуть оригинал.</string>
+    <string name="nav_stencil_view_all">Все</string>
+    <string name="nav_stencil_view_black">Чёрный</string>
+    <string name="nav_stencil_view_grey">Серый</string>
+    <string name="nav_stencil_view_white">Белый</string>
+    <string name="nav_stencil_view_info">Переключает показываемые листы трафарета: все, чёрный, серый или белый.</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">Обнаружение изменений (нужно фото чистой стены)</string>
+    <string name="target_clean_wall_text">Ещё нет отметок? Сначала сфотографируйте чистую стену кнопкой ниже, затем нарисуйте отметки. Отметки уже есть? Просто нажмите на них.</string>
+    <string name="target_clean_wall_photo">Фото чистой стены</string>
+    <string name="target_clean_wall_saved">Фото чистой стены сохранено. Переснять</string>
+
+    <!-- The CV view: a preview of everything the computer vision is looking for. -->
+    <string name="nav_cv_view">Вид CV</string>
+    <string name="nav_cv_view_info">Показывает всё, что ищет компьютерное зрение, поверх вашего рисунка. Каждый цвет — это один способ поиска; пустое кольцо всё ещё ждёт ответа стены, закрашенная точка уже найдена. Нажмите ещё раз, чтобы скрыть.</string>
+    <string name="nav_cv_legend_title">Ищем</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">Не удалось сохранить фото чистой стены. Снимите его заново.</string>
+    <string name="ar_feedback_clean_wall_register_failed">Это фото чистой стены не совпадает с этой стеной. Переснимите примерно с того места, где будете стоять.</string>
+
+    <!-- The CV view legend: the name of each way of looking. -->
+    <string name="cv_pass_features">Признаки</string>
+    <string name="cv_pass_colour">Цвет</string>
+    <string name="cv_pass_sketch">Набросок</string>
+    <string name="cv_pass_mosaic">Мозаика</string>
+    <string name="cv_pass_posterize2">2 тона</string>
+    <string name="cv_pass_posterize4">4 тона</string>
+    <string name="cv_pass_cartoon">Мультяшный</string>
+    <string name="cv_pass_blobs">Пятна</string>
+    <string name="cv_pass_invert">Негатив</string>
+    <string name="cv_pass_warm_luma">Тёплый свет</string>
+    <string name="cv_pass_stencil3">Трафарет</string>
+    <string name="cv_pass_change">Изменение</string>
 </resources>

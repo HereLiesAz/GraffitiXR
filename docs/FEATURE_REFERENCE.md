@@ -229,9 +229,13 @@ Every layer carries the full property set below; all except the runtime `bitmap`
 | `isInverted` | `false` | Bool | Colour invert |
 | `isSketch` | `false` | Bool | **Outline** effect — render as a traceable pencil sketch (dark lines opaque, light areas transparent); re-derived from `uri` each time, not baked in |
 | `isSubjectIsolated` | `false` | Bool | **Subject isolation** — ML Kit segmentation drops everything but the subject to transparent (see §4) |
+| `isStencil` | `false` | Bool | **Stencil** — the design is split into three tonal sheets (black, grey, white); exclusive with `isSketch` (§5) |
+| `stencilView` | `ALL` | `ALL`/`BASE`/`MIDTONE`/`SECONDARY` | Which sheets are shown while `isStencil` is on |
+| `stencilDark` | `true` | Bool | The last run's dark-or-light call, which names the cycler's options |
 
-`warpMesh`, `stencilType`, `stencilSourceId`, and `textParams` do not exist on `Layer` — Liquify,
-stencil generation, and rasterized text layers have no implementing code (see §3.3, §5, §2.4).
+`warpMesh`, `stencilType`, `stencilSourceId`, and `textParams` do not exist on `Layer` — Liquify and
+rasterized text layers have no implementing code (see §3.3, §2.4). Stencil is the `isStencil` /
+`stencilView` pair above (§5), not the old multi-layer pipeline.
 
 ### 2.2 Setting/replacing the design
 
@@ -287,6 +291,8 @@ These act on the design (contrast with §1.1, which acts on the whole design **p
 | `ToggleInvert` | `false` | — | |
 | `onToggleOutline` | `isSketch = false` | — | The traceable-sketch effect (§2.1) |
 | `onToggleSubjectIsolation` | `isSubjectIsolated = false` | — | Drop everything but the ML Kit-segmented subject (§4) |
+| `onToggleStencil` | `isStencil = false` | — | Three tonal sheets; turns Outline off (§5) |
+| `onCycleStencilView` | `stencilView = ALL` | `ALL` → `BASE` → `MIDTONE` → `SECONDARY` → `ALL` | Only while a stencil exists (§5) |
 
 Colour maths run through `ColorMatrixUtils`.
 
@@ -345,15 +351,38 @@ the design's two toggleable rendering effects.
 
 ---
 
-## 5. Stencil generation — removed / no implementing code
+## 5. Stencil
 
-**There is no stencil feature in the current app.** `StencilWizardStep`, `StencilLayerCount`,
-`StencilLayerType`, `TonalPolarity`, `StencilOutputDimension`, `outputSizeMm`, `StencilProcessor`, and
-every other symbol this section previously documented do not exist anywhere in the source
-(`find . -iname "*stencil*" -not -path "*/build/*"` returns only `docs/STENCILS.md`, which describes
-this as a design document rather than shipped code). See README.md's changelog: stencil generation was
-removed as a documented feature because it has no implementing code. `docs/STENCILS.md` should not be
-read as describing a live pipeline in this app.
+The design can be split into three tonal sheets: black, grey and white.
+
+- **Rail**: `Stencil` (`design.stencil`) is a sub-item of the Design folder. Tap to generate, tap
+  again to bring the original back. While a stencil exists, a cycler (`design.stencil.view`) appears
+  directly beneath it and steps **All → base → midtone → secondary**: All, Black, Grey, White for a
+  dark image; All, White, Grey, Black for a light one.
+- **State**: `Layer.isStencil` and `Layer.stencilView`. Like Outline and Isolate they are flags;
+  the shown bitmap is re-derived from the untouched import (`uri`), so turning it off is exact.
+  Stencil and Outline are exclusive.
+- **Pipeline** (`StencilProcessor`, `StencilTones`, `core/common`), restored from the old tool: it
+  first tries to **remove the background** (the same segmenter as Isolate; if no subject is found it
+  carries on with the whole image, and Isolate's own flag is not touched), and only then judges the image **dark or light**: the isolated subject's luminance (0.299R + 0.587G +
+  0.114B) is turned down by 40 levels and its contrast doubled about mid-grey, which leaves each pixel
+  clearly dark or light, and whichever covers more **area** wins (a tie is dark). That picks the **base sheet**: black for a dark image, white for
+  a light one. The value channel (brightest of R, G, B) is median-blurred (9x9), split into three
+  tones by a deterministic 1-D K-means, and the two sheets laid over the base are closed 5x5 so cut
+  edges are smooth. Transparent pixels stay transparent, so Isolate then Stencil keeps the cut-out.
+- **Sheets** are sequential, as paint is. Dark image: black = the whole subject, grey = grey and
+  lighter, white = the lightest. Light image: white = the whole subject, grey = grey and darker,
+  black = the darkest.
+- **Invariants** (`StencilTones.ranks`, unit-tested): the base is always the complete silhouette of
+  the isolated subject, holes in the cut-out filled in; if the background could not be removed, the
+  silhouette is the whole frame. The midtone always covers at least the secondary: a secondary
+  pixel is a midtone pixel, so the midtone's area is never smaller.
+- **Views**: All stacks the sheets (every pixel in its own tone). Base, Midtone or Secondary shows that
+  one sheet in its colour and leaves the rest transparent.
+- The same method also drives the `stencil3` filter of the SLAM passes (`docs/PASSES.md`).
+
+Not rebuilt: the old multi-sheet PDF export and tiling (`docs/STENCILS.md` still describes that as a
+design document).
 
 ---
 

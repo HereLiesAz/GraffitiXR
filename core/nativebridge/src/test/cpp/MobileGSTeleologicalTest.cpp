@@ -1,11 +1,14 @@
 // Host tests for the teleological-SLAM fixes: the partition fallback, growth surviving a
 // repartition, the inlier spread riding with the pose, and a design move resetting corroboration.
+#include <set>
 #include <gtest/gtest.h>
 #include <opencv2/opencv.hpp>
 #include <cstring>
 #include <jni.h>
 #include "MobileGS.h"
 #include "MobileGSTestPeer.h"
+#include "ShapeMatch.h"
+#include <algorithm>
 
 extern JavaVM* gJvm;
 
@@ -241,6 +244,7 @@ int paintMarksAfterThreeLocks(bool selfGrow) {
     const float K[4] = {700.f, 700.f, 400.f, 300.f};
     fingerprintFrontalWall(g, full, K);
     g.setArtworkFingerprint(full, nullptr, 0, 0, 0, nullptr, nullptr);
+    g.awaitFilterTargets();   // the filters' targets are built on a worker
     const float hw = (float)full.cols / (2.0f * K[0]);
     const float hh = (float)full.rows / (2.0f * K[1]);
     const float place[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0,
@@ -288,6 +292,113 @@ TEST(PassEvidence, EveryPassHasAStableName) {
     EXPECT_STREQ("features", passes::passName(passes::kPassFeatures));
     EXPECT_STREQ("colour", passes::passName(passes::kPassColour));
     EXPECT_STREQ("unknown", passes::passName(99));
+    for (int f = 0; f < designfilters::kCount; ++f)
+        EXPECT_STREQ(designfilters::name(f), passes::passName(passes::kPassFilterBase + f));
+}
+
+// ---- Design filter bank ------------------------------------------------------------------------------
+
+TEST(DesignFilters, EveryFilterReturnsAGreyPictureTheSizeOfTheDesign) {
+    const cv::Mat wall = makeWall(640, 480, 0x77);
+    cv::Mat design;
+    if (wall.channels() == 1) design = wall; else cv::cvtColor(wall, design, wall.channels() == 4 ? cv::COLOR_RGBA2GRAY : cv::COLOR_RGB2GRAY);
+    for (int ch : {1, 3, 4}) {
+        cv::Mat d;
+        if (ch == 1) d = design;
+        else if (ch == 3) cv::cvtColor(design, d, cv::COLOR_GRAY2RGB);
+        else cv::cvtColor(design, d, cv::COLOR_GRAY2RGBA);
+        for (int f = 0; f < designfilters::kCount; ++f) {
+            const cv::Mat out = designfilters::apply(f, d);
+            ASSERT_FALSE(out.empty()) << designfilters::name(f) << " ch=" << ch;
+            EXPECT_EQ(CV_8UC1, out.type()) << designfilters::name(f);
+            EXPECT_EQ(d.size(), out.size()) << designfilters::name(f);
+        }
+    }
+    EXPECT_TRUE(designfilters::apply(designfilters::kCount, design).empty());
+    EXPECT_TRUE(designfilters::apply(-1, design).empty());
+    EXPECT_TRUE(designfilters::apply(designfilters::kSketch, cv::Mat()).empty());
+}
+
+TEST(DesignFilters, PosterizeKeepsTwoAndFourTones) {
+    const cv::Mat design = makeWall(320, 240, 0x31);
+    for (auto [id, tones] : {std::pair{designfilters::kPosterize2, 2}, std::pair{designfilters::kPosterize4, 4}}) {
+        const cv::Mat out = designfilters::apply(id, design);
+        std::set<int> seen;
+        for (int y = 0; y < out.rows; ++y) for (int x = 0; x < out.cols; ++x) seen.insert(out.at<uchar>(y, x));
+        EXPECT_LE((int)seen.size(), tones) << designfilters::name(id);
+        EXPECT_GE((int)seen.size(), 2) << designfilters::name(id);
+    }
+}
+
+TEST(DesignFilters, StencilLayersHaveAtMostTheRequestedTonesAndAreRepeatable) {
+    const cv::Mat design = makeWall(640, 480, 0x31);
+    for (int tones = 2; tones <= 5; ++tones) {
+        const cv::Mat a = designfilters::stencilLayers(design, tones);
+        const cv::Mat b = designfilters::stencilLayers(design, tones);
+        ASSERT_FALSE(a.empty());
+        EXPECT_EQ(design.size(), a.size());
+        EXPECT_EQ(0, cv::countNonZero(a != b)) << "same design, different layers (tones=" << tones << ")";
+        std::set<int> seen;
+        for (int y = 0; y < a.rows; ++y) for (int x = 0; x < a.cols; ++x) seen.insert(a.at<uchar>(y, x));
+        EXPECT_LE((int)seen.size(), tones);
+        EXPECT_GE((int)seen.size(), 2);
+    }
+    EXPECT_TRUE(designfilters::stencilLayers(design, 1).empty());
+    EXPECT_TRUE(designfilters::stencilLayers(cv::Mat(), 3).empty());
+}
+
+TEST(DesignFilters, TheBuildOrderIsEveryFilterOnceAndTheCheapOnesFirst) {
+    std::set<int> seen(std::begin(designfilters::kBuildOrder), std::end(designfilters::kBuildOrder));
+    EXPECT_EQ((size_t)designfilters::kCount, seen.size());
+    for (int f = 0; f < designfilters::kCount; ++f) EXPECT_EQ(1u, seen.count(f)) << designfilters::name(f);
+    auto position = [](int id) {
+        return (int)(std::find(std::begin(designfilters::kBuildOrder), std::end(designfilters::kBuildOrder), id) -
+                     std::begin(designfilters::kBuildOrder));
+    };
+    EXPECT_LT(position(designfilters::kInvert), position(designfilters::kSketch));
+    EXPECT_LT(position(designfilters::kPosterize2), position(designfilters::kCartoon));
+    EXPECT_EQ(designfilters::kCount - 1, position(designfilters::kStencil3)) << "the stencil is the slowest, so it is last";
+}
+
+TEST(MobileGSTeleological, FilterTargetsAreBuiltOffTheCallingThreadAndSupersededBuildsStandDown) {
+    MobileGS g;
+    g.initialize(0, 0);
+    const float K[4] = {700.f, 700.f, 400.f, 300.f};
+    const cv::Mat wall = makeWall(800, 600, 0x51de);
+    fingerprintFrontalWall(g, wall, K);
+    // Two designs in a row: the first build must stand down for the second, never install its places.
+    g.setArtworkFingerprint(makeWall(800, 600, 0x1111), nullptr, 0, 0, 0, nullptr, nullptr);
+    g.setArtworkFingerprint(makeWall(800, 600, 0x2222), nullptr, 0, 0, 0, nullptr, nullptr);
+    g.awaitFilterTargets();
+    EXPECT_GE(g.readyFilterTargets(), 4);
+    // Clearing the wall drops the targets with the design.
+    g.clearWallFingerprint();
+    g.awaitFilterTargets();
+    EXPECT_EQ(0, g.readyFilterTargets());
+    g.destroy();
+}
+
+TEST(DesignFilters, InvertIsTheNegative) {
+    const cv::Mat design = makeWall(160, 120, 0x12);
+    cv::Mat grey;
+    if (design.channels() == 1) grey = design; else cv::cvtColor(design, grey, cv::COLOR_RGB2GRAY);
+    const cv::Mat out = designfilters::apply(designfilters::kInvert, design);
+    EXPECT_EQ(0, cv::countNonZero(out + grey - 255));
+}
+
+TEST(DesignFilters, LocationsStayInsideTheBorderAndWithinTheCap) {
+    const cv::Mat design = makeWall(640, 480, 0x77);
+    for (int f = 0; f < designfilters::kCount; ++f) {
+        const cv::Mat out = designfilters::apply(f, design);
+        const auto pts = designfilters::locations(out, 100, 32);
+        EXPECT_LE(pts.size(), 100u) << designfilters::name(f);
+        for (const auto& p : pts) {
+            EXPECT_GE(p.x, 32.f); EXPECT_GE(p.y, 32.f);
+            EXPECT_LT(p.x, 640.f - 32.f); EXPECT_LT(p.y, 480.f - 32.f);
+        }
+    }
+    EXPECT_TRUE(designfilters::locations(cv::Mat(), 10).empty());
+    EXPECT_TRUE(designfilters::locations(cv::Mat(40, 40, CV_8UC1, cv::Scalar(0)), 10, 32).empty());
 }
 
 // With the design laid exactly on the captured wall, the feature pass judges cells and sees paint in
@@ -316,8 +427,355 @@ TEST(MobileGSTeleological, ThePassStatsCountWhatEachPassJudged) {
     EXPECT_LE(st[2], st[1]);
     long colour[5];
     ASSERT_TRUE(g.getPassStats(passes::kPassColour, colour));
+    // The filter passes run too, all the time, beside the first two.
+    long filterJudged = 0, filterSeen = 0;
+    int setsWithRows = 0;
+    for (int f = 0; f < designfilters::kCount; ++f) {
+        if (MobileGSTestPeer::targetSetRows(g, f) > 0) ++setsWithRows;
+        long fs[5];
+        ASSERT_TRUE(g.getPassStats(passes::kPassFilterBase + f, fs));
+        filterJudged += fs[1]; filterSeen += fs[2];
+        EXPECT_LE(fs[2], fs[1]);
+    }
+    EXPECT_GE(setsWithRows, 4) << "most design filters found nothing to look at on a textured design";
+    EXPECT_GT(filterJudged, 0) << "no filter pass ever judged a cell";
+    EXPECT_GT(filterSeen, 0) << "no filter pass saw paint on a wall that matches the design";
     EXPECT_FALSE(g.getPassStats(passes::kPassCount, st));
     EXPECT_FALSE(g.getPassStats(-1, st));
     g.setEvalSyncReloc(false, 1);
+    g.destroy();
+}
+
+// ---- Wall exclusion list and baseline margin ---------------------------------------------------------
+
+namespace {
+struct PaintedRig {
+    MobileGS g;
+    cv::Mat bare, design, live;
+    float K[4] = {700.f, 700.f, 400.f, 300.f};
+    // A bare wall captured, a different design registered over it, and a live frame that is the wall
+    // with the design painted in the middle ([painted] false: the bare wall still).
+    void build(bool painted) {
+        g.initialize(0, 0);
+        bare = makeWall(800, 600, 0x51de);
+        design = makeWall(800, 600, 0xbeef);
+        fingerprintFrontalWall(g, bare, K);
+        g.setArtworkFingerprint(design, nullptr, 0, 0, 0, nullptr, nullptr);
+        const float hw = (float)bare.cols / (2.0f * K[0]);
+        const float hh = (float)bare.rows / (2.0f * K[1]);
+        const float place[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0,
+                                 (bare.cols * 0.5f - K[2]) / K[0], (bare.rows * 0.5f - K[3]) / K[1], 1.0f, 1};
+        g.setDesignPlacement(place, hw, hh);
+        live = bare.clone();
+        if (painted) {
+            const cv::Rect mid(150, 100, 500, 400);
+            design(mid).copyTo(live(mid));
+        }
+        g.setLiveIntrinsics(K);
+        g.setEvalSyncReloc(true, 1);
+        g.scheduleRelocCheck(live);
+    }
+    ~PaintedRig() { g.setEvalSyncReloc(false, 1); g.destroy(); }
+};
+} // namespace
+
+TEST(MobileGSTeleological, PaintedDesignCorroboratesAndTheBareWallDoesNot) {
+    PaintedRig painted; painted.build(true);
+    ASSERT_EQ(MobileGS::kRelocOk, painted.g.lastRelocReject());
+    ASSERT_EQ(MobileGS::kCorrobGated, painted.g.corrobGateReason());
+    PaintedRig bare; bare.build(false);
+    ASSERT_EQ(MobileGS::kRelocOk, bare.g.lastRelocReject());
+    ASSERT_EQ(MobileGS::kCorrobGated, bare.g.corrobGateReason());
+    std::fprintf(stderr, "painted matched %d / %d, bare matched %d / %d\n",
+                 painted.g.corrobMatched(), painted.g.corrobPredicted(),
+                 bare.g.corrobMatched(), bare.g.corrobPredicted());
+    EXPECT_GT(painted.g.corrobMatched(), 20) << "design painted on the wall did not corroborate";
+    EXPECT_LE(bare.g.corrobMatched() * 4, painted.g.corrobMatched()) << "the bare wall corroborated like paint";
+}
+
+// A design that repeats itself at the baseline's displacement agrees with the wall just as well at the
+// displaced placements as at the true one: that is chance-level agreement, not evidence, and the pass
+// must not count it. (Tile 120x90 px = the baseline's shift of 30% of the design's half-extent.)
+TEST(MobileGSTeleological, ARepeatingDesignFailsTheBaselineMargin) {
+    MobileGS g;
+    g.initialize(0, 0);
+    const float K[4] = {700.f, 700.f, 400.f, 300.f};
+    const cv::Mat bare = makeWall(800, 600, 0x51de);
+    const cv::Mat tile = makeWall(120, 90, 0x7157);
+    cv::Mat design(600, 800, CV_8UC3);
+    for (int y = 0; y < 600; y += 90) for (int x = 0; x < 800; x += 120) {
+        const cv::Rect r(x, y, std::min(120, 800 - x), std::min(90, 600 - y));
+        tile(cv::Rect(0, 0, r.width, r.height)).copyTo(design(r));
+    }
+    fingerprintFrontalWall(g, bare, K);
+    g.setArtworkFingerprint(design, nullptr, 0, 0, 0, nullptr, nullptr);
+    const float hw = 800.f / (2.0f * K[0]), hh = 600.f / (2.0f * K[1]);
+    const float place[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0.0f, 0.0f, 1.0f, 1};
+    g.setDesignPlacement(place, hw, hh);
+    cv::Mat live = bare.clone();
+    const cv::Rect mid(150, 90, 480, 360);
+    design(mid).copyTo(live(mid));
+    g.setLiveIntrinsics(K);
+    g.setEvalSyncReloc(true, 1);
+    g.scheduleRelocCheck(live);
+    ASSERT_EQ(MobileGS::kRelocOk, g.lastRelocReject());
+    ASSERT_EQ(MobileGS::kCorrobGated, g.corrobGateReason());
+    ASSERT_GT(g.corrobPredicted(), 50);
+    EXPECT_EQ(0, g.corrobMatched()) << "a design that matches itself at displaced placements counted as evidence";
+    g.setEvalSyncReloc(false, 1);
+    g.destroy();
+}
+
+// ---- Pass B: change against the clean wall, judged by shape ------------------------------------------
+
+namespace {
+// An 8 x 4 grid whose left half is design patch 0 and right half patch 1; nothing is outside the design.
+const int kCols = 8, kRows = 4;
+std::vector<int> twoPatches() {
+    std::vector<int> p((size_t)kCols * kRows);
+    for (int i = 0; i < kCols * kRows; ++i) p[(size_t)i] = (i % kCols) < kCols / 2 ? 0 : 1;
+    return p;
+}
+std::vector<uint8_t> allJudged() { return std::vector<uint8_t>((size_t)kCols * kRows, 1); }
+std::vector<uint8_t> cellsWhere(bool (*pred)(int x, int y)) {
+    std::vector<uint8_t> v((size_t)kCols * kRows, 0);
+    for (int i = 0; i < kCols * kRows; ++i) v[(size_t)i] = pred(i % kCols, i / kCols) ? 1 : 0;
+    return v;
+}
+int presentCount(const std::vector<uint8_t>& v) {
+    return (int)std::count(v.begin(), v.end(), (uint8_t)passes::kPresent);
+}
+} // namespace
+
+TEST(ShapeMatch, LabelsConnectedCellsOfTheSameKey) {
+    // 0 0 1 1
+    // 0 2 1 1   key 2 touches nothing of its own kind; -1 is outside
+    // 0 0 -1 0
+    const std::vector<int> key = {0, 0, 1, 1,  0, 2, 1, 1,  0, 0, -1, 0};
+    const auto l = shapematch::label(key, 4, 3);
+    EXPECT_EQ(l[0], l[1]);
+    EXPECT_EQ(l[0], l[4]);
+    EXPECT_EQ(l[0], l[8]);
+    EXPECT_EQ(l[2], l[3]);
+    EXPECT_NE(l[0], l[2]);
+    EXPECT_NE(l[5], l[0]);
+    EXPECT_EQ(-1, l[10]);
+    EXPECT_NE(l[11], l[0]) << "a same-key cell cut off by an outside cell is its own patch";
+}
+
+TEST(ShapeMatch, ACompletePatchIsPaintAndTheUntouchedOneIsNot) {
+    const auto v = shapematch::verdicts(cellsWhere([](int x, int) { return x < kCols / 2; }), allJudged(), twoPatches(), kCols, kRows);
+    EXPECT_EQ(kRows * kCols / 2, presentCount(v));
+    for (int i = 0; i < kCols * kRows; ++i)
+        EXPECT_EQ((i % kCols) < kCols / 2 ? passes::kPresent : passes::kAbsent, v[(size_t)i]) << "cell " << i;
+}
+
+TEST(ShapeMatch, TheWholeDesignPaintedAtOnceIsPaint) {
+    const auto v = shapematch::verdicts(cellsWhere([](int, int) { return true; }), allJudged(), twoPatches(), kCols, kRows);
+    EXPECT_EQ(kCols * kRows, presentCount(v));
+}
+
+TEST(ShapeMatch, PaintInProgressIsPaint) {
+    // The right patch complete, the left half done (one partial patch).
+    const auto v = shapematch::verdicts(
+        cellsWhere([](int x, int y) { return x >= kCols / 2 || y < kRows / 2; }), allJudged(), twoPatches(), kCols, kRows);
+    EXPECT_EQ(kCols * kRows - kCols / 2 * (kRows / 2), presentCount(v));
+}
+
+TEST(ShapeMatch, ABandCuttingAcrossManyPatchesIsNotPaint) {
+    // Four column patches; a band over the top half of every one is four partial patches: a shadow.
+    std::vector<int> patch((size_t)kCols * kRows);
+    for (int i = 0; i < kCols * kRows; ++i) patch[(size_t)i] = (i % kCols) / 2;
+    const auto v = shapematch::verdicts(cellsWhere([](int, int y) { return y < kRows / 2; }), allJudged(), patch, kCols, kRows);
+    EXPECT_EQ(0, presentCount(v));
+}
+
+TEST(ShapeMatch, AChangeOutsideTheDesignIsNotPaint) {
+    // The right half is not design at all (patch -1); a hand over it, plus a sliver of the left patch.
+    auto patch = twoPatches();
+    for (int i = 0; i < kCols * kRows; ++i) if ((i % kCols) >= kCols / 2) patch[(size_t)i] = -1;
+    const auto v = shapematch::verdicts(cellsWhere([](int x, int y) { return x >= kCols / 2 - 1 && y < kRows / 2; }),
+                                        allJudged(), patch, kCols, kRows);
+    EXPECT_EQ(0, presentCount(v));
+}
+
+TEST(ShapeMatch, ASingleChangedCellInABigPatchIsNoise) {
+    const auto v = shapematch::verdicts(cellsWhere([](int x, int y) { return x == 0 && y == 0; }),
+                                        allJudged(), twoPatches(), kCols, kRows);
+    EXPECT_EQ(0, presentCount(v));
+}
+
+TEST(ShapeMatch, CellsThatCouldNotBeComparedHaveNoVerdict) {
+    auto judged = allJudged();
+    judged[0] = 0;
+    const auto v = shapematch::verdicts(cellsWhere([](int, int) { return true; }), judged, twoPatches(), kCols, kRows);
+    EXPECT_EQ(passes::kNoData, v[0]);
+    EXPECT_EQ(passes::kPresent, v[1]);
+}
+
+// The pass reads the clean-wall photo, so it needs one registered, and the Settings switch on.
+namespace {
+struct ChangeRig {
+    MobileGS g;
+    cv::Mat bare, live;
+    float K[4] = {700.f, 700.f, 400.f, 300.f};
+    bool registered = false;
+    long judged = 0, seen = 0;
+
+    void build(bool enable, bool paintLeftHalf, bool giveCleanPhoto) {
+        g.initialize(0, 0);
+        bare = makeWall(800, 600, 0x51de);
+        // Two colour fields, left red and right blue, each with a few small dark and light marks (a
+        // design needs corners to register at all); the marks barely move a cell's mean colour.
+        cv::Mat design(600, 800, CV_8UC3);
+        design(cv::Rect(0, 0, 400, 600)).setTo(cv::Scalar(30, 30, 200));
+        design(cv::Rect(400, 0, 400, 600)).setTo(cv::Scalar(200, 60, 30));
+        cv::RNG rng(0x9e1);
+        for (int i = 0; i < 90; ++i) {
+            const int x = rng.uniform(10, 770), y = rng.uniform(10, 570);
+            cv::rectangle(design, cv::Rect(x, y, 9, 9), (i % 2) ? cv::Scalar(20, 20, 20) : cv::Scalar(235, 235, 235), cv::FILLED);
+        }
+        fingerprintFrontalWall(g, bare, K);
+        g.setCaptureImage(bare, K);
+        g.setArtworkFingerprint(design, nullptr, 0, 0, 0, nullptr, nullptr);
+        g.awaitFilterTargets();
+        const float hw = 800.f / (2.0f * K[0]), hh = 600.f / (2.0f * K[1]);
+        const float place[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0.0f, 0.0f, 1.0f, 1};
+        g.setDesignPlacement(place, hw, hh);
+        if (giveCleanPhoto) registered = g.setCleanWallImage(bare);
+        g.setChangePassEnabled(enable);
+        live = bare.clone();
+        // Paint the left half in a colour the design does NOT use: the pass cares about shape only.
+        if (paintLeftHalf) live(cv::Rect(0, 0, 400, 600)).setTo(cv::Scalar(40, 200, 40));
+        g.setLiveIntrinsics(K);
+        g.setEvalSyncReloc(true, 1);
+        for (int i = 0; i < 4; ++i) g.scheduleRelocCheck(live);
+        long st[5];
+        g.getPassStats(passes::kPassChange, st);
+        judged = st[1]; seen = st[2];
+    }
+    ~ChangeRig() { g.setEvalSyncReloc(false, 1); g.destroy(); }
+};
+} // namespace
+
+TEST(MobileGSTeleological, TheChangePassIsOffUntilTheSwitchIsOn) {
+    MobileGS g;
+    EXPECT_FALSE(g.changePassEnabled());
+    ChangeRig rig; rig.build(/*enable=*/false, /*paint=*/true, /*clean=*/true);
+    EXPECT_TRUE(rig.registered);
+    EXPECT_EQ(0, rig.judged) << "the pass ran with its switch off";
+}
+
+TEST(MobileGSTeleological, TheChangePassCannotRunWithoutTheCleanWallPhoto) {
+    ChangeRig rig; rig.build(/*enable=*/true, /*paint=*/true, /*clean=*/false);
+    EXPECT_EQ(MobileGS::kCleanNone, rig.g.cleanWallStatus());
+    EXPECT_EQ(0, rig.judged) << "the pass ran with no clean-wall photo";
+}
+
+TEST(MobileGSTeleological, ThePassSeesAPatchPaintedInAColourTheDesignDoesNotUse) {
+    ChangeRig rig; rig.build(true, true, true);
+    ASSERT_EQ(MobileGS::kRelocOk, rig.g.lastRelocReject());
+    ASSERT_TRUE(rig.registered);
+    std::fprintf(stderr, "change pass: judged %ld seen %ld\n", rig.judged, rig.seen);
+    EXPECT_GT(rig.judged, 0);
+    EXPECT_GT(rig.seen, 0) << "a whole patch painted, in the wrong colour, was not seen";
+}
+
+TEST(MobileGSTeleological, ThePassSeesNothingOnTheBareWall) {
+    ChangeRig rig; rig.build(true, false, true);
+    ASSERT_EQ(MobileGS::kRelocOk, rig.g.lastRelocReject());
+    EXPECT_GT(rig.judged, 0);
+    EXPECT_EQ(0, rig.seen) << "the unpainted wall looked like paint";
+}
+
+TEST(MobileGSTeleological, AClutterOfNonsenseFailsRegistrationAndTheStatusSaysSo) {
+    MobileGS g;
+    g.initialize(0, 0);
+    const float K[4] = {700.f, 700.f, 400.f, 300.f};
+    g.setCaptureImage(makeWall(800, 600, 0x51de), K);
+    EXPECT_FALSE(g.setCleanWallImage(cv::Mat(600, 800, CV_8UC3, cv::Scalar(90, 90, 90))));
+    EXPECT_EQ(MobileGS::kCleanFailed, g.cleanWallStatus());
+    g.clearCleanWallImage();
+    EXPECT_EQ(MobileGS::kCleanNone, g.cleanWallStatus());
+    g.destroy();
+}
+
+TEST(MobileGSTeleological, ACleanWallPhotoGivenBeforeTheCapturePhotoWaitsForIt) {
+    MobileGS g;
+    g.initialize(0, 0);
+    const float K[4] = {700.f, 700.f, 400.f, 300.f};
+    const cv::Mat wall = makeWall(800, 600, 0x51de);
+    EXPECT_FALSE(g.setCleanWallImage(wall));
+    EXPECT_EQ(MobileGS::kCleanPending, g.cleanWallStatus());
+    g.setCaptureImage(wall, K);
+    EXPECT_EQ(MobileGS::kCleanRegistered, g.cleanWallStatus());
+    g.destroy();
+}
+
+// ---- CV preview ----------------------------------------------------------------------------------------
+
+TEST(PassEvidence, EachPassHasItsOwnColour) {
+    std::set<uint32_t> seen;
+    for (int p = 0; p < passes::kPassCount; ++p) {
+        const uint32_t c = passes::passRgb(p);
+        EXPECT_EQ(0u, c >> 24) << "colour is packed 0xRRGGBB";
+        EXPECT_TRUE(seen.insert(c).second) << "pass " << p << " shares a colour";
+    }
+}
+
+TEST(MobileGSTeleological, TheCvPreviewDrawsEveryPassesTargetsInTheDesignsOwnPixels) {
+    MobileGS g;
+    g.initialize(0, 0);
+    cv::Mat none;
+    EXPECT_FALSE(g.renderCvPreview(none, 512)) << "no design, no preview";
+
+    const cv::Mat full = makeWall(800, 600, 0x51de);
+    const float K[4] = {700.f, 700.f, 400.f, 300.f};
+    fingerprintFrontalWall(g, full, K);
+    g.setArtworkFingerprint(full, nullptr, 0, 0, 0, nullptr, nullptr);
+    g.awaitFilterTargets();
+
+    cv::Mat rgba;
+    ASSERT_TRUE(g.renderCvPreview(rgba, 400));
+    EXPECT_EQ(CV_8UC4, rgba.type());
+    EXPECT_EQ(400, rgba.cols) << "scaled so the long side is the cap";
+    EXPECT_EQ(300, rgba.rows) << "aspect kept";
+    std::vector<cv::Mat> ch; cv::split(rgba, ch);
+    EXPECT_GT(cv::countNonZero(ch[3]), 50) << "nothing was drawn";
+
+    float legend[3 * passes::kPassCount];
+    g.getPassLegend(legend);
+    EXPECT_GT(legend[3 * passes::kPassFeatures + 1], 0.0f) << "the features pass has targets";
+    int filtersWithTargets = 0;
+    for (int f = 0; f < designfilters::kCount; ++f)
+        if (legend[3 * (passes::kPassFilterBase + f) + 1] > 0.0f) ++filtersWithTargets;
+    EXPECT_EQ(g.readyFilterTargets(), filtersWithTargets);
+    for (int p = 0; p < passes::kPassCount; ++p) {
+        EXPECT_EQ((float)passes::passRgb(p), legend[3 * p]);
+        EXPECT_LE(legend[3 * p + 2], legend[3 * p + 1]) << "more confirmed than targets, pass " << p;
+    }
+    g.destroy();
+}
+
+// A clean-wall photo taken from a little to one side registers, but its warp does not reach the whole
+// capture photo: the margin it cannot reach must be no-data, not the nearest edge colour repeated.
+TEST(MobileGSTeleological, TheUnsupportedMarginOfAShiftedCleanWallPhotoIsNoData) {
+    MobileGS g;
+    g.initialize(0, 0);
+    const float K[4] = {700.f, 700.f, 400.f, 300.f};
+    const cv::Mat wall = makeWall(800, 600, 0x51de);
+    g.setCaptureImage(wall, K);
+
+    ASSERT_TRUE(g.setCleanWallImage(wall));
+    const float same = MobileGSTestPeer::cleanWallSupportedFraction(g);
+    EXPECT_GT(same, 0.95f) << "an identical photo is supported nearly everywhere (only the eroded border is not)";
+
+    // The same wall seen 120 px to the left: its right-hand 120 px have nothing behind them.
+    cv::Mat shifted(wall.size(), wall.type(), cv::Scalar(128, 128, 128));
+    wall(cv::Rect(120, 0, 680, 600)).copyTo(shifted(cv::Rect(0, 0, 680, 600)));
+    ASSERT_TRUE(g.setCleanWallImage(shifted)) << "a shifted photo of the same wall should still register";
+    const float partial = MobileGSTestPeer::cleanWallSupportedFraction(g);
+    EXPECT_LT(partial, 0.9f) << "the margin the warp cannot reach counted as supported";
+    EXPECT_GT(partial, 0.6f);
     g.destroy();
 }

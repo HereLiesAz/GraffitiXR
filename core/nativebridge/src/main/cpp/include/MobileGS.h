@@ -790,6 +790,34 @@ private:
     std::vector<cv::Point3f> mPaintPoints3D;
     // Per artwork row, for the current generation: already promoted into the paint set.
     std::vector<uint8_t> mArtworkPromoted;
+    /**
+     * Pass targets (docs/PASSES.md): one per design filter. A filter chooses WHERE to look (corner
+     * places on the filtered design); the descriptors are the UNFILTERED design's at those places,
+     * so they match against the raw live frame like any other design feature. They corroborate
+     * exactly as the primary artwork's do (consecutive confirmations, gated by the pose) and feed
+     * the per-cell votes of pass kPassFilterBase + filter. They never become reloc marks.
+     * Guarded by mMutex; replaced together with the artwork, so mArtworkGeneration covers them.
+     */
+    struct TargetSet {
+        cv::Mat descs;                              // CV_32F (SuperPoint) or CV_8U (ORB), as the artwork's
+        std::vector<cv::Point2f> pts;               // composite pixels, 1:1 with descs
+        std::vector<uint8_t> corrob;                // consecutive gated confirmations, capped
+        std::vector<std::vector<int>> cellRows;     // per paint-grid cell: rows inside it
+    };
+    std::vector<TargetSet> mTargetSets;
+    // The filters' targets are made on a worker thread, cheapest first (designfilters::kBuildOrder), each
+    // installed as soon as it is ready; a pass whose targets are not there yet simply has no data.
+    std::thread mFilterThread;
+    std::mutex mFilterThreadMutex;   // guards mFilterThread: two registrations must not start/join it at once
+    std::atomic<bool> mFilterCancel{false};
+    void startFilterBuild(cv::Mat composite, cv::Mat gray, int descType, long generation);
+    void joinFilterBuild();
+    /**
+     * How many rows at the front of mWallDescriptors / mWallKeypoints3D are the wall as captured
+     * (the bare wall, before any paint). Self-grow only appends, so everything after is grown. The
+     * wall exclusion list is these rows. Guarded by mMutex.
+     */
+    size_t mBareWallCount = 0;
     // Bumped whenever the artwork is replaced or cleared. tryUpdateFingerprint snapshots the
     // descriptors under the lock, spends milliseconds matching outside it, and then merges its
     // result back in; without this it would merge into whatever artwork is registered by then. The
@@ -818,6 +846,9 @@ private:
         std::vector<int> cluster;                  // design colour cluster, -1 when weight == 0
         std::vector<std::vector<int>> features;    // artwork descriptor rows inside the cell
         std::vector<cv::Vec3f> base;               // bare-wall colour (lighting-normalised Lab)
+        std::vector<cv::Vec3f> baseClean;          // the same, from the clean-wall photo (pass B)
+        std::vector<uint8_t> hasBaseClean;
+        std::vector<int> patch;                    // design patch (connected, one colour cluster) per cell, -1 outside
         std::vector<uint8_t> hasBase;              // 1 = capture photo, 2 = first AR sighting
         std::vector<int> baseGroup;                // cluster of bare-wall colours, -1 = none yet
         std::vector<uint8_t> painted, pending;
@@ -829,6 +860,12 @@ private:
     // Per-pass diagnostics (see PassEvidence.h), guarded by mMutex.
     passes::Stats mPassStats[passes::kPassCount];
     cv::Mat mCaptureRgb;                           // capture photo (fingerprint frame = its camera)
+    cv::Mat mCleanWallRaw;                         // clean-wall photo as given (<= 640 px)
+    cv::Mat mCleanWallRgb;                         // ... warped into the capture photo's pixels
+    cv::Mat mCleanWallValid;                       // 255 where the warp has real clean-wall pixels behind it
+    std::atomic<int> mCleanWallStatus{kCleanNone};
+    std::atomic<bool> mChangePassEnabled{false};
+    void registerCleanWallLocked();                // needs mMutex; mCleanWallRaw -> mCleanWallRgb
     float mCaptureIntr[4] = {0,0,0,0};
     std::vector<uint8_t> mPendingGridRestore;      // applied when a grid of matching shape is built
     cv::Mat mArtworkGray;                          // normalised design composite, for autoFitDesign
@@ -841,7 +878,53 @@ public:
      * in the design plane), scale ratio, inliers}. Returns false when there is no confident fit.
      */
     bool autoFitDesign(float* out5);
+    /** Waits for the filter targets of the registered design to finish building (tests; shutdown does it too). */
+    void awaitFilterTargets() { joinFilterBuild(); }
+    /** How many filters' targets are installed and usable right now. */
+    int readyFilterTargets() const;
+
+    /**
+     * The CV preview: everything the passes are looking for, composited in the design's own pixel space
+     * (so it lays over the design exactly). Transparent RGBA, no larger than [maxSide] on the long side:
+     * each pass's targets as dots in that pass's colour ([passes::passRgb]), a ring while unconfirmed
+     * and a filled dot once the wall has answered, and the design cells already judged painted tinted
+     * green. False when no design is registered.
+     */
+    bool renderCvPreview(cv::Mat& rgba, int maxSide) const;
+
+    /**
+     * One row per pass, [kPassCount] rows of {colour (0xRRGGBB as a float), targets, confirmed}:
+     * features and the filters count their target places; colour counts opaque design cells and the
+     * ones painted. Passes with nothing to look for yet have 0 targets.
+     */
+    void getPassLegend(float* out) const;
     void setCaptureImage(const cv::Mat& rgb, const float* intr4);
+
+    /** What became of the clean-wall photo. */
+    enum CleanWallStatus {
+        kCleanNone = 0,        //!< no clean-wall photo
+        kCleanPending = 1,     //!< held, waiting for the capture photo to register against
+        kCleanRegistered = 2,  //!< registered to the capture photo; pass B can use it
+        kCleanFailed = 3,      //!< could not be registered (too different, too few features)
+    };
+
+    /**
+     * The clean-wall photo (pass B): the bare wall BEFORE it was marked or painted. It is registered
+     * to the capture photo by feature matching, and from then on supplies the bare-wall colours the
+     * change pass compares the live wall with. Replaces any earlier one. Returns whether it is
+     * registered now (false while it waits for the capture photo, or if registration failed; see
+     * [cleanWallStatus]).
+     */
+    bool setCleanWallImage(const cv::Mat& rgb);
+    int cleanWallStatus() const { return mCleanWallStatus.load(std::memory_order_relaxed); }
+    void clearCleanWallImage();
+
+    /**
+     * Pass B on or off. Off by default and never turned on from here: only the user's Settings switch
+     * does it. Even on, the pass judges nothing without a registered clean-wall photo.
+     */
+    void setChangePassEnabled(bool on) { mChangePassEnabled.store(on, std::memory_order_relaxed); }
+    bool changePassEnabled() const { return mChangePassEnabled.load(std::memory_order_relaxed); }
     std::vector<uint8_t> exportPaintGrid() const;
     void restorePaintGrid(const std::vector<uint8_t>& blob);
     float getFeatureProgress() const { return mFeatureProgress.load(std::memory_order_relaxed); }

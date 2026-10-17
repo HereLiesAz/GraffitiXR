@@ -14,6 +14,7 @@ import com.hereliesaz.graffitixr.common.coop.OpEmitter
 import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.common.util.ImageUtils
 import com.hereliesaz.graffitixr.common.util.SketchProcessor
+import com.hereliesaz.graffitixr.common.util.StencilProcessor
 import com.hereliesaz.graffitixr.common.util.computeAutoTune
 import com.hereliesaz.graffitixr.common.util.imageStats
 import com.hereliesaz.graffitixr.common.util.GallerySaveResult
@@ -397,7 +398,7 @@ class EditorViewModel @Inject constructor(
                 // Project-load restore, not a fresh user toggle -- don't surface the failure toast
                 // here even if a stage falls back; recomputeDesignEffects handles the live-toggle
                 // case where the user just took an action and needs to see it didn't apply.
-                val shown = source?.let { applyDesignEffects(it, loaded).first }
+                val shown = source?.let { applyDesignEffects(it, loaded).bitmap }
                 withContext(dispatchers.main) {
                     if (isCurrentProject(project.id) && _uiState.value.design?.id == loaded.id) {
                         designSourceBitmap = source
@@ -520,7 +521,9 @@ class EditorViewModel @Inject constructor(
         val imageChanged = command.oldDesign?.uri != _uiState.value.design?.uri
         val restored = command.oldDesign?.copy(bitmap = if (imageChanged) null else _uiState.value.design?.bitmap)
         val effectsChanged = restored?.isSketch != _uiState.value.design?.isSketch ||
-            restored?.isSubjectIsolated != _uiState.value.design?.isSubjectIsolated
+            restored?.isSubjectIsolated != _uiState.value.design?.isSubjectIsolated ||
+            restored?.isStencil != _uiState.value.design?.isStencil ||
+            restored?.stencilView != _uiState.value.design?.stencilView
         dispatch(EditorIntent.RestoreDesign(restored))
         // Restore the mode adjustment the snapshot was taken alongside, if any — without this, an
         // outside-DESIGN Undo restored an (unchanged) design and left modeAdjustments exactly where
@@ -545,7 +548,7 @@ class EditorViewModel @Inject constructor(
             if (restored != null) {
                 projectLoadJob = viewModelScope.launch(dispatchers.io) {
                     val source = ImageUtils.loadBitmapAsync(context, restored.uri)
-                    val shown = source?.let { applyDesignEffects(it, restored).first }
+                    val shown = source?.let { applyDesignEffects(it, restored).bitmap }
                     withContext(dispatchers.main) {
                         if (isCurrentProject(projectId) && _uiState.value.design?.id == restored.id) {
                             designSourceBitmap = source
@@ -672,11 +675,12 @@ class EditorViewModel @Inject constructor(
     /** @return the resulting bitmap, plus a user-facing message if a REQUESTED stage fell back to
      * its input rather than actually applying (null if every requested stage succeeded, or none
      * were requested). */
-    private suspend fun applyDesignEffects(source: Bitmap, design: Layer): Pair<Bitmap, String?> {
+    private suspend fun applyDesignEffects(source: Bitmap, design: Layer): EffectsResult {
         var out = source
         var failure: String? = null
+        var stencilDark: Boolean? = null
         if (design.isSubjectIsolated) {
-            val isolated = subjectIsolator.isolate(out).getOrNull()?.isolatedBitmap
+            val isolated = isolateCached(out)
             if (isolated != null) out = isolated
             else failure = "Couldn't isolate a subject in this image."
         }
@@ -685,7 +689,41 @@ class EditorViewModel @Inject constructor(
             if (sketched != null) out = sketched
             else failure = "Couldn't generate an outline for this image."
         }
-        return out to failure
+        // Outline and Stencil are exclusive (the toggles keep it so); a stored design with both
+        // flags set, e.g. from a hand-edited project, gets the outline.
+        if (design.isStencil && !design.isSketch) {
+            // The stencil tool always tries to remove the background first. If the design is not
+            // already isolated, this tries it here, and if no subject can be found it carries on with
+            // the whole image. Only then does the stencil decide whether the image is light or dark
+            // and choose its base sheet. Segmentation is the slow part and cycling the view repeats
+            // this, so the result for a given source is kept.
+            val forStencil = if (design.isSubjectIsolated) out else (isolateCached(out) ?: out)
+            val result = StencilProcessor.stencil(forStencil, design.stencilView)
+            if (result != null) {
+                out = result.bitmap
+                stencilDark = result.dark
+            } else failure = "Couldn't make a stencil from this image."
+        }
+        return EffectsResult(out, failure, stencilDark)
+    }
+
+    /** What [applyDesignEffects] produced: the bitmap to show, a failure to report, the stencil's call. */
+    private class EffectsResult(val bitmap: Bitmap, val failure: String?, val stencilDark: Boolean?) {
+        operator fun component1() = bitmap
+        operator fun component2() = failure
+    }
+
+    // Subject isolation of one source bitmap (null inside = no subject found), kept so toggling Isolate
+    // or cycling the Stencil view does not repeat the slow ML Kit segmentation for the same image.
+    private var isolatedFor: Bitmap? = null
+    private var isolatedResult: Bitmap? = null
+
+    private suspend fun isolateCached(source: Bitmap): Bitmap? {
+        if (isolatedFor === source) return isolatedResult
+        val isolated = subjectIsolator.isolate(source).getOrNull()?.isolatedBitmap
+        isolatedFor = source
+        isolatedResult = isolated
+        return isolated
     }
 
     /**
@@ -698,10 +736,12 @@ class EditorViewModel @Inject constructor(
         val design = _uiState.value.design ?: return
         designEffectJob?.cancel()
         designEffectJob = viewModelScope.launch(dispatchers.default) {
-            val (rendered, failureMessage) = applyDesignEffects(source, design)
+            val effects = applyDesignEffects(source, design)
+            val rendered = effects.bitmap
+            val failureMessage = effects.failure
             withContext(dispatchers.main) {
                 if (!isCurrentProject(projectId) || _uiState.value.design?.id != design.id) return@withContext
-                updateDesign { it.copy(bitmap = rendered) }
+                updateDesign { it.copy(bitmap = rendered, stencilDark = effects.stencilDark ?: it.stencilDark) }
                 if (failureMessage != null) {
                     _uiState.update { it.copy(effectFailureMessage = failureMessage) }
                 }
@@ -728,7 +768,7 @@ class EditorViewModel @Inject constructor(
             return
         }
         pushHistory()
-        updateDesign { it.copy(isSketch = !it.isSketch) }
+        updateDesign { it.copy(isSketch = !it.isSketch, isStencil = if (it.isSketch) it.isStencil else false) }
         recomputeDesignEffects()
     }
 
@@ -741,6 +781,30 @@ class EditorViewModel @Inject constructor(
         }
         pushHistory()
         updateDesign { it.copy(isSubjectIsolated = !it.isSubjectIsolated) }
+        recomputeDesignEffects()
+    }
+
+    /** Stencil: three tonal sheets (black, grey, white) the artist can cycle through. */
+    override fun onToggleStencil() {
+        if (_uiState.value.design == null) return
+        if (designSourceBitmap == null) {
+            _uiState.update { it.copy(effectFailureMessage = "Couldn't make a stencil from this image.") }
+            return
+        }
+        pushHistory()
+        // Turning it on starts from all three sheets, and takes Outline off: both rewrite the pixels.
+        updateDesign {
+            if (it.isStencil) it.copy(isStencil = false)
+            else it.copy(isStencil = true, stencilView = StencilView.ALL, isSketch = false)
+        }
+        recomputeDesignEffects()
+    }
+
+    override fun onCycleStencilView() {
+        val design = _uiState.value.design ?: return
+        if (!design.isStencil) return
+        pushHistory()
+        updateDesign { it.copy(stencilView = it.stencilView.next()) }
         recomputeDesignEffects()
     }
 

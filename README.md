@@ -21,7 +21,7 @@ And then, there's a decent suite of pertinent design tools for prepping the one 
 *   **Fingerprint Relocalization:** a C++17 native OpenCV pipeline (ORB/SuperPoint descriptors + PnP/RANSAC) fingerprints the marks you draw on the wall and snaps the overlay back after tracking loss — fully offline, no room pre-scan.
 *   **Pocket-Ready (experimental, off by default):** drift correction and a self-extending fingerprint (so snap-back can survive the original reference being painted over) exist and can be turned on from Settings > diagnostic overlay, but neither has been validated on real hardware yet — see [Teleological SLAM](docs/TELEOLOGICAL_SLAM.md).
 *   **Dual-Lens Aware:** auto-selects hardware stereo depth on devices that expose it; other devices track via ARCore's monocular pose with no separate depth estimate.
-*   **Co-op Mode:** encrypted, QR-paired session sharing so a collaborator can watch the host's live canvas in AR and edit it too: guest edits go back to the host as acknowledged, undoable operations, and Measure results are shared both ways (protocol v5).
+*   **Link:** (called co-op in the code and protocol) encrypted, QR-paired session sharing between two devices, yours or a collaborator's, so the second can watch the host's live canvas in AR and edit it too: guest edits go back to the host as acknowledged, undoable operations, and Measure results are shared both ways (protocol v5).
 *   **AzNavRail UI:** thumb-driven, one-handed navigation designed for artists holding a spray can.
 
 ## Modes
@@ -41,7 +41,7 @@ Strictly decoupled multi-module Clean Architecture:
 *   `:feature:editor` — Multi-layer image manipulation and adjustments.
 *   `:feature:dashboard` — Project library, onboarding, and settings.
 *   `:core:nativebridge` — Native C++ engine (`MobileGS`), JNI bridge, and relocalization threads. OpenCV itself is a Maven Central dependency (`org.opencv:opencv`), not a vendored module.
-*   `:android_collaboration_module` — peer-to-peer networking for Co-op Mode (host ↔ guest; see Key Features above).
+*   `:android_collaboration_module` — peer-to-peer networking for Link (host ↔ guest; see Key Features above).
 *   `:core:data` / `:core:domain` / `:core:common` — Unified data layer and wearable abstraction.
 *   `:core:design` — Shared Compose design system (reusable controls and overlays).
 

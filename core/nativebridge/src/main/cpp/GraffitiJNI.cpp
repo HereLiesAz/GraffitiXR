@@ -1384,6 +1384,48 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetCaptureImage(
     }
 }
 
+// Pass B: the bare wall BEFORE it was marked or painted. Returns whether it is registered to the
+// capture photo now (false while waiting for that photo, or if registration failed).
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetCleanWallImage(
+        JNIEnv* env, jobject thiz, jobject bitmap) {
+    if (!bitmap) return JNI_FALSE;
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return JNI_FALSE;
+    cv::Mat img;
+    bitmapToMat(env, bitmap, img);
+    if (img.empty()) return JNI_FALSE;
+    try {
+        return gSlamEngine->setCleanWallImage(img) ? JNI_TRUE : JNI_FALSE;
+    } catch (const std::exception& e) {
+        LOGE("nativeSetCleanWallImage: exception: %s", e.what());
+    } catch (...) {
+        LOGE("nativeSetCleanWallImage: unknown exception");
+    }
+    return JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearCleanWallImage(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (gSlamEngine) gSlamEngine->clearCleanWallImage();
+}
+
+// 0 none, 1 pending (waiting for the capture photo), 2 registered, 3 failed (MobileGS::CleanWallStatus).
+JNIEXPORT jint JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCleanWallStatus(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    return gSlamEngine ? gSlamEngine->cleanWallStatus() : 0;
+}
+
+// The Settings switch for pass B. Off unless the user turned it on.
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetChangePassEnabled(
+        JNIEnv* env, jobject thiz, jboolean enabled) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (gSlamEngine) gSlamEngine->setChangePassEnabled(enabled == JNI_TRUE);
+}
+
 JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAutoFitDesign(JNIEnv* env, jobject thiz) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
@@ -1408,6 +1450,58 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportPaintGrid(JN
     jbyteArray out = env->NewByteArray((jsize)blob.size());
     if (!out) return nullptr;
     env->SetByteArrayRegion(out, 0, (jsize)blob.size(), reinterpret_cast<const jbyte*>(blob.data()));
+    return out;
+}
+
+// The CV preview (everything the passes look for, in the design's pixel space): [width int32 LE]
+// [height int32 LE] then width*height RGBA bytes. Null when no design is registered.
+JNIEXPORT jbyteArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRenderCvPreview(JNIEnv* env, jobject thiz, jint maxSide) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return nullptr;
+    cv::Mat rgba;
+    try {
+        if (!gSlamEngine->renderCvPreview(rgba, (int)maxSide) || rgba.empty() || !rgba.isContinuous()) return nullptr;
+    } catch (const std::exception& e) {
+        LOGE("nativeRenderCvPreview: exception: %s", e.what());
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+    const int32_t hdr[2] = {rgba.cols, rgba.rows};
+    const size_t bytes = rgba.total() * rgba.elemSize();
+    jbyteArray out = env->NewByteArray((jsize)(sizeof(hdr) + bytes));
+    if (!out) return nullptr;
+    env->SetByteArrayRegion(out, 0, (jsize)sizeof(hdr), reinterpret_cast<const jbyte*>(hdr));
+    env->SetByteArrayRegion(out, (jsize)sizeof(hdr), (jsize)bytes, reinterpret_cast<const jbyte*>(rgba.data));
+    return out;
+}
+
+// One {colour 0xRRGGBB, targets, confirmed} row per pass; see MobileGS::getPassLegend.
+JNIEXPORT jfloatArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPassLegend(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return nullptr;
+    float rows[3 * passes::kPassCount];
+    gSlamEngine->getPassLegend(rows);
+    jfloatArray out = env->NewFloatArray(3 * passes::kPassCount);
+    if (!out) return nullptr;
+    env->SetFloatArrayRegion(out, 0, 3 * passes::kPassCount, rows);
+    return out;
+}
+
+// The pass names, in pass-id order (the legend rows' order).
+JNIEXPORT jobjectArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPassNames(JNIEnv* env, jobject thiz) {
+    jclass stringClass = env->FindClass("java/lang/String");
+    if (!stringClass) return nullptr;
+    jobjectArray out = env->NewObjectArray(passes::kPassCount, stringClass, nullptr);
+    if (!out) return nullptr;
+    for (int p = 0; p < passes::kPassCount; ++p) {
+        jstring name = env->NewStringUTF(passes::passName(p));
+        env->SetObjectArrayElement(out, p, name);
+        env->DeleteLocalRef(name);
+    }
     return out;
 }
 

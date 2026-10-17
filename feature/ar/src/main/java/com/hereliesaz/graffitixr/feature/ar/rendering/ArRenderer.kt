@@ -288,6 +288,12 @@ class ArRenderer(
     private val backgroundRenderer = BackgroundRenderer()
     private val displayRotationHelper = DisplayRotationHelper(context)
     private val overlayRenderer = OverlayRenderer(context)
+    // The CV preview: a second quad with the design's own placement, textured with everything the passes
+    // are looking for (see MobileGS::renderCvPreview). Drawn straight after the design.
+    private val cvPreviewRenderer = OverlayRenderer(context)
+    @Volatile private var pendingCvPreview: Bitmap? = null
+    @Volatile private var cvPreviewDirty = false
+    @Volatile var cvPreviewVisible: Boolean = false
     private val pointCloudRenderer = PointCloudRenderer()
     private val planeRenderer = PlaneRenderer()
     // Diagnostic "what is the AR seeing" view: current-frame ARCore feature points (yellow) +
@@ -1178,6 +1184,12 @@ class ArRenderer(
         }
     }
 
+    /** The latest CV preview composite, or null to drop it. Safe from any thread. */
+    fun setCvPreview(bitmap: Bitmap?) {
+        pendingCvPreview = bitmap
+        cvPreviewDirty = true
+    }
+
     fun updateOverlayBitmap(bitmap: Bitmap?) {
         pendingOverlayBitmap = bitmap
         overlayBitmapDirty = true
@@ -1294,6 +1306,8 @@ class ArRenderer(
         // the overlay kept `hasTexture == true` over an empty texture and drew black.
         overlayRenderer.createOnGlThread()
         if (pendingOverlayBitmap != null) overlayBitmapDirty = true
+        cvPreviewRenderer.createOnGlThread()
+        if (pendingCvPreview != null) cvPreviewDirty = true
         pointCloudRenderer.createOnGlThread(context)
         planeRenderer.createOnGlThread(context)
         arDebugRenderer.createOnGlThread(context)
@@ -3123,6 +3137,11 @@ class ArRenderer(
                 val bmp = pendingOverlayBitmap
                 if (bmp != null) overlayRenderer.updateTexture(bmp) else overlayRenderer.clearTexture()
             }
+            if (cvPreviewDirty) {
+                cvPreviewDirty = false
+                val preview = pendingCvPreview
+                if (preview != null && !preview.isRecycled) cvPreviewRenderer.updateTexture(preview) else cvPreviewRenderer.clearTexture()
+            }
 
             // Constrain the textured quad's initial size so it lands within the
             // visible screen frustum at the anchor's distance. Applied once per
@@ -3334,6 +3353,15 @@ class ArRenderer(
                 if (hasMeshData) meshWeightsBuffer else null,
                 contentRot
             )
+            // What the passes are looking for, over the design, through the same placement and warp.
+            if (cvPreviewVisible && cvPreviewRenderer.hasTexture) {
+                cvPreviewRenderer.setExtent(overlayRenderer.extentHalfW, overlayRenderer.extentHalfH)
+                cvPreviewRenderer.draw(viewMatrix, projMatrix, overlayComposedScratch,
+                    if (hasMeshData) meshVerticesBuffer else null,
+                    if (hasMeshData) meshWeightsBuffer else null,
+                    contentRot
+                )
+            }
 
             val showBorder = !anchorEstablished && !isCapturingTarget && showAnchorBoundary
             if (showBorder) {
@@ -3650,6 +3678,7 @@ class ArRenderer(
     fun releaseGlResources() {
         backgroundRenderer.release()
         overlayRenderer.release()
+        cvPreviewRenderer.release()
         // Drop the reference only. This runs from queueEvent concurrently with [destroy] and the
         // owner's Session.close on other threads, with no sessionLock held: a native Anchor.detach
         // here could race either one. As [destroy] documents for the page anchor, an unserialized
@@ -3836,6 +3865,7 @@ class ArRenderer(
         }
         failPendingHitTests()
         pendingOverlayBitmap = null
+        pendingCvPreview = null
         latestFrame.set(null)
         latestFrameTimestampNs = 0L
     }

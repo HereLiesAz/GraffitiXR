@@ -42,6 +42,15 @@ interface SettingsRepository {
     val ambientScanEnabled: Flow<Boolean>
 
     suspend fun setAmbientScanEnabled(enabled: Boolean)
+
+    /**
+     * Pass B, the change-against-the-clean-wall pass. OFF by default and never turned on by anything
+     * but the user's own switch in Settings. Even on, the pass judges nothing without the clean-wall
+     * photo.
+     */
+    val changePassEnabled: Flow<Boolean>
+
+    suspend fun setChangePassEnabled(on: Boolean)
     
     
 

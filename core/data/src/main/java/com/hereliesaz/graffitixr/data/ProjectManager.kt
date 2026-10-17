@@ -756,6 +756,7 @@ class ProjectManager @Inject constructor(
             originalOverlayImageUri = uri(project.originalOverlayImageUri),
             thumbnailUri = uri(project.thumbnailUri),
             targetImageUris = project.targetImageUris.map { uri(it) },
+            cleanWallUri = uri(project.cleanWallUri),
             sphereSlamReferenceUri = uri(project.sphereSlamReferenceUri),
             sphereSlamAtlasPages = project.sphereSlamAtlasPages.map { it.copy(referenceUri = uri(it.referenceUri)) },
             evolutionImageUris = project.evolutionImageUris.map { uri(it) },
@@ -1094,6 +1095,7 @@ class ProjectManager @Inject constructor(
                 originalOverlayImageUri = localUri(migrated.originalOverlayImageUri),
                 thumbnailUri = localUri(migrated.thumbnailUri),
                 targetImageUris = migrated.targetImageUris.map { localUri(it)!! },
+                cleanWallUri = localUri(migrated.cleanWallUri),
                 sphereSlamReferenceUri = localUri(migrated.sphereSlamReferenceUri),
                 sphereSlamAtlasPages = migrated.sphereSlamAtlasPages.map { page ->
                     page.copy(referenceUri = localUri(page.referenceUri)!!)

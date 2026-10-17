@@ -1,6 +1,7 @@
 // FILE: app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt
 package com.hereliesaz.graffitixr
 
+import com.hereliesaz.graffitixr.common.util.StencilTones
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -669,6 +670,14 @@ class MainActivity : AppCompatActivity() {
                         } else if (currentCaptureStep == CaptureStep.CAPTURE) {
                             mainViewModel.setCaptureStep(CaptureStep.REVIEW)
                         }
+                    }
+                }
+
+                // A clean-wall photo was just taken: keep it with the project, then let the AR side drop it.
+                val pendingCleanWall = arUiState.cleanWallBitmap
+                LaunchedEffect(pendingCleanWall) {
+                    if (pendingCleanWall != null) {
+                        mainViewModel.saveCleanWallPhoto(pendingCleanWall) { saved -> arViewModel.onCleanWallPhotoPersisted(saved) }
                     }
                 }
 
@@ -1627,6 +1636,20 @@ class MainActivity : AppCompatActivity() {
                                 )
                             }
 
+                            // The CV view's legend: one row per way of looking, in the colour its dots have on the
+                            // design, with how many of its targets the wall has answered.
+                            if (editorUiState.editorMode == EditorMode.AR && arUiState.cvPreviewOn &&
+                                arUiState.cvPassLegend.isNotEmpty() && !showLibrary && !showSettings
+                            ) {
+                                CvPreviewLegend(
+                                    title = strings.nav.cvLegendTitle,
+                                    rows = arUiState.cvPassLegend,
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(top = 16.dp, end = 16.dp)
+                                )
+                            }
+
                             // RelocState.IDLE means "target not yet confirmed" (UiState.kt) — SEARCHING/
                             // TRACKING both require the fingerprint to be active, i.e. an established
                             // anchor. This badge is therefore only meaningful once anchored; gating it on
@@ -1877,6 +1900,8 @@ class MainActivity : AppCompatActivity() {
                                     latestCapture = { arViewModel.awaitLatestTargetCapture() },
                                     captureStep = mainUiState.captureStep,
                                     isWaitingForTap = mainUiState.isWaitingForTap,
+                                    hasCleanWall = arUiState.hasCleanWall,
+                                    onCleanWallPhoto = { arViewModel.requestCleanWallPhoto() },
                                     strings = strings,
                                     onConfirmTarget = { bitmap, mask ->
                                         if (
@@ -2052,6 +2077,8 @@ class MainActivity : AppCompatActivity() {
                                     onAdaptiveRateEnabledChanged = { arViewModel.setAdaptiveRateEnabled(it) },
                                     ambientScanEnabled = arUiState.ambientScanEnabled,
                                     onAmbientScanEnabledChanged = { arViewModel.setAmbientScanEnabled(it) },
+                                    changePassEnabled = arUiState.changePassEnabled,
+                                    onChangePassEnabledChanged = { arViewModel.setChangePassEnabled(it) },
                                     showAnchorBoundary = arUiState.showAnchorBoundary,
                                     onAnchorBoundaryChanged = { arViewModel.setShowAnchorBoundary(it) },
                                     isImperialUnits = arUiState.isImperialUnits,
@@ -2277,6 +2304,40 @@ class MainActivity : AppCompatActivity() {
                     overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
             )
+            // Stencil — splits the design into three tonal sheets (black, grey, white). Tap to
+            // generate, tap again to get the original back. Once a stencil exists, the cycler right
+            // beneath it steps which sheets are shown: all, black, grey, white.
+            azRailSubItem(
+                id = "design.stencil",
+                hostId = railHostOf("design.stencil"),
+                text = navStrings.stencil,
+                color = navItemColor,
+                classifiers = setOf("toggle", "effect"),
+                shape = AzButtonShape.NONE,
+                disabled = showLibrary,
+                onClick = { editorViewModel.onToggleStencil() }
+            )
+            if (editorUiState.design?.isStencil == true) {
+                // All, then the sheets in the order they are laid: base, midtone, secondary. A light
+                // image goes white, grey, black; a dark one black, grey, white.
+                val colourName = mapOf(
+                    StencilTones.BLACK to navStrings.stencilViewBlack,
+                    StencilTones.GREY to navStrings.stencilViewGrey,
+                    StencilTones.WHITE to navStrings.stencilViewWhite,
+                )
+                val stencilLabels = listOf(navStrings.stencilViewAll) +
+                    StencilTones.sheetOrder(editorUiState.design?.stencilDark ?: true).map { colourName.getValue(it) }
+                azRailSubCycler(
+                    id = "design.stencil.view",
+                    hostId = railHostOf("design.stencil.view"),
+                    options = stencilLabels,
+                    selectedOption = stencilLabels[editorUiState.design?.stencilView?.ordinal ?: 0],
+                    color = navItemColor,
+                    shape = AzButtonShape.NONE,
+                    disabled = showLibrary,
+                    onClick = { editorViewModel.onCycleStencilView() }
+                )
+            }
             // Adjust ▸ the per-design controls. Every one of these drives an EditorViewModel action
             // that was already implemented and tested but had no way to be invoked: the layer list had
             // no opener (so add-a-layer was one-way — nothing could remove, rename, reorder or hide
@@ -2453,6 +2514,19 @@ class MainActivity : AppCompatActivity() {
                         shape = AzButtonShape.NONE,
                         disabled = showLibrary,
                         onClick = { editorViewModel.onMagicClicked() },
+                    )
+                    // CV view — a composited preview of everything the computer vision is looking for,
+                    // drawn over the design, with a legend of what each colour is and how much of it
+                    // the wall has answered.
+                    azRailSubItem(
+                        id = "mode.ar.cv",
+                        hostId = railHostOf("mode.ar.cv"),
+                        text = navStrings.cvView,
+                        color = navItemColor,
+                        classifiers = setOf("toggle"),
+                        shape = AzButtonShape.NONE,
+                        disabled = showLibrary,
+                        onClick = { arViewModel.toggleCvPreview() },
                     )
                     // Co-op requires an explicit shared coordinate frame. Protocol v3 now supplies
                     // that host wall-frame/backend/scale contract for both ARCore and standalone.
@@ -2779,6 +2853,8 @@ class MainActivity : AppCompatActivity() {
             if (editorUiState.design?.isInverted == true) azHighlight("design.invert", active = Cyan)
             if (editorUiState.design?.isSketch == true) azHighlight("design.outline", active = Cyan)
             if (editorUiState.design?.isSubjectIsolated == true) azHighlight("design.isolate", active = Cyan)
+            if (editorUiState.design?.isStencil == true) azHighlight("design.stencil", active = Cyan)
+            if (arUiState.cvPreviewOn) azHighlight("mode.ar.cv", active = Cyan)
             if (editorUiState.design?.isImageLocked == true) azHighlight("design.lock", active = Cyan)
 
             // State badges: surface important conditions as rail-item alerts.
@@ -3619,6 +3695,55 @@ private fun TargetIncompleteOverlay(modifier: Modifier = Modifier) {
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center
             )
+        }
+    }
+}
+
+/** The localized name of a pass, by the name the native engine reports; null for one this app does not know. */
+internal fun cvPassLabelRes(name: String): Int? = when (name) {
+    "features" -> DesignR.string.cv_pass_features
+    "colour" -> DesignR.string.cv_pass_colour
+    "sketch" -> DesignR.string.cv_pass_sketch
+    "mosaic" -> DesignR.string.cv_pass_mosaic
+    "posterize2" -> DesignR.string.cv_pass_posterize2
+    "posterize4" -> DesignR.string.cv_pass_posterize4
+    "cartoon" -> DesignR.string.cv_pass_cartoon
+    "blobs" -> DesignR.string.cv_pass_blobs
+    "invert" -> DesignR.string.cv_pass_invert
+    "warm-luma" -> DesignR.string.cv_pass_warm_luma
+    "stencil3" -> DesignR.string.cv_pass_stencil3
+    "change" -> DesignR.string.cv_pass_change
+    else -> null
+}
+
+/** The CV view's legend (see [ArViewModel.toggleCvPreview]): a colour swatch, the pass, found / looking for. */
+@Composable
+private fun CvPreviewLegend(
+    title: String,
+    rows: List<com.hereliesaz.graffitixr.common.model.CvPassLegendRow>,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .background(Color(0xCC000000), RoundedCornerShape(16.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Text(text = title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(4.dp))
+        rows.forEach { row ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .size(10.dp)
+                        .background(Color(row.argb), CircleShape)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = cvPassLabelRes(row.name)?.let { stringResource(it) } ?: row.name,
+                    color = Color.White, fontSize = 11.sp, modifier = Modifier.width(96.dp),
+                )
+                Text(text = "${row.confirmed}/${row.targets}", color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
+            }
         }
     }
 }

@@ -29,6 +29,9 @@ fun Layer.toOverlayLayer(): OverlayLayer {
         isInverted = isInverted,
         isSketch = isSketch,
         isSubjectIsolated = isSubjectIsolated,
+        isStencil = isStencil,
+        stencilView = stencilView,
+        stencilDark = stencilDark,
     )
 }
 
@@ -56,6 +59,9 @@ fun OverlayLayer.toLayer(): Layer {
         isInverted = isInverted,
         isSketch = isSketch,
         isSubjectIsolated = isSubjectIsolated,
+        isStencil = isStencil,
+        stencilView = stencilView,
+        stencilDark = stencilDark,
     )
 }
 

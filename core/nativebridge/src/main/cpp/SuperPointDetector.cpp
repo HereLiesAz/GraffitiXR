@@ -184,6 +184,53 @@ bool SuperPointDetector::detect(const cv::Mat& gray,
     }
 }
 
+bool SuperPointDetector::describeField(const cv::Mat& gray, DescriptorField& out) {
+    out = DescriptorField();
+    if (!mLoaded) return false;
+    if (gray.empty() || gray.cols < 8 || gray.rows < 8) return false;
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (mNet.empty()) return false;
+    const InputGeometry geo = inputGeometry(gray.cols, gray.rows);
+    try {
+        cv::Mat content = gray, input;
+        if (geo.resized) cv::resize(gray, content, cv::Size(geo.scaledW, geo.scaledH), 0, 0, cv::INTER_AREA);
+        const int padR = geo.netW - geo.scaledW, padB = geo.netH - geo.scaledH;
+        if (padR > 0 || padB > 0) cv::copyMakeBorder(content, input, 0, padB, 0, padR, cv::BORDER_REPLICATE);
+        else input = content;
+        cv::Mat f;
+        input.convertTo(f, CV_32F, 1.0 / 255.0);
+        mNet.setInput(cv::dnn::blobFromImage(f));
+        std::vector<cv::String> outNames = mNet.getUnconnectedOutLayersNames();
+        std::vector<cv::Mat> outputs;
+        mNet.forward(outputs, outNames);
+        const cv::Mat* descPtr = nullptr;
+        for (const cv::Mat& o : outputs) if (o.dims >= 4 && o.size[1] == 256) descPtr = &o;
+        if (!descPtr) return false;
+        out.tensor = descPtr->clone();   // the network reuses its output buffers on the next pass
+        out.geo = geo;
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+void SuperPointDetector::sampleField(const DescriptorField& field, const std::vector<cv::Point2f>& pts, cv::Mat& descs) {
+    descs = cv::Mat();
+    if (!field.valid() || pts.empty()) return;
+    // Sampling happens in network-input space; the caller's points are in source pixels.
+    std::vector<cv::KeyPoint> kps;
+    kps.reserve(pts.size());
+    for (const auto& p : pts) kps.emplace_back(p.x / field.geo.scaleX, p.y / field.geo.scaleY, 1.0f);
+    sampleDescriptors(field.tensor, kps, descs);
+}
+
+bool SuperPointDetector::describe(const cv::Mat& gray, const std::vector<cv::Point2f>& pts, cv::Mat& descs) {
+    DescriptorField field;
+    if (pts.empty() || !describeField(gray, field)) return false;
+    sampleField(field, pts, descs);
+    return descs.rows == (int)pts.size();
+}
+
 void SuperPointDetector::extractKeypoints(const cv::Mat& semiTensor, std::vector<cv::KeyPoint>& kps, float thresh, int maxKps) {
     if (semiTensor.dims < 4) return;
     int Hc = semiTensor.size[2], Wc = semiTensor.size[3];

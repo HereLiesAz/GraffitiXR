@@ -79,6 +79,28 @@ public:
                 float scoreThresh = kDefaultScoreThresh,
                 int   maxKps      = 500);
 
+    /**
+     * Describes [gray] at the given points instead of at the network's own detections: one forward
+     * pass, descriptors sampled where the caller says (source-image pixels). Rows of [descs] are
+     * 1:1 with [pts]. Points outside the image are clamped to its edge by the sampler, so callers
+     * keep them inside. False when not loaded, the image is degenerate, or the pass fails.
+     */
+    bool describe(const cv::Mat& gray, const std::vector<cv::Point2f>& pts, cv::Mat& descs);
+
+    /**
+     * The network's whole descriptor map for [gray], kept so many point sets can be described from ONE
+     * forward pass ([sampleField]). The forward pass is the expensive part of describing points; the
+     * sampling is cheap.
+     */
+    struct DescriptorField {
+        cv::Mat tensor;      //!< [1, 256, H/8, W/8], copied out of the network
+        InputGeometry geo;   //!< how [gray] was mapped onto the network input
+        bool valid() const { return !tensor.empty(); }
+    };
+    bool describeField(const cv::Mat& gray, DescriptorField& out);
+    /** Descriptors of [field] at [pts] (source-image pixels of the image it was made from). */
+    void sampleField(const DescriptorField& field, const std::vector<cv::Point2f>& pts, cv::Mat& descs);
+
 private:
     cv::dnn::Net       mNet;
     std::mutex         mMutex;

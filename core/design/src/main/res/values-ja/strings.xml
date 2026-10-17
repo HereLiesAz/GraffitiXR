@@ -560,13 +560,13 @@
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
-    <string name="nav_coop">コープ</string>
+    <string name="nav_coop">リンク</string>
     <string name="nav_host_coop">ホスト</string>
-    <string name="nav_host_coop_info">近くのユーザーとARの座標系を共有するために、コープセッションをホストします。</string>
+    <string name="nav_host_coop_info">リンクを開始して、AR座標系を近くの別のデバイスと共有します。</string>
     <string name="nav_join_coop">参加</string>
-    <string name="nav_join_coop_info">近くのコープセッションに参加して、AR表示をホストに合わせます。</string>
+    <string name="nav_join_coop_info">近くのリンクに参加して、AR表示をホストデバイスに合わせます。</string>
     <string name="nav_leave_coop">退出</string>
-    <string name="nav_leave_coop_info">現在のコープセッションから退出します。</string>
+    <string name="nav_leave_coop_info">現在のリンクから退出します。</string>
     <string name="nav_wearable">ウェアラブル</string>
     <string name="nav_wearable_info">スマートグラスに接続して、視点に合わせたカメラ入力によるハンズフリーのAR体験を実現します。</string>
     <string name="nav_wall_clear">消去</string>
@@ -774,4 +774,42 @@
     <string name="reloc_facing_it">正面にあります — ゆっくり左右に動かしてください</string>
     <string name="reloc_recapture">ターゲットを再キャプチャ</string>
     <string name="ar_feedback_capture_failed">ターゲットのキャプチャに失敗しました。タップして再試行してください。</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">ステンシル</string>
+    <string name="nav_stencil_info">デザインを黒・グレー・白の3枚に分けます。もう一度タップすると元に戻ります。</string>
+    <string name="nav_stencil_view_all">すべて</string>
+    <string name="nav_stencil_view_black">黒</string>
+    <string name="nav_stencil_view_grey">グレー</string>
+    <string name="nav_stencil_view_white">白</string>
+    <string name="nav_stencil_view_info">表示するステンシルを切り替えます：すべて、黒、グレー、白。</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">変化の検出（きれいな壁の写真が必要）</string>
+    <string name="target_clean_wall_text">まだ印をつけていませんか？ まず下のボタンで何もない壁を撮影し、そのあと印を描いてください。すでに印がある場合は、その印をタップしてください。</string>
+    <string name="target_clean_wall_photo">きれいな壁の写真</string>
+    <string name="target_clean_wall_saved">きれいな壁の写真を保存しました。撮り直す</string>
+
+    <!-- The CV view: a preview of everything the computer vision is looking for. -->
+    <string name="nav_cv_view">CVビュー</string>
+    <string name="nav_cv_view_info">コンピュータビジョンが探しているものをすべて、デザインの上に表示します。色は探し方ごとに異なり、中が空の輪は壁からの応答待ち、塗りつぶしの点は見つかったものです。もう一度タップすると隠します。</string>
+    <string name="nav_cv_legend_title">探しているもの</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">きれいな壁の写真を保存できませんでした。もう一度撮影してください。</string>
+    <string name="ar_feedback_clean_wall_register_failed">このきれいな壁の写真は、この壁と一致しません。作業する位置あたりから撮り直してください。</string>
+
+    <!-- The CV view legend: the name of each way of looking. -->
+    <string name="cv_pass_features">特徴点</string>
+    <string name="cv_pass_colour">色</string>
+    <string name="cv_pass_sketch">スケッチ</string>
+    <string name="cv_pass_mosaic">モザイク</string>
+    <string name="cv_pass_posterize2">2階調</string>
+    <string name="cv_pass_posterize4">4階調</string>
+    <string name="cv_pass_cartoon">カートゥーン</string>
+    <string name="cv_pass_blobs">塊</string>
+    <string name="cv_pass_invert">反転</string>
+    <string name="cv_pass_warm_luma">暖色輝度</string>
+    <string name="cv_pass_stencil3">ステンシル</string>
+    <string name="cv_pass_change">変化</string>
 </resources>

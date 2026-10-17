@@ -45,6 +45,10 @@ import com.hereliesaz.graffitixr.design.theme.HotPink
  * @param rawBitmap the captured photo and [annotatedBitmap] its highlighted-marks mask, as of this
  *   composition. Taken as the two bitmaps, not the whole ArUiState, so the screen recomposes only
  *   when one of them changes rather than on every unrelated AR state tick.
+ * @param hasCleanWall / [onCleanWallPhoto] the clean-wall step of the instructions, which is always
+ *   shown while waiting for a tap: photograph the bare wall first (one tap, [onCleanWallPhoto]) if it
+ *   has not been marked yet, or just tap the marks if it has. [hasCleanWall] only changes the button's
+ *   label to say one is already kept.
  * @param latestCapture the photo and mask as they stand when Confirm is tapped, after every queued
  *   mark erase has been applied (`ArViewModel.awaitLatestTargetCapture`). Erases are asynchronous, so
  *   the composition's own bitmaps can predate the last tap; Confirm uses this instead. The default
@@ -56,6 +60,8 @@ fun TargetCreationUi(
     annotatedBitmap: Bitmap?,
     captureStep: CaptureStep,
     isWaitingForTap: Boolean,
+    hasCleanWall: Boolean = false,
+    onCleanWallPhoto: (() -> Unit)? = null,
     strings: AppStrings,
     onConfirmTarget: (bitmap: Bitmap?, mask: Bitmap?) -> Unit,
     onRetake: () -> Unit,
@@ -110,6 +116,8 @@ fun TargetCreationUi(
                             isWaitingForTap = true,
                             captureStep = CaptureStep.NONE,
                             strings = strings,
+                            hasCleanWall = hasCleanWall,
+                            onCleanWallPhoto = onCleanWallPhoto,
                             onCancel = onCancel,
                             onNext = null,
                             // Top of screen so it clears the bottom adjustment + undo/redo controls.
@@ -131,7 +139,9 @@ private fun TargetInstructionCard(
     strings: AppStrings,
     onCancel: () -> Unit,
     onNext: (() -> Unit)?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    hasCleanWall: Boolean = false,
+    onCleanWallPhoto: (() -> Unit)? = null,
 ) {
     val data = when {
         isWaitingForTap -> Pair(strings.ar.targetCreationTitle, strings.ar.targetCreationText)
@@ -173,10 +183,32 @@ private fun TargetInstructionCard(
                     fontSize = 14.sp,
                     lineHeight = 20.sp
                 )
+                // The clean-wall step is always part of the instructions, whatever pass B's switch says:
+                // a bare-wall photo first if the surface has not been marked yet, otherwise just tap the marks.
+                if (isWaitingForTap) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        text = stringResource(DesignR.string.target_clean_wall_text),
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp
+                    )
+                }
             }
         }
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            if (isWaitingForTap && onCleanWallPhoto != null) {
+                AzButton(
+                    text = stringResource(
+                        if (hasCleanWall) DesignR.string.target_clean_wall_saved else DesignR.string.target_clean_wall_photo
+                    ).uppercase(),
+                    onClick = onCleanWallPhoto,
+                    color = HotPink,
+                    shape = AzButtonShape.RECTANGLE
+                )
+            }
             AzButton(
                 text = strings.common.cancel.uppercase(),
                 onClick = onCancel,

@@ -279,13 +279,13 @@
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
-    <string name="nav_coop">Coop</string>
+    <string name="nav_coop">Lien</string>
     <string name="nav_host_coop">Héberger</string>
-    <string name="nav_host_coop_info">Hébergez une session coopérative pour partager votre système de coordonnées AR avec des utilisateurs à proximité.</string>
+    <string name="nav_host_coop_info">Créez un lien pour partager votre système de coordonnées AR avec un autre appareil à proximité.</string>
     <string name="nav_join_coop">Rejoindre</string>
-    <string name="nav_join_coop_info">Rejoignez une session coopérative à proximité pour aligner votre vue AR sur celle de l\'hôte.</string>
+    <string name="nav_join_coop_info">Rejoignez un lien à proximité pour aligner votre vue AR sur celle de l’appareil hôte.</string>
     <string name="nav_leave_coop">Quitter</string>
-    <string name="nav_leave_coop_info">Quittez la session coopérative en cours.</string>
+    <string name="nav_leave_coop_info">Quittez le lien en cours.</string>
     <string name="nav_wearable">Objet connecté</string>
     <string name="nav_wearable_info">Connectez-vous à des lunettes connectées pour une expérience AR mains libres avec une entrée caméra alignée sur votre perspective.</string>
     <string name="nav_wall_clear">Effacer</string>
@@ -493,4 +493,42 @@
     <string name="reloc_facing_it">Vous lui faites face — déplacez-vous lentement de côté</string>
     <string name="reloc_recapture">Recapturer la cible</string>
     <string name="ar_feedback_capture_failed">Échec de la capture de la cible. Touchez pour réessayer.</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">Pochoir</string>
+    <string name="nav_stencil_info">Divise le motif en trois pochoirs : noir, gris et blanc. Touchez à nouveau pour retrouver l’original.</string>
+    <string name="nav_stencil_view_all">Tous</string>
+    <string name="nav_stencil_view_black">Noir</string>
+    <string name="nav_stencil_view_grey">Gris</string>
+    <string name="nav_stencil_view_white">Blanc</string>
+    <string name="nav_stencil_view_info">Change les pochoirs affichés : tous, noir, gris ou blanc.</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">Détection des changements (nécessite une photo du mur propre)</string>
+    <string name="target_clean_wall_text">Pas encore marqué ? Photographiez d’abord le mur nu avec le bouton ci-dessous, puis peignez vos repères. Déjà marqué ? Touchez simplement vos repères.</string>
+    <string name="target_clean_wall_photo">Photo du mur propre</string>
+    <string name="target_clean_wall_saved">Photo du mur propre enregistrée. Reprendre</string>
+
+    <!-- The CV view: a preview of everything the computer vision is looking for. -->
+    <string name="nav_cv_view">Vue CV</string>
+    <string name="nav_cv_view_info">Affiche tout ce que la vision par ordinateur recherche, dessiné sur votre motif. Chaque couleur est une façon de chercher ; un anneau vide attend encore la réponse du mur et un point plein a été trouvé. Touchez à nouveau pour la masquer.</string>
+    <string name="nav_cv_legend_title">Recherché</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">Impossible d’enregistrer la photo du mur propre. Reprenez-la.</string>
+    <string name="ar_feedback_clean_wall_register_failed">Cette photo du mur propre ne correspond pas à ce mur. Reprenez-la à peu près d’où vous serez.</string>
+
+    <!-- The CV view legend: the name of each way of looking. -->
+    <string name="cv_pass_features">Repères</string>
+    <string name="cv_pass_colour">Couleur</string>
+    <string name="cv_pass_sketch">Croquis</string>
+    <string name="cv_pass_mosaic">Mosaïque</string>
+    <string name="cv_pass_posterize2">2 tons</string>
+    <string name="cv_pass_posterize4">4 tons</string>
+    <string name="cv_pass_cartoon">Dessin animé</string>
+    <string name="cv_pass_blobs">Taches</string>
+    <string name="cv_pass_invert">Inversé</string>
+    <string name="cv_pass_warm_luma">Lumière chaude</string>
+    <string name="cv_pass_stencil3">Pochoir</string>
+    <string name="cv_pass_change">Changement</string>
 </resources>

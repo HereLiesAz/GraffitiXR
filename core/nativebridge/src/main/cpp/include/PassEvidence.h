@@ -1,5 +1,7 @@
 #pragma once
+#include <cmath>
 #include <cstdint>
+#include "DesignFilters.h"
 
 /**
  * Passes: independent ways of deciding that a part of the design has been painted.
@@ -25,15 +27,42 @@ enum Verdict : uint8_t {
 enum PassId : int {
     kPassFeatures = 0,   //!< design features confirmed on the wall (descriptor corroboration)
     kPassColour = 1,     //!< left the bare wall and matches the paint its design colour was painted with
-    kPassCount = 2,
+    kPassFilterBase = 2,   //!< pass kPassFilterBase + f looks where design filter f (DesignFilters.h) points
+    kPassChange = kPassFilterBase + designfilters::kCount,   //!< changed since the clean-wall photo, in the shape of a design patch
+    kPassCount = kPassChange + 1,
 };
 
 inline const char* passName(int id) {
     switch (id) {
         case kPassFeatures: return "features";
         case kPassColour:   return "colour";
-        default:            return "unknown";
+        case kPassChange:   return "change";
+        default:
+            if (id >= kPassFilterBase && id < kPassCount) return designfilters::name(id - kPassFilterBase);
+            return "unknown";
     }
+}
+
+/**
+ * A colour for pass [id] in the CV preview and its legend, packed 0xRRGGBB. Hues are spread by the
+ * golden angle so neighbouring ids are far apart; the one palette serves the native drawing and the
+ * legend the app shows beside it.
+ */
+inline uint32_t passRgb(int id) {
+    const float h = std::fmod((float)id * 137.508f, 360.0f) / 60.0f;
+    const float x = 1.0f - std::fabs(std::fmod(h, 2.0f) - 1.0f);
+    float r = 0, g = 0, b = 0;
+    switch ((int)h) {
+        case 0: r = 1; g = x; break;
+        case 1: r = x; g = 1; break;
+        case 2: g = 1; b = x; break;
+        case 3: g = x; b = 1; break;
+        case 4: r = x; b = 1; break;
+        default: r = 1; b = x; break;
+    }
+    // Saturated but not pure, so the dots read on both light and dark walls.
+    auto q = [](float v) { return (uint32_t)std::lround(60.0f + 195.0f * v); };
+    return (q(r) << 16) | (q(g) << 8) | q(b);
 }
 
 /**

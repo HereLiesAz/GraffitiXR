@@ -2,6 +2,8 @@
 #include "include/KeypointGrid.h"
 #include "include/SearchRadius.h"
 #include "include/DepthScaleFit.h"
+#include "include/DesignFilters.h"
+#include "include/ShapeMatch.h"
 #include <jni.h>
 #include <EGL/egl.h>
 #include <algorithm>
@@ -30,6 +32,232 @@ inline void normalizeForFeatures(cv::Mat& gray) {
     cv::Mat tmp;
     clahe->apply(gray, tmp);   // not in-place, and never aliases a caller's source bitmap
     gray = tmp;
+}
+
+// Most places a design filter may nominate. Each is one more descriptor to match per tick.
+constexpr int kMaxFilterTargets = 300;
+
+// ORB's orientation of a patch: the angle (degrees, [0,360)) of the intensity centroid within a
+// radius-15 disc, so a place a filter chose is described rotated the way ORB would have described it.
+inline float intensityCentroidAngle(const cv::Mat& gray, const cv::Point2f& p) {
+    const int cx = (int)std::lround(p.x), cy = (int)std::lround(p.y), R = 15;
+    double m01 = 0, m10 = 0;
+    for (int dy = -R; dy <= R; ++dy) {
+        const int y = cy + dy;
+        if (y < 0 || y >= gray.rows) continue;
+        const uchar* row = gray.ptr<uchar>(y);
+        for (int dx = -R; dx <= R; ++dx) {
+            const int x = cx + dx;
+            if (x < 0 || x >= gray.cols || dx * dx + dy * dy > R * R) continue;
+            m10 += dx * row[x]; m01 += dy * row[x];
+        }
+    }
+    float a = (float)(std::atan2(m01, m10) * 180.0 / CV_PI);
+    return a < 0 ? a + 360.0f : a;
+}
+
+// Lowe's ratio for registering the clean-wall photo to the capture photo (two photos of the same wall,
+// so the ordinary 0.75). Named, so it is not mistaken for the reloc or corroboration ratios.
+constexpr float kCleanWallMatchRatio = 0.75f;
+
+// Result of matching one target set's features, each against the live keypoints near where the
+// design says it should be.
+struct GatedMatch {
+    std::vector<char> hit;          // per target row: won the ratio test near its predicted position
+    std::vector<char> observed;     // per target row: predicted visible AND had a real ratio test
+    std::vector<int> hitQuery;      // per target row: the live keypoint that corroborated it, or -1
+    int matched = 0;
+    int predicted = 0;
+    int loneSkips = 0;              // predicted, but only one candidate: no second-best to divide by
+    float displacedMean = 0.0f;     // gatedMatchWithBaseline: matches at displaced placements, averaged
+    bool marginFailed = false;      // gatedMatchWithBaseline: true alignment did not beat chance
+};
+
+// The wall exclusion list: features known to be bare wall (the fingerprint as captured, before any
+// paint), projected into the live frame through the lock's pose.
+struct WallExclusion {
+    std::vector<cv::Point2f> uv;    // projected pixel of each bare-wall feature that lands in the frame
+    std::vector<int> row;           // its row in [descs]
+    cv::Mat descs;                  // the bare-wall descriptors (all rows; [row] indexes them)
+};
+
+// The IMPLEMENTATION.md 4.5 gated match, for any set of design features (the primary artwork's, or a
+// filter's): each design feature is projected through the lock's pose into the live frame, and only
+// live keypoints within [radiusPx] of that prediction may answer for it, by Lowe's ratio. See
+// MobileGS::tryUpdateFingerprint for why each skip and each count is what it is.
+void gatedMatchSet(const cv::Mat& artDescs, const std::vector<cv::Point2f>& artPts2d,
+                   int artImgW, int artImgH,
+                   const std::vector<cv::KeyPoint>& kps, const cv::Mat& descs,
+                   const KeypointGrid& grid, const glm::mat4& camFromDesign,
+                   float designHalfW, float designHalfH,
+                   float pnpFx, float pnpFy, float pnpCx, float pnpCy,
+                   float radiusPx, float frameW, float frameH,
+                   float kCorrobLoweRatio /* MobileGS::kCorrobLoweRatio, passed by every caller */,
+                   GatedMatch& out, std::vector<int>* validQuery,
+                   const WallExclusion* wall = nullptr) {
+    out.hit.assign((size_t)artDescs.rows, 0);
+    out.observed.assign((size_t)artDescs.rows, 0);
+    out.hitQuery.assign((size_t)artDescs.rows, -1);
+    out.matched = out.predicted = out.loneSkips = 0;
+    auto& hit = out.hit; auto& observed = out.observed; auto& hitQuery = out.hitQuery;
+    int& matched = out.matched; int& predicted = out.predicted;
+    // Descriptor distance, computed directly rather than through a matcher: the query here is
+    // "these few candidates", and building a per-feature cv::Mat to hand to knnMatch would cost
+    // more than the comparison. L2 for SuperPoint (CV_32F), Hamming for ORB — the same pairing
+    // mL2Matcher/mMatcher encode, and the type equality was checked above.
+    const bool isFloat = descs.type() == CV_32F;
+    const int dcols = descs.cols;
+    auto descDistance = [&](int q, int a) -> float {
+        if (isFloat) {
+            const float* pq = descs.ptr<float>(q);
+            const float* pa = artDescs.ptr<float>(a);
+            float acc = 0.0f;
+            for (int k = 0; k < dcols; ++k) { const float d = pq[k] - pa[k]; acc += d * d; }
+            return std::sqrt(acc);
+        }
+        const uchar* pq = descs.ptr<uchar>(q);
+        const uchar* pa = artDescs.ptr<uchar>(a);
+        int acc = 0;
+        for (int k = 0; k < dcols; ++k) acc += __builtin_popcount((unsigned)(pq[k] ^ pa[k]));
+        return (float)acc;
+    };
+
+    std::vector<int> cand;
+    int loneCandidateSkips = 0;
+    for (int a = 0; a < artDescs.rows; ++a) {
+        const cv::Point2f& ap = artPts2d[(size_t)a];
+        // Composite pixel -> design-plane metres. The overlay quad spans [-halfW, halfW] x
+        // [-halfH, halfH] with the texture stretched across it and V flipped (OverlayRenderer
+        // writes `1 - v` alongside `y = -halfH + v * 2 * halfH`), so image row 0 is +halfH. The
+        // mapping is parametric in the composite's size, which is why it needs no aspect
+        // agreement between the bitmap and the quad.
+        const float lx = designHalfW * (2.0f * ap.x / (float)artImgW - 1.0f);
+        const float ly = designHalfH * (1.0f - 2.0f * ap.y / (float)artImgH);
+        const glm::vec4 pc = camFromDesign * glm::vec4(lx, ly, 0.0f, 1.0f);
+        if (!(pc.z > 1e-4f)) continue;                       // behind or on the camera plane
+        const float u = pnpFx * pc.x / pc.z + pnpCx;
+        const float v = pnpFy * pc.y / pc.z + pnpCy;
+        if (!std::isfinite(u) || !std::isfinite(v)) continue;
+        // Predicted OUTSIDE the frame is not visible, and must not count in the denominator —
+        // that is the whole of 5b.1. The radius is allowed as slack on each edge because a
+        // feature predicted just off-frame can still have its true detection just on it.
+        if (u < -radiusPx || v < -radiusPx || u > frameW + radiusPx || v > frameH + radiusPx) continue;
+        ++predicted;
+
+        grid.candidatesWithin(u, v, radiusPx, cand);
+        // The grid returns a SUPERSET (every keypoint in the swept cells: whole cells covering
+        // the query's bounding box, not the r-disc). Its own contract leaves the exact test to
+        // the caller, and without it a candidate in a swept corner cell -- up to ~2.8r away
+        // with cell == r -- could win the ratio test, and a lone
+        // in-radius candidate could be "rescued" into a ratio test by an out-of-radius
+        // neighbour. Apply it before anything counts candidates.
+        KeypointGrid::keepWithinRadius(kps, u, v, radiusPx, cand);
+        if (cand.size() < 2) {
+            // Lowe's ratio needs a second-best to divide by. With one candidate there is nothing
+            // to compare against, and accepting it unconditionally would corroborate any
+            // keypoint that happens to land near the prediction regardless of what it looks
+            // like — a confidence signal that measures the wall's texture density instead of its
+            // agreement with the design, feeding PoseFusion's correction strength.
+            //
+            // Skipping deflates `matched` without touching `predicted`, so the cost shows up
+            // as lower confidence — but "lower confidence" is not free: it maps through
+            // PoseFusion's alpha to LESS relocalization correction and therefore more
+            // accumulated drift, which is the failure corroboration exists to prevent. So this
+            // is conservative against false snapping and anti-conservative against drift, and
+            // the only thing that tells you which side you are on is the rate.
+            //
+            // Published on its own diagnostic channel rather than logged, because at the MIN_PX
+            // floor a sparse frame can skip most of what it predicted and the symptom — a wall
+            // that has apparently stopped corroborating — looks identical to an unpainted one.
+            // E6 sets rho against this number.
+            if (cand.size() == 1) ++loneCandidateSkips;
+            continue;
+        }
+        observed[a] = 1;
+        float best = FLT_MAX, second = FLT_MAX;
+        int bestQ = -1;
+        for (int q : cand) {
+            const float d = descDistance(q, a);
+            if (d < best) { second = best; best = d; bestQ = q; }
+            else if (d < second) { second = d; }
+        }
+        if (bestQ < 0) continue;
+        if (best < kCorrobLoweRatio * second) {
+            // Bare wall explains this live feature at least as well as the design does: it is the
+            // wall's own texture, not paint. Observed (so the confirmation count resets), not a hit.
+            if (wall && !wall->uv.empty()) {
+                const cv::Point2f qp = kps[(size_t)bestQ].pt;
+                const float r2 = radiusPx * radiusPx;
+                bool isWall = false;
+                for (size_t w = 0; w < wall->uv.size() && !isWall; ++w) {
+                    const float ex = wall->uv[w].x - qp.x, ey = wall->uv[w].y - qp.y;
+                    if (ex * ex + ey * ey > r2) continue;
+                    const int wr = wall->row[w];
+                    float d;
+                    if (isFloat) {
+                        const float* pq = descs.ptr<float>(bestQ);
+                        const float* pw = wall->descs.ptr<float>(wr);
+                        float acc = 0.0f;
+                        for (int k = 0; k < dcols; ++k) { const float t = pq[k] - pw[k]; acc += t * t; }
+                        d = std::sqrt(acc);
+                    } else {
+                        const uchar* pq = descs.ptr<uchar>(bestQ);
+                        const uchar* pw = wall->descs.ptr<uchar>(wr);
+                        int acc = 0;
+                        for (int k = 0; k < dcols; ++k) acc += __builtin_popcount((unsigned)(pq[k] ^ pw[k]));
+                        d = (float)acc;
+                    }
+                    if (d <= best) isWall = true;
+                }
+                if (isWall) continue;
+            }
+            hit[a] = 1;
+            hitQuery[a] = bestQ;
+            ++matched;
+            if (validQuery) validQuery->push_back(bestQ);
+        }
+    }
+    out.loneSkips = loneCandidateSkips;
+}
+
+// gatedMatchSet plus the baseline margin check: the same set is matched at four DISPLACED placements
+// of the design (shifted well past the search radius, so a real feature cannot answer for both). A
+// pass counts only when its true alignment beats chance: matched at the true placement must exceed
+// twice the displaced average. Chance-level agreement means the pass is reading wall texture, and
+// its hits are dropped (the rows stay observed, so their confirmation counts reset).
+void gatedMatchWithBaseline(const cv::Mat& artDescs, const std::vector<cv::Point2f>& artPts2d,
+                            int artImgW, int artImgH,
+                            const std::vector<cv::KeyPoint>& kps, const cv::Mat& descs,
+                            const KeypointGrid& grid, const glm::mat4& camFromDesign,
+                            float designHalfW, float designHalfH,
+                            float pnpFx, float pnpFy, float pnpCx, float pnpCy,
+                            float radiusPx, float frameW, float frameH, float loweRatio,
+                            float shiftXm, float shiftYm,
+                            GatedMatch& out, std::vector<int>* validQuery, const WallExclusion* wall) {
+    const size_t validBefore = validQuery ? validQuery->size() : 0;
+    gatedMatchSet(artDescs, artPts2d, artImgW, artImgH, kps, descs, grid, camFromDesign, designHalfW,
+                  designHalfH, pnpFx, pnpFy, pnpCx, pnpCy, radiusPx, frameW, frameH, loweRatio, out,
+                  validQuery, wall);
+    if (out.matched == 0) return;
+    const float dx[4] = {shiftXm, -shiftXm, 0.0f, 0.0f};
+    const float dy[4] = {0.0f, 0.0f, shiftYm, -shiftYm};
+    int displaced = 0;
+    for (int i = 0; i < 4; ++i) {
+        GatedMatch d;
+        const glm::mat4 shifted = camFromDesign * glm::translate(glm::mat4(1.0f), glm::vec3(dx[i], dy[i], 0.0f));
+        gatedMatchSet(artDescs, artPts2d, artImgW, artImgH, kps, descs, grid, shifted, designHalfW,
+                      designHalfH, pnpFx, pnpFy, pnpCx, pnpCy, radiusPx, frameW, frameH, loweRatio, d,
+                      nullptr, wall);
+        displaced += d.matched;
+    }
+    out.displacedMean = displaced / 4.0f;
+    if (!((float)out.matched > 2.0f * out.displacedMean)) {
+        std::fill(out.hit.begin(), out.hit.end(), (char)0);
+        std::fill(out.hitQuery.begin(), out.hitQuery.end(), -1);
+        out.matched = 0;
+        out.marginFailed = true;
+        if (validQuery) validQuery->resize(validBefore);
+    }
 }
 
 // C++17-compatible atomic double add via CAS loop.
@@ -1375,6 +1603,9 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     cv::Mat artDescs;
     std::vector<cv::Point2f> artPts2d;
     int artImgW = 0, artImgH = 0;
+    cv::Mat bareDescs;                   // the wall as captured: the exclusion list's source
+    std::vector<cv::Point3f> barePts;
+    std::vector<TargetSet> targetSets;   // snapshot; matched below, folded back under the generation check
     long artGeneration = 0;
     bool havePlacement = false;
     float fpFromDesign[16];
@@ -1393,6 +1624,12 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         }
         artDescs = mArtworkDescriptors;
         artPts2d = mArtworkKeypoints2D;
+        targetSets = mTargetSets;
+        const size_t nBare = std::min(mBareWallCount, (size_t)mWallDescriptors.rows);
+        if (nBare > 0 && mWallKeypoints3D.size() >= nBare) {
+            bareDescs = mWallDescriptors.rowRange(0, (int)nBare).clone();
+            barePts.assign(mWallKeypoints3D.begin(), mWallKeypoints3D.begin() + nBare);
+        }
         artImgW = mArtworkImageW;
         artImgH = mArtworkImageH;
         artGeneration = mArtworkGeneration;
@@ -1452,6 +1689,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     mCorrobGate.store(gateReason, std::memory_order_relaxed);
     const bool gated = gateReason == kCorrobGated;
 
+    std::vector<GatedMatch> setMatches;   // one per target set, empty unless gated
     std::vector<char> hit(artDescs.rows, 0);
     std::vector<char> observed(artDescs.rows, 0);   // predicted visible AND had a real ratio test
     std::vector<int> hitQuery(artDescs.rows, -1);   // the live keypoint that corroborated feature a
@@ -1482,98 +1720,50 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         KeypointGrid grid;
         grid.build(kps, radiusPx);
 
-        // Descriptor distance, computed directly rather than through a matcher: the query here is
-        // "these few candidates", and building a per-feature cv::Mat to hand to knnMatch would cost
-        // more than the comparison. L2 for SuperPoint (CV_32F), Hamming for ORB — the same pairing
-        // mL2Matcher/mMatcher encode, and the type equality was checked above.
-        const bool isFloat = descs.type() == CV_32F;
-        const int dcols = descs.cols;
-        auto descDistance = [&](int q, int a) -> float {
-            if (isFloat) {
-                const float* pq = descs.ptr<float>(q);
-                const float* pa = artDescs.ptr<float>(a);
-                float acc = 0.0f;
-                for (int k = 0; k < dcols; ++k) { const float d = pq[k] - pa[k]; acc += d * d; }
-                return std::sqrt(acc);
+        // The exclusion list: the captured bare wall, projected through this lock's pose.
+        WallExclusion wallList;
+        const WallExclusion* wallPtr = nullptr;
+        if (bareDescs.rows > 0 && bareDescs.type() == descs.type() && bareDescs.cols == descs.cols &&
+            (int)barePts.size() == bareDescs.rows) {
+            const glm::mat4 camFromFpM = glm::make_mat4(camFromFp);
+            wallList.descs = bareDescs;
+            for (int r = 0; r < bareDescs.rows; ++r) {
+                const glm::vec4 pc = camFromFpM * glm::vec4(barePts[(size_t)r].x, barePts[(size_t)r].y, barePts[(size_t)r].z, 1.0f);
+                if (!(pc.z > 1e-4f)) continue;
+                const float u = pnpFx * pc.x / pc.z + pnpCx, v = pnpFy * pc.y / pc.z + pnpCy;
+                if (!std::isfinite(u) || !std::isfinite(v)) continue;
+                if (u < 0 || v < 0 || u > (float)grayClean.cols || v > (float)grayClean.rows) continue;
+                wallList.uv.emplace_back(u, v);
+                wallList.row.push_back(r);
             }
-            const uchar* pq = descs.ptr<uchar>(q);
-            const uchar* pa = artDescs.ptr<uchar>(a);
-            int acc = 0;
-            for (int k = 0; k < dcols; ++k) acc += __builtin_popcount((unsigned)(pq[k] ^ pa[k]));
-            return (float)acc;
-        };
+            wallPtr = &wallList;
+        }
 
+        // Shift for the baseline: 30% of the design's half-extent at least, and three search radii.
+        const float radiusM = radiusPx * std::max(wallDistM, 0.05f) / focalPx;
+        const float shiftXm = std::max(0.3f * designHalfW, 3.0f * radiusM);
+        const float shiftYm = std::max(0.3f * designHalfH, 3.0f * radiusM);
         const float frameW = (float)grayClean.cols;
         const float frameH = (float)grayClean.rows;
-        std::vector<int> cand;
-        predicted = 0;
-        int loneCandidateSkips = 0;
-        for (int a = 0; a < artDescs.rows; ++a) {
-            const cv::Point2f& ap = artPts2d[(size_t)a];
-            // Composite pixel -> design-plane metres. The overlay quad spans [-halfW, halfW] x
-            // [-halfH, halfH] with the texture stretched across it and V flipped (OverlayRenderer
-            // writes `1 - v` alongside `y = -halfH + v * 2 * halfH`), so image row 0 is +halfH. The
-            // mapping is parametric in the composite's size, which is why it needs no aspect
-            // agreement between the bitmap and the quad.
-            const float lx = designHalfW * (2.0f * ap.x / (float)artImgW - 1.0f);
-            const float ly = designHalfH * (1.0f - 2.0f * ap.y / (float)artImgH);
-            const glm::vec4 pc = camFromDesign * glm::vec4(lx, ly, 0.0f, 1.0f);
-            if (!(pc.z > 1e-4f)) continue;                       // behind or on the camera plane
-            const float u = pnpFx * pc.x / pc.z + pnpCx;
-            const float v = pnpFy * pc.y / pc.z + pnpCy;
-            if (!std::isfinite(u) || !std::isfinite(v)) continue;
-            // Predicted OUTSIDE the frame is not visible, and must not count in the denominator —
-            // that is the whole of 5b.1. The radius is allowed as slack on each edge because a
-            // feature predicted just off-frame can still have its true detection just on it.
-            if (u < -radiusPx || v < -radiusPx || u > frameW + radiusPx || v > frameH + radiusPx) continue;
-            ++predicted;
-
-            grid.candidatesWithin(u, v, radiusPx, cand);
-            // The grid returns a SUPERSET (every keypoint in the swept cells: whole cells covering
-            // the query's bounding box, not the r-disc). Its own contract leaves the exact test to
-            // the caller, and without it a candidate in a swept corner cell -- up to ~2.8r away
-            // with cell == r -- could win the ratio test, and a lone
-            // in-radius candidate could be "rescued" into a ratio test by an out-of-radius
-            // neighbour. Apply it before anything counts candidates.
-            KeypointGrid::keepWithinRadius(kps, u, v, radiusPx, cand);
-            if (cand.size() < 2) {
-                // Lowe's ratio needs a second-best to divide by. With one candidate there is nothing
-                // to compare against, and accepting it unconditionally would corroborate any
-                // keypoint that happens to land near the prediction regardless of what it looks
-                // like — a confidence signal that measures the wall's texture density instead of its
-                // agreement with the design, feeding PoseFusion's correction strength.
-                //
-                // Skipping deflates `matched` without touching `predicted`, so the cost shows up
-                // as lower confidence — but "lower confidence" is not free: it maps through
-                // PoseFusion's alpha to LESS relocalization correction and therefore more
-                // accumulated drift, which is the failure corroboration exists to prevent. So this
-                // is conservative against false snapping and anti-conservative against drift, and
-                // the only thing that tells you which side you are on is the rate.
-                //
-                // Published on its own diagnostic channel rather than logged, because at the MIN_PX
-                // floor a sparse frame can skip most of what it predicted and the symptom — a wall
-                // that has apparently stopped corroborating — looks identical to an unpainted one.
-                // E6 sets rho against this number.
-                if (cand.size() == 1) ++loneCandidateSkips;
-                continue;
-            }
-            observed[a] = 1;
-            float best = FLT_MAX, second = FLT_MAX;
-            int bestQ = -1;
-            for (int q : cand) {
-                const float d = descDistance(q, a);
-                if (d < best) { second = best; best = d; bestQ = q; }
-                else if (d < second) { second = d; }
-            }
-            if (bestQ < 0) continue;
-            if (best < kCorrobLoweRatio * second) {
-                hit[a] = 1;
-                hitQuery[a] = bestQ;
-                ++matched;
-                validQuery.push_back(bestQ);
-            }
+        GatedMatch pm;
+        gatedMatchWithBaseline(artDescs, artPts2d, artImgW, artImgH, kps, descs, grid, camFromDesign,
+                               designHalfW, designHalfH, pnpFx, pnpFy, pnpCx, pnpCy,
+                               radiusPx, frameW, frameH, kCorrobLoweRatio, shiftXm, shiftYm,
+                               pm, &validQuery, wallPtr);
+        hit = std::move(pm.hit); observed = std::move(pm.observed); hitQuery = std::move(pm.hitQuery);
+        matched = pm.matched; predicted = pm.predicted; loneSkips = pm.loneSkips;
+        const int loneCandidateSkips = pm.loneSkips;
+        // The filters' targets look at the same live keypoints, through the same pose.
+        setMatches.resize(targetSets.size());
+        for (size_t si = 0; si < targetSets.size(); ++si) {
+            const TargetSet& ts = targetSets[si];
+            if (ts.descs.empty() || ts.descs.type() != descs.type() || ts.descs.cols != descs.cols ||
+                (int)ts.pts.size() != ts.descs.rows) continue;
+            gatedMatchWithBaseline(ts.descs, ts.pts, artImgW, artImgH, kps, descs, grid, camFromDesign,
+                                   designHalfW, designHalfH, pnpFx, pnpFy, pnpCx, pnpCy,
+                                   radiusPx, frameW, frameH, kCorrobLoweRatio, shiftXm, shiftYm,
+                                   setMatches[si], nullptr, wallPtr);
         }
-        loneSkips = loneCandidateSkips;
         if (loneCandidateSkips > 0) {
             LOGI("Corroboration (gated): r=%.1fpx predicted=%d matched=%d lone-candidate skips=%d",
                  radiusPx, predicted, matched, loneCandidateSkips);
@@ -1621,6 +1811,16 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         if (mArtworkGeneration == artGeneration &&
             mArtworkCorroborated.size() == (size_t)artDescs.rows) {
             everCorroborated = 0;
+            for (size_t si = 0; si < setMatches.size() && si < mTargetSets.size(); ++si) {
+                TargetSet& ts = mTargetSets[si];
+                const GatedMatch& sm = setMatches[si];
+                if (sm.hit.size() != ts.corrob.size()) continue;   // never matched (type mismatch) or replaced
+                for (size_t r = 0; r < ts.corrob.size(); ++r) {
+                    uint8_t& c = ts.corrob[r];
+                    if (sm.hit[r]) { if (c < kCorrobConfirmations) ++c; }
+                    else if (sm.observed[r] && c < kCorrobConfirmations) c = 0;
+                }
+            }
             if (mArtworkPromoted.size() != (size_t)artDescs.rows) mArtworkPromoted.assign(artDescs.rows, 0);
             // Paint-mark promotion rewrites the reloc set just as self-grow does, so it answers to the
             // same switch AND the same trust gate (inlier ratio and spread of THIS pose). It used to
@@ -1954,6 +2154,8 @@ void MobileGS::destroy() {
         mRelocCv.notify_all();
     }
     if (mRelocThread.joinable()) mRelocThread.join();
+    mFilterCancel.store(true, std::memory_order_relaxed);
+    joinFilterBuild();
 }
 
 void MobileGS::setViewportSize(int w, int h) {
@@ -2019,6 +2221,7 @@ void MobileGS::restoreWallFingerprint(const cv::Mat& d, const std::vector<cv::Po
     std::lock_guard<std::mutex> lock(mMutex);
     invalidateRelocResultLocked();
     mWallDescriptors = d.clone();
+    mBareWallCount = (size_t)mWallDescriptors.rows;
     mWallKeypoints3D = p;
     // This path carries no partition, and the previous fingerprint's must not survive onto it: the
     // bytes would index a different point set entirely. Empty = all backbone, as before Phase 2.
@@ -2088,6 +2291,10 @@ void MobileGS::restoreWallFingerprintMetric(const cv::Mat& d, const std::vector<
         (!anchorMatrix16 || memcmp(anchorMatrix16, mFingerprintAnchorMatrix, 16 * sizeof(float)) == 0) &&
         (!intrinsics4 || memcmp(intrinsics4, mFingerprintIntrinsics, 4 * sizeof(float)) == 0);
     if (!sameFrame) invalidateRelocResultLocked();
+    // The captured (bare) part of the stored set: the base alone when grown marks ride behind it, the
+    // standing count when the identical set is re-pushed, otherwise everything.
+    mBareWallCount = growthOfSame ? baseN
+        : (sameFingerprint && mBareWallCount > 0 ? std::min(mBareWallCount, (size_t)useD.rows) : (size_t)useD.rows);
     mWallDescriptors = useD.clone();
     mWallKeypoints3D = useP;
     // Belt and braces over the JNI-side length check: a partition that does not index the points it
@@ -2110,6 +2317,7 @@ void MobileGS::clearWallFingerprint() {
     std::lock_guard<std::mutex> lock(mMutex);
     mWallDescriptors.release();
     mWallKeypoints3D.clear();
+    mBareWallCount = 0;
     mWallRegions.clear();
     // Back to the constructed defaults, so a later project can't inherit this one's co-registration.
     static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
@@ -2132,12 +2340,17 @@ void MobileGS::clearWallFingerprint() {
     mArtworkKeypoints2D.clear();
     mArtworkCorroborated.clear();
     mArtworkPromoted.clear();
+    mTargetSets.clear();
     mPaintDescriptors.release();
     mPaintPoints3D.clear();
     mGrid = PaintGrid();
     for (auto& st : mPassStats) st = passes::Stats();
     mPendingGridRestore.clear();
     mCaptureRgb.release();
+    // The registration was to that photo. The clean-wall photo itself stays (it is registered afresh
+    // when the next capture photo arrives); clearCleanWallImage drops it.
+    mCleanWallRgb.release(); mCleanWallValid.release();
+    mCleanWallStatus.store(mCleanWallRaw.empty() ? kCleanNone : kCleanPending, std::memory_order_relaxed);
     ++mArtworkGeneration;
     mArtworkImageW = 0;
     mArtworkGray.release();
@@ -2199,6 +2412,7 @@ void MobileGS::setDesignPlacement(const float* fpFromDesign16, float halfW, floa
     if (moved) {
         std::fill(mArtworkCorroborated.begin(), mArtworkCorroborated.end(), (uint8_t)0);
         std::fill(mArtworkPromoted.begin(), mArtworkPromoted.end(), (uint8_t)0);
+        for (auto& ts : mTargetSets) std::fill(ts.corrob.begin(), ts.corrob.end(), (uint8_t)0);
     }
 }
 
@@ -2326,6 +2540,11 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
         mPaintDescriptors.release();
         mPaintPoints3D.clear();
         mWallDescriptors = descs.clone();
+        // A peer's blob is the host's set INCLUDING anything self-grow appended, with no boundary between
+        // the captured wall and the grown tail. Treating all of it as bare wall would exclude learned
+        // (painted) features from the evidence, so this device has no exclusion list for a peer's
+        // fingerprint: the pass loses its guard here rather than gaining a wrong one.
+        mBareWallCount = 0;
         // A peer's fingerprint carries no partition, and the local one indexes a different point
         // set. Empty = all backbone, i.e. pre-Phase-2 behaviour, which is the right default for a
         // map whose design footprint this device never saw.
@@ -2367,6 +2586,8 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
         memset(mMapIntrinsics, 0, 4 * sizeof(float));
         mMapRevision.fetch_add(1, std::memory_order_relaxed);
         mCaptureRgb.release();
+        mCleanWallRgb.release(); mCleanWallValid.release();
+        mCleanWallStatus.store(mCleanWallRaw.empty() ? kCleanNone : kCleanPending, std::memory_order_relaxed);
         memset(mCaptureIntr, 0, 4 * sizeof(float));
     }
     {
@@ -2476,6 +2697,168 @@ bool MobileGS::loadLowLightEnhancer(const std::vector<uchar>& onnxBytes) { retur
 // which new real paint-marks to promote into the live fingerprint as the original marks get covered.
 // Mirrors generateFingerprint's detect + depth back-projection, stored into mArtwork* (no mask: the
 // whole target is the reference).
+bool MobileGS::renderCvPreview(cv::Mat& rgba, int maxSide) const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (mArtworkImageW <= 0 || mArtworkImageH <= 0 || maxSide < 16) return false;
+    const double s = std::min(1.0, (double)maxSide / (double)std::max(mArtworkImageW, mArtworkImageH));
+    const int w = std::max(1, (int)std::lround(mArtworkImageW * s));
+    const int h = std::max(1, (int)std::lround(mArtworkImageH * s));
+    rgba = cv::Mat(h, w, CV_8UC4, cv::Scalar(0, 0, 0, 0));
+    auto colour = [](int pass, int alpha) {
+        const uint32_t c = passes::passRgb(pass);
+        return cv::Scalar((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF, alpha);
+    };
+
+    // The area progress: design cells already judged painted are tinted, the rest outlined.
+    const PaintGrid& g = mGrid;
+    if (g.cols > 0 && g.rows > 0 && g.painted.size() == (size_t)g.cols * g.rows) {
+        for (int r = 0; r < g.rows; ++r) for (int c = 0; c < g.cols; ++c) {
+            const int i = r * g.cols + c;
+            if (g.weight[(size_t)i] <= 0) continue;
+            const cv::Rect cell(c * w / g.cols, r * h / g.rows, (c + 1) * w / g.cols - c * w / g.cols,
+                                (r + 1) * h / g.rows - r * h / g.rows);
+            if (g.painted[(size_t)i]) cv::rectangle(rgba, cell, cv::Scalar(60, 220, 90, 70), cv::FILLED);
+            cv::rectangle(rgba, cell, cv::Scalar(255, 255, 255, 40), 1);
+        }
+    }
+
+    const int radius = std::max(3, std::min(w, h) / 120);
+    auto dots = [&](const std::vector<cv::Point2f>& pts, const std::vector<uint8_t>& corrob, int pass) {
+        for (size_t i = 0; i < pts.size(); ++i) {
+            const cv::Point centre((int)std::lround(pts[i].x * s), (int)std::lround(pts[i].y * s));
+            const bool confirmed = i < corrob.size() && corrob[i] >= kCorrobConfirmations;
+            if (confirmed) {
+                cv::circle(rgba, centre, radius + 1, cv::Scalar(255, 255, 255, 230), cv::FILLED);
+                cv::circle(rgba, centre, radius, colour(pass, 255), cv::FILLED);
+            } else {
+                cv::circle(rgba, centre, radius, colour(pass, 200), 1);
+            }
+        }
+    };
+    // Slowest layers first, so the cheap, plentiful ones are not hidden under them.
+    for (int f = designfilters::kCount - 1; f >= 0; --f) {
+        if ((size_t)f < mTargetSets.size()) dots(mTargetSets[(size_t)f].pts, mTargetSets[(size_t)f].corrob, passes::kPassFilterBase + f);
+    }
+    dots(mArtworkKeypoints2D, mArtworkCorroborated, passes::kPassFeatures);
+    // An Android Bitmap holds premultiplied alpha; drawn here straight, a translucent pixel would show
+    // brighter than it should.
+    for (int y = 0; y < rgba.rows; ++y) {
+        cv::Vec4b* row = rgba.ptr<cv::Vec4b>(y);
+        for (int x = 0; x < rgba.cols; ++x) {
+            const int a = row[x][3];
+            if (a == 0 || a == 255) continue;
+            for (int c = 0; c < 3; ++c) row[x][c] = (uchar)((row[x][c] * a + 127) / 255);
+        }
+    }
+    return true;
+}
+
+void MobileGS::getPassLegend(float* out) const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    for (int p = 0; p < passes::kPassCount; ++p) {
+        float total = 0, confirmed = 0;
+        if (p == passes::kPassFeatures) {
+            total = (float)mArtworkKeypoints2D.size();
+            for (uint8_t c : mArtworkCorroborated) if (c >= kCorrobConfirmations) confirmed += 1;
+        } else if (p == passes::kPassColour) {
+            for (size_t i = 0; i < mGrid.weight.size(); ++i) {
+                if (mGrid.weight[i] <= 0) continue;
+                total += 1;
+                if (i < mGrid.painted.size() && mGrid.painted[i]) confirmed += 1;
+            }
+        } else if (p >= passes::kPassFilterBase && p < passes::kPassChange) {
+            const size_t f = (size_t)(p - passes::kPassFilterBase);
+            if (f < mTargetSets.size()) {
+                total = (float)mTargetSets[f].pts.size();
+                for (uint8_t c : mTargetSets[f].corrob) if (c >= kCorrobConfirmations) confirmed += 1;
+            }
+        }
+        out[3 * p] = (float)passes::passRgb(p);
+        out[3 * p + 1] = total;
+        out[3 * p + 2] = confirmed;
+    }
+}
+
+int MobileGS::readyFilterTargets() const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    int ready = 0;
+    for (const auto& ts : mTargetSets) if (!ts.descs.empty()) ++ready;
+    return ready;
+}
+
+void MobileGS::joinFilterBuild() {
+    std::lock_guard<std::mutex> lock(mFilterThreadMutex);
+    if (mFilterThread.joinable()) mFilterThread.join();
+}
+
+// The design filter bank: each filter picks places on the design worth looking at; the descriptors are
+// the UNFILTERED design's there (same normalised grey, same descriptor type as the artwork). Built on a
+// worker, cheapest filter first, each installed the moment it is ready. A newer design (or a clear)
+// makes a running build stand down: it checks the artwork generation before installing anything.
+void MobileGS::startFilterBuild(cv::Mat composite, cv::Mat gray, int descType, long generation) {
+    // Held across stopping the old worker and starting the new one. The worker never takes this mutex
+    // (it uses mMutex), so joining under it cannot deadlock.
+    std::lock_guard<std::mutex> threadLock(mFilterThreadMutex);
+    mFilterCancel.store(true, std::memory_order_relaxed);
+    if (mFilterThread.joinable()) mFilterThread.join();
+    mFilterCancel.store(false, std::memory_order_relaxed);
+    mFilterThread = std::thread([this, composite, gray, descType, generation]() {
+        try {
+            // Filters work on a copy no larger than 800 px on its long side: place picking does not need
+            // more, and the slow filters scale with the pixel count. Places are scaled back up.
+            const double s = std::min(1.0, 800.0 / (double)std::max(composite.cols, composite.rows));
+            cv::Mat work = composite;
+            if (s < 1.0) cv::resize(composite, work, cv::Size(), s, s, cv::INTER_AREA);
+
+            // One SuperPoint forward pass serves every filter; sampling it is cheap.
+            SuperPointDetector::DescriptorField field;
+            if (descType == CV_32F && (!mSuperPoint.isLoaded() || !mSuperPoint.describeField(gray, field))) return;
+
+            for (int f : designfilters::kBuildOrder) {
+                if (mFilterCancel.load(std::memory_order_relaxed)) return;
+                const cv::Mat filtered = designfilters::apply(f, work);
+                std::vector<cv::Point2f> pts = designfilters::locations(filtered, kMaxFilterTargets);
+                for (auto& p : pts) { p.x = (float)(p.x / s); p.y = (float)(p.y / s); }
+                if (pts.empty()) continue;
+                cv::Mat d;
+                if (descType == CV_32F) {
+                    mSuperPoint.sampleField(field, pts, d);
+                } else {
+                    std::vector<cv::KeyPoint> ks;
+                    for (const auto& p : pts) {
+                        // ORB uses the angle it is given. Orient each place as ORB itself would.
+                        ks.emplace_back(p, 31.0f, intensityCentroidAngle(gray, p), 0.0f, 0);
+                    }
+                    cv::ORB::create(kMaxFilterTargets)->compute(gray, ks, d);   // drops border keypoints
+                    pts.clear();
+                    for (const auto& k : ks) pts.push_back(k.pt);
+                }
+                if (d.empty() || d.rows != (int)pts.size()) continue;
+
+                TargetSet ts;
+                ts.descs = d;
+                ts.pts = std::move(pts);
+                ts.corrob.assign((size_t)d.rows, 0);
+                std::lock_guard<std::mutex> lock(mMutex);
+                if (mArtworkGeneration != generation || (size_t)f >= mTargetSets.size()) return;   // superseded
+                ts.cellRows.assign((size_t)mGrid.cols * mGrid.rows, {});
+                if (mGrid.cols > 0 && mGrid.rows > 0) {
+                    for (int r = 0; r < (int)ts.pts.size(); ++r) {
+                        const int c = std::min(mGrid.cols - 1, std::max(0, (int)(ts.pts[(size_t)r].x * mGrid.cols / composite.cols)));
+                        const int w = std::min(mGrid.rows - 1, std::max(0, (int)(ts.pts[(size_t)r].y * mGrid.rows / composite.rows)));
+                        ts.cellRows[(size_t)w * mGrid.cols + c].push_back(r);
+                    }
+                }
+                mTargetSets[(size_t)f] = std::move(ts);
+            }
+        } catch (const std::exception& e) {
+            LOGE("filter build: exception: %s", e.what());
+        } catch (...) {
+            LOGE("filter build: unknown exception");
+        }
+    });
+}
+
 void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* depthData,
                                      int depthW, int depthH, int depthStride,
                                      const float* intr, const float* /*viewMat*/) {
@@ -2552,6 +2935,8 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
         }
     }
 
+    const int artworkType = keepDescs.type();
+
     int storedRows = 0; size_t storedPts = 0;
     {
         std::lock_guard<std::mutex> lock(mMutex);
@@ -2565,6 +2950,8 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
         mArtworkCorroborated.assign((size_t)mArtworkDescriptors.rows, 0);
         mArtworkPromoted.assign((size_t)mArtworkDescriptors.rows, 0);
         buildPaintGridLocked(composite, mArtworkKeypoints2D);
+        // Empty until the worker installs each filter's targets (startFilterBuild below).
+        mTargetSets.assign((size_t)designfilters::kCount, TargetSet());
         ++mArtworkGeneration;
         mCorrobPredicted.store(-1, std::memory_order_relaxed);
         mCorrobMatched.store(-1, std::memory_order_relaxed);
@@ -2578,6 +2965,9 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
         storedRows = mArtworkDescriptors.rows;
         storedPts = mArtworkKeypoints3D.size();
     }
+    long generation;
+    { std::lock_guard<std::mutex> lock(mMutex); generation = mArtworkGeneration; }
+    startFilterBuild(composite.clone(), gray.clone(), artworkType, generation);
     LOGI("setArtworkFingerprint: stored %d validator features (%zu with 3D)", storedRows, storedPts);
 }
 
@@ -2786,6 +3176,7 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
         mPaintDescriptors.release();
         mPaintPoints3D.clear();
         mWallKeypoints3D  = std::move(pts3d);
+        mBareWallCount = (size_t)mWallDescriptors.rows;
         // The depth path supplies no partition. Clearing rather than leaving the previous
         // fingerprint's is not optional: those bytes index a point set that no longer exists.
         mWallRegions.clear();
@@ -2921,6 +3312,11 @@ void MobileGS::buildPaintGridLocked(const cv::Mat& composite, const std::vector<
                    cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::COUNT, 20, 0.5),
                    3, cv::KMEANS_PP_CENTERS, centers);
         for (int i = 0; i < (int)used.size(); ++i) g.cluster[used[i]] = labels.at<int>(i);
+    }
+    {
+        std::vector<int> patchKey((size_t)n, -1);
+        for (int i = 0; i < n; ++i) if (g.weight[i] > 0) patchKey[(size_t)i] = g.cluster[i];
+        g.patch = shapematch::label(patchKey, g.cols, g.rows);
     }
     g.paintSum.assign(g.k, cv::Vec3f()); g.paintN.assign(g.k, 0);
 
@@ -3065,10 +3461,82 @@ void MobileGS::setCaptureImage(const cv::Mat& img, const float* intr4) {
     std::lock_guard<std::mutex> lock(mMutex);
     mCaptureRgb = rgb;
     memcpy(mCaptureIntr, k, 4 * sizeof(float));
+    registerCleanWallLocked();   // a clean-wall photo given first was waiting for this
     // Bare-wall colours are re-sampled from the new photo on the next tick.
     std::fill(mGrid.hasBase.begin(), mGrid.hasBase.end(), 0);
     std::fill(mGrid.baseGroup.begin(), mGrid.baseGroup.end(), -1);
     mGrid.baseGroupsBuilt = false;
+    std::fill(mGrid.hasBaseClean.begin(), mGrid.hasBaseClean.end(), 0);
+}
+
+void MobileGS::registerCleanWallLocked() {
+    mCleanWallRgb.release(); mCleanWallValid.release();
+    if (mCleanWallRaw.empty()) { mCleanWallStatus.store(kCleanNone, std::memory_order_relaxed); return; }
+    if (mCaptureRgb.empty()) { mCleanWallStatus.store(kCleanPending, std::memory_order_relaxed); return; }
+    auto features = [&](const cv::Mat& rgb, std::vector<cv::KeyPoint>& kps, cv::Mat& descs) {
+        cv::Mat gray; cv::cvtColor(rgb, gray, cv::COLOR_RGB2GRAY);
+        normalizeForFeatures(gray);
+        cv::ORB::create(2000)->detectAndCompute(gray, cv::noArray(), kps, descs);
+    };
+    std::vector<cv::KeyPoint> ck, pk; cv::Mat cd, pd;
+    features(mCleanWallRaw, ck, cd);
+    features(mCaptureRgb, pk, pd);
+    bool ok = false;
+    cv::Mat H;
+    if (cd.rows >= 30 && pd.rows >= 30) {
+        std::vector<std::vector<cv::DMatch>> knn;
+        cv::BFMatcher(cv::NORM_HAMMING).knnMatch(cd, pd, knn, 2);
+        std::vector<cv::Point2f> src, dst;
+        for (const auto& m : knn) {
+            if (m.size() < 2 || !(m[0].distance < kCleanWallMatchRatio * m[1].distance)) continue;
+            src.push_back(ck[(size_t)m[0].queryIdx].pt);
+            dst.push_back(pk[(size_t)m[0].trainIdx].pt);
+        }
+        if (src.size() >= 30) {
+            std::vector<uchar> inl;
+            H = cv::findHomography(src, dst, cv::RANSAC, 4.0, inl);
+            const int n = H.empty() ? 0 : cv::countNonZero(inl);
+            if (n >= 25 && n * 100 >= 35 * (int)src.size()) {
+                // Reject a collapsed or wildly stretched mapping: both photos are of the same wall,
+                // taken from about the same place.
+                const double det = H.at<double>(0, 0) * H.at<double>(1, 1) - H.at<double>(0, 1) * H.at<double>(1, 0);
+                ok = det > 0.25 && det < 4.0;
+            }
+        }
+    }
+    if (!ok) { mCleanWallStatus.store(kCleanFailed, std::memory_order_relaxed); return; }
+    // Where the homography reaches beyond the clean photo there is nothing real to compare with. Warp
+    // an all-valid mask beside the image (constant border, not replicated edge colour) and keep only
+    // cells well inside its support, so a shifted or turned photo leaves its unsupported margin as
+    // no-data instead of repeating the nearest edge colour.
+    cv::warpPerspective(mCleanWallRaw, mCleanWallRgb, H, mCaptureRgb.size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT);
+    cv::Mat support(mCleanWallRaw.size(), CV_8UC1, cv::Scalar(255));
+    cv::warpPerspective(support, mCleanWallValid, H, mCaptureRgb.size(), cv::INTER_NEAREST, cv::BORDER_CONSTANT);
+    cv::erode(mCleanWallValid, mCleanWallValid, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(9, 9)));
+    mCleanWallStatus.store(kCleanRegistered, std::memory_order_relaxed);
+    std::fill(mGrid.hasBaseClean.begin(), mGrid.hasBaseClean.end(), 0);
+}
+
+bool MobileGS::setCleanWallImage(const cv::Mat& img) {
+    if (img.empty()) return false;
+    cv::Mat rgb;
+    if (img.channels() == 4) cv::cvtColor(img, rgb, cv::COLOR_RGBA2RGB);
+    else if (img.channels() == 1) cv::cvtColor(img, rgb, cv::COLOR_GRAY2RGB);
+    else rgb = img.clone();
+    const float down = 640.0f / (float)std::max(rgb.cols, rgb.rows);
+    if (down < 1.0f) cv::resize(rgb, rgb, cv::Size(), down, down, cv::INTER_AREA);
+    std::lock_guard<std::mutex> lock(mMutex);
+    mCleanWallRaw = rgb;
+    registerCleanWallLocked();
+    return mCleanWallStatus.load(std::memory_order_relaxed) == kCleanRegistered;
+}
+
+void MobileGS::clearCleanWallImage() {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mCleanWallRaw.release();
+    mCleanWallRgb.release(); mCleanWallValid.release();
+    mCleanWallStatus.store(kCleanNone, std::memory_order_relaxed);
+    std::fill(mGrid.hasBaseClean.begin(), mGrid.hasBaseClean.end(), 0);
 }
 
 void MobileGS::updatePaintGrid(const cv::Mat& colorFrame) {
@@ -3091,6 +3559,7 @@ void MobileGS::updatePaintGrid(const cv::Mat& colorFrame) {
     const int ec = g.cols + 2, er = g.rows + 2, en = ec * er;
     if ((int)g.base.size() != en) {
         g.base.assign(en, cv::Vec3f()); g.hasBase.assign(en, 0); g.baseGroup.assign(en, -1);
+        g.baseClean.assign(en, cv::Vec3f()); g.hasBaseClean.assign(en, 0);
         g.baseGroupsBuilt = false;
     }
     auto designIdx = [&](int e) {            // -1 for ring cells
@@ -3135,6 +3604,32 @@ void MobileGS::updatePaintGrid(const cv::Mat& colorFrame) {
             toLab(cols); normaliseL(cols);
             for (size_t j = 0; j < idxs.size(); ++j) { g.base[idxs[j]] = cols[j]; g.hasBase[idxs[j]] = 1; }
             g.baseGroupsBuilt = false;
+        }
+    }
+
+    // 1b. Pass B: bare-wall colours from the clean-wall photo, once registered. Same sample points,
+    //     same conditions as the capture photo above; only read while the user has the pass on.
+    const bool changeOn = mChangePassEnabled.load(std::memory_order_relaxed) && !mCleanWallRgb.empty();
+    auto cleanSupported = [&](float u, float v) {
+        const int x = (int)std::lround(u), y = (int)std::lround(v);
+        return !mCleanWallValid.empty() && x >= 0 && y >= 0 && x < mCleanWallValid.cols && y < mCleanWallValid.rows &&
+               mCleanWallValid.at<uchar>(y, x) != 0;
+    };
+    if (changeOn && mCaptureIntr[0] > 0 &&
+        std::any_of(g.hasBaseClean.begin(), g.hasBaseClean.end(), [](uint8_t b) { return b == 0; }) &&
+        fingerprintFrameIsCaptureCamera(mWallKeypoints3D)) {
+        std::vector<int> idxs; std::vector<cv::Vec3f> cols;
+        for (int e = 0; e < en; ++e) {
+            if (g.hasBaseClean[e]) continue;
+            float u, v; cv::Vec3f rgb;
+            if (project(fpFromDesign, centre(e), mCaptureIntr, u, v) && sampleRgb(mCleanWallRgb, u, v, 3, rgb) &&
+                cleanSupported(u, v)) {
+                idxs.push_back(e); cols.push_back(rgb);
+            }
+        }
+        if (!idxs.empty()) {
+            toLab(cols); normaliseL(cols);
+            for (size_t j = 0; j < idxs.size(); ++j) { g.baseClean[idxs[j]] = cols[j]; g.hasBaseClean[idxs[j]] = 1; }
         }
     }
 
@@ -3197,10 +3692,39 @@ void MobileGS::updatePaintGrid(const cv::Mat& colorFrame) {
         changed[j] = colourDist(cur[j], ref) > kGridChange;
     }
 
+    // 4b. Pass B: which cells differ from the CLEAN wall, and do the differing regions have the shape
+    //     of a design patch? Colour plays no part in the second question.
+    std::vector<uint8_t> changeVerdict;   // per DESIGN cell
+    if (changeOn && (int)g.patch.size() == n) {
+        // Over the extended grid, so a change that runs out of the design into the ring or the
+        // transparent cells around it is seen as running out (those cells have no patch).
+        std::vector<uint8_t> chB((size_t)en, 0), judgedB((size_t)en, 0);
+        std::vector<int> patchExt((size_t)en, -1);
+        for (int e = 0; e < en; ++e) {
+            const int d = designIdx(e);
+            if (d >= 0 && g.weight[(size_t)d] > 0) patchExt[(size_t)e] = g.patch[(size_t)d];
+        }
+        bool any = false;
+        for (size_t j = 0; j < vis.size(); ++j) {
+            const int e = vis[j];
+            if (!g.hasBaseClean[e]) continue;
+            judgedB[(size_t)e] = 1; any = true;
+            chB[(size_t)e] = colourDist(cur[j], g.baseClean[e]) > kGridChange;
+        }
+        if (any) {
+            const std::vector<uint8_t> ext = shapematch::verdicts(chB, judgedB, patchExt, ec, er);
+            changeVerdict.assign((size_t)n, (uint8_t)passes::kNoData);
+            for (int d = 0; d < n; ++d) {
+                const int e = (d / g.cols + 1) * ec + (d % g.cols + 1);
+                changeVerdict[(size_t)d] = ext[(size_t)e];
+            }
+        }
+    }
+
     // 5. Verdicts per opaque design cell. Each pass votes (see PassEvidence.h); the cell is confirmed
     //    when any pass sees paint. A cell with nothing to judge it by gets no verdict from that pass.
-    long judged[passes::kPassCount] = {0, 0};
-    long seen[passes::kPassCount] = {0, 0};
+    long judged[passes::kPassCount] = {};
+    long seen[passes::kPassCount] = {};
     std::vector<cv::Vec3f> paintMean(g.k);
     for (int k = 0; k < g.k; ++k) if (g.paintN[k] > 0) paintMean[k] = g.paintSum[k] * (1.0f / g.paintN[k]);
     for (size_t j = 0; j < vis.size(); ++j) {
@@ -3239,8 +3763,19 @@ void MobileGS::updatePaintGrid(const cv::Mat& colorFrame) {
                 }
             }
         }
-        uint8_t votes[passes::kPassCount];
+        uint8_t votes[passes::kPassCount] = {};   // kNoData unless a pass below says otherwise
         votes[passes::kPassFeatures] = featureVote;
+        // Filter passes: same rule as features -- at least half of the target's rows in this cell
+        // confirmed on the wall. A cell with no row of a filter's gets no verdict from it.
+        for (size_t si = 0; si < mTargetSets.size() && si < (size_t)designfilters::kCount; ++si) {
+            const TargetSet& ts = mTargetSets[si];
+            if (i >= (int)ts.cellRows.size() || ts.cellRows[i].empty() || ts.corrob.size() != ts.pts.size()) continue;
+            int ok = 0;
+            for (int r : ts.cellRows[i]) if (ts.corrob[(size_t)r] >= kCorrobConfirmations) ++ok;
+            votes[passes::kPassFilterBase + (int)si] =
+                ok * 2 >= (int)ts.cellRows[i].size() ? passes::kPresent : passes::kAbsent;
+        }
+        if (!changeVerdict.empty()) votes[passes::kPassChange] = changeVerdict[(size_t)i];
         votes[passes::kPassColour] = !colourJudged ? passes::kNoData : (byColour ? passes::kPresent : passes::kAbsent);
         for (int pidx = 0; pidx < passes::kPassCount; ++pidx) {
             if (votes[pidx] == passes::kNoData) continue;

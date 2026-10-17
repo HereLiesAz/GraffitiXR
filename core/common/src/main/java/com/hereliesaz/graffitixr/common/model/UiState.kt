@@ -67,6 +67,13 @@ data class ArUiState(
     val isFlashlightOn: Boolean = false,
     val lightLevel: Float = 1.0f,
     val tempCaptureBitmap: Bitmap? = null,
+    /** A clean-wall photo just taken, waiting for the app layer to save it to the project (then cleared). */
+    val cleanWallBitmap: Bitmap? = null,
+    /** Whether this project has a clean-wall photo (just taken, or loaded with the project). */
+    val hasCleanWall: Boolean = false,
+    /** The CV preview is on: everything the passes look for, drawn over the design, with a legend. */
+    val cvPreviewOn: Boolean = false,
+    val cvPassLegend: List<CvPassLegendRow> = emptyList(),
     // Grayscale + ORB keypoint overlay computed after capture so the artist can
     // judge whether the surface has enough visual texture before confirming.
     val annotatedCaptureBitmap: Bitmap? = null,
@@ -154,6 +161,8 @@ data class ArUiState(
      * so that is what the setting now says.
      */
     val ambientScanEnabled: Boolean = true,
+    /** Settings switch for pass B (change against the clean-wall photo). Off unless the user turned it on. */
+    val changePassEnabled: Boolean = false,
     // The specific engine used when MURAL is active.
 
     // Phase 3 — True once the renderer has confirmed ARCore Depth API is available on this device.

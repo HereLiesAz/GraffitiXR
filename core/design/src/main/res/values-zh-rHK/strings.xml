@@ -548,13 +548,13 @@
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
-    <string name="nav_coop">協作</string>
+    <string name="nav_coop">連線</string>
     <string name="nav_host_coop">主持</string>
-    <string name="nav_host_coop_info">主持協作工作階段，與附近使用者共享您的AR座標系統。</string>
+    <string name="nav_host_coop_info">發起連線，將你嘅 AR 座標系同附近另一部裝置共享。</string>
     <string name="nav_join_coop">加入</string>
-    <string name="nav_join_coop_info">加入附近的協作工作階段，將您的AR視圖與主持人對齊。</string>
+    <string name="nav_join_coop_info">加入附近嘅連線，令你嘅 AR 視圖同主機裝置對齊。</string>
     <string name="nav_leave_coop">離開</string>
-    <string name="nav_leave_coop_info">離開目前的協作工作階段。</string>
+    <string name="nav_leave_coop_info">退出目前嘅連線。</string>
     <string name="nav_wearable">穿戴裝置</string>
     <string name="nav_wearable_info">連接智能眼鏡，透過與視角對齊的鏡頭輸入，獲得免持AR體驗。</string>
     <string name="nav_wall_clear">清除</string>
@@ -762,4 +762,42 @@
     <string name="reloc_facing_it">您正對著它 — 請緩慢左右移動</string>
     <string name="reloc_recapture">重新擷取目標</string>
     <string name="ar_feedback_capture_failed">目標擷取失敗。請輕按以重試。</string>
+
+    <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
+    <string name="nav_stencil">模板</string>
+    <string name="nav_stencil_info">將設計拆分為黑、灰、白三張模板。再次點按可還原原圖。</string>
+    <string name="nav_stencil_view_all">全部</string>
+    <string name="nav_stencil_view_black">黑</string>
+    <string name="nav_stencil_view_grey">灰</string>
+    <string name="nav_stencil_view_white">白</string>
+    <string name="nav_stencil_view_info">切換顯示的模板：全部、黑、灰或白。</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">變化偵測（需要一張乾淨牆面的相片）</string>
+    <string name="target_clean_wall_text">仲未做標記？請先用下面按鈕影一張乾淨嘅牆面，然後再畫上標記。已經做咗標記？直接點按標記就得。</string>
+    <string name="target_clean_wall_photo">乾淨牆面相片</string>
+    <string name="target_clean_wall_saved">乾淨牆面相片已儲存。重影</string>
+
+    <!-- The CV view: a preview of everything the computer vision is looking for. -->
+    <string name="nav_cv_view">CV 檢視</string>
+    <string name="nav_cv_view_info">喺設計上疊加顯示電腦視覺正在尋找嘅一切。每種顏色代表一種尋找方式；空心圓環代表仍在等牆面回應，實心圓點代表已經搵到。再點按一次可隱藏。</string>
+    <string name="nav_cv_legend_title">尋找中</string>
+
+    <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
+    <string name="ar_feedback_clean_wall_save_failed">無法儲存乾淨牆面嘅相片。請重新影過。</string>
+    <string name="ar_feedback_clean_wall_register_failed">呢張乾淨牆面嘅相片同而家嘅牆面對唔上。請喺大約你會企嘅位置重新影過。</string>
+
+    <!-- The CV view legend: the name of each way of looking. -->
+    <string name="cv_pass_features">特徵</string>
+    <string name="cv_pass_colour">顏色</string>
+    <string name="cv_pass_sketch">草圖</string>
+    <string name="cv_pass_mosaic">馬賽克</string>
+    <string name="cv_pass_posterize2">2 色調</string>
+    <string name="cv_pass_posterize4">4 色調</string>
+    <string name="cv_pass_cartoon">卡通</string>
+    <string name="cv_pass_blobs">色塊</string>
+    <string name="cv_pass_invert">反相</string>
+    <string name="cv_pass_warm_luma">暖光</string>
+    <string name="cv_pass_stencil3">模板</string>
+    <string name="cv_pass_change">變化</string>
 </resources>
