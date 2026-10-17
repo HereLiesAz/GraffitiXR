@@ -1,3 +1,54 @@
+    private suspend fun applyDesignEffects(source: Bitmap, design: Layer): EffectsResult {
+        var out = source
+        var failure: String? = null
+        var stencilDark: Boolean? = null
+        if (design.isSubjectIsolated) {
+            val isolated = subjectIsolator.isolate(out).getOrNull()?.isolatedBitmap
+            if (isolated != null) out = isolated
+            else failure = "Couldn't isolate a subject in this image."
+        }
+        if (design.isSketch) {
+            val sketched = SketchProcessor.sketchEffect(out)
+            if (sketched != null) out = sketched
+            else failure = "Couldn't generate an outline for this image."
+        }
+        // Outline and Stencil are exclusive (the toggles keep it so); a stored design with both
+        // flags set, e.g. from a hand-edited project, gets the outline.
+        if (design.isStencil && !design.isSketch) {
+            // The stencil tool always tries to remove the background first. If the design is not
+            // already isolated, this tries it here, and if no subject can be found it carries on with
+            // the whole image. Only then does the stencil decide whether the image is light or dark
+            // and choose its base sheet. Segmentation is the slow part and cycling the view repeats
+            // this, so the result for a given source is kept.
+            val forStencil = if (design.isSubjectIsolated) out else stencilBackgroundRemoved(out)
+            val result = StencilProcessor.stencil(forStencil, design.stencilView)
+            if (result != null) {
+                out = result.bitmap
+                stencilDark = result.dark
+            } else failure = "Couldn't make a stencil from this image."
+        }
+        return EffectsResult(out, failure, stencilDark)
+    }
+
+    /** What [applyDesignEffects] produced: the bitmap to show, a failure to report, the stencil's call. */
+    private class EffectsResult(val bitmap: Bitmap, val failure: String?, val stencilDark: Boolean?) {
+        operator fun component1() = bitmap
+        operator fun component2() = failure
+    }
+
+    // The stencil's background-removed image for one source bitmap (null inside = no subject found).
+    private var stencilBaseFor: Bitmap? = null
+    private var stencilBase: Bitmap? = null
+
+    private suspend fun stencilBackgroundRemoved(source: Bitmap): Bitmap {
+        if (stencilBaseFor === source) return stencilBase ?: source
+        val isolated = subjectIsolator.isolate(source).getOrNull()?.isolatedBitmap
+        stencilBaseFor = source
+        stencilBase = isolated
+        return isolated ?: source
+    }
+
+
 // FILE: feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/EditorViewModel.kt
 package com.hereliesaz.graffitixr.feature.editor
 
@@ -398,7 +449,7 @@ class EditorViewModel @Inject constructor(
                 // Project-load restore, not a fresh user toggle -- don't surface the failure toast
                 // here even if a stage falls back; recomputeDesignEffects handles the live-toggle
                 // case where the user just took an action and needs to see it didn't apply.
-                val shown = source?.let { applyDesignEffects(it, loaded).first }
+                val shown = source?.let { applyDesignEffects(it, loaded).bitmap }
                 withContext(dispatchers.main) {
                     if (isCurrentProject(project.id) && _uiState.value.design?.id == loaded.id) {
                         designSourceBitmap = source
@@ -548,7 +599,7 @@ class EditorViewModel @Inject constructor(
             if (restored != null) {
                 projectLoadJob = viewModelScope.launch(dispatchers.io) {
                     val source = ImageUtils.loadBitmapAsync(context, restored.uri)
-                    val shown = source?.let { applyDesignEffects(it, restored).first }
+                    val shown = source?.let { applyDesignEffects(it, restored).bitmap }
                     withContext(dispatchers.main) {
                         if (isCurrentProject(projectId) && _uiState.value.design?.id == restored.id) {
                             designSourceBitmap = source
@@ -708,10 +759,12 @@ class EditorViewModel @Inject constructor(
         val design = _uiState.value.design ?: return
         designEffectJob?.cancel()
         designEffectJob = viewModelScope.launch(dispatchers.default) {
-            val (rendered, failureMessage) = applyDesignEffects(source, design)
+            val effects = applyDesignEffects(source, design)
+            val rendered = effects.bitmap
+            val failureMessage = effects.failure
             withContext(dispatchers.main) {
                 if (!isCurrentProject(projectId) || _uiState.value.design?.id != design.id) return@withContext
-                updateDesign { it.copy(bitmap = rendered) }
+                updateDesign { it.copy(bitmap = rendered, stencilDark = effects.stencilDark ?: it.stencilDark) }
                 if (failureMessage != null) {
                     _uiState.update { it.copy(effectFailureMessage = failureMessage) }
                 }

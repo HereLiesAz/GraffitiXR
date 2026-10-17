@@ -16,23 +16,27 @@ import timber.log.Timber
  * a median blur, clustered into three tones, and each sheet's edge is closed 5x5 so the cuts are
  * smooth.
  *
- * It decides first whether the image is dark or light (mean luminance, 0.299R + 0.587G + 0.114B
+ * Callers cut the background out first when they can (the editor tries; see EditorViewModel), so
+ * this sees the subject alone. It then decides whether the image is dark or light (mean luminance, 0.299R + 0.587G + 0.114B
  * over the opaque pixels; dark at 0.5 or below), and that picks the BASE sheet, the one covering
  * the whole subject: black for a dark image, white for a light one. The other two sheets are laid
  * over it, sequentially, as paint is (see [StencilTones.render]).
  *
  * Transparent pixels of the source stay transparent (an isolated subject keeps its cut-out).
  */
+/** A rendered stencil view, and whether the image was judged dark (black base) or light (white base). */
+class StencilResult(val bitmap: Bitmap, val dark: Boolean)
+
 object StencilProcessor {
 
     private const val MEDIAN_KERNEL = 9
     private const val CLOSE_KERNEL = 5
 
     /**
-     * @return the design rendered as [view], an ARGB_8888 bitmap the size of [bitmap], or null if
-     *   processing fails (the caller falls back to the original, as with the other effects).
+     * @return the design rendered as [view], an ARGB_8888 bitmap the size of [bitmap] together with
+     *   the dark-or-light call that chose the base sheet, or null if processing fails (the caller falls back to the original, as with the other effects).
      */
-    fun stencil(bitmap: Bitmap, view: StencilView): Bitmap? {
+    fun stencil(bitmap: Bitmap, view: StencilView): StencilResult? {
         val mats = mutableListOf<Mat>()
         return try {
             // Loaded here and not in an init block, for the reason given in SketchProcessor.
@@ -110,7 +114,7 @@ object StencilProcessor {
             }
             val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
             out.setPixels(StencilTones.render(ranks, view, dark), 0, w, 0, 0, w, h)
-            out
+            StencilResult(out, dark)
         } catch (e: Exception) {
             Timber.e(e, "StencilProcessor: stencil failed")
             null

@@ -63,30 +63,32 @@ class StencilTonesTest {
     }
 
     @Test
-    fun `a dark image starts from a black base then grey then white`() {
-        assertArrayEquals("black: the whole subject", intArrayOf(0, black, black, black),
-            StencilTones.render(ranks, StencilView.BLACK, dark = true))
-        assertArrayEquals("grey: grey and lighter", intArrayOf(0, 0, grey, grey),
-            StencilTones.render(ranks, StencilView.GREY, dark = true))
-        assertArrayEquals("white: the lightest", intArrayOf(0, 0, 0, white),
-            StencilTones.render(ranks, StencilView.WHITE, dark = true))
+    fun `a dark image goes black base, grey midtone, white secondary`() {
+        assertArrayEquals("base: the whole subject", intArrayOf(0, black, black, black),
+            StencilTones.render(ranks, StencilView.BASE, dark = true))
+        assertArrayEquals("midtone: grey and lighter", intArrayOf(0, 0, grey, grey),
+            StencilTones.render(ranks, StencilView.MIDTONE, dark = true))
+        assertArrayEquals("secondary: the lightest", intArrayOf(0, 0, 0, white),
+            StencilTones.render(ranks, StencilView.SECONDARY, dark = true))
+        assertEquals(listOf(StencilTones.BLACK, StencilTones.GREY, StencilTones.WHITE), StencilTones.sheetOrder(true))
     }
 
     @Test
-    fun `a light image starts from a white base then grey then black`() {
-        assertArrayEquals("white: the whole subject", intArrayOf(0, white, white, white),
-            StencilTones.render(ranks, StencilView.WHITE, dark = false))
-        assertArrayEquals("grey: grey and darker", intArrayOf(0, grey, grey, 0),
-            StencilTones.render(ranks, StencilView.GREY, dark = false))
-        assertArrayEquals("black: the darkest", intArrayOf(0, black, 0, 0),
-            StencilTones.render(ranks, StencilView.BLACK, dark = false))
+    fun `a light image goes white base, grey midtone, black secondary`() {
+        assertArrayEquals("base: the whole subject", intArrayOf(0, white, white, white),
+            StencilTones.render(ranks, StencilView.BASE, dark = false))
+        assertArrayEquals("midtone: grey and darker", intArrayOf(0, grey, grey, 0),
+            StencilTones.render(ranks, StencilView.MIDTONE, dark = false))
+        assertArrayEquals("secondary: the darkest", intArrayOf(0, black, 0, 0),
+            StencilTones.render(ranks, StencilView.SECONDARY, dark = false))
+        assertEquals(listOf(StencilTones.WHITE, StencilTones.GREY, StencilTones.BLACK), StencilTones.sheetOrder(false))
     }
 
     @Test
-    fun `the cycler steps all, black, grey, white and wraps`() {
-        assertEquals(StencilView.BLACK, StencilView.ALL.next())
-        assertEquals(StencilView.GREY, StencilView.BLACK.next())
-        assertEquals(StencilView.WHITE, StencilView.GREY.next())
-        assertEquals(StencilView.ALL, StencilView.WHITE.next())
+    fun `the cycler steps all, base, midtone, secondary and wraps`() {
+        assertEquals(StencilView.BASE, StencilView.ALL.next())
+        assertEquals(StencilView.MIDTONE, StencilView.BASE.next())
+        assertEquals(StencilView.SECONDARY, StencilView.MIDTONE.next())
+        assertEquals(StencilView.ALL, StencilView.SECONDARY.next())
     }
 }

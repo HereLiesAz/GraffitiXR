@@ -1,6 +1,7 @@
 // FILE: app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt
 package com.hereliesaz.graffitixr
 
+import com.hereliesaz.graffitixr.common.util.StencilTones
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -2291,10 +2292,15 @@ class MainActivity : AppCompatActivity() {
                 onClick = { editorViewModel.onToggleStencil() }
             )
             if (editorUiState.design?.isStencil == true) {
-                val stencilLabels = listOf(
-                    navStrings.stencilViewAll, navStrings.stencilViewBlack,
-                    navStrings.stencilViewGrey, navStrings.stencilViewWhite,
+                // All, then the sheets in the order they are laid: base, midtone, secondary. A light
+                // image goes white, grey, black; a dark one black, grey, white.
+                val colourName = mapOf(
+                    StencilTones.BLACK to navStrings.stencilViewBlack,
+                    StencilTones.GREY to navStrings.stencilViewGrey,
+                    StencilTones.WHITE to navStrings.stencilViewWhite,
                 )
+                val stencilLabels = listOf(navStrings.stencilViewAll) +
+                    StencilTones.sheetOrder(editorUiState.design?.stencilDark ?: true).map { colourName.getValue(it) }
                 azRailSubCycler(
                     id = "design.stencil.view",
                     hostId = railHostOf("design.stencil.view"),

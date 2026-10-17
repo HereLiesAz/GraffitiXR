@@ -61,14 +61,27 @@ data class Layer(
      */
     val isStencil: Boolean = false,
     val stencilView: StencilView = StencilView.ALL,
+    /**
+     * What the last stencil run decided about the image: dark (black is the base sheet) or light
+     * (white is). Kept so the rail can name the cycler's options in the right order before anything
+     * is re-rendered; every run overwrites it.
+     */
+    val stencilDark: Boolean = true,
 )
 
-/** Which of the stencil's three sheets are shown. The rail cycler steps through these in order. */
+/**
+ * Which of the stencil's sheets are shown. They are named by ROLE, because which colour plays each
+ * role depends on the image: the base sheet is black for a dark image and white for a light one,
+ * the secondary the opposite end, and the midtone is grey either way.
+ *
+ * The rail cycler steps ALL, BASE, MIDTONE, SECONDARY: black, grey, white for a dark image; white,
+ * grey, black for a light one.
+ */
 @Serializable
 enum class StencilView {
-    ALL, BLACK, GREY, WHITE;
+    ALL, BASE, MIDTONE, SECONDARY;
 
-    /** The next view after this one, wrapping from [WHITE] back to [ALL]. */
+    /** The next view after this one, wrapping from [SECONDARY] back to [ALL]. */
     fun next(): StencilView = entries[(ordinal + 1) % entries.size]
 }
 

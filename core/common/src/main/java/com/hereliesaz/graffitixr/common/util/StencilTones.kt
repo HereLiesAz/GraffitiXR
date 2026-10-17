@@ -73,32 +73,33 @@ object StencilTones {
      * ARGB pixels for [ranks] (one of [NONE], [BLACK], [GREY], [WHITE] per pixel) as [view] shows
      * them, for an image judged [dark] or light.
      *
-     * The sheets are laid sequentially, as paint is, starting from the BASE sheet that covers the
-     * whole subject: black for a dark image, white for a light one. Each later sheet covers the
-     * pixels of its tone and everything toward the far end:
-     *  - dark:  black = whole subject, grey = grey and lighter, white = the lightest;
-     *  - light: white = whole subject, grey = grey and darker, black = the darkest.
-     * ALL shows them stacked (every pixel in its own tone). A single view shows that one sheet, in
-     * its colour, and leaves the rest transparent. [NONE] is always transparent.
+     * The sheets are laid sequentially, as paint is, from the BASE sheet that covers the whole
+     * subject to the midtone and then the secondary:
+     *  - dark:  base black = whole subject, midtone grey = grey and lighter, secondary white = lightest;
+     *  - light: base white = whole subject, midtone grey = grey and darker, secondary black = darkest.
+     * ALL shows them stacked (every pixel in its own tone). A single view shows that one sheet, in its
+     * colour, and leaves the rest transparent. [NONE] is always transparent.
      */
-    fun render(ranks: IntArray, view: StencilView, dark: Boolean): IntArray = IntArray(ranks.size) { i ->
-        val rank = ranks[i]
-        val covered = rank != NONE
-        val shown = when (view) {
-            StencilView.ALL -> covered
-            StencilView.BLACK -> covered && (if (dark) true else rank == BLACK)
-            StencilView.GREY -> covered && (if (dark) rank >= GREY else rank <= GREY)
-            StencilView.WHITE -> covered && (if (dark) rank == WHITE else true)
-        }
-        if (!shown) 0 else when (view) {
-            StencilView.ALL -> when (rank) {
-                BLACK -> ARGB_BLACK
-                GREY -> ARGB_GREY
-                else -> ARGB_WHITE
+    fun render(ranks: IntArray, view: StencilView, dark: Boolean): IntArray {
+        val baseColor = if (dark) ARGB_BLACK else ARGB_WHITE
+        val secondaryColor = if (dark) ARGB_WHITE else ARGB_BLACK
+        val secondaryRank = if (dark) WHITE else BLACK
+        return IntArray(ranks.size) { i ->
+            val rank = ranks[i]
+            if (rank == NONE) return@IntArray 0
+            when (view) {
+                StencilView.ALL -> when (rank) {
+                    BLACK -> ARGB_BLACK
+                    GREY -> ARGB_GREY
+                    else -> ARGB_WHITE
+                }
+                StencilView.BASE -> baseColor
+                StencilView.MIDTONE -> if (if (dark) rank >= GREY else rank <= GREY) ARGB_GREY else 0
+                StencilView.SECONDARY -> if (rank == secondaryRank) secondaryColor else 0
             }
-            StencilView.BLACK -> ARGB_BLACK
-            StencilView.GREY -> ARGB_GREY
-            StencilView.WHITE -> ARGB_WHITE
         }
     }
+
+    /** The colours of the sheets in cycler order after ALL: base, midtone, secondary. */
+    fun sheetOrder(dark: Boolean): List<Int> = if (dark) listOf(BLACK, GREY, WHITE) else listOf(WHITE, GREY, BLACK)
 }
