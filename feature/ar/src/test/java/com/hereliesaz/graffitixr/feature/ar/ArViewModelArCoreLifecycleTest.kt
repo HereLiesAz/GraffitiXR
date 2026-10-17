@@ -82,6 +82,10 @@ class ArViewModelArCoreLifecycleTest {
         mockkObject(ArAvailabilityChecker)
         coEvery { ArAvailabilityChecker.check(any()) } returns ArAvailabilityChecker.Result.Supported
         every { settingsRepository.ambientScanEnabled } returns flowOf(true)
+        // Pinned off: these lifecycle tests are about teardown ordering, not the shipped defaults.
+        every { settingsRepository.driftCorrectionEnabled } returns flowOf(false)
+        every { settingsRepository.selfGrowEnabled } returns flowOf(false)
+        every { settingsRepository.featureMapEnabled } returns flowOf(false)
         every { settingsRepository.isRightHanded } returns flowOf(true)
         every { settingsRepository.showAnchorBoundary } returns flowOf(false)
         every { settingsRepository.isImperialUnits } returns flowOf(false)

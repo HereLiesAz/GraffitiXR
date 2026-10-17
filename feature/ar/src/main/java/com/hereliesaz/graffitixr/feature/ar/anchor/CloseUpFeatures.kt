@@ -58,7 +58,7 @@ internal object CloseUpFeatures {
         // actually sees, so they are the most integral and are learned (and installed) first.
         for (i in (distance - 1) downTo 1) {
             val zoom = distance.toFloat() / i
-            if (zoom < MIN_ZOOM) break
+            if (zoom < MIN_ZOOM) continue
             val n = settings.aimsPerSide(i - 1)
             val w = max(1, (width / zoom).roundToInt())
             val h = max(1, (height / zoom).roundToInt())

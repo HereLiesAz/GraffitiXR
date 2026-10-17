@@ -991,6 +991,8 @@ class ArViewModelTest {
      */
     @Test
     fun `attaching re-applies the self-grow intent`() = runTest {
+        // Self-grow now defaults on, so the init-time restore has already written `true` once.
+        io.mockk.clearMocks(slamManager, answers = false)
         viewModel.evalSetSelfGrowEnabled(true)
         viewModel.attachSessionToRenderer(null)
         verify(exactly = 2) { slamManager.setSelfGrowEnabled(true) }
