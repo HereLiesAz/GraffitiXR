@@ -1168,14 +1168,45 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
         mapMutated = true;
     }
 
-    // Confidence-prune when at capacity so the map keeps refreshing within the cap (drop points that
-    // never earned a re-observation). Compacts all four parallel arrays + the descriptor matrix.
-    const size_t kMapCap = 5000;
+    // Prune when at capacity so the map keeps refreshing within the cap. Compacts all four parallel
+    // arrays + the descriptor matrix.
+    //
+    // Points whose confidence has decayed to nothing (see the miss decay below: the camera predicted
+    // them in view and the wall no longer showed them: paint over, or a ladder that was moved) go
+    // first. If that is not enough, the lowest-scoring points go until a tenth of the cap is free.
+    // A point seen only once is ranked above every established one, so fresh paint is not the first
+    // thing evicted: this used to keep everything at >= 0.2, which discarded exactly the
+    // never-yet-re-seen points (new paint) and kept stale bare-wall points forever, because
+    // confidence only ever went up.
+    constexpr size_t kMapCap = 5000;
+    constexpr float kMapDeadConfidence = 0.02f;
+    constexpr float kMapFreshProtect = 1.0f;
+    constexpr float kMapMissDecay = 0.01f;
     if (mMapPoints3D.size() >= kMapCap) {
+        const size_t n = mMapPoints3D.size();
+        std::vector<char> drop(n, 0);
+        size_t dropped = 0;
+        for (size_t i = 0; i < n; ++i)
+            if (mMapConfidence[i] <= kMapDeadConfidence) { drop[i] = 1; ++dropped; }
+        const size_t target = kMapCap - kMapCap / 10;
+        if (n - dropped > target) {
+            auto score = [&](size_t i) {
+                const float c = mMapConfidence[i];
+                // Seen once: ranked above every established point (whose confidence is <= 1), and by
+                // its own confidence among the other fresh ones, so it leaves only once it decays.
+                return (mMapObs[i] <= 1) ? kMapFreshProtect + c : c;
+            };
+            std::vector<size_t> alive;
+            alive.reserve(n - dropped);
+            for (size_t i = 0; i < n; ++i) if (!drop[i]) alive.push_back(i);
+            std::sort(alive.begin(), alive.end(),
+                      [&](size_t x, size_t y) { return score(x) < score(y); });
+            const size_t extra = (n - dropped) - target;
+            for (size_t k = 0; k < extra; ++k) drop[alive[k]] = 1;
+        }
         std::vector<size_t> kept;
-        kept.reserve(mMapPoints3D.size());
-        for (size_t i = 0; i < mMapPoints3D.size(); ++i)
-            if (mMapConfidence[i] >= 0.2f) kept.push_back(i);
+        kept.reserve(n);
+        for (size_t i = 0; i < n; ++i) if (!drop[i]) kept.push_back(i);
         std::vector<cv::Point3f> np; np.reserve(kept.size());
         std::vector<float> nc; nc.reserve(kept.size());
         std::vector<int> no; no.reserve(kept.size());
@@ -1188,7 +1219,7 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
                 mMapDescriptors.row((int)i).copyTo(nd.row((int)idx));
             }
         }
-        if (kept.size() != mMapPoints3D.size()) mapMutated = true;
+        if (kept.size() != n) mapMutated = true;
         mMapPoints3D.swap(np); mMapConfidence.swap(nc); mMapObs.swap(no); mMapDescriptors = nd;
     }
 
@@ -1209,6 +1240,7 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
 
     // Associate detected features to the existing map by descriptor; bump confidence on re-observation.
     std::vector<char> matched(kps.size(), 0);
+    std::vector<char> mapSeen(mMapPoints3D.size(), 0);
     if (mMapDescriptors.rows >= 2) {   // knnMatch(k=2) needs >=2 candidates for the Lowe ratio
         cv::Ptr<cv::DescriptorMatcher>& matcher = (descs.type() == CV_32F) ? mL2Matcher : mMatcher;
         std::vector<std::vector<cv::DMatch>> matches;
@@ -1223,8 +1255,27 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
                     mMapObs[ti] += 1;
                     mapMutated = true;
                     matched[qi] = 1;
+                    mapSeen[(size_t)ti] = 1;
                 }
             }
+        }
+    }
+
+    // Miss decay. A map point the camera predicts is in view (projected through this lock's pose,
+    // inside the frame) that was NOT re-observed loses a little confidence, so paint that has since
+    // covered it, or a ladder that has moved, eventually falls out of the map instead of staying at
+    // its old confidence forever. Small on purpose: a few missed frames must not cost a good point.
+    {
+        const double frameW = 2.0 * cx, frameH = 2.0 * cy;
+        for (size_t i = 0; i < mMapPoints3D.size(); ++i) {
+            if (mapSeen[i] || mMapConfidence[i] <= 0.0f) continue;
+            const cv::Point3f& P = mMapPoints3D[i];
+            const glm::vec4 pc = camFromFp * glm::vec4(P.x, P.y, P.z, 1.0f);
+            if (!(pc.z > 0.1f)) continue;
+            const double u = fx * pc.x / pc.z + cx, v = fy * pc.y / pc.z + cy;
+            if (!std::isfinite(u) || !std::isfinite(v) || u < 0.0 || v < 0.0 || u > frameW || v > frameH) continue;
+            mMapConfidence[i] = std::max(0.0f, mMapConfidence[i] - kMapMissDecay);
+            mapMutated = true;
         }
     }
 
@@ -1571,8 +1622,16 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
             mArtworkCorroborated.size() == (size_t)artDescs.rows) {
             everCorroborated = 0;
             if (mArtworkPromoted.size() != (size_t)artDescs.rows) mArtworkPromoted.assign(artDescs.rows, 0);
-            const bool canPromote = mPaintDescriptors.empty() ||
-                (mPaintDescriptors.type() == artDescs.type() && mPaintDescriptors.cols == artDescs.cols);
+            // Paint-mark promotion rewrites the reloc set just as self-grow does, so it answers to the
+            // same switch AND the same trust gate (inlier ratio and spread of THIS pose). It used to
+            // run ahead of both: switching self-grow off did not stop it, and a clustered, badly
+            // rotated lock could confirm design features at wrong positions and have them saved
+            // for good. Counting toward progress is unaffected; only the promotion is gated.
+            const bool paintTrusted = mSelfGrowEnabled.load(std::memory_order_relaxed) &&
+                growTrusted(mPnpInlierCount.load(std::memory_order_relaxed),
+                            mPnpMatchCount.load(std::memory_order_relaxed), mPnpInlierSpread);
+            const bool canPromote = paintTrusted && (mPaintDescriptors.empty() ||
+                (mPaintDescriptors.type() == artDescs.type() && mPaintDescriptors.cols == artDescs.cols));
             const glm::mat4 fpFromDesignM = glm::make_mat4(fpFromDesign);
             for (int a = 0; a < artDescs.rows; ++a) {
                 uint8_t& c = mArtworkCorroborated[(size_t)a];
