@@ -457,6 +457,13 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
     // apart: they must agree about which fingerprint is partitioned or the diagnostics describe
     // a different point set from the one PnP saw.
     const bool usePartition = wallRegions.size() == wallKps3d.size();
+    // A partition that leaves (almost) nothing outside the artwork cannot localize anything, and
+    // paint marks, which only appear after a lock, can never bootstrap from nothing. Fall back to
+    // every stored mark: the originals under the artwork still match until they are painted over,
+    // which is far better than a permanent FEW_MATCHES. Counted from the same regions.
+    const int outsideMarks = usePartition
+        ? (int)std::count(wallRegions.begin(), wallRegions.end(), kRegionOutside) : 0;
+    const bool partitionActive = usePartition && outsideMarks >= kMinBackboneMarks;
     // 2.11: how many stored points PnP is allowed to draw on. An UNPARTITIONED fingerprint is
     // 2.7's legacy all-backbone case, so it reports its FULL point count — not zero, and not the
     // -1 sentinel. Zero here is a real measurement meaning F_out is empty (the artwork covers
@@ -544,7 +551,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
                 // work surface — they decay as it is painted, which is exactly what makes
                 // accuracy degrade with task progress. BAND straddles the edge and is trusted by
                 // neither side. Corroboration against F_in happens later, once a pose exists.
-                if (usePartition && wallRegions[match[0].trainIdx] != kRegionOutside) continue;
+                if (partitionActive && wallRegions[match[0].trainIdx] != kRegionOutside) continue;
                 if (corrSeen[match[0].trainIdx]) continue;
                 corrSeen[match[0].trainIdx] = 1;
                 cv::Point2f p = kps[match[0].queryIdx].pt;
@@ -559,7 +566,8 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
                 // non-OUTSIDE rows were skipped, and without one because 2.7's zero-length rule
                 // makes the whole fingerprint backbone. Recorded per correspondence rather than
                 // counted, because the inlier attribution below indexes back through this.
-                outFromBackbone.push_back(1);
+                outFromBackbone.push_back(
+                    (!usePartition || wallRegions[match[0].trainIdx] == kRegionOutside) ? 1 : 0);
             }
         }
     };
@@ -844,7 +852,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
         // production default and keeps this inert outside an eval run.
         const long long evalSeed = mEvalRngSeed.load(std::memory_order_relaxed);
         if (evalSeed >= 0) cv::theRNG().state = (uint64_t)evalSeed;
-        if (!cv::solvePnPRansac(objPts, imgPts, intr, cv::Mat(), rvec, tvec, false, 100, 8.0, 0.99, inliers)) {
+        if (!cv::solvePnPRansac(objPts, imgPts, intr, cv::Mat(), rvec, tvec, false, kPnpRansacIterations, 8.0, kPnpRansacConfidence, inliers)) {
             mLastRelocReject.store(kRelocPnpFailed, std::memory_order_relaxed);
         } else {
             mLastRelocInliers.store((int)inliers.size(), std::memory_order_relaxed);
@@ -942,12 +950,17 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
                         // atomics only because a few diagnostics read them without the lock.)
                         mPnpInlierCount.store((int)inliers.size(), std::memory_order_relaxed);
                         mPnpMatchCount.store((int)imgPts.size(), std::memory_order_relaxed);
+                        mPnpInlierSpread = mLastRelocInlierSpread.load(std::memory_order_relaxed);
                         mPnpResultSeq.fetch_add(1, std::memory_order_relaxed);
                         published = true;
                     }
                 }
                 if (!published) {
                     LOGI("Relocalization: dropped a PnP solve made against a replaced fingerprint");
+                    // Nothing was published, so the previous attempt's reject code must not stand:
+                    // kRelocOk left over here would tell the corroboration gate that
+                    // mPnpCamFromFpWorld describes THIS frame.
+                    mLastRelocReject.store(kRelocPnpFailed, std::memory_order_relaxed);
                 } else {
                     mLastRelocReject.store(kRelocOk, std::memory_order_relaxed);
                     LOGI("Relocalization: PnP match published (%zu/%zu inliers)", inliers.size(), imgPts.size());
@@ -1389,6 +1402,8 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     const bool gated = gateReason == kCorrobGated;
 
     std::vector<char> hit(artDescs.rows, 0);
+    std::vector<char> observed(artDescs.rows, 0);   // predicted visible AND had a real ratio test
+    std::vector<int> hitQuery(artDescs.rows, -1);   // the live keypoint that corroborated feature a
     std::vector<int> validQuery;   // clean keypoints that corroborate the artwork (self-grow candidates)
     int matched = 0;
     int predicted = -1;            // -1 = no gated attempt ran; 0 is a real reading
@@ -1491,6 +1506,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
                 if (cand.size() == 1) ++loneCandidateSkips;
                 continue;
             }
+            observed[a] = 1;
             float best = FLT_MAX, second = FLT_MAX;
             int bestQ = -1;
             for (int q : cand) {
@@ -1501,6 +1517,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
             if (bestQ < 0) continue;
             if (best < kCorrobLoweRatio * second) {
                 hit[a] = 1;
+                hitQuery[a] = bestQ;
                 ++matched;
                 validQuery.push_back(bestQ);
             }
@@ -1559,7 +1576,12 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
             const glm::mat4 fpFromDesignM = glm::make_mat4(fpFromDesign);
             for (int a = 0; a < artDescs.rows; ++a) {
                 uint8_t& c = mArtworkCorroborated[(size_t)a];
-                if (hit[a] && c < kCorrobConfirmations) ++c;
+                // CONSECUTIVE confirmations: a feature that was predicted in view, tested, and NOT
+                // matched drops back to zero until confirmed. Counting hits ever let two chance
+                // matches on bare wall, hundreds of attempts apart, mark a feature painted for good.
+                // Once confirmed it stays (progress is cumulative); only unconfirmed ones reset.
+                if (hit[a]) { if (c < kCorrobConfirmations) ++c; }
+                else if (observed[a] && c < kCorrobConfirmations) c = 0;
                 if (c >= kCorrobConfirmations) ++everCorroborated;
                 // Teleological promotion: a confirmed design feature is paint on the wall, at the
                 // place the design put it. It joins the reloc reference set (see kMaxPaintMarks).
@@ -1574,8 +1596,17 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
                         if (std::abs(q.x - X.x) < 0.005f && std::abs(q.y - X.y) < 0.005f &&
                             std::abs(q.z - X.z) < 0.005f) { dup = true; break; }
                     if (!dup && std::isfinite(X.x) && std::isfinite(X.y) && std::isfinite(X.z)) {
+                        // The descriptor is what the camera SAW (the live keypoint that corroborated
+                        // this feature), not the flat digital composite's: reloc later matches live
+                        // frames against it, and real paint differs from the composite in colour,
+                        // sheen and texture. Falls back to the composite's only if the live row is
+                        // unavailable. The point stays where the design puts the feature, which is
+                        // where the wall was confirmed to show it.
+                        const int q = hitQuery[(size_t)a];
+                        const bool haveLive = q >= 0 && q < descs.rows && descs.cols == artDescs.cols &&
+                            descs.type() == artDescs.type();
                         mPaintPoints3D.emplace_back(X.x, X.y, X.z);
-                        mPaintDescriptors.push_back(artDescs.row(a));
+                        mPaintDescriptors.push_back(haveLive ? descs.row(q) : artDescs.row(a));
                     }
                     mArtworkPromoted[(size_t)a] = 1;
                 }
@@ -1626,6 +1657,15 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
             if (!gridActive) mPaintingProgress.store(featureProgress, std::memory_order_relaxed);
         }
     }
+    if (mDistortionHead.isLoaded() && gated && predicted > 0) {
+        // The head compares the live view with the capture patch of the ORIGINAL marks, so its
+        // matchability falls as those are painted over, which is the opposite of the teleological
+        // claim. The descriptor ratio is measured against the design itself and does not. Trust the
+        // stronger of the two, so a mural that is mostly painted is not penalised for it.
+        const float descConf = (float)matched / (float)predicted;
+        if (descConf > mCorroborationConfidence.load(std::memory_order_relaxed))
+            mCorroborationConfidence.store(descConf, std::memory_order_relaxed);
+    }
     if (!mDistortionHead.isLoaded()) {
         if (gated) {
             // 4.8: zero predicted-visible is "the artist is not looking at the design", NOT "the
@@ -1654,7 +1694,8 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     // that matches the target — surviving the original marks being painted over. Depth-free: each new
     // feature is placed on the wall plane via the current relocalized pose. Guarded hard (fresh +
     // confident relock, gatekeeper-validated, capped, deduped) and RANSAC in the reloc PnP is the
-    // backstop, but it still mutates the authoritative set, so it stays OFF unless explicitly enabled.
+    // backstop, but it still mutates the authoritative set, so it only runs when the app has enabled
+    // it (its persisted setting, default on; see MobileGS.h).
     if (!mSelfGrowEnabled.load(std::memory_order_relaxed)) {
         mGrowOutcome.store(kGrowDisabled, std::memory_order_relaxed);
         return;
@@ -1670,8 +1711,10 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     cv::Matx33d R; cv::Vec3d t; double fx, fy, cx, cy; int inliers; int pnpMatches; long seq;
     float spread = kPromotionNotMeasured; bool trusted = false;
     std::vector<cv::Point3f> wall;
+    uint64_t growFingerprintGeneration = 0;
     {
         std::lock_guard<std::mutex> lock(mMutex);
+        growFingerprintGeneration = mFingerprintGeneration;
         seq = mPnpResultSeq.load(std::memory_order_relaxed);
         if (seq == mLastGrowSeq) {                // no fresh relock this tick — pose would be stale
             mGrowOutcome.store(kGrowStaleSeq, std::memory_order_relaxed);
@@ -1753,6 +1796,11 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         bool dup = false;
         for (const auto& w : wall)
             if (std::abs(w.x-Xp.x) < 0.01f && std::abs(w.y-Xp.y) < 0.01f && std::abs(w.z-Xp.z) < 0.01f) { dup = true; break; }
+        // Several design features can be won by the same live keypoint, so dedupe within this batch
+        // as well as against the stored wall.
+        if (!dup)
+            for (const auto& w : newPts)
+                if (std::abs(w.x-Xp.x) < 0.01f && std::abs(w.y-Xp.y) < 0.01f && std::abs(w.z-Xp.z) < 0.01f) { dup = true; break; }
         if (dup) continue;
         newPts.push_back(Xp);
         newDescs.push_back(descs.row(q));
@@ -1769,6 +1817,13 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     int outsideN = 0, insideN = 0, bandN = 0;
     {
         std::lock_guard<std::mutex> lock(mMutex);
+        // The points above were solved against the fingerprint of growFingerprintGeneration; if it was
+        // replaced or cleared while this ran they are in the OLD wall's frame and must not be
+        // appended to the new one.
+        if (growFingerprintGeneration != mFingerprintGeneration) {
+            mGrowOutcome.store(kGrowStaleSeq, std::memory_order_relaxed);
+            return;
+        }
         if (mWallDescriptors.type() != newDescs.type() || mWallDescriptors.cols != newDescs.cols ||
             mWallKeypoints3D.size() >= kMaxWallMarks) {
             mGrowOutcome.store(
@@ -1813,7 +1868,12 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
                 if (region == kRegionOutside) ++promotedOutside;
                 else if (region == kRegionInside) ++promotedInside;
                 else ++promotedBand;
-                mWallRegions.push_back(region);
+                // Tagged OUTSIDE whatever Φ said (the counts above still report it). These are LIVE
+                // features the wall has just corroborated against the design, placed where they were
+                // SEEN: the very paint the teleological loop wants relocalization to use. Tagging
+                // them INSIDE/BAND, as their position under the artwork would, put them where the
+                // reloc filter refuses to look, so self-grow only used up slots.
+                mWallRegions.push_back(kRegionOutside);
             }
         }
         // Snapshot inside the lock: these feed a log line below, and reading the containers after
@@ -1892,6 +1952,7 @@ void MobileGS::invalidateRelocResultLocked() {
     memset(mPnpIntrinsics, 0, 4 * sizeof(float));
     mPnpInlierCount.store(0, std::memory_order_relaxed);
     mPnpMatchCount.store(0, std::memory_order_relaxed);
+    mPnpInlierSpread = -1.0f;
     mLastRelocReject.store(kRelocNoFingerprint, std::memory_order_relaxed);
 }
 
@@ -1929,9 +1990,37 @@ void MobileGS::restoreWallFingerprintMetric(const cv::Mat& d, const std::vector<
     // Phase-2 repartition path, a standalone session re-seeding the same page) is the same wall,
     // and dropping its patch there would silently switch the head off for the rest of the
     // session; only the content decides, not the call.
-    const bool sameFingerprint = p == mWallKeypoints3D && d.rows == mWallDescriptors.rows &&
+    //
+    // The stored set may also be that same fingerprint PLUS marks self-grow has appended since. The
+    // Kotlin copy a repartition re-pushes is only the base, so it never equals the grown native set;
+    // treat "the base is an exact prefix of what is stored" as the same fingerprint, keep the grown
+    // tail (and the patch), and re-partition only the base. Without this the first design move
+    // after any growth wiped the grown marks and silently switched the distortion head off.
+    const size_t baseN = p.size();
+    const bool growthOfSame = baseN > 0 && mWallKeypoints3D.size() > baseN &&
+        d.rows == (int)baseN && d.cols == mWallDescriptors.cols && d.type() == mWallDescriptors.type() &&
+        std::equal(p.begin(), p.end(), mWallKeypoints3D.begin()) &&
+        cv::norm(d, mWallDescriptors.rowRange(0, (int)baseN), cv::NORM_INF) == 0.0;
+    cv::Mat useD = d;
+    std::vector<cv::Point3f> useP = p;
+    std::vector<uint8_t> useRegions = regions;
+    if (growthOfSame) {
+        const size_t total = mWallKeypoints3D.size();
+        cv::Mat merged = d.clone();
+        merged.push_back(mWallDescriptors.rowRange((int)baseN, (int)total).clone());
+        useD = merged;
+        useP.insert(useP.end(), mWallKeypoints3D.begin() + baseN, mWallKeypoints3D.end());
+        if (regions.size() == baseN) {
+            useRegions = regions;
+            if (mWallRegions.size() == total) useRegions.insert(useRegions.end(), mWallRegions.begin() + baseN, mWallRegions.end());
+            else useRegions.insert(useRegions.end(), total - baseN, kRegionOutside);
+        } else {
+            useRegions.clear();
+        }
+    }
+    const bool sameFingerprint = growthOfSame || (p == mWallKeypoints3D && d.rows == mWallDescriptors.rows &&
         d.cols == mWallDescriptors.cols && d.type() == mWallDescriptors.type() &&
-        (d.empty() || cv::norm(d, mWallDescriptors, cv::NORM_INF) == 0.0);
+        (d.empty() || cv::norm(d, mWallDescriptors, cv::NORM_INF) == 0.0));
     if (!sameFingerprint) mWallPatch.release();
     // A re-push of the identical point set (repartition) keeps the standing result: the pose is still
     // in this fingerprint's frame. Any other content is a different wall -- or a different anchor and
@@ -1940,12 +2029,12 @@ void MobileGS::restoreWallFingerprintMetric(const cv::Mat& d, const std::vector<
         (!anchorMatrix16 || memcmp(anchorMatrix16, mFingerprintAnchorMatrix, 16 * sizeof(float)) == 0) &&
         (!intrinsics4 || memcmp(intrinsics4, mFingerprintIntrinsics, 4 * sizeof(float)) == 0);
     if (!sameFrame) invalidateRelocResultLocked();
-    mWallDescriptors = d.clone();
-    mWallKeypoints3D = p;
+    mWallDescriptors = useD.clone();
+    mWallKeypoints3D = useP;
     // Belt and braces over the JNI-side length check: a partition that does not index the points it
     // is stored beside is worse than no partition, and this is the last place it can be refused
     // before the reloc thread subscripts it. Empty = all backbone = pre-Phase-2 behaviour.
-    mWallRegions = (regions.size() == p.size()) ? regions : std::vector<uint8_t>();
+    mWallRegions = (useRegions.size() == useP.size()) ? useRegions : std::vector<uint8_t>();
     if (anchorMatrix16) memcpy(mFingerprintAnchorMatrix, anchorMatrix16, 16 * sizeof(float));
     if (intrinsics4)    memcpy(mFingerprintIntrinsics, intrinsics4, 4 * sizeof(float));
     if (viewMatrix16) {
@@ -2035,10 +2124,22 @@ void MobileGS::setDesignPlacement(const float* fpFromDesign16, float halfW, floa
     for (int i = 0; i < 16; ++i) {
         if (!std::isfinite(fpFromDesign16[i])) { mHasDesignPlacement = false; return; }
     }
+    // A real move invalidates what was confirmed under the old placement: features corroborated at
+    // the old spot would still count toward progress, and already-promoted ones could never be
+    // promoted again where the design now is. (A re-push of the same placement, as a load or a
+    // repartition does, changes nothing.) The paint marks already on the wall are kept: they are
+    // real paint at real wall positions, whatever the design does next.
+    bool moved = !mHasDesignPlacement || mDesignHalfW != halfW || mDesignHalfH != halfH;
+    for (int i = 0; i < 16 && !moved; ++i)
+        if (std::abs(mDesignFpFromDesign[i] - fpFromDesign16[i]) > 1e-3f) moved = true;
     memcpy(mDesignFpFromDesign, fpFromDesign16, 16 * sizeof(float));
     mDesignHalfW = halfW;
     mDesignHalfH = halfH;
     mHasDesignPlacement = true;
+    if (moved) {
+        std::fill(mArtworkCorroborated.begin(), mArtworkCorroborated.end(), (uint8_t)0);
+        std::fill(mArtworkPromoted.begin(), mArtworkPromoted.end(), (uint8_t)0);
+    }
 }
 
 void MobileGS::restoreWallFeatureMap(const cv::Mat& d, const std::vector<cv::Point3f>& p,
@@ -3168,13 +3269,16 @@ int MobileGS::getPaintMarkCount() const {
     return (int)mPaintPoints3D.size();
 }
 
-void MobileGS::getRelocResult(float* out, bool withSolveView) const {
+void MobileGS::getRelocResult(float* out, bool withSolveView, bool withSpread) const {
     std::lock_guard<std::mutex> lock(mMutex);
     memcpy(out, mPnpCamFromFpWorld, 16 * sizeof(float));
     out[16] = (float) mPnpInlierCount.load(std::memory_order_relaxed);
     out[17] = (float) mPnpMatchCount.load(std::memory_order_relaxed);
     out[18] = (float) mPnpResultSeq.load(std::memory_order_relaxed);
     if (withSolveView) memcpy(out + 19, mPnpSolveView, 16 * sizeof(float));
+    // [35]: how far the inliers span the frame (a fraction of its area), or negative when it was not
+    // measured. Written only when the caller's buffer has the slot (withSpread).
+    if (withSpread) out[35] = mPnpInlierSpread;
 }
 void MobileGS::getFingerprintAnchor(float* out16) const {
     std::lock_guard<std::mutex> lock(mMutex);

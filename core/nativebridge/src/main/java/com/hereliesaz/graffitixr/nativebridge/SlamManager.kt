@@ -832,7 +832,8 @@ class SlamManager @Inject constructor(
 
     /**
      * Pose fusion (B): [0..15] PnP camera_from_fp, 16 inliers, 17 matches, 18 seq, [19..34] view
-     * matrix of the solve frame. Allocates a fresh array per call, which is fine off the render
+     * matrix of the solve frame, [35] the solve's inlier spread (fraction of the frame's area, or
+     * negative when not measured). Allocates a fresh array per call, which is fine off the render
      * loop; the GL thread reads it up to three times a frame and uses [getRelocResultInto].
      */
     fun getRelocResult(): FloatArray = getRelocResultInto(FloatArray(RELOC_RESULT_SIZE))
@@ -1091,8 +1092,8 @@ class SlamManager @Inject constructor(
     companion object {
         private const val TAG = "SlamManager"
 
-        /** Floats in a full reloc result: 19 pose/counter slots + the 16-float solve-frame view. */
-        const val RELOC_RESULT_SIZE = 35
+        /** Floats in a full reloc result: 19 pose/counter slots + the 16-float solve-frame view + the inlier spread. */
+        const val RELOC_RESULT_SIZE = 36
 
         /**
          * How long a capture waits for the anchor to be established before giving up.

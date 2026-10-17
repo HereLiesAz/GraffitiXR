@@ -25,6 +25,7 @@ set(GLM_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../libs/glm)
 add_executable(native_host_tests
     MobileGSFingerprintStateTest.cpp
     MobileGSRelocTest.cpp
+    MobileGSTeleologicalTest.cpp
     SuperPointDetectorTest.cpp
     FrameBufferGuardTest.cpp
     DepthScaleFitTest.cpp

@@ -39,4 +39,42 @@ struct MobileGSTestPeer {
         g.growMapFromReloc(camFromFp, kps, descs, fx, fy, cx, cy);
     }
     static std::vector<cv::Point3f> mapPoints(MobileGS& g) { return g.mMapPoints3D; }
+    static void setWallRegions(MobileGS& g, const std::vector<uint8_t>& r) {
+        std::lock_guard<std::mutex> lock(g.mMutex);
+        g.mWallRegions = r;
+    }
+    static size_t wallPointCount(MobileGS& g) {
+        std::lock_guard<std::mutex> lock(g.mMutex);
+        return g.mWallKeypoints3D.size();
+    }
+    static size_t wallRegionCount(MobileGS& g) {
+        std::lock_guard<std::mutex> lock(g.mMutex);
+        return g.mWallRegions.size();
+    }
+    // What self-grow does to the stored set, without running the detector: append [pts] with [descs].
+    static void appendGrown(MobileGS& g, const std::vector<cv::Point3f>& pts, const cv::Mat& descs, uint8_t region) {
+        std::lock_guard<std::mutex> lock(g.mMutex);
+        for (int i = 0; i < (int)pts.size(); ++i) {
+            g.mWallKeypoints3D.push_back(pts[(size_t)i]);
+            g.mWallDescriptors.push_back(descs.row(i));
+            if (!g.mWallRegions.empty()) g.mWallRegions.push_back(region);
+        }
+    }
+    static void setPnpSpread(MobileGS& g, float v) {
+        std::lock_guard<std::mutex> lock(g.mMutex);
+        g.mPnpInlierSpread = v;
+    }
+    static void setCorroborated(MobileGS& g, const std::vector<uint8_t>& c) {
+        std::lock_guard<std::mutex> lock(g.mMutex);
+        g.mArtworkCorroborated = c;
+        g.mArtworkPromoted.assign(c.size(), 1);
+    }
+    static std::vector<uint8_t> corroborated(MobileGS& g) {
+        std::lock_guard<std::mutex> lock(g.mMutex);
+        return g.mArtworkCorroborated;
+    }
+    static std::vector<uint8_t> promoted(MobileGS& g) {
+        std::lock_guard<std::mutex> lock(g.mMutex);
+        return g.mArtworkPromoted;
+    }
 };
