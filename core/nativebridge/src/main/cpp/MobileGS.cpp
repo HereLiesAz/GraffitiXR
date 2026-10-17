@@ -56,6 +56,10 @@ inline float intensityCentroidAngle(const cv::Mat& gray, const cv::Point2f& p) {
     return a < 0 ? a + 360.0f : a;
 }
 
+// Lowe's ratio for registering the clean-wall photo to the capture photo (two photos of the same wall,
+// so the ordinary 0.75). Named, so it is not mistaken for the reloc or corroboration ratios.
+constexpr float kCleanWallMatchRatio = 0.75f;
+
 // Result of matching one target set's features, each against the live keypoints near where the
 // design says it should be.
 struct GatedMatch {
@@ -3480,7 +3484,7 @@ void MobileGS::registerCleanWallLocked() {
         cv::BFMatcher(cv::NORM_HAMMING).knnMatch(cd, pd, knn, 2);
         std::vector<cv::Point2f> src, dst;
         for (const auto& m : knn) {
-            if (m.size() < 2 || !(m[0].distance < 0.75f * m[1].distance)) continue;
+            if (m.size() < 2 || !(m[0].distance < kCleanWallMatchRatio * m[1].distance)) continue;
             src.push_back(ck[(size_t)m[0].queryIdx].pt);
             dst.push_back(pk[(size_t)m[0].trainIdx].pt);
         }
