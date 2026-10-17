@@ -756,3 +756,26 @@ TEST(MobileGSTeleological, TheCvPreviewDrawsEveryPassesTargetsInTheDesignsOwnPix
     }
     g.destroy();
 }
+
+// A clean-wall photo taken from a little to one side registers, but its warp does not reach the whole
+// capture photo: the margin it cannot reach must be no-data, not the nearest edge colour repeated.
+TEST(MobileGSTeleological, TheUnsupportedMarginOfAShiftedCleanWallPhotoIsNoData) {
+    MobileGS g;
+    g.initialize(0, 0);
+    const float K[4] = {700.f, 700.f, 400.f, 300.f};
+    const cv::Mat wall = makeWall(800, 600, 0x51de);
+    g.setCaptureImage(wall, K);
+
+    ASSERT_TRUE(g.setCleanWallImage(wall));
+    const float same = MobileGSTestPeer::cleanWallSupportedFraction(g);
+    EXPECT_GT(same, 0.95f) << "an identical photo is supported nearly everywhere (only the eroded border is not)";
+
+    // The same wall seen 120 px to the left: its right-hand 120 px have nothing behind them.
+    cv::Mat shifted(wall.size(), wall.type(), cv::Scalar(128, 128, 128));
+    wall(cv::Rect(120, 0, 680, 600)).copyTo(shifted(cv::Rect(0, 0, 680, 600)));
+    ASSERT_TRUE(g.setCleanWallImage(shifted)) << "a shifted photo of the same wall should still register";
+    const float partial = MobileGSTestPeer::cleanWallSupportedFraction(g);
+    EXPECT_LT(partial, 0.9f) << "the margin the warp cannot reach counted as supported";
+    EXPECT_GT(partial, 0.6f);
+    g.destroy();
+}

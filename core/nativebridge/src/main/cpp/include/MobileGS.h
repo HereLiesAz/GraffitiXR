@@ -861,6 +861,7 @@ private:
     cv::Mat mCaptureRgb;                           // capture photo (fingerprint frame = its camera)
     cv::Mat mCleanWallRaw;                         // clean-wall photo as given (<= 640 px)
     cv::Mat mCleanWallRgb;                         // ... warped into the capture photo's pixels
+    cv::Mat mCleanWallValid;                       // 255 where the warp has real clean-wall pixels behind it
     std::atomic<int> mCleanWallStatus{kCleanNone};
     std::atomic<bool> mChangePassEnabled{false};
     void registerCleanWallLocked();                // needs mMutex; mCleanWallRaw -> mCleanWallRgb

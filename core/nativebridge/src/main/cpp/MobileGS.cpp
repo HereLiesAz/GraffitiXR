@@ -2345,7 +2345,7 @@ void MobileGS::clearWallFingerprint() {
     mCaptureRgb.release();
     // The registration was to that photo. The clean-wall photo itself stays (it is registered afresh
     // when the next capture photo arrives); clearCleanWallImage drops it.
-    mCleanWallRgb.release();
+    mCleanWallRgb.release(); mCleanWallValid.release();
     mCleanWallStatus.store(mCleanWallRaw.empty() ? kCleanNone : kCleanPending, std::memory_order_relaxed);
     ++mArtworkGeneration;
     mArtworkImageW = 0;
@@ -2582,7 +2582,7 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
         memset(mMapIntrinsics, 0, 4 * sizeof(float));
         mMapRevision.fetch_add(1, std::memory_order_relaxed);
         mCaptureRgb.release();
-        mCleanWallRgb.release();
+        mCleanWallRgb.release(); mCleanWallValid.release();
         mCleanWallStatus.store(mCleanWallRaw.empty() ? kCleanNone : kCleanPending, std::memory_order_relaxed);
         memset(mCaptureIntr, 0, 4 * sizeof(float));
     }
@@ -3462,7 +3462,7 @@ void MobileGS::setCaptureImage(const cv::Mat& img, const float* intr4) {
 }
 
 void MobileGS::registerCleanWallLocked() {
-    mCleanWallRgb.release();
+    mCleanWallRgb.release(); mCleanWallValid.release();
     if (mCleanWallRaw.empty()) { mCleanWallStatus.store(kCleanNone, std::memory_order_relaxed); return; }
     if (mCaptureRgb.empty()) { mCleanWallStatus.store(kCleanPending, std::memory_order_relaxed); return; }
     auto features = [&](const cv::Mat& rgb, std::vector<cv::KeyPoint>& kps, cv::Mat& descs) {
@@ -3497,7 +3497,14 @@ void MobileGS::registerCleanWallLocked() {
         }
     }
     if (!ok) { mCleanWallStatus.store(kCleanFailed, std::memory_order_relaxed); return; }
-    cv::warpPerspective(mCleanWallRaw, mCleanWallRgb, H, mCaptureRgb.size(), cv::INTER_LINEAR, cv::BORDER_REPLICATE);
+    // Where the homography reaches beyond the clean photo there is nothing real to compare with. Warp
+    // an all-valid mask beside the image (constant border, not replicated edge colour) and keep only
+    // cells well inside its support, so a shifted or turned photo leaves its unsupported margin as
+    // no-data instead of repeating the nearest edge colour.
+    cv::warpPerspective(mCleanWallRaw, mCleanWallRgb, H, mCaptureRgb.size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT);
+    cv::Mat support(mCleanWallRaw.size(), CV_8UC1, cv::Scalar(255));
+    cv::warpPerspective(support, mCleanWallValid, H, mCaptureRgb.size(), cv::INTER_NEAREST, cv::BORDER_CONSTANT);
+    cv::erode(mCleanWallValid, mCleanWallValid, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(9, 9)));
     mCleanWallStatus.store(kCleanRegistered, std::memory_order_relaxed);
     std::fill(mGrid.hasBaseClean.begin(), mGrid.hasBaseClean.end(), 0);
 }
@@ -3519,7 +3526,7 @@ bool MobileGS::setCleanWallImage(const cv::Mat& img) {
 void MobileGS::clearCleanWallImage() {
     std::lock_guard<std::mutex> lock(mMutex);
     mCleanWallRaw.release();
-    mCleanWallRgb.release();
+    mCleanWallRgb.release(); mCleanWallValid.release();
     mCleanWallStatus.store(kCleanNone, std::memory_order_relaxed);
     std::fill(mGrid.hasBaseClean.begin(), mGrid.hasBaseClean.end(), 0);
 }
@@ -3595,6 +3602,11 @@ void MobileGS::updatePaintGrid(const cv::Mat& colorFrame) {
     // 1b. Pass B: bare-wall colours from the clean-wall photo, once registered. Same sample points,
     //     same conditions as the capture photo above; only read while the user has the pass on.
     const bool changeOn = mChangePassEnabled.load(std::memory_order_relaxed) && !mCleanWallRgb.empty();
+    auto cleanSupported = [&](float u, float v) {
+        const int x = (int)std::lround(u), y = (int)std::lround(v);
+        return !mCleanWallValid.empty() && x >= 0 && y >= 0 && x < mCleanWallValid.cols && y < mCleanWallValid.rows &&
+               mCleanWallValid.at<uchar>(y, x) != 0;
+    };
     if (changeOn && mCaptureIntr[0] > 0 &&
         std::any_of(g.hasBaseClean.begin(), g.hasBaseClean.end(), [](uint8_t b) { return b == 0; }) &&
         fingerprintFrameIsCaptureCamera(mWallKeypoints3D)) {
@@ -3602,7 +3614,8 @@ void MobileGS::updatePaintGrid(const cv::Mat& colorFrame) {
         for (int e = 0; e < en; ++e) {
             if (g.hasBaseClean[e]) continue;
             float u, v; cv::Vec3f rgb;
-            if (project(fpFromDesign, centre(e), mCaptureIntr, u, v) && sampleRgb(mCleanWallRgb, u, v, 3, rgb)) {
+            if (project(fpFromDesign, centre(e), mCaptureIntr, u, v) && sampleRgb(mCleanWallRgb, u, v, 3, rgb) &&
+                cleanSupported(u, v)) {
                 idxs.push_back(e); cols.push_back(rgb);
             }
         }
@@ -3673,17 +3686,31 @@ void MobileGS::updatePaintGrid(const cv::Mat& colorFrame) {
 
     // 4b. Pass B: which cells differ from the CLEAN wall, and do the differing regions have the shape
     //     of a design patch? Colour plays no part in the second question.
-    std::vector<uint8_t> changeVerdict;
+    std::vector<uint8_t> changeVerdict;   // per DESIGN cell
     if (changeOn && (int)g.patch.size() == n) {
-        std::vector<uint8_t> chB((size_t)n, 0), judgedB((size_t)n, 0);
+        // Over the extended grid, so a change that runs out of the design into the ring or the
+        // transparent cells around it is seen as running out (those cells have no patch).
+        std::vector<uint8_t> chB((size_t)en, 0), judgedB((size_t)en, 0);
+        std::vector<int> patchExt((size_t)en, -1);
+        for (int e = 0; e < en; ++e) {
+            const int d = designIdx(e);
+            if (d >= 0 && g.weight[(size_t)d] > 0) patchExt[(size_t)e] = g.patch[(size_t)d];
+        }
         bool any = false;
         for (size_t j = 0; j < vis.size(); ++j) {
-            const int e = vis[j]; const int d = designIdx(e);
-            if (d < 0 || !isDesign(e) || !g.hasBaseClean[e]) continue;
-            judgedB[(size_t)d] = 1; any = true;
-            chB[(size_t)d] = colourDist(cur[j], g.baseClean[e]) > kGridChange;
+            const int e = vis[j];
+            if (!g.hasBaseClean[e]) continue;
+            judgedB[(size_t)e] = 1; any = true;
+            chB[(size_t)e] = colourDist(cur[j], g.baseClean[e]) > kGridChange;
         }
-        if (any) changeVerdict = shapematch::verdicts(chB, judgedB, g.patch, g.cols, g.rows);
+        if (any) {
+            const std::vector<uint8_t> ext = shapematch::verdicts(chB, judgedB, patchExt, ec, er);
+            changeVerdict.assign((size_t)n, (uint8_t)passes::kNoData);
+            for (int d = 0; d < n; ++d) {
+                const int e = (d / g.cols + 1) * ec + (d % g.cols + 1);
+                changeVerdict[(size_t)d] = ext[(size_t)e];
+            }
+        }
     }
 
     // 5. Verdicts per opaque design cell. Each pass votes (see PassEvidence.h); the cell is confirmed
