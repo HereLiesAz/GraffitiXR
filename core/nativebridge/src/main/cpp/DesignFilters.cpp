@@ -1,5 +1,6 @@
 #include "include/DesignFilters.h"
 #include <opencv2/imgproc.hpp>
+#include <opencv2/features2d.hpp>
 #include <algorithm>
 
 namespace designfilters {
@@ -163,11 +164,32 @@ std::vector<cv::Point2f> locations(const cv::Mat& filtered, int maxPoints, int b
     std::vector<cv::Point2f> pts;
     if (filtered.empty() || filtered.type() != CV_8UC1 || maxPoints <= 0) return pts;
     if (filtered.cols <= 2 * border || filtered.rows <= 2 * border) return pts;
-    std::vector<cv::Point2f> raw;
-    const double minDist = std::max(8.0, std::min(filtered.cols, filtered.rows) / 40.0);
-    cv::goodFeaturesToTrack(filtered, raw, maxPoints * 2, 0.02, minDist, cv::noArray(), 5);
-    for (const auto& p : raw) {
+    // FAST corners, strongest first, thinned so no two are closer than minDist. (Not
+    // goodFeaturesToTrack: OpenCV 5 moved it out of imgproc, and the Android build is OpenCV 5.)
+    const int minDist = (int)std::max(8.0, std::min(filtered.cols, filtered.rows) / 40.0);
+    std::vector<cv::KeyPoint> kps;
+    cv::FastFeatureDetector::create(20, true)->detect(filtered, kps);
+    std::sort(kps.begin(), kps.end(), [](const cv::KeyPoint& a, const cv::KeyPoint& b) { return a.response > b.response; });
+    const int gw = filtered.cols / minDist + 1, gh = filtered.rows / minDist + 1;
+    std::vector<char> taken((size_t)gw * gh, 0);
+    for (const auto& k : kps) {
+        const cv::Point2f p = k.pt;
         if (p.x < border || p.y < border || p.x >= filtered.cols - border || p.y >= filtered.rows - border) continue;
+        const int cx = (int)p.x / minDist, cy = (int)p.y / minDist;
+        bool near = false;
+        for (int dy = -1; dy <= 1 && !near; ++dy) for (int dx = -1; dx <= 1 && !near; ++dx) {
+            const int nx = cx + dx, ny = cy + dy;
+            if (nx < 0 || ny < 0 || nx >= gw || ny >= gh) continue;
+            if (taken[(size_t)ny * gw + nx]) {
+                // a point recorded in that cell is within minDist only if actually close; recheck below
+                for (const auto& q : pts) {
+                    const float ex = q.x - p.x, ey = q.y - p.y;
+                    if (ex * ex + ey * ey < (float)minDist * minDist) { near = true; break; }
+                }
+            }
+        }
+        if (near) continue;
+        taken[(size_t)cy * gw + cx] = 1;
         pts.push_back(p);
         if ((int)pts.size() >= maxPoints) break;
     }
