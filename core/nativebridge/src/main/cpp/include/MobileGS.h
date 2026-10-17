@@ -805,6 +805,12 @@ private:
         std::vector<std::vector<int>> cellRows;     // per paint-grid cell: rows inside it
     };
     std::vector<TargetSet> mTargetSets;
+    /**
+     * How many rows at the front of mWallDescriptors / mWallKeypoints3D are the wall as captured
+     * (the bare wall, before any paint). Self-grow only appends, so everything after is grown. The
+     * wall exclusion list is these rows. Guarded by mMutex.
+     */
+    size_t mBareWallCount = 0;
     // Bumped whenever the artwork is replaced or cleared. tryUpdateFingerprint snapshots the
     // descriptors under the lock, spends milliseconds matching outside it, and then merges its
     // result back in; without this it would merge into whatever artwork is registered by then. The

@@ -394,3 +394,83 @@ TEST(MobileGSTeleological, ThePassStatsCountWhatEachPassJudged) {
     g.setEvalSyncReloc(false, 1);
     g.destroy();
 }
+
+// ---- Wall exclusion list and baseline margin ---------------------------------------------------------
+
+namespace {
+struct PaintedRig {
+    MobileGS g;
+    cv::Mat bare, design, live;
+    float K[4] = {700.f, 700.f, 400.f, 300.f};
+    // A bare wall captured, a different design registered over it, and a live frame that is the wall
+    // with the design painted in the middle ([painted] false: the bare wall still).
+    void build(bool painted) {
+        g.initialize(0, 0);
+        bare = makeWall(800, 600, 0x51de);
+        design = makeWall(800, 600, 0xbeef);
+        fingerprintFrontalWall(g, bare, K);
+        g.setArtworkFingerprint(design, nullptr, 0, 0, 0, nullptr, nullptr);
+        const float hw = (float)bare.cols / (2.0f * K[0]);
+        const float hh = (float)bare.rows / (2.0f * K[1]);
+        const float place[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0,
+                                 (bare.cols * 0.5f - K[2]) / K[0], (bare.rows * 0.5f - K[3]) / K[1], 1.0f, 1};
+        g.setDesignPlacement(place, hw, hh);
+        live = bare.clone();
+        if (painted) {
+            const cv::Rect mid(150, 100, 500, 400);
+            design(mid).copyTo(live(mid));
+        }
+        g.setLiveIntrinsics(K);
+        g.setEvalSyncReloc(true, 1);
+        g.scheduleRelocCheck(live);
+    }
+    ~PaintedRig() { g.setEvalSyncReloc(false, 1); g.destroy(); }
+};
+} // namespace
+
+TEST(MobileGSTeleological, PaintedDesignCorroboratesAndTheBareWallDoesNot) {
+    PaintedRig painted; painted.build(true);
+    ASSERT_EQ(MobileGS::kRelocOk, painted.g.lastRelocReject());
+    ASSERT_EQ(MobileGS::kCorrobGated, painted.g.corrobGateReason());
+    PaintedRig bare; bare.build(false);
+    ASSERT_EQ(MobileGS::kRelocOk, bare.g.lastRelocReject());
+    ASSERT_EQ(MobileGS::kCorrobGated, bare.g.corrobGateReason());
+    std::fprintf(stderr, "painted matched %d / %d, bare matched %d / %d\n",
+                 painted.g.corrobMatched(), painted.g.corrobPredicted(),
+                 bare.g.corrobMatched(), bare.g.corrobPredicted());
+    EXPECT_GT(painted.g.corrobMatched(), 20) << "design painted on the wall did not corroborate";
+    EXPECT_LE(bare.g.corrobMatched() * 4, painted.g.corrobMatched()) << "the bare wall corroborated like paint";
+}
+
+// A design that repeats itself at the baseline's displacement agrees with the wall just as well at the
+// displaced placements as at the true one: that is chance-level agreement, not evidence, and the pass
+// must not count it. (Tile 120x90 px = the baseline's shift of 30% of the design's half-extent.)
+TEST(MobileGSTeleological, ARepeatingDesignFailsTheBaselineMargin) {
+    MobileGS g;
+    g.initialize(0, 0);
+    const float K[4] = {700.f, 700.f, 400.f, 300.f};
+    const cv::Mat bare = makeWall(800, 600, 0x51de);
+    const cv::Mat tile = makeWall(120, 90, 0x7157);
+    cv::Mat design(600, 800, CV_8UC3);
+    for (int y = 0; y < 600; y += 90) for (int x = 0; x < 800; x += 120) {
+        const cv::Rect r(x, y, std::min(120, 800 - x), std::min(90, 600 - y));
+        tile(cv::Rect(0, 0, r.width, r.height)).copyTo(design(r));
+    }
+    fingerprintFrontalWall(g, bare, K);
+    g.setArtworkFingerprint(design, nullptr, 0, 0, 0, nullptr, nullptr);
+    const float hw = 800.f / (2.0f * K[0]), hh = 600.f / (2.0f * K[1]);
+    const float place[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0.0f, 0.0f, 1.0f, 1};
+    g.setDesignPlacement(place, hw, hh);
+    cv::Mat live = bare.clone();
+    const cv::Rect mid(150, 90, 480, 360);
+    design(mid).copyTo(live(mid));
+    g.setLiveIntrinsics(K);
+    g.setEvalSyncReloc(true, 1);
+    g.scheduleRelocCheck(live);
+    ASSERT_EQ(MobileGS::kRelocOk, g.lastRelocReject());
+    ASSERT_EQ(MobileGS::kCorrobGated, g.corrobGateReason());
+    ASSERT_GT(g.corrobPredicted(), 50);
+    EXPECT_EQ(0, g.corrobMatched()) << "a design that matches itself at displaced placements counted as evidence";
+    g.setEvalSyncReloc(false, 1);
+    g.destroy();
+}

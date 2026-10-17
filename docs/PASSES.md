@@ -47,15 +47,23 @@ or is replaced. A cell's vote is "present" when at least half of that filter's p
 confirmed, "absent" when some are not, and no data when it has none. Filter targets never become
 reloc marks: they judge progress only.
 
+## Guards on every set
+
+- **Wall exclusion list**: the wall as captured (the bare fingerprint, before any paint or self-grow)
+  is projected into the live frame through the lock's pose. A design feature's live match is not
+  counted when a bare-wall feature near it describes that live keypoint at least as well as the
+  design does: that is the wall's own texture. The row stays observed, so its confirmation count
+  resets.
+- **Baseline margin**: the same set is matched again at four displaced placements of the design
+  (shifted by at least 30% of the half-extent and three search radii). The true placement counts
+  only when its matches exceed twice the displaced average. Chance-level agreement drops that
+  tick's hits for the set (and the primary artwork's self-grow candidates from it).
+
 ## Planned
 
 1. **More filters**: watercolor, Kuwahara, halftone, stencil layers of 2 to 5 tones, Voronoi, colour
    shifts. (The first eight are in; see above.)
-2. **Wall exclusion list**: features known to be bare wall do not count as paint, and the same list
-   supplies a null baseline.
-3. **Baseline margin check**: a pass counts only when its true alignment beats displaced alignments
-   by a clear margin.
-4. **Change against the bare-wall photo** (optional): the stored clean-wall photo, registered to the
+2. **Change against the bare-wall photo** (optional): the stored clean-wall photo, registered to the
    capture, compared with the live frame through the pose. The painted mask's shapes are matched
    against the design's patch shapes, whatever the colour.
    - A switch in **Settings** (not the diagnostics overlay), off by default: it is never turned on
@@ -64,7 +72,7 @@ reloc marks: they judge progress only.
    - The target-creation instructions ALWAYS carry the clean-wall step, switch or no switch: if the
      surface has not been marked (gridded) yet, take a photo of the bare wall first (one tap), then
      mark it; if the marks already exist, just continue by tapping them.
-5. Per-pass diagnostics in the overlay.
+3. Per-pass diagnostics in the overlay.
 
 Passes judge progress and how much to trust a lock. They do not localize until one has earned trust
 against real locks.

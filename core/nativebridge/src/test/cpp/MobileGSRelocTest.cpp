@@ -237,7 +237,10 @@ TEST(MobileGSReloc, GatedCorroborationProjectsWithTheLiveCamera) {
     ASSERT_GT(g.corrobPredicted(), 50);
     // Projected with the capture camera instead, every prediction lands (120, 90) px away -- far
     // outside a ~20 px search radius -- and almost nothing corroborates.
-    EXPECT_GT(g.corrobMatched(), g.corrobPredicted() / 2)
+    // The design here IS the captured wall, so the wall exclusion list rightly discards the features the
+    // bare wall explains as well as the design does (most of them); what is left is still far above the
+    // ~0 of a mis-projected search.
+    EXPECT_GT(g.corrobMatched(), g.corrobPredicted() / 8)
         << "matched " << g.corrobMatched() << " of " << g.corrobPredicted();
     g.setEvalSyncReloc(false, 1);
     g.destroy();

@@ -64,6 +64,16 @@ struct GatedMatch {
     int matched = 0;
     int predicted = 0;
     int loneSkips = 0;              // predicted, but only one candidate: no second-best to divide by
+    float displacedMean = 0.0f;     // gatedMatchWithBaseline: matches at displaced placements, averaged
+    bool marginFailed = false;      // gatedMatchWithBaseline: true alignment did not beat chance
+};
+
+// The wall exclusion list: features known to be bare wall (the fingerprint as captured, before any
+// paint), projected into the live frame through the lock's pose.
+struct WallExclusion {
+    std::vector<cv::Point2f> uv;    // projected pixel of each bare-wall feature that lands in the frame
+    std::vector<int> row;           // its row in [descs]
+    cv::Mat descs;                  // the bare-wall descriptors (all rows; [row] indexes them)
 };
 
 // The IMPLEMENTATION.md 4.5 gated match, for any set of design features (the primary artwork's, or a
@@ -77,7 +87,8 @@ void gatedMatchSet(const cv::Mat& artDescs, const std::vector<cv::Point2f>& artP
                    float designHalfW, float designHalfH,
                    float pnpFx, float pnpFy, float pnpCx, float pnpCy,
                    float radiusPx, float frameW, float frameH, float loweRatio,
-                   GatedMatch& out, std::vector<int>* validQuery) {
+                   GatedMatch& out, std::vector<int>* validQuery,
+                   const WallExclusion* wall = nullptr) {
     out.hit.assign((size_t)artDescs.rows, 0);
     out.observed.assign((size_t)artDescs.rows, 0);
     out.hitQuery.assign((size_t)artDescs.rows, -1);
@@ -166,6 +177,34 @@ void gatedMatchSet(const cv::Mat& artDescs, const std::vector<cv::Point2f>& artP
         }
         if (bestQ < 0) continue;
         if (best < loweRatio * second) {
+            // Bare wall explains this live feature at least as well as the design does: it is the
+            // wall's own texture, not paint. Observed (so the confirmation count resets), not a hit.
+            if (wall && !wall->uv.empty()) {
+                const cv::Point2f qp = kps[(size_t)bestQ].pt;
+                const float r2 = radiusPx * radiusPx;
+                bool isWall = false;
+                for (size_t w = 0; w < wall->uv.size() && !isWall; ++w) {
+                    const float ex = wall->uv[w].x - qp.x, ey = wall->uv[w].y - qp.y;
+                    if (ex * ex + ey * ey > r2) continue;
+                    const int wr = wall->row[w];
+                    float d;
+                    if (isFloat) {
+                        const float* pq = descs.ptr<float>(bestQ);
+                        const float* pw = wall->descs.ptr<float>(wr);
+                        float acc = 0.0f;
+                        for (int k = 0; k < dcols; ++k) { const float t = pq[k] - pw[k]; acc += t * t; }
+                        d = std::sqrt(acc);
+                    } else {
+                        const uchar* pq = descs.ptr<uchar>(bestQ);
+                        const uchar* pw = wall->descs.ptr<uchar>(wr);
+                        int acc = 0;
+                        for (int k = 0; k < dcols; ++k) acc += __builtin_popcount((unsigned)(pq[k] ^ pw[k]));
+                        d = (float)acc;
+                    }
+                    if (d <= best) isWall = true;
+                }
+                if (isWall) continue;
+            }
             hit[a] = 1;
             hitQuery[a] = bestQ;
             ++matched;
@@ -173,6 +212,46 @@ void gatedMatchSet(const cv::Mat& artDescs, const std::vector<cv::Point2f>& artP
         }
     }
     out.loneSkips = loneCandidateSkips;
+}
+
+// gatedMatchSet plus the baseline margin check: the same set is matched at four DISPLACED placements
+// of the design (shifted well past the search radius, so a real feature cannot answer for both). A
+// pass counts only when its true alignment beats chance: matched at the true placement must exceed
+// twice the displaced average. Chance-level agreement means the pass is reading wall texture, and
+// its hits are dropped (the rows stay observed, so their confirmation counts reset).
+void gatedMatchWithBaseline(const cv::Mat& artDescs, const std::vector<cv::Point2f>& artPts2d,
+                            int artImgW, int artImgH,
+                            const std::vector<cv::KeyPoint>& kps, const cv::Mat& descs,
+                            const KeypointGrid& grid, const glm::mat4& camFromDesign,
+                            float designHalfW, float designHalfH,
+                            float pnpFx, float pnpFy, float pnpCx, float pnpCy,
+                            float radiusPx, float frameW, float frameH, float loweRatio,
+                            float shiftXm, float shiftYm,
+                            GatedMatch& out, std::vector<int>* validQuery, const WallExclusion* wall) {
+    const size_t validBefore = validQuery ? validQuery->size() : 0;
+    gatedMatchSet(artDescs, artPts2d, artImgW, artImgH, kps, descs, grid, camFromDesign, designHalfW,
+                  designHalfH, pnpFx, pnpFy, pnpCx, pnpCy, radiusPx, frameW, frameH, loweRatio, out,
+                  validQuery, wall);
+    if (out.matched == 0) return;
+    const float dx[4] = {shiftXm, -shiftXm, 0.0f, 0.0f};
+    const float dy[4] = {0.0f, 0.0f, shiftYm, -shiftYm};
+    int displaced = 0;
+    for (int i = 0; i < 4; ++i) {
+        GatedMatch d;
+        const glm::mat4 shifted = camFromDesign * glm::translate(glm::mat4(1.0f), glm::vec3(dx[i], dy[i], 0.0f));
+        gatedMatchSet(artDescs, artPts2d, artImgW, artImgH, kps, descs, grid, shifted, designHalfW,
+                      designHalfH, pnpFx, pnpFy, pnpCx, pnpCy, radiusPx, frameW, frameH, loweRatio, d,
+                      nullptr, wall);
+        displaced += d.matched;
+    }
+    out.displacedMean = displaced / 4.0f;
+    if (!((float)out.matched > 2.0f * out.displacedMean)) {
+        std::fill(out.hit.begin(), out.hit.end(), (char)0);
+        std::fill(out.hitQuery.begin(), out.hitQuery.end(), -1);
+        out.matched = 0;
+        out.marginFailed = true;
+        if (validQuery) validQuery->resize(validBefore);
+    }
 }
 
 // C++17-compatible atomic double add via CAS loop.
@@ -1518,6 +1597,8 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     cv::Mat artDescs;
     std::vector<cv::Point2f> artPts2d;
     int artImgW = 0, artImgH = 0;
+    cv::Mat bareDescs;                   // the wall as captured: the exclusion list's source
+    std::vector<cv::Point3f> barePts;
     std::vector<TargetSet> targetSets;   // snapshot; matched below, folded back under the generation check
     long artGeneration = 0;
     bool havePlacement = false;
@@ -1538,6 +1619,11 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         artDescs = mArtworkDescriptors;
         artPts2d = mArtworkKeypoints2D;
         targetSets = mTargetSets;
+        const size_t nBare = std::min(mBareWallCount, (size_t)mWallDescriptors.rows);
+        if (nBare > 0 && mWallKeypoints3D.size() >= nBare) {
+            bareDescs = mWallDescriptors.rowRange(0, (int)nBare).clone();
+            barePts.assign(mWallKeypoints3D.begin(), mWallKeypoints3D.begin() + nBare);
+        }
         artImgW = mArtworkImageW;
         artImgH = mArtworkImageH;
         artGeneration = mArtworkGeneration;
@@ -1628,12 +1714,36 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         KeypointGrid grid;
         grid.build(kps, radiusPx);
 
+        // The exclusion list: the captured bare wall, projected through this lock's pose.
+        WallExclusion wallList;
+        const WallExclusion* wallPtr = nullptr;
+        if (bareDescs.rows > 0 && bareDescs.type() == descs.type() && bareDescs.cols == descs.cols &&
+            (int)barePts.size() == bareDescs.rows) {
+            const glm::mat4 camFromFpM = glm::make_mat4(camFromFp);
+            wallList.descs = bareDescs;
+            for (int r = 0; r < bareDescs.rows; ++r) {
+                const glm::vec4 pc = camFromFpM * glm::vec4(barePts[(size_t)r].x, barePts[(size_t)r].y, barePts[(size_t)r].z, 1.0f);
+                if (!(pc.z > 1e-4f)) continue;
+                const float u = pnpFx * pc.x / pc.z + pnpCx, v = pnpFy * pc.y / pc.z + pnpCy;
+                if (!std::isfinite(u) || !std::isfinite(v)) continue;
+                if (u < 0 || v < 0 || u > (float)grayClean.cols || v > (float)grayClean.rows) continue;
+                wallList.uv.emplace_back(u, v);
+                wallList.row.push_back(r);
+            }
+            wallPtr = &wallList;
+        }
+
+        // Shift for the baseline: 30% of the design's half-extent at least, and three search radii.
+        const float radiusM = radiusPx * std::max(wallDistM, 0.05f) / focalPx;
+        const float shiftXm = std::max(0.3f * designHalfW, 3.0f * radiusM);
+        const float shiftYm = std::max(0.3f * designHalfH, 3.0f * radiusM);
         const float frameW = (float)grayClean.cols;
         const float frameH = (float)grayClean.rows;
         GatedMatch pm;
-        gatedMatchSet(artDescs, artPts2d, artImgW, artImgH, kps, descs, grid, camFromDesign,
-                      designHalfW, designHalfH, pnpFx, pnpFy, pnpCx, pnpCy,
-                      radiusPx, frameW, frameH, kCorrobLoweRatio, pm, &validQuery);
+        gatedMatchWithBaseline(artDescs, artPts2d, artImgW, artImgH, kps, descs, grid, camFromDesign,
+                               designHalfW, designHalfH, pnpFx, pnpFy, pnpCx, pnpCy,
+                               radiusPx, frameW, frameH, kCorrobLoweRatio, shiftXm, shiftYm,
+                               pm, &validQuery, wallPtr);
         hit = std::move(pm.hit); observed = std::move(pm.observed); hitQuery = std::move(pm.hitQuery);
         matched = pm.matched; predicted = pm.predicted; loneSkips = pm.loneSkips;
         const int loneCandidateSkips = pm.loneSkips;
@@ -1643,9 +1753,10 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
             const TargetSet& ts = targetSets[si];
             if (ts.descs.empty() || ts.descs.type() != descs.type() || ts.descs.cols != descs.cols ||
                 (int)ts.pts.size() != ts.descs.rows) continue;
-            gatedMatchSet(ts.descs, ts.pts, artImgW, artImgH, kps, descs, grid, camFromDesign,
-                          designHalfW, designHalfH, pnpFx, pnpFy, pnpCx, pnpCy,
-                          radiusPx, frameW, frameH, kCorrobLoweRatio, setMatches[si], nullptr);
+            gatedMatchWithBaseline(ts.descs, ts.pts, artImgW, artImgH, kps, descs, grid, camFromDesign,
+                                   designHalfW, designHalfH, pnpFx, pnpFy, pnpCx, pnpCy,
+                                   radiusPx, frameW, frameH, kCorrobLoweRatio, shiftXm, shiftYm,
+                                   setMatches[si], nullptr, wallPtr);
         }
         if (loneCandidateSkips > 0) {
             LOGI("Corroboration (gated): r=%.1fpx predicted=%d matched=%d lone-candidate skips=%d",
@@ -2102,6 +2213,7 @@ void MobileGS::restoreWallFingerprint(const cv::Mat& d, const std::vector<cv::Po
     std::lock_guard<std::mutex> lock(mMutex);
     invalidateRelocResultLocked();
     mWallDescriptors = d.clone();
+    mBareWallCount = (size_t)mWallDescriptors.rows;
     mWallKeypoints3D = p;
     // This path carries no partition, and the previous fingerprint's must not survive onto it: the
     // bytes would index a different point set entirely. Empty = all backbone, as before Phase 2.
@@ -2171,6 +2283,10 @@ void MobileGS::restoreWallFingerprintMetric(const cv::Mat& d, const std::vector<
         (!anchorMatrix16 || memcmp(anchorMatrix16, mFingerprintAnchorMatrix, 16 * sizeof(float)) == 0) &&
         (!intrinsics4 || memcmp(intrinsics4, mFingerprintIntrinsics, 4 * sizeof(float)) == 0);
     if (!sameFrame) invalidateRelocResultLocked();
+    // The captured (bare) part of the stored set: the base alone when grown marks ride behind it, the
+    // standing count when the identical set is re-pushed, otherwise everything.
+    mBareWallCount = growthOfSame ? baseN
+        : (sameFingerprint && mBareWallCount > 0 ? std::min(mBareWallCount, (size_t)useD.rows) : (size_t)useD.rows);
     mWallDescriptors = useD.clone();
     mWallKeypoints3D = useP;
     // Belt and braces over the JNI-side length check: a partition that does not index the points it
@@ -2193,6 +2309,7 @@ void MobileGS::clearWallFingerprint() {
     std::lock_guard<std::mutex> lock(mMutex);
     mWallDescriptors.release();
     mWallKeypoints3D.clear();
+    mBareWallCount = 0;
     mWallRegions.clear();
     // Back to the constructed defaults, so a later project can't inherit this one's co-registration.
     static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
@@ -2411,6 +2528,7 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
         mPaintDescriptors.release();
         mPaintPoints3D.clear();
         mWallDescriptors = descs.clone();
+        mBareWallCount = (size_t)mWallDescriptors.rows;
         // A peer's fingerprint carries no partition, and the local one indexes a different point
         // set. Empty = all backbone, i.e. pre-Phase-2 behaviour, which is the right default for a
         // map whose design footprint this device never saw.
@@ -2908,6 +3026,7 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
         mPaintDescriptors.release();
         mPaintPoints3D.clear();
         mWallKeypoints3D  = std::move(pts3d);
+        mBareWallCount = (size_t)mWallDescriptors.rows;
         // The depth path supplies no partition. Clearing rather than leaving the previous
         // fingerprint's is not optional: those bytes index a point set that no longer exists.
         mWallRegions.clear();
