@@ -766,4 +766,10 @@
     <string name="nav_stencil_view_grey">Grigio</string>
     <string name="nav_stencil_view_white">Bianco</string>
     <string name="nav_stencil_view_info">Cambia quali fogli sono mostrati: tutti, nero, grigio o bianco.</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">Rilevamento dei cambiamenti (richiede una foto del muro pulito)</string>
+    <string name="target_clean_wall_text">Non ancora segnato? Prima fotografa il muro pulito con il pulsante qui sotto, poi dipingi i tuoi segni. Già segnato? Tocca i tuoi segni.</string>
+    <string name="target_clean_wall_photo">Foto del muro pulito</string>
+    <string name="target_clean_wall_saved">Foto del muro pulito salvata. Rifai</string>
 </resources>

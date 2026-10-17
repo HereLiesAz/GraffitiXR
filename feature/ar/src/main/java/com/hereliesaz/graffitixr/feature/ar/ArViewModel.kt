@@ -1928,6 +1928,13 @@ class ArViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            // Pass B's switch. The stored value is the only source; it defaults to off.
+            settingsRepository.changePassEnabled.collect { on ->
+                _uiState.update { it.copy(changePassEnabled = on) }
+                slamManager.setChangePassEnabled(on)
+            }
+        }
+        viewModelScope.launch {
             // Camera target fps. Stored in state for the session-config selection; a change while an
             // ARCore session is live swaps its camera config in place (reconcileLiveSessionSettings).
             settingsRepository.cameraTargetFps.collect { fps ->
@@ -2302,6 +2309,11 @@ class ArViewModel @Inject constructor(
     // motion depth — they do NOT require hardware stereo. The mono-vs-stereo *camera config* is
     // chosen separately (probe + initArSessionLocked); it must not disable the MURAL *scan mode*.
     // So the scan mode is never auto-downgraded to Canvas; the user picks Canvas explicitly if wanted.
+
+    /** The Settings switch for pass B: persisted, and handed to the native engine by the collector. */
+    fun setChangePassEnabled(on: Boolean) {
+        viewModelScope.launch { settingsRepository.setChangePassEnabled(on) }
+    }
 
     fun setAmbientScanEnabled(enabled: Boolean) {
         // Turning the sweep back ON is a retry: clear the sticky stereo-unstable flag so the next
@@ -4508,6 +4520,18 @@ class ArViewModel @Inject constructor(
                     }.getOrNull()
                     if (bmp != null) slamManager.setCaptureImage(bmp, intr.toFloatArray())
                 }
+                // Pass B's reference, registered against the capture photo set just above.
+                val clean = project.cleanWallUri?.let { uri ->
+                    runCatching {
+                        com.hereliesaz.graffitixr.common.util.ImageUtils.loadBitmapAsync(appContext, uri)
+                    }.getOrNull()
+                }
+                if (clean != null) slamManager.setCleanWallImage(clean) else slamManager.clearCleanWallImage()
+                _uiState.update { it.copy(hasCleanWall = clean != null) }
+            } else {
+                // No fingerprint frame to register against: the previous project's clean wall is not this one's.
+                slamManager.clearCleanWallImage()
+                _uiState.update { it.copy(hasCleanWall = false) }
             }
             lastSavedProgress = 0f
             // The wall's normal this project learned, for the sensor turn from the first attempt.
@@ -4784,6 +4808,7 @@ class ArViewModel @Inject constructor(
         // a new ArRenderer — but re-asserting it is idempotent and costs one atomic store, and it
         // means one place re-establishes every experiment switch instead of two rules to remember.
         slamManager.setSelfGrowEnabled(_evalSelfGrowEnabled.value)
+        slamManager.setChangePassEnabled(_uiState.value.changePassEnabled)
         applyFeatureMapSwitch(_evalFeatureMapEnabled.value)
         renderer?.updateAutoFocus(effectiveAutoFocus)
         // A renderer attached while a teardown is in flight must not receive the session being
@@ -5516,6 +5541,24 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    // The next frame captured is the clean-wall photo, not a target (see requestCleanWallPhoto).
+    @Volatile private var cleanWallPending = false
+
+    /**
+     * One tap: photograph the bare wall as it is now. The next captured frame becomes the clean-wall
+     * photo (pass B's reference) instead of a target capture; nothing is marked or isolated.
+     */
+    fun requestCleanWallPhoto() {
+        if (_uiState.value.coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) return
+        cleanWallPending = true
+        requestCapture()
+    }
+
+    /** The app layer has saved [ArUiState.cleanWallBitmap] to the project. */
+    fun onCleanWallPhotoPersisted() {
+        _uiState.update { it.copy(cleanWallBitmap = null) }
+    }
+
     fun onTargetCaptured(
         bitmap: Bitmap,
         depthBuffer: ByteBuffer?,
@@ -5536,6 +5579,20 @@ class ArViewModel @Inject constructor(
         environment: com.hereliesaz.graffitixr.common.model.CaptureEnvironment =
             com.hereliesaz.graffitixr.common.model.CaptureEnvironment(),
     ) {
+        if (cleanWallPending) {
+            cleanWallPending = false
+            onCaptureRequestHandled()
+            slamManager.setMappingPaused(false)
+            viewModelScope.launch(dispatchers.default) {
+                val upright = if (displayRotation != 0) {
+                    val matrix = android.graphics.Matrix().apply { postRotate(displayRotation.toFloat()) }
+                    Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+                } else bitmap
+                slamManager.setCleanWallImage(upright)
+                _uiState.update { it.copy(cleanWallBitmap = upright, hasCleanWall = true) }
+            }
+            return
+        }
         autoFitArmed = true // a fresh photo of the wall may show paint the new design should fit
         // Doodle demo: a headless capture (no tap, no review) — build the fingerprint from the
         // drawing and return before the normal capture/review flow runs. Clear the capture-request

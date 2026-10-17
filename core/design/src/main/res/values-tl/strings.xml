@@ -481,4 +481,10 @@
     <string name="nav_stencil_view_grey">Abo</string>
     <string name="nav_stencil_view_white">Puti</string>
     <string name="nav_stencil_view_info">Pinapalitan kung aling mga stencil sheet ang ipinapakita: lahat, itim, abo, o puti.</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">Pagtukoy ng pagbabago (kailangan ng larawan ng malinis na pader)</string>
+    <string name="target_clean_wall_text">Hindi pa namamarkahan? Kunan muna ng larawan ang hubad na pader gamit ang button sa ibaba, saka ipinta ang iyong mga marka. Namarkahan na? I-tap lang ang iyong mga marka.</string>
+    <string name="target_clean_wall_photo">Larawan ng malinis na pader</string>
+    <string name="target_clean_wall_saved">Na-save ang larawan ng malinis na pader. Ulitin</string>
 </resources>

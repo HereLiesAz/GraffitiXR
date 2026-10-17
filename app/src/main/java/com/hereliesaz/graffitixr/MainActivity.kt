@@ -673,6 +673,14 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
+                // A clean-wall photo was just taken: keep it with the project, then let the AR side drop it.
+                val pendingCleanWall = arUiState.cleanWallBitmap
+                LaunchedEffect(pendingCleanWall) {
+                    if (pendingCleanWall != null) {
+                        mainViewModel.saveCleanWallPhoto(pendingCleanWall) { arViewModel.onCleanWallPhotoPersisted() }
+                    }
+                }
+
                 LaunchedEffect(dashboardUiState.showNewProjectDialog) {
                     if (dashboardUiState.showNewProjectDialog) showSettings = false
                 }
@@ -1878,6 +1886,8 @@ class MainActivity : AppCompatActivity() {
                                     latestCapture = { arViewModel.awaitLatestTargetCapture() },
                                     captureStep = mainUiState.captureStep,
                                     isWaitingForTap = mainUiState.isWaitingForTap,
+                                    hasCleanWall = arUiState.hasCleanWall,
+                                    onCleanWallPhoto = { arViewModel.requestCleanWallPhoto() },
                                     strings = strings,
                                     onConfirmTarget = { bitmap, mask ->
                                         if (
@@ -2053,6 +2063,8 @@ class MainActivity : AppCompatActivity() {
                                     onAdaptiveRateEnabledChanged = { arViewModel.setAdaptiveRateEnabled(it) },
                                     ambientScanEnabled = arUiState.ambientScanEnabled,
                                     onAmbientScanEnabledChanged = { arViewModel.setAmbientScanEnabled(it) },
+                                    changePassEnabled = arUiState.changePassEnabled,
+                                    onChangePassEnabledChanged = { arViewModel.setChangePassEnabled(it) },
                                     showAnchorBoundary = arUiState.showAnchorBoundary,
                                     onAnchorBoundaryChanged = { arViewModel.setShowAnchorBoundary(it) },
                                     isImperialUnits = arUiState.isImperialUnits,

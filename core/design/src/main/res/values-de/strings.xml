@@ -766,4 +766,10 @@
     <string name="nav_stencil_view_grey">Grau</string>
     <string name="nav_stencil_view_white">Weiß</string>
     <string name="nav_stencil_view_info">Wechselt, welche Schablonen angezeigt werden: alle, schwarz, grau oder weiß.</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">Änderungserkennung (braucht ein Foto der sauberen Wand)</string>
+    <string name="target_clean_wall_text">Noch nicht markiert? Fotografiere zuerst die leere Wand mit der Schaltfläche unten und male dann deine Markierungen. Schon markiert? Tippe einfach auf deine Markierungen.</string>
+    <string name="target_clean_wall_photo">Foto der sauberen Wand</string>
+    <string name="target_clean_wall_saved">Foto der sauberen Wand gespeichert. Neu aufnehmen</string>
 </resources>

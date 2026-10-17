@@ -771,4 +771,10 @@
     <string name="nav_stencil_view_grey">Grijs</string>
     <string name="nav_stencil_view_white">Wit</string>
     <string name="nav_stencil_view_info">Wisselt welke stencilvellen zichtbaar zijn: alle, zwart, grijs of wit.</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">Wijzigingsdetectie (heeft een foto van de schone muur nodig)</string>
+    <string name="target_clean_wall_text">Nog niet gemarkeerd? Fotografeer eerst de kale muur met de knop hieronder en schilder dan je markeringen. Al gemarkeerd? Tik gewoon op je markeringen.</string>
+    <string name="target_clean_wall_photo">Foto van schone muur</string>
+    <string name="target_clean_wall_saved">Foto van schone muur bewaard. Opnieuw</string>
 </resources>

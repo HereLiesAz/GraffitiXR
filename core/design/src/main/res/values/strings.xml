@@ -788,4 +788,10 @@
     <string name="nav_stencil_view_grey">Grey</string>
     <string name="nav_stencil_view_white">White</string>
     <string name="nav_stencil_view_info">Cycles which stencil sheets are shown: all, black, grey or white.</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">Change detection (needs a clean-wall photo)</string>
+    <string name="target_clean_wall_text">Not marked yet? First photograph the bare wall with the button below, then paint your marks. Already marked? Just tap your marks.</string>
+    <string name="target_clean_wall_photo">Clean wall photo</string>
+    <string name="target_clean_wall_saved">Clean wall photo saved. Retake</string>
 </resources>

@@ -35,6 +35,7 @@ class SettingsRepositoryImpl @Inject constructor(
     // Legacy: the Canvas/Mural scan mode, read only to migrate an existing preference (below).
     private val AR_SCAN_MODE = stringPreferencesKey("ar_scan_mode")
     private val AMBIENT_SCAN_ENABLED = booleanPreferencesKey("ambient_scan_enabled")
+    private val CHANGE_PASS_ENABLED = booleanPreferencesKey("change_pass_enabled")
 
     /**
      * The legacy Canvas mode's persisted name, as a literal.
@@ -266,6 +267,18 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setArCoreEnabled(on: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[AR_CORE_ENABLED] = on
+        }
+    }
+
+    // Defaults FALSE, and nothing but the user's own switch ever sets it: pass B compares the live wall with
+    // the clean-wall photo and is opt-in.
+    override val changePassEnabled: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[CHANGE_PASS_ENABLED] ?: false }
+
+    override suspend fun setChangePassEnabled(on: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[CHANGE_PASS_ENABLED] = on
         }
     }
 

@@ -771,4 +771,10 @@
     <string name="nav_stencil_view_grey">Серый</string>
     <string name="nav_stencil_view_white">Белый</string>
     <string name="nav_stencil_view_info">Переключает показываемые листы трафарета: все, чёрный, серый или белый.</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">Обнаружение изменений (нужно фото чистой стены)</string>
+    <string name="target_clean_wall_text">Ещё нет отметок? Сначала сфотографируйте чистую стену кнопкой ниже, затем нарисуйте отметки. Отметки уже есть? Просто нажмите на них.</string>
+    <string name="target_clean_wall_photo">Фото чистой стены</string>
+    <string name="target_clean_wall_saved">Фото чистой стены сохранено. Переснять</string>
 </resources>

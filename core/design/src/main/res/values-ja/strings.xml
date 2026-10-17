@@ -783,4 +783,10 @@
     <string name="nav_stencil_view_grey">グレー</string>
     <string name="nav_stencil_view_white">白</string>
     <string name="nav_stencil_view_info">表示するステンシルを切り替えます：すべて、黒、グレー、白。</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">変化の検出（きれいな壁の写真が必要）</string>
+    <string name="target_clean_wall_text">まだ印をつけていませんか？ まず下のボタンで何もない壁を撮影し、そのあと印を描いてください。すでに印がある場合は、その印をタップしてください。</string>
+    <string name="target_clean_wall_photo">きれいな壁の写真</string>
+    <string name="target_clean_wall_saved">きれいな壁の写真を保存しました。撮り直す</string>
 </resources>

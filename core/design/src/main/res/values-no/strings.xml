@@ -766,4 +766,10 @@
     <string name="nav_stencil_view_grey">Grå</string>
     <string name="nav_stencil_view_white">Hvit</string>
     <string name="nav_stencil_view_info">Bytter hvilke sjablongark som vises: alle, svart, grå eller hvit.</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">Endringsgjenkjenning (trenger et bilde av den rene veggen)</string>
+    <string name="target_clean_wall_text">Ikke markert ennå? Ta først et bilde av den bare veggen med knappen under, og mal deretter markeringene dine. Allerede markert? Trykk på markeringene dine.</string>
+    <string name="target_clean_wall_photo">Bilde av ren vegg</string>
+    <string name="target_clean_wall_saved">Bilde av ren vegg lagret. Ta på nytt</string>
 </resources>

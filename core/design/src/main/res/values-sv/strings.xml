@@ -771,4 +771,10 @@
     <string name="nav_stencil_view_grey">Grå</string>
     <string name="nav_stencil_view_white">Vit</string>
     <string name="nav_stencil_view_info">Växlar vilka stencilark som visas: alla, svart, grå eller vit.</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">Ändringsdetektering (kräver ett foto av den rena väggen)</string>
+    <string name="target_clean_wall_text">Inte markerad än? Fotografera först den bara väggen med knappen nedan och måla sedan dina markeringar. Redan markerad? Tryck bara på dina markeringar.</string>
+    <string name="target_clean_wall_photo">Foto av ren vägg</string>
+    <string name="target_clean_wall_saved">Foto av ren vägg sparat. Ta om</string>
 </resources>

@@ -766,4 +766,10 @@
     <string name="nav_stencil_view_grey">Gris</string>
     <string name="nav_stencil_view_white">Blanco</string>
     <string name="nav_stencil_view_info">Cambia qué plantillas se muestran: todas, negro, gris o blanco.</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">Detección de cambios (necesita una foto de la pared limpia)</string>
+    <string name="target_clean_wall_text">¿Aún sin marcar? Primero fotografía la pared limpia con el botón de abajo y luego pinta tus marcas. ¿Ya marcada? Toca tus marcas.</string>
+    <string name="target_clean_wall_photo">Foto de la pared limpia</string>
+    <string name="target_clean_wall_saved">Foto de la pared limpia guardada. Repetir</string>
 </resources>

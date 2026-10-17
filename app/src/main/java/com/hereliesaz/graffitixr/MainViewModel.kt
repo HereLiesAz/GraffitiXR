@@ -189,6 +189,29 @@ class MainViewModel @Inject constructor(
         if (!cameraShowing) _uiState.update { it.copy(isOverlayGyroActive = false) }
     }
 
+    /**
+     * Saves a clean-wall photo (pass B's reference) into the current project, replacing any earlier
+     * one. The native side already has it; this makes it survive a restart.
+     */
+    fun saveCleanWallPhoto(bitmap: android.graphics.Bitmap, onSaved: () -> Unit = {}) {
+        val projectId = projectRepository.currentProject.value?.id ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val path = runCatching {
+                projectRepository.saveArtifact(
+                    projectId, "clean_wall.png",
+                    com.hereliesaz.graffitixr.common.util.ImageUtils.bitmapToByteArray(bitmap),
+                )
+            }.getOrNull()
+            if (path != null) {
+                projectRepository.updateProject { current ->
+                    if (current.id != projectId) current
+                    else current.copy(cleanWallUri = android.net.Uri.parse("file://$path"))
+                }
+            }
+            withContext(Dispatchers.Main) { onSaved() }
+        }
+    }
+
     fun startTargetCapture() {
         _uiState.update {
             it.copy(

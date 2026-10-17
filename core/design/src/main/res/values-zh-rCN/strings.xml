@@ -783,4 +783,10 @@
     <string name="nav_stencil_view_grey">灰</string>
     <string name="nav_stencil_view_white">白</string>
     <string name="nav_stencil_view_info">切换显示的模板：全部、黑、灰或白。</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">变化检测（需要一张干净墙面的照片）</string>
+    <string name="target_clean_wall_text">还没有做标记？请先用下方按钮拍一张干净的墙面，然后再画上标记。已经做了标记？直接点击标记即可。</string>
+    <string name="target_clean_wall_photo">干净墙面照片</string>
+    <string name="target_clean_wall_saved">干净墙面照片已保存。重拍</string>
 </resources>

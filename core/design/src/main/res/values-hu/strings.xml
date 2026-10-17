@@ -771,4 +771,10 @@
     <string name="nav_stencil_view_grey">Szürke</string>
     <string name="nav_stencil_view_white">Fehér</string>
     <string name="nav_stencil_view_info">Váltja, melyik sablonok láthatók: mind, fekete, szürke vagy fehér.</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">Változásészlelés (tiszta fal fotó kell hozzá)</string>
+    <string name="target_clean_wall_text">Még nincs megjelölve? Előbb fotózd le a tiszta falat az alábbi gombbal, aztán fesd fel a jeleket. Már meg van jelölve? Koppints a jelekre.</string>
+    <string name="target_clean_wall_photo">Tiszta fal fotó</string>
+    <string name="target_clean_wall_saved">Tiszta fal fotó elmentve. Újra</string>
 </resources>

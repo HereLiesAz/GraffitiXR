@@ -766,4 +766,10 @@
     <string name="nav_stencil_view_grey">Cinza</string>
     <string name="nav_stencil_view_white">Branco</string>
     <string name="nav_stencil_view_info">Alterna quais folhas do estêncil são exibidas: todas, preto, cinza ou branco.</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">Detecção de mudanças (precisa de uma foto da parede limpa)</string>
+    <string name="target_clean_wall_text">Ainda sem marcas? Primeiro fotografe a parede limpa com o botão abaixo e depois pinte suas marcas. Já marcada? Toque nas suas marcas.</string>
+    <string name="target_clean_wall_photo">Foto da parede limpa</string>
+    <string name="target_clean_wall_saved">Foto da parede limpa salva. Refazer</string>
 </resources>

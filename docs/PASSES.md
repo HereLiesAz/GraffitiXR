@@ -32,6 +32,7 @@ collects each pass's verdict per opaque design cell and combines them; the conse
 | 1 | `colour` | a cell that has left the bare wall and matches the paint its design colour was painted with. Hue-free: purple in the design may be yellow on the wall. The bare wall comes from the capture photo, or the first AR sighting |
 
 | 2 to 10 | `sketch`, `mosaic`, `posterize2`, `posterize4`, `cartoon`, `blobs`, `invert`, `warm-luma`, `stencil3` | design features at places the matching design filter points to (below) |
+| 11 | `change` | cells that changed since the clean-wall photo, in the shape of the design (optional; see Pass B below) |
 
 ### Filter passes
 
@@ -63,20 +64,32 @@ reloc marks: they judge progress only.
   only when its matches exceed twice the displaced average. Chance-level agreement drops that
   tick's hits for the set (and the primary artwork's self-grow candidates from it).
 
+## Pass B: change against the clean wall (`change`, id 11)
+
+Optional. It compares the live wall with the **clean-wall photo**: the bare wall photographed before
+anything was marked or painted. It asks which cells of the wall have changed, and whether the changed
+region has the shape of the design. Colour plays no part in the second question.
+
+- **The photo**: one tap during target creation (`ArViewModel.requestCleanWallPhoto`), saved to the
+  project as `cleanWallUri`, and registered to the capture photo by feature matching and a RANSAC
+  homography (`MobileGS::setCleanWallImage`; status none, pending, registered or failed). A photo
+  given before the capture photo waits for it.
+- **The instructions always carry the step**, whatever the switch says: not marked yet, photograph
+  the bare wall first (button), then paint the marks; already marked, just tap them.
+- **The switch** is in **Settings** (not the diagnostics overlay), **off by default**, and nothing
+  but the user turns it on (`SettingsRepository.changePassEnabled`). Even on, the pass judges
+  nothing without a registered clean-wall photo.
+- **Shape rule** (`ShapeMatch.h`, unit-tested): a connected region of changed cells is paint when it
+  lies inside the design (at most a quarter of its cells outside) and the design patches it touches
+  are complete (nearly all seen cells changed), untouched, or few: at most two partial, or less than
+  40% of the region in partial ones. A shadow or a hand cuts across many patches and spills outside
+  the design, so it is not paint. Whatever colour the paint is.
+
 ## Planned
 
 1. **More filters**: watercolor, Kuwahara, halftone, Voronoi, colour
    shifts. (The first eight are in; see above.)
-2. **Change against the bare-wall photo** (optional): the stored clean-wall photo, registered to the
-   capture, compared with the live frame through the pose. The painted mask's shapes are matched
-   against the design's patch shapes, whatever the colour.
-   - A switch in **Settings** (not the diagnostics overlay), off by default: it is never turned on
-     automatically.
-   - It cannot run without the clean-wall photo, whatever the switch says.
-   - The target-creation instructions ALWAYS carry the clean-wall step, switch or no switch: if the
-     surface has not been marked (gridded) yet, take a photo of the bare wall first (one tap), then
-     mark it; if the marks already exist, just continue by tapping them.
-3. Per-pass diagnostics in the overlay.
+2. Per-pass diagnostics in the overlay.
 
 Passes judge progress and how much to trust a lock. They do not localize until one has earned trust
 against real locks.

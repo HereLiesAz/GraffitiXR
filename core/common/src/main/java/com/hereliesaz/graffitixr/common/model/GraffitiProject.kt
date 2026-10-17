@@ -131,6 +131,13 @@ data class GraffitiProject(
     val targetImageUris: List<@Serializable(with = UriSerializer::class) Uri> = emptyList(),
 
     /**
+     * The clean-wall photo: the bare wall BEFORE it was marked or painted (pass B compares the live
+     * wall against it). Optional; only one is kept, and a new one replaces it.
+     */
+    @Serializable(with = UriSerializer::class)
+    val cleanWallUri: Uri? = null,
+
+    /**
      * Rectified wall reference used by the ARCore-independent SphereSLAM/KPM tracker.
      *
      * Kept separate from [targetImageUris]: this is the canonical page that must be restored on a

@@ -109,6 +109,8 @@ fun SettingsScreen(
     onAdaptiveRateEnabledChanged: (Boolean) -> Unit,
     ambientScanEnabled: Boolean,
     onAmbientScanEnabledChanged: (Boolean) -> Unit,
+    changePassEnabled: Boolean,
+    onChangePassEnabledChanged: (Boolean) -> Unit,
     showAnchorBoundary: Boolean,
     onAnchorBoundaryChanged: (Boolean) -> Unit,
     isImperialUnits: Boolean,
@@ -338,6 +340,9 @@ fun SettingsScreen(
                             // its result shows in the diag overlay.
                             SettingsSwitch(strings.settings.monocularDepth, monocularDepthEnabled, onMonocularDepthEnabledChanged)
                             SettingsSwitch(strings.settings.ambientScan, ambientScanEnabled, onAmbientScanEnabledChanged)
+                            // Pass B: also judge progress by what has changed since the clean-wall photo. Off
+                            // by default, never switched on for the user; it needs that photo to do anything.
+                            SettingsSwitch(strings.settings.changePass, changePassEnabled, onChangePassEnabledChanged)
                             SettingsSwitch(strings.settings.anchorBoundary, showAnchorBoundary, onAnchorBoundaryChanged)
                             SettingsItem(
                                 label = strings.settings.cameraFps,

@@ -502,4 +502,10 @@
     <string name="nav_stencil_view_grey">Gris</string>
     <string name="nav_stencil_view_white">Blanc</string>
     <string name="nav_stencil_view_info">Change les pochoirs affichés : tous, noir, gris ou blanc.</string>
+
+    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <string name="settings_change_pass">Détection des changements (nécessite une photo du mur propre)</string>
+    <string name="target_clean_wall_text">Pas encore marqué ? Photographiez d’abord le mur nu avec le bouton ci-dessous, puis peignez vos repères. Déjà marqué ? Touchez simplement vos repères.</string>
+    <string name="target_clean_wall_photo">Photo du mur propre</string>
+    <string name="target_clean_wall_saved">Photo du mur propre enregistrée. Reprendre</string>
 </resources>
