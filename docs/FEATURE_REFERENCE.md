@@ -375,9 +375,9 @@ Detailed math in `RELOC_MAP_DESIGN.md`, `SELF_GROWING_FINGERPRINT.md`,
 - **Teleological self-grow.** Because the intended result is known, OpenCV can watch your progress and
   **extend the fingerprint from validated new marks** as you paint — so snap-back survives the original
   reference marks being painted over, tightening the lock instead of degrading it.
-- **These are opt-in A/B switches, not always-on behaviour.** `ArViewModel.evalSetFusionEnabled`
-  (drift correction) and `evalSetSelfGrowEnabled` (teleological self-grow) both **default to
-  `false`**, are persisted (`SettingsRepository.driftCorrectionEnabled` /
+- **These are A/B switches.** `ArViewModel.evalSetFusionEnabled`
+  (drift correction, default **on**) and `evalSetSelfGrowEnabled` (teleological self-grow, default
+  off) are both persisted (`SettingsRepository.driftCorrectionEnabled` /
   `.selfGrowEnabled`), and are surfaced as "Drift correction: ON/OFF" and "Self-grow: ON/OFF"
   toggles in the AR diagnostics overlay — see §7.4a. With drift correction enabled, a fresh accepted
   physically-metric KPM observation has first priority; MobileGS PnP is the fallback correction
@@ -477,7 +477,7 @@ Settings screen:
 
 | Setting | Key | Default | Effect |
 |---|---|---|---|
-| Drift correction | `drift_correction_enabled` | off | "Fusion" — pulls the overlay back onto each accepted relocalization instead of riding the raw ARCore anchor |
+| Drift correction | `drift_correction_enabled` | on | "Fusion" — pulls the overlay back onto each accepted relocalization instead of riding the raw ARCore anchor |
 | Self-grow | `self_grow_enabled` | off | Promotes newly validated marks into the reloc fingerprint as you paint; writes the map, so is colour-coded amber rather than green |
 | Feature map | `feature_map_enabled` | off | Builds and matches against the persistent wall feature map (`WallFeatureMap`); also writes, also amber |
 

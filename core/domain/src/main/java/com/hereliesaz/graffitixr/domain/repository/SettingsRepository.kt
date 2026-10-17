@@ -58,7 +58,7 @@ interface SettingsRepository {
      * relocalization correction computed while it was off is discarded, so the overlay drifts
      * exactly as if nothing worked, with nothing in the UI to say why.
      *
-     * Off by default still: it is unvalidated on a device. But a switch the artist has to remember
+     * On by default: without it a saved target never pulls the overlay onto the wall. A switch the artist has to remember
      * to find and re-flip on every launch is not a switch they have.
      */
     val driftCorrectionEnabled: Flow<Boolean>

@@ -159,10 +159,10 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
-    // Both default false. Persistence remembers an explicit choice; it does not make one.
+    // Drift correction defaults ON; an explicit choice (either way) is remembered.
     override val driftCorrectionEnabled: Flow<Boolean> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { preferences -> preferences[DRIFT_CORRECTION_ENABLED] ?: false }
+        .map { preferences -> preferences[DRIFT_CORRECTION_ENABLED] ?: true }
 
     override suspend fun setDriftCorrectionEnabled(on: Boolean) {
         context.dataStore.edit { preferences ->

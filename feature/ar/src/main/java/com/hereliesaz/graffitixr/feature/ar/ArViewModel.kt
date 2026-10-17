@@ -926,7 +926,7 @@ class ArViewModel @Inject constructor(
         // down at construction. A store with nothing in it means "never chosen", which is the
         // default — not an error.
         viewModelScope.launch {
-            _evalFusionEnabled.value = settingsRepository.driftCorrectionEnabled.firstOrNull() ?: false
+            _evalFusionEnabled.value = settingsRepository.driftCorrectionEnabled.firstOrNull() ?: true
             renderer?.fusionEnabled = _evalFusionEnabled.value
         }
         viewModelScope.launch {
@@ -970,7 +970,7 @@ class ArViewModel @Inject constructor(
         )
     }
 
-    private val _evalFusionEnabled = MutableStateFlow(false)
+    private val _evalFusionEnabled = MutableStateFlow(true)
 
     /**
      * The A/B switch's ACTUAL position, mirrored rather than shadowed.
