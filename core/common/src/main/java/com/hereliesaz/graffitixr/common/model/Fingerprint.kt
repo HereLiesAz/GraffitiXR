@@ -103,11 +103,10 @@ data class Fingerprint(
      * feature of the capture; empty when unknown (older projects, a capture with no tapped marks).
      * 1:1 with the points when present.
      *
-     * The capture no longer masks the fingerprint down to the tapped marks: every feature is kept,
-     * and the tapped ones are only recorded here. The partition then forces them OUTSIDE (the
-     * backbone) wherever the design is placed, because they are the marks the artist chose to
-     * relocalize against, even when the design is laid over them. Everything else is classified by
-     * where the design falls, as before.
+     * The partition forces these OUTSIDE (the backbone) wherever the design is placed, because they
+     * are the marks the artist chose to relocalize against, even when the design is laid over
+     * them. A capture is still masked to the tapped marks, so every stored point is normally
+     * pinned; any point that is not is classified by where the design falls, as before.
      */
     val pinned: ByteArray = ByteArray(0),
 ) {

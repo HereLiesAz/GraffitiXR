@@ -240,14 +240,13 @@ using the wall's normal learned at earlier locks and saved with the project.
 
 ## The reference marks and the design (current flow)
 
-The artist taps their painted reference marks. The capture keeps **every** feature of the photo
-(and its close-ups) rather than masking down to the tapped ones; the tapped marks are recorded per
-point as `Fingerprint.pinned` and the overlay is centred on them. When the design is placed,
-`FingerprintPartition` classifies every feature by where the design falls (INSIDE / BAND / OUTSIDE)
-but forces the pinned marks OUTSIDE, so the marks the artist chose stay in the backbone the
-relocalizer matches against even with the design laid over them. If the backbone is still tiny
-(fewer than `kMinBackboneMarks` OUTSIDE marks) native ignores the partition for matching rather than
-sitting at FEW_MATCHES forever.
+The artist taps their painted reference marks and the capture is masked to them, as before. Those
+tapped marks are recorded per point as `Fingerprint.pinned`. When the design is placed,
+`FingerprintPartition` forces the pinned marks OUTSIDE (the backbone the relocalizer matches against)
+wherever the design falls, instead of classifying them INSIDE just because the design is laid over
+them. Any point that is not pinned is classified by where the design falls. If the backbone is still
+tiny (fewer than `kMinBackboneMarks` OUTSIDE marks) native ignores the partition for matching rather
+than sitting at FEW_MATCHES forever.
 
 Other behaviour worth knowing:
 - A repartition (design nudged) keeps marks self-grow appended and the distortion head's patch: the

@@ -15,8 +15,8 @@ import org.opencv.core.KeyPoint
  * The flow tells the artist to tap their painted reference marks, then to place the design over
  * them. Those marks used to be partitioned INSIDE like any other feature under the design, and
  * relocalization only matches OUTSIDE marks, so the marks the artist chose could not be used. The
- * capture now keeps every feature and records the tapped ones as [Fingerprint.pinned]; the partition
- * forces them OUTSIDE wherever the design falls.
+ * tapped marks are recorded as [Fingerprint.pinned] and the partition forces them OUTSIDE wherever
+ * the design falls.
  */
 class FingerprintPartitionWeaknessTest {
 

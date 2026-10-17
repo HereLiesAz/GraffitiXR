@@ -266,16 +266,13 @@ object MetricFingerprintBuilder {
                 val pixels = ArrayList<Pixel>(pos.size / 2)
                 var i = 0
                 while (i + 1 < pos.size) { pixels.add(Pixel(pos[i], pos[i + 1])); i += 2 }
-                // No masking: every feature of the capture is kept. The artist's tapped marks are
-                // recorded as `pinned` (see ingestSingle), not used to discard the rest.
-                val basePixels: List<Pixel> = pixels
-                val baseDescs: Mat = descs
+                val (basePixels, baseDescs) = applyMask(mask, bitmap, pixels, descs)
                 val early = EarlyInstall(slam, cvView, intr, planePointWorld, planeNormalWorld, anchorModel,
                     minPoints, glView, rotationDeg, mask, bitmap.width, bitmap.height)
                 // Install the photo's own features straight away so relocalization starts now; the
                 // close-ups below only add to it.
                 if (features.closeUps) early.installBase(basePixels, baseDescs, bitmap)
-                val (mPixels, mDescs) = withCloseUps(bitmap, basePixels, baseDescs, features.closeUps,
+                val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps,
                     onQuickSet = { p, d -> early.install(p, d) }, firstStage = 2, stages = 3, stepsBefore = 1) { view, _ ->
                     StandaloneFingerprintBuilder.detectSuperPoint(slam, view)
                 }
@@ -310,12 +307,11 @@ object MetricFingerprintBuilder {
                 return null
             }
             val pixels = kp.toArray().map { Pixel(it.pt.x.toFloat(), it.pt.y.toFloat()) }
-            val basePixels: List<Pixel> = pixels
-            val baseDescs: Mat = d
+            val (basePixels, baseDescs) = applyMask(mask, bitmap, pixels, d)
             val early = EarlyInstall(slam, cvView, intr, planePointWorld, planeNormalWorld, anchorModel,
                 minPoints, glView, rotationDeg, mask, bitmap.width, bitmap.height)
             if (features.closeUps) early.installBase(basePixels, baseDescs, bitmap)
-            val (mPixels, mDescs) = withCloseUps(bitmap, basePixels, baseDescs, features.closeUps,
+            val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps,
                 onQuickSet = { p, dd -> early.install(p, dd) }, firstStage = 2, stages = 3, stepsBefore = 1) { view, n ->
                 StandaloneFingerprintBuilder.detectOrb(view, null, n)
             }
@@ -371,11 +367,11 @@ object MetricFingerprintBuilder {
 
     /**
      * [pixels]/[descs] followed by the photo's close-up features ([CloseUpFeatures]) found by
-     * [detect] (the same detector, so the descriptors match). Returns the inputs
+     * [detect] (the same detector, so the descriptors match), kept to [mask]. Returns the inputs
      * unchanged when there are none; otherwise a new descriptor Mat the caller must release.
      */
     private fun withCloseUps(
-        bitmap: Bitmap, pixels: List<Pixel>, descs: Mat, enabled: Boolean,
+        bitmap: Bitmap, mask: Bitmap?, pixels: List<Pixel>, descs: Mat, enabled: Boolean,
         /**
          * Called with [pixels]/[descs] plus the quick set of close-ups once those are learned, before
          * the finer ones are; the Mat is released after the call returns. See [CloseUpFeatures.detect].
@@ -387,21 +383,22 @@ object MetricFingerprintBuilder {
         if (!enabled || pixels.isEmpty() || descs.empty()) return pixels to descs
         val quick: ((StandaloneFingerprintBuilder.DetectedFeatures?) -> Unit)? = onQuickSet?.let { cb ->
             { partial ->
-                mergeCloseUps(pixels, descs, partial)?.let { (p, d) ->
+                mergeCloseUps(bitmap, mask, pixels, descs, partial)?.let { (p, d) ->
                     try { cb(p, d) } finally { d.release() }
                 }
             }
         }
         val extra = CloseUpFeatures.detect(bitmap, pixels.size, quick, firstStage, stages, stepsBefore, detect)
-        return mergeCloseUps(pixels, descs, extra) ?: (pixels to descs)
+        return mergeCloseUps(bitmap, mask, pixels, descs, extra) ?: (pixels to descs)
     }
 
-    /** [pixels]/[descs] plus [extra]; null when [extra] adds nothing usable. */
+    /** [pixels]/[descs] plus [extra] (kept to [mask]); null when [extra] adds nothing usable. */
     private fun mergeCloseUps(
-        pixels: List<Pixel>, descs: Mat,
+        bitmap: Bitmap, mask: Bitmap?, pixels: List<Pixel>, descs: Mat,
         extra0: StandaloneFingerprintBuilder.DetectedFeatures?,
     ): Pair<List<Pixel>, Mat>? {
         val extra = extra0
+            ?.let { StandaloneFingerprintBuilder.filterByMask(it, mask, bitmap.width, bitmap.height) }
             ?.takeIf { it.rows > 0 && it.cols == descs.cols() && it.type == descs.type() }
             ?: return null
         val extraDescs = Mat(extra.rows, extra.cols, extra.type)
@@ -418,6 +415,27 @@ object MetricFingerprintBuilder {
         extraDescs.release()
         val extraPixels = List(extra.rows) { Pixel(extra.positions[it * 2], extra.positions[it * 2 + 1]) }
         return (pixels + extraPixels) to all
+    }
+
+    /**
+     * Keep only the features inside [mask] (alpha > 0). Returns the inputs unchanged when there is no
+     * mask or every feature is inside it; otherwise a new descriptor Mat the caller must release.
+     */
+    private fun applyMask(
+        mask: Bitmap?, bitmap: Bitmap, pixels: List<Pixel>, descs: Mat,
+    ): Pair<List<Pixel>, Mat> {
+        if (mask == null || pixels.isEmpty() || bitmap.width <= 0 || bitmap.height <= 0) return pixels to descs
+        val sx = mask.width.toFloat() / bitmap.width
+        val sy = mask.height.toFloat() / bitmap.height
+        val keep = pixels.indices.filter { i ->
+            val mx = (pixels[i].u * sx).toInt().coerceIn(0, mask.width - 1)
+            val my = (pixels[i].v * sy).toInt().coerceIn(0, mask.height - 1)
+            android.graphics.Color.alpha(mask.getPixel(mx, my)) > 0
+        }
+        if (keep.size == pixels.size) return pixels to descs
+        val out = Mat(keep.size, descs.cols(), descs.type())
+        for ((dst, src) in keep.withIndex()) descs.row(src).copyTo(out.row(dst))
+        return keep.map { pixels[it] } to out
     }
 
     /**
@@ -483,8 +501,8 @@ object MetricFingerprintBuilder {
         val anchorCam = RigidMath.multiply(cvView, anchorModel)
 
         // Center the AR overlay on the marks (their centroid), not the screen-center anchor.
-        // Which kept features are tapped reference marks. The overlay is centred on THEM, as before,
-        // not on the whole capture, which no longer is the marks.
+        // Which kept features are tapped reference marks (all of them, when the capture was masked to
+        // the tapped marks). The overlay is centred on them, as before.
         val pinFlag = pinFlags(pinMask, photoW, photoH, pixels)
         val pinnedKept = ByteArray(res.count) { i -> pinFlag[res.kept[i]] }
         val pinnedPoints = FloatArray(pinnedKept.count { it.toInt() != 0 } * 3)
