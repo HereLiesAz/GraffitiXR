@@ -39,6 +39,9 @@ internal object CloseUpFeatures {
     /** At least this many per close-up, so the smallest crops still contribute. */
     const val MIN_PER_VIEW = 30
 
+    /** Crops at or below this zoom are the "quick set": learned first, installed before the rest. */
+    const val QUICK_MAX_ZOOM = 3f
+
     /** A close-up: the photo's crop at ([x], [y]), [w] × [h] pixels, seen [zoom] times nearer. */
     data class View(val x: Int, val y: Int, val w: Int, val h: Int, val zoom: Float)
 
@@ -51,7 +54,9 @@ internal object CloseUpFeatures {
         if (width <= 0 || height <= 0) return emptyList()
         val settings = AnticipationSettings(distance = distance)
         val out = ArrayList<View>()
-        for (i in 1 until distance) {
+        // Coarsest first: the broad, low-zoom crops are the views a search from normal distance
+        // actually sees, so they are the most integral and are learned (and installed) first.
+        for (i in (distance - 1) downTo 1) {
             val zoom = distance.toFloat() / i
             if (zoom < MIN_ZOOM) break
             val n = settings.aimsPerSide(i - 1)
@@ -124,8 +129,19 @@ internal object CloseUpFeatures {
      * (the base fingerprint's own detector, asked for at most the given count), positions in the
      * photo's pixels. Null when none was found.
      */
-    fun detect(photo: Bitmap, baseRows: Int, detect: (Bitmap, Int) -> DetectedFeatures?): DetectedFeatures? {
+    fun detect(
+        photo: Bitmap,
+        baseRows: Int,
+        /**
+         * Called once, on this thread, with the features of the quick set (every crop at or below
+         * [QUICK_MAX_ZOOM]) as soon as they are done, so relocalization can start while the finer
+         * crops are still being learned. Null when the quick set found nothing.
+         */
+        onQuickSet: ((DetectedFeatures?) -> Unit)? = null,
+        detect: (Bitmap, Int) -> DetectedFeatures?,
+    ): DetectedFeatures? {
         val views = views(photo.width, photo.height)
+        val quickCount = views.count { it.zoom <= QUICK_MAX_ZOOM }
         val per = perViewBudget(baseRows, views.size)
         val parts = ArrayList<DetectedFeatures>(views.size)
         // The slow part of building a target: the artist sees it count down.
@@ -142,6 +158,7 @@ internal object CloseUpFeatures {
                     if (crop !== photo) crop.recycle()
                 }
                 FingerprintBuildProgress.set(FingerprintBuildProgress.Step(i + 1, views.size))
+                if (i + 1 == quickCount && i + 1 < views.size) onQuickSet?.invoke(concat(parts))
             }
         } finally {
             FingerprintBuildProgress.set(null)

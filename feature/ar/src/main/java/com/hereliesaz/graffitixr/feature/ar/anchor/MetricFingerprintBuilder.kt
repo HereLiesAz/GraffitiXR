@@ -267,13 +267,20 @@ object MetricFingerprintBuilder {
                 var i = 0
                 while (i + 1 < pos.size) { pixels.add(Pixel(pos[i], pos[i + 1])); i += 2 }
                 val (basePixels, baseDescs) = applyMask(mask, bitmap, pixels, descs)
-                val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps) { view, _ ->
+                val early = EarlyInstall(slam, cvView, intr, planePointWorld, planeNormalWorld, anchorModel,
+                    minPoints, glView, rotationDeg)
+                // Install the photo's own features straight away so relocalization starts now; the
+                // close-ups below only add to it.
+                if (features.closeUps) early.install(basePixels, baseDescs)
+                val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps,
+                    onQuickSet = { p, d -> early.install(p, d) }) { view, _ ->
                     StandaloneFingerprintBuilder.detectSuperPoint(slam, view)
                 }
                 if (baseDescs !== descs && baseDescs !== mDescs) baseDescs.release()
                 val fp = try {
                     ingestSingle(slam, mDescs, mPixels, cvView, intr,
-                        planePointWorld, planeNormalWorld, anchorModel, minPoints, glView, rotationDeg)
+                        planePointWorld, planeNormalWorld, anchorModel, minPoints, glView, rotationDeg,
+                        markCenterOverride = early.markCenter)
                 } finally {
                     if (mDescs !== descs) mDescs.release()
                 }
@@ -300,18 +307,49 @@ object MetricFingerprintBuilder {
             }
             val pixels = kp.toArray().map { Pixel(it.pt.x.toFloat(), it.pt.y.toFloat()) }
             val (basePixels, baseDescs) = applyMask(mask, bitmap, pixels, d)
-            val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps) { view, n ->
+            val early = EarlyInstall(slam, cvView, intr, planePointWorld, planeNormalWorld, anchorModel,
+                minPoints, glView, rotationDeg)
+            if (features.closeUps) early.install(basePixels, baseDescs)
+            val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps,
+                onQuickSet = { p, dd -> early.install(p, dd) }) { view, n ->
                 StandaloneFingerprintBuilder.detectOrb(view, null, n)
             }
             if (baseDescs !== d && baseDescs !== mDescs) baseDescs.release()
             try {
                 return ingestSingle(slam, mDescs, mPixels, cvView, intr,
-                    planePointWorld, planeNormalWorld, anchorModel, minPoints, glView, rotationDeg)
+                    planePointWorld, planeNormalWorld, anchorModel, minPoints, glView, rotationDeg,
+                    markCenterOverride = early.markCenter)
             } finally {
                 if (mDescs !== d) mDescs.release()
             }
         } finally {
             gray.release(); norm.release(); kp.release(); d.release()
+        }
+    }
+
+    /**
+     * Installs a partial fingerprint during the build so relocalization can start before the slow
+     * close-ups finish. Each [install] replaces the last; the final [ingestSingle] replaces them all
+     * and keeps the overlay centre the first one set, so the artwork does not shift when the finer
+     * views land. A failed install (too few points yet) is ignored: the final one is authoritative.
+     */
+    private class EarlyInstall(
+        private val slam: SlamManager,
+        private val cvView: FloatArray, private val intr: FloatArray,
+        private val planePointWorld: FloatArray, private val planeNormalWorld: FloatArray,
+        private val anchorModel: FloatArray, private val minPoints: Int,
+        private val glView: FloatArray, private val rotationDeg: Int,
+    ) {
+        var markCenter: FloatArray? = null
+            private set
+
+        fun install(pixels: List<Pixel>, descs: Mat) {
+            val savedRefusal = lastRefusalReason
+            val fp = ingestSingle(slam, descs, pixels, cvView, intr, planePointWorld, planeNormalWorld,
+                anchorModel, minPoints, glView, rotationDeg, markCenterOverride = markCenter)
+            // A short first install is not a refusal: the final pass reports the real outcome.
+            if (fp == null) lastRefusalReason = savedRefusal
+            else if (markCenter == null) markCenter = fp.markCenterLocal.takeIf { it.isNotEmpty() }?.toFloatArray()
         }
     }
 
@@ -322,13 +360,34 @@ object MetricFingerprintBuilder {
      */
     private fun withCloseUps(
         bitmap: Bitmap, mask: Bitmap?, pixels: List<Pixel>, descs: Mat, enabled: Boolean,
+        /**
+         * Called with [pixels]/[descs] plus the quick set of close-ups once those are learned, before
+         * the finer ones are; the Mat is released after the call returns. See [CloseUpFeatures.detect].
+         */
+        onQuickSet: ((List<Pixel>, Mat) -> Unit)? = null,
         detect: (Bitmap, Int) -> StandaloneFingerprintBuilder.DetectedFeatures?,
     ): Pair<List<Pixel>, Mat> {
         if (!enabled || pixels.isEmpty() || descs.empty()) return pixels to descs
-        val extra = CloseUpFeatures.detect(bitmap, pixels.size, detect)
+        val quick: ((StandaloneFingerprintBuilder.DetectedFeatures?) -> Unit)? = onQuickSet?.let { cb ->
+            { partial ->
+                mergeCloseUps(bitmap, mask, pixels, descs, partial)?.let { (p, d) ->
+                    try { cb(p, d) } finally { d.release() }
+                }
+            }
+        }
+        val extra = CloseUpFeatures.detect(bitmap, pixels.size, quick, detect)
+        return mergeCloseUps(bitmap, mask, pixels, descs, extra) ?: (pixels to descs)
+    }
+
+    /** [pixels]/[descs] plus [extra] (kept to [mask]); null when [extra] adds nothing usable. */
+    private fun mergeCloseUps(
+        bitmap: Bitmap, mask: Bitmap?, pixels: List<Pixel>, descs: Mat,
+        extra0: StandaloneFingerprintBuilder.DetectedFeatures?,
+    ): Pair<List<Pixel>, Mat>? {
+        val extra = extra0
             ?.let { StandaloneFingerprintBuilder.filterByMask(it, mask, bitmap.width, bitmap.height) }
             ?.takeIf { it.rows > 0 && it.cols == descs.cols() && it.type == descs.type() }
-            ?: return pixels to descs
+            ?: return null
         val extraDescs = Mat(extra.rows, extra.cols, extra.type)
         if (extra.type == org.opencv.core.CvType.CV_32F) {
             val floats = FloatArray(extra.rows * extra.cols)
@@ -379,6 +438,8 @@ object MetricFingerprintBuilder {
         glView: FloatArray? = null,
         /** rotationNeeded for this capture; rotates [glView] to match the points. See 0.10. */
         rotationDeg: Int = 0,
+        /** Overlay centre from an earlier partial install of this same capture; reused, not recomputed. */
+        markCenterOverride: FloatArray? = null,
     ): Fingerprint? {
         val res = MetricMarks.backProjectToPlane(
             pixelArray(pixels), cvView, planePointWorld, planeNormalWorld,
@@ -406,7 +467,7 @@ object MetricFingerprintBuilder {
         val anchorCam = RigidMath.multiply(cvView, anchorModel)
 
         // Center the AR overlay on the marks (their centroid), not the screen-center anchor.
-        val markCenterLocal = marksCentroidLocal(res.points, cvView, anchorModel)
+        val markCenterLocal = markCenterOverride ?: marksCentroidLocal(res.points, cvView, anchorModel)
         slam.overlayMarkCenterLocal = markCenterLocal
 
         val keptDesc = Mat(res.count, descAll.cols(), descAll.type())

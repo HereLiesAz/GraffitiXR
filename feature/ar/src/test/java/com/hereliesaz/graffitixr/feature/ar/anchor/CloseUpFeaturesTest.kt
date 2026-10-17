@@ -35,6 +35,15 @@ class CloseUpFeaturesTest {
     }
 
     @Test
+    fun `coarsest crops come first and the quick set is a leading prefix`() {
+        val views = CloseUpFeatures.views(w, h)
+        assertEquals(views.sortedBy { it.zoom }.map { it.zoom }, views.map { it.zoom })
+        val quick = views.count { it.zoom <= CloseUpFeatures.QUICK_MAX_ZOOM }
+        assertEquals(13, quick)
+        assertTrue(views.take(quick).all { it.zoom <= CloseUpFeatures.QUICK_MAX_ZOOM })
+    }
+
+    @Test
     fun `close-ups are about a live frame's size, and their features land back on the photo's pixels`() {
         val v = CloseUpFeatures.View(400, 300, 267, 200, 6f)
         val (outW, outH) = CloseUpFeatures.outputSize(v, w, h)
