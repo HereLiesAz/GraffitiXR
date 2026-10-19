@@ -504,6 +504,7 @@
     <string name="help_light">Zaklamp: Schakel apparaat-LED in. Instructies: Gebruik dit om donkere muren te verlichten voor betere AR-tracking.</string>
 
     <string name="help_lock_trace">Bevriezen: vergrendelt het hele touchscreen zodat calqueerpapier het ontwerp niet verschuift — in tegenstelling tot Vergrendelen blokkeert dit ook scrollen en tikken. Om te stoppen: snel Volume Omhoog, Omlaag, Omhoog, Omlaag indrukken.</string>
+    <string name="help_lock_ar">Bevriezen: vergrendelt het hele touchscreen terwijl je schildert, zodat een hand, een mouw of een broekzak het ontwerp niet verschuift en geen modus wisselt. Het scherm vergrendelt ook vanzelf zodra het bedekt is (in een zak, met de voorkant omlaag). Om te stoppen druk je snel op Volume omhoog, omlaag, omhoog, omlaag.</string>
 
 
 

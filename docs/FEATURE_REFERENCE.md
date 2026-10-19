@@ -184,6 +184,11 @@ deliberate Volume Up-Down-Up-Down exit** — a physical-button sequence, not a t
 resting hand or the paper itself can't trigger it by accident. Exports a transparent-background PNG
 (not a solid fill).
 
+**Freeze** (Trace ▸ Freeze, and AR ▸ Freeze) is that lock. While frozen the orientation is held as it
+was, Link edits from the peer wait and land in order on unlock, and an image shared into the app
+waits too (its replace prompt would take touches). In AR the screen also locks by itself while the
+proximity sensor is covered (a pocket, the phone face-down) and unlocks when it is uncovered.
+
 ---
 
 ## 2. The design (`Layer`)

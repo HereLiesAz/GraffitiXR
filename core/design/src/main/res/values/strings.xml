@@ -556,6 +556,7 @@
     <string name="help_light">Flashlight: Toggle device LED. Instructions: Use this to illuminate dark walls for better AR tracking.</string>
     <!-- Lock/Freeze help text. -->
     <string name="help_lock_trace">Freeze: locks the whole touchscreen so tracing paper doesn\'t drag the design — unlike Lock, this also blocks scrolling and taps. To exit, press Volume Up, Down, Up, Down — quickly.</string>
+    <string name="help_lock_ar">Freeze: locks the whole touchscreen while you paint, so a hand, a sleeve or a pocket can\'t move the design or switch modes. The screen also locks by itself whenever it is covered (in a pocket, face-down). To exit Freeze, press Volume Up, Down, Up, Down — quickly.</string>
     <!-- Interactive 'Help' help text. -->
     <!-- Individual Layer help text. -->
 

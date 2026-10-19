@@ -254,6 +254,7 @@
     <string name="help_settings">Mga Setting ng App: I-configure ang mga kagustuhan. Mga Tagubilin: Buksan para isaayos ang handedness, mga unit, at mga parameter ng pag-scan.</string>
     <string name="help_light">Flashlight: I-toggle ang LED ng device. Mga Tagubilin: Gamitin ito upang maipaliwanag ang madilim na pader para sa mas mahusay na pagsubaybay sa AR.</string>
     <string name="help_lock_trace">I-freeze: ni-lock ang buong touchscreen para hindi maigalaw ang disenyo ng tracing paper — hindi tulad ng Lock, ino-block din nito ang pag-scroll at pagtap. Para lumabas, pindutin nang mabilis ang Volume Up, Down, Up, Down.</string>
+    <string name="help_lock_ar">I-freeze: nila-lock ang buong touchscreen habang nagpipinta ka, para hindi magalaw ng kamay, manggas o bulsa ang disenyo o makapagpalit ng mode. Kusa ring nala-lock ang screen kapag natatakpan ito (nasa bulsa, nakataob). Para lumabas, pindutin nang mabilis ang Volume Up, Down, Up, Down.</string>
     <string name="unit_feet">ft</string>
     <string name="unit_centimeters">cm</string>
     <string name="unit_meters">m</string>

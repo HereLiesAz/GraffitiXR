@@ -499,6 +499,7 @@
     <string name="help_light">Taschenlampe: Geräte-LED umschalten. Anweisungen: Verwenden Sie diese Funktion, um dunkle Wände für ein besseres AR-Tracking zu beleuchten.</string>
     <!-- Lock/Freeze help text. -->
     <string name="help_lock_trace">Einfrieren: Sperrt den gesamten Touchscreen, damit Pauspapier das Design nicht verschiebt — anders als Sperren blockiert dies auch Scrollen und Tippen. Zum Beenden: Lautstärke Hoch, Runter, Hoch, Runter — schnell — drücken.</string>
+    <string name="help_lock_ar">Einfrieren: sperrt den ganzen Touchscreen, während du malst, damit Hand, Ärmel oder Tasche das Design nicht verschieben und keinen Modus wechseln. Der Bildschirm sperrt sich außerdem von selbst, sobald er abgedeckt ist (in der Tasche, mit der Vorderseite nach unten). Zum Beenden schnell Lauter, Leiser, Lauter, Leiser drücken.</string>
     <!-- Interactive 'Help' help text. -->
     <!-- Individual Layer help text. -->
 

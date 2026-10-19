@@ -32,7 +32,7 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
   - Where: `PoseFusion.kt:309, 327-337`. Below COLD_SNAP the blend is about 0.07 per relock. The ratio's denominator (`MobileGS.cpp:1222`) counts every pass plus the map and paint correspondences.
   - Fix: on a cold start, snap on a spread-gated bar, and compute the inlier ratio per correspondence source.
   - Done: the snap bar here; the ratio dilution by paint and map correspondences is removed at its source (B10 dedupe and prior gating, B7 map gating).
-- [ ] **A6. No touch lock in AR while pocketed.**
+- [x] **A6. No touch lock in AR while pocketed.**
   - Where: `MainActivity.kt:741` keeps the screen on, but Freeze exists only in TRACE (`:2758-2770`).
   - Effect: fabric touches drag the overlay, switch modes (tearing AR down) or re-capture.
   - Fix: block input while the proximity sensor is covered, and offer Freeze in AR.
@@ -139,7 +139,7 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
 - [ ] **D3. Overlay has no no-ARCore tracking fallback, despite the README.**
   - Where: `MainScreen.kt:783-792`, `MainActivity.kt:2642-2680`.
   - Fix: add the marked-shape planar tracking (the standalone OpenCV pipeline) to Overlay when ARCore is absent.
-- [ ] **D4. Freeze doesn't lock orientation.**
+- [x] **D4. Freeze doesn't lock orientation.**
   - Where: `AndroidManifest.xml:82`; `requestedOrientation` is never set.
   - Fix: lock to the current orientation on Freeze and release it on unlock.
 - [ ] **D5. Controls at the top of the screen.**
@@ -157,10 +157,10 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
 - [ ] **D9. UI text frames the app as murals only.**
   - Where: `lib_no_projects_hint`, `help_project_host`, `help_new`, `help_save`, `help_load`, `onboarding_mockup[0]` ("brush"), dead `settings_mural_method_label` and `nav_update_info`.
   - Fix: say piece/project and spray can, in all 15 locales.
-- [ ] **D10. Guest edits can land during Freeze.**
+- [x] **D10. Guest edits can land during Freeze.**
   - Where: `EditorViewModel.kt:1523-1547` applies guest ops with no mode or touch-lock check.
   - Fix: hold guest ops while frozen and apply them on unlock.
-- [ ] **D11. Dialogs can take touches during Freeze.**
+- [x] **D11. Dialogs can take touches during Freeze.**
   - Where: a shared-in image raises the replace dialog (`MainActivity.kt:349-356, 625-629`).
   - Fix: defer incoming shares until unlock.
 - [x] **D12. The privacy policy doesn't disclose ARCore (Google Play Services for AR).**

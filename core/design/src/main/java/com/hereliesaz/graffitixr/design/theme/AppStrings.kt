@@ -220,6 +220,7 @@ fun rememberAppStrings(): AppStrings {
             appSettings = R.string.help_settings,
             flashlight = R.string.help_light,
             lockTrace = R.string.help_lock_trace,
+            lockAr = R.string.help_lock_ar,
         ),
         adj = AppStrings.Adjustments(
             detail = stringResource(R.string.adj_detail),
@@ -580,6 +581,7 @@ data class AppStrings(
         val appSettings: Int,
         val flashlight: Int,
         val lockTrace: Int,
+        val lockAr: Int,
     )
     data class Adjustments(
         val detail: String,

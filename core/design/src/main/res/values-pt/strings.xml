@@ -499,6 +499,7 @@
     <string name="help_light">Lanterna: Alterne o LED do dispositivo. Instruções: Use isso para iluminar paredes escuras para melhor rastreamento AR.</string>
     <!-- Lock/Freeze help text. -->
     <string name="help_lock_trace">Congelar: bloqueia toda a tela sensível ao toque para que o papel vegetal não arraste o design — diferente de Bloquear, isso também bloqueia rolagem e toques. Para sair, pressione rápido Volume Aumentar, Diminuir, Aumentar, Diminuir.</string>
+    <string name="help_lock_ar">Congelar: bloqueia toda a tela sensível ao toque enquanto você pinta, para que uma mão, uma manga ou um bolso não movam o design nem troquem de modo. A tela também se bloqueia sozinha quando está coberta (no bolso, virada para baixo). Para sair, pressione rápido Volume para cima, baixo, cima, baixo.</string>
     <!-- Interactive 'Help' help text. -->
     <!-- Individual Layer help text. -->
 

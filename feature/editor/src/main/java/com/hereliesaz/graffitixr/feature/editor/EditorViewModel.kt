@@ -1531,7 +1531,36 @@ class EditorViewModel @Inject constructor(
      * persisted to the authoritative project and rebroadcast once written, with no undo entry
      * (Measure's own Save is not undoable either).
      */
+    // Freeze (the touch lock) holds every incoming Link op: the artist is tracing or painting from a
+    // design that must not move under them. Held in arrival order and applied on unlock.
+    private val heldOps = ArrayDeque<() -> Unit>()
+    private var frozen = false
+
+    /** Freeze on or off; off applies whatever Link delivered meanwhile, in order. */
+    fun setFrozen(on: Boolean) {
+        val release = synchronized(heldOps) {
+            frozen = on
+            if (on) emptyList() else heldOps.toList().also { heldOps.clear() }
+        }
+        release.forEach { it() }
+    }
+
+    /** Runs [apply] now, or on unlock if frozen. */
+    private fun unlessFrozen(apply: () -> Unit) {
+        val now = synchronized(heldOps) {
+            if (frozen) { heldOps.addLast(apply); false } else true
+        }
+        if (now) apply()
+    }
+
+    /** A host op for this guest, held while frozen. */
+    fun receiveSpectatorOp(op: Op) = unlessFrozen { applySpectatorOp(op) }
+
     fun applyGuestOp(op: Op, hostedArStandalone: Boolean = standaloneArBackendActive) {
+        if (synchronized(heldOps) { frozen }) {
+            unlessFrozen { applyGuestOp(op, hostedArStandalone) }
+            return
+        }
         if (op is Op.WallWidth) {
             persistWallWidth(op.meters) { opEmitter.emit(op) }
             return

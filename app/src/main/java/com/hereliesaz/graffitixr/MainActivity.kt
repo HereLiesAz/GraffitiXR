@@ -180,6 +180,8 @@ private val VOLUME_UNLOCK_SEQUENCE = intArrayOf(
     KeyEvent.KEYCODE_VOLUME_DOWN,
 )
 private const val VOLUME_UNLOCK_WINDOW_MS = 1500L
+/** Proximity readings under this (cm) are "covered": a pocket, a jacket, the phone face-down. */
+private const val PROXIMITY_NEAR_CM = 3f
 
 /** Saved-state key for a shared-in image still waiting for a project to land in. */
 private const val STATE_PENDING_SHARED_IMAGE = "pending_shared_image"
@@ -628,8 +630,11 @@ class MainActivity : AppCompatActivity() {
                 // creates a project, then add it.
                 val sharedImage = incomingSharedImage
                 val projectIdForShare = editorUiState.projectId
-                LaunchedEffect(sharedImage, projectIdForShare) {
-                    if (sharedImage != null && projectIdForShare != null) {
+                // Also held while frozen: adding it raises the replace prompt, which would take the
+                // touches Freeze exists to refuse. It lands on unlock.
+                val shareFrozen = mainUiState.isTouchLocked
+                LaunchedEffect(sharedImage, projectIdForShare, shareFrozen) {
+                    if (sharedImage != null && projectIdForShare != null && !shareFrozen) {
                         editorViewModel.onAddLayer(sharedImage)
                         incomingSharedImage = null
                     }
@@ -766,6 +771,14 @@ class MainActivity : AppCompatActivity() {
                     // resting hand can't pull down the notification shade or hit a nav gesture. The
                     // bars still swipe in transiently (then re-hide) so the user is never trapped.
                     // Any other state shows them normally.
+                    // Freeze also holds the orientation it was frozen in: a phone taped to a wall or
+                    // laid on paper must not rotate the tracing out from under the artist. Unlock
+                    // hands rotation back to the manifest's default.
+                    requestedOrientation = if (mainUiState.isTouchLocked) {
+                        android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LOCKED
+                    } else {
+                        android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                    }
                     val insets = WindowInsetsControllerCompat(window, window.decorView)
                     if (mainUiState.isTouchLocked) {
                         insets.systemBarsBehavior =
@@ -852,8 +865,10 @@ class MainActivity : AppCompatActivity() {
 
                 LaunchedEffect(arViewModel, editorViewModel) {
                     // Also flushes, in order, any spectator ops that arrived before this effect ran.
-                    arViewModel.setSpectatorOpHandler { op -> editorViewModel.applySpectatorOp(op) }
+                    arViewModel.setSpectatorOpHandler { op -> editorViewModel.receiveSpectatorOp(op) }
                 }
+                // Freeze holds Link edits (both directions) until unlock.
+                LaunchedEffect(mainUiState.isTouchLocked) { editorViewModel.setFrozen(mainUiState.isTouchLocked) }
                 // Co-op v4, host side: a connected guest's edits land on the authoritative project.
                 LaunchedEffect(arViewModel, editorViewModel) {
                     arViewModel.setGuestOpHandler { op ->
@@ -2184,12 +2199,17 @@ class MainActivity : AppCompatActivity() {
                 }
                 guidanceControllerRef = guidanceController
 
+                // In AR the screen also locks itself while the proximity sensor is covered (in a
+                // pocket, against a jacket): touches there are fabric, not the artist. It lifts the
+                // moment the sensor is uncovered; no gesture is needed.
+                val pocketed = rememberProximityCovered(enabled = editorUiState.editorMode == EditorMode.AR)
+
                 // Trace ▸ Freeze: absorb EVERY pointer event above the (now folded) rail so nothing
                 // responds — including the rail's app-icon unfold tap, which would otherwise bring the
                 // rail back. Drawn as the last sibling in the theme Surface, so it sits on top of the
                 // host layout and the rail it renders. Unlock stays volume-key only (key events don't
                 // go through this), matching the existing touch lock.
-                if (mainUiState.isTouchLocked) {
+                if (mainUiState.isTouchLocked || pocketed) {
                     Box(
                         Modifier
                             .fillMaxSize()
@@ -2204,6 +2224,38 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * True while the proximity sensor reads covered, when [enabled]. Listens only while enabled; a
+     * device without the sensor always reads uncovered.
+     */
+    @Composable
+    private fun rememberProximityCovered(enabled: Boolean): Boolean {
+        var covered by remember { mutableStateOf(false) }
+        DisposableEffect(enabled) {
+            val sm = getSystemService(android.content.Context.SENSOR_SERVICE) as? android.hardware.SensorManager
+            val sensor = sm?.getDefaultSensor(android.hardware.Sensor.TYPE_PROXIMITY)
+            if (!enabled || sm == null || sensor == null) {
+                covered = false
+                return@DisposableEffect onDispose {}
+            }
+            val listener = object : android.hardware.SensorEventListener {
+                override fun onSensorChanged(event: android.hardware.SensorEvent) {
+                    // Many sensors are binary (0 or their maximum range); near is under both the
+                    // range and a few centimetres.
+                    val d = event.values.firstOrNull() ?: return
+                    covered = d < minOf(sensor.maximumRange, PROXIMITY_NEAR_CM)
+                }
+                override fun onAccuracyChanged(s: android.hardware.Sensor?, accuracy: Int) = Unit
+            }
+            sm.registerListener(listener, sensor, android.hardware.SensorManager.SENSOR_DELAY_NORMAL)
+            onDispose {
+                sm.unregisterListener(listener)
+                covered = false
+            }
+        }
+        return covered
     }
 
     @Composable
@@ -2497,6 +2549,22 @@ class MainActivity : AppCompatActivity() {
                         shape = AzButtonShape.NONE,
                         disabled = showLibrary,
                         onClick = { editorViewModel.onToggleModeTransformLocked(EditorMode.AR) },
+                    )
+                    // Freeze in AR, as in Trace: the whole touchscreen locked while painting, so a
+                    // hand, a sleeve or a pocket can't drag the design, switch modes or re-capture.
+                    azRailSubItem(
+                        id = "mode.ar.freeze",
+                        hostId = railHostOf("mode.ar.freeze"),
+                        text = "Freeze",
+                        color = navItemColor,
+                        classifiers = setOf("toggle"),
+                        shape = AzButtonShape.NONE,
+                        disabled = showLibrary,
+                        onClick = {
+                            val freezing = !isTouchLocked
+                            mainViewModel.setTouchLocked(freezing)
+                            if (freezing) editorViewModel.onDismissPanel()
+                        },
                     )
                     // Measure — two taps on the wall the design is drawn on. Needs the anchor's wall
                     // frame, and the ARCore backend: standalone has no measurement path yet, and must
@@ -2905,6 +2973,9 @@ class MainActivity : AppCompatActivity() {
             }
             if (editorUiState.editorMode == EditorMode.TRACE) {
                 if (isTouchLocked) azHighlight("mode.trace.freeze", active = Cyan)
+            }
+            if (editorUiState.editorMode == EditorMode.AR) {
+                if (isTouchLocked) azHighlight("mode.ar.freeze", active = Cyan)
             }
             if (editorUiState.activePanel == EditorPanel.ADJUST) azHighlight("design.adjust", active = Cyan)
             if (editorUiState.activePanel == EditorPanel.COLOR) azHighlight("design.balance", active = Cyan)

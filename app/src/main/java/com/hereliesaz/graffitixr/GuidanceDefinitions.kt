@@ -37,7 +37,7 @@ internal val GUIDANCE_HIGHLIGHT_IDS =
  */
 internal val DECORATED_IDS = setOf(
     "item.open",
-    "doodle.create", "mode.ar.light", "mode.ar.lock", "mode.ar.measure",
+    "doodle.create", "mode.ar.light", "mode.ar.lock", "mode.ar.freeze", "mode.ar.measure",
     "coop", "coop.host", "coop.join",
     "mode.ar",
     "mode.overlay.light", "mode.overlay.lock", "mode.overlay.gyro",
