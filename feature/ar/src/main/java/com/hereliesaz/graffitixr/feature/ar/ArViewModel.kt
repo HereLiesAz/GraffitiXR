@@ -3979,11 +3979,16 @@ class ArViewModel @Inject constructor(
         val map = slamManager.getWallFeatureMap()?.takeIf { it.pointCount > 0 }
 
         if (standaloneBackend) {
-            if (map == null) return
+            val standalonePaint = slamManager.getPaintMarks()
+            val standaloneGrid = slamManager.exportPaintGrid()?.let { java.util.Base64.getEncoder().encodeToString(it) }
+            val standaloneGrown = slamManager.getGrownWall()
+            if (map == null && standalonePaint == null && standaloneGrid == null && standaloneGrown == null) return
             val mapFromFingerprint = currentProject.sphereSlamMapFromFingerprint
+            // The frame check: the map's co-registration, or (no map yet) the seeded Doodle's anchor.
+            val nativeAnchor = map?.anchor ?: slamManager.getDoodleAnchor()
             if (
                 mapFromFingerprint.size != 16 ||
-                !sameStandaloneTransform(map.anchor, mapFromFingerprint)
+                !sameStandaloneTransform(nativeAnchor, mapFromFingerprint)
             ) {
                 appendDiag(
                     "SphereSLAM explicit precision-map save refused: " +
@@ -3997,7 +4002,11 @@ class ArViewModel @Inject constructor(
                     project.sphereSlamReferenceUri == currentProject.sphereSlamReferenceUri
                 ) {
                     project.copy(
-                        sphereSlamWallFeatureMap = map,
+                        sphereSlamWallFeatureMap = map ?: project.sphereSlamWallFeatureMap,
+                        // Paint marks, area progress and grown rows live in the same page frame.
+                        sphereSlamPaintMarks = standalonePaint ?: project.sphereSlamPaintMarks,
+                        sphereSlamPaintGrid = standaloneGrid ?: project.sphereSlamPaintGrid,
+                        sphereSlamGrownDoodle = standaloneGrown ?: project.sphereSlamGrownDoodle,
                         sphereSlamWallFeatureMapFrameVersion =
                             com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                         // Phase 1b: persist the per-keyframe orientation log alongside the map it is
@@ -5431,6 +5440,29 @@ class ArViewModel @Inject constructor(
 
     @Volatile private var lastStandaloneGuideKey: String? = null
     @Volatile private var lastStandaloneNativeUiUpdateMs: Long = Long.MIN_VALUE
+    /** The native Doodle generation whose standalone paint/grid/grown rows were restored. */
+    @Volatile private var standaloneTeleologicalRestoredFor: Long = Long.MIN_VALUE
+
+    /**
+     * Once per standalone seed (a new native Doodle generation holding this project's fingerprint):
+     * put back what the wall confirmed in earlier sessions -- grown rows, paint marks, area progress --
+     * so standalone does not start from zero every session.
+     */
+    private fun maybeRestoreStandaloneTeleological() {
+        val gen = slamManager.getDoodleGeneration()
+        if (gen == standaloneTeleologicalRestoredFor) return
+        val project = projectRepository.currentProject.value ?: return
+        val fp = project.sphereSlamFingerprint ?: return
+        // Only onto this project's own fingerprint, freshly seeded (no grown rows yet).
+        if (slamManager.getWallKeypointCount() != fp.descriptorsRows) return
+        standaloneTeleologicalRestoredFor = gen
+        project.sphereSlamGrownDoodle?.takeIf { it.pointCount > 0 }?.let { slamManager.restoreGrownWall(it) }
+        project.sphereSlamPaintMarks?.takeIf { it.pointCount > 0 }?.let { slamManager.restorePaintMarks(it) }
+        project.sphereSlamPaintGrid?.let { encoded ->
+            runCatching { java.util.Base64.getDecoder().decode(encoded) }.getOrNull()
+                ?.let { slamManager.restorePaintGrid(it) }
+        }
+    }
     @Volatile private var lastStandaloneSavedMapRevision: Long = Long.MIN_VALUE
     @Volatile private var lastStandaloneMapSaveMs: Long = Long.MIN_VALUE
     private val standaloneMapSaveInFlight = AtomicBoolean(false)
@@ -5552,6 +5584,7 @@ class ArViewModel @Inject constructor(
         val mapPoints = slamManager.getMapPointCount()
         val mapRevision = slamManager.getWallFeatureMapRevision()
         maybePersistStandaloneWallFeatureMap(now, mapPoints, mapRevision)
+        maybeRestoreStandaloneTeleological()
 
         _uiState.update { state ->
             state.copy(

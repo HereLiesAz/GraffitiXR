@@ -516,8 +516,16 @@ class SlamManager @Inject constructor(
         map.descriptorsData, map.descriptorsRows, map.descriptorsCols, map.descriptorsType, map.points3d,
     )
 
-    /** Drop the paint set — required whenever the doodle FRAME changes (a new capture). */
+    /** Drop the paint set and wipe area progress: a different wall or project, not a re-capture. */
     fun clearPaintMarks() = nativeClearPaintMarks()
+
+    /**
+     * Before a NEW capture's Doodle is installed: paint marks and the map are carried into its frame
+     * through a fresh lock of the old Doodle, or dropped without one. Area progress (design-relative)
+     * is kept either way. [captureView]: the view restoreWallDoodleMetric gets, or null.
+     */
+    fun carryDoodleFrameState(captureView: FloatArray?) =
+        nativeCarryDoodleFrameState(captureView?.takeIf { it.size >= 16 })
 
     fun getPaintMarkCount(): Int = nativeGetPaintMarkCount()
 
@@ -829,6 +837,12 @@ class SlamManager @Inject constructor(
         nativeUpdateCamera(viewMatrix, projectionMatrix, timestampNs)
     }
 
+    /** Which Doodle native holds: changes whenever it is replaced or cleared. */
+    fun getDoodleGeneration(): Long = nativeGetDoodleGeneration()
+
+    /** Inliers of the current reloc lock that stood on paint; 0 without a fresh lock. */
+    fun getRelocPaintInliers(): Int = nativeGetRelocPaintInliers()
+
     /** Whether the reloc worker would take a frame now: idle, with a Doodle to match. Cheap. */
     fun relocWantsFrame(): Boolean = nativeRelocWantsFrame()
 
@@ -1114,7 +1128,10 @@ class SlamManager @Inject constructor(
     private external fun nativeSetChangePassEnabled(enabled: Boolean)
     private external fun nativeExportPaintGrid(): ByteArray?
     private external fun nativeRelocWantsFrame(): Boolean
+    private external fun nativeGetDoodleGeneration(): Long
+    private external fun nativeGetRelocPaintInliers(): Int
     private external fun nativeExportGrownWall(): ByteArray?
+    private external fun nativeCarryDoodleFrameState(view: FloatArray?)
     private external fun nativeRestoreGrownWall(desc: ByteArray, rows: Int, cols: Int, type: Int, points: FloatArray)
     private external fun nativeAutoFitDesign(minimumEvidence: Boolean): FloatArray?
     private external fun nativeGetLastAutoFitResult(): Int

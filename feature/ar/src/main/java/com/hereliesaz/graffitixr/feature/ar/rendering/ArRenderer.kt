@@ -2263,6 +2263,11 @@ class ArRenderer(
                         hybridFrameReady = hybridFrameReady,
                         hasRelocCapturePose = captureAnchorCam != null,
                         relocGated = relocGated,
+                        // A lock standing on paint gets through a degrading hybrid page: the page is
+                        // the wall before the paint, the paint is the wall now.
+                        relocPaintBacked = slamManager.getRelocPaintInliers() >=
+                            com.hereliesaz.graffitixr.feature.ar.anchor.CorrectionSourceArbiter.PAINT_BACKED_MIN_INLIERS,
+                        hybridConfidence = hybridAccepted?.confidence ?: 1f,
                     )
                 }
             val anchorMatrix: FloatArray = when {

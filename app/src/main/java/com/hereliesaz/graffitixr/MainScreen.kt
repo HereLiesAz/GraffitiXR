@@ -325,7 +325,10 @@ fun MainScreen(
                         // doodle value is part of the key so a newly accepted wall page
                         // re-registers the same design against the new MobileGS wall frame.
                         LaunchedEffect(
-                            standaloneDesign,
+                            standaloneDesign?.bitmap,
+                            standaloneDesign?.uri,
+                            standaloneDesign?.scale,
+                            standaloneDesign?.rotationZ,
                             arUiState.sphereSlamFingerprint,
                             arUiState.sphereSlamReferenceUri,
                         ) {
@@ -334,7 +337,7 @@ fun MainScreen(
                                 arUiState.sphereSlamFingerprint != null
                             ) {
                                 val guide = withContext(Dispatchers.Default) {
-                                    compositeDesignForAr(standaloneDesign)
+                                    compositeDesignForAr(guideLayer(standaloneDesign))
                                 }
                                 val guideKey =
                                     (standaloneDesign.uri?.toString() ?: "memory") + "|" +
@@ -660,12 +663,20 @@ fun MainScreen(
                                 editorViewModel.applyArFit(fit.dx, fit.dy, fit.dThetaRad, fit.scale)
                             }
                         }
-                        LaunchedEffect(visibleDesign, arUiState.isAnchorEstablished) {
+                        // Keyed on what the composite is made of (the source bitmap and the geometry baked
+                        // into it), never the whole Layer: a tone or opacity edit must not re-register.
+                        LaunchedEffect(
+                            visibleDesign?.bitmap,
+                            visibleDesign?.uri,
+                            visibleDesign?.scale,
+                            visibleDesign?.rotationZ,
+                            arUiState.isAnchorEstablished,
+                        ) {
                             if (!arUiState.isAnchorEstablished || visibleDesign == null) {
                                 return@LaunchedEffect
                             }
                             val guide = withContext(Dispatchers.Default) {
-                                compositeDesignForAr(visibleDesign)
+                                compositeDesignForAr(guideLayer(visibleDesign))
                             }
                             arViewModel.updatePaintingGuide(guide, visibleDesign.uri?.toString())
                         }
@@ -1101,6 +1112,22 @@ fun MainScreen(
 
     }
 }
+
+/**
+ * The layer as the painting guide sees it: the artwork itself, at full opacity and neutral tone.
+ * Tone and opacity are how the overlay looks on screen. Baked into the guide, a faint overlay
+ * would weight every grid cell to zero and hold progress at 0%.
+ */
+internal fun guideLayer(layer: Layer): Layer = layer.copy(
+    opacity = 1f,
+    brightness = 0f,
+    contrast = 1f,
+    saturation = 1f,
+    colorBalanceR = 1f,
+    colorBalanceG = 1f,
+    colorBalanceB = 1f,
+    isInverted = false,
+)
 
 /**
  * Composites the visible layers into the AR wall texture.

@@ -54,10 +54,10 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
 
 ## B. Native relocalizer and the Doodle
 
-- [ ] **B1. Self-grown rows are never saved.**
+- [x] **B1. Self-grown rows are never saved.**
   - Where: `MobileGS.cpp:2162-2188` grows in memory only. `exportDoodle` is co-op only (`ArViewModel.kt:429, 462`); the save (`:4001-4011`, `:4303`) and the load (`:4519, 4541`) use the original capture.
   - Fix: persist the grown tail (rows and regions) with the project and restore it after the base. ARCore and standalone both.
-  - Done: ARCore (`grownDoodle`). Standalone lands with C3.
+  - Done: ARCore (`grownDoodle`) and standalone (`sphereSlamGrownDoodle`, C3).
 - [x] **B2. Self-grow hits a hard cap with no eviction.**
   - Where: `kMaxWallMarks = 5000` is shared with the capture and close-ups (`MobileGS.h:248`; `MobileGS.cpp:2056, 2118, 2139-2148`).
   - Fix: evict rows that are no longer re-observed (painted-over originals first) instead of refusing growth. The 5000 cap is memory and stays.
@@ -98,34 +98,34 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
 
 ## C. Teleological progress
 
-- [ ] **C1. Re-capturing mid-mural destroys progress and treats the paint as bare wall.**
+- [x] **C1. Re-capturing mid-mural destroys progress and treats the paint as bare wall.**
   - Where: `MetricDoodleBuilder.kt:111, 547` → `clearPaintMarks()` (`MobileGS.cpp:4095-4108`) wipes the marks and the design-relative grid. The new capture photo then becomes the bare-wall colour source (`MainViewModel.kt:874`; `MobileGS.cpp:3808-3824`). New-Doodle features on the paint are INSIDE and skipped (`:824`).
   - Fix: carry paint marks into the new frame, keep the grid, and never re-baseline bare-wall colour from a photo of an already-painted wall.
-- [ ] **C2. The grid's peer check vetoes large uniform fills (the first coat).**
+- [x] **C2. The grid's peer check vetoes large uniform fills (the first coat).**
   - Where: `MobileGS.cpp:3892-3909`. Unlatched design cells are peers, so a covering coat reads as lighting.
   - Fix: peers only from the ring, transparent cells and confirmed-bare cells.
-- [ ] **C3. Standalone starts from zero every session.**
+- [x] **C3. Standalone starts from zero every session.**
   - Where: `ArViewModel.kt:3960-3996` saves no paint marks or grid. On reload the bare-wall colour comes from the first sighting (`MobileGS.cpp:3866-3871`), so painted cells are latched as bare.
   - Fix: persist paint marks and the grid for standalone, and never take a first-sighting baseline over cells with saved progress.
-- [ ] **C4. A baseline-margin failure resets confirmation counts.**
+- [x] **C4. A baseline-margin failure resets confirmation counts.**
   - Where: `MobileGS.cpp:258-263`, then `:1873`, `:1895`. Repetitive designs never confirm.
   - Fix: a margin failure is "no data" and leaves counts alone.
-- [ ] **C5. Any layer edit re-registers the design and wipes corroboration.**
+- [x] **C5. Any layer edit re-registers the design and wipes corroboration.**
   - Where: `MainScreen.kt:662-670` is keyed on the whole `Layer`, so it runs `setArtworkDoodle` (`MobileGS.cpp:2996-3006`).
   - Fix: key on the layer's source and geometry only.
-- [ ] **C6. Any design nudge over 1 mm zeroes all confirmations.**
+- [x] **C6. Any design nudge over 1 mm zeroes all confirmations.**
   - Where: `MobileGS.cpp:2451-2462`, pushed on every footprint change (`ArViewModel.kt:4225`).
   - Fix: re-project confirmations through the old→new placement and keep the ones that still land.
-- [ ] **C7. Low layer opacity freezes progress at 0%.**
+- [x] **C7. Low layer opacity freezes progress at 0%.**
   - Where: `MainScreen.kt:1183`. At ≤12.5% opacity every grid weight is 0 (`MobileGS.cpp:3330-3333`), and feature progress is suppressed (`:1953`, `:1968`).
   - Fix: build the guide composite at full opacity.
-- [ ] **C8. Filter passes can't find stylised paint.**
+- [x] **C8. Filter passes can't find stylised paint.**
   - Where: `MobileGS.cpp:2856-2873`. Descriptors are sampled from the unfiltered design.
   - Fix: describe each filter's places on the filtered image as well, and keep both descriptor rows.
-- [ ] **C9. A fresh SphereSLAM hybrid page holds off the teleological correction.**
+- [x] **C9. A fresh SphereSLAM hybrid page holds off the teleological correction.**
   - Where: `ArRenderer.kt:2256-2340`. The page is a photo of the original wall and degrades as it is painted.
   - Fix: let a paint-backed reloc correction through the arbiter when hybrid quality drops.
-- [ ] **C10. Per-feature confirmation counts are never saved.**
+- [x] **C10. Per-feature confirmation counts are never saved.**
   - Fix: persist them with the paint grid.
 
 ## D. Modes, offline and design scope
@@ -202,7 +202,7 @@ The self-grown rows not being saved is B1, and standalone paint marks and grid n
 - [ ] **F9. The wrong capture photo can be used for the grid.**
   - Where: `ArViewModel.kt:4602-4608` uses `doodleImageUris.lastOrNull()` with the ARCore intrinsics, but standalone captures append to the same list (`MainViewModel.kt:346, 387`) and a rejected candidate's image stays (`:498-536`).
   - Fix: keep a dedicated ARCore capture-photo reference, and drop rejected candidates' images.
-- [ ] **F10. A standalone capture nulls the ARCore paint marks and grid.**
+- [x] **F10. A standalone capture nulls the ARCore paint marks and grid.**
   - Where: `MainViewModel.kt:385-386`.
   - Fix: keep them (they belong to the ARCore frame).
 - [ ] **F11. Silent and lossy failures.**

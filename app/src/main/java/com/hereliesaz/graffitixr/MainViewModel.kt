@@ -382,8 +382,12 @@ class MainViewModel @Inject constructor(
                             // doodle creation/recapture. Only the doodle-relative KPM atlas
                             // is replaced here.
                             sphereSlamAtlasPages = emptyList(),
-                            paintMarks = null,
-                            paintGrid = null,
+                            // A new standalone page frame: its paint marks and grown rows were in the
+                            // old one. Area progress is design-relative and stays. The ARCore paint
+                            // marks and grid belong to the ARCore doodle frame, which this capture
+                            // does not touch, so they stay too.
+                            sphereSlamPaintMarks = null,
+                            sphereSlamGrownDoodle = null,
                             doodleImageUris = doodleUris,
                         )
                     }
@@ -532,6 +536,9 @@ class MainViewModel @Inject constructor(
                         paintMarks = p.paintMarks,
                         paintGrid = p.paintGrid,
                         grownDoodle = p.grownDoodle,
+                        sphereSlamPaintMarks = p.sphereSlamPaintMarks,
+                        sphereSlamPaintGrid = p.sphereSlamPaintGrid,
+                        sphereSlamGrownDoodle = p.sphereSlamGrownDoodle,
                     )
                 }
             }
@@ -681,9 +688,9 @@ class MainViewModel @Inject constructor(
                 current.copy(
                     doodle = fp.copy(patchData = patch),
                     // New capture = new doodle frame; paint placed in the old one is invalid,
-                    // and so is the wall feature map (its points are in the old frame too).
+                    // and so is the wall feature map (its points are in the old frame too). Area
+                    // progress is design-relative and stays.
                     paintMarks = null,
-                    paintGrid = null,
                     grownDoodle = null,
                     wallFeatureMap = null,
                     // This path records no co-registration. Clear any left by an earlier single
@@ -882,18 +889,23 @@ class MainViewModel @Inject constructor(
                 }
             }
             // Guarded on id: see the depth path above.
+            // New capture = new doodle frame. The builder carried the paint marks and map into it
+            // through a fresh lock of the old Doodle (or dropped them without one), and kept area
+            // progress, which is design-relative: write what native now holds, so the reload that
+            // follows this update restores it instead of wiping it.
+            val carriedPaint = slamManager.getPaintMarks()
+            val carriedMap = slamManager.getWallFeatureMap()?.takeIf { it.pointCount > 0 }
+            val keptGrid = slamManager.exportPaintGrid()?.let { java.util.Base64.getEncoder().encodeToString(it) }
             var committed = false
             projectRepository.updateProject { current ->
                 if (current.id != currentProject.id) return@updateProject current
                 committed = true
                 current.copy(
                     doodle = fp.copy(patchData = patch),
-                    // New capture = new doodle frame; paint placed in the old one is invalid,
-                    // and so is the wall feature map (its points are in the old frame too).
-                    paintMarks = null,
-                    paintGrid = null,
+                    paintMarks = carriedPaint,
+                    paintGrid = keptGrid ?: current.paintGrid,
                     grownDoodle = null,
-                    wallFeatureMap = null,
+                    wallFeatureMap = carriedMap,
                     // Persist the capture's intrinsics + anchor + view — the exact values just fed to
                     // restoreWallDoodleMetric — so reload relocalizes with the true intrinsics
                     // and keeps the plane-guided rectification that the capture session had.

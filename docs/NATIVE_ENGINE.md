@@ -44,6 +44,8 @@ The ownership boundary is strict:
   for the whole window (and a capture pose exists, and no re-capture is awaiting its new
   doodle — `SlamManager.awaitingNewDoodle`). Unloading the KPM page does not end the
   window early: the correction is held until it elapses;
+- except that a fresh reloc lock standing on paint (`getRelocPaintInliers` ≥ 8) drives when KPM is
+  silent or its last accepted confidence is below 0.5, and then keeps the anchor for its own window;
 - if neither source is available, PoseFusion only re-applies its standing anchor-local correction.
 See `TELEOLOGICAL_SLAM.md` ("Correction sources").
 

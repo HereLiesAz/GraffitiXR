@@ -374,6 +374,12 @@ data class GraffitiProject(
     // Restored after the Doodle so a return visit keeps what it learned instead of reverting to marks
     // that may be painted over by now. Tied to the doodle like paintMarks: a new capture clears it.
     val grownDoodle: WallFeatureMap? = null,
+    // The same three for the standalone (no-ARCore) backend, in the SphereSLAM page frame its MobileGS
+    // seed lives in: paint marks, area progress (Base64 grid blob) and grown Doodle rows. Saved under
+    // the same map_from_doodle guard as sphereSlamWallFeatureMap; a new standalone capture clears them.
+    val sphereSlamPaintMarks: WallFeatureMap? = null,
+    val sphereSlamPaintGrid: String? = null,
+    val sphereSlamGrownDoodle: WallFeatureMap? = null,
 
     // Per-host AzNavRail expansion state (host id -> expanded), so the rail restores exactly as the
     // user left it on reopen. Defaulted for back-compat with projects saved before this field

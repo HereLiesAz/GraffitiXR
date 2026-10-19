@@ -213,6 +213,9 @@ class ProjectManager @Inject constructor(
                     paintMarks = projectData.paintMarks ?: existing.paintMarks,
                     paintGrid = projectData.paintGrid ?: existing.paintGrid,
                     grownDoodle = projectData.grownDoodle ?: existing.grownDoodle,
+                    sphereSlamPaintMarks = projectData.sphereSlamPaintMarks ?: existing.sphereSlamPaintMarks,
+                    sphereSlamPaintGrid = projectData.sphereSlamPaintGrid ?: existing.sphereSlamPaintGrid,
+                    sphereSlamGrownDoodle = projectData.sphereSlamGrownDoodle ?: existing.sphereSlamGrownDoodle,
                     cloudAnchorId = projectData.cloudAnchorId ?: existing.cloudAnchorId,
                     // Written once by the AR placement; a stale snapshot must not reset it.
                     arDesignHalfWidthM = if (projectData.arDesignHalfWidthM > 0f) projectData.arDesignHalfWidthM

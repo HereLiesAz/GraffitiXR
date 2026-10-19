@@ -3,6 +3,7 @@
 #pragma once
 #include <opencv2/core.hpp>
 #include <vector>
+#include <cstring>
 #include "MobileGS.h"
 
 struct MobileGSTestPeer {
@@ -41,7 +42,29 @@ struct MobileGSTestPeer {
         std::lock_guard<std::mutex> lock(g.mMutex);
         return (size_t)filter < g.mTargetSets.size() ? g.mTargetSets[(size_t)filter].pts.size() : 0;
     }
+    static std::vector<uint8_t> targetCorrob(MobileGS& g, int filter) {
+        std::lock_guard<std::mutex> lock(g.mMutex);
+        return (size_t)filter < g.mTargetSets.size() ? g.mTargetSets[(size_t)filter].corrob : std::vector<uint8_t>{};
+    }
+    static void setTargetCorrob(MobileGS& g, int filter, const std::vector<uint8_t>& c) {
+        std::lock_guard<std::mutex> lock(g.mMutex);
+        g.mTargetSets[(size_t)filter].corrob = c;
+    }
+    static void setCorroboratedOnly(MobileGS& g, const std::vector<uint8_t>& c, const std::vector<uint8_t>& p) {
+        std::lock_guard<std::mutex> lock(g.mMutex);
+        g.mArtworkCorroborated = c;
+        g.mArtworkPromoted = p;
+    }
     static long pnpSeq(MobileGS& g) { return g.mPnpResultSeq.load(); }
+    // A lock of the current Doodle, published now: camera_from_doodle and the solve frame's view.
+    static void setFreshLock(MobileGS& g, const float camFromFp16[16], const float solveView16[16]) {
+        std::lock_guard<std::mutex> l(g.mMutex);
+        std::memcpy(g.mPnpCamFromFpWorld, camFromFp16, 16 * sizeof(float));
+        std::memcpy(g.mPnpSolveView, solveView16, 16 * sizeof(float));
+        g.mPnpResultSeq.fetch_add(1);
+        g.mPnpPublishTime = std::chrono::steady_clock::now();
+        g.mHasTrackingPose.store(true);
+    }
     static void setWallLastSeen(MobileGS& g, std::vector<long> seen) { std::lock_guard<std::mutex> l(g.mMutex); g.mWallLastSeen = std::move(seen); }
     static void evictGrown(MobileGS& g, size_t n) { std::lock_guard<std::mutex> l(g.mMutex); g.evictLeastSeenGrownLocked(n); }
     static std::vector<cv::Point3f> wallPoints(MobileGS& g) { std::lock_guard<std::mutex> l(g.mMutex); return g.mWallKeypoints3D; }
@@ -94,6 +117,12 @@ struct MobileGSTestPeer {
         std::lock_guard<std::mutex> lock(g.mMutex);
         g.mArtworkCorroborated = c;
         g.mArtworkPromoted.assign(c.size(), 1);
+    }
+    static void setArtworkPoints(MobileGS& g, const std::vector<cv::Point2f>& pts, int w, int h) {
+        std::lock_guard<std::mutex> lock(g.mMutex);
+        g.mArtworkKeypoints2D = pts;
+        g.mArtworkImageW = w;
+        g.mArtworkImageH = h;
     }
     static std::vector<uint8_t> corroborated(MobileGS& g) {
         std::lock_guard<std::mutex> lock(g.mMutex);

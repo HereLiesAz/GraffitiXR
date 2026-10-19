@@ -471,6 +471,18 @@ public:
     // floats (points), then the descriptor bytes. Empty vector when there are none.
     std::vector<uint8_t> exportPaintMarks() const;
     void restorePaintMarks(const cv::Mat& descs, const std::vector<cv::Point3f>& pts);
+    /**
+     * Call before installing a NEW capture's Doodle (instead of clearPaintMarks + clearWallFeatureMap).
+     * With a lock of the old Doodle in the last kCarryMaxAgeMs, paint marks and the map are moved into
+     * the new capture's frame through it; otherwise they are dropped. The paint grid (design-relative)
+     * is kept either way. [newCaptureView16]: the new capture's view, as given to
+     * restoreWallDoodleMetric; null when the capture has none.
+     */
+    void carryDoodleFrameState(const float* newCaptureView16);
+    static constexpr int kCarryMaxAgeMs = 3000;
+    /** A mark under the design whose cell is painted counts as painted OVER once this many locks pass without it. */
+    static constexpr long kCoveredStaleLocks = 20;
+    bool mMapAnchorPending = false;   // guarded by mMutex
     void clearPaintMarks();
     int getPaintMarkCount() const;
     void getDoodleAnchor(float* out16) const;
@@ -607,6 +619,20 @@ public:
      * Empty when nothing has grown.
      */
     std::vector<uint8_t> exportGrownWall() const;
+    /**
+     * Paint inliers (paint marks and grown rows) of the current lock, or 0 when there is no lock
+     * published within kRelocPriorMaxAgeMs. What lets a paint-backed correction past a degrading
+     * hybrid page (CorrectionSourceArbiter).
+     */
+    int relocPaintInliers() const {
+        std::lock_guard<std::mutex> lock(mMutex);
+        if (mPnpResultSeq.load(std::memory_order_relaxed) <= 0 ||
+            (std::chrono::steady_clock::now() - mPnpPublishTime) >= std::chrono::milliseconds(kRelocPriorMaxAgeMs))
+            return 0;
+        return mPnpPaintInliers.load(std::memory_order_relaxed);
+    }
+    /** Which Doodle native holds; advances whenever it is replaced or cleared. */
+    uint64_t doodleGeneration() const { std::lock_guard<std::mutex> lock(mMutex); return mDoodleGeneration; }
     /**
      * Append saved grown rows behind the captured Doodle (call after restoring it). Refused when
      * there is no Doodle or the descriptor type differs; tagged OUTSIDE like every grown row.
@@ -891,6 +917,10 @@ private:
     size_t mDoodleBaseCount = 0;
     /** Per wall row: the reloc seq of the last lock it was an inlier of (lazily sized). Guarded by mMutex. */
     std::vector<long> mWallLastSeen;
+    /** corrRow tag for a correspondence that came from a paint mark (-1 is the persistent map). */
+    static constexpr int kCorrRowPaint = -2;
+    /** Inliers of the published lock that stood on paint (paint marks, grown rows). */
+    std::atomic<int> mPnpPaintInliers{0};
     /** When the current reloc pose was published, for priorFresh. Guarded by mMutex. */
     std::chrono::steady_clock::time_point mPnpPublishTime{};
     /** A reloc pose older than this is not a prior for gating (the camera has moved, or was lost). */
@@ -906,6 +936,21 @@ private:
     void cleanWallExclusionLocked(cv::Mat& descs, std::vector<cv::Point3f>& pts);
     float mCaptureIntr[4] = {0,0,0,0};
     std::vector<uint8_t> mPendingGridRestore;      // applied when a grid of matching shape is built
+    /**
+     * Saved per-feature confirmation counts (the paint-grid blob's tail), waiting for the same design
+     * to register (artwork rows) and for each filter's targets to be built (set rows). A design whose
+     * composite size or feature count differs is another design, and drops them. Guarded by mMutex.
+     */
+    struct PendingCorrob {
+        bool valid = false;
+        int imgW = 0, imgH = 0;
+        std::vector<uint8_t> art, promoted;
+        std::vector<std::vector<uint8_t>> sets;
+    };
+    PendingCorrob mPendingCorrob;
+    static constexpr int32_t kCorrobTailMagic = 0x42524F43;   // "CORB"
+    /** Apply what of mPendingCorrob fits the registered design and its built target sets. Needs mMutex. */
+    void applyPendingCorrobLocked(bool artworkJustRegistered);
     cv::Mat mArtworkGray;                          // normalised design composite, for autoFitDesign
 public:
     /**
@@ -972,6 +1017,10 @@ public:
      */
     void setChangePassEnabled(bool on) { mChangePassEnabled.store(on, std::memory_order_relaxed); }
     bool changePassEnabled() const { return mChangePassEnabled.load(std::memory_order_relaxed); }
+    /**
+     * The paint grid (painted cells, paint colours per group), followed by every design feature's
+     * consecutive-confirmation count and promoted flag, artwork first, then each filter's target set.
+     */
     std::vector<uint8_t> exportPaintGrid() const;
     void restorePaintGrid(const std::vector<uint8_t>& blob);
     float getFeatureProgress() const { return mFeatureProgress.load(std::memory_order_relaxed); }

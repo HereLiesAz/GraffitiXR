@@ -283,3 +283,26 @@ TEST(MobileGSDoodleState, AStagedBuildKeepsGrownRowsAndThePartition) {
     int32_t rows; std::memcpy(&rows, grownBlob.data(), sizeof rows);
     EXPECT_EQ(2, rows) << "the close-up rows are captured, not grown";
 }
+
+// A re-capture mid-mural: with a fresh lock of the old Doodle, the paint marks move into the new
+// capture's frame through it instead of being thrown away; without one they go.
+TEST(MobileGSDoodleState, ARecaptureCarriesPaintMarksThroughAFreshLock) {
+    MobileGS g;
+    seedMetric(g);
+    g.restorePaintMarks(cv::Mat(1, 32, CV_8U, cv::Scalar(3)), {{0, 0, 2}});
+    // camera_from_oldDoodle: the old Doodle's origin sits 0.1 m to the camera's right.
+    const float camFromFp[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0.1f,0,0,1};
+    MobileGSTestPeer::setFreshLock(g, camFromFp, kIdentity);
+    g.carryDoodleFrameState(kIdentity);   // the new capture is taken from the solve frame's pose
+    ASSERT_EQ(1, g.getPaintMarkCount());
+    const std::vector<uint8_t> blob = g.exportPaintMarks();
+    float xyz[3]; std::memcpy(xyz, blob.data() + 12, sizeof xyz);
+    EXPECT_NEAR(0.1f, xyz[0], 1e-5f);
+    EXPECT_NEAR(2.0f, xyz[2], 1e-5f);
+
+    MobileGS h;   // no lock at all: nothing relates the frames
+    seedMetric(h);
+    h.restorePaintMarks(cv::Mat(1, 32, CV_8U, cv::Scalar(3)), {{0, 0, 2}});
+    h.carryDoodleFrameState(kIdentity);
+    EXPECT_EQ(0, h.getPaintMarkCount());
+}

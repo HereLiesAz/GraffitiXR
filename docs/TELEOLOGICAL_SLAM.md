@@ -136,7 +136,15 @@ standing anchor-local correction, so exactly one drives it on any frame
 
 The handover is one-way and timed — reloc until hybrid first accepts, hybrid while it keeps
 accepting, reloc again only after a full silent window — so the correction never flips between the two
-estimators frame by frame (they differ in latency and bias). A re-capture resets the history. The 3 s
+estimators frame by frame (they differ in latency and bias).
+
+**Paint goes through.** The KPM page is a photo of the wall before the paint, so it degrades as the
+wall is painted, while a reloc lock that stands on paint gets better. A lock with at least
+`PAINT_BACKED_MIN_INLIERS` (8) inliers on paint marks or grown rows (`SlamManager.getRelocPaintInliers`,
+fresh within `kRelocPriorMaxAgeMs`) drives whenever hybrid is not holding well: silent past the window,
+or its last accepted observation below `HYBRID_DEGRADED_CONF` (0.5). Once paint has driven it keeps the
+anchor the way hybrid does (held through frames without a paint-backed lock for the window; a hybrid
+acceptance meanwhile does not take it back). Both constants are unmeasured. A re-capture resets the history. The 3 s
 window is unmeasured; it belongs to the same eval sweep as the other fusion constants.
 
 On a re-capture `PoseFusion.reset(seq)` also adopts the native reloc seq current at that instant as
@@ -278,8 +286,13 @@ Other behaviour worth knowing:
 - If the design was registered in another descriptor type than the Doodle (`GrowOutcome.TYPE_MISMATCH`),
   the app registers it again; paint marks of the old type are dropped then.
 - Corroboration needs `kCorrobConfirmations` CONSECUTIVE hits for a feature predicted in view;
-  an observed miss resets an unconfirmed feature. Moving the design resets corroboration; paint marks
-  already on the wall are kept. Paint marks store the LIVE descriptor that corroborated them.
+  an observed miss resets an unconfirmed feature. Moving the design re-projects corroboration: a
+  feature whose wall spot moved less than `kRho` of the design's extent keeps its count (and promoted
+  flag); one that moved further starts over. Paint marks already on the wall are kept. The counts are
+  saved in the paint-grid blob and resume on reload of the same design.
+- Tone and opacity are how the overlay looks, not what the artwork is: the painting guide is the
+  design at full opacity and neutral tone, and a tone edit never re-registers it (only the source
+  bitmap, scale or rotation do). Paint marks store the LIVE descriptor that corroborated them.
 - `PoseFusion` believes a diverged, not-high-confidence fix only after three consecutive agreeing
   fixes, and a cold snap needs the inliers spread across the frame (`reloc[35]`, published with the
   pose).

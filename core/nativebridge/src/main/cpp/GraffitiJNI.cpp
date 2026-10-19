@@ -991,6 +991,34 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportPaintMarks(J
     return out;
 }
 
+// Paint inliers of the current (fresh) lock; 0 without one.
+JNIEXPORT jint JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocPaintInliers(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    return gSlamEngine ? (jint)gSlamEngine->relocPaintInliers() : 0;
+}
+
+// Which Doodle native holds: advances whenever it is replaced or cleared (see invalidateRelocResultLocked).
+JNIEXPORT jlong JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetDoodleGeneration(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    return gSlamEngine ? (jlong)gSlamEngine->doodleGeneration() : 0;
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeCarryDoodleFrameState(
+        JNIEnv* env, jobject thiz, jfloatArray viewArray) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return;
+    if (viewArray && env->GetArrayLength(viewArray) >= 16) {
+        jfloat* v = env->GetFloatArrayElements(viewArray, nullptr);
+        gSlamEngine->carryDoodleFrameState(v);
+        env->ReleaseFloatArrayElements(viewArray, v, JNI_ABORT);
+    } else {
+        gSlamEngine->carryDoodleFrameState(nullptr);
+    }
+}
+
 JNIEXPORT jbyteArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportGrownWall(JNIEnv* env, jobject thiz) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
