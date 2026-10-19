@@ -426,6 +426,45 @@ TEST(MobileGSFrames, AutoFitFindsPaintWithTheDoodleBuildersDesignFeatures) {
     EXPECT_NEAR(0.06f, req5[0], 0.01f);
 }
 
+// The wall's own texture is there from start to finish. The design here is a crop of the bare wall
+// at A (where it is placed); paint copies it at B. Every match at A is the wall itself, which
+// the clean-wall photo explains as well as the design does, so Align goes to the paint at B.
+TEST(MobileGSFrames, AlignIgnoresTheWallsOwnTextureWithACleanWallPhoto) {
+    const float K[4] = {500.f, 500.f, 320.f, 240.f};   // wall 2 m ahead: 1 px = 4 mm
+    const cv::Mat bare = makeWall(640, 480);
+    const cv::Rect A(40, 40, 240, 180), B(360, 260, 240, 180);
+    const cv::Mat design = bare(A).clone();
+    cv::Mat photo = bare.clone();
+    design.copyTo(photo(B));
+    auto run = [&](bool clean, float out5[5]) {
+        MobileGS g;
+        g.initialize(0, 0);
+        std::vector<cv::Point3f> wall;
+        for (int i = 0; i < 40; ++i) wall.emplace_back(-1.2f + 0.06f * i, (i % 8) * 0.12f - 0.4f, 2.0f);
+        const float anchor[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+        g.restoreWallDoodleMetric(cv::Mat(40, 32, CV_8U, cv::Scalar(4)), wall, anchor, K);   // ORB doodle
+        g.setArtworkDoodle(design, nullptr, 0, 0, 0, nullptr, nullptr);
+        g.awaitFilterTargets();
+        // Placed over A: centre pixel (160, 130) -> (-0.64, -0.44, 2) m; local y up.
+        const float fpFromDesign[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0, -0.64f,-0.44f,2,1};
+        g.setDesignPlacement(fpFromDesign, 0.48f, 0.36f);
+        g.setCaptureImage(photo, K);
+        if (clean) EXPECT_TRUE(g.setCleanWallImage(bare));
+        const bool ok = g.autoFitDesign(out5);
+        g.destroy();
+        return ok;
+    };
+    float without[5], with[5];
+    // Without a clean-wall photo the texture at A and the paint at B are ambiguous to the ratio test:
+    // whatever comes out, it is not the paint.
+    if (run(false, without)) EXPECT_GT(std::abs(without[0] - 1.28f), 0.1f);
+    ASSERT_TRUE(run(true, with));
+    // B is 320 px right and 220 px down of A: (+1.28, -0.88) m in design-local (y up).
+    EXPECT_NEAR(1.28f, with[0], 0.02f);
+    EXPECT_NEAR(-0.88f, with[1], 0.02f);
+    EXPECT_NEAR(1.0f, with[3], 0.03f);
+}
+
 TEST(MobileGSFrames, AutoFitOnRequestStillRefusesAnImpossibleMatch) {
     // A blank photo has nothing to match: no fit even when any possible fit would be taken.
     MobileGS g;

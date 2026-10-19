@@ -865,7 +865,8 @@ private:
      * capture photo's pixels, in the wall doodle's descriptor type. Detected when the photo registers;
      * [mCleanFeatSrc] shares the registered photo's buffer, so they are current only while it is the
      * registered one. The wall's own texture stays to the end, so these are the exclusion list for
-     * the whole job. The Doodle is NOT bare wall: it is for reloc (and Align). Guarded by mMutex.
+     * the whole job (and are dropped from the photo before Align matches it). The Doodle is NOT bare
+     * wall: it is for reloc. Guarded by mMutex.
      */
     std::vector<cv::Point2f> mCleanFeatPx;
     cv::Mat mCleanFeatDescs;
@@ -885,9 +886,9 @@ public:
      * Fit the registered design to paint already on the wall (a project restarted in the app but not
      * on the wall). Matches the Doodle builder's design features -- the artwork's own, each design
      * filter's target set (mTargetSets), and the inverted design, since paint rarely keeps the
-     * design's colours -- against the Doodle (its features and close-ups, on the wall plane) and the
-     * capture photo (back-projected onto the wall plane); either alone is enough. Takes the pairing
-     * with the most inliers of a RANSAC similarity in the CURRENT design's local frame. Waits for a
+     * design's colours -- against the capture photo (back-projected onto the wall plane), less its
+     * unchanged bare wall when a clean-wall photo is registered. The Doodle is not a source: it is
+     * marks drawn for reloc, not the design. Takes the set with the most inliers of a RANSAC similarity in the CURRENT design's local frame. Waits for a
      * filter build in flight, and returns no fit when the placement, design, Doodle or capture photo
      * changed while matching (the Doodle may grow). out5 = {dx, dy (m), dTheta (rad, CCW in the
      * design plane), scale ratio, inliers}. Returns false when there is no fit.

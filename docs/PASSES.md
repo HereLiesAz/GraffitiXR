@@ -60,10 +60,12 @@ the same pose-gated match (`gatedMatchSet`), consecutive confirmations, reset wh
 or is replaced. A cell's vote is "present" when at least half of that filter's places inside it are
 confirmed, "absent" when some are not, and no data when it has none. Filter targets never become
 reloc marks: they judge progress, and Align uses them too. `MobileGS::autoFitDesign` matches the artwork's
-features, every installed target set and the inverted design against two things on the wall: the
-Doodle itself (base features and close-ups, already on the wall plane) and the capture photo (rays
-onto the wall plane). It keeps the pairing whose similarity fit has the most inliers. Either one is
-enough; no capture photo is needed when there is a Doodle.
+features, every installed target set and the inverted design against the capture photo (rays onto
+the wall plane), and keeps the set whose similarity fit has the most inliers. The Doodle is not a
+source: it is marks drawn for reloc, not the design. With a clean-wall photo, the photo's unchanged
+bare wall (a feature the clean-wall photo has at the same place, uniquely) is dropped before
+matching, so the wall's own texture can neither answer for the design nor make real paint look
+ambiguous.
 
 ## Guards on every set
 
@@ -72,7 +74,7 @@ enough; no capture photo is needed when there is a Doodle.
   on the wall plane through the capture camera, and projected into the live frame through the
   lock's pose. The wall's own texture is there from start to finish, so this list holds for the
   whole job. The Doodle (base features and close-ups) is never bare wall: it is for reloc, placing,
-  sizing and transforming the overlay, and Align matches against it. Without a clean-wall photo
+  sizing and transforming the overlay. Without a clean-wall photo
   there is no exclusion list. A design feature's live match is not
   counted when a bare-wall feature near it describes that live keypoint at least as well as the
   design does: that is the wall's own texture. The row stays observed, so its confirmation count
