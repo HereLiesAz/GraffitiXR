@@ -94,6 +94,7 @@
     <string name="nav_adjust">Justere</string>
     <!-- Description of the image adjustment tools. -->
     <string name="nav_adjust_info">Finjuster lysstyrke, kontrast, metning og fargebalanse for dette laget.</string>
+    <string name="nav_edit">Rediger</string>
 
     <!-- Label for color balance and tinting tools. -->
     <string name="nav_balance">Farge</string>
@@ -330,7 +331,7 @@
     <string name="adj_blue">Blå</string>
     <string name="adj_undo">Angre</string>
     <string name="adj_redo">Gjenta</string>
-    <string name="adj_magic_align">Magisk justering</string>
+    <string name="adj_magic_align">Rett inn</string>
 
     <!-- Overlays & Status -->
     <string name="status_create_grid">Lag et rutenett for å starte.</string>
@@ -558,7 +559,7 @@
     <string name="nav_wearable_info">Koble til smartbriller for en håndfri AR-opplevelse med kamerainndata justert etter perspektivet ditt.</string>
     <string name="nav_wall_clear">Fjern</string>
     <string name="nav_wall_clear_info">Fjerner bakgrunnsbildet av veggen som brukes i Mockup-modus.</string>
-    <string name="nav_magic">Magi</string>
+    <string name="nav_magic">Rett inn</string>
     <string name="nav_edges">Kanter</string>
     <string name="nav_filter">Filter</string>
     <string name="nav_photo">Foto</string>

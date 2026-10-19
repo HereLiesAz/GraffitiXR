@@ -54,6 +54,7 @@ fun rememberNavStrings(): NavStrings {
         outlineInfo = stringResource(R.string.nav_outline_info),
         adjust = stringResource(R.string.nav_adjust),
         adjustInfo = stringResource(R.string.nav_adjust_info),
+        edit = stringResource(R.string.nav_edit),
         balance = stringResource(R.string.nav_balance),
         balanceInfo = stringResource(R.string.nav_balance_info),
         build = stringResource(R.string.nav_blending),
@@ -158,6 +159,8 @@ data class NavStrings(
     val outlineInfo: String,
     val adjust: String,
     val adjustInfo: String,
+    /** The rail host over the per-design controls; not [adjust], which is one of them. */
+    val edit: String,
     val balance: String,
     val balanceInfo: String,
     val build: String,

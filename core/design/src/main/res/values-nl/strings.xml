@@ -96,6 +96,7 @@
     <string name="nav_adjust">Aanpassen</string>
 
     <string name="nav_adjust_info">Verfijn de helderheid, het contrast, de verzadiging en de kleurbalans voor deze laag.</string>
+    <string name="nav_edit">Bewerken</string>
 
 
     <string name="nav_balance">Kleur</string>
@@ -335,7 +336,7 @@
     <string name="adj_blue">Blauw</string>
     <string name="adj_undo">Ongedaan maken</string>
     <string name="adj_redo">Opnieuw uitvoeren</string>
-    <string name="adj_magic_align">Magisch uitlijnen</string>
+    <string name="adj_magic_align">Uitlijnen</string>
 
 
     <string name="status_create_grid">Maak een raster om te beginnen.</string>
@@ -563,7 +564,7 @@
     <string name="nav_wearable_info">Maak verbinding met een smartbril voor een handsfree AR-ervaring met camera-invoer die is afgestemd op je perspectief.</string>
     <string name="nav_wall_clear">Wissen</string>
     <string name="nav_wall_clear_info">Verwijdert de achtergrondfoto van de muur die wordt gebruikt in de Mock-up-modus.</string>
-    <string name="nav_magic">Magie</string>
+    <string name="nav_magic">Uitlijnen</string>
     <string name="nav_edges">Randen</string>
     <string name="nav_filter">Filter</string>
     <string name="nav_photo">Foto</string>

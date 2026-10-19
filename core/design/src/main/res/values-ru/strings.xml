@@ -96,6 +96,7 @@
     <string name="nav_adjust">Регулировать</string>
 
     <string name="nav_adjust_info">Точная настройка яркости, контрастности, насыщенности и цветового баланса для этого слоя.</string>
+    <string name="nav_edit">Правка</string>
 
 
     <string name="nav_balance">Цвет</string>
@@ -335,7 +336,7 @@
     <string name="adj_blue">Синий</string>
     <string name="adj_undo">Отменить</string>
     <string name="adj_redo">Повторить</string>
-    <string name="adj_magic_align">Волшебное выравнивание</string>
+    <string name="adj_magic_align">Выровнять</string>
 
 
     <string name="status_create_grid">Для начала создайте сетку.</string>
@@ -563,7 +564,7 @@
     <string name="nav_wearable_info">Подключитесь к смарт-очкам для AR-опыта без использования рук с вводом камеры, согласованным с вашей перспективой.</string>
     <string name="nav_wall_clear">Очистить</string>
     <string name="nav_wall_clear_info">Удаляет фоновое фото стены, используемое в режиме Макет.</string>
-    <string name="nav_magic">Магия</string>
+    <string name="nav_magic">Выровнять</string>
     <string name="nav_edges">Края</string>
     <string name="nav_filter">Фильтр</string>
     <string name="nav_photo">Фото</string>

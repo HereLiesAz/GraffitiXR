@@ -94,6 +94,7 @@
     <string name="nav_adjust">Ajustar</string>
     <!-- Description of the image adjustment tools. -->
     <string name="nav_adjust_info">Ajusta el brillo, el contraste, la saturación y el balance de color de esta capa.</string>
+    <string name="nav_edit">Editar</string>
 
     <!-- Label for color balance and tinting tools. -->
     <string name="nav_balance">Color</string>
@@ -330,7 +331,7 @@
     <string name="adj_blue">Azul</string>
     <string name="adj_undo">Deshacer</string>
     <string name="adj_redo">Rehacer</string>
-    <string name="adj_magic_align">Alineación Mágica</string>
+    <string name="adj_magic_align">Alinear</string>
 
     <!-- Overlays & Status -->
     <string name="status_create_grid">Crea una Cuadrícula para comenzar.</string>
@@ -558,7 +559,7 @@
     <string name="nav_wearable_info">Conéctate a unas gafas inteligentes para una experiencia AR manos libres con entrada de cámara alineada a tu perspectiva.</string>
     <string name="nav_wall_clear">Quitar</string>
     <string name="nav_wall_clear_info">Elimina la foto de fondo de la pared usada en el modo Maqueta.</string>
-    <string name="nav_magic">Magia</string>
+    <string name="nav_magic">Alinear</string>
     <string name="nav_edges">Bordes</string>
     <string name="nav_filter">Filtro</string>
     <string name="nav_photo">Foto</string>

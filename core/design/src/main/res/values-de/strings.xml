@@ -94,6 +94,7 @@
     <string name="nav_adjust">Anpassen</string>
     <!-- Description of the image adjustment tools. -->
     <string name="nav_adjust_info">Nehmen Sie eine Feinabstimmung von Helligkeit, Kontrast, Sättigung und Farbbalance für diese Ebene vor.</string>
+    <string name="nav_edit">Bearbeiten</string>
 
     <!-- Label for color balance and tinting tools. -->
     <string name="nav_balance">Farbe</string>
@@ -330,7 +331,7 @@
     <string name="adj_blue">Blau</string>
     <string name="adj_undo">Rückgängig</string>
     <string name="adj_redo">Wiederholen</string>
-    <string name="adj_magic_align">Magische Ausrichtung</string>
+    <string name="adj_magic_align">Ausrichten</string>
 
     <!-- Overlays & Status -->
     <string name="status_create_grid">Erstellen Sie ein Raster, um zu beginnen.</string>
@@ -558,7 +559,7 @@
     <string name="nav_wearable_info">Verbinde dich mit einer Datenbrille für eine freihändige AR-Erfahrung mit perspektivisch abgestimmter Kameraeingabe.</string>
     <string name="nav_wall_clear">Entfernen</string>
     <string name="nav_wall_clear_info">Entfernt das Wandfoto im Hintergrund, das im Mockup-Modus verwendet wird.</string>
-    <string name="nav_magic">Magie</string>
+    <string name="nav_magic">Ausrichten</string>
     <string name="nav_edges">Kanten</string>
     <string name="nav_filter">Filter</string>
     <string name="nav_photo">Foto</string>

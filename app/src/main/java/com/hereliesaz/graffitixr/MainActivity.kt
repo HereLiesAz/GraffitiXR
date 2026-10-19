@@ -2342,7 +2342,7 @@ class MainActivity : AppCompatActivity() {
                     onClick = { editorViewModel.onCycleStencilView() }
                 )
             }
-            // Adjust ▸ the per-design controls. Every one of these drives an EditorViewModel action
+            // Edit ▸ the per-design controls. Every one of these drives an EditorViewModel action
             // that was already implemented and tested but had no way to be invoked: the layer list had
             // no opener (so add-a-layer was one-way — nothing could remove, rename, reorder or hide
             // one), the adjust and colour-balance panels had no toggle outside a Mode, and per-layer
@@ -2350,7 +2350,7 @@ class MainActivity : AppCompatActivity() {
             azRailSubHostItem(
                 id = "host.design",
                 hostId = railHostOf("host.design"),
-                text = navStrings.adjust,
+                text = navStrings.edit,
                 color = navItemColor,
                 shape = AzButtonShape.NONE,
                 disabled = showLibrary,
@@ -2506,7 +2506,7 @@ class MainActivity : AppCompatActivity() {
                             arViewModel.toggleMeasure()
                         },
                     )
-                    // Magic — fit the design to the established anchor's extent (falling back to a
+                    // Align (onMagicClicked) — fit the design to the established anchor's extent (falling back to a
                     // legibility auto-tune when there is no anchor yet). onMagicClicked was
                     // implemented and unreachable: the "Magic Wand" the adjustments panel's doc
                     // still described had been removed from that panel's action row.

@@ -81,7 +81,7 @@ the painted reference marks and what GraffitiXR's engine captures from them (for
 ## 4. THE AZNAVRAIL (The Nervous System)
 **Definition:** The master controller managed by `AzHostActivityLayout`. See
 [`UI_UX.md`](../UI_UX.md) for the authoritative current rail hierarchy — three top-level accordion
-hosts (**Modes**, **Adjust**, **Project**) plus the plain **Open** and **Help** items. The table
+hosts (**Modes**, **Edit**, **Project**) plus the plain **Open** and **Help** items. The table
 below is a purpose summary, not a literal hierarchy diagram:
 
 | Group | Item | Action / Logic |
@@ -91,7 +91,7 @@ below is a purpose summary, not a literal hierarchy diagram:
 | | `Mockup` | Switch to compositing over a static reference photo. |
 | | `Trace` | Switch to lightbox mode (full brightness, touch-locked). |
 | **Modes ▸ AR** | `Doodle` | Arms tap-to-place for Doodle (wall anchor) capture. |
-| **Adjust** | — | Whole-design toggles: Adjust, Balance, Invert, Outline, Isolate — not general layer tools (there is only one design). |
+| **Edit** | — | Whole-design toggles: Adjust, Balance, Invert, Outline, Isolate — not general layer tools (there is only one design). |
 | **Open** | — | Picks the design image. Stages a replace-confirmation if a design is already placed. |
 | **Project** | `Save/Load` | Project manifest (JSON) plus the persisted wall doodle — no voxel/map binary. |
 

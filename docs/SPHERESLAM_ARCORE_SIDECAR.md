@@ -451,7 +451,7 @@ still measured. Accepted-match metrics are rate-limited to one diagnostic line e
 ## AR rail capability contract
 
 AR mode remains reachable regardless of ARCore availability, but individual actions are gated by
-what the active backend can actually do. Standalone keeps the shared Light, Lock, Magic, design,
+what the active backend can actually do. Standalone keeps the shared Light, Lock, Align, design,
 project, and settings actions. The legacy ARCore Target rail action is disabled and points the artist
 to the standalone on-screen Wall Target capture. Co-op Host/Join use protocol-v3 explicit host
 wall-frame metadata: measured standalone pages can pair cross-backend, normalized pages can pair

@@ -92,8 +92,8 @@
 
     <!-- Label for the subject-isolation effect. -->
     <string name="nav_isolate">Isolate</string>
-    <!-- Label for the Magic tool: auto-fits the layer to the AR anchor, or auto-tones it. -->
-    <string name="nav_magic">Magic</string>
+    <!-- Label for the Align tool: fits the design to the AR anchor, or auto-tones it when there is none. -->
+    <string name="nav_magic">Align</string>
     <!-- Label for the Edges tool: generates a Canny edge-detect outline of the layer. -->
     <string name="nav_edges">Edges</string>
     <!-- Description of the Isolate effect. -->
@@ -114,6 +114,8 @@
     <string name="nav_adjust">Adjust</string>
     <!-- Description of the image adjustment tools. -->
     <string name="nav_adjust_info">Fine-tune brightness, contrast, saturation, and color balance for this layer.</string>
+    <!-- Label for the rail host holding the per-design controls (Adjust, Balance, Invert, Outline, Isolate). -->
+    <string name="nav_edit">Edit</string>
 
     <!-- Label for color balance and tinting tools. -->
     <string name="nav_balance">Color</string>
@@ -365,7 +367,7 @@
     <string name="adj_redo">Redo</string>
     <string name="adj_reset">Reset placement</string>
     <string name="adj_restore_placement">Restore placement</string>
-    <string name="adj_magic_align">Magic Align</string>
+    <string name="adj_magic_align">Align</string>
 
     <!-- Overlays & Status -->
     <string name="status_create_grid">Create a Grid to start.</string>

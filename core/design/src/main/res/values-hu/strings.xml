@@ -96,6 +96,7 @@
     <string name="nav_adjust">Igazítás</string>
 
     <string name="nav_adjust_info">Finomhangold a fényerőt, kontrasztot, telítettséget és színegyensúlyt ehhez a réteghez.</string>
+    <string name="nav_edit">Szerkesztés</string>
 
 
     <string name="nav_balance">Szín</string>
@@ -335,7 +336,7 @@
     <string name="adj_blue">Kék</string>
     <string name="adj_undo">Visszavonás</string>
     <string name="adj_redo">Újra</string>
-    <string name="adj_magic_align">Varázslatos igazítás</string>
+    <string name="adj_magic_align">Illesztés</string>
 
 
     <string name="status_create_grid">Hozz létre egy Rácsot a kezdéshez.</string>
@@ -563,7 +564,7 @@
     <string name="nav_wearable_info">Csatlakozz egy okosszemüveghez a kéz nélküli AR-élményhez és a nézőponthoz igazított kamerabemenethez.</string>
     <string name="nav_wall_clear">Törlés</string>
     <string name="nav_wall_clear_info">Eltávolítja a Makett módban használt háttér falfotót.</string>
-    <string name="nav_magic">Varázslat</string>
+    <string name="nav_magic">Illesztés</string>
     <string name="nav_edges">Élek</string>
     <string name="nav_filter">Szűrő</string>
     <string name="nav_photo">Fotó</string>

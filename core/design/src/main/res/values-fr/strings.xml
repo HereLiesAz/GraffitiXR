@@ -21,7 +21,7 @@
     <string name="adj_blue">Bleu</string>
     <string name="adj_undo">Annuler</string>
     <string name="adj_redo">Rétablir</string>
-    <string name="adj_magic_align">Alignement Magique</string>
+    <string name="adj_magic_align">Aligner</string>
 
     <!-- Overlays & Status -->
     <string name="status_create_grid">Créez une Grille pour commencer.</string>
@@ -185,6 +185,7 @@
     <string name="nav_outline_info">Convertir ce calque en dessin au trait noir sur fond transparent — idéal pour créer des modèles de pochoir.</string>
     <string name="nav_adjust">Ajuster</string>
     <string name="nav_adjust_info">Ajustez finement la luminosité, le contraste, la saturation et la balance des couleurs pour ce calque.</string>
+    <string name="nav_edit">Modifier</string>
     <string name="nav_balance">Couleur</string>
     <string name="nav_balance_info">Teinter les couleurs du calque à l\'aide des curseurs des canaux rouge, vert et bleu.</string>
     <string name="nav_blending">Mélange</string>
@@ -294,7 +295,7 @@
     <string name="nav_wearable_info">Connectez-vous à des lunettes connectées pour une expérience AR mains libres avec une entrée caméra alignée sur votre perspective.</string>
     <string name="nav_wall_clear">Effacer</string>
     <string name="nav_wall_clear_info">Supprime la photo de mur en arrière-plan utilisée en mode Maquette.</string>
-    <string name="nav_magic">Magie</string>
+    <string name="nav_magic">Aligner</string>
     <string name="nav_edges">Contours</string>
     <string name="nav_filter">Filtre</string>
     <string name="nav_photo">Photo</string>
