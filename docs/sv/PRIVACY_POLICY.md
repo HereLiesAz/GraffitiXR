@@ -1,6 +1,6 @@
 # Sekretesspolicy för GraffitiXR
 
-**Senast uppdaterad:** 2026-09-04
+**Senast uppdaterad:** 2026-10-19
 HereLiesAZ byggde GraffitiXR-appen som en källkodstillgänglig (source-available) app (se repots LICENSE-fil och docs/LICENSING.md för villkoren). Denna TJÄNST tillhandahålls av HereLiesAZ utan kostnad och är avsedd att användas som den är.
 Denna sida används för att informera besökare om vår policy med insamling, användning och avslöjande av personlig information om någon bestämt sig för att använda vår tjänst.
 Om du väljer att använda vår tjänst, samtycker du till insamling och användning av information i samband med denna policy. Personuppgifterna som vi samlar in används för att tillhandahålla och förbättra Tjänsten. Vi kommer inte att använda eller dela din information med någon förutom enligt beskrivningen i denna integritetspolicy.
@@ -9,7 +9,7 @@ Om du väljer att använda vår tjänst, samtycker du till insamling och använd
 För en bättre upplevelse när vi använder vår tjänst kan vi kräva att du förser oss med viss personligt identifierbar information, inklusive men inte begränsat till:
 * **Kameradata:** Appen kräver åtkomst till enhetens kamera för att visa Augmented Reality (AR)-vyn, överlagringsläge och för att ta bilder för projektmål. Kameradata bearbetas lokalt på din enhet och överförs inte till våra servrar om du inte uttryckligen väljer att dela en projektfil.
 * **Lagring/foton:** Appen begär ingen lagringsbehörighet. Bilder du lägger till kommer via Android-systemets bild- eller filväljare, som bara ger appen åtkomst till filen du väljer. Projekt sparas i appens privata lagring och exporterade bilder i enhetens fotogalleri.
-* **Platsdata (valfritt):** Appen ber om platsbehörighet bara när du börjar fånga ett AR-mål. Om du ger den sparar målets fångstpost var det togs (latitud, longitud, höjd och noggrannhet). Den sparas lokalt i projektfilen och lämnar enheten bara om du själv delar eller exporterar projektfilen.
+* **Platsdata (valfritt):** Appen ber om platsbehörighet bara när du börjar fånga ett AR-mål. Om du ger den sparar målets fångstpost var det togs (latitud, longitud, höjd och noggrannhet). Den sparas lokalt i projektfilen och lämnar enheten bara om du själv delar eller exporterar projektfilen. Link (dela en session med en andra enhet) skickar den aldrig: den andra enheten får projektet utan någon plats.
 ## Kraschrapporter (valbart)
 
 Ingenting som rör en krasch lämnar din enhet som standard. Om appen kraschar eller återhämtar sig från ett internt fel skrivs en rapport till en lokal, tillfällig fil på din enhet så att appen kan visa dig en "senaste körningen kraschade"-notis nästa gång du öppnar den — den filen lämnar aldrig enheten av sig själv.
@@ -31,7 +31,9 @@ Vi kan anställa tredjepartsföretag och individer av följande skäl:
 * För att tillhandahålla tjänsten för vår räkning;
 * Att utföra tjänsterelaterade tjänster; eller
 * För att hjälpa oss att analysera hur vår tjänst används.
-Vi använder **Google ML Kit** för ämnessegmentering (bakgrundsborttagning). Denna bearbetning sker lokalt på din enhet.
+Motivisolering (bakgrundsborttagning) använder **U²-Net**, en modell som är inbyggd i appen, helt på din enhet. Inget laddas ned för det och inga bilder lämnar enheten.
+
+På enheter som stöder det körs AR-läget på **Google Play-tjänster för AR (ARCore)**, som tillhandahålls av Google LLC och omfattas av [Googles integritetspolicy](https://policies.google.com/privacy). ARCore bearbetar kamerabilder och data från rörelsesensorerna för att spåra enheten; se Googles [integritetskrav för ARCore](https://developers.google.com/ar/develop/privacy-requirements) för vad det samlar in. På enheter utan ARCore använder appen sin egen spårning och ARCore är aldrig inblandat.
 ## Uppdateringar
 
 Appen kontaktar aldrig en server för att söka efter uppdateringar. Inställningsskärmen har ett val "Öppna versionssidan"; ett tryck öppnar projektets GitHub-versionssida (github.com/HereLiesAz/GraffitiXR/releases) i din webbläsare, precis som om du hade följt länken själv. Appen själv skickar ingenting.

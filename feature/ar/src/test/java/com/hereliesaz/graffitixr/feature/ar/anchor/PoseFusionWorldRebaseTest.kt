@@ -71,4 +71,24 @@ class PoseFusionWorldRebaseTest {
         assertEquals(1f, rebased[13], 1e-4f)
         assertEquals(0f, rebased[14], 1e-4f)
     }
+
+    @Test
+    fun `a correction made against a frozen backbone is re-based when the anchor resumes`() {
+        val fusion = PoseFusion()
+        // A relock while ARCore's anchor was frozen at the identity: drawn at +1 m X.
+        fusion.currentAnchor(
+            backbone = identity(),
+            vCurrent = identity(),
+            reloc = reloc(trans(1f, 0f, 0f), seq = 1f),
+            captureAnchorCam = captureAtOrigin(),
+            confGlobal = 1f,
+        )
+        // The anchor resumes 0.3 m along Y. Re-based, the overlay stays where it was drawn.
+        val resumed = trans(0f, 0.3f, 0f)
+        fusion.rebase(identity(), resumed)
+        val held = fusion.holdCurrentAnchor(resumed)
+        assertEquals(1f, held[12], 1e-4f)
+        assertEquals(0f, held[13], 1e-4f)
+        assertEquals(0f, held[14], 1e-4f)
+    }
 }

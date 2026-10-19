@@ -22,13 +22,11 @@ kotlin = "2.4.21"
 ksp = "2.3.12"
 kotlinxSerialization = "1.11.0"
 lifecycle = "2.11.0"
-mlkitSubjectSegmentation = "16.0.0-beta1" # ACCEPTED RISK: no stable release as of 2026-04-02
 navigation = "2.10.2"
 onnxruntime = "1.30.0"
 opencv = "5.0.0.1"
 playServicesBase = "18.11.0"
 playServicesLocation = "21.4.0"
-segmentationSelfie = "16.0.0-beta6" # ACCEPTED RISK: no stable release as of 2026-04-02
 sphereSlam = "0.26.6"
 timber = "5.0.1"
 robolectric = "4.17"
@@ -98,14 +96,12 @@ kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-cor
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 kotlinx-serialization-cbor = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-cbor", version.ref = "kotlinxSerialization" }
-mlkit-subject-segmentation = { group = "com.google.android.gms", name = "play-services-mlkit-subject-segmentation", version.ref = "mlkitSubjectSegmentation" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
 onnxruntime-android = { group = "com.microsoft.onnxruntime", name = "onnxruntime-android", version.ref = "onnxruntime" }
 opencv = { group = "org.opencv", name = "opencv", version.ref = "opencv" }
 play-services-base = { group = "com.google.android.gms", name = "play-services-base", version.ref = "playServicesBase" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
-segmentation-selfie = { module = "com.google.mlkit:segmentation-selfie", version.ref = "segmentationSelfie" }
 sphereslam-core = { group = "com.github.HereLiesAz.SphereSLAM", name = "sphereslam", version.ref = "sphereSlam" }
 sphereslam-overlay = { group = "com.github.HereLiesAz.SphereSLAM", name = "overlay", version.ref = "sphereSlam" }
 sphereslam-reloc = { group = "com.github.HereLiesAz.SphereSLAM", name = "reloc", version.ref = "sphereSlam" }

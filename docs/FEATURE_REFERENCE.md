@@ -184,6 +184,11 @@ deliberate Volume Up-Down-Up-Down exit** — a physical-button sequence, not a t
 resting hand or the paper itself can't trigger it by accident. Exports a transparent-background PNG
 (not a solid fill).
 
+**Freeze** (Trace ▸ Freeze, and AR ▸ Freeze) is that lock. While frozen the orientation is held as it
+was, Link edits from the peer wait and land in order on unlock, and an image shared into the app
+waits too (its replace prompt would take touches). In AR the screen also locks by itself while the
+proximity sensor is covered (a pocket, the phone face-down) and unlocks when it is uncovered.
+
 ---
 
 ## 2. The design (`Layer`)
@@ -228,7 +233,7 @@ Every layer carries the full property set below; all except the runtime `bitmap`
 | `scale` | `1.0` | multiplier | Uniform scale |
 | `isInverted` | `false` | Bool | Colour invert |
 | `isSketch` | `false` | Bool | **Outline** effect — render as a traceable pencil sketch (dark lines opaque, light areas transparent); re-derived from `uri` each time, not baked in |
-| `isSubjectIsolated` | `false` | Bool | **Subject isolation** — ML Kit segmentation drops everything but the subject to transparent (see §4) |
+| `isSubjectIsolated` | `false` | Bool | **Subject isolation** — the bundled U²-Net segmenter drops everything but the subject to transparent (see §4) |
 | `isStencil` | `false` | Bool | **Stencil** — the design is split into three tonal sheets (black, grey, white); exclusive with `isSketch` (§5) |
 | `stencilView` | `ALL` | `ALL`/`BASE`/`MIDTONE`/`SECONDARY` | Which sheets are shown while `isStencil` is on |
 | `stencilDark` | `true` | Bool | The last run's dark-or-light call, which names the cycler's options |
@@ -290,7 +295,7 @@ These act on the design (contrast with §1.1, which acts on the whole design **p
 | `SetColorBalanceR/G/B` | `1.0` each | multiplier | Surfaced in the `COLOR` panel (`onColorBalance{R,G,B}Changed`) |
 | `ToggleInvert` | `false` | — | |
 | `onToggleOutline` | `isSketch = false` | — | The traceable-sketch effect (§2.1) |
-| `onToggleSubjectIsolation` | `isSubjectIsolated = false` | — | Drop everything but the ML Kit-segmented subject (§4) |
+| `onToggleSubjectIsolation` | `isSubjectIsolated = false` | — | Drop everything but the segmented subject (§4) |
 | `onToggleStencil` | `isStencil = false` | — | Three tonal sheets; turns Outline off (§5) |
 | `onCycleStencilView` | `stencilView = ALL` | `ALL` → `BASE` → `MIDTONE` → `SECONDARY` → `ALL` | Only while a stencil exists (§5) |
 
@@ -331,8 +336,10 @@ The enum still declares `NONE`, `LAYERS`, `ADJUSTMENTS`, `TRANSFORM`, `COLOR`, `
 
 ## 4. Subject isolation & Outline effects
 
-`SubjectIsolator` (`feature/editor/.../SubjectIsolator.kt`) wraps ML Kit's `SubjectSegmentation`
-client to cut the design's subject out, making everything else transparent. There is no
+`SubjectIsolator` (`feature/editor/.../SubjectIsolator.kt`) runs U²-Net (small, `assets/u2netp.onnx`,
+bundled; see `docs/MODELS.md`) through OpenCV's DNN module, on the device and offline, to cut the
+design's subject out, making everything else transparent. A model that fails to load or run is
+reported as unavailable, never as a fault of the image, and no failure is cached. There is no
 `BackgroundRemover` class, and no stencil pipeline to feed (§5) — isolation exists solely as one of
 the design's two toggleable rendering effects.
 
@@ -633,6 +640,9 @@ Robust LAN peer-to-peer sync for collaborative painting — **no cloud, no accou
   peers are rejected at the handshake.
   **Known limit:** an incoming op (the echo of the guest's previous gesture, or a host edit)
   arriving mid-gesture overrides the guest's in-progress drag.
+  **Size limit:** one bulk transfer is held in memory on both ends, so Link carries projects up to
+  256 MiB (`Limits.MAX_BULK_BYTES`); export streams and takes up to 512 MiB. Hosting a larger
+  project says so, with both sizes, and points to export.
 
 **Known/deferred (see `BACKLOG.md`):** a mid-bulk stall in `GuestSession` under investigation;
 `LocalLoopTest.kt` real-socket timeouts are a latent CI-gate risk.

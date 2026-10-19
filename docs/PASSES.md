@@ -42,9 +42,10 @@ layer 5x5 as a cut sheet would be. N is 3 here: black, grey, white (the stencil 
 
 `DesignFilters.h` holds the bank. Each filter turns the design (offscreen, once, when it is
 registered) into another picture of itself, and `locations` picks up to 300 corner-like places on it.
-The filtered picture is then thrown away: descriptors are computed on the UNFILTERED, normalised
-design at those places (SuperPoint `describe`, or ORB with the orientation ORB would give), so they
-match against the raw live frame's own features. A filter decides where to look, nothing else.
+Each place gets two descriptor rows: one on the UNFILTERED, normalised design (SuperPoint
+`describe`, or ORB with the orientation ORB would give), which matches paint that looks like the
+design, and one on the normalised filtered picture itself, which matches paint that looks like the
+filter (a stencil, a posterised fill, a sketch). Then the filtered picture is thrown away.
 
 **Built cheapest first, off the calling thread.** Making the targets takes time, so design
 registration returns at once and a worker builds them in `designfilters::kBuildOrder`: invert,
@@ -57,10 +58,10 @@ build stand down before it installs anything.
 
 Each filter's places form a target set (`MobileGS::TargetSet`) that corroborates like the artwork's:
 the same pose-gated match (`gatedMatchSet`), consecutive confirmations, reset when the design moves
-or is replaced. A cell's vote is "present" when at least half of that filter's places inside it are
-confirmed, "absent" when some are not, and no data when it has none. Filter targets never become
+or is replaced. A cell's vote is "present" when at least half of that filter's rows inside it are
+confirmed (one of a place's two rows confirming is half that place), "absent" when some are not, and no data when it has none. Filter targets never become
 reloc marks: they judge progress, and Align uses them too. `MobileGS::autoFitDesign` matches the artwork's
-features, every installed target set and the inverted design against the capture photo (rays onto
+features, every installed target set (both rows of each place) and the inverted design against the capture photo (rays onto
 the wall plane) and against the Doodle (its rows are on the wall plane already), and keeps the
 pairing whose similarity fit has the most inliers; either source alone is enough. The Doodle starts
 as marks drawn for reloc, but once paint covers them (rows grown from live frames that matched the

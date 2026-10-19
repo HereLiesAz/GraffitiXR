@@ -17,7 +17,7 @@ boundaries are correct before code exists.
 | `:extension-api` / SDK / plugin loader *(not built yet)* | **MIT** | The contract extensions build against, and that other apps can adopt. |
 | Asset importers — ABR, `.brushset`, `.cube` *(not built yet)* | **MIT** | Interop layer; open is pure upside. |
 | Commodity reference tools that do **not** touch the native engine (brush, eraser, blur, curves, color-balance) | **MIT** | Seed the ecosystem; double as extension templates. |
-| Bundled third parties (OpenCV, ML Kit, …) | Their own upstream licenses | Not ours to relicense. |
+| Bundled third parties (OpenCV, the SuperPoint and U²-Net model weights, …) | Their own upstream licenses | Not ours to relicense. |
 
 Primary terms: `/LICENSE` (PolyForm). MIT text: `/docs/licenses/MIT.txt`. AGPL-3.0 (retained, not applied):
 `/docs/licenses/AGPL-3.0.txt`.

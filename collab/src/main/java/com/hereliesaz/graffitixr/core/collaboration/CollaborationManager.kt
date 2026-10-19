@@ -32,7 +32,6 @@ import javax.inject.Singleton
 data class ProjectSnapshot(
     val doodleBytes: ByteArray,
     val projectBytes: ByteArray,
-    val layerCount: Int,
     val spatialFrame: CoopSpatialFrame,
 ) {
     override fun equals(other: Any?): Boolean {
@@ -40,14 +39,12 @@ data class ProjectSnapshot(
         if (other !is ProjectSnapshot) return false
         return doodleBytes.contentEquals(other.doodleBytes) &&
             projectBytes.contentEquals(other.projectBytes) &&
-            layerCount == other.layerCount &&
             spatialFrame == other.spatialFrame
     }
 
     override fun hashCode(): Int {
         var result = doodleBytes.contentHashCode()
         result = 31 * result + projectBytes.contentHashCode()
-        result = 31 * result + layerCount
         result = 31 * result + spatialFrame.hashCode()
         return result
     }

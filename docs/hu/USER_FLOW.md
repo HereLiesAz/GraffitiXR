@@ -11,7 +11,7 @@
     * **`offset` / `scale` / `rotationX,Y,Z`**: A transzformációs paraméterek (Compose `Offset` + skalár forgatás/méretezés mezők), nem egy `Matrix` objektum.
     * **Szín- és fényerő-paraméterek**: `opacity`, `brightness`, `contrast`, `saturation`, `colorBalanceR/G/B` (Float értékek).
     * **`blendMode`**: `androidx.compose.ui.graphics.BlendMode` (Compose keverési mód, pl. `Screen`, `Multiply`) — nem Android `PorterDuff.Mode`.
-    * **Effekt-jelzők**: `isInverted`, `isSketch` (körvonal-kinyerés), `isSubjectIsolated` (MLKit alany-elkülönítés) — külön logikai mezők, nincs `Mesh warpMesh` és nincs GPU-gyorsított Liquify funkció; ilyen mező vagy funkció nem létezik a kódban.
+    * **Effekt-jelzők**: `isInverted`, `isSketch` (körvonal-kinyerés), `isSubjectIsolated` (U²-Net alany-elkülönítés) — külön logikai mezők, nincs `Mesh warpMesh` és nincs GPU-gyorsított Liquify funkció; ilyen mező vagy funkció nem létezik a kódban.
 
 ### B. Implementációs Logika
 * **AR Módban:** A `UniversalPlane` egy 3D Négyszögre (Quad) kerül renderelésre.
@@ -87,7 +87,7 @@
 | | `Balance` | A színegyensúly-panel nyitása/zárása. |
 | | `Invert` | A `Layer.isInverted` kapcsoló váltása. |
 | | `Outline` | A `Layer.isSketch` (körvonal-kinyerés, OpenCV Canny) kapcsoló váltása. |
-| | `Isolate` | A `Layer.isSubjectIsolated` (MLKit alany-elkülönítés) kapcsoló váltása. |
+| | `Isolate` | A `Layer.isSubjectIsolated` (U²-Net alany-elkülönítés) kapcsoló váltása. |
 | **PROJECT** | `New` / `Save` / `Load` / `Export` / `Settings` | Új projekt, mentés, betöltés, exportálás, beállítások. A projektfájl a `Doodle`-et szerializálja, nem egy voxeltérképet (lásd 2. szakasz). |
 | *(önálló elem)* | `Open` | Kép (vagy szövegréteg) kiválasztása; mellékhatásként átvált Design módba. Nincs "Design" harmonika-hoszt. |
 | *(önálló elem)* | `Help` | Az AzNavRail beépített súgó-overlayjét nyitja meg. |

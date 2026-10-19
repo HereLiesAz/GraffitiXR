@@ -63,8 +63,9 @@ class ProjectRepositoryImpl @Inject constructor(
         projectManager.loadProjectMetadata(context, id)
     }
 
-    // loadProjectMetadata returns null for an unreadable manifest or one whose id does not match its
-    // folder name, so such folders are skipped here rather than listed under a second identity.
+    // loadProjectMetadata returns null for a folder whose manifest id does not match a name that cannot
+    // be a project id, so such folders are skipped rather than listed under a second identity. An
+    // unreadable manifest is listed as a damaged placeholder (GraffitiProject.isDamaged).
     override suspend fun getProjects(): List<GraffitiProject> = withContext(Dispatchers.IO) {
         projectManager.getProjectList(context).mapNotNull { id ->
             projectManager.loadProjectMetadata(context, id)
@@ -73,7 +74,9 @@ class ProjectRepositoryImpl @Inject constructor(
 
     override suspend fun loadProject(id: String): Result<Unit> = saveMutex.withLock {
         val project = getProject(id)
-        if (project != null) {
+        if (project?.isDamaged == true) {
+            Result.failure(java.io.IOException("Project $id is damaged and can't be opened"))
+        } else if (project != null) {
             _currentProject.value = project
             Result.success(Unit)
         } else {

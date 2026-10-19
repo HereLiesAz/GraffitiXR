@@ -69,6 +69,37 @@ class CorrectionSourceArbiterTest {
         assertEquals(Source.NONE, a.select(1, false, hybridFrameReady = false, hasRelocCapturePose = false))
     }
 
+    @Test fun `a healthy fresh hybrid keeps a paint-backed lock out`() {
+        val a = CorrectionSourceArbiter()
+        assertEquals(Source.HYBRID, a.select(0, true, true, true, hybridConfidence = 0.9f))
+        assertEquals(Source.HOLD, a.select(10 * ms, false, true, true, relocPaintBacked = true))
+    }
+
+    @Test fun `a paint-backed lock drives once hybrid degrades, and keeps the anchor`() {
+        val a = CorrectionSourceArbiter()
+        assertEquals(Source.HYBRID, a.select(0, true, true, true, hybridConfidence = 0.3f))
+        assertEquals(Source.RELOC, a.select(10 * ms, false, true, true, relocPaintBacked = true))
+        // A healthy hybrid acceptance does not take it back while paint keeps locking...
+        assertEquals(Source.RELOC, a.select(20 * ms, true, true, true, relocPaintBacked = true, hybridConfidence = 0.9f))
+        // ...and frames without a paint lock hold, through the window.
+        assertEquals(Source.HOLD, a.select(30 * ms, false, true, true))
+        assertEquals(Source.HOLD, a.select(20 * ms + window, false, true, true))
+        // Paint silent past the window: back to the old rule.
+        assertEquals(Source.HYBRID, a.select(30 * ms + window, true, true, true, hybridConfidence = 0.9f))
+    }
+
+    @Test fun `a paint-backed lock drives when hybrid is silent past the window`() {
+        val a = CorrectionSourceArbiter()
+        a.select(0, true, true, true, hybridConfidence = 0.9f)
+        assertEquals(Source.RELOC, a.select(window + 1, false, true, true, relocPaintBacked = true))
+    }
+
+    @Test fun `a gated paint-backed lock is never selected`() {
+        val a = CorrectionSourceArbiter()
+        a.select(0, true, true, true, hybridConfidence = 0.1f)
+        assertEquals(Source.HOLD, a.select(10 * ms, false, true, true, relocGated = true, relocPaintBacked = true))
+    }
+
     @Test fun `a gated reloc path is never selected`() {
         val a = CorrectionSourceArbiter()
         // Nothing but reloc available: gated means the raw backbone, not RELOC.

@@ -1,6 +1,6 @@
 # Privacy Policy for GraffitiXR
 
-**Last Updated:** 2026-09-04
+**Last Updated:** 2026-10-19
 
 HereLiesAZ built the GraffitiXR app as a source-available app (see the repository's LICENSE and docs/LICENSING.md for terms). This SERVICE is provided by HereLiesAZ at no cost and is intended for use as is.
 
@@ -14,7 +14,7 @@ For a better experience, while using our Service, we may require you to provide 
 
 *   **Camera Data:** The app requires access to your device's camera to display the Augmented Reality (AR) view, Overlay mode, and to capture images for project targets. Camera data is processed locally on your device and is not transmitted to our servers unless you explicitly choose to share a project file.
 *   **Storage / Photos:** The app requests no storage permission. Images you add come through Android's system photo picker or file picker, which give the app access only to the file you pick. Projects are saved in the app's private storage, and exported images are saved to your device's photo gallery.
-*   **Location Data (Optional):** The app asks for location permission only when you start capturing an AR target. If you grant it, that target's capture record stores where it was taken (latitude, longitude, altitude and accuracy). It is saved locally in the project file and leaves your device only if you share or export that project file yourself.
+*   **Location Data (Optional):** The app asks for location permission only when you start capturing an AR target. If you grant it, that target's capture record stores where it was taken (latitude, longitude, altitude and accuracy). It is saved locally in the project file and leaves your device only if you share or export that project file yourself. Link (sharing a session with a second device) never sends it: the other device receives the project with every location removed.
 
 ## Crash Reports (Opt-In)
 
@@ -40,7 +40,9 @@ We may employ third-party companies and individuals due to the following reasons
 *   To perform Service-related services; or
 *   To assist us in analyzing how our Service is used.
 
-We use **Google ML Kit** for subject segmentation (background removal). This processing happens locally on your device.
+Subject isolation (background removal) runs **U²-Net**, a model bundled in the app, entirely on your device. Nothing is downloaded for it and no image leaves the device.
+
+On devices that support it, AR mode runs on **Google Play Services for AR (ARCore)**, provided by Google LLC and governed by the [Google Privacy Policy](https://policies.google.com/privacy). ARCore processes camera frames and motion-sensor data to track the device; see Google's [ARCore privacy requirements](https://developers.google.com/ar/develop/privacy-requirements) for what it collects. On devices without ARCore the app uses its own tracking and ARCore is never involved.
 
 ## Updates
 
@@ -70,4 +72,4 @@ If you have any questions or suggestions about our Privacy Policy, do not hesita
 
 
 ---
-*Documentation updated on 2026-09-04: corrected the Log Data section, which described crash data as collected automatically and without consent — the app actually requires an explicit opt-in (Settings > Crash reports, off by default) before any crash report leaves the device, and the report is filed as a public GitHub issue, not sent to "our servers." Gave the existing GitHub-API update-check disclosure its own section and clarified it is user-initiated (the Settings "Check for updates" button), not automatic. Prior update: 2026-03-17, during website redesign and Stencil generation integration phase.*
+*Documentation updated on 2026-10-19: disclosed Google Play Services for AR (ARCore); subject isolation now runs a model bundled in the app (U²-Net) instead of Google ML Kit; Link sends no location. Earlier: 2026-09-04: corrected the Log Data section, which described crash data as collected automatically and without consent — the app actually requires an explicit opt-in (Settings > Crash reports, off by default) before any crash report leaves the device, and the report is filed as a public GitHub issue, not sent to "our servers." Gave the existing GitHub-API update-check disclosure its own section and clarified it is user-initiated (the Settings "Check for updates" button), not automatic. Prior update: 2026-03-17, during website redesign and Stencil generation integration phase.*

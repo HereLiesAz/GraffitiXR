@@ -35,6 +35,12 @@ public:
     // definition for why that half is a logged no-op rather than a real write.
     void updateCamera(float* viewMat, float* projMat);
     void updateLightLevel(float level);
+    /**
+     * The low-light enhancement every native detect path applies (Zero-DCE, when bundled, under
+     * kLowLightThreshold), for detectors that run outside native (the ORB builds), so their
+     * descriptors stay comparable with live reloc frames. False when nothing was done.
+     */
+    bool enhanceIfDark(const cv::Mat& image, cv::Mat& out);
     void updateAnchorTransform(float* transformMat);
     // Deliberately a no-op: neither the angular nor linear velocity this receives is read anywhere
     // in this engine (there is no deblur or motion-compensation consumer). Kept as a callable,
@@ -121,6 +127,7 @@ public:
         kRelocFewMatches = 4,    //!< fewer than 8 correspondences survived the Lowe ratio test
         kRelocPnpFailed = 5,     //!< solvePnPRansac found no consistent pose
         kRelocFewInliers = 6,    //!< PnP solved but fewer than 6 inliers agreed
+        kRelocTypeMismatch = 7,  //!< the live descriptors can't compare with the doodle's (e.g. a SuperPoint doodle, SuperPoint unavailable)
     };
 
     /**
@@ -244,12 +251,6 @@ public:
         return kRegionBand;
     }
 
-    /** Hard ceiling on stored wall marks — a memory guard on the self-grow append. */
-    static constexpr size_t kMaxWallMarks = 5000;
-    // Fewer OUTSIDE marks than this and the partition is ignored for reloc matching: with almost no
-    // backbone nothing could localize, and paint marks (which only appear after a lock) could never
-    // bootstrap. Every stored mark is used instead until real backbone returns.
-    static constexpr int kMinBackboneMarks = 12;
     // solvePnPRansac budget. 100 iterations at 0.99 fails a solvable frame about 4% of the time at a
     // 50% inlier ratio and about a third of the time at 40%; the point sets here are small enough
     // that more iterations are cheap.
@@ -294,8 +295,9 @@ public:
         kGrowUntrusted = 4,        //!< the promotion gate refused — inlier spread or match quality
         kGrowNoGeometry = 5,       //!< intrinsics, wall size or plane fit degenerate
         kGrowNoNewPoints = 6,      //!< every candidate back-projected behind the camera or deduped
-        kGrowAtCap = 7,            //!< the wall is at kMaxWallMarks
+        kGrowAtCap = 7,            //!< no longer reported: past kMaxGrownRows the least-seen grown rows give way
         kGrowPromoted = 8,         //!< marks were written into the map
+        kGrowTypeMismatch = 9,     //!< the artwork's descriptors are not the wall doodle's type
     };
 
     /** Last [CorrobGate]; see the enum for why this is worth a channel of its own. */
@@ -475,6 +477,18 @@ public:
     // floats (points), then the descriptor bytes. Empty vector when there are none.
     std::vector<uint8_t> exportPaintMarks() const;
     void restorePaintMarks(const cv::Mat& descs, const std::vector<cv::Point3f>& pts);
+    /**
+     * Call before installing a NEW capture's Doodle (instead of clearPaintMarks + clearWallFeatureMap).
+     * With a lock of the old Doodle in the last kCarryMaxAgeMs, paint marks and the map are moved into
+     * the new capture's frame through it; otherwise they are dropped. The paint grid (design-relative)
+     * is kept either way. [newCaptureView16]: the new capture's view, as given to
+     * restoreWallDoodleMetric; null when the capture has none.
+     */
+    void carryDoodleFrameState(const float* newCaptureView16);
+    static constexpr int kCarryMaxAgeMs = 3000;
+    /** A mark under the design whose cell is painted counts as painted OVER once this many locks pass without it. */
+    static constexpr long kCoveredStaleLocks = 20;
+    bool mMapAnchorPending = false;   // guarded by mMutex
     void clearPaintMarks();
     int getPaintMarkCount() const;
     void getDoodleAnchor(float* out16) const;
@@ -605,6 +619,31 @@ public:
 
     // Collaboration methods
     std::vector<uint8_t> exportDoodle();
+    /**
+     * The Doodle's GROWN rows (everything self-grow appended after the captured ones), in the
+     * exportPaintMarks blob layout, so a project can keep what the Doodle learned across sessions.
+     * Empty when nothing has grown.
+     */
+    std::vector<uint8_t> exportGrownWall() const;
+    /**
+     * Paint inliers (paint marks and grown rows) of the current lock, or 0 when there is no lock
+     * published within kRelocPriorMaxAgeMs. What lets a paint-backed correction past a degrading
+     * hybrid page (CorrectionSourceArbiter).
+     */
+    int relocPaintInliers() const {
+        std::lock_guard<std::mutex> lock(mMutex);
+        if (mPnpResultSeq.load(std::memory_order_relaxed) <= 0 ||
+            (std::chrono::steady_clock::now() - mPnpPublishTime) >= std::chrono::milliseconds(kRelocPriorMaxAgeMs))
+            return 0;
+        return mPnpPaintInliers.load(std::memory_order_relaxed);
+    }
+    /** Which Doodle native holds; advances whenever it is replaced or cleared. */
+    uint64_t doodleGeneration() const { std::lock_guard<std::mutex> lock(mMutex); return mDoodleGeneration; }
+    /**
+     * Append saved grown rows behind the captured Doodle (call after restoring it). Refused when
+     * there is no Doodle or the descriptor type differs; tagged OUTSIDE like every grown row.
+     */
+    void restoreGrownWall(const cv::Mat& descs, const std::vector<cv::Point3f>& pts);
     void alignToDoodle(const uint8_t* data, size_t size);
 
     void destroy();
@@ -876,10 +915,48 @@ private:
     cv::Mat mCleanExclDescs;
     std::vector<cv::Point3f> mCleanExclPts;
     const uchar* mCleanExclFor = nullptr; size_t mCleanExclWallN = 0; uint64_t mCleanExclDoodleGen = 0;
+    /**
+     * How many rows at the front of mWallDescriptors / mWallKeypoints3D are the Doodle as captured.
+     * Self-grow only appends, so every row after it is grown -- what exportGrownWall saves. Guarded by
+     * mMutex.
+     */
+    size_t mDoodleBaseCount = 0;
+    /** Per wall row: the reloc seq of the last lock it was an inlier of (lazily sized). Guarded by mMutex. */
+    std::vector<long> mWallLastSeen;
+    /** corrRow tag for a correspondence that came from a paint mark (-1 is the persistent map). */
+    static constexpr int kCorrRowPaint = -2;
+    /** Inliers of the published lock that stood on paint (paint marks, grown rows). */
+    std::atomic<int> mPnpPaintInliers{0};
+    /** When the current reloc pose was published, for priorFresh. Guarded by mMutex. */
+    std::chrono::steady_clock::time_point mPnpPublishTime{};
+    /** A reloc pose older than this is not a prior for gating (the camera has moved, or was lost). */
+    static constexpr int kRelocPriorMaxAgeMs = 1500;
+    /** Map points must have been re-observed, or carry real confidence, to join a reloc solve. */
+    static constexpr int kMapMinObsForReloc = 2;
+    static constexpr float kMapMinConfForReloc = 0.2f;
+    /** Grown rows behind the captured Doodle; at the cap the least recently seen give way. */
+    static constexpr size_t kMaxGrownRows = 5000;
     void detectCleanWallFeaturesLocked();
+    /** Drop [count] grown rows, least recently seen by a lock first. Needs mMutex. */
+    void evictLeastSeenGrownLocked(size_t count);
     void cleanWallExclusionLocked(cv::Mat& descs, std::vector<cv::Point3f>& pts);
     float mCaptureIntr[4] = {0,0,0,0};
     std::vector<uint8_t> mPendingGridRestore;      // applied when a grid of matching shape is built
+    /**
+     * Saved per-feature confirmation counts (the paint-grid blob's tail), waiting for the same design
+     * to register (artwork rows) and for each filter's targets to be built (set rows). A design whose
+     * composite size or feature count differs is another design, and drops them. Guarded by mMutex.
+     */
+    struct PendingCorrob {
+        bool valid = false;
+        int imgW = 0, imgH = 0;
+        std::vector<uint8_t> art, promoted;
+        std::vector<std::vector<uint8_t>> sets;
+    };
+    PendingCorrob mPendingCorrob;
+    static constexpr int32_t kCorrobTailMagic = 0x42524F43;   // "CORB"
+    /** Apply what of mPendingCorrob fits the registered design and its built target sets. Needs mMutex. */
+    void applyPendingCorrobLocked(bool artworkJustRegistered);
     cv::Mat mArtworkGray;                          // normalised design composite, for autoFitDesign
 public:
     /**
@@ -946,6 +1023,10 @@ public:
      */
     void setChangePassEnabled(bool on) { mChangePassEnabled.store(on, std::memory_order_relaxed); }
     bool changePassEnabled() const { return mChangePassEnabled.load(std::memory_order_relaxed); }
+    /**
+     * The paint grid (painted cells, paint colours per group), followed by every design feature's
+     * consecutive-confirmation count and promoted flag, artwork first, then each filter's target set.
+     */
     std::vector<uint8_t> exportPaintGrid() const;
     void restorePaintGrid(const std::vector<uint8_t>& blob);
     float getFeatureProgress() const { return mFeatureProgress.load(std::memory_order_relaxed); }
@@ -1041,6 +1122,17 @@ private:
     // restored without a capture view (rectification is then skipped — plain matching still runs).
     float mDoodleViewMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     bool mHasDoodleView = false;
+    // The capture view is in the tracking world it was recorded in. A project reopened, or a new
+    // tracking session, is another world: rectifying then compared poses from two worlds. Stale
+    // until a lock re-derives the capture view in the current world (C·inv(camFromFp)·C·V_solve);
+    // a re-push of the same doodle keeps the derived view. Guarded by mMutex.
+    bool mDoodleViewStale = false;
+    bool mDoodleViewDerived = false;
+public:
+    /** The capture view is from another tracking world (a reload, a new session): see mDoodleViewStale. */
+    void markDoodleViewStale() { std::lock_guard<std::mutex> lock(mMutex); mDoodleViewStale = true; }
+    bool doodleViewStale() const { std::lock_guard<std::mutex> lock(mMutex); return mDoodleViewStale; }
+private:
     // Teleological self-grow: default OFF + the last reloc seq we grew from (only grow on a fresh,
     // confident relock so promoted marks are placed with a current pose, never a stale one).
     //

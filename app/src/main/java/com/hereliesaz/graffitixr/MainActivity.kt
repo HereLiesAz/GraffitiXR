@@ -180,6 +180,10 @@ private val VOLUME_UNLOCK_SEQUENCE = intArrayOf(
     KeyEvent.KEYCODE_VOLUME_DOWN,
 )
 private const val VOLUME_UNLOCK_WINDOW_MS = 1500L
+/** Bottom offset of the rail-side controls column: clear of the adjustment knobs and undo row. */
+private val RAIL_SIDE_CONTROLS_BOTTOM = 220.dp
+/** Proximity readings under this (cm) are "covered": a pocket, a jacket, the phone face-down. */
+private const val PROXIMITY_NEAR_CM = 3f
 
 /** Saved-state key for a shared-in image still waiting for a project to land in. */
 private const val STATE_PENDING_SHARED_IMAGE = "pending_shared_image"
@@ -214,6 +218,11 @@ private const val AR_UNAVAILABLE_EXPLAINER_KEY = "ar_unavailable_explainer"
  * only when the stored choice genuinely differs from the locale already in effect.
  */
 class MainActivity : AppCompatActivity() {
+    private companion object {
+        /** MainActivity instances alive in this process (a quick relaunch can overlap a teardown). */
+        val liveInstances = java.util.concurrent.atomic.AtomicInteger(0)
+    }
+
 
     @Inject lateinit var slamManager: SlamManager
     @Inject lateinit var projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository
@@ -434,6 +443,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        liveInstances.incrementAndGet()
 
         // Interop: capture an image handed in by ACTION_SEND on this cold start (consumed in setContent).
         // Only on a genuinely new launch: on recreation (rotation is handled in place, but a locale
@@ -622,8 +632,11 @@ class MainActivity : AppCompatActivity() {
                 // creates a project, then add it.
                 val sharedImage = incomingSharedImage
                 val projectIdForShare = editorUiState.projectId
-                LaunchedEffect(sharedImage, projectIdForShare) {
-                    if (sharedImage != null && projectIdForShare != null) {
+                // Also held while frozen: adding it raises the replace prompt, which would take the
+                // touches Freeze exists to refuse. It lands on unlock.
+                val shareFrozen = mainUiState.isTouchLocked
+                LaunchedEffect(sharedImage, projectIdForShare, shareFrozen) {
+                    if (sharedImage != null && projectIdForShare != null && !shareFrozen) {
                         editorViewModel.onAddLayer(sharedImage)
                         incomingSharedImage = null
                     }
@@ -760,6 +773,14 @@ class MainActivity : AppCompatActivity() {
                     // resting hand can't pull down the notification shade or hit a nav gesture. The
                     // bars still swipe in transiently (then re-hide) so the user is never trapped.
                     // Any other state shows them normally.
+                    // Freeze also holds the orientation it was frozen in: a phone taped to a wall or
+                    // laid on paper must not rotate the tracing out from under the artist. Unlock
+                    // hands rotation back to the manifest's default.
+                    requestedOrientation = if (mainUiState.isTouchLocked) {
+                        android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LOCKED
+                    } else {
+                        android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                    }
                     val insets = WindowInsetsControllerCompat(window, window.decorView)
                     if (mainUiState.isTouchLocked) {
                         insets.systemBarsBehavior =
@@ -816,6 +837,10 @@ class MainActivity : AppCompatActivity() {
                 // re-asked on every capture — rather than at startup or for unrelated camera use.
                 var locationAskedThisLaunch by rememberSaveable { mutableStateOf(false) }
                 LaunchedEffect(mainUiState.isCapturingDoodle, editorUiState.editorMode) {
+                    // One fix for this capture (waits for the grant below if there is none yet).
+                    if (mainUiState.isCapturingDoodle && editorUiState.editorMode == EditorMode.AR) {
+                        arViewModel.requestCaptureLocationFix()
+                    }
                     if (mainUiState.isCapturingDoodle &&
                         editorUiState.editorMode == EditorMode.AR &&
                         !locationAskedThisLaunch &&
@@ -842,8 +867,10 @@ class MainActivity : AppCompatActivity() {
 
                 LaunchedEffect(arViewModel, editorViewModel) {
                     // Also flushes, in order, any spectator ops that arrived before this effect ran.
-                    arViewModel.setSpectatorOpHandler { op -> editorViewModel.applySpectatorOp(op) }
+                    arViewModel.setSpectatorOpHandler { op -> editorViewModel.receiveSpectatorOp(op) }
                 }
+                // Freeze holds Link edits (both directions) until unlock.
+                LaunchedEffect(mainUiState.isTouchLocked) { editorViewModel.setFrozen(mainUiState.isTouchLocked) }
                 // Co-op v4, host side: a connected guest's edits land on the authoritative project.
                 LaunchedEffect(arViewModel, editorViewModel) {
                     arViewModel.setGuestOpHandler { op ->
@@ -1420,6 +1447,7 @@ class MainActivity : AppCompatActivity() {
                                     val dashboardState by dashboardViewModel.uiState.collectAsState()
                                     LaunchedEffect(Unit) { dashboardViewModel.loadAvailableProjects() }
                                     ProjectLibraryScreen(
+                                        isRightHanded = editorUiState.isRightHanded,
                                         projects = dashboardState.availableProjects,
                                         onLoadProject = { project ->
                                             // Switching projects ends any active guest co-op session
@@ -1650,35 +1678,24 @@ class MainActivity : AppCompatActivity() {
                             // anchor. This badge is therefore only meaningful once anchored; gating it on
                             // `!isAnchorEstablished` made every branch but IDLE dead (the badge always
                             // returned immediately, per RelocStatusBadge's own state machine below).
+                            // Controls that take a tap sit at the bottom on the rail's side, in reach of the
+                            // thumb holding the phone (docs/UI_UX.md "Thumb Range Only"); badges that are
+                            // only read stay at the top.
+                            val railBottom = if (editorUiState.isRightHanded) Alignment.BottomStart else Alignment.BottomEnd
+                            var showDoodleSearch = false
                             if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && arUiState.isAnchorEstablished) {
                                 // Locked = relocalization has actually matched the saved target. Painting
-                                // progress is NOT a lock signal: it is 0 on an unpainted wall.
-                                val relocLocked = arUiState.paintingProgress > 0f ||
-                                    arUiState.relocDiagnostics.reject == RelocReject.OK ||
-                                    arUiState.fusionDiagnostics.state in setOf(
+                                // progress is NOT a lock signal (it is 0 on an unpainted wall, and it stays
+                                // up after a loss). A standing fusion correction counts only while ARCore
+                                // tracks (isScanning): out of a pocket it is HOLDING the pre-loss pose,
+                                // which is searching, not locked, until a relock lands.
+                                val relocLocked = arUiState.relocDiagnostics.reject == RelocReject.OK ||
+                                    (arUiState.isScanning && arUiState.fusionDiagnostics.state in setOf(
                                         FusionState.COLD_SNAP, FusionState.BLENDING, FusionState.HOLDING
-                                    )
+                                    ))
                                 if (mainUiState.hasArCoreDoodle == true && !relocLocked) {
-                                    // A saved target exists but is not matched: say so, point the
-                                    // artist the way the saved compass attitude says, and after a
-                                    // while offer to recapture. Sensors run only while this is shown.
-                                    SavedDoodleSearchStatus(
-                                        savedQuaternion = mainUiState.savedDoodleQuaternion,
-                                        savedMagneticAccuracy = mainUiState.savedDoodleMagneticAccuracy,
-                                        doodleSearchKey = mainUiState.loadedProjectId,
-                                        canRecapture = !mainUiState.isConfirmingDoodle &&
-                                            !mainUiState.isCapturingDoodle && !mainUiState.isWaitingForTap,
-                                        onRecapture = {
-                                            // Same effect as the rail's Target item.
-                                            arViewModel.clearCaptureForRetry()
-                                            arViewModel.cancelMeasure()
-                                            mainViewModel.startDoodleCapture()
-                                        },
-                                        modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .padding(top = 16.dp, end = 16.dp),
-                                        strings = strings
-                                    )
+                                    // Shown with the bottom rail-side controls below (it carries Recapture).
+                                    showDoodleSearch = true
                                 } else {
                                     RelocStatusBadge(
                                         isAnchorEstablished = arUiState.isAnchorEstablished,
@@ -2124,17 +2141,59 @@ class MainActivity : AppCompatActivity() {
                                     waiting = stringResource(DesignR.string.link_tripod_waiting),
                                 )
                             }
-                            if (arUiState.coopRole == CoopRole.GUEST &&
-                                (coopState is CoopSessionState.Connected || coopState is CoopSessionState.Reconnecting)) {
-                                CoopSpectatorBanner(
-                                    peerName = (coopState as? CoopSessionState.Connected)?.peerName ?: "host",
-                                    isReconnecting = coopState is CoopSessionState.Reconnecting,
-                                    onLeave = { arViewModel.leaveSession() },
-                                    modifier = Modifier.align(Alignment.TopCenter),
-                                )
-                            }
-
                             val glassesState by arViewModel.glassesSessionState.collectAsState()
+                            Column(
+                                modifier = Modifier
+                                    .align(railBottom)
+                                    .padding(start = 16.dp, end = 16.dp, bottom = RAIL_SIDE_CONTROLS_BOTTOM),
+                                horizontalAlignment = if (editorUiState.isRightHanded) Alignment.Start else Alignment.End,
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                if (showDoodleSearch) {
+                                    // A saved target exists but is not matched: say so, point the
+                                    // artist the way the saved compass attitude says, and after a
+                                    // while offer to recapture. Sensors run only while this is shown.
+                                    SavedDoodleSearchStatus(
+                                        savedQuaternion = mainUiState.savedDoodleQuaternion,
+                                        savedMagneticAccuracy = mainUiState.savedDoodleMagneticAccuracy,
+                                        doodleSearchKey = mainUiState.loadedProjectId,
+                                        canRecapture = !mainUiState.isConfirmingDoodle &&
+                                            !mainUiState.isCapturingDoodle && !mainUiState.isWaitingForTap,
+                                        onRecapture = {
+                                            // Same effect as the rail's Target item.
+                                            arViewModel.clearCaptureForRetry()
+                                            arViewModel.cancelMeasure()
+                                            mainViewModel.startDoodleCapture()
+                                        },
+                                        strings = strings
+                                    )
+                                }
+                                if (arUiState.coopRole == CoopRole.GUEST &&
+                                    (coopState is CoopSessionState.Connected || coopState is CoopSessionState.Reconnecting)) {
+                                    CoopSpectatorBanner(
+                                        peerName = (coopState as? CoopSessionState.Connected)?.peerName ?: "host",
+                                        isReconnecting = coopState is CoopSessionState.Reconnecting,
+                                        onLeave = { arViewModel.leaveSession() },
+                                    )
+                                }
+                                when (val s = glassesState) {
+                                    is com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.Active ->
+                                        com.hereliesaz.graffitixr.ui.glasses.GlassesStatusBanner(
+                                            isFallback = false,
+                                            fallbackReason = null,
+                                            onReconnect = {},
+                                            onLeave = { arViewModel.endGlassesSession() },
+                                        )
+                                    is com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.Fallback ->
+                                        com.hereliesaz.graffitixr.ui.glasses.GlassesStatusBanner(
+                                            isFallback = true,
+                                            fallbackReason = s.reason,
+                                            onReconnect = { arViewModel.startGlassesSession() },
+                                            onLeave = { arViewModel.endGlassesSession() },
+                                        )
+                                    else -> Unit
+                                }
+                            }
                             when (val s = glassesState) {
                                 is com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.PairingPrompt -> {
                                     com.hereliesaz.graffitixr.ui.glasses.GlassesPairingOverlay(
@@ -2147,37 +2206,25 @@ class MainActivity : AppCompatActivity() {
                                         onTap = { point -> arViewModel.submitCalibrationTap(point) },
                                     )
                                 }
-                                is com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.Active -> {
-                                    com.hereliesaz.graffitixr.ui.glasses.GlassesStatusBanner(
-                                        isFallback = false,
-                                        fallbackReason = null,
-                                        onReconnect = {},
-                                        onLeave = { arViewModel.endGlassesSession() },
-                                        modifier = Modifier.align(Alignment.TopCenter),
-                                    )
-                                }
-                                is com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.Fallback -> {
-                                    com.hereliesaz.graffitixr.ui.glasses.GlassesStatusBanner(
-                                        isFallback = true,
-                                        fallbackReason = s.reason,
-                                        onReconnect = { arViewModel.startGlassesSession() },
-                                        onLeave = { arViewModel.endGlassesSession() },
-                                        modifier = Modifier.align(Alignment.TopCenter),
-                                    )
-                                }
-                                com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.Idle -> Unit
+                                // Active and Fallback banners are in the rail-side column above.
+                                else -> Unit
                             }
                         }
                     }
                 }
                 guidanceControllerRef = guidanceController
 
+                // In AR the screen also locks itself while the proximity sensor is covered (in a
+                // pocket, against a jacket): touches there are fabric, not the artist. It lifts the
+                // moment the sensor is uncovered; no gesture is needed.
+                val pocketed = rememberProximityCovered(enabled = editorUiState.editorMode == EditorMode.AR)
+
                 // Trace ▸ Freeze: absorb EVERY pointer event above the (now folded) rail so nothing
                 // responds — including the rail's app-icon unfold tap, which would otherwise bring the
                 // rail back. Drawn as the last sibling in the theme Surface, so it sits on top of the
                 // host layout and the rail it renders. Unlock stays volume-key only (key events don't
                 // go through this), matching the existing touch lock.
-                if (mainUiState.isTouchLocked) {
+                if (mainUiState.isTouchLocked || pocketed) {
                     Box(
                         Modifier
                             .fillMaxSize()
@@ -2192,6 +2239,38 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * True while the proximity sensor reads covered, when [enabled]. Listens only while enabled; a
+     * device without the sensor always reads uncovered.
+     */
+    @Composable
+    private fun rememberProximityCovered(enabled: Boolean): Boolean {
+        var covered by remember { mutableStateOf(false) }
+        DisposableEffect(enabled) {
+            val sm = getSystemService(android.content.Context.SENSOR_SERVICE) as? android.hardware.SensorManager
+            val sensor = sm?.getDefaultSensor(android.hardware.Sensor.TYPE_PROXIMITY)
+            if (!enabled || sm == null || sensor == null) {
+                covered = false
+                return@DisposableEffect onDispose {}
+            }
+            val listener = object : android.hardware.SensorEventListener {
+                override fun onSensorChanged(event: android.hardware.SensorEvent) {
+                    // Many sensors are binary (0 or their maximum range); near is under both the
+                    // range and a few centimetres.
+                    val d = event.values.firstOrNull() ?: return
+                    covered = d < minOf(sensor.maximumRange, PROXIMITY_NEAR_CM)
+                }
+                override fun onAccuracyChanged(s: android.hardware.Sensor?, accuracy: Int) = Unit
+            }
+            sm.registerListener(listener, sensor, android.hardware.SensorManager.SENSOR_DELAY_NORMAL)
+            onDispose {
+                sm.unregisterListener(listener)
+                covered = false
+            }
+        }
+        return covered
     }
 
     @Composable
@@ -2215,8 +2294,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        arViewModel.destroyArSession()
-        if (isFinishing) slamManager.destroy()
+        liveInstances.decrementAndGet()
+        // The teardown saves the session's map, paint and grown Doodle before it closes ARCore; the
+        // engine is destroyed only once that save has run (destroying it first made the save read a
+        // null engine and write nothing), and only if no new Activity has started using it meanwhile.
+        val teardown = arViewModel.destroyArSession()
+        if (isFinishing) {
+            teardown.invokeOnCompletion { if (liveInstances.get() == 0) slamManager.destroy() }
+        }
     }
 
     private fun AzNavHostScope.ConfigureRailItems(
@@ -2479,6 +2564,22 @@ class MainActivity : AppCompatActivity() {
                         shape = AzButtonShape.NONE,
                         disabled = showLibrary,
                         onClick = { editorViewModel.onToggleModeTransformLocked(EditorMode.AR) },
+                    )
+                    // Freeze in AR, as in Trace: the whole touchscreen locked while painting, so a
+                    // hand, a sleeve or a pocket can't drag the design, switch modes or re-capture.
+                    azRailSubItem(
+                        id = "mode.ar.freeze",
+                        hostId = railHostOf("mode.ar.freeze"),
+                        text = "Freeze",
+                        color = navItemColor,
+                        classifiers = setOf("toggle"),
+                        shape = AzButtonShape.NONE,
+                        disabled = showLibrary,
+                        onClick = {
+                            val freezing = !isTouchLocked
+                            mainViewModel.setTouchLocked(freezing)
+                            if (freezing) editorViewModel.onDismissPanel()
+                        },
                     )
                     // Measure — two taps on the wall the design is drawn on. Needs the anchor's wall
                     // frame, and the ARCore backend: standalone has no measurement path yet, and must
@@ -2888,6 +2989,9 @@ class MainActivity : AppCompatActivity() {
             if (editorUiState.editorMode == EditorMode.TRACE) {
                 if (isTouchLocked) azHighlight("mode.trace.freeze", active = Cyan)
             }
+            if (editorUiState.editorMode == EditorMode.AR) {
+                if (isTouchLocked) azHighlight("mode.ar.freeze", active = Cyan)
+            }
             if (editorUiState.activePanel == EditorPanel.ADJUST) azHighlight("design.adjust", active = Cyan)
             if (editorUiState.activePanel == EditorPanel.COLOR) azHighlight("design.balance", active = Cyan)
             if (editorUiState.design?.isInverted == true) azHighlight("design.invert", active = Cyan)
@@ -3284,6 +3388,8 @@ private fun RelocDiagnosticsOverlay(
             "NO POSE" to "${d.matches} matches, none geometrically consistent"
         RelocReject.FEW_INLIERS ->
             "${d.inliers}/6 INLIERS" to "close — hold steadier, or get square to the wall"
+        RelocReject.TYPE_MISMATCH ->
+            "TYPE MISMATCH" to "the Doodle needs the SuperPoint model, which isn't available — re-capture the Doodle"
         RelocReject.UNKNOWN -> "—" to "waiting for the first attempt"
     }
     val locked = d.reject == RelocReject.OK

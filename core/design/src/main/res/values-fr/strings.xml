@@ -40,8 +40,9 @@
     <string name="lib_new_project">Nouveau</string>
     <string name="lib_import_project">Importer</string>
     <string name="lib_no_projects">Aucun projet pour le moment</string>
-    <string name="lib_no_projects_hint">Appuyez sur Nouveau ci-dessus pour commencer votre première fresque.\n\nVous serez dirigé vers l\'éditeur où vous pourrez :\n  \u2022  Ajouter des œuvres d\'art depuis le menu Conception\n  \u2022  Passer en mode AR pour projeter sur un vrai mur\n  \u2022  Utiliser Superposition pour faire flotter votre conception sur la caméra en direct\n  \u2022  Utiliser Maquette pour prévisualiser sur une photo de mur\n  \u2022  Utiliser Table lumineuse pour tracer votre conception sur papier</string>
+    <string name="lib_no_projects_hint">Appuyez sur Nouveau ci-dessous pour commencer votre première œuvre.\n\nVous serez dirigé vers l\'éditeur où vous pourrez :\n  \u2022  Ajouter des œuvres d\'art depuis le menu Conception\n  \u2022  Passer en mode AR pour projeter sur un vrai mur\n  \u2022  Utiliser Superposition pour faire flotter votre conception sur la caméra en direct\n  \u2022  Utiliser Maquette pour prévisualiser sur une photo de mur\n  \u2022  Utiliser Calque pour décalquer votre conception sur papier</string>
     <string name="lib_project_thumbnail">Vignette du projet</string>
+    <string name="lib_project_damaged">Endommagé : impossible de l’ouvrir</string>
     <string name="lib_delete_project_desc">Supprimer le projet %1$s</string>
 
     <!-- Settings Screen -->
@@ -114,8 +115,6 @@
     <string name="settings_copyright">GraffitiXR © 2025</string>
 
     <!-- Editor UI -->
-    <string name="layers_title">Calques</string>
-    <string name="brush_size_title">Taille du pinceau</string>
     <string name="save_project_hint">Nom du projet</string>
 
     <!-- Target Creation -->
@@ -133,7 +132,6 @@
     <string name="reset_button">Réinitialiser</string>
 
     <string name="poster_title">GÉNÉRER AFFICHE</string>
-    <string name="poster_select_layers">Sélectionner les calques à inclure :</string>
     <string name="poster_physical_size">Taille physique (Largeur en mm) :</string>
     <string name="poster_generate_pdf">GÉNÉRER PDF</string>
 
@@ -151,14 +149,13 @@
     <string name="desc_segmentation_preview">Aperçu de la segmentation</string>
     <string name="settings_scan_mode_voxel_hash">Hachage de voxels</string>
     <string name="settings_scan_mode_surface_mesh">Maillage de surface</string>
-    <string name="settings_mural_method_label">Moteur de fresque</string>
 
     <!-- Migrated from stale app-module strings.xml (audit item 2) -->
     <string name="app_name">GraffitiXR</string>
     <string name="nav_modes">Modes</string>
     <string name="nav_modes_info">Basculer entre les modes Projection AR, Superposition, Maquette et Calque.</string>
     <string name="nav_ar_mode">AR</string>
-    <string name="nav_ar_mode_info">Projetez votre œuvre sur un vrai mur à l\'aide de la réalité augmentée. Scannez d\'abord le mur pour placer l\'ancre, puis ajoutez vos calques de conception.</string>
+    <string name="nav_ar_mode_info">Projetez votre œuvre sur un vrai mur à l\'aide de la réalité augmentée. Scannez d\'abord le mur pour placer l\'ancre, puis ajoutez votre conception.</string>
     <string name="nav_overlay">Superposition</string>
     <string name="nav_overlay_info">Superposez votre conception sur le flux de la caméra en direct sans ancrage AR. Idéal pour des vérifications rapides de cadrage et de placement.</string>
     <string name="nav_mockup">Maquette</string>
@@ -171,28 +168,26 @@
     <string name="nav_create_info">Photographiez une marque de référence sur le mur pour créer une nouvelle ancre AR. L\'application suivra cette marque pour garder votre projection alignée.</string>
     <string name="nav_refine">Affiner</string>
     <string name="nav_refine_info">Ajustez finement la position d\'un Gribouillis existant.</string>
-    <string name="nav_update">Progrès</string>
-    <string name="nav_update_info">Marquez les zones terminées de votre fresque pour suivre l\'avancement de la peinture.</string>
     <string name="nav_design">Conception</string>
-    <string name="nav_design_info">Ajoutez et gérez des calques de conception. Chaque calque peut être une image importée ou un dessin à main levée.</string>
+    <string name="nav_design_info">Votre espace de travail. La conception que vous ajoutez avec \'Ouvrir\' — et modifiez avec les outils ci-dessous — est conservée dans tous les modes.</string>
     <string name="nav_open">Ouvrir</string>
-    <string name="nav_open_info">Ajouter une image de votre galerie comme nouveau calque.</string>
+    <string name="nav_open_info">Ajouter une image de votre galerie comme conception.</string>
     <string name="nav_wall">Mur</string>
     <string name="nav_wall_info">Remplacer la photo du mur d\'arrière-plan utilisée en mode Maquette.</string>
     <string name="nav_isolate">Isoler</string>
     <string name="nav_isolate_info">Supprimer automatiquement l\'arrière-plan de ce calque, ne laissant que le sujet sur un arrière-plan transparent.</string>
     <string name="nav_invert">Inverser</string>
     <string name="nav_blend">Fusion</string>
-    <string name="nav_invert_info">Créer un négatif du calque actuel. Les noirs deviennent blancs et les couleurs sont inversées — utile pour l\'analyse de pochoir et de superposition.</string>
+    <string name="nav_invert_info">Créer un négatif de la conception. Les noirs deviennent blancs et les couleurs sont inversées — utile pour l\'analyse de pochoir et de superposition.</string>
     <string name="nav_outline">Contour</string>
     <string name="nav_outline_info">Convertir ce calque en dessin au trait noir sur fond transparent — idéal pour créer des modèles de pochoir.</string>
     <string name="nav_adjust">Ajuster</string>
-    <string name="nav_adjust_info">Ajustez finement la luminosité, le contraste, la saturation et la balance des couleurs pour ce calque.</string>
+    <string name="nav_adjust_info">Ajustez finement la luminosité, le contraste, la saturation et la balance des couleurs de la conception.</string>
     <string name="nav_edit">Modifier</string>
     <string name="nav_balance">Couleur</string>
-    <string name="nav_balance_info">Teinter les couleurs du calque à l\'aide des curseurs des canaux rouge, vert et bleu.</string>
+    <string name="nav_balance_info">Teinter les couleurs de la conception à l\'aide des curseurs des canaux rouge, vert et bleu.</string>
     <string name="nav_blending">Mélange</string>
-    <string name="nav_blending_info">Faire défiler les modes de fusion (Normal, Produit, Superposition…) pour contrôler comment ce calque se compose avec les calques inférieurs.</string>
+    <string name="nav_blending_info">Faire défiler les modes de fusion (Normal, Produit, Superposition…) pour contrôler comment la conception se compose avec ce qui se trouve derrière.</string>
     <string name="nav_settings">Paramètres</string>
     <string name="nav_settings_info">Configurez la manualité, le mode de numérisation AR, les unités et d\'autres préférences de l\'application.</string>
     <string name="nav_project">Projet</string>
@@ -204,7 +199,7 @@
     <string name="nav_load">Charger</string>
     <string name="nav_load_info">Ouvrir la bibliothèque de projets pour charger un projet précédemment sauvegardé.</string>
     <string name="nav_export">Exporter</string>
-    <string name="nav_export_info">Exporter une image aplatie de tous les calques visibles vers votre galerie de photos.</string>
+    <string name="nav_export_info">Exporter la conception sous forme d\'image aplatie vers votre galerie de photos.</string>
     <string name="nav_help">Aide</string>
     <string name="nav_help_info">Appuyez sur n\'importe quel bouton pendant que l\'Aide est active pour voir ce qu\'il fait.</string>
     <string name="nav_light">Lumière</string>
@@ -220,17 +215,12 @@
     <string name="double_tap_hint">Appuyez deux fois pour changer l\'axe de rotation.</string>
     <string name="ok_button">OK</string>
     <string name="generating">GÉNÉRATION...</string>
-    <string name="stencil_hint">Appuyez à nouveau pour ajouter un calque.</string>
     <string name="rename_hint">Renommer</string>
     <string name="edit_text_hint">Modifier le texte</string>
     <string name="copy_edits">Copier les modifs</string>
     <string name="paste_edits">Coller les modifs</string>
     <string name="generate_poster">Générer Affiche</string>
     <string name="duplicate">Dupliquer</string>
-    <string name="unlink_layer">Délier le calque</string>
-    <string name="link_layer">Lier le calque</string>
-    <string name="hide_layer">Masquer le calque</string>
-    <string name="show_layer">Afficher le calque</string>
     <string name="flatten_all">Aplatir tout</string>
     <string name="delete">Supprimer</string>
     <string name="new_project_name">Nouveau projet</string>
@@ -264,19 +254,20 @@
     <string name="help_mode_host">Commutateur de mode : Basculer entre les modes de l\'application. Instructions : Appuyez pour développer, puis sélectionnez AR, Superposition, Maquette ou Table lumineuse.</string>
     <string name="help_ar">Mode AR : Projeter la conception sur un mur à l\'aide de la cartographie spatiale. Instructions : Scannez l\'environnement jusqu\'à ce que le mur soit détecté, puis appuyez pour placer l\'ancre.</string>
     <string name="help_overlay">Mode Superposition : Afficher la conception sur la caméra en direct sans suivi spatial. Instructions : Mettez à l\'échelle et déplacez manuellement la conception pour l\'adapter à votre cadre.</string>
-    <string name="help_mockup">Mode Maquette : Prévisualiser la conception sur une photo statique. Instructions : Utilisez \'Mur\' pour définir une image d\'arrière-plan, puis organisez les calques par-dessus.</string>
+    <string name="help_mockup">Mode Maquette : Prévisualiser la conception sur une photo statique. Instructions : Utilisez \'Mur\' pour définir une image d\'arrière-plan, puis placez la conception par-dessus.</string>
     <string name="help_trace">Mode Table lumineuse : Surface de traçage haute luminosité. Instructions : Placez du papier sur l\'écran et tracez. Appuyez rapidement sur Volume Haut, Bas, Haut, Bas pour quitter.</string>
     <string name="help_create">Créer une Ancre : Photographier une marque sur le mur pour verrouiller la projection. Instructions : Pointez sur une texture distincte et appuyez. L\'application suivra cette marque.</string>
-    <string name="help_add_img">Importer Image : Ajouter un croquis ou une photo de référence. Instructions : Sélectionnez une image dans votre galerie. Elle apparaîtra comme un nouveau calque de conception.</string>
+    <string name="help_add_img">Importer Image : Ajouter un croquis ou une photo de référence. Instructions : Sélectionnez une image dans votre galerie. Elle deviendra la conception.</string>
     <string name="help_wall">Changer de Mur : Définir l\'arrière-plan pour le mode Maquette. Instructions : Sélectionnez une photo du mur physique sur lequel vous prévoyez de peindre.</string>
-    <string name="help_project_host">Gestion de Projet : Sauvegarder, charger et exporter le travail. Instructions : Appuyez pour accéder aux tâches administratives pour votre fresque.</string>
-    <string name="help_new">Nouveau Projet : Démarrer une nouvelle fresque. Instructions : Appuyez pour réinitialiser. Avertissement : Cela efface tout le travail en cours. Sauvegardez d\'abord !</string>
-    <string name="help_save">Sauvegarder le Projet : Stocker la fresque et la carte AR. Instructions : Entrez un nom de projet et appuyez sur Sauvegarder pour préserver votre progression.</string>
-    <string name="help_load">Bibliothèque de Projets : Accéder aux fresques sauvegardées. Instructions : Parcourez la bibliothèque pour reprendre le travail ou importer des fichiers de projet partagés.</string>
-    <string name="help_export">Exporter l\'Image : Enregistrer un instantané haute résolution. Instructions : Rendu de tous les calques visibles en un seul PNG dans votre galerie photo.</string>
+    <string name="help_project_host">Gestion de Projet : Sauvegarder, charger et exporter le travail. Instructions : Appuyez pour accéder aux tâches administratives de votre projet.</string>
+    <string name="help_new">Nouveau Projet : Démarrer une nouvelle œuvre. Instructions : Appuyez pour réinitialiser. Avertissement : Cela efface tout le travail en cours. Sauvegardez d\'abord !</string>
+    <string name="help_save">Sauvegarder le Projet : Stocker l\'œuvre et la carte AR. Instructions : Entrez un nom de projet et appuyez sur Sauvegarder pour préserver votre progression.</string>
+    <string name="help_load">Bibliothèque de Projets : Accéder aux projets sauvegardés. Instructions : Parcourez la bibliothèque pour reprendre le travail ou importer des fichiers de projet partagés.</string>
+    <string name="help_export">Exporter l\'Image : Enregistrer un instantané haute résolution. Instructions : Rendu de la conception en un seul PNG dans votre galerie photo.</string>
     <string name="help_settings">Paramètres de l\'Appli : Configurer les préférences. Instructions : Ouvrir pour ajuster la manualité, les unités et les paramètres de numérisation.</string>
     <string name="help_light">Lampe de poche : Basculer la LED de l\'appareil. Instructions : Utilisez-la pour éclairer les murs sombres pour un meilleur suivi AR.</string>
     <string name="help_lock_trace">Geler : verrouille tout l\'écran tactile pour que le papier calque ne déplace pas le dessin — contrairement à Verrouiller, cela bloque aussi le défilement et les appuis. Pour quitter, appuyez rapidement sur Volume Haut, Bas, Haut, Bas.</string>
+    <string name="help_lock_ar">Figer : verrouille tout l’écran tactile pendant que vous peignez, pour qu’une main, une manche ou une poche ne déplace pas le design ni ne change de mode. L’écran se verrouille aussi tout seul dès qu’il est couvert (dans une poche, face contre une surface). Pour quitter, appuyez vite sur Volume haut, bas, haut, bas.</string>
     <string name="unit_feet">pi</string>
     <string name="unit_centimeters">cm</string>
     <string name="unit_meters">m</string>
@@ -326,8 +317,8 @@
     <string name="settings_reset_tutorials_value">Réafficher les guides de première utilisation</string>
     <string-array name="onboarding_trace">
         <item>Ceci est le mode Calque.</item>
-        <item>Appuyez sur « Ouvrir » pour ajouter votre première couche. Une fois ajoutée, pincez et faites glisser sur le canevas pour la redimensionner et la placer.</item>
-        <item>Quand elles sont où et comme vous le souhaitez, appuyez sur le bouton Geler pour transformer votre téléphone en table lumineuse pour le calque sur papier.</item>
+        <item>Appuyez sur « Ouvrir » pour ajouter votre design. Une fois ajouté, pincez et faites glisser sur le canevas pour le redimensionner et le placer.</item>
+        <item>Quand il est où et comme vous le souhaitez, appuyez sur le bouton Geler pour transformer votre téléphone en table lumineuse afin de le décalquer sur papier.</item>
         <item>Nous recommandons d\'utiliser le mode Calque ou le mode Maquette pour l\'édition.</item>
         <item>Ainsi, vos visuels sont prêts et votre téléphone peut se concentrer sur la réalité augmentée quand vous appuyez sur le bouton AR.</item>
     </string-array>
@@ -335,12 +326,12 @@
         <item>Projection AR — projette votre design sur un vrai mur à l\'aide du capteur de profondeur et du suivi spatial du téléphone.</item>
         <item>Pointez le mur et déplacez-vous lentement d\'un côté à l\'autre. Des formes colorées apparaissent au fur et à mesure que le moteur cartographie la surface. Attendez que toute la zone du mur soit couverte.</item>
         <item>Appuyez simplement sur l\'écran. L\'application photographie le mur, extrait des points de suivi et verrouille l\'ancre instantanément.</item>
-        <item>Appuyez sur « Ouvrir » pour ajouter une couche de design — elle se projette sur le mur à l\'aide de l\'ancre que vous venez de définir.</item>
+        <item>Appuyez sur « Ouvrir » pour ajouter votre design — il se projette sur le mur à l\'aide de l\'ancre que vous venez de définir.</item>
         <item>Astuce — les murs blancs vides, le béton lisse et les surfaces unies ne peuvent pas être suivis. Visez votre point d\'ancrage sur un graffiti, un enduit rugueux ou toute marque distincte.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Superposition en direct — votre design flotte au-dessus du flux caméra en direct, sans avoir besoin de scanner une surface.</item>
-        <item>Appuyez sur « Ouvrir » pour ajouter une couche — choisissez une photo, elle apparaît ici, flottant au-dessus du flux caméra en direct.</item>
+        <item>Appuyez sur « Ouvrir » pour ajouter votre design — choisissez une photo, elle apparaît ici, flottant au-dessus du flux caméra en direct.</item>
         <item>Pincez pour redimensionner, faites glisser pour repositionner. La superposition reste fixée à votre écran — reculez pour voir comment elle s\'adapte au mur.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
@@ -349,18 +340,15 @@
         <item>Calque, Maquette et Superposition fonctionnent comme d\'habitude. Touchez pour fermer.</item>
     </string-array>
     <string-array name="onboarding_mockup">
-        <item>Maquette photo — prévisualisez votre design sur une photo avant même de prendre un pinceau.</item>
+        <item>Maquette photo — prévisualisez votre design sur une photo avant même de prendre une bombe.</item>
         <item>Appuyez sur « Mur » pour choisir ou prendre une photo de votre surface. Faites-le en premier !</item>
-        <item>Appuyez sur « Ouvrir » pour ajouter une couche sur la photo du mur. Pincez et faites glisser pour la redimensionner et la positionner.</item>
+        <item>Appuyez sur « Ouvrir » pour placer votre design sur la photo du mur. Pincez et faites glisser pour le redimensionner et le positionner.</item>
     </string-array>
     <string-array name="onboarding_design">
         <item>Ceci est Conception — votre espace de travail. Tout ce que vous créez ici se retrouve dans tous les autres modes.</item>
-        <item>Appuyez sur « Ouvrir » pour ajouter votre première couche — choisissez une photo dans votre galerie, elle atterrit ici en tant qu\'œuvre.</item>
-        <item>Appuyez sur une couche pour ouvrir ses outils — regroupés dans les dossiers Peindre, Retoucher, Ajuster et Effets. Pincez et faites glisser sur le canevas pour la redimensionner et la placer.</item>
+        <item>Appuyez sur « Ouvrir » pour ajouter votre design — choisissez une photo dans votre galerie, elle atterrit ici en tant qu\'œuvre.</item>
+        <item>Utilisez les outils Modifier pour l\'ajuster, l\'inverser, en extraire le contour ou l\'isoler. Pincez et faites glisser sur le canevas pour le redimensionner et le placer.</item>
         <item>Quand le rendu vous convient, choisissez comment l\'utiliser : « Calque » pour transformer votre téléphone en table lumineuse, « Maquette » pour prévisualiser sur une photo, ou « AR » pour le projeter sur un mur.</item>
-    </string-array>
-    <string-array name="onboarding_design_layers">
-        <item>Ouvrir — importe une photo depuis votre galerie ; elle atterrit comme nouvelle couche.</item>
     </string-array>
     <string name="nav_measure">Mesurer</string>
     <string name="nav_measure_info">Mesurez le vrai mur : touchez un bord, puis l\'autre, sur le mur qui porte le design. La largeur est enregistrée dans le projet : mesurée, pas devinée.</string>
@@ -461,10 +449,10 @@
     <string name="doodle_cd_detected_marks">Marques détectées</string>
     <string name="doodle_cd_confirm">Confirmer</string>
     <string name="doodle_cd_unwarp_base">Photo du mur capturée avec poignées de coin</string>
-    <string name="guidance_open_via_design_overlay">Appuyez sur « Conception » dans la barre, puis sur « Ouvrir », pour ajouter un calque : choisissez une photo et elle apparaît ici, flottant sur la vue caméra en direct.</string>
-    <string name="guidance_open_via_design_mockup">Appuyez sur « Conception » dans la barre, puis sur « Ouvrir », pour ajouter un calque sur la photo du mur. Pincez et faites glisser pour le dimensionner et le positionner.</string>
-    <string name="guidance_open_via_design_trace">Appuyez sur « Conception » dans la barre, puis sur « Ouvrir », pour ajouter votre premier calque. Une fois en place, pincez et faites glisser sur le canevas pour le dimensionner et le placer.</string>
-    <string name="guidance_open_via_design_ar">Appuyez sur « Conception » dans la barre, puis sur « Ouvrir », pour ajouter un calque de conception : il se projette sur le mur à partir de l\'ancre que vous venez de définir.</string>
+    <string name="guidance_open_via_design_overlay">Appuyez sur « Conception » dans la barre, puis sur « Ouvrir », pour ajouter votre conception : choisissez une photo et elle apparaît ici, flottant sur la vue caméra en direct.</string>
+    <string name="guidance_open_via_design_mockup">Appuyez sur « Conception » dans la barre, puis sur « Ouvrir », pour placer votre conception sur la photo du mur. Pincez et faites glisser pour la dimensionner et la positionner.</string>
+    <string name="guidance_open_via_design_trace">Appuyez sur « Conception » dans la barre, puis sur « Ouvrir », pour ajouter votre conception. Une fois en place, pincez et faites glisser sur le canevas pour la dimensionner et la placer.</string>
+    <string name="guidance_open_via_design_ar">Appuyez sur « Conception » dans la barre, puis sur « Ouvrir », pour ajouter votre conception : elle se projette sur le mur à partir de l\'ancre que vous venez de définir.</string>
     <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
     <string name="ar_feedback_guest_edit_dropped">Ce changement ne peut pas être partagé avec l\'hôte : il reste sur cet appareil</string>
     <string name="ar_feedback_backend_resolving">Le moteur AR est encore en cours de sélection : réessayez d\'héberger dans un instant</string>
@@ -474,6 +462,7 @@
     <string name="ar_feedback_doodle_not_ready">Le Gribouillis n\'est pas encore prêt — gardez-le dans le champ et relancez « Héberger »</string>
     <string name="ar_feedback_package_failed">Impossible d\'empaqueter ce projet pour le partager : essayez d\'abord de l\'enregistrer</string>
     <string name="ar_feedback_host_failed">Impossible de démarrer le partage : %1$s</string>
+    <string name="ar_feedback_host_too_large">Ce projet est trop volumineux pour être partagé via Link (%1$d Mo ; la limite est de %2$d Mo). Exportez-le pour le partager.</string>
     <string name="ar_feedback_join_load_failed">Impossible de charger le projet de l\'hôte : la session a été terminée.</string>
     <string name="ar_feedback_join_no_geometry">L\'hôte n\'a pas fourni de géométrie sur laquelle ARCore puisse s\'aligner.</string>
     <string name="ar_feedback_join_failed">Impossible de rejoindre : %1$s</string>
@@ -524,6 +513,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">Impossible d’enregistrer la photo du mur propre. Reprenez-la.</string>
+    <string name="ar_feedback_progress_save_failed">Impossible d’enregistrer la carte du mur et la progression de la peinture. Elles sont conservées pour cette session. Libérez de l’espace, puis enregistrez à nouveau.</string>
     <string name="ar_feedback_clean_wall_register_failed">Cette photo du mur propre ne correspond pas à ce mur. Reprenez-la à peu près d’où vous serez.</string>
 
     <!-- The CV view legend: the name of each way of looking. -->

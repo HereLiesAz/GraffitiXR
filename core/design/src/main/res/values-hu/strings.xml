@@ -11,7 +11,7 @@
 
     <string name="nav_ar_mode">AR</string>
 
-    <string name="nav_ar_mode_info">Vetítsd a művedet egy valódi falra a kiterjesztett valóság segítségével. Először szkenneld be a falat a horgony elhelyezéséhez, majd add hozzá a tervezési rétegeket.</string>
+    <string name="nav_ar_mode_info">Vetítsd a művedet egy valódi falra a kiterjesztett valóság segítségével. Először szkenneld be a falat a horgony elhelyezéséhez, majd add hozzá a tervedet.</string>
 
 
     <string name="nav_overlay">Rétegzés</string>
@@ -55,19 +55,17 @@
     <string name="nav_refine_info">Egy meglévő Firka pozíciójának finomhangolása.</string>
 
 
-    <string name="nav_update">Folyamat</string>
 
-    <string name="nav_update_info">Jelöld meg a falfestményed elkészült részeit a festési folyamat nyomon követéséhez.</string>
 
 
     <string name="nav_design">Tervezés</string>
 
-    <string name="nav_design_info">Tervezési rétegek hozzáadása és kezelése. Minden réteg lehet egy importált kép vagy egy szabadkézi rajz.</string>
+    <string name="nav_design_info">A munkaterületed. A \'Megnyitás\' gombbal hozzáadott – és az alábbi eszközökkel szerkesztett – terved minden módba átkerül.</string>
 
 
     <string name="nav_open">Megnyitás</string>
 
-    <string name="nav_open_info">Adj hozzá egy képet a galériádból új rétegként.</string>
+    <string name="nav_open_info">Adj hozzá egy képet a galériádból tervként.</string>
 
 
     <string name="nav_wall">Fal</string>
@@ -85,7 +83,7 @@
 
     <string name="nav_blend">Keverés</string>
 
-    <string name="nav_invert_info">Hozd létre az aktuális réteg negatívját. A feketék fehérek lesznek, a színek pedig az ellentettjükre fordulnak - hasznos a sablon és a rétegzés elemzéséhez.</string>
+    <string name="nav_invert_info">Hozd létre a terv negatívját. A feketék fehérek lesznek, a színek pedig az ellentettjükre fordulnak - hasznos a sablon és a rétegzés elemzéséhez.</string>
 
 
     <string name="nav_outline">Körvonal</string>
@@ -95,18 +93,18 @@
 
     <string name="nav_adjust">Igazítás</string>
 
-    <string name="nav_adjust_info">Finomhangold a fényerőt, kontrasztot, telítettséget és színegyensúlyt ehhez a réteghez.</string>
+    <string name="nav_adjust_info">Finomhangold a terv fényerejét, kontrasztját, telítettségét és színegyensúlyát.</string>
     <string name="nav_edit">Szerkesztés</string>
 
 
     <string name="nav_balance">Szín</string>
 
-    <string name="nav_balance_info">Színezd a réteg színeit piros, zöld és kék csatornacsúszkák segítségével.</string>
+    <string name="nav_balance_info">Színezd a terv színeit piros, zöld és kék csatornacsúszkák segítségével.</string>
 
 
     <string name="nav_blending">Keverés</string>
 
-    <string name="nav_blending_info">Lapozz a keverési módok között (Normál, Szorzás, Képernyő, Rétegzés...), hogy szabályozd, hogyan kompozitálódik ez a réteg az alatta lévőkkel.</string>
+    <string name="nav_blending_info">Lapozz a keverési módok között (Normál, Szorzás, Képernyő, Rétegzés...), hogy szabályozd, hogyan olvad össze a terv a mögötte lévő képpel.</string>
 
 
     <string name="nav_settings">Beállítások</string>
@@ -136,7 +134,7 @@
 
     <string name="nav_export">Exportálás</string>
 
-    <string name="nav_export_info">Exportálj egy lapos, egyesített képet az összes látható rétegről a fotógalériádba.</string>
+    <string name="nav_export_info">Exportáld a tervet lapos képként a fotógalériádba.</string>
 
 
     <string name="nav_help">Súgó</string>
@@ -220,7 +218,6 @@
 
     <string name="generating">GENERÁLÁS...</string>
 
-    <string name="stencil_hint">Nyomd meg újra a réteg hozzáadásához.</string>
 
     <string name="rename_hint">Átnevezés</string>
 
@@ -234,13 +231,9 @@
 
     <string name="duplicate">Kettőzés</string>
 
-    <string name="unlink_layer">Réteg leválasztása</string>
 
-    <string name="link_layer">Réteg összekapcsolása</string>
 
-    <string name="hide_layer">Réteg elrejtése</string>
 
-    <string name="show_layer">Réteg megjelenítése</string>
 
     <string name="flatten_all">Összes lapítása</string>
 
@@ -355,8 +348,9 @@
     <string name="lib_new_project">Új</string>
     <string name="lib_import_project">Importálás</string>
     <string name="lib_no_projects">Még nincsenek projektek</string>
-    <string name="lib_no_projects_hint">Koppints az Új gombra fent az első falfestményed megkezdéséhez.\n\nA szerkesztőbe kerülsz, ahol a következőket teheted:\n  \u2022  Műalkotás hozzáadása a Tervezés menüből\n  \u2022  Válts AR módba, hogy valódi falra vetíts\n  \u2022  Használd a Rétegzést, hogy a tervedet az élő kamerán lebegtesd\n  \u2022  Használd a Makettet az előnézethez egy falfotón\n  \u2022  Használd a Világítótáblát a terved papírra rajzolásához</string>
+    <string name="lib_no_projects_hint">Koppints lent az Új gombra az első alkotásod megkezdéséhez.\n\nA szerkesztőbe kerülsz, ahol a következőket teheted:\n  \u2022  Műalkotás hozzáadása a Tervezés menüből\n  \u2022  Válts AR módba, hogy valódi falra vetíts\n  \u2022  Használd a Rétegzést, hogy a tervedet az élő kamerán lebegtesd\n  \u2022  Használd a Makettet az előnézethez egy falfotón\n  \u2022  Használd a Rajzolás módot a terved papírra rajzolásához</string>
     <string name="lib_project_thumbnail">Projekt miniatűr</string>
+    <string name="lib_project_damaged">Sérült: nem nyitható meg</string>
     <string name="lib_delete_project_desc">%1$s projekt törlése</string>
 
 
@@ -429,8 +423,6 @@
     <string name="settings_copyright">GraffitiXR © 2025</string>
 
 
-    <string name="layers_title">Rétegek</string>
-    <string name="brush_size_title">Ecsetméret</string>
     <string name="save_project_hint">Projekt neve</string>
 
 
@@ -448,7 +440,6 @@
     <string name="reset_button">Visszaállítás</string>
 
     <string name="poster_title">POSZTER GENERÁLÁSA</string>
-    <string name="poster_select_layers">Válaszd ki a belefoglalandó rétegeket:</string>
     <string name="poster_physical_size">Fizikai méret (szélesség mm-ben):</string>
     <string name="poster_generate_pdf">PDF GENERÁLÁSA</string>
 
@@ -473,7 +464,7 @@
 
     <string name="help_overlay">Rétegzés Mód: Terv megjelenítése élő kamerán térbeli követés nélkül. Utasítások: Méretezd és mozgasd manuálisan a tervet, hogy illeszkedjen a kerethez.</string>
 
-    <string name="help_mockup">Makett Mód: A terv előnézete egy statikus fotón. Utasítások: Használd a \'Fal\' lehetőséget háttérkép beállításához, majd rendezd a rétegeket felülre.</string>
+    <string name="help_mockup">Makett Mód: A terv előnézete egy statikus fotón. Utasítások: Használd a \'Fal\' lehetőséget háttérkép beállításához, majd helyezd rá a tervet.</string>
 
     <string name="help_trace">Világítótábla Mód: Nagy fényerejű rajzoló felület. Utasítások: Helyezz papírt a képernyőre és rajzolj. Nyomd meg gyorsan a Hangerő Fel, Le, Fel, Le gombokat a kilépéshez.</string>
 
@@ -482,27 +473,28 @@
     <string name="help_create">Horgony Létrehozása: Fényképezz le egy jelölést a falon a vetítés rögzítéséhez. Utasítások: Mutass egy jellegzetes textúrára, és koppints. Az alkalmazás követni fogja ezt a jelölést.</string>
 
 
-    <string name="help_add_img">Kép Importálása: Vázlat vagy referenciafotó hozzáadása. Utasítások: Válassz egy képet a galériádból. Új tervezési rétegként fog megjelenni.</string>
+    <string name="help_add_img">Kép Importálása: Vázlat vagy referenciafotó hozzáadása. Utasítások: Válassz egy képet a galériádból. Ez lesz a terv.</string>
 
 
 
     <string name="help_wall">Fal Módosítása: Háttér beállítása Makett módhoz. Utasítások: Válassz egy fotót a fizikai falról, amelyre festeni tervezel.</string>
 
-    <string name="help_project_host">Projekt Kezelés: Mentsd, töltsd be és exportáld a munkát. Utasítások: Koppints a falfestmény adminisztratív feladatainak eléréséhez.</string>
+    <string name="help_project_host">Projekt Kezelés: Mentsd, töltsd be és exportáld a munkát. Utasítások: Koppints a projekted adminisztratív feladatainak eléréséhez.</string>
 
-    <string name="help_new">Új Projekt: Kezdj egy friss falfestményt. Utasítások: Koppints a visszaállításhoz. Figyelmeztetés: Ez törli az összes jelenlegi munkát. Először ments!</string>
+    <string name="help_new">Új Projekt: Kezdj egy friss alkotást. Utasítások: Koppints a visszaállításhoz. Figyelmeztetés: Ez törli az összes jelenlegi munkát. Először ments!</string>
 
-    <string name="help_save">Projekt Mentése: Tárold a falfestményt és az AR térképet. Utasítások: Add meg a projekt nevét, és koppints a Mentés gombra a haladás megőrzéséhez.</string>
+    <string name="help_save">Projekt Mentése: Tárold az alkotást és az AR térképet. Utasítások: Add meg a projekt nevét, és koppints a Mentés gombra a haladás megőrzéséhez.</string>
 
-    <string name="help_load">Projekt Könyvtár: Hozzáférés a mentett falfestményekhez. Utasítások: Böngéssz a könyvtárban a munka folytatásához vagy a megosztott projektfájlok importálásához.</string>
+    <string name="help_load">Projekt Könyvtár: Hozzáférés a mentett projektekhez. Utasítások: Böngéssz a könyvtárban a munka folytatásához vagy a megosztott projektfájlok importálásához.</string>
 
-    <string name="help_export">Kép Exportálása: Ments nagy felbontású pillanatképet. Utasítások: Az összes látható réteget egyetlen PNG formátumban jeleníti meg a fotógalériádban.</string>
+    <string name="help_export">Kép Exportálása: Ments nagy felbontású pillanatképet. Utasítások: A tervet egyetlen PNG képként jeleníti meg a fotógalériádban.</string>
 
     <string name="help_settings">Alkalmazás Beállítások: Preferenciák konfigurálása. Utasítások: Nyisd meg a kezesség, az egységek és a szkennelési paraméterek beállításához.</string>
 
     <string name="help_light">Zseblámpa: Kapcsold be az eszköz LED-jét. Utasítások: Használd ezt sötét falak megvilágítására a jobb AR követés érdekében.</string>
 
     <string name="help_lock_trace">Fagyasztás: zárolja a teljes érintőképernyőt, hogy a pauszpapír ne mozdítsa el a tervet — a Zárolással ellentétben ez a görgetést és az érintéseket is blokkolja. Kilépéshez nyomja meg gyorsan: Hangerő Fel, Le, Fel, Le.</string>
+    <string name="help_lock_ar">Fagyasztás: festés közben lezárja az egész érintőképernyőt, hogy kéz, ujj vagy zseb ne mozdítsa el a tervet és ne váltson módot. A képernyő magától is lezár, ha le van takarva (zsebben, képernyővel lefelé). A kilépéshez gyorsan nyomd meg: Hangerő fel, le, fel, le.</string>
 
 
 
@@ -548,7 +540,6 @@
 
     <string name="settings_scan_mode_voxel_hash">Voxel-hash</string>
     <string name="settings_scan_mode_surface_mesh">Felületháló</string>
-    <string name="settings_mural_method_label">Falfestmény-motor</string>
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
@@ -595,8 +586,8 @@
     <string name="settings_reset_tutorials_value">Kezdő útmutatók újbóli megjelenítése</string>
     <string-array name="onboarding_trace">
         <item>Ez a Rajzolás mód.</item>
-        <item>Koppints a „Megnyitás” gombra az első réteged hozzáadásához. Miután hozzáadtad, csippentéssel és húzással méretezheted és helyezheted el a vásznon.</item>
-        <item>Amikor ott vannak és úgy néznek ki, ahogy szeretnéd, nyomd meg a Fagyasztás gombot, hogy a telefonod fénydobozzá váljon a papírra való átrajzoláshoz.</item>
+        <item>Koppints a „Megnyitás” gombra a terved hozzáadásához. Miután hozzáadtad, csippentéssel és húzással méretezheted és helyezheted el a vásznon.</item>
+        <item>Amikor ott van és úgy néz ki, ahogy szeretnéd, nyomd meg a Fagyasztás gombot, hogy a telefonod fénydobozzá váljon a papírra való átrajzoláshoz.</item>
         <item>A szerkesztéshez a Rajzolás vagy a Makett módot ajánljuk.</item>
         <item>Így a képanyagod készen áll, és a telefonod az AR gomb megnyomásakor teljesen a kiterjesztett valóságra tud koncentrálni.</item>
     </string-array>
@@ -604,12 +595,12 @@
         <item>AR-vetítés — a telefon mélységérzékelőjével és térbeli követésével vetíti a terved egy valódi falra.</item>
         <item>Irányítsd a telefont a falra, és mozogj lassan oldalirányba. Színes formák jelennek meg, ahogy a motor feltérképezi a felületet. Várj, amíg a fal teljes területe le nem fedésre kerül.</item>
         <item>Csak koppints a képernyőre. Az alkalmazás lefényképezi a falat, kinyeri a követési jellemzőket, és azonnal rögzíti a horgonyt.</item>
-        <item>Koppints a „Megnyitás” gombra egy tervezési réteg hozzáadásához — ez a most beállított horgony segítségével vetül a falra.</item>
+        <item>Koppints a „Megnyitás” gombra a terved hozzáadásához — ez a most beállított horgony segítségével vetül a falra.</item>
         <item>Tipp — az üres fehér falak, a sima beton és az egyszínű felületek nem követhetők. Célozd a horgonypontot graffitire, durva vakolatra vagy bármilyen jellegzetes jelre.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Élő rétegzés — a terved a live kamerakép fölött lebeg, felületszkennelés nélkül.</item>
-        <item>Koppints a „Megnyitás” gombra egy réteg hozzáadásához — válassz ki egy fotót, és az megjelenik itt, a live kamerakép fölött lebegve.</item>
+        <item>Koppints a „Megnyitás” gombra a terved hozzáadásához — válassz ki egy fotót, és az megjelenik itt, az élő kamerakép fölött lebegve.</item>
         <item>Csippentéssel méretezhető, húzással áthelyezhető. A rétegzés a képernyődhöz rögzítve marad — lépj hátrébb, hogy lásd, hogyan illeszkedik a falhoz.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
@@ -618,18 +609,15 @@
         <item>A Rajzolás, a Makett és a Rétegzés a szokásos módon működik. Koppints a bezáráshoz.</item>
     </string-array>
     <string-array name="onboarding_mockup">
-        <item>Fotómakett — nézd meg a terved egy fotón, mielőtt akár ecsetet is fognál.</item>
+        <item>Fotómakett — nézd meg a terved egy fotón, mielőtt egyáltalán spray-t vennél a kezedbe.</item>
         <item>Koppints a „Fal” gombra a felületed fotójának kiválasztásához vagy elkészítéséhez. Ezt csináld először!</item>
-        <item>Koppints a „Megnyitás” gombra egy réteg hozzáadásához a falfotó fölé. Csippentéssel és húzással méretezheted és pozicionálhatod.</item>
+        <item>Koppints a „Megnyitás” gombra, hogy a tervedet a falfotó fölé helyezd. Csippentéssel és húzással méretezheted és pozicionálhatod.</item>
     </string-array>
     <string-array name="onboarding_design">
         <item>Ez a Tervezés — a munkaterületed. Amit itt létrehozol, az minden más módba átkerül.</item>
-        <item>Koppints a „Megnyitás” gombra az első réteged hozzáadásához — válassz egy fotót a galériádból, és az ide kerül, mint a műved.</item>
-        <item>Koppints egy rétegre az eszközeinek megnyitásához — ezek a Festés, Retusálás, Beállítás és Effektek mappákba vannak csoportosítva. Csippentéssel és húzással méretezheted és helyezheted el a vásznon.</item>
+        <item>Koppints a „Megnyitás” gombra a terved hozzáadásához — válassz egy fotót a galériádból, és az ide kerül, mint a műved.</item>
+        <item>A Szerkesztés eszközeivel beállíthatod, invertálhatod, körvonalazhatod vagy elkülönítheted. Csippentéssel és húzással méretezheted és helyezheted el a vásznon.</item>
         <item>Amikor jónak látod, válaszd ki, hogyan használnád: „Rajzolás” a telefonod fénydobozzá alakításához, „Makett” a fotón történő megtekintéshez, vagy „AR” a falra vetítéshez.</item>
-    </string-array>
-    <string-array name="onboarding_design_layers">
-        <item>Megnyitás — fotót importál a galériádból; új rétegként kerül be.</item>
     </string-array>
     <string name="nav_measure">Mérés</string>
     <string name="nav_measure_info">Mérd meg a valódi falat: koppints az egyik szélére, majd a másikra azon a falon, ahol a terv van. A szélesség a projekttel együtt mentődik – mért, nem becsült.</string>
@@ -730,10 +718,10 @@
     <string name="doodle_cd_detected_marks">Észlelt jelölések</string>
     <string name="doodle_cd_confirm">Megerősítés</string>
     <string name="doodle_cd_unwarp_base">Rögzített falfotó sarokfogantyúkkal</string>
-    <string name="guidance_open_via_design_overlay">Koppints a sávon a „Tervezés”, majd a „Megnyitás” elemre egy réteg hozzáadásához – válassz egy fotót, és az itt jelenik meg, az élő kameranézet fölött lebegve.</string>
-    <string name="guidance_open_via_design_mockup">Koppints a sávon a „Tervezés”, majd a „Megnyitás” elemre egy réteg hozzáadásához a falfotó fölé. Csípéssel és húzással állítsd be a méretét és a helyét.</string>
-    <string name="guidance_open_via_design_trace">Koppints a sávon a „Tervezés”, majd a „Megnyitás” elemre az első réteg hozzáadásához. Ha bekerült, csípéssel és húzással méretezd és helyezd el a vásznon.</string>
-    <string name="guidance_open_via_design_ar">Koppints a sávon a „Tervezés”, majd a „Megnyitás” elemre egy tervréteg hozzáadásához – az az imént beállított horgony segítségével vetül a falra.</string>
+    <string name="guidance_open_via_design_overlay">Koppints a sávon a „Tervezés”, majd a „Megnyitás” elemre a terved hozzáadásához – válassz egy fotót, és az itt jelenik meg, az élő kameranézet fölött lebegve.</string>
+    <string name="guidance_open_via_design_mockup">Koppints a sávon a „Tervezés”, majd a „Megnyitás” elemre, hogy a tervedet a falfotó fölé helyezd. Csípéssel és húzással állítsd be a méretét és a helyét.</string>
+    <string name="guidance_open_via_design_trace">Koppints a sávon a „Tervezés”, majd a „Megnyitás” elemre a terved hozzáadásához. Ha bekerült, csípéssel és húzással méretezd és helyezd el a vásznon.</string>
+    <string name="guidance_open_via_design_ar">Koppints a sávon a „Tervezés”, majd a „Megnyitás” elemre a terved hozzáadásához – az az imént beállított horgony segítségével vetül a falra.</string>
     <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
     <string name="ar_feedback_guest_edit_dropped">Ezt a módosítást nem lehet megosztani a házigazdával – csak ezen az eszközön marad meg</string>
     <string name="ar_feedback_backend_resolving">Az AR-háttér még kiválasztás alatt áll – próbáld újra a házigazdaként indítást egy pillanat múlva</string>
@@ -743,6 +731,7 @@
     <string name="ar_feedback_doodle_not_ready">A Firka még nem áll készen — tartsd a képben, és próbáld újra a „Hoszt” indítását</string>
     <string name="ar_feedback_package_failed">Nem sikerült becsomagolni a projektet a megosztáshoz – próbáld előbb elmenteni</string>
     <string name="ar_feedback_host_failed">Nem sikerült elindítani a megosztást: %1$s</string>
+    <string name="ar_feedback_host_too_large">Ez a projekt túl nagy a Linken való megosztáshoz (%1$d MB; a korlát %2$d MB). Exportáld, és úgy oszd meg.</string>
     <string name="ar_feedback_join_load_failed">Nem sikerült betölteni a házigazda projektjét – a munkamenet véget ért.</string>
     <string name="ar_feedback_join_no_geometry">A házigazda nem adott meg olyan geometriát, amelyhez az ARCore igazodni tud.</string>
     <string name="ar_feedback_join_failed">Nem sikerült csatlakozni: %1$s</string>
@@ -793,6 +782,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">Nem sikerült menteni a tiszta fal fotóját. Készítsd el újra.</string>
+    <string name="ar_feedback_progress_save_failed">Nem sikerült menteni a faltérképet és a festés előrehaladását. Ebben a munkamenetben megmaradnak. Szabadíts fel helyet, majd mentsd újra.</string>
     <string name="ar_feedback_clean_wall_register_failed">Ez a tiszta fal fotó nem illik ehhez a falhoz. Készítsd el újra nagyjából onnan, ahol majd állni fogsz.</string>
 
     <!-- The CV view legend: the name of each way of looking. -->

@@ -467,13 +467,13 @@ class ArViewModel @Inject constructor(
                         projectBytes = kotlinx.coroutines.runBlocking {
                             projectManager.serializeCurrentProject()
                         },
-                        layerCount = current.layers.size,
                         spatialFrame = currentSpatial.copy(
                             doodleAvailable = wireDoodle.isNotEmpty(),
                         ),
                     )
                 }
                 hostedCoopSpatialFrame = hostedSpatial
+                arCorePeerDoodle = null
                 _uiState.update {
                     it.copy(
                         coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.HOST,
@@ -496,15 +496,46 @@ class ArViewModel @Inject constructor(
                     )
                 }
                 android.util.Log.e("ArViewModel", "Failed to start hosting", e)
-                _feedback.tryEmit(
-                    com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                        appContext.getString(DesignR.string.ar_feedback_host_failed, e.message ?: appContext.getString(DesignR.string.ar_feedback_unknown_error)), e
+                val tooLarge = generateSequence(e as Throwable) { it.cause }
+                    .filterIsInstance<com.hereliesaz.graffitixr.core.collaboration.session.ProjectTooLargeToHostException>()
+                    .firstOrNull()
+                val message = if (tooLarge != null) {
+                    // Link holds one transfer in memory; export streams and takes twice that. Name
+                    // the limit, and the way out.
+                    appContext.getString(
+                        DesignR.string.ar_feedback_host_too_large,
+                        (tooLarge.bytes + MIB - 1) / MIB,
+                        tooLarge.capBytes / MIB,
                     )
-                )
+                } else {
+                    appContext.getString(DesignR.string.ar_feedback_host_failed, e.message ?: appContext.getString(DesignR.string.ar_feedback_unknown_error))
+                }
+                _feedback.tryEmit(com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(message, e))
                 return@launch
             }
             observeCoopState()
         }
+    }
+
+    /** The ARCore host's doodle this guest joined with, re-installed on every ARCore entry. */
+    @Volatile private var arCorePeerDoodle: ByteArray? = null
+
+    /**
+     * Install the ARCore host's geometry: its doodle (PnP object frame -> host wall frame is explicit;
+     * PoseFusion and return-visit anchoring consume this exact bridge), its paint marks (same doodle
+     * frame; alignToPeer clears them, and a guest at a painted-over wall would otherwise have only the
+     * original marks; the host's grown rows ride in the doodle blob), and its wall normal (earth frame,
+     * so it holds on any device; without one, alignToPeer has already dropped this device's last).
+     */
+    private fun installArCorePeer(
+        doodle: ByteArray,
+        spatialFrame: com.hereliesaz.graffitixr.common.model.CoopSpatialFrame,
+    ) {
+        slamManager.alignToPeer(doodle)
+        val project = projectRepository.currentProject.value
+        project?.paintMarks?.takeIf { it.pointCount > 0 }?.let { slamManager.restorePaintMarks(it) }
+        slamManager.setWallNormalEnu(project?.doodleWallNormalEnu?.takeIf { it.size == 3 }?.toFloatArray())
+        slamManager.captureAnchorCam = spatialFrame.doodleFromWall.toFloatArray()
     }
 
     fun joinFromQr(qr: String) {
@@ -581,11 +612,8 @@ class ArViewModel @Inject constructor(
                                 leaveSession()
                                 return@joinFromQr
                             }
-                            // PnP object frame -> host wall frame is now explicit. Existing ARCore
-                            // PoseFusion/return-visit anchoring consumes this exact bridge.
-                            slamManager.alignToPeer(doodle)
-                            slamManager.captureAnchorCam =
-                                spatialFrame.doodleFromWall.toFloatArray()
+                            arCorePeerDoodle = doodle.copyOf()
+                            installArCorePeer(doodle, spatialFrame)
                             // coopPeerSpatialFrame/role were published before spectator load so the
                             // generic project loader could not race this peer installation.
                         } else {
@@ -608,6 +636,7 @@ class ArViewModel @Inject constructor(
                 val managerTerminal =
                     collaborationManager.state.value as?
                         com.hereliesaz.graffitixr.common.model.CoopSessionState.Ended
+                arCorePeerDoodle = null
                 _uiState.update {
                     it.copy(
                         coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.NONE,
@@ -640,6 +669,7 @@ class ArViewModel @Inject constructor(
             collaborationManager.leaveSession()
             reportedGuestEditDrop = false
             hostedCoopSpatialFrame = null
+            arCorePeerDoodle = null
             _uiState.update {
                 it.copy(
                     coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.NONE,
@@ -1047,7 +1077,10 @@ class ArViewModel @Inject constructor(
     /** Same arrangement for self-grow, which had the identical shadowing problem. */
     val evalSelfGrowEnabled: StateFlow<Boolean> = _evalSelfGrowEnabled.asStateFlow()
 
-    /** A/B switch for teleological self-grow (default OFF): promote validated new marks into the doodle. */
+    /**
+     * A/B switch for teleological self-grow (default ON, from SettingsRepository.selfGrowEnabled):
+     * promote validated new marks into the doodle.
+     */
     fun evalSetSelfGrowEnabled(on: Boolean) {
         slamManager.setSelfGrowEnabled(on)
         _evalSelfGrowEnabled.value = on
@@ -1060,7 +1093,8 @@ class ArViewModel @Inject constructor(
     val evalFeatureMapEnabled: StateFlow<Boolean> = _evalFeatureMapEnabled.asStateFlow()
 
     /**
-     * A/B switch for the persistent wall feature map (default OFF): grow it from locked frames and
+     * A/B switch for the persistent wall feature map (default ON, from
+     * SettingsRepository.featureMapEnabled): grow it from locked frames and
      * match against it. Both native flags had no caller before this, so the map — and the `.gxr`
      * persistence built for it — could never do anything.
      */
@@ -1808,6 +1842,8 @@ class ArViewModel @Inject constructor(
     // every AR-mode entry; updated each time setTrackingState reports tracking.
     @Volatile private var arEntryTimestampMs: Long = 0L
     @Volatile private var lastTrackingTimestampMs: Long = 0L
+    /** ARCore has tracked at least once since this AR entry: whatever comes after is a loss, not a broken start. */
+    @Volatile private var trackedSinceArEntry: Boolean = false
     private val trackingFailureGraceMs: Long = 10_000L
     // Forced-stereo "stuck" detection must beat the 5s input-timeout ANR, so it's much shorter
     // than the general tracking-failure grace.
@@ -1822,6 +1858,10 @@ class ArViewModel @Inject constructor(
     // the threshold and the project was rewritten every 30 s for the whole session.)
     private val lastSavedMapPointCount = AtomicInteger(0)
     private val lastSavedPaintCount = AtomicInteger(0)
+    /** The project native was last loaded for, kept so a switch can save it after the repository moved on. */
+    @Volatile private var lastLoadedProjectSnapshot: com.hereliesaz.graffitixr.common.model.GraffitiProject? = null
+    /** The Doodle's row count at the last save: it only grows (self-grow), so a rise is unsaved growth. */
+    private val lastSavedWallRows = AtomicInteger(0)
     @Volatile private var lastSavedProgress = 0f
     private var autoSaveJob: kotlinx.coroutines.Job? = null
     private var loadedProjectId: String? = null
@@ -1999,6 +2039,18 @@ class ArViewModel @Inject constructor(
                     // A restored hybrid page belongs to its project; drop it on a switch (including
                     // to a co-op spectator project, which never offers a replacement).
                     if (project.id != loadedProjectId) {
+                        // Native still holds the outgoing project's paint, grown Doodle and map, and
+                        // the loader below is about to replace them: write them to that project first.
+                        val outgoing = lastLoadedProjectSnapshot
+                        if (outgoing != null && outgoing.id == loadedProjectId) {
+                            try {
+                                withContext(dispatchers.io) { saveProjectWallMap(outgoing) }
+                            } catch (e: kotlinx.coroutines.CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                Timber.e(e, "Saving the outgoing project's AR state failed")
+                            }
+                        }
                         renderer?.restoreHybridPage(null)
                         // The yaw sweep and the COMPLETE latch describe the previous project's wall.
                         if (loadedProjectId != null) resetScanProgress()
@@ -2006,6 +2058,7 @@ class ArViewModel @Inject constructor(
                     // BEFORE anything can be written: native still holds the previous project's state.
                     nativeStateOwner.beginSwitch(project.id)
                     loadedProjectId = project.id
+                    lastLoadedProjectSnapshot = project
                     // Native MobileGS has exactly one active doodle frame. Standalone owns it
                     // on non-ARCore devices; an ARCore co-op GUEST also owns it once protocol-v3 peer
                     // geometry has been installed. Never let a later spectator-project emission run
@@ -2506,6 +2559,15 @@ class ArViewModel @Inject constructor(
     }
 
     /**
+     * Screen-off, home, another app: save now. Autosave runs every 30 s and only past its deltas, and
+     * a process killed in the background never reaches the teardown save, so without this whatever
+     * was learned since the last autosave (paint, grown Doodle rows, map points) was lost.
+     */
+    fun onActivityStopped() {
+        if (loadedProjectId != null) saveMapNow()
+    }
+
+    /**
      * Called by the dead-camera watchdog when the camera HAL never delivered a frame to ARCore.
      * Pins the safest ARCore default camera config for the next AR entry this process (no fps-variant
      * swap, no hardware stereo). Idempotent; process-scoped so a fresh launch retries normally.
@@ -2522,7 +2584,7 @@ class ArViewModel @Inject constructor(
      */
     private var attitudeProvider: DeviceAttitudeProvider? = null
 
-    /** Last known location, cached while AR is active. Null until a fix arrives or if denied. */
+    /** The fix taken for the latest capture. Null until one arrives, or if denied. */
     @Volatile
     private var lastLocation: android.location.Location? = null
     private var locationTracker: com.hereliesaz.graffitixr.common.LocationTracker? = null
@@ -2530,10 +2592,10 @@ class ArViewModel @Inject constructor(
     /**
      * Begin sampling attitude and location for capture records. Idempotent.
      *
-     * Location is cached from a low-rate subscription rather than requested at capture: the capture
-     * happens on the GL thread inside a frame callback and cannot wait on a fix. A cached value with
-     * its age recorded is strictly better than a blocking call that would drop frames — and the age
-     * is what makes a stale fix visible instead of silently wrong.
+     * Location is one fix taken when a capture begins ([requestCaptureLocationFix]) and cached: the
+     * capture happens on the GL thread inside a frame callback and cannot wait on a fix. A cached
+     * value with its age recorded is strictly better than a blocking call that would drop frames —
+     * and the age is what makes a stale fix visible instead of silently wrong.
      */
     private fun startEnvironmentSampling(context: Context) {
         // Each source is guarded separately, and neither can stop AR mode.
@@ -2560,15 +2622,8 @@ class ArViewModel @Inject constructor(
             if (locationTracker == null) {
                 locationTracker = com.hereliesaz.graffitixr.common.LocationTracker(context)
             }
-            locationTracker?.let { tracker ->
-                // Without permission the tracker defers the start and begins once the artist grants
-                // it — location is asked for when target capture begins, after this has run.
-                // Not an error either way: location is optional and a capture never depends on it.
-                if (!tracker.hasPermissions()) {
-                    Timber.i("Location permission not granted yet; captures record no location until it is")
-                }
-                tracker.startLocationUpdates { loc -> lastLocation = loc }
-            }
+            // No subscription: one fix is taken when a capture begins (requestCaptureLocationFix),
+            // not GPS held hot for the whole session.
         } catch (t: Throwable) {
             Timber.w(t, "location sampling unavailable; captures will record no location")
             locationTracker = null
@@ -2591,6 +2646,19 @@ class ArViewModel @Inject constructor(
             locationTracker?.stopLocationUpdates()
         } catch (t: Throwable) {
             Timber.w(t, "location sampling teardown failed")
+        }
+    }
+
+    /**
+     * A target capture is starting: take one balanced-accuracy fix for its record. The capture itself
+     * runs on the GL thread and cannot wait, so the fix lands in [lastLocation] while the artist taps
+     * the marks. Without permission it waits for the grant (asked for at this same moment).
+     */
+    fun requestCaptureLocationFix() {
+        try {
+            locationTracker?.requestSingleFix { loc -> lastLocation = loc }
+        } catch (t: Throwable) {
+            Timber.w(t, "location fix unavailable; the capture records no location")
         }
     }
 
@@ -2651,11 +2719,26 @@ class ArViewModel @Inject constructor(
             // doodle into it. Force the normal ARCore doodle loader to touch native again
             // on ARCore entry even when the project id/value itself did not change.
             loadedDoodle = null
-            loadDoodleIfExists()
+            val peerFrame = _uiState.value.coopPeerSpatialFrame
+            val peerDoodle = arCorePeerDoodle
+            if (
+                shouldRestoreLocalArCoreDoodle(
+                    isArCoreAvailable = _uiState.value.isArCoreAvailable,
+                    coopRole = _uiState.value.coopRole,
+                    peerSpatialFramePresent = peerFrame != null,
+                )
+            ) {
+                loadDoodleIfExists()
+            } else if (peerFrame != null && peerDoodle != null) {
+                // A guest: the local copy of the host project carries host intrinsics, anchor and
+                // view. Re-install the host's geometry instead (standalone may have replaced it).
+                viewModelScope.launch(Dispatchers.IO) { installArCorePeer(peerDoodle, peerFrame) }
+            }
 
             val now = System.currentTimeMillis()
             arEntryTimestampMs = now
             lastTrackingTimestampMs = now
+            trackedSinceArEntry = false
             // A fresh AR session gets a fresh watcher. This view model outlives the session — AR is
             // a mode switch inside it — so without this the previous session's edge state, latches
             // and spent budget carry over: the first tick of session two compares against session
@@ -2708,30 +2791,7 @@ class ArViewModel @Inject constructor(
         // against the DEAD session's design pose. Ordering is the whole fix.
         renderer?.isDestroying = true
         lastMappingPausedCmd = null
-        // Drop the marks-centering override so a later AR re-entry (or a different project) doesn't
-        // center the overlay on a stale target's marks before a new one is built/restored.
-        slamManager.overlayMarkCenterLocal = null
-        // 0.9 — same lifetime: without it PoseFusion cannot compose a correction at all.
-        slamManager.captureAnchorCam = null
-        // Same argument, for the anchor. The ARCore session and its anchors do not survive this, so
-        // "an anchor has been established" must not either — otherwise the next capture's
-        // `awaitAnchorTransform` returns immediately with the previous session's pose, which is the
-        // identity-shaped bug it was written to prevent, wearing different numbers.
-        slamManager.clearAnchorEstablished()
-        // The partition's in-memory state belongs to the session that built it: the retained design
-        // footprint is expressed relative to an anchor that is about to stop existing.
-        latestDesignFootprint = null
-        dropPartitionState()
-        // The UI's copy of "an anchor exists" is a separate latch, set true in
-        // onPrimaryAnchorEstablished and — until this line — never set false anywhere in the
-        // repository. Left standing it made the NEXT session pause splat mapping on its first
-        // tracking frame (updateAutoMapping gates on it) and report scanPhase COMPLETE on a session
-        // that never scanned. Sixth field to be cleared in one place and not its sibling.
-        _uiState.update {
-            it.copy(isAnchorEstablished = false, backboneTooSmall = false, measure = MeasureUi())
-        }
-        // The scan progression (visited yaw sectors, the COMPLETE latch) belongs to this session too.
-        resetScanProgress()
+        resetSessionAnchorState()
         // Anchor gone — clear any manual override and return the live mode to the artist's saved
         // preference, which re-arms acquire-then-lock for an AUTO preference. The preference itself
         // (UI state and DataStore) is untouched.
@@ -3886,6 +3946,23 @@ class ArViewModel @Inject constructor(
      * return at once, so teardown closed the session — and a backend switch cleared the native map —
      * before the save had read anything).
      */
+    @Volatile private var lastProgressSaveFailureNoticeMs = 0L
+
+    /**
+     * Tell the artist a wall-map / progress / Doodle write failed. Once a minute at most: an autosave
+     * that keeps failing (a full disk) would otherwise say it on every tick.
+     */
+    private fun reportProgressSaveFailure(e: Exception) {
+        val now = System.currentTimeMillis()
+        if (now - lastProgressSaveFailureNoticeMs < PROGRESS_SAVE_FAILURE_NOTICE_MS) return
+        lastProgressSaveFailureNoticeMs = now
+        _feedback.tryEmit(
+            com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                appContext.getString(DesignR.string.ar_feedback_progress_save_failed), e
+            )
+        )
+    }
+
     private suspend fun saveMapBlocking() {
         val projectId = loadedProjectId ?: return
         // The wall feature map is the only thing here that survives a session meaningfully: it is
@@ -3904,6 +3981,7 @@ class ArViewModel @Inject constructor(
             throw e
         } catch (e: Exception) {
             Timber.e(e, "Wall feature map save failed")
+            reportProgressSaveFailure(e)
             return
         }
 
@@ -3933,10 +4011,18 @@ class ArViewModel @Inject constructor(
      * Phase 3b: persist the in-session passive feature map into the project record (.gxr), preserving the
      * rest of the current project. No-op when building is off / the map is empty. Async + best-effort.
      */
-    suspend fun saveProjectWallMap() {
-        val projectId = loadedProjectId ?: return
-        val currentProject = projectRepository.currentProject.value ?: return
+    suspend fun saveProjectWallMap(outgoing: com.hereliesaz.graffitixr.common.model.GraffitiProject? = null) {
+        // [outgoing]: the project being switched AWAY from, whose state native still holds. The
+        // repository already publishes the incoming one as current, so the outgoing snapshot is written
+        // whole (ProjectManager merges what it omits) instead of through the current-project transform.
+        val projectId = outgoing?.id ?: loadedProjectId ?: return
+        val currentProject = outgoing ?: projectRepository.currentProject.value ?: return
         if (currentProject.id != projectId) return
+        suspend fun write(transform: (com.hereliesaz.graffitixr.common.model.GraffitiProject) ->
+            com.hereliesaz.graffitixr.common.model.GraffitiProject) {
+            if (outgoing != null) projectRepository.updateProject(transform(outgoing))
+            else projectRepository.updateProject { project -> if (project.id == projectId) transform(project) else project }
+        }
         val ui = _uiState.value
         val standaloneBackend =
             ui.isArCoreAvailabilityResolved &&
@@ -3953,16 +4039,21 @@ class ArViewModel @Inject constructor(
             Timber.d("Wall map save skipped: native state is not (yet) project $projectId's")
             return
         }
-        saveWallNormalIfChanged(projectId, currentProject)
+        if (outgoing == null) saveWallNormalIfChanged(projectId, currentProject)
 
         val map = slamManager.getWallFeatureMap()?.takeIf { it.pointCount > 0 }
 
         if (standaloneBackend) {
-            if (map == null) return
+            val standalonePaint = slamManager.getPaintMarks()
+            val standaloneGrid = slamManager.exportPaintGrid()?.let { java.util.Base64.getEncoder().encodeToString(it) }
+            val standaloneGrown = slamManager.getGrownWall()
+            if (map == null && standalonePaint == null && standaloneGrid == null && standaloneGrown == null) return
             val mapFromFingerprint = currentProject.sphereSlamMapFromFingerprint
+            // The frame check: the map's co-registration, or (no map yet) the seeded Doodle's anchor.
+            val nativeAnchor = map?.anchor ?: slamManager.getDoodleAnchor()
             if (
                 mapFromFingerprint.size != 16 ||
-                !sameStandaloneTransform(map.anchor, mapFromFingerprint)
+                !sameStandaloneTransform(nativeAnchor, mapFromFingerprint)
             ) {
                 appendDiag(
                     "SphereSLAM explicit precision-map save refused: " +
@@ -3970,13 +4061,17 @@ class ArViewModel @Inject constructor(
                 )
                 return
             }
-            projectRepository.updateProject { project ->
+            write { project ->
                 if (
                     project.id == projectId &&
                     project.sphereSlamReferenceUri == currentProject.sphereSlamReferenceUri
                 ) {
                     project.copy(
-                        sphereSlamWallFeatureMap = map,
+                        sphereSlamWallFeatureMap = map ?: project.sphereSlamWallFeatureMap,
+                        // Paint marks, area progress and grown rows live in the same page frame.
+                        sphereSlamPaintMarks = standalonePaint ?: project.sphereSlamPaintMarks,
+                        sphereSlamPaintGrid = standaloneGrid ?: project.sphereSlamPaintGrid,
+                        sphereSlamGrownDoodle = standaloneGrown ?: project.sphereSlamGrownDoodle,
                         sphereSlamWallFeatureMapFrameVersion =
                             com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                         // Phase 1b: persist the per-keyframe orientation log alongside the map it is
@@ -4001,19 +4096,23 @@ class ArViewModel @Inject constructor(
         val paint = slamManager.getPaintMarks()
         val grid = slamManager.exportPaintGrid()
             ?.let { java.util.Base64.getEncoder().encodeToString(it) }
-        if (map == null && paint == null && grid == null) return
-        projectRepository.updateProject { project ->
+        // What the Doodle grew this session (and the restored earlier growth it still carries).
+        val grown = slamManager.getGrownWall()
+        if (map == null && paint == null && grid == null && grown == null) return
+        write { project ->
             if (project.id == projectId) {
                 project.copy(
                     wallFeatureMap = map ?: project.wallFeatureMap,
                     paintMarks = paint ?: project.paintMarks,
                     paintGrid = grid ?: project.paintGrid,
+                    grownDoodle = grown ?: project.grownDoodle,
                 )
             } else {
                 project
             }
         }
         paint?.let { lastSavedPaintCount.set(it.pointCount) }
+        lastSavedWallRows.set(slamManager.getWallKeypointCount())
         lastSavedProgress = slamManager.getPaintingProgress()
     }
 
@@ -4300,7 +4399,17 @@ class ArViewModel @Inject constructor(
             // Persist so the next load starts from the size the artist settled on. Merged through
             // the repository transform rather than a full-object write, for the save-race reason
             // documented on the wall-map save above.
-            projectRepository.updateProject { it.copy(doodle = updated) }
+            // A write error (a full disk) must not take the app down from a viewModelScope launch: native
+            // holds the partition for this session either way.
+            try {
+                projectRepository.updateProject { it.copy(doodle = updated) }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Partitioned Doodle save failed")
+                reportProgressSaveFailure(e)
+                return@launch
+            }
             Timber.i(
                 "Design footprint %.3f x %.3f m; partitioned %d points, backbone %d",
                 design.halfW, design.halfH, updated.points3d.size / 3, backbone,
@@ -4391,6 +4500,24 @@ class ArViewModel @Inject constructor(
      * `return`, so a refused project kept the previous project's map in native and then SAVED it into
      * the refused project's file on teardown.
      */
+    /**
+     * A doodle saved before the capture pose was recorded (pre-Phase-2) has none, so it could never
+     * be corrected or partitioned without a re-capture. Its capture view and anchor are saved with
+     * the project, and the pose is exactly `cv(view) · anchor` (as MetricDoodleBuilder builds it), so
+     * derive it. Only for a doodle in the display frame (not a pre-Phase-0 one) with both saved.
+     */
+    private fun withDerivedCaptureAnchorCam(
+        doodle: com.hereliesaz.graffitixr.common.model.Doodle,
+        project: com.hereliesaz.graffitixr.common.model.GraffitiProject,
+    ): com.hereliesaz.graffitixr.common.model.Doodle {
+        if (doodle.captureAnchorCam.size == 16 || doodle.points3d.isEmpty()) return doodle
+        if (doodle.isLegacyFrame() && project.doodleCaptureRotationDeg < 0) return doodle
+        val view = project.doodleViewMatrix.takeIf { it.size == 16 }?.toFloatArray() ?: return doodle
+        val anchor = project.doodleAnchor.takeIf { it.size == 16 }?.toFloatArray() ?: return doodle
+        val cam = RigidMath.multiply(RigidMath.glViewToCv(view), anchor)
+        return doodle.copy(captureAnchorCam = cam.toList())
+    }
+
     private fun loadDoodleIfExists() {
         viewModelScope.launch(Dispatchers.IO) {
             val project = projectRepository.currentProject.value ?: return@launch
@@ -4420,7 +4547,7 @@ class ArViewModel @Inject constructor(
         reportExit: (NativeStateOwner.LoadExit) -> Unit,
     ) {
         run {
-            val fp = project.doodle
+            val fp = project.doodle?.let { withDerivedCaptureAnchorCam(it, project) }
             val incoming = LoadedDoodle(project.id, fp)
             val current = loadedDoodle
 
@@ -4528,6 +4655,8 @@ class ArViewModel @Inject constructor(
                         // reload relocalizes exactly as it did before the phase landed.
                         regions = fp.regions,
                     )
+                    // That view is in the world it was captured in; a reopened project is another.
+                    slamManager.markDoodleViewStaleUnlessCapturedThisSession()
                     // Retained for the repartition path (2.2), with exactly the values just pushed
                     // so a later re-push cannot drift from what native holds.
                     liveDoodle = LiveDoodle(fp, anchor.toFloatArray(), intr.toFloatArray(), view)
@@ -4573,6 +4702,13 @@ class ArViewModel @Inject constructor(
             // Only after the state above is consistent, because this can launch a partition that
             // reads it.
             if (fp != null && !legacyFrame && hasCoRegistration) partitionLiveDoodleIfNeeded()
+            // What the Doodle grew in earlier sessions, behind the captured rows it grew from. A
+            // partition re-push of the same base keeps it (MobileGS::restoreWallDoodleMetric).
+            val grown = project.grownDoodle
+            if (fp != null && !legacyFrame && grown != null && grown.pointCount > 0) {
+                slamManager.restoreGrownWall(grown)
+            }
+            lastSavedWallRows.set(slamManager.getWallKeypointCount())
 
             val map = project.wallFeatureMap
             if (map != null && map.pointCount > 0) {
@@ -4599,7 +4735,12 @@ class ArViewModel @Inject constructor(
                     runCatching { java.util.Base64.getDecoder().decode(encoded) }.getOrNull()
                         ?.let { slamManager.restorePaintGrid(it) }
                 }
-                val photo = project.doodleImageUris.lastOrNull()
+                // The ARCore capture's own photo. Older projects predate the field: their last photo
+                // is it only if no standalone capture has appended since.
+                val photo = project.arCoreCaptureImageUri?.takeIf { it in project.doodleImageUris }
+                    ?: project.doodleImageUris.lastOrNull()?.takeIf {
+                        project.arCoreCaptureImageUri == null && project.sphereSlamReferenceUri == null
+                    }
                 val intr = project.doodleIntrinsics
                 if (photo != null && intr.size == 4) {
                     val bmp = runCatching {
@@ -4658,6 +4799,8 @@ class ArViewModel @Inject constructor(
                         savedPaintMarks = lastSavedPaintCount.get(),
                         progress = slamManager.getPaintingProgress(),
                         savedProgress = lastSavedProgress,
+                        wallRows = slamManager.getWallKeypointCount(),
+                        savedWallRows = lastSavedWallRows.get(),
                     )
                 ) {
                     saveMapNow()
@@ -4671,6 +4814,41 @@ class ArViewModel @Inject constructor(
         autoSaveJob = null
     }
 
+    /**
+     * Everything that belongs to the AR session's anchor, cleared when the session goes away: by
+     * [exitArMode], and by [destroyArSession] (a finishing Activity, or a recreation the manifest
+     * does not absorb -- font scale, locale, density -- which used to close the session yet leave the
+     * UI saying an anchor existed).
+     */
+    private fun resetSessionAnchorState() {
+        // Drop the marks-centering override so a later AR re-entry (or a different project) doesn't
+        // center the overlay on a stale target's marks before a new one is built/restored.
+        slamManager.overlayMarkCenterLocal = null
+        // 0.9 — same lifetime: without it PoseFusion cannot compose a correction at all.
+        slamManager.captureAnchorCam = null
+        // Same argument, for the anchor. The ARCore session and its anchors do not survive this, so
+        // "an anchor has been established" must not either — otherwise the next capture's
+        // `awaitAnchorTransform` returns immediately with the previous session's pose, which is the
+        // identity-shaped bug it was written to prevent, wearing different numbers.
+        slamManager.clearAnchorEstablished()
+        // The next session is another tracking world: the loaded doodle's capture view is not in it.
+        slamManager.markDoodleViewStale()
+        // The partition's in-memory state belongs to the session that built it: the retained design
+        // footprint is expressed relative to an anchor that is about to stop existing.
+        latestDesignFootprint = null
+        dropPartitionState()
+        // The UI's copy of "an anchor exists" is a separate latch, set true in
+        // onPrimaryAnchorEstablished and — until this line — never set false anywhere in the
+        // repository. Left standing it made the NEXT session pause splat mapping on its first
+        // tracking frame (updateAutoMapping gates on it) and report scanPhase COMPLETE on a session
+        // that never scanned. Sixth field to be cleared in one place and not its sibling.
+        _uiState.update {
+            it.copy(isAnchorEstablished = false, backboneTooSmall = false, measure = MeasureUi())
+        }
+        // The scan progression (visited yaw sectors, the COMPLETE latch) belongs to this session too.
+        resetScanProgress()
+    }
+
     fun destroyArSession(): Job {
         // Off-main for the same reason as exitArMode: session.close() blocks until any
         // in-flight session.update() returns, which never happens when the GL thread is
@@ -4681,6 +4859,8 @@ class ArViewModel @Inject constructor(
         // Latch isDestroying synchronously so a renderer created before the teardown takes the
         // mutex (activity recreation) is never handed the session that is about to close.
         isDestroying = true
+        renderer?.isDestroying = true
+        resetSessionAnchorState()
         val ownedRenderer = renderer
         return teardownScope.launch {
             performFullCleanupLocked(ownedRenderer)
@@ -4918,6 +5098,12 @@ class ArViewModel @Inject constructor(
         // Read every tick (~15 Hz) rather than only on a successful lock — the whole point is to show
         // the FAILING states, which by definition never reach a success path.
         val relocDiag = slamManager.getRelocDiagnostics()
+        // The design was registered against a Doodle of another descriptor type (re-captured with
+        // another detector, or SuperPoint became (un)available): nothing it corroborates can grow
+        // the Doodle or become a paint mark. Register it again for the current Doodle.
+        if (relocDiag.growOutcome == com.hereliesaz.graffitixr.common.model.GrowOutcome.TYPE_MISMATCH) {
+            reRegisterGuideForWallType()
+        }
         // IMPLEMENTATION.md 4.6, read on the same tick and for the same reason. Separate call
         // because these are floats and the record above arrives as an int[]; the two are read one
         // after the other rather than merged natively, so they can disagree by one reloc cycle. That
@@ -4972,9 +5158,12 @@ class ArViewModel @Inject constructor(
             }
         }
 
-        if (isTracking) lastTrackingTimestampMs = nowMs
+        if (isTracking) { lastTrackingTimestampMs = nowMs; trackedSinceArEntry = true }
+        // "Tracking failed" is for an AR start that never got going. Once the wall is anchored, a
+        // long loss is the phone in a pocket, which the Doodle relocks from; it is not a failure.
         val trackingFailed = isInArMode &&
                 !isTracking &&
+                !_uiState.value.isAnchorEstablished &&
                 arEntryTimestampMs > 0L &&
                 (nowMs - lastTrackingTimestampMs) > trackingFailureGraceMs
 
@@ -5041,10 +5230,15 @@ class ArViewModel @Inject constructor(
         // (ARCore motion-stereo ComputeDisparity / spherical_rectifier fails). Detect it FAST —
         // well before the 5s input-timeout ANR — and reconfigure the LIVE session to mono so the
         // first AR entry recovers instead of crashing. Persisted so future sessions skip stereo too.
+        // Only a start that NEVER tracked: a loss after tracking (a dark pocket, screen-off) also reads
+        // zero points, and reconfiguring the session then -- and dropping stereo for good -- would
+        // break the very relock the Doodle is there for.
         if (!forcedStereoUnstable &&
             isInArMode &&
             isHardwareStereo &&
             !isTracking &&
+            !trackedSinceArEntry &&
+            !_uiState.value.isAnchorEstablished &&
             splatCount == 0 &&
             _uiState.value.ambientScanEnabled &&
             arEntryTimestampMs > 0L &&
@@ -5299,7 +5493,24 @@ class ArViewModel @Inject constructor(
 
     private fun guideSettled() = guideRegistered == guideRequested.get()
 
+    /** The last design composite registered (a copy: the caller may recycle its own), for [reRegisterGuideForWallType]. */
+    @Volatile private var lastGuide: Pair<Bitmap, String?>? = null
+    @Volatile private var lastTypeReRegisterMs = 0L
+
+    private fun reRegisterGuideForWallType() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastTypeReRegisterMs < TYPE_REREGISTER_MIN_INTERVAL_MS) return
+        val (bitmap, key) = lastGuide ?: return
+        if (bitmap.isRecycled) return
+        lastTypeReRegisterMs = now
+        updatePaintingGuide(bitmap, key)
+    }
+
     fun updatePaintingGuide(bitmap: Bitmap, designKey: String? = null) {
+        if (lastGuide?.first !== bitmap) {
+            val copy = runCatching { bitmap.copy(Bitmap.Config.ARGB_8888, false) }.getOrNull()
+            if (copy != null) lastGuide = copy to designKey
+        }
         val request = guideRequested.incrementAndGet()
         if (designKey != null && designKey != lastGuideKey) {
             lastGuideKey = designKey
@@ -5331,6 +5542,29 @@ class ArViewModel @Inject constructor(
 
     @Volatile private var lastStandaloneGuideKey: String? = null
     @Volatile private var lastStandaloneNativeUiUpdateMs: Long = Long.MIN_VALUE
+    /** The native Doodle generation whose standalone paint/grid/grown rows were restored. */
+    @Volatile private var standaloneTeleologicalRestoredFor: Long = Long.MIN_VALUE
+
+    /**
+     * Once per standalone seed (a new native Doodle generation holding this project's fingerprint):
+     * put back what the wall confirmed in earlier sessions -- grown rows, paint marks, area progress --
+     * so standalone does not start from zero every session.
+     */
+    private fun maybeRestoreStandaloneTeleological() {
+        val gen = slamManager.getDoodleGeneration()
+        if (gen == standaloneTeleologicalRestoredFor) return
+        val project = projectRepository.currentProject.value ?: return
+        val fp = project.sphereSlamFingerprint ?: return
+        // Only onto this project's own fingerprint, freshly seeded (no grown rows yet).
+        if (slamManager.getWallKeypointCount() != fp.descriptorsRows) return
+        standaloneTeleologicalRestoredFor = gen
+        project.sphereSlamGrownDoodle?.takeIf { it.pointCount > 0 }?.let { slamManager.restoreGrownWall(it) }
+        project.sphereSlamPaintMarks?.takeIf { it.pointCount > 0 }?.let { slamManager.restorePaintMarks(it) }
+        project.sphereSlamPaintGrid?.let { encoded ->
+            runCatching { java.util.Base64.getDecoder().decode(encoded) }.getOrNull()
+                ?.let { slamManager.restorePaintGrid(it) }
+        }
+    }
     @Volatile private var lastStandaloneSavedMapRevision: Long = Long.MIN_VALUE
     @Volatile private var lastStandaloneMapSaveMs: Long = Long.MIN_VALUE
     private val standaloneMapSaveInFlight = AtomicBoolean(false)
@@ -5452,6 +5686,7 @@ class ArViewModel @Inject constructor(
         val mapPoints = slamManager.getMapPointCount()
         val mapRevision = slamManager.getWallFeatureMapRevision()
         maybePersistStandaloneWallFeatureMap(now, mapPoints, mapRevision)
+        maybeRestoreStandaloneTeleological()
 
         _uiState.update { state ->
             state.copy(
@@ -6339,6 +6574,9 @@ class ArViewModel @Inject constructor(
 
         /** A clean-wall photo request counts only for the capture that follows it this closely. */
         private const val CLEAN_WALL_REQUEST_WINDOW_MS = 5_000L
+        private const val MIB = 1024L * 1024L
+        /** A failing wall-map / progress save is reported at most this often. */
+        private const val PROGRESS_SAVE_FAILURE_NOTICE_MS = 60_000L
         /** cos 2°: a learned wall normal is saved again only once it has moved more than this. */
         private const val WALL_NORMAL_RESAVE_COS = 0.99939f
         /** How long a Measure tap waits for the GL thread to resolve it. */
@@ -6357,6 +6595,9 @@ class ArViewModel @Inject constructor(
          * always [com.hereliesaz.graffitixr.feature.ar.rendering.OverlayRenderer.QUAD_HALF_EXTENT].
          */
         const val ANCHOR_BORDER_FRAME_FRACTION = 0.18f
+
+        /** How often the design may be re-registered for a Doodle of another descriptor type. */
+        const val TYPE_REREGISTER_MIN_INTERVAL_MS = 10_000L
 
         /** Longest Align waits for a design registration in flight before giving up as "no match". */
         const val ALIGN_REGISTRATION_WAIT_MS = 5_000L
@@ -6764,7 +7005,11 @@ internal fun shouldAutosaveWallMap(
     savedPaintMarks: Int,
     progress: Float,
     savedProgress: Float,
+    wallRows: Int = 0,
+    savedWallRows: Int = 0,
 ): Boolean =
     (mapPoints > 0 && mapPoints - savedMapPoints >= ArViewModel.AUTOSAVE_POINT_DELTA) ||
         paintMarks - savedPaintMarks >= ArViewModel.AUTOSAVE_PAINT_DELTA ||
+        // Self-grown Doodle rows: as valuable as paint marks, on the same delta.
+        wallRows - savedWallRows >= ArViewModel.AUTOSAVE_PAINT_DELTA ||
         progress - savedProgress >= ArViewModel.AUTOSAVE_PROGRESS_DELTA

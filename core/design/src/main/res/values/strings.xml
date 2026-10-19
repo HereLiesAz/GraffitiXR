@@ -11,12 +11,12 @@
     <!-- Label for the Augmented Reality (AR) projection mode. -->
     <string name="nav_ar_mode">AR</string>
     <!-- Instructions for AR mode, explaining how to project artwork onto a wall. -->
-    <string name="nav_ar_mode_info">Project your artwork onto a real wall using augmented reality. Scan the wall first to place the anchor, then add your design layers.</string>
+    <string name="nav_ar_mode_info">Project your artwork onto a real wall using augmented reality. Scan the wall first to place the anchor, then add your design.</string>
 
     <!-- Label for the camera overlay mode, which doesn't use AR tracking. -->
     <string name="nav_overlay">Overlay</string>
     <!-- Description of Overlay mode, used for quick checks without spatial tracking. -->
-    <string name="nav_overlay_info">Layer your design over the live camera feed without AR anchoring. Great for quick framing and placement checks.</string>
+    <string name="nav_overlay_info">Float your design over the live camera feed without AR anchoring. Great for quick framing and placement checks.</string>
 
     <!-- Label for the Mockup mode, used for previewing on a static background. -->
     <string name="nav_mockup">Mockup</string>
@@ -66,20 +66,18 @@
     <string name="nav_refine_info">Fine-tune the position of an existing Doodle.</string>
 
     <!-- Label for the progress tracking tool. -->
-    <string name="nav_update">Progress</string>
     <!-- Description of the progress tool, used for marking completed parts of a mural. -->
-    <string name="nav_update_info">Mark completed areas of your mural to track painting progress.</string>
 
     <!-- Label for the Design workspace — the default screen you land on after opening or creating a
          project. There is no separate "Design" menu/button to tap; this just names that screen. -->
     <string name="nav_design">Design</string>
     <!-- Description of the Design workspace, where layers are added and managed. -->
-    <string name="nav_design_info">Your workspace. Layers you add with \'Open\' — and edit with the tools below — carry over into every mode.</string>
+    <string name="nav_design_info">Your workspace. The design you add with \'Open\' — and edit with the tools below — carries over into every mode.</string>
 
     <!-- Action label to open or import an image. -->
     <string name="nav_open">Open</string>
     <!-- Description of the Open action, used to add an image layer from the gallery. -->
-    <string name="nav_open_info">Add an image from your gallery as a new layer.</string>
+    <string name="nav_open_info">Add an image from your gallery as the design.</string>
 
     <!-- Label for the background wall image in Mockup mode. -->
     <string name="nav_wall">Wall</string>
@@ -103,7 +101,7 @@
     <string name="nav_invert">Invert</string>
     <string name="nav_blend">Blend</string>
     <!-- Description of the Invert tool, explaining its use for stencil and overlay analysis. -->
-    <string name="nav_invert_info">Create a negative of the current layer. Blacks become whites, and colors are flipped to their opposites — useful for stencil and overlay analysis.</string>
+    <string name="nav_invert_info">Create a negative of the design. Blacks become whites, and colors are flipped to their opposites — useful for stencil and overlay analysis.</string>
 
     <!-- Label for the outline filter. -->
     <string name="nav_outline">Outline</string>
@@ -113,19 +111,19 @@
     <!-- Label for image adjustment tools (brightness, contrast, etc.). -->
     <string name="nav_adjust">Adjust</string>
     <!-- Description of the image adjustment tools. -->
-    <string name="nav_adjust_info">Fine-tune brightness, contrast, saturation, and color balance for this layer.</string>
+    <string name="nav_adjust_info">Fine-tune brightness, contrast, saturation, and color balance for the design.</string>
     <!-- Label for the rail host holding the per-design controls (Adjust, Balance, Invert, Outline, Isolate). -->
     <string name="nav_edit">Edit</string>
 
     <!-- Label for color balance and tinting tools. -->
     <string name="nav_balance">Color</string>
     <!-- Description of the color balance tool, mentioning RGB sliders. -->
-    <string name="nav_balance_info">Tint the layer colors using red, green, and blue channel sliders.</string>
+    <string name="nav_balance_info">Tint the design\'s colors using red, green, and blue channel sliders.</string>
 
     <!-- Label for layer blending mode selection. -->
     <string name="nav_blending">Blend</string>
     <!-- Description of blending modes, used to control how layers composite. -->
-    <string name="nav_blending_info">Cycle through blend modes (Normal, Multiply, Screen, Overlay…) to control how this layer composites with layers below.</string>
+    <string name="nav_blending_info">Cycle through blend modes (Normal, Multiply, Screen, Overlay…) to control how the design composites with what is behind it.</string>
 
     <!-- Label for the application settings menu. -->
     <string name="nav_settings">Settings</string>
@@ -155,7 +153,7 @@
     <!-- Action label to export the final image. -->
     <string name="nav_export">Export</string>
     <!-- Description of the Export action, explaining it merges layers into one image. -->
-    <string name="nav_export_info">Export a flat merged image of all visible layers to your photo gallery.</string>
+    <string name="nav_export_info">Export the design as a flat image to your photo gallery.</string>
 
     <!-- Label for the interactive help system. -->
     <string name="nav_help">Help</string>
@@ -245,7 +243,6 @@
 
     <string name="generating">GENERATING...</string>
     <!-- Hint shown when user can add a layer by pressing again. -->
-    <string name="stencil_hint">Press again to add a layer.</string>
     <!-- Hint for renaming a layer. -->
     <string name="rename_hint">Rename</string>
     <!-- Hint for editing text content. -->
@@ -259,13 +256,9 @@
     <!-- Action to duplicate a layer. -->
     <string name="duplicate">Duplicate</string>
     <!-- Action to unlink a layer from others. -->
-    <string name="unlink_layer">Unlink Layer</string>
     <!-- Action to link a layer with others. -->
-    <string name="link_layer">Link Layer</string>
     <!-- Action to hide a layer. -->
-    <string name="hide_layer">Hide Layer</string>
     <!-- Action to show a layer. -->
-    <string name="show_layer">Show Layer</string>
     <!-- Action to flatten all layers. -->
     <string name="flatten_all">Flatten All</string>
     <!-- Action to delete a layer. -->
@@ -392,8 +385,9 @@
     <string name="lib_new_project">New</string>
     <string name="lib_import_project">Import</string>
     <string name="lib_no_projects">No projects yet</string>
-    <string name="lib_no_projects_hint">Tap New above to start your first mural.\n\nYou\'ll be taken into the editor where you can:\n \n \u2022  Add artwork from the Design menu\n \n \u2022  Switch to AR mode to project onto a real wall\n \n \u2022  Use Overlay to float your design on the live camera\n \n  \u2022  Use Mockup to preview on a wall photo\n\n  \u2022  Use Lightbox to trace your design onto paper</string>
+    <string name="lib_no_projects_hint">Tap New below to start your first piece.\n\nYou\'ll be taken into the editor where you can:\n \n \u2022  Add artwork from the Design menu\n \n \u2022  Switch to AR mode to project onto a real wall\n \n \u2022  Use Overlay to float your design on the live camera\n \n  \u2022  Use Mockup to preview on a wall photo\n\n  \u2022  Use Trace to trace your design onto paper</string>
     <string name="lib_project_thumbnail">Project Thumbnail</string>
+    <string name="lib_project_damaged">Damaged: can\'t be opened</string>
     <string name="lib_delete_project_desc">Delete project %1$s</string>
 
     <!-- Settings Screen -->
@@ -440,7 +434,6 @@
     <string name="settings_scan_mode_label">AR Scan Mode</string>
     <string name="settings_scan_mode_point_cloud">Point Cloud</string>
     <string name="settings_scan_mode_voxel_hash">Voxel Hash</string>
-    <string name="settings_mural_method_label">Mural Engine</string>
     <string name="settings_scan_mode_surface_mesh">Surface Mesh</string>
     <string name="settings_scan_mode_cloud_offset">Cloud Offset</string>
     <string name="settings_anchor_boundary_label">Show Anchor Boundary</string>
@@ -480,8 +473,6 @@
     <string name="settings_copyright">GraffitiXR © 2025</string>
 
     <!-- Editor UI -->
-    <string name="layers_title">Layers</string>
-    <string name="brush_size_title">Brush Size</string>
     <string name="save_project_hint">Project Name</string>
 
     <!-- Target Creation -->
@@ -499,7 +490,6 @@
     <string name="reset_button">Reset</string>
 
     <string name="poster_title">GENERATE POSTER</string>
-    <string name="poster_select_layers">Select layers to include:</string>
     <string name="poster_physical_size">Physical Size (Width in mm):</string>
     <string name="poster_generate_pdf">GENERATE PDF</string>
 
@@ -524,7 +514,7 @@
     <!-- Overlay Mode help text. -->
     <string name="help_overlay">Overlay Mode: Display design over live camera without spatial tracking. Instructions: Manually scale and move the design to fit your frame.</string>
     <!-- Mockup Mode help text. -->
-    <string name="help_mockup">Mockup Mode: Preview design on a static photo. Instructions: Use \'Wall\' to set a background image, then arrange layers on top.</string>
+    <string name="help_mockup">Mockup Mode: Preview the design on a still photo. Instructions: Use \'Wall\' to set a background photo, then place the design on top.</string>
     <!-- Lightbox Mode help text. -->
     <string name="help_trace">Lightbox Mode: High-brightness tracing surface. Instructions: Place paper over the screen and trace. Press Volume Up, Down, Up, Down quickly to exit.</string>
     <!-- Target Management help text. -->
@@ -534,27 +524,28 @@
     <string name="help_create">Create Anchor: Photograph a mark on the wall to lock projection. Instructions: Point at a distinct texture and tap. The app will track this mark.</string>
     <!-- Layer Management help text. -->
     <!-- Import Image help text. -->
-    <string name="help_add_img">Import Image: Add a sketch or reference photo. Instructions: Select an image from your gallery. It will appear as a new design layer.</string>
+    <string name="help_add_img">Import Image: Add a sketch or reference photo. Instructions: Select an image from your gallery. It becomes the design.</string>
     <!-- New Sketch help text. -->
     <!-- Add Text help text. -->
     <!-- Change Wall help text. -->
     <string name="help_wall">Change Wall: Set background for Mockup mode. Instructions: Select a photo of the physical wall you plan to paint on.</string>
     <!-- Project Management help text. -->
-    <string name="help_project_host">Project Management: Save, load, and export work. Instructions: Tap to access administrative tasks for your mural.</string>
+    <string name="help_project_host">Project Management: Save, load, and export work. Instructions: Tap to access administrative tasks for your project.</string>
     <!-- New Project help text. -->
-    <string name="help_new">New Project: Start a fresh mural. Instructions: Tap to reset. Warning: This clears all current work. Save first!</string>
+    <string name="help_new">New Project: Start a fresh piece. Instructions: Tap to reset. Warning: This clears all current work. Save first!</string>
     <!-- Save Project help text. -->
-    <string name="help_save">Save Project: Store mural and AR map. Instructions: Enter a project name and tap Save to preserve your progress.</string>
+    <string name="help_save">Save Project: Store the piece and its AR map. Instructions: Enter a project name and tap Save to preserve your progress.</string>
     <!-- Project Library help text. -->
-    <string name="help_load">Project Library: Access saved murals. Instructions: Browse the library to resume work or import shared project files.</string>
+    <string name="help_load">Project Library: Access saved projects. Instructions: Browse the library to resume work or import shared project files.</string>
     <!-- Export Image help text. -->
-    <string name="help_export">Export Image: Save high-res snapshot. Instructions: Renders all visible layers into a single PNG in your photo gallery.</string>
+    <string name="help_export">Export Image: Save a high-res snapshot. Instructions: Renders the design into a single PNG in your photo gallery.</string>
     <!-- App Settings help text. -->
     <string name="help_settings">App Settings: Configure preferences. Instructions: Open to adjust handedness, units, and scanning parameters.</string>
     <!-- Flashlight help text. -->
     <string name="help_light">Flashlight: Toggle device LED. Instructions: Use this to illuminate dark walls for better AR tracking.</string>
     <!-- Lock/Freeze help text. -->
     <string name="help_lock_trace">Freeze: locks the whole touchscreen so tracing paper doesn\'t drag the design — unlike Lock, this also blocks scrolling and taps. To exit, press Volume Up, Down, Up, Down — quickly.</string>
+    <string name="help_lock_ar">Freeze: locks the whole touchscreen while you paint, so a hand, a sleeve or a pocket can\'t move the design or switch modes. The screen also locks by itself whenever it is covered (in a pocket, face-down). To exit Freeze, press Volume Up, Down, Up, Down — quickly.</string>
     <!-- Interactive 'Help' help text. -->
     <!-- Individual Layer help text. -->
 
@@ -592,8 +583,8 @@
     <!-- Mode onboarding scripts (chromeless tap-to-advance overlay) -->
     <string-array name="onboarding_trace">
         <item>This is Trace mode.</item>
-        <item>Tap \'Open\' to add your first layer. Once it\'s in, pinch and drag on the canvas to size and place it.</item>
-        <item>When they are where and how you want them, press the Freeze button to turn your phone into a lightbox for tracing onto paper.</item>
+        <item>Tap \'Open\' to add your design. Once it\'s in, pinch and drag on the canvas to size and place it.</item>
+        <item>When it is where and how you want it, press the Freeze button to turn your phone into a lightbox for tracing onto paper.</item>
         <item>We recommend using either Trace mode or Mockup mode for editing.</item>
         <item>That way your imagery is all ready to go and your phone can focus on augmenting reality when you press the AR button.</item>
     </string-array>
@@ -601,12 +592,12 @@
         <item>AR Projection — projects your design onto a real wall using the phone\'s depth sensor and spatial tracking.</item>
         <item>Point at the wall and move slowly side-to-side. Coloured shapes appear as the engine maps the surface. Wait until the wall area is covered.</item>
         <item>Just tap the screen. The app photographs the wall, extracts tracking features, and locks the anchor instantly.</item>
-        <item>Tap \'Open\' to add a design layer — it projects onto the wall using the anchor you just set.</item>
+        <item>Tap \'Open\' to add your design — it projects onto the wall using the anchor you just set.</item>
         <item>Tip — blank white walls, smooth concrete, and single-colour surfaces won\'t track. Aim your anchor point at graffiti, rough plaster, or any distinct mark.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Live Overlay — your design floats over the live camera view, no surface scanning needed.</item>
-        <item>Tap \'Open\' to add a layer — pick a photo and it appears here, floating over the live camera view.</item>
+        <item>Tap \'Open\' to add your design — pick a photo and it appears here, floating over the live camera view.</item>
         <item>Pinch to scale, drag to reposition. The overlay stays fixed to your screen — step back to see how it fits the wall.</item>
     </string-array>
     <!-- Shown once (ArUnavailableOverlay, key "ar_unavailable_explainer") on a device without ARCore.
@@ -618,32 +609,26 @@
         <item>Trace, Mockup and Overlay work as usual. Tap to dismiss.</item>
     </string-array>
     <string-array name="onboarding_mockup">
-        <item>Photo Mockup — preview your design on a photo before you ever pick up a brush.</item>
+        <item>Photo Mockup — preview your design on a photo before you ever pick up a can.</item>
         <item>Tap \'Wall\' to choose or take a photo of your surface. Do this first!</item>
-        <item>Tap \'Open\' to add a layer on top of the wall photo. Pinch and drag to size and position it.</item>
+        <item>Tap \'Open\' to put your design on top of the wall photo. Pinch and drag to size and position it.</item>
     </string-array>
     <string-array name="onboarding_design">
         <item>This is Design — your workspace. Whatever you build here carries over into every other mode.</item>
-        <item>Tap \'Open\' to add your first layer — pick a photo from your gallery and it lands here as your artwork.</item>
-        <item>Tap a layer to open its tools — grouped into Paint, Retouch, Adjust and Effects folders. Pinch and drag on the canvas to size and place it.</item>
+        <item>Tap \'Open\' to add your design — pick a photo from your gallery and it lands here as your artwork.</item>
+        <item>Use the Edit tools to adjust, invert, outline or isolate it. Pinch and drag on the canvas to size and place it.</item>
         <item>When it looks right, choose how to use it: \'Trace\' to turn your phone into a lightbox, \'Mockup\' to preview on a photo, or \'AR\' to project it onto a wall.</item>
     </string-array>
-    <!-- Guidance steps for "add a layer" outside Design mode, where the rail's Open item lives
+    <!-- Guidance steps for "add the design" outside Design mode, where the rail's Open item lives
          under the Design host and is hidden until Design is opened first (expandWhen collapses
          it in every other mode) — unlike onboarding_overlay[1]/onboarding_mockup[2]/
          onboarding_trace[1]/onboarding_ar[3] above, which say "Tap Open" alone and point at a
          control that isn't actually visible yet. Each locale names the two rail items with its own
          nav_design / nav_open labels so the words match what is on screen. -->
-    <string name="guidance_open_via_design_overlay">Tap \'Design\' on the rail, then \'Open\', to add a layer — pick a photo and it appears here, floating over the live camera view.</string>
-    <string name="guidance_open_via_design_mockup">Tap \'Design\' on the rail, then \'Open\', to add a layer on top of the wall photo. Pinch and drag to size and position it.</string>
-    <string name="guidance_open_via_design_trace">Tap \'Design\' on the rail, then \'Open\', to add your first layer. Once it\'s in, pinch and drag on the canvas to size and place it.</string>
-    <string name="guidance_open_via_design_ar">Tap \'Design\' on the rail, then \'Open\', to add a design layer — it projects onto the wall using the anchor you just set.</string>
-    <!-- Currently unreferenced by any guidance edge (kept for a possible future walkthrough).
-         Only one rail button adds a layer today — Open, which imports a photo from the gallery;
-         there is no separate Sketch or Text layer source. -->
-    <string-array name="onboarding_design_layers">
-        <item>Open — import a photo from your gallery; it lands as a new layer.</item>
-    </string-array>
+    <string name="guidance_open_via_design_overlay">Tap \'Design\' on the rail, then \'Open\', to add your design — pick a photo and it appears here, floating over the live camera view.</string>
+    <string name="guidance_open_via_design_mockup">Tap \'Design\' on the rail, then \'Open\', to put your design on top of the wall photo. Pinch and drag to size and position it.</string>
+    <string name="guidance_open_via_design_trace">Tap \'Design\' on the rail, then \'Open\', to add your design. Once it\'s in, pinch and drag on the canvas to size and place it.</string>
+    <string name="guidance_open_via_design_ar">Tap \'Design\' on the rail, then \'Open\', to add your design — it projects onto the wall using the anchor you just set.</string>
 
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
     <string name="nav_measure">Measure</string>
@@ -762,6 +747,7 @@
     <string name="ar_feedback_doodle_not_ready">Doodle is not ready yet — keep it in view and try Host again</string>
     <string name="ar_feedback_package_failed">Couldn\'t package this project to share — try saving it first</string>
     <string name="ar_feedback_host_failed">Couldn\'t start sharing: %1$s</string>
+    <string name="ar_feedback_host_too_large">This project is too big to share over Link (%1$d MB; the limit is %2$d MB). Export it to share it instead.</string>
     <string name="ar_feedback_join_load_failed">Couldn\'t load the host\'s project — the session was ended.</string>
     <string name="ar_feedback_join_no_geometry">The host did not provide geometry ARCore can align to.</string>
     <string name="ar_feedback_join_failed">Couldn\'t join: %1$s</string>
@@ -812,6 +798,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">Couldn\'t save the clean-wall photo. Take it again.</string>
+    <string name="ar_feedback_progress_save_failed">Couldn\'t save the wall map and painting progress. They\'re kept for this session. Free some space, then save again.</string>
     <string name="ar_feedback_clean_wall_register_failed">That clean-wall photo doesn\'t line up with this wall. Retake it from about where you will stand.</string>
 
     <!-- The CV view legend: the name of each way of looking. -->

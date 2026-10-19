@@ -6,7 +6,7 @@
 ## Key Components
 
 ### 1. The wall doodle
-A doodle is ORB (`cv::ORB::create(1500)`) or SuperPoint descriptors paired with the triangulated 3D positions of the marks the artist drew, captured once when the target is confirmed (`restoreWallDoodleMetric`). It optionally carries a per-point region tag (`Footprint::Region` — INSIDE/BAND/OUTSIDE) so relocalization can exclude points that sit under the artwork itself and will be painted over.
+A doodle is ORB (`cv::ORB::create(1500)`) or SuperPoint descriptors paired with the triangulated 3D positions of the marks the artist drew, captured once when the target is confirmed (`restoreWallDoodleMetric`). It optionally carries a per-point region tag (`Footprint::Region` — INSIDE/BAND/OUTSIDE) so relocalization can exclude points under the artwork once the paint grid has them painted over.
 
 Both app builders (`MetricDoodleBuilder`, `StandaloneFingerprintBuilder`) add the capture
 photo's **close-ups** (`CloseUpFeatures`): crops at zooms 6×, 3× and 2× (the anticipation
@@ -44,12 +44,32 @@ The ownership boundary is strict:
   for the whole window (and a capture pose exists, and no re-capture is awaiting its new
   doodle — `SlamManager.awaitingNewDoodle`). Unloading the KPM page does not end the
   window early: the correction is held until it elapses;
+- except that a fresh reloc lock standing on paint (`getRelocPaintInliers` ≥ 8) drives when KPM is
+  silent or its last accepted confidence is below 0.5, and then keeps the anchor for its own window;
 - if neither source is available, PoseFusion only re-applies its standing anchor-local correction.
 See `TELEOLOGICAL_SLAM.md` ("Correction sources").
 
 MobileGS does not consume the hybrid KPM page frame and KPM does not mutate MobileGS doodle
 coordinates. The only shared downstream object is PoseFusion's **anchor-local correction**, which is
-frame-invariant under ARCore global world rebases. The correction switch remains off by default.
+frame-invariant under ARCore global world rebases. The correction switch (drift correction) is on by
+default and remembered; it can be switched off from the AR diagnostics panel.
+
+### 2a'. Frames, worlds and light
+- Every doodle native holds is in the display-oriented capture camera's CV frame, with display
+  intrinsics and a display-oriented view, like every live frame. The depth path builds in the sensor
+  frame (the depth buffer's) and is then re-expressed in the display frame (`p = R_z(+deg) · p_sensor`)
+  with the anchor's capture pose, so it is corrected, re-anchored on reopen and hosted like the plane
+  path. Without an anchor it stays as built, for that session only, and says so.
+- A capture view is in the tracking world it was recorded in. A reopened project, or a new AR session
+  (`SlamManager.clearAnchorEstablished`), is another world: the view is stale
+  (`markDoodleViewStale`) and the rectifying pass waits until a lock re-derives it in the current world
+  (`C · inv(camFromFp) · C · V_solve`). A re-push of the same doodle keeps the derived view.
+- A project saved before the capture pose was recorded gets it derived on load:
+  `captureAnchorCam = cv(doodleViewMatrix) · doodleAnchor`.
+- The low-light enhancer (Zero-DCE, when bundled) runs under `kLowLightThreshold` in every detect
+  path, ORB builds included (`SlamManager.enhanceIfDark`). Standalone has no ARCore light estimate;
+  its analyzer publishes the frame's mean luma as the light level instead.
+- A Link guest drops this device's last wall normal at `alignToDoodle` and takes the host project's.
 
 ### 2b. The sensor turn (lost frames)
 When no tracking pose is current, the pose-based rectifying pass cannot run. The phone's sensors still
@@ -64,15 +84,15 @@ averaged in, saved with the project (`doodleWallNormalEnu`) and restored on load
 there for the first relocalization of the next session; a new target forgets it. Diagnostics:
 `lastRelocTurnDeg`, `lastRelocTurnCorr`.
 
-### 3. Teleological corroboration and self-grow (both off by default)
-Two optional, separately-gated mechanisms sit on top of relocalization:
+### 3. Teleological corroboration and self-grow
+Two mechanisms sit on top of relocalization:
 - **Corroboration**: compares descriptors from the design composite against the live wall to produce a confidence signal (Lowe ratio `kCorrobLoweRatio = 0.85`) — see `docs/TELEOLOGICAL_SLAM.md` for what it does and does not measure.
-- **Self-grow** (`mSelfGrowEnabled`, default **off**, `setSelfGrowEnabled`): lets validated new marks extend the doodle as the artist paints, so relocalization can survive the original reference being covered. Capped at `kMaxWallMarks = 5000` points. Two further, independent 5000 caps exist: `kMaxPaintMarks = 5000` (painted-design reference marks) and `kMapCap = 5000` (the persistent feature map, which confidence-prunes when full).
+- **Self-grow** (`mSelfGrowEnabled`, `setSelfGrowEnabled`; the engine starts off and the app turns it on from its setting, default **on**): lets validated new marks extend the doodle as the artist paints, so relocalization can survive the original reference being covered. Grown rows are capped at `kMaxGrownRows = 5000` behind the captured Doodle, and past it the least recently seen grown rows are evicted, so growth never stops. Two further, independent 5000 caps exist: `kMaxPaintMarks = 5000` (painted-design reference marks) and `kMapCap = 5000` (the persistent feature map, which confidence-prunes when full).
 
-Both are reachable only from the diagnostic overlay (Settings > diagnostic overlay), not the artist-facing UI — see that doc for why, and for the open questions around self-grow's promotion gate.
+Self-grow's switch is in the AR diagnostics panel, not the artist-facing UI; corroboration always runs once a design is registered. See that doc for the open questions around self-grow's promotion gate.
 
 ### 4. Optional persistent wall feature map
-`WallFeatureMap` (`setMapRelocEnabled`/`setMapBuildEnabled`, `IMPLEMENTATION.md` phases 2b/3) is a second, longer-lived relocalization source that can be built and matched against across sessions. Off by default like the two mechanisms above. The **map path** of the reloc pass is additive and prior-gated: it needs a previous published pose (`mapPriorSeq > 0`, i.e. the doodle has locked at least once), frustum-gates the map to the points that pose says are in view (never a brute-force match of the whole map), and appends those correspondences to the doodle's before the single PnP solve.
+`WallFeatureMap` (`setMapRelocEnabled`/`setMapBuildEnabled`, `IMPLEMENTATION.md` phases 2b/3) is a second, longer-lived relocalization source that can be built and matched against across sessions. On by default (the AR diagnostics panel switches it off, remembered); the engine starts off until the app applies the setting. The **map path** of the reloc pass is additive and prior-gated: it needs a previous published pose (`mapPriorSeq > 0`, i.e. the doodle has locked at least once), frustum-gates the map to the points that pose says are in view (never a brute-force match of the whole map), and appends those correspondences to the doodle's before the single PnP solve.
 
 For standalone SphereSLAM, both self-grown doodle points and feature-map growth are written
 directly in the centered KPM-page fingerprint frame (+X right, +Y up, +Z wall normal). The
@@ -81,7 +101,7 @@ doodle-anchor transform on save and restore; incompatible anchors are refused ra
 implicitly converted.
 
 ## Memory Management
-- The doodle itself is small (a few thousand descriptor+point pairs at most); there is no fixed-size point-cloud or voxel budget to speak of beyond `kMaxWallMarks`.
+- The doodle itself is small (a few thousand descriptor+point pairs at most); there is no fixed-size point-cloud or voxel budget to speak of beyond `kMaxGrownRows`.
 
 ## JNI Interface (`GraffitiJNI.cpp` → `SlamManager.kt`)
 
@@ -93,7 +113,7 @@ A representative subset of the real, currently-exported surface (see `SlamManage
 | `updateAnchorTransform(mat)` | Hands the engine the current ARCore anchor pose. (The relocalization correction itself is computed Kotlin-side by `PoseFusion` from `getRelocResult`.) |
 | `getRelocDiagnostics()` | Structured relocalization state (inliers, reprojection error, reject reason). |
 | `getCorroborationConfidence()` | Teleological corroboration's confidence signal (see `TELEOLOGICAL_SLAM.md`). |
-| `setSelfGrowEnabled(enabled)` | Toggles self-grow (default off). |
+| `setSelfGrowEnabled(enabled)` | Toggles self-grow (engine starts off; the app applies its setting, default on). |
 | `feedYuvFrame(...)` | Per-frame camera feed into the reloc thread. |
 | `setCameraAttitude(earthFromCamera)` | The frame's north-referenced camera attitude, for the sensor turn. |
 | `getWallNormalEnu()` / `setWallNormalEnu(n)` | The wall's normal learned at locks; saved with and restored from the project. |

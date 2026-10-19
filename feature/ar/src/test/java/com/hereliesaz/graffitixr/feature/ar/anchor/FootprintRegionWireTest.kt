@@ -58,16 +58,21 @@ class FootprintRegionWireTest {
     }
 
     /**
-     * The reloc filter must keep only OUTSIDE. Pinned as a literal comparison against the native
-     * constant name used in `MobileGS.cpp`, because "exclude INSIDE" and "keep only OUTSIDE" differ
-     * precisely on the BAND — the region whose whole purpose is to be trusted by neither side.
+     * Pinned as literals against `MobileGS.cpp`: which stored marks the global reloc solve skips.
      */
     @Test
-    fun `the reloc filter keeps only the backbone, not merely everything that is not inside`() {
+    fun `the reloc filter drops only marks under the design whose cell is painted over`() {
+        // The audit's B3/B4: a mark under the design is still a doodle the artist drew until paint
+        // covers it, so the global solve keeps it until the paint grid says its cell is painted.
+        // The backbone (OUTSIDE) is never dropped.
         val src = findRepoFile("core/nativebridge/src/main/cpp/MobileGS.cpp").readText()
         assertTrue(
-            "expected the correspondence build to skip anything that is not kRegionOutside",
-            src.contains("wallRegions[match[0].trainIdx] != kRegionOutside"),
+            "expected the correspondence build to skip covered marks only",
+            src.contains("if (!wallCovered.empty() && wallCovered[match[0].trainIdx]) continue;"),
+        )
+        assertTrue(
+            "expected OUTSIDE rows never to be flagged covered",
+            src.contains("if (mWallRegions[i] == kRegionOutside) continue;"),
         )
     }
 

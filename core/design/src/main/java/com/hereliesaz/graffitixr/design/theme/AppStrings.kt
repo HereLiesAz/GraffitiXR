@@ -76,7 +76,6 @@ fun rememberAppStrings(): AppStrings {
             scanMode = stringResource(R.string.settings_scan_mode_label),
             pointCloud = stringResource(R.string.settings_scan_mode_point_cloud),
             voxelHash = stringResource(R.string.settings_scan_mode_voxel_hash),
-            muralMethod = stringResource(R.string.settings_mural_method_label),
             surfaceMesh = stringResource(R.string.settings_scan_mode_surface_mesh),
             cloudOffset = stringResource(R.string.settings_scan_mode_cloud_offset),
             anchorBoundary = stringResource(R.string.settings_anchor_boundary_label),
@@ -140,18 +139,12 @@ fun rememberAppStrings(): AppStrings {
             fpsDeviceMax = stringResource(R.string.settings_fps_device_max)
         ),
         editor = AppStrings.Editor(
-            layers = stringResource(R.string.layers_title),
-            brushSize = stringResource(R.string.brush_size_title),
             renameHint = stringResource(R.string.rename_hint),
             editTextHint = stringResource(R.string.edit_text_hint),
             copyEdits = stringResource(R.string.copy_edits),
             pasteEdits = stringResource(R.string.paste_edits),
             generatePoster = stringResource(R.string.generate_poster),
             duplicate = stringResource(R.string.duplicate),
-            unlinkLayer = stringResource(R.string.unlink_layer),
-            linkLayer = stringResource(R.string.link_layer),
-            hideLayer = stringResource(R.string.hide_layer),
-            showLayer = stringResource(R.string.show_layer),
             flattenAll = stringResource(R.string.flatten_all),
             delete = stringResource(R.string.delete),
             lock = stringResource(R.string.lock_button),
@@ -159,7 +152,6 @@ fun rememberAppStrings(): AppStrings {
             saveProjectHint = stringResource(R.string.save_project_hint),
             chooseFont = stringResource(R.string.choose_font),
             posterTitle = stringResource(R.string.poster_title),
-            posterSelectLayers = stringResource(R.string.poster_select_layers),
             posterPhysicalSize = stringResource(R.string.poster_physical_size),
             posterGeneratePdf = stringResource(R.string.poster_generate_pdf)
         ),
@@ -220,6 +212,7 @@ fun rememberAppStrings(): AppStrings {
             appSettings = R.string.help_settings,
             flashlight = R.string.help_light,
             lockTrace = R.string.help_lock_trace,
+            lockAr = R.string.help_lock_ar,
         ),
         adj = AppStrings.Adjustments(
             detail = stringResource(R.string.adj_detail),
@@ -344,7 +337,6 @@ data class AppStrings(
         val scanMode: String,
         val pointCloud: String,
         val voxelHash: String,
-        val muralMethod: String,
         val surfaceMesh: String,
         val cloudOffset: String,
         val anchorBoundary: String,
@@ -408,18 +400,12 @@ data class AppStrings(
         val fpsDeviceMax: String = "Device max"
     )
     data class Editor(
-        val layers: String,
-        val brushSize: String,
         val renameHint: String,
         val editTextHint: String,
         val copyEdits: String,
         val pasteEdits: String,
         val generatePoster: String,
         val duplicate: String,
-        val unlinkLayer: String,
-        val linkLayer: String,
-        val hideLayer: String,
-        val showLayer: String,
         val flattenAll: String,
         val delete: String,
         val lock: String,
@@ -427,7 +413,6 @@ data class AppStrings(
         val saveProjectHint: String,
         val chooseFont: String,
         val posterTitle: String,
-        val posterSelectLayers: String,
         val posterPhysicalSize: String,
         val posterGeneratePdf: String
     )
@@ -580,6 +565,7 @@ data class AppStrings(
         val appSettings: Int,
         val flashlight: Int,
         val lockTrace: Int,
+        val lockAr: Int,
     )
     data class Adjustments(
         val detail: String,

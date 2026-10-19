@@ -546,6 +546,25 @@ class EditorViewModelTest {
     }
 
     @Test
+    fun `Link edits wait while frozen and land in order on unlock`() = runTest {
+        viewModel.setEditorMode(EditorMode.TRACE)
+        addDesign()
+        testDispatcher.scheduler.advanceUntilIdle()
+        fun traceScale() = viewModel.uiState.value.modeAdjustments[EditorMode.TRACE]?.scale ?: 1f
+        val before = traceScale()
+
+        viewModel.setFrozen(true)
+        viewModel.applyGuestOp(com.hereliesaz.graffitixr.common.model.Op.ModeTransform("TRACE", ModeAdjustment(scale = 2f)))
+        viewModel.receiveSpectatorOp(com.hereliesaz.graffitixr.common.model.Op.ModeTransform("TRACE", ModeAdjustment(scale = 3f)))
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals("nothing moves while frozen", before, traceScale(), 0.001f)
+
+        viewModel.setFrozen(false)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals("the later op wins", 3f, traceScale(), 0.001f)
+    }
+
+    @Test
     fun `a guest AR placement on a standalone session lands in the standalone slot while the host is elsewhere`() = runTest {
         viewModel.setEditorMode(EditorMode.TRACE)
         addDesign()

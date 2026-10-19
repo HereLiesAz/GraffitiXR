@@ -135,6 +135,7 @@ fun AdjustmentsPanel(
                     onAdjustmentEnd = onAdjustmentEnd,
                     strings = strings,
                     labelColor = labelColor,
+                    isRightHanded = state.isRightHanded,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -157,6 +158,7 @@ fun AdjustmentsPanel(
                     onAdjustmentEnd = onAdjustmentEnd,
                     strings = strings,
                     labelColor = labelColor,
+                    isRightHanded = state.isRightHanded,
                     modifier = Modifier.fillMaxWidth()
                 )
             }

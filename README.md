@@ -10,7 +10,7 @@ I had to invent a custom **doodled relocalizer** that works on Android without t
 
 And I followed it up with what I call a **Teleological SLAM**—since we know what the result is supposed to look like, I use OpenCV to look for your progress, meaning that the further along you are, the more tightly the overlay sticks to the wall. Without this, you'd cover those marks up with the painting itself, making the app less accurate as you go. That's exactly where other apps like this truly fail.
 
-Both of those—snap-back and the self-extending doodle—currently ship as an opt-in toggle (Settings > diagnostic overlay, off by default) while I validate them on real hardware, so don't expect either out of the box just yet.
+Both of those (snap-back and the self-extending doodle) are on by default, along with the persistent wall feature map. Each can be switched off from the AR diagnostics panel, and the choice is remembered. I'm still validating them on real hardware, so expect rough edges.
 
 Just for shirts and goggles, I included the non-AR, image overlay functionality for image tracing, just like you get with those other apps, in case you cray like that. Or if you cray-cray, there's **Mockup mode**. Nab a picture of the wall, then I got some quick tools for a quick mockup. And if you've got nothing to prove, you just want something copied onto paper perfectly, **Trace mode** allows you to use your phone as a lightbox, keeping your screen on with the brightness turned up, locking your image into place and blocking all touches until you're finished.
 
@@ -19,26 +19,26 @@ And then, there's a decent suite of pertinent design tools for prepping the one 
 ## Key Features
 *   **Offline-First:** No cloud dependencies for anything the app does — tracking, rendering, and design work are all local. The one thing that ever leaves the device is a crash report, and that's opt-in and off by default (Settings > Crash reports); see [`docs/en/PRIVACY_POLICY.md`](docs/en/PRIVACY_POLICY.md).
 *   **Doodle Relocalization:** a C++17 native OpenCV pipeline (ORB/SuperPoint descriptors + PnP/RANSAC) doodles the marks you draw on the wall and snaps the overlay back after tracking loss — fully offline, no room pre-scan.
-*   **Pocket-Ready (experimental, off by default):** drift correction and a self-extending doodle (so snap-back can survive the original reference being painted over) exist and can be turned on from Settings > diagnostic overlay, but neither has been validated on real hardware yet — see [Teleological SLAM](docs/TELEOLOGICAL_SLAM.md).
+*   **Pocket-Ready (experimental, on by default):** drift correction, a self-extending doodle (so snap-back can survive the original reference being painted over) and the persistent wall feature map are on from the first launch, and each can be switched off from the AR diagnostics panel (the choice is remembered). None has been validated on real hardware yet — see [Teleological SLAM](docs/TELEOLOGICAL_SLAM.md).
 *   **Dual-Lens Aware:** auto-selects hardware stereo depth on devices that expose it; other devices track via ARCore's monocular pose with no separate depth estimate.
 *   **Link:** (called co-op in the code and protocol) encrypted, QR-paired session sharing between two devices, yours or a collaborator's, so the second can watch the host's live canvas in AR and edit it too: guest edits go back to the host as acknowledged, undoable operations, and Measure results are shared both ways (protocol v5).
 *   **AzNavRail UI:** thumb-driven, one-handed navigation designed for artists holding a spray can.
 
 ## Modes
-*   **AR Mural:** The core precision instrument for anchoring digital concepts to physical surfaces, tracked via the doodle relocalizer above.
-*   **Mockup Mode:** Fast tools for visualizing layers and blend modes on top of static wall photos.
+*   **AR Mural:** The core precision instrument for anchoring digital concepts to physical surfaces, tracked via the doodle relocalizer above. On the small number of devices without ARCore, the overlaid image tracks a shape you mark on the wall instead, using the same OpenCV pipeline (CameraX + SphereSLAM, planar-only).
+*   **Mockup Mode:** Fast tools for previewing the design and its blend mode on top of a still wall photo.
 *   **Trace (Lightbox):** Full-brightness surface for copying onto paper with touch-lock, rail auto-retract, and physical-volume-button exit (Up, Down, Up, Down).
-*   **Overlay:** Non-AR image tracing — your reference image overlaid on the live camera (CameraX) with adjustable opacity. On the small number of devices without ARCore, this mode can instead track a shape you mark on the wall using the same OpenCV pipeline, planar-only.
+*   **Overlay:** Non-AR image tracing — your reference image overlaid on the live camera (CameraX) with adjustable opacity, fixed to the screen.
 *   **Design:** Placement and legibility tools for the one design image being traced — opacity/brightness/contrast/saturation/colour-balance, invert, outline extraction, and subject isolation. There is exactly one design image; compositing several images into one is the companion design app's job, not this app's.
 
 ## Licensing
-GraffitiXR is **source-available, not open source.** The app, the `core:*` modules, and the AR / SLAM / teleological engine are licensed under **PolyForm Noncommercial 1.0.0** ([`/LICENSE`](LICENSE)); the declared extension API surface and asset importers are **MIT** ([`docs/licenses/MIT.txt`](docs/licenses/MIT.txt)). The **compiled app is free for anyone to use, including paid commissions** — the noncommercial term binds re-use of the *source*, not muralists doing paid work. See [`docs/LICENSING.md`](docs/LICENSING.md) for the authoritative, path-by-path layout and precedence. Bundled third parties (OpenCV, ML Kit, …) keep their own upstream licenses.
+GraffitiXR is **source-available, not open source.** The app, the `core:*` modules, and the AR / SLAM / teleological engine are licensed under **PolyForm Noncommercial 1.0.0** ([`/LICENSE`](LICENSE)); the declared extension API surface and asset importers are **MIT** ([`docs/licenses/MIT.txt`](docs/licenses/MIT.txt)). The **compiled app is free for anyone to use, including paid commissions** — the noncommercial term binds re-use of the *source*, not muralists doing paid work. See [`docs/LICENSING.md`](docs/LICENSING.md) for the authoritative, path-by-path layout and precedence. Bundled third parties (OpenCV, U²-Net, …) keep their own upstream licenses.
 
 ## Architecture
 Strictly decoupled multi-module Clean Architecture:
 *   `:app` — Navigation, camera orchestration, and Hilt dependency injection.
 *   `:feature:ar` — ARCore session management, `ArRenderer`, and SLAM data processing.
-*   `:feature:editor` — Multi-layer image manipulation and adjustments.
+*   `:feature:editor` — Editing and adjusting the one design image.
 *   `:feature:dashboard` — Project library, onboarding, and settings.
 *   `:core:nativebridge` — Native C++ engine (`MobileGS`), JNI bridge, and relocalization threads. OpenCV itself is a Maven Central dependency (`org.opencv:opencv`), not a vendored module.
 *   `:android_collaboration_module` — peer-to-peer networking for Link (host ↔ guest; see Key Features above).

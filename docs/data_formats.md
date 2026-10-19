@@ -91,6 +91,19 @@ missing from an old file just uses its Kotlin default). Notably:
   `descriptorsRows`/`descriptorsCols`/`descriptorsType` to reconstruct an OpenCV `Mat`.
 - `wallFeatureMap: WallFeatureMap?` carries the passively-built wide-area feature map the same
   way — flat `FloatArray`/`ByteArray`/`IntArray` fields, not a separate file (see §1).
+- `grownDoodle: WallFeatureMap?` is the Doodle's self-grown rows (in the doodle frame), stored the
+  same way and restored behind the captured `doodle`. A new capture clears it, as it clears
+  `paintMarks` and `paintGrid`.
+- `arCoreCaptureImageUri` names which of `doodleImageUris` is the ARCore doodle's capture photo (the
+  grid's bare-wall colours, with `doodleIntrinsics`). Bound to `doodle`, and never pruned from the
+  list. Older projects without it use the last photo only if no standalone capture appended since.
+- An unreadable `project.json` is listed in the library as damaged (`GraffitiProject.isDamaged`,
+  never serialized): it can be deleted, never opened or written, and its files stay as they are.
+- `paintGrid` is `MobileGS::exportPaintGrid`: int32 cols, rows, k; cols·rows painted bytes; k×4 floats
+  (paint colour sum and count per group); then a tail, int32 `0x42524F43`, the design composite's
+  int32 width and height, int32 n, n confirmation counts, n promoted flags, int32 set count, and per
+  filter set int32 n and n counts. Saves without the tail load as before; the counts apply only to a
+  design with the same composite size and feature count.
 - `sphereSlamAnchorGeneration` + `sphereSlamAnchorFrameVersion` identify the canonical standalone
   wall frame; `sphereSlamModeAdjustment` stores standalone AR's adjustment separately from
   `modeAdjustments[AR]` (ARCore), and `sphereSlamPlacementAnchorGeneration` says which standalone

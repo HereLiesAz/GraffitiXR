@@ -339,6 +339,34 @@ class PoseFusionTest {
         assertEquals(10f, out[12], 1e-3f)
     }
 
+    /** Out of the pocket: a spread-gated relock that agrees with where the overlay is drawn snaps. */
+    @Test fun `after a loss an agreeing moderate relock snaps instead of easing in`() {
+        val f = PoseFusion()
+        f.currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(0.01f,0f,0f), inliers = 90f, matches = 100f, seq = 1f), captureAtOrigin(), confGlobal = 1f)
+        f.markRelocalizing()
+        // Ratio 0.6 (below the high-confidence bar), 60 inliers, a little off the standing correction.
+        val out = f.currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(0.02f,0f,0f), inliers = 60f, matches = 100f, seq = 2f), captureAtOrigin(), confGlobal = 0f)
+        assertEquals(0.02f, out[12], 1e-4f)
+    }
+
+    /** Out of the pocket: a weak relock that DISAGREES with the standing pose waits for agreement. */
+    @Test fun `after a loss a weak disagreeing relock needs agreeing fixes`() {
+        val f = PoseFusion()
+        f.currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(0.01f,0f,0f), inliers = 90f, matches = 100f, seq = 1f), captureAtOrigin(), confGlobal = 1f)
+        f.markRelocalizing()
+        val first = f.currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(5f,0f,0f), inliers = 60f, matches = 100f, seq = 2f), captureAtOrigin(), confGlobal = 0f)
+        assertEquals("a lone false twin moved the overlay", 0.01f, first[12], 1e-4f)
+        f.currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(5f,0f,0f), inliers = 60f, matches = 100f, seq = 3f), captureAtOrigin(), confGlobal = 0f)
+        val third = f.currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(5f,0f,0f), inliers = 60f, matches = 100f, seq = 4f), captureAtOrigin(), confGlobal = 0f)
+        assertEquals("three agreeing fixes should land", 5f, third[12], 1e-4f)
+    }
+
     @Test fun `moderate-confidence first snap partially corrects`() {
         val f = PoseFusion()
         // ratio 0.6: above MIN_INLIER_RATIO but below COLD_SNAP_INLIER_RATIO -> smooth, not snap.

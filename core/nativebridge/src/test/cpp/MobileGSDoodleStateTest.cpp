@@ -205,3 +205,121 @@ TEST(MobileGSDoodleState, PeerDoodleWithMismatchedPointAndDescriptorCountsIsReje
     EXPECT_EQ(4, guest.getWallKeypointCount()) << "a mismatched peer doodle replaced the local one";
     EXPECT_TRUE(MobileGSTestPeer::hasView(guest));
 }
+
+// The Doodle's grown rows survive a save and reload: exported apart from the captured ones, appended
+// behind a freshly restored Doodle, and kept through a partition re-push of the same base.
+TEST(MobileGSDoodleState, GrownRowsRoundTripBehindTheCapturedDoodle) {
+    MobileGS g;
+    seedMetric(g);
+    EXPECT_TRUE(g.exportGrownWall().empty()) << "nothing has grown yet";
+    cv::Mat grownDescs(3, 32, CV_8U, cv::Scalar(9));
+    const std::vector<cv::Point3f> grownPts = {{0.2f,0,0}, {0,0.2f,0}, {0.2f,0.2f,0}};
+    g.restoreGrownWall(grownDescs, grownPts);
+    EXPECT_EQ(7, g.getWallKeypointCount());
+    // Not twice: a set that already carries grown rows keeps them.
+    g.restoreGrownWall(grownDescs, grownPts);
+    EXPECT_EQ(7, g.getWallKeypointCount());
+
+    const std::vector<uint8_t> blob = g.exportGrownWall();
+    ASSERT_GE(blob.size(), 12u);
+    int32_t hdr[3]; std::memcpy(hdr, blob.data(), sizeof hdr);
+    EXPECT_EQ(3, hdr[0]); EXPECT_EQ(32, hdr[1]); EXPECT_EQ(CV_8U, hdr[2]);
+    float first[3]; std::memcpy(first, blob.data() + sizeof hdr, sizeof first);
+    EXPECT_FLOAT_EQ(0.2f, first[0]);
+    EXPECT_EQ(9, blob.back()) << "descriptors are the grown rows', not the captured ones'";
+
+    // A repartition re-push of the identical base keeps the grown tail.
+    cv::Mat base(4, 32, CV_8U, cv::Scalar(7));
+    std::vector<cv::Point3f> basePts = {{0,0,0}, {0.1f,0,0}, {0,0.1f,0}, {0.1f,0.1f,0}};
+    g.restoreWallDoodleMetric(base, basePts, kAnchor, kIntr, kView);
+    EXPECT_EQ(7, g.getWallKeypointCount());
+    EXPECT_FALSE(g.exportGrownWall().empty());
+
+    // A different Doodle replaces everything, grown rows included.
+    cv::Mat other(4, 32, CV_8U, cv::Scalar(1));
+    g.restoreWallDoodleMetric(other, {{1,0,0}, {1.1f,0,0}, {1,0.1f,0}, {1.1f,0.1f,0}}, kAnchor, kIntr, kView);
+    EXPECT_EQ(4, g.getWallKeypointCount());
+    EXPECT_TRUE(g.exportGrownWall().empty());
+}
+
+// At the grown-row cap growth goes on: the grown rows the locks have gone longest without seeing make
+// room. The captured Doodle is never evicted.
+TEST(MobileGSDoodleState, EvictionDropsTheLeastSeenGrownRowsOnly) {
+    MobileGS g;
+    seedMetric(g);
+    cv::Mat grownDescs(3, 32, CV_8U, cv::Scalar(9));
+    g.restoreGrownWall(grownDescs, {{0.2f,0,0}, {0.3f,0,0}, {0.4f,0,0}});
+    ASSERT_EQ(7, g.getWallKeypointCount());
+    MobileGSTestPeer::setWallLastSeen(g, {0, 0, 0, 0, 5, 1, 3});   // base rows unseen, on purpose
+    MobileGSTestPeer::evictGrown(g, 1);
+    const auto pts = MobileGSTestPeer::wallPoints(g);
+    ASSERT_EQ(6u, pts.size());
+    EXPECT_FLOAT_EQ(0.0f, pts[0].x);   // the captured four are all still there
+    EXPECT_FLOAT_EQ(0.2f, pts[4].x);
+    EXPECT_FLOAT_EQ(0.4f, pts[5].x);   // 0.3 (seen longest ago) went
+}
+
+// The Doodle build installs in stages, each the previous plus more rows: rows self-grow added in
+// between, and the partition pushed for the shared rows, survive the next stage.
+TEST(MobileGSDoodleState, AStagedBuildKeepsGrownRowsAndThePartition) {
+    MobileGS g;
+    cv::Mat base(4, 32, CV_8U, cv::Scalar(7));
+    std::vector<cv::Point3f> basePts = {{0,0,1}, {0.1f,0,1}, {0,0.1f,1}, {0.1f,0.1f,1}};
+    g.restoreWallDoodleMetric(base, basePts, kAnchor, kIntr, kView, {2, 2, 0, 1});
+    cv::Mat grownDescs(2, 32, CV_8U, cv::Scalar(9));
+    g.restoreGrownWall(grownDescs, {{0.2f,0,1}, {0.3f,0,1}});
+    ASSERT_EQ(6, g.getWallKeypointCount());
+    // Next stage: the same four rows plus two close-up rows, no partition yet.
+    cv::Mat staged(6, 32, CV_8U, cv::Scalar(7));
+    std::vector<cv::Point3f> stagedPts = basePts;
+    stagedPts.push_back({0.05f,0.05f,1}); stagedPts.push_back({0.06f,0.05f,1});
+    g.restoreWallDoodleMetric(staged, stagedPts, kAnchor, kIntr, kView);
+    EXPECT_EQ(8, g.getWallKeypointCount()) << "the grown rows went with the staged re-push";
+    const auto pts = MobileGSTestPeer::wallPoints(g);
+    EXPECT_FLOAT_EQ(0.2f, pts[6].x);
+    EXPECT_FLOAT_EQ(0.3f, pts[7].x);
+    const std::vector<uint8_t> grownBlob = g.exportGrownWall();
+    ASSERT_GE(grownBlob.size(), 12u);
+    int32_t rows; std::memcpy(&rows, grownBlob.data(), sizeof rows);
+    EXPECT_EQ(2, rows) << "the close-up rows are captured, not grown";
+}
+
+// A re-capture mid-mural: with a fresh lock of the old Doodle, the paint marks move into the new
+// capture's frame through it instead of being thrown away; without one they go.
+TEST(MobileGSDoodleState, ARecaptureCarriesPaintMarksThroughAFreshLock) {
+    MobileGS g;
+    seedMetric(g);
+    g.restorePaintMarks(cv::Mat(1, 32, CV_8U, cv::Scalar(3)), {{0, 0, 2}});
+    // camera_from_oldDoodle: the old Doodle's origin sits 0.1 m to the camera's right.
+    const float camFromFp[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0.1f,0,0,1};
+    MobileGSTestPeer::setFreshLock(g, camFromFp, kIdentity);
+    g.carryDoodleFrameState(kIdentity);   // the new capture is taken from the solve frame's pose
+    ASSERT_EQ(1, g.getPaintMarkCount());
+    const std::vector<uint8_t> blob = g.exportPaintMarks();
+    float xyz[3]; std::memcpy(xyz, blob.data() + 12, sizeof xyz);
+    EXPECT_NEAR(0.1f, xyz[0], 1e-5f);
+    EXPECT_NEAR(2.0f, xyz[2], 1e-5f);
+
+    MobileGS h;   // no lock at all: nothing relates the frames
+    seedMetric(h);
+    h.restorePaintMarks(cv::Mat(1, 32, CV_8U, cv::Scalar(3)), {{0, 0, 2}});
+    h.carryDoodleFrameState(kIdentity);
+    EXPECT_EQ(0, h.getPaintMarkCount());
+}
+
+// F4: a capture view from another tracking world (a reopened project) is stale until a lock
+// re-derives it; a re-push of the same doodle keeps the mark, a new doodle clears it.
+TEST(MobileGSDoodleState, AReloadedCaptureViewIsStaleUntilRelocked) {
+    MobileGS g;
+    seedMetric(g);
+    EXPECT_FALSE(g.doodleViewStale());
+    g.markDoodleViewStale();
+    EXPECT_TRUE(g.doodleViewStale());
+    cv::Mat descs(4, 32, CV_8U, cv::Scalar(7));
+    const std::vector<cv::Point3f> pts = {{0,0,0}, {0.1f,0,0}, {0,0.1f,0}, {0.1f,0.1f,0}};
+    g.restoreWallDoodleMetric(descs, pts, kAnchor, kIntr, kView);   // the same doodle (a repartition)
+    EXPECT_TRUE(g.doodleViewStale());
+    cv::Mat other(4, 32, CV_8U, cv::Scalar(11));
+    g.restoreWallDoodleMetric(other, {{0,0,1}, {0.2f,0,1}, {0,0.2f,1}, {0.2f,0.2f,1}}, kAnchor, kIntr, kView);
+    EXPECT_FALSE(g.doodleViewStale());
+}

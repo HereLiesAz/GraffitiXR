@@ -339,6 +339,42 @@ class ProjectManagerTest {
         assertEquals(30, doodleFiles())
     }
 
+    @Test
+    fun `a Link snapshot carries no location`() {
+        val gps = com.hereliesaz.graffitixr.common.model.GpsData(29.95, -90.07, 2.0, 5f, 1L)
+        val project = com.hereliesaz.graffitixr.common.model.GraffitiProject(
+            id = "located",
+            gpsData = gps,
+            captureEnvironment = com.hereliesaz.graffitixr.common.model.CaptureEnvironment(
+                location = com.hereliesaz.graffitixr.common.model.LocationFix(29.95, -90.07),
+            ),
+            calibrationSnapshots = listOf(
+                com.hereliesaz.graffitixr.common.model.CalibrationSnapshot(gps, null, null, 1L),
+            ),
+        )
+        val shared = manager.withoutLocation(project)
+        assertEquals(null, shared.gpsData)
+        assertEquals(null, shared.captureEnvironment?.location)
+        assertEquals(null, shared.calibrationSnapshots.single().gpsData)
+        assertEquals("located", shared.id)
+    }
+
+    @Test
+    fun `appendDoodleImage never prunes the ARCore capture photo`() = runTest {
+        val projectRepositoryProvider = mockk<javax.inject.Provider<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>>(relaxed = true)
+        val pruningManager = ProjectManager(mockContext, uriProvider, projectRepositoryProvider)
+        val bitmap = mockk<Bitmap>(relaxed = true) {
+            every { compress(any(), any(), any()) } returns true
+        }
+        var uris = pruningManager.appendDoodleImage(mockContext, "keep_capture", emptyList(), bitmap)
+        val capture = uris.single()
+        repeat(40) {
+            uris = pruningManager.appendDoodleImage(mockContext, "keep_capture", uris, bitmap, keep = capture)
+        }
+        assertEquals(30, uris.size)
+        assertEquals(capture, uris.first())
+    }
+
 
     // --- Standalone SphereSLAM reference persistence ---
 

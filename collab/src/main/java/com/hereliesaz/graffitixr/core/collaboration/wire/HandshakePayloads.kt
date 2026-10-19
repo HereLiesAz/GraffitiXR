@@ -88,12 +88,20 @@ internal data class HelloRejectedPayload(val reason: RejectReason) {
 @Serializable
 internal data class BulkBeginPayload(
     val projectId: String,
+    /**
+     * Left from when a project had several layers; a project has one design. Nothing reads it, but
+     * protocol-7 peers require the field, so it is sent as [ONE_DESIGN] until the next protocol bump.
+     */
     val layerCount: Int,
     @SerialName("fingerprintBytes")
     val doodleBytes: Int,
     val projectBytes: Int,
     val spatialFrame: CoopSpatialFrame,
-)
+) {
+    companion object {
+        const val ONE_DESIGN = 1
+    }
+}
 
 @Serializable
 internal data class DeltaPayload(val seq: Long, val op: Op)

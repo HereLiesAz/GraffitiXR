@@ -19,7 +19,7 @@ class VideoStreamTest {
 
     private fun host() = HostSession(
         token = "tok", protocolVersion = ProtocolVersion.CURRENT, localDeviceName = "tripod", projectId = "p",
-        snapshotProvider = { ProjectSnapshot(ByteArray(8), ByteArray(8), 0, testSpatialFrame()) },
+        snapshotProvider = { ProjectSnapshot(ByteArray(8), ByteArray(8), testSpatialFrame()) },
     )
 
     private fun guest(port: Int) = GuestSession(

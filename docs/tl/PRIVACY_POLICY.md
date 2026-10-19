@@ -1,6 +1,6 @@
 # Patakaran sa Privacy para sa GraffitiXR
 
-**Huling Na-update:** 2026-09-04
+**Huling Na-update:** 2026-10-19
 
 Binuo ng HereLiesAZ ang GraffitiXR app bilang source-available na app (tingnan ang LICENSE at docs/LICENSING.md ng repository para sa mga tuntunin). Ang SERBISYONG ito ay ibinibigay ng HereLiesAZ nang walang bayad at nilayon para sa paggamit kung ano man.
 
@@ -14,7 +14,7 @@ Para sa isang mas mahusay na karanasan, habang ginagamit ang aming Serbisyo, maa
 
 * **Data ng Camera:** Nangangailangan ang app ng access sa camera ng iyong device upang ipakita ang view ng Augmented Reality (AR), Overlay mode, at para kumuha ng mga larawan para sa mga target ng proyekto. Lokal na pinoproseso ang data ng camera sa iyong device at hindi ipinapadala sa aming mga server maliban kung tahasan mong pipiliin na magbahagi ng project file.
 * **Storage / Mga Larawan:** Walang hinihinging pahintulot sa storage ang app. Ang mga larawang idinadagdag mo ay dumarating sa pamamagitan ng photo picker o file picker ng Android system, na nagbibigay sa app ng access lamang sa file na pinili mo. Ang mga proyekto ay sine-save sa pribadong storage ng app, at ang mga na-export na larawan ay sine-save sa photo gallery ng iyong device.
-* **Data ng Lokasyon (Opsyonal):** Humihingi lamang ang app ng pahintulot sa lokasyon kapag sinimulan mong kumuha ng AR target. Kung ibibigay mo ito, itinatala ng capture record ng target na iyon kung saan ito kinuha (latitude, longitude, altitude at katumpakan). Lokal itong sine-save sa project file at aalis lamang sa iyong device kung ikaw mismo ang magbabahagi o mag-e-export ng project file na iyon.
+* **Data ng Lokasyon (Opsyonal):** Humihingi lamang ang app ng pahintulot sa lokasyon kapag sinimulan mong kumuha ng AR target. Kung ibibigay mo ito, itinatala ng capture record ng target na iyon kung saan ito kinuha (latitude, longitude, altitude at katumpakan). Lokal itong sine-save sa project file at aalis lamang sa iyong device kung ikaw mismo ang magbabahagi o mag-e-export ng project file na iyon. Hindi ito kailanman ipinapadala ng Link (pagbabahagi ng session sa pangalawang device): natatanggap ng kabilang device ang proyekto nang walang anumang lokasyon.
 
 ## Mga Ulat ng Pag-crash (Opt-In)
 
@@ -40,7 +40,9 @@ Maaari kaming gumamit ng mga third-party na kumpanya at indibidwal dahil sa mga 
 * Upang magsagawa ng mga serbisyong nauugnay sa Serbisyo;o
 * Upang tulungan kami sa pagsusuri kung paano ginagamit ang aming Serbisyo.
 
-Ginagamit namin ang **Google ML Kit** para sa pagse-segment ng paksa (pag-alis ng background). Nangyayari ang pagproseso na ito nang lokal sa iyong device.
+Ang pag-isolate ng paksa (pag-alis ng background) ay gumagamit ng **U²-Net**, isang modelong kasama na sa app, nang buo sa iyong device. Walang dina-download para dito at walang larawang lumalabas sa device.
+
+Sa mga device na sumusuporta rito, tumatakbo ang AR mode sa **Google Play Services for AR (ARCore)**, na ibinibigay ng Google LLC at saklaw ng [Patakaran sa Privacy ng Google](https://policies.google.com/privacy). Pinoproseso ng ARCore ang mga frame ng camera at ang data ng mga motion sensor para subaybayan ang device; tingnan ang [mga kinakailangan sa privacy ng ARCore](https://developers.google.com/ar/develop/privacy-requirements) ng Google para sa kinokolekta nito. Sa mga device na walang ARCore, sariling tracking ng app ang ginagamit at hindi kailanman kasali ang ARCore.
 
 ## Mga Update
 

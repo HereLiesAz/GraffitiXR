@@ -500,6 +500,15 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateAnchorTransf
     }
 }
 
+// Whether the reloc worker would take a frame now (it is idle and there is a Doodle). Lets the
+// caller skip acquiring and assembling a camera image the worker would only drop, so it can offer
+// every frame and let the worker's own pace (hunting / locked back-off) set the rate.
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRelocWantsFrame(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    return (gSlamEngine && gSlamEngine->relocWantsFrame()) ? JNI_TRUE : JNI_FALSE;
+}
+
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
         JNIEnv* env, jobject thiz, jobject yBuffer, jobject uBuffer, jobject vBuffer,
@@ -980,6 +989,102 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportPaintMarks(J
     if (!out) return nullptr;
     env->SetByteArrayRegion(out, 0, (jsize)blob.size(), reinterpret_cast<const jbyte*>(blob.data()));
     return out;
+}
+
+// The loaded doodle's capture view is from another tracking world (MobileGS::mDoodleViewStale).
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeMarkDoodleViewStale(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (gSlamEngine) gSlamEngine->markDoodleViewStale();
+}
+
+// MobileGS::enhanceIfDark into [out] (an ARGB_8888 bitmap of the same size); false when not enhanced.
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeEnhanceIfDark(JNIEnv* env, jobject thiz, jobject bitmap, jobject out) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return JNI_FALSE;
+    cv::Mat image; bitmapToMat(env, bitmap, image);
+    if (image.empty()) return JNI_FALSE;
+    cv::Mat enhanced;
+    try {
+        if (!gSlamEngine->enhanceIfDark(image, enhanced)) return JNI_FALSE;
+    } catch (const std::exception& e) {
+        LOGE("nativeEnhanceIfDark: exception: %s", e.what());
+        return JNI_FALSE;
+    }
+    if (enhanced.cols != image.cols || enhanced.rows != image.rows) return JNI_FALSE;
+    matToBitmap(env, enhanced, out);
+    return JNI_TRUE;
+}
+
+// Paint inliers of the current (fresh) lock; 0 without one.
+JNIEXPORT jint JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocPaintInliers(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    return gSlamEngine ? (jint)gSlamEngine->relocPaintInliers() : 0;
+}
+
+// Which Doodle native holds: advances whenever it is replaced or cleared (see invalidateRelocResultLocked).
+JNIEXPORT jlong JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetDoodleGeneration(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    return gSlamEngine ? (jlong)gSlamEngine->doodleGeneration() : 0;
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeCarryDoodleFrameState(
+        JNIEnv* env, jobject thiz, jfloatArray viewArray) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return;
+    if (viewArray && env->GetArrayLength(viewArray) >= 16) {
+        jfloat* v = env->GetFloatArrayElements(viewArray, nullptr);
+        gSlamEngine->carryDoodleFrameState(v);
+        env->ReleaseFloatArrayElements(viewArray, v, JNI_ABORT);
+    } else {
+        gSlamEngine->carryDoodleFrameState(nullptr);
+    }
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportGrownWall(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return nullptr;
+    std::vector<uint8_t> blob = gSlamEngine->exportGrownWall();
+    if (blob.empty()) return nullptr;
+    jbyteArray out = env->NewByteArray((jsize)blob.size());
+    if (!out) return nullptr;
+    env->SetByteArrayRegion(out, 0, (jsize)blob.size(), reinterpret_cast<const jbyte*>(blob.data()));
+    return out;
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreGrownWall(
+        JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type,
+        jfloatArray ptsArray) {
+    // Same validation as nativeRestorePaintMarks.
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine || !descArray || !ptsArray) return;
+    if (rows < 0 || cols < 0) return;
+    int depth = CV_MAT_DEPTH(type);
+    int channels = CV_MAT_CN(type);
+    if (depth < 0 || depth > CV_64F || channels < 1 || channels > 4) return;
+    if ((jlong)rows * (jlong)cols * (jlong)CV_ELEM_SIZE(type) > (jlong)env->GetArrayLength(descArray)) return;
+    if ((jlong)env->GetArrayLength(ptsArray) != (jlong)rows * 3LL) return;
+    jbyte* descData = env->GetByteArrayElements(descArray, nullptr);
+    jfloat* ptsData = env->GetFloatArrayElements(ptsArray, nullptr);
+    try {
+        cv::Mat descriptors(rows, cols, type, descData);
+        std::vector<cv::Point3f> pts;
+        pts.reserve((size_t)rows);
+        for (int i = 0; i < rows; ++i) pts.emplace_back(ptsData[3*i], ptsData[3*i+1], ptsData[3*i+2]);
+        gSlamEngine->restoreGrownWall(descriptors, pts); // copies the rows
+    } catch (const std::exception& e) {
+        LOGE("nativeRestoreGrownWall: exception: %s", e.what());
+    } catch (...) {
+        LOGE("nativeRestoreGrownWall: unknown exception");
+    }
+    env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
+    env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
 }
 
 JNIEXPORT void JNICALL

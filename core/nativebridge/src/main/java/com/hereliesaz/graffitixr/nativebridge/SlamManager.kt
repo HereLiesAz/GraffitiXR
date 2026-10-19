@@ -202,6 +202,21 @@ class SlamManager @Inject constructor(
         _anchorGeneration.value = _anchorGeneration.value + 1
     }
 
+    /** The loaded doodle's capture view is from another tracking world (see MobileGS::mDoodleViewStale). */
+    fun markDoodleViewStale() = nativeMarkDoodleViewStale()
+
+    /** The session epoch the loaded doodle was captured in; -1 for one loaded from a project. */
+    @Volatile private var doodleViewEpoch = -1
+
+    /**
+     * A doodle loaded from a project carries a capture view from the tracking world it was captured
+     * in. Unless that is this session (the capture just made, reloaded), rectification waits for a
+     * lock to re-derive the view in this world.
+     */
+    fun markDoodleViewStaleUnlessCapturedThisSession() {
+        if (doodleViewEpoch != sessionEpoch) nativeMarkDoodleViewStale()
+    }
+
     /**
      * Centroid of the matched doodle marks, expressed in the DOODLE ANCHOR's local frame
      * (the anchor PoseFusion converges the live render anchor toward), or null to fall back to the
@@ -276,6 +291,7 @@ class SlamManager @Inject constructor(
      */
     fun completeDoodleReplacement(newCaptureAnchorCam: FloatArray?) {
         captureAnchorCam = newCaptureAnchorCam
+        doodleViewEpoch = sessionEpoch
         awaitingNewDoodle = false
     }
 
@@ -478,8 +494,22 @@ class SlamManager @Inject constructor(
      * as they get painted over. Returned as a [WallFeatureMap] (points + descriptors only) for
      * project persistence, or null when empty. Blob: [rows, cols, type][rows*3 floats][descriptors].
      */
-    fun getPaintMarks(): WallFeatureMap? {
-        val blob = nativeExportPaintMarks() ?: return null
+    fun getPaintMarks(): WallFeatureMap? = nativeExportPaintMarks()?.let(::parseMarkBlob)
+
+    /**
+     * The Doodle's grown rows: everything self-grow added after the captured ones. Saved with the
+     * project so the Doodle keeps what it learned (README: it self-extends so snap-back survives the
+     * original marks being painted over). Null when nothing has grown.
+     */
+    fun getGrownWall(): WallFeatureMap? = nativeExportGrownWall()?.let(::parseMarkBlob)
+
+    /** Append saved [getGrownWall] rows behind the captured Doodle. Must follow the Doodle restore. */
+    fun restoreGrownWall(map: WallFeatureMap) = nativeRestoreGrownWall(
+        map.descriptorsData, map.descriptorsRows, map.descriptorsCols, map.descriptorsType, map.points3d,
+    )
+
+    /** The exportPaintMarks / exportGrownWall blob: int rows, cols, type; rows*3 floats; descriptors. */
+    private fun parseMarkBlob(blob: ByteArray): WallFeatureMap? {
         if (blob.size < 12) return null
         val bb = ByteBuffer.wrap(blob).order(ByteOrder.nativeOrder())
         val rows = bb.int; val cols = bb.int; val type = bb.int
@@ -498,13 +528,20 @@ class SlamManager @Inject constructor(
         }
     }
 
-    /** Restore a persisted [getPaintMarks] set. Must follow the doodle restore it belongs to. */
     fun restorePaintMarks(map: WallFeatureMap) = nativeRestorePaintMarks(
         map.descriptorsData, map.descriptorsRows, map.descriptorsCols, map.descriptorsType, map.points3d,
     )
 
-    /** Drop the paint set — required whenever the doodle FRAME changes (a new capture). */
+    /** Drop the paint set and wipe area progress: a different wall or project, not a re-capture. */
     fun clearPaintMarks() = nativeClearPaintMarks()
+
+    /**
+     * Before a NEW capture's Doodle is installed: paint marks and the map are carried into its frame
+     * through a fresh lock of the old Doodle, or dropped without one. Area progress (design-relative)
+     * is kept either way. [captureView]: the view restoreWallDoodleMetric gets, or null.
+     */
+    fun carryDoodleFrameState(captureView: FloatArray?) =
+        nativeCarryDoodleFrameState(captureView?.takeIf { it.size >= 16 })
 
     fun getPaintMarkCount(): Int = nativeGetPaintMarkCount()
 
@@ -598,9 +635,12 @@ class SlamManager @Inject constructor(
     fun getMapPointCount(): Int = nativeGetMapPointCount()
     /** Monotonic content revision; changes for point, descriptor, confidence, or observation updates. */
     fun getWallFeatureMapRevision(): Long = nativeGetWallFeatureMapRevision()
-    /** Phase 2b: enable live map-matching in reloc. Default OFF — experimental until device-validated. */
+    /**
+     * Phase 2b: enable live map-matching in reloc. The engine starts OFF; the app turns it on from the
+     * saved setting (default ON) as soon as it starts.
+     */
     fun setMapRelocEnabled(enabled: Boolean) = nativeSetMapRelocEnabled(enabled)
-    /** Phase 3: passively grow the feature map from reloc-locked frames. Default OFF; independent of matching. */
+    /** Phase 3: passively grow the feature map from reloc-locked frames. Engine OFF, app setting ON; independent of matching. */
     fun setMapBuildEnabled(enabled: Boolean) = nativeSetMapBuildEnabled(enabled)
 
     /**
@@ -696,7 +736,7 @@ class SlamManager @Inject constructor(
     fun setViewportSize(width: Int, height: Int) = nativeSetViewportSize(width, height)
 
     fun setRelocEnabled(enabled: Boolean) = nativeSetRelocEnabled(enabled)
-    /** Teleological self-grow (default OFF): promote validated new marks into the live doodle. */
+    /** Teleological self-grow: promote validated new marks into the live doodle. Engine OFF until the app applies its setting (default ON). */
     fun setSelfGrowEnabled(enabled: Boolean) = nativeSetSelfGrowEnabled(enabled)
 
     /**
@@ -815,6 +855,25 @@ class SlamManager @Inject constructor(
     ) {
         nativeUpdateCamera(viewMatrix, projectionMatrix, timestampNs)
     }
+
+    /** Which Doodle native holds: changes whenever it is replaced or cleared. */
+    fun getDoodleGeneration(): Long = nativeGetDoodleGeneration()
+
+    /**
+     * [bitmap] as native's detectors would see it in low light: enhanced (Zero-DCE, when bundled and
+     * the light level is low), else [bitmap] itself. For the ORB builds that detect in Kotlin.
+     */
+    fun enhanceIfDark(bitmap: android.graphics.Bitmap): android.graphics.Bitmap {
+        if (bitmap.config != android.graphics.Bitmap.Config.ARGB_8888) return bitmap
+        val out = android.graphics.Bitmap.createBitmap(bitmap.width, bitmap.height, android.graphics.Bitmap.Config.ARGB_8888)
+        return if (nativeEnhanceIfDark(bitmap, out)) out else { out.recycle(); bitmap }
+    }
+
+    /** Inliers of the current reloc lock that stood on paint; 0 without a fresh lock. */
+    fun getRelocPaintInliers(): Int = nativeGetRelocPaintInliers()
+
+    /** Whether the reloc worker would take a frame now: idle, with a Doodle to match. Cheap. */
+    fun relocWantsFrame(): Boolean = nativeRelocWantsFrame()
 
     fun feedYuvFrame(
         yBuffer: ByteBuffer,
@@ -1097,6 +1156,14 @@ class SlamManager @Inject constructor(
     private external fun nativeGetCleanWallStatus(): Int
     private external fun nativeSetChangePassEnabled(enabled: Boolean)
     private external fun nativeExportPaintGrid(): ByteArray?
+    private external fun nativeRelocWantsFrame(): Boolean
+    private external fun nativeGetDoodleGeneration(): Long
+    private external fun nativeGetRelocPaintInliers(): Int
+    private external fun nativeMarkDoodleViewStale()
+    private external fun nativeEnhanceIfDark(bitmap: android.graphics.Bitmap, out: android.graphics.Bitmap): Boolean
+    private external fun nativeExportGrownWall(): ByteArray?
+    private external fun nativeCarryDoodleFrameState(view: FloatArray?)
+    private external fun nativeRestoreGrownWall(desc: ByteArray, rows: Int, cols: Int, type: Int, points: FloatArray)
     private external fun nativeAutoFitDesign(minimumEvidence: Boolean): FloatArray?
     private external fun nativeGetLastAutoFitResult(): Int
     private external fun nativeRestorePaintGrid(state: ByteArray)

@@ -17,8 +17,8 @@ buildscript {
         // (com.google.android.gms.common.internal.ConnectionThrottlingConfig,
         // InternalClientFlagRegistry, InternalClientFlags) off the classpath entirely,
         // which R8 then reports as missing rather than merely unused. 18.11.0 also still
-        // satisfies play-services-location (needs 18.9.0) and the mlkit segmentation
-        // artifact (needs 18.1.0), the two other basement consumers on this classpath.
+        // satisfies play-services-location (needs 18.9.0), the other basement consumer on this
+        // classpath.
         "com.google.android.gms:play-services-basement:18.12.0",
         // Bouncy Castle: 1.79 (transitive, via the build + app classpaths) is vulnerable to
         // a covert timing channel (HIGH), LDAP injection, and a risky-crypto-algo issue in

@@ -22,6 +22,14 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
  *     a hybrid page ready the correction is held ([Source.HOLD]); with neither source the raw
  *     backbone is used ([Source.NONE]).
  *
+ * **Paint goes through.** The KPM page is a photo of the wall as it was, and every coat of paint takes
+ * it further from the wall as it is; reloc locks that stand on paint are the teleological
+ * correction, getting better as the page gets worse. So a paint-backed reloc lock ([relocPaintBacked])
+ * drives when hybrid is not holding well: silent past the window, or its last accepted observation
+ * below [HYBRID_DEGRADED_CONF]. Once paint has driven, it keeps the anchor the way hybrid does: held
+ * through frames without a paint-backed lock, until it too has been silent for the window, and a
+ * hybrid acceptance in between does not take it back. Still one source at a time.
+ *
  * **Reloc gate.** While a re-capture is replacing the wall doodle (`relocGated`) the reloc
  * result and `captureAnchorCam` describe the PREVIOUS wall. The reloc path is then unusable no matter
  * what else is true — [Source.RELOC] is never returned — so a later solve cannot cold-snap the new
@@ -37,11 +45,18 @@ class CorrectionSourceArbiter {
     enum class Source { HYBRID, HOLD, RELOC, NONE }
 
     private var lastHybridAcceptedNs = NEVER
+    private var lastHybridConfidence = 1f
+    private var lastPaintRelocNs = NEVER
 
     /** Forget the hybrid history — a new anchor (re-capture) starts from "reloc until hybrid accepts". */
     fun reset() {
         lastHybridAcceptedNs = NEVER
+        lastHybridConfidence = 1f
+        lastPaintRelocNs = NEVER
     }
+
+    private fun paintFresh(nowNs: Long): Boolean =
+        lastPaintRelocNs != NEVER && nowNs - lastPaintRelocNs in 0..HYBRID_FRESH_WINDOW_NS
 
     /** True while the last accepted hybrid observation is within [HYBRID_FRESH_WINDOW_NS] of [nowNs]. */
     fun hybridFresh(nowNs: Long): Boolean =
@@ -54,6 +69,8 @@ class CorrectionSourceArbiter {
      * @param hasRelocCapturePose `captureAnchorCam` exists (the reloc path can compose a correction)
      * @param relocGated the wall doodle is being replaced (a re-capture's anchor exists but its
      *   new doodle and `captureAnchorCam` are not both installed yet): reloc must not drive
+     * @param relocPaintBacked the current reloc lock is fresh and stands on paint
+     * @param hybridConfidence the confidence of this frame's accepted hybrid observation, `[0,1]`
      */
     fun select(
         nowNs: Long,
@@ -61,7 +78,25 @@ class CorrectionSourceArbiter {
         hybridFrameReady: Boolean,
         hasRelocCapturePose: Boolean,
         relocGated: Boolean = false,
+        relocPaintBacked: Boolean = false,
+        hybridConfidence: Float = 1f,
     ): Source {
+        if (hybridAccepted) lastHybridConfidence = hybridConfidence
+        val relocUsable = hasRelocCapturePose && !relocGated
+        if (!relocUsable) lastPaintRelocNs = NEVER
+        val hybridHolding = hybridFresh(nowNs) || hybridAccepted
+        if (
+            relocUsable && relocPaintBacked &&
+            (paintFresh(nowNs) || !hybridHolding || lastHybridConfidence < HYBRID_DEGRADED_CONF)
+        ) {
+            if (hybridAccepted) lastHybridAcceptedNs = nowNs
+            lastPaintRelocNs = nowNs
+            return Source.RELOC
+        }
+        if (paintFresh(nowNs)) {
+            if (hybridAccepted) lastHybridAcceptedNs = nowNs
+            return Source.HOLD
+        }
         if (hybridAccepted) {
             lastHybridAcceptedNs = nowNs
             return Source.HYBRID
@@ -85,5 +120,15 @@ class CorrectionSourceArbiter {
          * the same eval sweep as the other fusion constants.
          */
         const val HYBRID_FRESH_WINDOW_NS = 3_000_000_000L
+
+        /**
+         * Below this, an accepted hybrid observation no longer keeps a paint-backed lock out. Hybrid
+         * acceptance already passed its own gates; this is the band where the page has visibly
+         * drifted from the wall. Unmeasured, like the window.
+         */
+        const val HYBRID_DEGRADED_CONF = 0.5f
+
+        /** Paint inliers a reloc lock needs to count as paint-backed. Unmeasured. */
+        const val PAINT_BACKED_MIN_INLIERS = 8
     }
 }

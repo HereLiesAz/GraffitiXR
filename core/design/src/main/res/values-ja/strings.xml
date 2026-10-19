@@ -11,12 +11,12 @@
 
     <string name="nav_ar_mode">AR</string>
 
-    <string name="nav_ar_mode_info">拡張現実を使用してアートワークを実際の壁に投影します。まず壁をスキャンしてアンカーを配置し、次にデザインレイヤーを追加します。</string>
+    <string name="nav_ar_mode_info">拡張現実を使用してアートワークを実際の壁に投影します。まず壁をスキャンしてアンカーを配置し、次にデザインを追加します。</string>
 
 
     <string name="nav_overlay">オーバーレイ</string>
 
-    <string name="nav_overlay_info">ARアンカーを使用せずに、ライブカメラフィード上にデザインをレイヤーします。素早いフレーミングや配置の確認に最適です。</string>
+    <string name="nav_overlay_info">ARアンカーを使用せずに、ライブカメラフィード上にデザインを重ねて表示します。素早いフレーミングや配置の確認に最適です。</string>
 
 
     <string name="nav_mockup">モックアップ</string>
@@ -55,19 +55,17 @@
     <string name="nav_refine_info">既存のらくがきの位置を微調整します。</string>
 
 
-    <string name="nav_update">進捗</string>
 
-    <string name="nav_update_info">壁画の完了した部分をマークして、ペイントの進捗を追跡します。</string>
 
 
     <string name="nav_design">デザイン</string>
 
-    <string name="nav_design_info">デザインレイヤーを追加および管理します。各レイヤーはインポートされた画像またはフリーハンドの描画にすることができます。</string>
+    <string name="nav_design_info">作業スペースです。「開く」で追加し、下のツールで編集したデザインは、すべてのモードに引き継がれます。</string>
 
 
     <string name="nav_open">開く</string>
 
-    <string name="nav_open_info">ギャラリーから画像を新しいレイヤーとして追加します。</string>
+    <string name="nav_open_info">ギャラリーから画像をデザインとして追加します。</string>
 
 
     <string name="nav_wall">壁</string>
@@ -85,7 +83,7 @@
 
     <string name="nav_blend">ブレンド</string>
 
-    <string name="nav_invert_info">現在のレイヤーのネガを作成します。黒は白になり、色は反対色に反転します — ステンシルやオーバーレイの分析に便利です。</string>
+    <string name="nav_invert_info">デザインのネガを作成します。黒は白になり、色は反対色に反転します — ステンシルやオーバーレイの分析に便利です。</string>
 
 
     <string name="nav_outline">輪郭</string>
@@ -95,18 +93,18 @@
 
     <string name="nav_adjust">調整</string>
 
-    <string name="nav_adjust_info">このレイヤーの明るさ、コントラスト、彩度、カラーバランスを微調整します。</string>
+    <string name="nav_adjust_info">デザインの明るさ、コントラスト、彩度、カラーバランスを微調整します。</string>
     <string name="nav_edit">編集</string>
 
 
     <string name="nav_balance">カラー</string>
 
-    <string name="nav_balance_info">赤、緑、青のチャンネルスライダーを使用してレイヤーの色を調整します。</string>
+    <string name="nav_balance_info">赤、緑、青のチャンネルスライダーを使用してデザインの色を調整します。</string>
 
 
     <string name="nav_blending">ブレンド</string>
 
-    <string name="nav_blending_info">ブレンドモード（通常、乗算、スクリーン、オーバーレイなど）を切り替えて、このレイヤーが下のレイヤーとどのように合成されるかを制御します。</string>
+    <string name="nav_blending_info">ブレンドモード（通常、乗算、スクリーン、オーバーレイなど）を切り替えて、デザインが背後のものとどのように合成されるかを制御します。</string>
 
 
     <string name="nav_settings">設定</string>
@@ -136,7 +134,7 @@
 
     <string name="nav_export">エクスポート</string>
 
-    <string name="nav_export_info">すべての表示レイヤーを統合した画像をフォトギャラリーにエクスポートします。</string>
+    <string name="nav_export_info">デザインをフラットな画像としてフォトギャラリーにエクスポートします。</string>
 
 
     <string name="nav_help">ヘルプ</string>
@@ -220,7 +218,6 @@
 
     <string name="generating">生成中...</string>
 
-    <string name="stencil_hint">もう一度押すとレイヤーが追加されます。</string>
 
     <string name="rename_hint">名前の変更</string>
 
@@ -234,13 +231,9 @@
 
     <string name="duplicate">複製</string>
 
-    <string name="unlink_layer">レイヤーのリンク解除</string>
 
-    <string name="link_layer">レイヤーをリンク</string>
 
-    <string name="hide_layer">レイヤーを非表示</string>
 
-    <string name="show_layer">レイヤーを表示</string>
 
     <string name="flatten_all">すべてを統合</string>
 
@@ -360,15 +353,9 @@
     <string name="lib_new_project">新規</string>
     <string name="lib_import_project">インポート</string>
     <string name="lib_no_projects">プロジェクトはまだありません</string>
-    <string name="lib_no_projects_hint">上の「新規」をタップして、最初の壁画を開始します。
-
-エディターに移動し、以下を行うことができます:
-  ・  「デザイン」メニューからアートワークを追加
-  ・  ARモードに切り替えて実際の壁に投影
-  ・  オーバーレイを使用してライブカメラ上にデザインを浮かせます
-  ・  モックアップを使用して壁の写真でプレビュー
-  ・  ライトボックスを使用してデザインを紙にトレース</string>
+    <string name="lib_no_projects_hint">下の「新規」をタップして、最初の作品を開始します。\n\nエディターに移動し、以下を行うことができます:\n  ・  「デザイン」メニューからアートワークを追加\n  ・  ARモードに切り替えて実際の壁に投影\n  ・  オーバーレイを使用してライブカメラ上にデザインを浮かせます\n  ・  モックアップを使用して壁の写真でプレビュー\n  ・  ライトボックスを使用してデザインを紙にトレース</string>
     <string name="lib_project_thumbnail">プロジェクトのサムネイル</string>
+    <string name="lib_project_damaged">破損しています。開けません</string>
     <string name="lib_delete_project_desc">プロジェクト %1$s を削除</string>
 
 
@@ -441,8 +428,6 @@
     <string name="settings_copyright">GraffitiXR © 2025</string>
 
 
-    <string name="layers_title">レイヤー</string>
-    <string name="brush_size_title">ブラシのサイズ</string>
     <string name="save_project_hint">プロジェクト名</string>
 
 
@@ -460,7 +445,6 @@
     <string name="reset_button">リセット</string>
 
     <string name="poster_title">ポスターを生成</string>
-    <string name="poster_select_layers">含めるレイヤーを選択:</string>
     <string name="poster_physical_size">実際のサイズ (幅 mm):</string>
     <string name="poster_generate_pdf">PDFを生成</string>
 
@@ -485,7 +469,7 @@
 
     <string name="help_overlay">オーバーレイモード: 空間トラッキングなしでライブカメラ上にデザインを表示します。手順: 手動で拡大縮小および移動してフレームに合わせます。</string>
 
-    <string name="help_mockup">モックアップモード: 静止画でデザインをプレビューします。手順:「壁」を使用して背景画像を設定し、その上にレイヤーを配置します。</string>
+    <string name="help_mockup">モックアップモード: 静止画でデザインをプレビューします。手順:「壁」を使用して背景画像を設定し、その上にデザインを配置します。</string>
 
     <string name="help_trace">ライトボックスモード: 高輝度のトレース面。手順: 画面の上に紙を置き、トレースします。音量を上・下・上・下、素早く押すと終了します。</string>
 
@@ -494,27 +478,28 @@
     <string name="help_create">アンカーの作成: 壁のマークを撮影して投影を固定します。手順: はっきりしたテクスチャを指してタップします。アプリはこのマークを追跡します。</string>
 
 
-    <string name="help_add_img">画像のインポート: スケッチや参考写真を追加します。手順: ギャラリーから画像を選択します。新しいデザインレイヤーとして表示されます。</string>
+    <string name="help_add_img">画像のインポート: スケッチや参考写真を追加します。手順: ギャラリーから画像を選択します。それがデザインになります。</string>
 
 
 
     <string name="help_wall">壁の変更: モックアップモードの背景を設定します。手順: ペイントする予定の物理的な壁の写真を選択します。</string>
 
-    <string name="help_project_host">プロジェクト管理: 作業の保存、読み込み、エクスポート。手順: タップして壁画の管理タスクにアクセスします。</string>
+    <string name="help_project_host">プロジェクト管理: 作業の保存、読み込み、エクスポート。手順: タップしてプロジェクトの管理タスクにアクセスします。</string>
 
-    <string name="help_new">新規プロジェクト: 新しい壁画を開始します。手順: タップしてリセットします。警告: これにより現在のすべての作業がクリアされます。最初に保存してください！</string>
+    <string name="help_new">新規プロジェクト: 新しい作品を開始します。手順: タップしてリセットします。警告: これにより現在のすべての作業がクリアされます。最初に保存してください！</string>
 
-    <string name="help_save">プロジェクトの保存: 壁画とARマップを保存します。手順: プロジェクト名を入力し、「保存」をタップして進捗を保持します。</string>
+    <string name="help_save">プロジェクトの保存: 作品とARマップを保存します。手順: プロジェクト名を入力し、「保存」をタップして進捗を保持します。</string>
 
-    <string name="help_load">プロジェクトライブラリ: 保存された壁画にアクセスします。手順: ライブラリを参照して作業を再開するか、共有プロジェクトファイルをインポートします。</string>
+    <string name="help_load">プロジェクトライブラリ: 保存されたプロジェクトにアクセスします。手順: ライブラリを参照して作業を再開するか、共有プロジェクトファイルをインポートします。</string>
 
-    <string name="help_export">画像のエクスポート: 高解像度のスナップショットを保存します。手順: 表示されているすべてのレイヤーをフォトギャラリーの1つのPNGにレンダリングします。</string>
+    <string name="help_export">画像のエクスポート: 高解像度のスナップショットを保存します。手順: デザインをフォトギャラリーの1つのPNGにレンダリングします。</string>
 
     <string name="help_settings">アプリの設定: 環境設定を構成します。手順: 開いて利き手、単位、およびスキャンパラメータを調整します。</string>
 
     <string name="help_light">フラッシュライト: デバイスのLEDを切り替えます。手順: これを使用して暗い壁を照らし、ARトラッキングを改善します。</string>
 
     <string name="help_lock_trace">フリーズ: トレーシングペーパーでデザインがずれないよう、タッチスクリーン全体をロックします — ロックと異なり、スクロールやタップもブロックします。解除するには、音量を上・下・上・下と素早く押してください。</string>
+    <string name="help_lock_ar">フリーズ：塗装中にタッチスクリーン全体をロックし、手や袖やポケットでデザインが動いたりモードが切り替わったりしないようにします。画面が覆われると（ポケットの中、伏せたとき）自動でもロックされます。解除するには、音量の上・下・上・下をすばやく押します。</string>
 
 
 
@@ -560,7 +545,6 @@
 
     <string name="settings_scan_mode_voxel_hash">ボクセルハッシュ</string>
     <string name="settings_scan_mode_surface_mesh">サーフェスメッシュ</string>
-    <string name="settings_mural_method_label">ミューラルエンジン</string>
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
@@ -607,7 +591,7 @@
     <string name="settings_reset_tutorials_value">初回ガイドを再表示する</string>
     <string-array name="onboarding_trace">
         <item>これはライトボックスモードです。</item>
-        <item>「開く」をタップして最初のレイヤーを追加します。追加したら、キャンバス上でピンチとドラッグを行い、サイズと位置を調整できます。</item>
+        <item>「開く」をタップしてデザインを追加します。追加したら、キャンバス上でピンチとドラッグを行い、サイズと位置を調整できます。</item>
         <item>希望の位置とサイズになったら、凍結ボタンを押すと、スマートフォンが紙にトレースするためのライトボックスになります。</item>
         <item>編集にはライトボックスモードまたはモックアップモードの使用をお勧めします。</item>
         <item>こうしておけば画像の準備が整い、ARボタンを押したときにスマートフォンは拡張現実に集中できます。</item>
@@ -616,12 +600,12 @@
         <item>AR投影 — スマートフォンの深度センサーと空間トラッキングを使って、デザインを実際の壁に投影します。</item>
         <item>壁に向けて、ゆっくり左右に動かしてください。エンジンが表面をマッピングするにつれて、色の付いた図形が表示されます。壁のエリア全体がカバーされるまで待ちます。</item>
         <item>画面をタップするだけです。アプリが壁を撮影し、トラッキング用の特徴を抽出して、即座にアンカーを固定します。</item>
-        <item>「開く」をタップしてデザインレイヤーを追加します — 今設定したアンカーを使って壁に投影されます。</item>
+        <item>「開く」をタップしてデザインを追加します — 今設定したアンカーを使って壁に投影されます。</item>
         <item>ヒント — 何もない白い壁、滑らかなコンクリート、単色の面は追跡できません。落書き、粗い漆喰、その他の明確な模様にアンカーポイントを合わせてください。</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>ライブオーバーレイ — 表面をスキャンする必要なく、ライブカメラ映像の上にデザインが浮かびます。</item>
-        <item>「開く」をタップしてレイヤーを追加します — 写真を選ぶと、ライブカメラ映像の上に浮かんでここに表示されます。</item>
+        <item>「開く」をタップしてデザインを追加します — 写真を選ぶと、ライブカメラ映像の上に浮かんでここに表示されます。</item>
         <item>ピンチで拡大縮小、ドラッグで移動します。オーバーレイは画面に固定されたままです — 後ろに下がって、壁にどう収まるか確認しましょう。</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
@@ -630,18 +614,15 @@
         <item>ライトボックス、モックアップ、オーバーレイはいつもどおり使えます。タップして閉じます。</item>
     </string-array>
     <string-array name="onboarding_mockup">
-        <item>写真モックアップ — 筆を取る前に、写真の上でデザインをプレビューできます。</item>
+        <item>写真モックアップ — スプレー缶を手に取る前に、写真の上でデザインをプレビューできます。</item>
         <item>「壁」をタップして、表面の写真を選択または撮影します。最初にこれを行ってください!</item>
-        <item>「開く」をタップして、壁の写真の上にレイヤーを追加します。ピンチとドラッグでサイズと位置を調整します。</item>
+        <item>「開く」をタップして、壁の写真の上にデザインを配置します。ピンチとドラッグでサイズと位置を調整します。</item>
     </string-array>
     <string-array name="onboarding_design">
         <item>これがデザイン画面です — あなたの作業スペースです。ここで作成したものは、他のすべてのモードに引き継がれます。</item>
-        <item>「開く」をタップして最初のレイヤーを追加します — ギャラリーから写真を選ぶと、作品としてここに配置されます。</item>
-        <item>レイヤーをタップしてツールを開きます — ペイント、レタッチ、調整、エフェクトのフォルダにグループ化されています。キャンバス上でピンチとドラッグを行い、サイズと位置を調整します。</item>
+        <item>「開く」をタップしてデザインを追加します — ギャラリーから写真を選ぶと、作品としてここに配置されます。</item>
+        <item>「編集」ツールで、調整、反転、輪郭化、切り抜きができます。キャンバス上でピンチとドラッグを行い、サイズと位置を調整します。</item>
         <item>仕上がりに満足したら、使い方を選びます: 「ライトボックス」でスマートフォンをライトボックスにする、「モックアップ」で写真上にプレビューする、または「AR」で壁に投影する。</item>
-    </string-array>
-    <string-array name="onboarding_design_layers">
-        <item>開く — ギャラリーから写真をインポートします。新しいレイヤーとして配置されます。</item>
     </string-array>
     <string name="nav_measure">計測</string>
     <string name="nav_measure_info">実際の壁を計測します。デザインを配置した壁の一方の端をタップし、次にもう一方の端をタップします。幅はプロジェクトに保存されます(推測ではなく計測値)。</string>
@@ -742,10 +723,10 @@
     <string name="doodle_cd_detected_marks">検出されたマーク</string>
     <string name="doodle_cd_confirm">確認</string>
     <string name="doodle_cd_unwarp_base">角のハンドル付きで撮影した壁の写真</string>
-    <string name="guidance_open_via_design_overlay">レールの「デザイン」をタップし、続けて「開く」をタップしてレイヤーを追加します。写真を選ぶと、ライブカメラ映像の上に浮かんで表示されます。</string>
-    <string name="guidance_open_via_design_mockup">レールの「デザイン」をタップし、続けて「開く」をタップして、壁の写真の上にレイヤーを追加します。ピンチとドラッグで大きさと位置を調整します。</string>
-    <string name="guidance_open_via_design_trace">レールの「デザイン」をタップし、続けて「開く」をタップして、最初のレイヤーを追加します。追加後は、キャンバス上でピンチとドラッグをして大きさと位置を決めます。</string>
-    <string name="guidance_open_via_design_ar">レールの「デザイン」をタップし、続けて「開く」をタップしてデザインレイヤーを追加します。設定したばかりのアンカーを使って壁に投影されます。</string>
+    <string name="guidance_open_via_design_overlay">レールの「デザイン」をタップし、続けて「開く」をタップしてデザインを追加します。写真を選ぶと、ライブカメラ映像の上に浮かんで表示されます。</string>
+    <string name="guidance_open_via_design_mockup">レールの「デザイン」をタップし、続けて「開く」をタップして、壁の写真の上にデザインを配置します。ピンチとドラッグで大きさと位置を調整します。</string>
+    <string name="guidance_open_via_design_trace">レールの「デザイン」をタップし、続けて「開く」をタップして、デザインを追加します。追加後は、キャンバス上でピンチとドラッグをして大きさと位置を決めます。</string>
+    <string name="guidance_open_via_design_ar">レールの「デザイン」をタップし、続けて「開く」をタップしてデザインを追加します。設定したばかりのアンカーを使って壁に投影されます。</string>
     <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
     <string name="ar_feedback_guest_edit_dropped">この変更はホストと共有できません。この端末にのみ残ります</string>
     <string name="ar_feedback_backend_resolving">AR バックエンドを判定中です。しばらくしてからもう一度ホストを試してください</string>
@@ -755,6 +736,7 @@
     <string name="ar_feedback_doodle_not_ready">らくがきの準備がまだできていません — 画面内に保ったまま、もう一度「ホスト」を試してください</string>
     <string name="ar_feedback_package_failed">このプロジェクトを共有用にパッケージできませんでした。先に保存してみてください</string>
     <string name="ar_feedback_host_failed">共有を開始できませんでした：%1$s</string>
+    <string name="ar_feedback_host_too_large">このプロジェクトは大きすぎて Link で共有できません（%1$d MB、上限は %2$d MB）。エクスポートして共有してください。</string>
     <string name="ar_feedback_join_load_failed">ホストのプロジェクトを読み込めませんでした。セッションを終了しました。</string>
     <string name="ar_feedback_join_no_geometry">ホストが ARCore で位置合わせできるジオメトリを提供しませんでした。</string>
     <string name="ar_feedback_join_failed">参加できませんでした：%1$s</string>
@@ -805,6 +787,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">きれいな壁の写真を保存できませんでした。もう一度撮影してください。</string>
+    <string name="ar_feedback_progress_save_failed">壁のマップと塗装の進捗を保存できませんでした。このセッション中は保持されます。空き容量を確保してから、もう一度保存してください。</string>
     <string name="ar_feedback_clean_wall_register_failed">このきれいな壁の写真は、この壁と一致しません。作業する位置あたりから撮り直してください。</string>
 
     <!-- The CV view legend: the name of each way of looking. -->
