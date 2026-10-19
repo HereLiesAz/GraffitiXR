@@ -6,6 +6,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -21,6 +22,7 @@ import com.hereliesaz.aznavrail.model.AzButtonShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -30,6 +32,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
@@ -45,10 +50,12 @@ import com.hereliesaz.graffitixr.design.theme.HotPink
  * @param rawBitmap the captured photo and [annotatedBitmap] its highlighted-marks mask, as of this
  *   composition. Taken as the two bitmaps, not the whole ArUiState, so the screen recomposes only
  *   when one of them changes rather than on every unrelated AR state tick.
- * @param hasCleanWall / [onCleanWallPhoto] the clean-wall step of the instructions, which is always
- *   shown while waiting for a tap: photograph the bare wall first (one tap, [onCleanWallPhoto]) if it
- *   has not been marked yet, or just tap the marks if it has. [hasCleanWall] only changes the button's
- *   label to say one is already kept.
+ * @param hasCleanWall / [onCleanWallPhoto] the bare-wall photo, taken with the round shutter at the
+ *   bottom of the screen before the Doodle grid is painted. [hasCleanWall] fills the shutter to show
+ *   one is already kept (pressing it again retakes it).
+ *   The card's Cancel only puts the card and shutter away: its two steps are instructions, not
+ *   modes, so tapping the painted marks works the whole time, with or without the card. Doodle
+ *   capture itself is left from the rail item or Back.
  * @param latestCapture the photo and mask as they stand when Confirm is tapped, after every queued
  *   mark erase has been applied (`ArViewModel.awaitLatestTargetCapture`). Erases are asynchronous, so
  *   the composition's own bitmaps can predate the last tap; Confirm uses this instead. The default
@@ -65,7 +72,6 @@ fun TargetCreationUi(
     strings: AppStrings,
     onConfirmTarget: (bitmap: Bitmap?, mask: Bitmap?) -> Unit,
     onRetake: () -> Unit,
-    onCancel: () -> Unit,
     onEraseAtPoint: (Float, Float) -> Unit,
     latestCapture: suspend () -> Pair<Bitmap?, Bitmap?> = { rawBitmap to annotatedBitmap },
 ) {
@@ -110,21 +116,31 @@ fun TargetCreationUi(
             }
 
             else -> {
-                if (isWaitingForTap) {
+                // Re-shown each time Doodle capture is armed again.
+                var cardDismissed by remember(isWaitingForTap) { mutableStateOf(false) }
+                if (isWaitingForTap && !cardDismissed) {
                     Box(Modifier.fillMaxSize()) {
                         TargetInstructionCard(
                             isWaitingForTap = true,
                             captureStep = CaptureStep.NONE,
                             strings = strings,
-                            hasCleanWall = hasCleanWall,
-                            onCleanWallPhoto = onCleanWallPhoto,
-                            onCancel = onCancel,
+                            onCancel = { cardDismissed = true },
                             onNext = null,
                             // Top of screen so it clears the bottom adjustment + undo/redo controls.
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
                                 .padding(top = 32.dp)
                         )
+                        if (onCleanWallPhoto != null) {
+                            ShutterButton(
+                                saved = hasCleanWall,
+                                onClick = onCleanWallPhoto,
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .navigationBarsPadding()
+                                    .padding(bottom = 32.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -140,8 +156,6 @@ private fun TargetInstructionCard(
     onCancel: () -> Unit,
     onNext: (() -> Unit)?,
     modifier: Modifier = Modifier,
-    hasCleanWall: Boolean = false,
-    onCleanWallPhoto: (() -> Unit)? = null,
 ) {
     val data = when {
         isWaitingForTap -> Pair(strings.ar.targetCreationTitle, strings.ar.targetCreationText)
@@ -183,32 +197,10 @@ private fun TargetInstructionCard(
                     fontSize = 14.sp,
                     lineHeight = 20.sp
                 )
-                // The clean-wall step is always part of the instructions, whatever pass B's switch says:
-                // a bare-wall photo first if the surface has not been marked yet, otherwise just tap the marks.
-                if (isWaitingForTap) {
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        text = stringResource(DesignR.string.target_clean_wall_text),
-                        color = Color.White,
-                        textAlign = TextAlign.Center,
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp
-                    )
-                }
             }
         }
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            if (isWaitingForTap && onCleanWallPhoto != null) {
-                AzButton(
-                    text = stringResource(
-                        if (hasCleanWall) DesignR.string.target_clean_wall_saved else DesignR.string.target_clean_wall_photo
-                    ).uppercase(),
-                    onClick = onCleanWallPhoto,
-                    color = HotPink,
-                    shape = AzButtonShape.RECTANGLE
-                )
-            }
             AzButton(
                 text = strings.common.cancel.uppercase(),
                 onClick = onCancel,
@@ -225,6 +217,28 @@ private fun TargetInstructionCard(
             }
         }
     }
+}
+
+/**
+ * The bare-wall photo button: a camera app's round shutter, no label. A white ring; once a photo is
+ * kept, its centre fills cyan (pressing again retakes it). Spoken label via contentDescription.
+ */
+@Composable
+private fun ShutterButton(saved: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val label = stringResource(
+        if (saved) DesignR.string.target_shutter_retake_cd else DesignR.string.target_shutter_cd
+    )
+    Box(
+        modifier = modifier
+            .size(76.dp)
+            .clip(CircleShape)
+            .semantics { contentDescription = label }
+            // The whole 76 dp circle is the touch target, not just the inner disc.
+            .clickable(role = Role.Button, onClick = onClick)
+            .border(4.dp, Color.White, CircleShape)
+            .padding(8.dp)
+            .background(if (saved) Color.Cyan else Color.White, CircleShape)
+    )
 }
 
 /**

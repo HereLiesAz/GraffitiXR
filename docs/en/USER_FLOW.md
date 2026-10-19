@@ -53,12 +53,17 @@ engine" and is a no-op). There is no `VoxelMap`, `ConfidenceMap`, `PersistentVox
 
 ---
 
-## 3. TARGET CREATION (The Grid Ritual)
-**Definition:** The workflow to establish the initial wall anchor.
+## 3. THE DOODLE GRID (The Grid Ritual)
+**Definition:** The workflow to establish the initial wall anchor. **Doodle** is the user's name for
+the painted reference marks and what the app captures from them (formerly "target" /
+"fingerprint"); SphereSLAM's own wall reference keeps the name **target**.
 
 ### A. The Workflow Logic
+0.  **Instructions:** the **DOODLE GRID** card: if the grid isn't painted yet, photograph the bare
+    wall with the round shutter at the bottom of the screen; otherwise press **Cancel**, which only
+    puts the card and shutter away. Tapping the painted marks works with or without the card.
 1.  **Capture Phase:**
-    * **User Action:** arm "Target" on the rail, then tap the wall.
+    * **User Action:** arm "Doodle" on the rail, then tap the painted marks.
     * **Data:** captures a bitmap plus depth (when hardware stereo is available) or relies on the
       artist's step-in/step-back baseline for metric triangulation otherwise.
 2.  **Rectification Phase:**
@@ -84,7 +89,7 @@ below is a purpose summary, not a literal hierarchy diagram:
 | | `Overlay` | Switch to non-AR image tracing over the live camera (CameraX, or a planar homography tracker on the small number of devices without ARCore). |
 | | `Mockup` | Switch to compositing over a static reference photo. |
 | | `Trace` | Switch to lightbox mode (full brightness, touch-locked). |
-| **Modes ▸ AR** | `Target` | Arms tap-to-place for wall-anchor/fingerprint capture. |
+| **Modes ▸ AR** | `Doodle` | Arms tap-to-place for Doodle (wall anchor) capture. |
 | **Adjust** | — | Whole-design toggles: Adjust, Balance, Invert, Outline, Isolate — not general layer tools (there is only one design). |
 | **Open** | — | Picks the design image. Stages a replace-confirmation if a design is already placed. |
 | **Project** | `Save/Load` | Project manifest (JSON) plus the persisted wall fingerprint — no voxel/map binary. |

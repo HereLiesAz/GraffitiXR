@@ -127,6 +127,6 @@ class MainViewModelTargetSaveTest {
         synchronized(toastTexts) {
             assertTrue("no failure toast: $toastTexts", toastTexts.any { it.startsWith("Couldn't save the target") })
         }
-        verify(exactly = 0) { Toast.makeText(any(), "Target Saved & Locked", any()) }
+        verify(exactly = 0) { Toast.makeText(any(), "Doodle Saved & Locked", any()) }
     }
 }

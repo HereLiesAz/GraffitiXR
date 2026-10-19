@@ -274,7 +274,7 @@ class MainViewModel @Inject constructor(
             resetCaptureUi()
             Toast.makeText(
                 context,
-                "Capture incomplete. Try creating the target again.",
+                "Capture incomplete. Try creating the Doodle again.",
                 Toast.LENGTH_LONG,
             ).show()
             return
@@ -282,7 +282,7 @@ class MainViewModel @Inject constructor(
         if (placement == null) {
             Toast.makeText(
                 context,
-                "SphereSLAM map is not ready to anchor this fingerprint yet. Keep the camera on the wall and try again.",
+                "SphereSLAM map is not ready to anchor this Doodle yet. Keep the camera on the wall and try again.",
                 Toast.LENGTH_LONG,
             ).show()
             return
@@ -301,7 +301,7 @@ class MainViewModel @Inject constructor(
                     withContext(Dispatchers.Main) {
                         Toast.makeText(
                             context,
-                            "No project open — a target is saved into a project. Open or create one first.",
+                            "No project open — a Doodle is saved into a project. Open or create one first.",
                             Toast.LENGTH_LONG,
                         ).show()
                     }
@@ -325,7 +325,7 @@ class MainViewModel @Inject constructor(
                     withContext(Dispatchers.Main) {
                         Toast.makeText(
                             context,
-                            "Target lacks enough selected visual detail. Keep more distinctive wall marks.",
+                            "Doodle lacks enough selected visual detail. Keep more distinctive wall marks.",
                             Toast.LENGTH_LONG,
                         ).show()
                     }
@@ -399,7 +399,7 @@ class MainViewModel @Inject constructor(
                     withContext(Dispatchers.Main) {
                         Toast.makeText(
                             context,
-                            "The target changed while this one was saving — not saved. Try again.",
+                            "The Doodle changed while this one was saving — not saved. Try again.",
                             Toast.LENGTH_LONG,
                         ).show()
                     }
@@ -435,7 +435,7 @@ class MainViewModel @Inject constructor(
                 projectRepository.loadProject(currentProject.id)
                 _uiState.update { it.copy(targetCapturedThisSession = true) }
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Target Saved & Locked", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Doodle Saved & Locked", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -574,7 +574,7 @@ class MainViewModel @Inject constructor(
             resetCaptureUi()
             Toast.makeText(
                 context,
-                "Capture incomplete (missing camera pose). Try creating the target again.",
+                "Capture incomplete (missing camera pose). Try creating the Doodle again.",
                 Toast.LENGTH_LONG,
             ).show()
             return
@@ -606,7 +606,7 @@ class MainViewModel @Inject constructor(
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         context,
-                        "No project open — a target is saved into a project. Open or create one first.",
+                        "No project open — a Doodle is saved into a project. Open or create one first.",
                         Toast.LENGTH_LONG,
                     ).show()
                 }
@@ -646,7 +646,7 @@ class MainViewModel @Inject constructor(
 
             if (fp == null) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Target lacks visual detail. Please use a surface with more contrast.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Doodle lacks visual detail. Please use a surface with more contrast.", Toast.LENGTH_LONG).show()
                 }
                 return@launch
             }
@@ -708,7 +708,7 @@ class MainViewModel @Inject constructor(
             _uiState.update { it.copy(targetCapturedThisSession = true) }
 
             withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Target Saved & Locked", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Doodle Saved & Locked", Toast.LENGTH_SHORT).show()
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -809,7 +809,7 @@ class MainViewModel @Inject constructor(
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         context,
-                        "Couldn't lock an anchor for this target — hold the phone steady on the " +
+                        "Couldn't lock an anchor for this Doodle — hold the phone steady on the " +
                             "wall and try again.",
                         Toast.LENGTH_LONG,
                     ).show()
@@ -825,7 +825,7 @@ class MainViewModel @Inject constructor(
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         context,
-                        "No project open — a target is saved into a project. Open or create one first.",
+                        "No project open — a Doodle is saved into a project. Open or create one first.",
                         Toast.LENGTH_LONG,
                     ).show()
                 }
@@ -923,7 +923,7 @@ class MainViewModel @Inject constructor(
             projectRepository.loadProject(currentProject.id)
             _uiState.update { it.copy(targetCapturedThisSession = true) }
             withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Target Saved & Locked", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Doodle Saved & Locked", Toast.LENGTH_SHORT).show()
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -944,7 +944,7 @@ class MainViewModel @Inject constructor(
         withContext(Dispatchers.Main) {
             Toast.makeText(
                 context,
-                "Another project was opened before the target saved — it was not saved. Capture it again.",
+                "Another project was opened before the Doodle saved — it was not saved. Capture it again.",
                 Toast.LENGTH_LONG,
             ).show()
         }
@@ -957,7 +957,7 @@ class MainViewModel @Inject constructor(
             "target save failed: ${e.message ?: e.javaClass.simpleName}",
         )
         withContext(Dispatchers.Main) {
-            Toast.makeText(context, "Couldn't save the target. Try again.", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "Couldn't save the Doodle. Try again.", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -978,10 +978,6 @@ class MainViewModel @Inject constructor(
      */
     fun notifyTargetNotOnWall() {
         Toast.makeText(context, notOnGreenWallMessage, Toast.LENGTH_LONG).show()
-    }
-
-    fun onCancelCaptureClicked() {
-        resetCaptureUi()
     }
 
     private companion object {

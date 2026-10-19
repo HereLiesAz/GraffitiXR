@@ -94,7 +94,7 @@ fun OffscreenIndicators(
                 // relDir is in view space: +x = camera-right, +y = up, +z = behind the camera.
                 DirectionalIndicator(
                     angle = viewSpaceArrowAngleDeg(lx, ly),
-                    label = "Wall Target",
+                    label = "Doodle",
                     color = Cyan,
                     modifier = modifier,
                     distance = if (lz > 0) "BEHIND" else null
