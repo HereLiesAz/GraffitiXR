@@ -277,9 +277,9 @@
 
     <string name="target_creation_title">KRUMELURRUTNÄT</string>
 
-    <string name="target_creation_text">Om du inte har skapat ditt Krumelurrutnät än, ta en bild av väggen genom att trycka på fotoknappen. Tryck annars på Avboka.</string>
+    <string name="target_creation_text">Om du inte har skapat ditt Krumelurrutnät än, ta en bild av väggen genom att trycka på fotoknappen. Tryck annars på Avbryt.</string>
 
-    <string name="cancel">Avboka</string>
+    <string name="cancel">Avbryt</string>
 
 
     <string name="diag_copied">KOPIERAD ✓</string>
@@ -315,7 +315,7 @@
     <string name="choose_font">Välj Teckensnitt</string>
 
 
-    <string name="cancel_button">Avboka</string>
+    <string name="cancel_button">Avbryt</string>
     <string name="done_button">Gjort</string>
     <string name="apply_button">Tillämpas</string>
     <string name="close_button">Stäng</string>

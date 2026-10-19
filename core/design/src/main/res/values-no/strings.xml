@@ -275,9 +275,9 @@
     <!-- Title for target creation overlay. -->
     <string name="target_creation_title">KRUSEDULL-RUTENETT</string>
     <!-- Instructions for creating a target by tapping on reference marks. -->
-    <string name="target_creation_text">Hvis du ikke har laget Krusedull-rutenettet ditt ennå, tar du et bilde av veggen ved å trykke på utløserknappen. Ellers trykker du på Kansellere.</string>
+    <string name="target_creation_text">Hvis du ikke har laget Krusedull-rutenettet ditt ennå, tar du et bilde av veggen ved å trykke på utløserknappen. Ellers trykker du på Avbryt.</string>
     <!-- Generic cancel action. -->
-    <string name="cancel">Kansellere</string>
+    <string name="cancel">Avbryt</string>
 
     <!-- Label shown when diagnostic info is copied. -->
     <string name="diag_copied">KOPIERT ✓</string>
@@ -310,7 +310,7 @@
     <string name="choose_font">Velg Font</string>
 
     <!-- General Actions -->
-    <string name="cancel_button">Kansellere</string>
+    <string name="cancel_button">Avbryt</string>
     <string name="done_button">Ferdig</string>
     <string name="apply_button">Søke</string>
     <string name="close_button">Lukke</string>
