@@ -520,10 +520,10 @@ TEST(MobileGSTeleological, ADoodleOfPaintedWallDoesNotVetoThePaint) {
     g.destroy();
 }
 
-// Align matches the Doodle's GROWN rows (self-grow appends live features that matched the design:
-// paint, on the wall plane), never the original doodles. The rows here carry the design 30 px
-// (= 30/700 m at 1 m) right of where it is placed; no capture photo.
-TEST(MobileGSTeleological, AlignFitsTheDesignToTheGrownDoodleNeverTheOriginal) {
+// Once paint covers the doodles, the Doodle's rows are paint, already on the wall plane: Align fits
+// the design to them with no capture photo. The paint is the design 30 px (= 30/700 m at 1 m) right
+// of where it is placed.
+TEST(MobileGSTeleological, AlignFitsTheDesignToAPaintedDoodleWithoutAPhoto) {
     MobileGS g;
     g.initialize(0, 0);
     const float K[4] = {700.f, 700.f, 400.f, 300.f};
@@ -536,11 +536,6 @@ TEST(MobileGSTeleological, AlignFitsTheDesignToTheGrownDoodleNeverTheOriginal) {
     const float place[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0.0f, 0.0f, 1.0f, 1};
     g.setDesignPlacement(place, 200.f / K[0], 150.f / K[1]);
     float out5[5];
-    // As captured, every row is an original doodle: nothing to align to.
-    EXPECT_FALSE(g.autoFitDesign(out5));
-    EXPECT_EQ(MobileGS::kAutoFitNotReady, g.lastAutoFitResult());
-    // The same rows as grown ones (as if self-grow had added them): the fit.
-    MobileGSTestPeer::setDoodleBaseCount(g, 0);
     ASSERT_TRUE(g.autoFitDesign(out5));
     EXPECT_NEAR(30.f / 700.f, out5[0], 0.005f);
     EXPECT_NEAR(0.0f, out5[1], 0.005f);

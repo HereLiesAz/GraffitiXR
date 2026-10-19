@@ -42,7 +42,6 @@ struct MobileGSTestPeer {
         return (size_t)filter < g.mTargetSets.size() ? g.mTargetSets[(size_t)filter].pts.size() : 0;
     }
     static long pnpSeq(MobileGS& g) { return g.mPnpResultSeq.load(); }
-    static void setDoodleBaseCount(MobileGS& g, size_t n) { std::lock_guard<std::mutex> l(g.mMutex); g.mDoodleBaseCount = n; }
     static long long evalFrameCounter(MobileGS& g) { return g.mEvalSyncFrameCounter.load(); }
     static void setWallPoints(MobileGS& g, const std::vector<cv::Point3f>& p) { g.mWallKeypoints3D = p; }
     static void grow(MobileGS& g, const glm::mat4& camFromFp, const std::vector<cv::KeyPoint>& kps,

@@ -2273,7 +2273,6 @@ void MobileGS::restoreWallDoodle(const cv::Mat& d, const std::vector<cv::Point3f
     std::lock_guard<std::mutex> lock(mMutex);
     invalidateRelocResultLocked();
     mWallDescriptors = d.clone();
-    mDoodleBaseCount = (size_t)mWallDescriptors.rows;
     mWallKeypoints3D = p;
     // This path carries no partition, and the previous doodle's must not survive onto it: the
     // bytes would index a different point set entirely. Empty = all backbone, as before Phase 2.
@@ -2343,10 +2342,6 @@ void MobileGS::restoreWallDoodleMetric(const cv::Mat& d, const std::vector<cv::P
         (!anchorMatrix16 || memcmp(anchorMatrix16, mDoodleAnchorMatrix, 16 * sizeof(float)) == 0) &&
         (!intrinsics4 || memcmp(intrinsics4, mDoodleIntrinsics, 4 * sizeof(float)) == 0);
     if (!sameFrame) invalidateRelocResultLocked();
-    // The captured part of the stored set: the base alone when grown rows ride behind it, the standing
-    // count when the identical set is re-pushed, otherwise everything.
-    mDoodleBaseCount = growthOfSame ? baseN
-        : (sameDoodle && mDoodleBaseCount > 0 ? std::min(mDoodleBaseCount, (size_t)useD.rows) : (size_t)useD.rows);
     mWallDescriptors = useD.clone();
     mWallKeypoints3D = useP;
     // Belt and braces over the JNI-side length check: a partition that does not index the points it
@@ -2369,7 +2364,6 @@ void MobileGS::clearWallDoodle() {
     std::lock_guard<std::mutex> lock(mMutex);
     mWallDescriptors.release();
     mWallKeypoints3D.clear();
-    mDoodleBaseCount = 0;
     mWallRegions.clear();
     // Back to the constructed defaults, so a later project can't inherit this one's co-registration.
     static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
@@ -2592,9 +2586,6 @@ void MobileGS::alignToDoodle(const uint8_t* data, size_t size) {
         mPaintDescriptors.release();
         mPaintPoints3D.clear();
         mWallDescriptors = descs.clone();
-        // A peer's blob has no boundary between its captured doodles and its grown tail: all of it
-        // counts as captured, so Align never takes an original doodle for paint.
-        mDoodleBaseCount = (size_t)mWallDescriptors.rows;
         // A peer's doodle carries no partition, and the local one indexes a different point
         // set. Empty = all backbone, i.e. pre-Phase-2 behaviour, which is the right default for a
         // map whose design footprint this device never saw.
@@ -3231,7 +3222,6 @@ MobileGS::DoodleData MobileGS::generateDoodle(
         mPaintDescriptors.release();
         mPaintPoints3D.clear();
         mWallKeypoints3D  = std::move(pts3d);
-        mDoodleBaseCount = (size_t)mWallDescriptors.rows;
         // The depth path supplies no partition. Clearing rather than leaving the previous
         // doodle's is not optional: those bytes index a point set that no longer exists.
         mWallRegions.clear();
@@ -3403,8 +3393,7 @@ bool MobileGS::autoFitDesign(float* out5, bool minimumEvidence) {
     constexpr int kPossible = 3;
     cv::Mat photoRgb, designGray, cleanDescs, wallDescs; float K[4] = {0, 0, 0, 0}; float fpFromDesign[16]; float halfW, halfH;
     std::vector<cv::Point2f> cleanPx;   // the bare wall (clean-wall photo) in the capture photo's pixels
-    std::vector<cv::Point3f> wall, grown;   // grown: the Doodle's rows after the captured ones
-    size_t grownFrom = 0;
+    std::vector<cv::Point3f> wall;
     // The Doodle builder's design features: the artwork's own, then each filter's target set (places
     // a filter chose, described on the unfiltered design). Paint that only resembles a filtered
     // version of the design (a stencil, a posterized fill, a sketch) is found by that filter's set.
@@ -3418,13 +3407,12 @@ bool MobileGS::autoFitDesign(float* out5, bool minimumEvidence) {
     joinFilterBuild();
     {
         std::lock_guard<std::mutex> lock(mMutex);
-        // The paint is looked for in two places: the capture photo, and the Doodle's GROWN rows. The
-        // original doodles (and their close-ups) are marks drawn for reloc, not the design; the rows
-        // self-grow appends after them came from live frames that matched the design -- paint, already
-        // on the wall plane. Either one is enough.
+        // The paint is looked for in two places: the capture photo, and the Doodle itself. The Doodle
+        // starts as marks drawn for reloc, but once paint covers them (a Doodle grown from live frames
+        // that matched the design, or one captured over paint) its rows are paint, on the wall plane.
+        // Either one is enough.
         const bool havePhoto = !mCaptureRgb.empty() && mCaptureIntr[0] > 0 && mCaptureIntr[1] > 0;
-        const size_t base = std::min(mDoodleBaseCount, mWallKeypoints3D.size());
-        const bool haveDoodle = (size_t)mWallDescriptors.rows == mWallKeypoints3D.size() && mWallKeypoints3D.size() > base;
+        const bool haveDoodle = !mWallDescriptors.empty() && (size_t)mWallDescriptors.rows == mWallKeypoints3D.size();
         if (mArtworkGray.empty() || !mHasDesignPlacement || !(mDesignHalfW > 0) || !(mDesignHalfH > 0) ||
             mWallKeypoints3D.size() < 12 || !(havePhoto || haveDoodle)) {
             mLastAutoFitResult.store(kAutoFitNotReady, std::memory_order_relaxed);
@@ -3438,11 +3426,7 @@ bool MobileGS::autoFitDesign(float* out5, bool minimumEvidence) {
                 cleanPx = mCleanFeatPx; cleanDescs = mCleanFeatDescs.clone();
             }
         }
-        if (haveDoodle) {
-            wallDescs = mWallDescriptors.rowRange((int)base, mWallDescriptors.rows).clone();
-            grown.assign(mWallKeypoints3D.begin() + (long)base, mWallKeypoints3D.end());
-            grownFrom = base;
-        }
+        if (haveDoodle) wallDescs = mWallDescriptors.clone();
         designGray = mArtworkGray.clone(); artworkGen = mArtworkGeneration;
         memcpy(fpFromDesign, mDesignFpFromDesign, sizeof(fpFromDesign));
         halfW = mDesignHalfW; halfH = mDesignHalfH; wall = mWallKeypoints3D;
@@ -3530,10 +3514,10 @@ bool MobileGS::autoFitDesign(float* out5, bool minimumEvidence) {
     }
 
     // What the design is matched against, each row with its place on the wall in the CURRENT
-    // design-local frame: the photo (above), and the Doodle's grown rows (on the wall plane already).
+    // design-local frame: the photo (above), and the Doodle (its rows are on the wall plane already).
     struct Target { const cv::Mat* descs; const std::vector<cv::Point2f>* local; };
     std::vector<cv::Point2f> wallLocal;
-    for (const auto& p : grown) wallLocal.push_back(toDesign(p.x, p.y, p.z));
+    for (const auto& p : wall) wallLocal.push_back(toDesign(p.x, p.y, p.z));
     std::vector<Target> targets;
     if (!photoDescs.empty()) targets.push_back({&photoDescs, &photoLocal});
     if (!wallDescs.empty()) targets.push_back({&wallDescs, &wallLocal});
@@ -3583,9 +3567,9 @@ bool MobileGS::autoFitDesign(float* out5, bool minimumEvidence) {
         std::lock_guard<std::mutex> lock(mMutex);
         const bool wallKept = mWallKeypoints3D.size() >= wall.size() &&
             std::equal(wall.begin(), wall.end(), mWallKeypoints3D.begin()) &&
-            (wallDescs.empty() || (mWallDescriptors.rows >= (int)grownFrom + wallDescs.rows && mWallDescriptors.type() == wallDescs.type() &&
+            (wallDescs.empty() || (mWallDescriptors.rows >= wallDescs.rows && mWallDescriptors.type() == wallDescs.type() &&
                                    mWallDescriptors.cols == wallDescs.cols &&
-                                   cv::norm(mWallDescriptors.rowRange((int)grownFrom, (int)grownFrom + wallDescs.rows), wallDescs, cv::NORM_INF) == 0.0));
+                                   cv::norm(mWallDescriptors.rowRange(0, wallDescs.rows), wallDescs, cv::NORM_INF) == 0.0));
         if (!mHasDesignPlacement || mDesignHalfW != halfW || mDesignHalfH != halfH ||
             memcmp(mDesignFpFromDesign, fpFromDesign, sizeof(fpFromDesign)) != 0 ||
             mArtworkGeneration != artworkGen || mCaptureRgb.data != photoRef.data ||

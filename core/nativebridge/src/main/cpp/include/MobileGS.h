@@ -876,13 +876,6 @@ private:
     cv::Mat mCleanExclDescs;
     std::vector<cv::Point3f> mCleanExclPts;
     const uchar* mCleanExclFor = nullptr; size_t mCleanExclWallN = 0; uint64_t mCleanExclDoodleGen = 0;
-    /**
-     * How many rows at the front of mWallDescriptors / mWallKeypoints3D are the Doodle as captured
-     * (the doodles and their close-ups). Self-grow only appends, so every row after is grown from live
-     * frames that matched the design: paint. Align matches only those; the original doodles are not
-     * the design. Guarded by mMutex.
-     */
-    size_t mDoodleBaseCount = 0;
     void detectCleanWallFeaturesLocked();
     void cleanWallExclusionLocked(cv::Mat& descs, std::vector<cv::Point3f>& pts);
     float mCaptureIntr[4] = {0,0,0,0};
@@ -894,8 +887,8 @@ public:
      * on the wall). Matches the Doodle builder's design features -- the artwork's own, each design
      * filter's target set (mTargetSets), and the inverted design, since paint rarely keeps the
      * design's colours -- against the capture photo (back-projected onto the wall plane), less its
-     * unchanged bare wall when a clean-wall photo is registered, and against the Doodle's grown rows
-     * (paint, on the wall plane; never the original doodles). Either alone is enough. Takes the
+     * unchanged bare wall when a clean-wall photo is registered, and against the Doodle (on the wall
+     * plane; once paint covers the doodles its rows are paint). Either alone is enough. Takes the
      * pairing with the most inliers of a RANSAC similarity in the CURRENT design's local frame. Waits for a
      * filter build in flight, and returns no fit when the placement, design, Doodle or capture photo
      * changed while matching (the Doodle may grow). out5 = {dx, dy (m), dTheta (rad, CCW in the
