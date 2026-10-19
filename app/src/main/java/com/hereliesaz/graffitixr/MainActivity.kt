@@ -1946,9 +1946,6 @@ class MainActivity : AppCompatActivity() {
                                             arViewModel.requestCapture()
                                         }
                                     },
-                                    onCancel = {
-                                        mainViewModel.onCancelCaptureClicked()
-                                    },
                                     onEraseAtPoint = { nx, ny -> arViewModel.removeMarkAt(nx, ny) }
                                 )
 
@@ -3127,7 +3124,7 @@ private fun CoopNotFoundDialog(
                 if (!canHost) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = "Establish a target first to host.",
+                        text = "Create a Doodle first to host.",
                         color = Color.Gray,
                         fontSize = 12.sp
                     )
@@ -3248,7 +3245,7 @@ private fun RelocDiagnosticsOverlay(
     val (label, hint) = when (d.reject) {
         RelocReject.OK -> "LOCKED" to "matching the wall"
         RelocReject.NO_FINGERPRINT ->
-            "NO TARGET" to "create a target — nothing to match against"
+            "NO DOODLE" to "create a Doodle — nothing to match against"
         RelocReject.DISABLED -> "OFF" to "relocalization disabled"
         RelocReject.NO_FEATURES ->
             "NO FEATURES" to "frame has no texture — light, focus or blur"
@@ -3388,12 +3385,12 @@ private fun RelocDiagnosticsOverlay(
                 // Spelled out rather than abbreviated: this one sends the artist to "re-create the
                 // target", which no other state does, and it is the newest and least familiar.
                 com.hereliesaz.graffitixr.common.model.FusionState.NO_CAPTURE_POSE ->
-                    "OLD TARGET — re-create it"
+                    "OLD DOODLE — re-create it"
                 // Distinct from the line above, which used to cover this case and sent the artist to
                 // "re-create" a target that had never been created — directly contradicting the
                 // Reloc row's own "NO TARGET" three rows up.
                 com.hereliesaz.graffitixr.common.model.FusionState.NO_FINGERPRINT ->
-                    "NO TARGET — create one"
+                    "NO DOODLE — create one"
                 com.hereliesaz.graffitixr.common.model.FusionState.WAITING_FOR_LOCK -> "waiting for lock"
                 com.hereliesaz.graffitixr.common.model.FusionState.COLD_SNAP -> "snapped"
                 com.hereliesaz.graffitixr.common.model.FusionState.BLENDING ->
@@ -3700,7 +3697,7 @@ private fun TargetIncompleteOverlay(modifier: Modifier = Modifier) {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "TARGET NOT LOCKED",
+                text = "DOODLE NOT LOCKED",
                 color = HotPink,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
@@ -3709,7 +3706,7 @@ private fun TargetIncompleteOverlay(modifier: Modifier = Modifier) {
             Spacer(Modifier.height(12.dp))
             Text(
                 text = "The anchor is placed, but no wall features were matched to it — the overlay " +
-                    "will drift. Re-capture the target: get squarer to the wall, closer, and aim at " +
+                    "will drift. Re-capture the Doodle: get squarer to the wall, closer, and aim at " +
                     "a patch with more detail.",
                 color = Color.White,
                 fontSize = 14.sp,

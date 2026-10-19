@@ -47,7 +47,7 @@
     <string name="settings_ar_section">RA</string>
     <string name="settings_glow_section">Halo de couverture</string>
     <string name="settings_anticipation_section">Anticipation</string>
-    <string name="settings_anticipation_desc">Des vues de la cible de tous côtés, pour qu’une superposition perdue retrouve le mur. Plus de vues raccrochent sous plus d’angles et coûtent plus de batterie et de chaleur.</string>
+    <string name="settings_anticipation_desc">Des vues du Gribouillis de tous côtés, pour qu\'une superposition perdue retrouve le mur. Plus de vues le raccrochent sous plus d\'angles et coûtent plus de batterie et de chaleur.</string>
     <string name="settings_anticipation_distance">Distance</string>
     <string name="settings_anticipation_latitude">Latitude</string>
     <string name="settings_anticipation_longitude">Longitude</string>
@@ -56,13 +56,13 @@
     <string name="settings_anticipation_heat">La chaleur réduit de</string>
     <string name="settings_anticipation_compute">La charge réduit de</string>
     <string name="settings_anticipation_views">%1$d vues par page au plus</string>
-    <string name="settings_fingerprint_features">Empreinte</string>
+    <string name="settings_fingerprint_features">Gribouillis</string>
     <string name="settings_fingerprint_superpoint">SuperPoint</string>
     <string name="settings_fingerprint_half_sphere">Demi-sphère</string>
     <string name="settings_fingerprint_both">Les deux</string>
-    <string name="settings_fingerprint_superpoint_desc">Seulement les points SuperPoint de la capture. Tient à la lumière et à l’usure ; environ 1,5 Mo par cible. S’applique à la prochaine cible.</string>
-    <string name="settings_fingerprint_half_sphere_desc">Points ORB de la capture et de ses 49 gros plans. Solide de près et léger, moins de 0,1 Mo par cible. S’applique à la prochaine cible.</string>
-    <string name="settings_fingerprint_both_desc">Points SuperPoint de la capture et de ses 49 gros plans. Le plus solide ; environ 2–3 Mo par cible. S’applique à la prochaine cible.</string>
+    <string name="settings_fingerprint_superpoint_desc">Seulement les points SuperPoint de la capture. Tient à la lumière et à l\'usure ; environ 1,5 Mo par Gribouillis. S\'applique au prochain Gribouillis.</string>
+    <string name="settings_fingerprint_half_sphere_desc">Points ORB de la capture et de ses 49 gros plans. Solide de près et léger, moins de 0,1 Mo par Gribouillis. S\'applique au prochain Gribouillis.</string>
+    <string name="settings_fingerprint_both_desc">Points SuperPoint de la capture et de ses 49 gros plans. Le plus solide ; environ 2–3 Mo par Gribouillis. S\'applique au prochain Gribouillis.</string>
     <string name="settings_power_section">Énergie</string>
     <string name="settings_privacy_section">Confidentialité</string>
     <string name="settings_developer_section">Développeur</string>
@@ -116,11 +116,11 @@
     <string name="save_project_hint">Nom du projet</string>
 
     <!-- Target Creation -->
-    <string name="target_guide_desc">Guide d\'alignement de cible</string>
-    <string name="target_captured_desc">Cible capturée</string>
-    <string name="target_review_desc">Examiner la cible extraite</string>
+    <string name="target_guide_desc">Guide d\'alignement du Gribouillis</string>
+    <string name="target_captured_desc">Gribouillis capturé</string>
+    <string name="target_review_desc">Examiner le Gribouillis extrait</string>
     <string name="target_unwarp_hint">Faites glisser les coins pour déformer</string>
-    <string name="target_review_title">Examiner les marquages extraits</string>
+    <string name="target_review_title">GRIBOUILLIS VERROUILLÉ</string>
     <string name="fingerprint_closeups_progress">Apprentissage du mur : étape %1$d sur %2$d · %3$d sur %4$d</string>
 
     <string name="target_exclude">Exclure</string>
@@ -141,7 +141,7 @@
     <string name="scan_hint_build_map">Marchez à gauche et à droite pour construire la carte</string>
     <string name="scan_hint_closer">Rapprochez-vous du mur</string>
     <string name="scan_hint_higher_lower">Scannez plus haut et plus bas</string>
-    <string name="reacquiring_target">Recherche de la cible…</string>
+    <string name="reacquiring_target">Recherche du Gribouillis…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Maquette d\'arrière-plan</string>
@@ -162,12 +162,12 @@
     <string name="nav_mockup_info">Prévisualisez votre conception composée sur une photo d\'un mur. Aucune caméra ni numérisation requise.</string>
     <string name="nav_trace">Calque</string>
     <string name="nav_trace_info">Utilisez votre conception comme une table lumineuse pour tracer des lignes de référence sur une surface physique.</string>
-    <string name="nav_grid">Cible</string>
-    <string name="nav_grid_info">Créez et gérez des cibles d\'ancrage AR. Photographiez les marques de référence peintes sur le mur pour verrouiller la projection en place.</string>
+    <string name="nav_grid">Gribouillis</string>
+    <string name="nav_grid_info">Créez et gérez votre Gribouillis. Photographiez les marques de référence peintes sur le mur pour verrouiller la projection en place.</string>
     <string name="nav_create">Créer</string>
     <string name="nav_create_info">Photographiez une marque de référence sur le mur pour créer une nouvelle ancre AR. L\'application suivra cette marque pour garder votre projection alignée.</string>
     <string name="nav_refine">Affiner</string>
-    <string name="nav_refine_info">Ajustez finement la position d\'une cible d\'ancrage AR existante.</string>
+    <string name="nav_refine_info">Ajustez finement la position d\'un Gribouillis existant.</string>
     <string name="nav_update">Progrès</string>
     <string name="nav_update_info">Marquez les zones terminées de votre fresque pour suivre l\'avancement de la peinture.</string>
     <string name="nav_design">Conception</string>
@@ -242,14 +242,14 @@
     <string name="install_arcore">Installer ARCore</string>
     <string name="camera_permission_required">La permission de la caméra est requise pour le mode AR.</string>
     <string name="open_settings">Ouvrir Paramètres</string>
-    <string name="target_creation_title">CRÉATION DE CIBLE</string>
-    <string name="target_creation_text">Appuyez directement sur vos marques de repère peintes à l\'écran. L\'application les isolera immédiatement.</string>
+    <string name="target_creation_title">GRILLE DU GRIBOUILLIS</string>
+    <string name="target_creation_text">Si vous n\'avez pas encore créé la grille de votre Gribouillis, prenez une photo du mur en appuyant sur le bouton de capture. Sinon, appuyez sur Annuler.</string>
     <string name="cancel">Annuler</string>
     <string name="diag_copied">COPIÉ ✓</string>
     <string name="diag_title">DIAG PROFONDEUR (appuyer pour copier)</string>
     <string name="diag_waiting">En attente de la première image…</string>
     <string name="scan_step_1">Étape 1 : Cartographier l\'environnement</string>
-    <string name="scan_step_2">Étape 2 : Scanner le mur cible</string>
+    <string name="scan_step_2">Étape 2 : Scanner le mur</string>
     <string name="plane_confirm_question">L\'œuvre est-elle sur le bon mur ?</string>
     <string name="looks_correct">Semble correct</string>
     <string name="redetect">Redétecter</string>
@@ -437,9 +437,9 @@
     <string name="standalone_failure_persisted_target_corrupt">La cible murale enregistrée est introuvable ou illisible. Capturez une nouvelle cible.</string>
     <string name="standalone_failure_internal">SphereSLAM n\'a pas pu continuer à suivre cette cible.</string>
     <string name="standalone_tracking_stopped">Le suivi SphereSLAM s\'est arrêté. Recapturez la cible pour le relancer.</string>
-    <string name="standalone_status_mapping">Cartographie SphereSLAM • touchez Cible pour ajouter une empreinte</string>
-    <string name="standalone_status_preparing">Préparation de la cible d\'empreinte…</string>
-    <string name="standalone_status_finding">Recherche de la cible d\'empreinte…</string>
+    <string name="standalone_status_mapping">Cartographie SphereSLAM • touchez Gribouillis pour ajouter votre Gribouillis</string>
+    <string name="standalone_status_preparing">Préparation de la cible murale…</string>
+    <string name="standalone_status_finding">Recherche de la cible murale…</string>
     <string name="standalone_quality_too_small">Cette cible murale est trop petite après rectification. Capturez une zone plus grande.</string>
     <string name="standalone_quality_low_contrast">Cette cible murale manque de contraste visuel. Incluez plus de texture ou de détails.</string>
     <string name="standalone_quality_blurry">Cette cible murale est trop floue pour un suivi fiable. Restez stable et recapturez.</string>
@@ -465,15 +465,15 @@
     <string name="ar_feedback_guest_edit_dropped">Ce changement ne peut pas être partagé avec l\'hôte : il reste sur cet appareil</string>
     <string name="ar_feedback_backend_resolving">Le moteur AR est encore en cours de sélection : réessayez d\'héberger dans un instant</string>
     <string name="ar_feedback_open_project_first">Ouvrez un projet avant de partager : il n\'y a encore rien à envoyer à un invité</string>
-    <string name="ar_feedback_host_need_target_arcore">Capturez et verrouillez une cible murale à jour avant d\'héberger</string>
+    <string name="ar_feedback_host_need_target_arcore">Capturez et verrouillez un Gribouillis à jour avant de lancer « Héberger »</string>
     <string name="ar_feedback_host_need_target_standalone">Capturez une cible murale autonome avant d\'héberger</string>
-    <string name="ar_feedback_fingerprint_not_ready">L\'empreinte du mur n\'est pas encore prête : gardez la cible dans le champ et réessayez d\'héberger</string>
+    <string name="ar_feedback_fingerprint_not_ready">Le Gribouillis n\'est pas encore prêt — gardez-le dans le champ et relancez « Héberger »</string>
     <string name="ar_feedback_package_failed">Impossible d\'empaqueter ce projet pour le partager : essayez d\'abord de l\'enregistrer</string>
     <string name="ar_feedback_host_failed">Impossible de démarrer le partage : %1$s</string>
     <string name="ar_feedback_join_load_failed">Impossible de charger le projet de l\'hôte : la session a été terminée.</string>
     <string name="ar_feedback_join_no_geometry">L\'hôte n\'a pas fourni de géométrie sur laquelle ARCore puisse s\'aligner.</string>
     <string name="ar_feedback_join_failed">Impossible de rejoindre : %1$s</string>
-    <string name="ar_feedback_wall_target_changed">La cible murale a changé : le partage est terminé. Relancez l\'hébergement pour le nouveau mur.</string>
+    <string name="ar_feedback_wall_target_changed">Le Gribouillis a changé — le partage est terminé. Relancez « Héberger » pour le nouveau mur.</string>
     <string name="ar_feedback_backend_changed">Le moteur de suivi a changé : le partage est terminé. Relancez le partage.</string>
     <string name="ar_feedback_camera_busy">La caméra est occupée ou indisponible : fermez les autres applications de caméra, puis rouvrez l\'AR</string>
     <string name="ar_feedback_ar_start_failed">Impossible de démarrer l\'AR : votre caméra est peut-être utilisée par une autre application</string>
@@ -482,21 +482,21 @@
     <string name="ar_feedback_camera_not_resumed">La caméra AR n\'a pas repris : essayez de quitter le mode AR puis d\'y revenir</string>
     <string name="ar_feedback_camera_permission">Caméra indisponible : vérifiez l\'autorisation de la caméra, puis rouvrez l\'AR</string>
     <string name="ar_feedback_camera_not_paused">La caméra AR ne s\'est pas mise en pause proprement : elle peut continuer à tourner en arrière-plan</string>
-    <string name="ar_feedback_backbone_warning">L\'œuvre couvre presque tout le mur visible : seuls %1$d points suivis se trouvent en dehors. Réduisez-la ou reculez, sinon la cible risque de ne pas se verrouiller.</string>
-    <string name="ar_feedback_legacy_target_geometry">La cible enregistrée de ce projet a été créée par une version plus ancienne et sa géométrie 3D ne peut pas être corrigée. Recréez la cible pour l\'utiliser.</string>
+    <string name="ar_feedback_backbone_warning">L\'œuvre couvre presque tout le mur visible — seuls %1$d points suivis se trouvent en dehors. Réduisez-la ou reculez, sinon le Gribouillis risque de ne pas se verrouiller.</string>
+    <string name="ar_feedback_legacy_target_geometry">Le Gribouillis enregistré de ce projet a été créé par une version plus ancienne et sa géométrie 3D ne peut pas être corrigée. Recréez le Gribouillis pour l\'utiliser.</string>
     <string name="ar_feedback_camera_no_frames">La caméra ne fournit aucune image : quittez l\'AR et réessayez</string>
     <string name="ar_feedback_camera_recovery_timeout">La récupération de la caméra AR a expiré sans risque : quittez l\'AR puis rouvrez-la</string>
     <string name="ar_feedback_target_prepare_failed">Impossible de préparer la cible capturée. Réessayez.</string>
     <string name="ar_feedback_wall_width_save_failed">Impossible d\'enregistrer la largeur du mur. Réessayez d\'enregistrer.</string>
     <string name="ar_feedback_unknown_error">erreur inconnue</string>
-    <string name="reloc_looking">Recherche de votre cible…</string>
+    <string name="reloc_looking">Recherche de votre Gribouillis…</string>
     <string name="reloc_turn_right">Tournez à droite de %1$d°</string>
     <string name="reloc_turn_left">Tournez à gauche de %1$d°</string>
     <string name="reloc_tilt_up">Inclinez vers le haut de %1$d°</string>
     <string name="reloc_tilt_down">Inclinez vers le bas de %1$d°</string>
     <string name="reloc_facing_it">Vous lui faites face — déplacez-vous lentement de côté</string>
-    <string name="reloc_recapture">Recapturer la cible</string>
-    <string name="ar_feedback_capture_failed">Échec de la capture de la cible. Touchez pour réessayer.</string>
+    <string name="reloc_recapture">Recapturer le Gribouillis</string>
+    <string name="ar_feedback_capture_failed">Échec de la capture du Gribouillis. Touchez pour réessayer.</string>
 
     <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
     <string name="nav_stencil">Pochoir</string>
@@ -507,11 +507,11 @@
     <string name="nav_stencil_view_white">Blanc</string>
     <string name="nav_stencil_view_info">Change les pochoirs affichés : tous, noir, gris ou blanc.</string>
 
-    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <!-- Pass B: the Settings switch. -->
     <string name="settings_change_pass">Détection des changements (nécessite une photo du mur propre)</string>
-    <string name="target_clean_wall_text">Pas encore marqué ? Photographiez d’abord le mur nu avec le bouton ci-dessous, puis peignez vos repères. Déjà marqué ? Touchez simplement vos repères.</string>
-    <string name="target_clean_wall_photo">Photo du mur propre</string>
-    <string name="target_clean_wall_saved">Photo du mur propre enregistrée. Reprendre</string>
+    <!-- Spoken labels for the round shutter on the Doodle grid screen, which photographs the bare wall. -->
+    <string name="target_shutter_cd">Photographier le mur nu</string>
+    <string name="target_shutter_retake_cd">Reprendre la photo du mur nu</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">Vue CV</string>

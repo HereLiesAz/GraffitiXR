@@ -37,9 +37,9 @@
 
 
 
-    <string name="nav_grid">Mål</string>
+    <string name="nav_grid">Krumelur</string>
 
-    <string name="nav_grid_info">Skapa och hantera AR-ankarmål. Fotografera målade referensmärken på väggen för att låsa projektionen på plats.</string>
+    <string name="nav_grid_info">Skapa och hantera din Krumelur. Fotografera de målade referensmärkena på väggen för att låsa projektionen på plats.</string>
 
 
 
@@ -52,7 +52,7 @@
 
     <string name="nav_refine">Förfina</string>
 
-    <string name="nav_refine_info">Finjustera positionen för ett befintligt AR-ankarmål.</string>
+    <string name="nav_refine_info">Finjustera positionen för en befintlig Krumelur.</string>
 
 
     <string name="nav_update">Framsteg</string>
@@ -275,11 +275,11 @@
     <string name="open_settings">Öppna Inställningar</string>
 
 
-    <string name="target_creation_title">MÅLSKAPANDE</string>
+    <string name="target_creation_title">KRUMELURRUTNÄT</string>
 
-    <string name="target_creation_text">Tryck direkt på dina målade referensmärken på skärmen. Appen kommer omedelbart att isolera dem.</string>
+    <string name="target_creation_text">Om du inte har skapat ditt Krumelurrutnät än, ta en bild av väggen genom att trycka på fotoknappen. Tryck annars på Avbryt.</string>
 
-    <string name="cancel">Avboka</string>
+    <string name="cancel">Avbryt</string>
 
 
     <string name="diag_copied">KOPIERAD ✓</string>
@@ -291,7 +291,7 @@
 
     <string name="scan_step_1">Steg 1: Kartlägg din omgivning</string>
 
-    <string name="scan_step_2">Steg 2: Skanna målväggen</string>
+    <string name="scan_step_2">Steg 2: Skanna väggen</string>
 
 
     <string name="plane_confirm_question">Är konstverket på rätt vägg?</string>
@@ -315,7 +315,7 @@
     <string name="choose_font">Välj Teckensnitt</string>
 
 
-    <string name="cancel_button">Avboka</string>
+    <string name="cancel_button">Avbryt</string>
     <string name="done_button">Gjort</string>
     <string name="apply_button">Tillämpas</string>
     <string name="close_button">Stäng</string>
@@ -361,7 +361,7 @@
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">Täckningsglöd</string>
     <string name="settings_anticipation_section">Förutseende</string>
-    <string name="settings_anticipation_desc">Vyer av målet från alla håll, så att ett förlorat överlägg hittar väggen igen. Fler vyer låser från fler vinklar och kostar mer batteri och värme.</string>
+    <string name="settings_anticipation_desc">Vyer av Krumeluren från alla håll, så att ett förlorat överlägg hittar väggen igen. Fler vyer låser om från fler vinklar och kostar mer batteri och värme.</string>
     <string name="settings_anticipation_distance">Avstånd</string>
     <string name="settings_anticipation_latitude">Latitud</string>
     <string name="settings_anticipation_longitude">Longitud</string>
@@ -370,13 +370,13 @@
     <string name="settings_anticipation_heat">Värme stryper med</string>
     <string name="settings_anticipation_compute">Belastning stryper med</string>
     <string name="settings_anticipation_views">Högst %1$d vyer per sida</string>
-    <string name="settings_fingerprint_features">Fingeravtryck</string>
+    <string name="settings_fingerprint_features">Krumelur</string>
     <string name="settings_fingerprint_superpoint">SuperPoint</string>
     <string name="settings_fingerprint_half_sphere">Halvsfär</string>
     <string name="settings_fingerprint_both">Båda</string>
-    <string name="settings_fingerprint_superpoint_desc">Bara SuperPoint-drag från tagningen. Tål ljus och slitage; ungefär 1,5 MB per mål. Gäller från nästa mål.</string>
-    <string name="settings_fingerprint_half_sphere_desc">ORB-drag från tagningen och dess 49 närbilder. Starkt på nära håll och litet, under 0,1 MB per mål. Gäller från nästa mål.</string>
-    <string name="settings_fingerprint_both_desc">SuperPoint-drag från tagningen och dess 49 närbilder. Starkast; ungefär 2–3 MB per mål. Gäller från nästa mål.</string>
+    <string name="settings_fingerprint_superpoint_desc">Bara SuperPoint-drag från tagningen. Tål ljus och slitage; ungefär 1,5 MB per Krumelur. Gäller från nästa Krumelur.</string>
+    <string name="settings_fingerprint_half_sphere_desc">ORB-drag från tagningen och dess 49 närbilder. Starkt på nära håll och litet, under 0,1 MB per Krumelur. Gäller från nästa Krumelur.</string>
+    <string name="settings_fingerprint_both_desc">SuperPoint-drag från tagningen och dess 49 närbilder. Starkast; ungefär 2–3 MB per Krumelur. Gäller från nästa Krumelur.</string>
     <string name="settings_power_section">Ström</string>
     <string name="settings_privacy_section">Integritet</string>
     <string name="settings_developer_section">Utvecklare</string>
@@ -430,11 +430,11 @@
     <string name="save_project_hint">Projektnamn</string>
 
 
-    <string name="target_guide_desc">Målinriktningsguide</string>
-    <string name="target_captured_desc">Fångat mål</string>
-    <string name="target_review_desc">Granska extraherade mål</string>
+    <string name="target_guide_desc">Justeringsguide för Krumelur</string>
+    <string name="target_captured_desc">Fångad Krumelur</string>
+    <string name="target_review_desc">Granska extraherad Krumelur</string>
     <string name="target_unwarp_hint">Dra i hörnen för att avvika</string>
-    <string name="target_review_title">Granska extraherade markeringar</string>
+    <string name="target_review_title">KRUMELUR LÅST</string>
     <string name="fingerprint_closeups_progress">Lär sig väggen: steg %1$d av %2$d · moment %3$d av %4$d</string>
 
     <string name="target_exclude">Utesluta</string>
@@ -455,7 +455,7 @@
     <string name="scan_hint_build_map">Gå åt vänster och höger för att bygga en karta</string>
     <string name="scan_hint_closer">Flytta dig närmare väggen</string>
     <string name="scan_hint_higher_lower">Skanna högre och lägre</string>
-    <string name="reacquiring_target">Hittar målet igen…</string>
+    <string name="reacquiring_target">Hittar Krumeluren igen…</string>
 
 
     <string name="desc_bg_mockup">Bakgrundsmockup</string>
@@ -706,9 +706,9 @@
     <string name="standalone_failure_persisted_target_corrupt">Det sparade väggmålet saknas eller går inte att läsa. Fånga ett nytt mål.</string>
     <string name="standalone_failure_internal">SphereSLAM kunde inte fortsätta spåra det här målet.</string>
     <string name="standalone_tracking_stopped">SphereSLAM-spårningen stoppades. Fånga målet igen för att starta om den.</string>
-    <string name="standalone_status_mapping">SphereSLAM kartlägger • tryck på Mål för att lägga till ett fingeravtryck</string>
-    <string name="standalone_status_preparing">Förbereder fingeravtrycksmål…</string>
-    <string name="standalone_status_finding">Söker fingeravtrycksmål…</string>
+    <string name="standalone_status_mapping">SphereSLAM kartlägger • tryck på Krumelur för att lägga till din Krumelur</string>
+    <string name="standalone_status_preparing">Förbereder väggmål…</string>
+    <string name="standalone_status_finding">Söker väggmål…</string>
     <string name="standalone_quality_too_small">Det väggmålet är för litet efter uträtningen. Fånga ett större utsnitt.</string>
     <string name="standalone_quality_low_contrast">Det väggmålet har för lite visuell kontrast. Ta med mer textur eller detaljer.</string>
     <string name="standalone_quality_blurry">Det väggmålet är för suddigt för pålitlig spårning. Håll stilla och fånga det igen.</string>
@@ -734,15 +734,15 @@
     <string name="ar_feedback_guest_edit_dropped">Ändringen kan inte delas med värden – den stannar på den här enheten</string>
     <string name="ar_feedback_backend_resolving">AR-backend fastställs fortfarande – försök vara värd igen om en stund</string>
     <string name="ar_feedback_open_project_first">Öppna ett projekt innan du delar – det finns inget att skicka till en gäst än</string>
-    <string name="ar_feedback_host_need_target_arcore">Fånga och lås ett aktuellt väggmål innan du är värd</string>
+    <string name="ar_feedback_host_need_target_arcore">Fånga och lås en aktuell Krumelur innan du är värd</string>
     <string name="ar_feedback_host_need_target_standalone">Fånga ett fristående väggmål innan du är värd</string>
-    <string name="ar_feedback_fingerprint_not_ready">Väggens fingeravtryck är inte klart än – håll målet i bild och försök vara värd igen</string>
+    <string name="ar_feedback_fingerprint_not_ready">Krumeluren är inte klar än — håll den i bild och försök med ”Vara värd” igen</string>
     <string name="ar_feedback_package_failed">Det gick inte att paketera projektet för delning – försök spara det först</string>
     <string name="ar_feedback_host_failed">Det gick inte att starta delningen: %1$s</string>
     <string name="ar_feedback_join_load_failed">Det gick inte att läsa in värdens projekt – sessionen avslutades.</string>
     <string name="ar_feedback_join_no_geometry">Värden angav ingen geometri som ARCore kan justera mot.</string>
     <string name="ar_feedback_join_failed">Det gick inte att ansluta: %1$s</string>
-    <string name="ar_feedback_wall_target_changed">Väggmålet ändrades – delningen avslutades. Starta värdskap igen för den nya väggen.</string>
+    <string name="ar_feedback_wall_target_changed">Krumeluren ändrades — delningen avslutades. Starta ”Vara värd” igen för den nya väggen.</string>
     <string name="ar_feedback_backend_changed">Spårningsmotorn ändrades – delningen avslutades. Starta delningen igen.</string>
     <string name="ar_feedback_camera_busy">Kameran är upptagen eller otillgänglig – stäng andra kameraappar och gå sedan in i AR igen</string>
     <string name="ar_feedback_ar_start_failed">Det gick inte att starta AR – kameran kanske används av en annan app</string>
@@ -751,21 +751,21 @@
     <string name="ar_feedback_camera_not_resumed">AR-kameran återupptogs inte – försök lämna AR-läget och gå in igen</string>
     <string name="ar_feedback_camera_permission">Kameran är otillgänglig – kontrollera kameratillståndet och gå sedan in i AR igen</string>
     <string name="ar_feedback_camera_not_paused">AR-kameran pausades inte ordentligt – den kan fortsätta köra i bakgrunden</string>
-    <string name="ar_feedback_backbone_warning">Konstverket täcker nästan hela väggen i bild – bara %1$d spårade särdrag finns utanför. Gör det mindre eller kliv tillbaka, annars låser målet kanske inte.</string>
-    <string name="ar_feedback_legacy_target_geometry">Projektets sparade mål skapades av en äldre version och dess 3D-geometri kan inte korrigeras. Skapa målet igen för att använda det.</string>
+    <string name="ar_feedback_backbone_warning">Konstverket täcker nästan hela väggen i bild — bara %1$d spårade särdrag finns utanför. Gör det mindre eller kliv tillbaka, annars kanske Krumeluren inte låser.</string>
+    <string name="ar_feedback_legacy_target_geometry">Projektets sparade Krumelur skapades av en äldre version och dess 3D-geometri kan inte korrigeras. Skapa Krumeluren igen för att använda den.</string>
     <string name="ar_feedback_camera_no_frames">Kameran levererar inga bildrutor – lämna AR och försök igen</string>
     <string name="ar_feedback_camera_recovery_timeout">Återställningen av AR-kameran avbröts säkert på grund av tidsgräns – lämna AR och gå in igen</string>
     <string name="ar_feedback_target_prepare_failed">Det gick inte att förbereda det fångade målet. Försök igen.</string>
     <string name="ar_feedback_wall_width_save_failed">Det gick inte att spara väggbredden. Försök spara igen.</string>
     <string name="ar_feedback_unknown_error">okänt fel</string>
-    <string name="reloc_looking">Letar efter ditt mål…</string>
+    <string name="reloc_looking">Letar efter din Krumelur…</string>
     <string name="reloc_turn_right">Vrid %1$d° åt höger</string>
     <string name="reloc_turn_left">Vrid %1$d° åt vänster</string>
     <string name="reloc_tilt_up">Luta %1$d° uppåt</string>
     <string name="reloc_tilt_down">Luta %1$d° nedåt</string>
     <string name="reloc_facing_it">Du tittar mot det — rör dig långsamt från sida till sida</string>
-    <string name="reloc_recapture">Fånga målet igen</string>
-    <string name="ar_feedback_capture_failed">Det gick inte att fånga målet. Tryck för att försöka igen.</string>
+    <string name="reloc_recapture">Fånga Krumeluren igen</string>
+    <string name="ar_feedback_capture_failed">Det gick inte att fånga Krumeluren. Tryck för att försöka igen.</string>
 
     <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
     <string name="nav_stencil">Stencil</string>
@@ -778,9 +778,8 @@
 
     <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
     <string name="settings_change_pass">Ändringsdetektering (kräver ett foto av den rena väggen)</string>
-    <string name="target_clean_wall_text">Inte markerad än? Fotografera först den bara väggen med knappen nedan och måla sedan dina markeringar. Redan markerad? Tryck bara på dina markeringar.</string>
-    <string name="target_clean_wall_photo">Foto av ren vägg</string>
-    <string name="target_clean_wall_saved">Foto av ren vägg sparat. Ta om</string>
+    <string name="target_shutter_cd">Fotografera den bara väggen</string>
+    <string name="target_shutter_retake_cd">Ta om fotot av den bara väggen</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">CV-vy</string>

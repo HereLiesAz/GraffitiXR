@@ -125,8 +125,8 @@ class MainViewModelTargetSaveTest {
 
         coVerify(exactly = 0) { projectRepository.updateProject(any<(GraffitiProject) -> GraffitiProject>()) }
         synchronized(toastTexts) {
-            assertTrue("no failure toast: $toastTexts", toastTexts.any { it.startsWith("Couldn't save the target") })
+            assertTrue("no failure toast: $toastTexts", toastTexts.any { it.startsWith("Couldn't save the Doodle") })
         }
-        verify(exactly = 0) { Toast.makeText(any(), "Target Saved & Locked", any()) }
+        verify(exactly = 0) { Toast.makeText(any(), "Doodle Saved & Locked", any()) }
     }
 }

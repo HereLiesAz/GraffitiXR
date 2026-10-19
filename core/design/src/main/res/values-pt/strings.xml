@@ -37,9 +37,9 @@
     <!-- Description of the Stencil tool, explaining how it creates multi-layer printable templates. -->
 
     <!-- Label for the Target/Grid management menu in AR mode. -->
-    <string name="nav_grid">Alvo</string>
+    <string name="nav_grid">Rabisco</string>
     <!-- Description of Target management, used for anchor creation and management. -->
-    <string name="nav_grid_info">Crie e gerencie alvos de âncora AR. Fotografe marcas de referência pintadas na parede para fixar a projeção no lugar.</string>
+    <string name="nav_grid_info">Crie e gerencie seu Rabisco. Fotografe as marcas de referência pintadas na parede para fixar a projeção no lugar.</string>
 
     <!-- Label for the wall survey tool, used to improve AR tracking. -->
     <!-- Description of the Survey tool, explaining its role in tracking accuracy. -->
@@ -52,7 +52,7 @@
     <!-- Label for the action to refine an existing AR anchor. -->
     <string name="nav_refine">Refinar</string>
     <!-- Description of the anchor refinement process. -->
-    <string name="nav_refine_info">Ajuste com precisão a posição de um alvo de âncora AR existente.</string>
+    <string name="nav_refine_info">Ajuste com precisão a posição de um Rabisco existente.</string>
 
     <!-- Label for the progress tracking tool. -->
     <string name="nav_update">Progresso</string>
@@ -273,9 +273,9 @@
     <string name="open_settings">Abrir Configurações</string>
 
     <!-- Title for target creation overlay. -->
-    <string name="target_creation_title">CRIAÇÃO DE ALVO</string>
+    <string name="target_creation_title">GRADE DO RABISCO</string>
     <!-- Instructions for creating a target by tapping on reference marks. -->
-    <string name="target_creation_text">Toque diretamente nas suas marcas de referência pintadas na tela. O aplicativo as isolará imediatamente.</string>
+    <string name="target_creation_text">Se você ainda não criou sua grade do Rabisco, tire uma foto da parede pressionando o botão de captura. Caso contrário, pressione Cancelar.</string>
     <!-- Generic cancel action. -->
     <string name="cancel">Cancelar</string>
 
@@ -289,7 +289,7 @@
     <!-- Coaching step 1 for scanning. -->
     <string name="scan_step_1">Etapa 1: Mapeie seus arredores</string>
     <!-- Coaching step 2 for scanning. -->
-    <string name="scan_step_2">Etapa 2: Escaneie a parede alvo</string>
+    <string name="scan_step_2">Etapa 2: Escaneie a parede</string>
 
     <!-- Question asking if the AR artwork is correctly placed on the wall. -->
     <string name="plane_confirm_question">A arte está na parede correta?</string>
@@ -356,7 +356,7 @@
     <string name="settings_ar_section">RA</string>
     <string name="settings_glow_section">Brilho de cobertura</string>
     <string name="settings_anticipation_section">Antecipação</string>
-    <string name="settings_anticipation_desc">Vistas do alvo de todos os lados, para que uma sobreposição perdida volte a encontrar a parede. Mais vistas recuperam de mais ângulos e custam mais bateria e calor.</string>
+    <string name="settings_anticipation_desc">Vistas do Rabisco de todos os lados, para que uma sobreposição perdida volte a encontrar a parede. Mais vistas retravam de mais ângulos e custam mais bateria e calor.</string>
     <string name="settings_anticipation_distance">Distância</string>
     <string name="settings_anticipation_latitude">Latitude</string>
     <string name="settings_anticipation_longitude">Longitude</string>
@@ -365,13 +365,13 @@
     <string name="settings_anticipation_heat">O calor reduz em</string>
     <string name="settings_anticipation_compute">A carga reduz em</string>
     <string name="settings_anticipation_views">No máximo %1$d vistas por página</string>
-    <string name="settings_fingerprint_features">Impressão</string>
+    <string name="settings_fingerprint_features">Rabisco</string>
     <string name="settings_fingerprint_superpoint">SuperPoint</string>
     <string name="settings_fingerprint_half_sphere">Meia esfera</string>
     <string name="settings_fingerprint_both">Ambos</string>
-    <string name="settings_fingerprint_superpoint_desc">Só traços SuperPoint da captura. Resiste a luz e desgaste; cerca de 1,5 MB por alvo. Vale a partir do próximo alvo.</string>
-    <string name="settings_fingerprint_half_sphere_desc">Traços ORB da captura e dos seus 49 close-ups. Forte de perto e pequeno, menos de 0,1 MB por alvo. Vale a partir do próximo alvo.</string>
-    <string name="settings_fingerprint_both_desc">Traços SuperPoint da captura e dos seus 49 close-ups. O mais forte; cerca de 2–3 MB por alvo. Vale a partir do próximo alvo.</string>
+    <string name="settings_fingerprint_superpoint_desc">Só traços SuperPoint da captura. Resiste a luz e desgaste; cerca de 1,5 MB por Rabisco. Vale a partir do próximo Rabisco.</string>
+    <string name="settings_fingerprint_half_sphere_desc">Traços ORB da captura e dos seus 49 close-ups. Forte de perto e pequeno, menos de 0,1 MB por Rabisco. Vale a partir do próximo Rabisco.</string>
+    <string name="settings_fingerprint_both_desc">Traços SuperPoint da captura e dos seus 49 close-ups. O mais forte; cerca de 2–3 MB por Rabisco. Vale a partir do próximo Rabisco.</string>
     <string name="settings_power_section">Energia</string>
     <string name="settings_privacy_section">Privacidade</string>
     <string name="settings_developer_section">Desenvolvedor</string>
@@ -425,11 +425,11 @@
     <string name="save_project_hint">Nome do Projeto</string>
 
     <!-- Target Creation -->
-    <string name="target_guide_desc">Guia de Alinhamento de Alvo</string>
-    <string name="target_captured_desc">Alvo Capturado</string>
-    <string name="target_review_desc">Revisar Alvo Extraído</string>
+    <string name="target_guide_desc">Guia de Alinhamento do Rabisco</string>
+    <string name="target_captured_desc">Rabisco Capturado</string>
+    <string name="target_review_desc">Revisar Rabisco Extraído</string>
     <string name="target_unwarp_hint">Arraste os cantos para desfazer distorções</string>
-    <string name="target_review_title">Revisar Marcações Extraídas</string>
+    <string name="target_review_title">RABISCO TRAVADO</string>
     <string name="fingerprint_closeups_progress">Aprendendo a parede: etapa %1$d de %2$d · passo %3$d de %4$d</string>
 
     <string name="target_exclude">Excluir</string>
@@ -450,7 +450,7 @@
     <string name="scan_hint_build_map">Ande para a esquerda e para a direita para construir o mapa</string>
     <string name="scan_hint_closer">Chegue mais perto da parede</string>
     <string name="scan_hint_higher_lower">Escaneie mais alto e mais baixo</string>
-    <string name="reacquiring_target">Reencontrando o alvo…</string>
+    <string name="reacquiring_target">Reencontrando o Rabisco…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Maquete de Fundo</string>
@@ -701,9 +701,9 @@
     <string name="standalone_failure_persisted_target_corrupt">O alvo da parede salvo está ausente ou ilegível. Capture um novo alvo.</string>
     <string name="standalone_failure_internal">O SphereSLAM não conseguiu continuar rastreando este alvo.</string>
     <string name="standalone_tracking_stopped">O rastreamento do SphereSLAM parou. Capture o alvo novamente para reiniciá-lo.</string>
-    <string name="standalone_status_mapping">SphereSLAM mapeando • toque em Alvo para adicionar uma impressão digital</string>
-    <string name="standalone_status_preparing">Preparando o alvo de impressão digital…</string>
-    <string name="standalone_status_finding">Procurando o alvo de impressão digital…</string>
+    <string name="standalone_status_mapping">SphereSLAM mapeando • toque em Rabisco para adicionar seu Rabisco</string>
+    <string name="standalone_status_preparing">Preparando o alvo da parede…</string>
+    <string name="standalone_status_finding">Procurando o alvo da parede…</string>
     <string name="standalone_quality_too_small">Esse alvo da parede ficou pequeno demais após a retificação. Capture um trecho maior.</string>
     <string name="standalone_quality_low_contrast">Esse alvo da parede tem pouco contraste visual. Inclua mais textura ou detalhes.</string>
     <string name="standalone_quality_blurry">Esse alvo da parede está borrado demais para um rastreamento confiável. Mantenha firme e capture novamente.</string>
@@ -729,15 +729,15 @@
     <string name="ar_feedback_guest_edit_dropped">Essa alteração não pode ser compartilhada com o anfitrião — ela fica só neste dispositivo</string>
     <string name="ar_feedback_backend_resolving">O backend de AR ainda está sendo definido — tente hospedar de novo em instantes</string>
     <string name="ar_feedback_open_project_first">Abra um projeto antes de compartilhar — ainda não há nada para enviar a um convidado</string>
-    <string name="ar_feedback_host_need_target_arcore">Capture e bloqueie um alvo de parede atual antes de hospedar</string>
+    <string name="ar_feedback_host_need_target_arcore">Capture e trave um Rabisco atual antes de hospedar</string>
     <string name="ar_feedback_host_need_target_standalone">Capture um alvo de parede independente antes de hospedar</string>
-    <string name="ar_feedback_fingerprint_not_ready">A impressão digital da parede ainda não está pronta — mantenha o alvo à vista e tente hospedar de novo</string>
+    <string name="ar_feedback_fingerprint_not_ready">O Rabisco ainda não está pronto — mantenha-o à vista e tente Hospedar de novo</string>
     <string name="ar_feedback_package_failed">Não foi possível empacotar este projeto para compartilhar — tente salvá-lo primeiro</string>
     <string name="ar_feedback_host_failed">Não foi possível iniciar o compartilhamento: %1$s</string>
     <string name="ar_feedback_join_load_failed">Não foi possível carregar o projeto do anfitrião — a sessão foi encerrada.</string>
     <string name="ar_feedback_join_no_geometry">O anfitrião não forneceu geometria à qual o ARCore possa se alinhar.</string>
     <string name="ar_feedback_join_failed">Não foi possível entrar: %1$s</string>
-    <string name="ar_feedback_wall_target_changed">O alvo de parede mudou — o compartilhamento foi encerrado. Inicie a hospedagem de novo para a nova parede.</string>
+    <string name="ar_feedback_wall_target_changed">O Rabisco mudou — o compartilhamento foi encerrado. Inicie Hospedar de novo para a nova parede.</string>
     <string name="ar_feedback_backend_changed">O backend de rastreamento mudou — o compartilhamento foi encerrado. Inicie o compartilhamento de novo.</string>
     <string name="ar_feedback_camera_busy">A câmera está ocupada ou indisponível — feche outros apps de câmera e entre no AR novamente</string>
     <string name="ar_feedback_ar_start_failed">Não foi possível iniciar o AR — a câmera pode estar em uso por outro app</string>
@@ -746,21 +746,21 @@
     <string name="ar_feedback_camera_not_resumed">A câmera do AR não retomou — tente sair do modo AR e entrar novamente</string>
     <string name="ar_feedback_camera_permission">Câmera indisponível — verifique a permissão da câmera e entre no AR novamente</string>
     <string name="ar_feedback_camera_not_paused">A câmera do AR não pausou corretamente — ela pode continuar em execução em segundo plano</string>
-    <string name="ar_feedback_backbone_warning">A obra cobre quase toda a parede visível — apenas %1$d características rastreadas ficam fora dela. Deixe-a menor ou afaste-se, ou o alvo pode não travar.</string>
-    <string name="ar_feedback_legacy_target_geometry">O alvo salvo deste projeto foi criado por uma versão mais antiga e sua geometria 3D não pode ser corrigida. Crie o alvo de novo para usá-lo.</string>
+    <string name="ar_feedback_backbone_warning">A obra cobre quase toda a parede visível — apenas %1$d características rastreadas ficam fora dela. Deixe-a menor ou afaste-se, ou o Rabisco pode não travar.</string>
+    <string name="ar_feedback_legacy_target_geometry">O Rabisco salvo deste projeto foi criado por uma versão mais antiga e sua geometria 3D não pode ser corrigida. Crie o Rabisco de novo para usá-lo.</string>
     <string name="ar_feedback_camera_no_frames">A câmera não está entregando quadros — saia do AR e tente novamente</string>
     <string name="ar_feedback_camera_recovery_timeout">A recuperação da câmera do AR expirou com segurança — saia do AR e entre novamente</string>
     <string name="ar_feedback_target_prepare_failed">Não foi possível preparar o alvo capturado. Tente novamente.</string>
     <string name="ar_feedback_wall_width_save_failed">Não foi possível salvar a largura da parede. Tente salvar novamente.</string>
     <string name="ar_feedback_unknown_error">erro desconhecido</string>
-    <string name="reloc_looking">Procurando seu alvo…</string>
+    <string name="reloc_looking">Procurando seu Rabisco…</string>
     <string name="reloc_turn_right">Vire %1$d° para a direita</string>
     <string name="reloc_turn_left">Vire %1$d° para a esquerda</string>
     <string name="reloc_tilt_up">Incline %1$d° para cima</string>
     <string name="reloc_tilt_down">Incline %1$d° para baixo</string>
     <string name="reloc_facing_it">Você está de frente para ele — mova-se devagar de um lado para o outro</string>
-    <string name="reloc_recapture">Recapturar alvo</string>
-    <string name="ar_feedback_capture_failed">Falha ao capturar o alvo. Toque para tentar novamente.</string>
+    <string name="reloc_recapture">Recapturar Rabisco</string>
+    <string name="ar_feedback_capture_failed">Falha ao capturar o Rabisco. Toque para tentar novamente.</string>
 
     <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
     <string name="nav_stencil">Estêncil</string>
@@ -773,9 +773,9 @@
 
     <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
     <string name="settings_change_pass">Detecção de mudanças (precisa de uma foto da parede limpa)</string>
-    <string name="target_clean_wall_text">Ainda sem marcas? Primeiro fotografe a parede limpa com o botão abaixo e depois pinte suas marcas. Já marcada? Toque nas suas marcas.</string>
-    <string name="target_clean_wall_photo">Foto da parede limpa</string>
-    <string name="target_clean_wall_saved">Foto da parede limpa salva. Refazer</string>
+    <!-- Spoken labels for the round shutter on the Doodle grid screen, which photographs the bare wall. -->
+    <string name="target_shutter_cd">Fotografar a parede vazia</string>
+    <string name="target_shutter_retake_cd">Refazer a foto da parede vazia</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">Visão CV</string>

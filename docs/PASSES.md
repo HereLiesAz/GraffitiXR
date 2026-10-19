@@ -79,12 +79,13 @@ Optional. It compares the live wall with the **clean-wall photo**: the bare wall
 anything was marked or painted. It asks which cells of the wall have changed, and whether the changed
 region has the shape of the design. Colour plays no part in the second question.
 
-- **The photo**: one tap during target creation (`ArViewModel.requestCleanWallPhoto`), saved to the
+- **The photo**: the round shutter on the Doodle grid screen (`ArViewModel.requestCleanWallPhoto`), saved to the
   project as `cleanWallUri`, and registered to the capture photo by feature matching and a RANSAC
   homography (`MobileGS::setCleanWallImage`; status none, pending, registered or failed). A photo
   given before the capture photo waits for it.
-- **The instructions always carry the step**, whatever the switch says: not marked yet, photograph
-  the bare wall first (button), then paint the marks; already marked, just tap them.
+- **The instructions always carry the step**, whatever the switch says: the DOODLE GRID card says
+  to photograph the bare wall with the shutter if the grid isn't painted yet, otherwise press
+  Cancel. Cancel only puts the card and shutter away; tapping the marks works throughout.
 - **The switch** is in **Settings** (not the diagnostics overlay), **off by default**, and nothing
   but the user turns it on (`SettingsRepository.changePassEnabled`). Even on, the pass judges
   nothing without a registered clean-wall photo.

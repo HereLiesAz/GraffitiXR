@@ -37,9 +37,9 @@
 
 
 
-    <string name="nav_grid">Doel</string>
+    <string name="nav_grid">Krabbel</string>
 
-    <string name="nav_grid_info">Creëer en beheer AR-ankerdoelen. Maak een foto van geschilderde referentiemarkeringen op de muur om de projectie op zijn plaats te vergrendelen.</string>
+    <string name="nav_grid_info">Maak en beheer je Krabbel. Fotografeer de geschilderde referentiemarkeringen op de muur om de projectie op zijn plaats te vergrendelen.</string>
 
 
 
@@ -52,7 +52,7 @@
 
     <string name="nav_refine">Verfijnen</string>
 
-    <string name="nav_refine_info">Verfijn de positie van een bestaand AR-ankerdoel.</string>
+    <string name="nav_refine_info">Verfijn de positie van een bestaande Krabbel.</string>
 
 
     <string name="nav_update">Voortgang</string>
@@ -275,9 +275,9 @@
     <string name="open_settings">Instellingen openen</string>
 
 
-    <string name="target_creation_title">DOEL CREATIE</string>
+    <string name="target_creation_title">KRABBELRASTER</string>
 
-    <string name="target_creation_text">Tik rechtstreeks op uw geschilderde referentiemerken op het scherm. De app zal ze onmiddellijk isoleren.</string>
+    <string name="target_creation_text">Als je je Krabbelraster nog niet hebt gemaakt, maak dan een foto van de muur door op de opnameknop te drukken. Druk anders op Annuleren.</string>
 
     <string name="cancel">Annuleren</string>
 
@@ -291,7 +291,7 @@
 
     <string name="scan_step_1">Stap 1: Breng uw omgeving in kaart</string>
 
-    <string name="scan_step_2">Stap 2: Scan de doelmuur</string>
+    <string name="scan_step_2">Stap 2: Scan de muur</string>
 
 
     <string name="plane_confirm_question">Hangt het kunstwerk op de juiste muur?</string>
@@ -361,7 +361,7 @@
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">Dekkingsgloed</string>
     <string name="settings_anticipation_section">Anticipatie</string>
-    <string name="settings_anticipation_desc">Aanzichten van het doel van alle kanten, zodat een verloren overlay de muur terugvindt. Meer aanzichten herstellen vanuit meer hoeken en kosten meer batterij en warmte.</string>
+    <string name="settings_anticipation_desc">Aanzichten van de Krabbel van alle kanten, zodat een verloren overlay de muur terugvindt. Meer aanzichten vergrendelen opnieuw vanuit meer hoeken en kosten meer batterij en warmte.</string>
     <string name="settings_anticipation_distance">Afstand</string>
     <string name="settings_anticipation_latitude">Breedte</string>
     <string name="settings_anticipation_longitude">Lengte</string>
@@ -370,13 +370,13 @@
     <string name="settings_anticipation_heat">Warmte beperkt met</string>
     <string name="settings_anticipation_compute">Belasting beperkt met</string>
     <string name="settings_anticipation_views">Hoogstens %1$d aanzichten per pagina</string>
-    <string name="settings_fingerprint_features">Vingerafdruk</string>
+    <string name="settings_fingerprint_features">Krabbel</string>
     <string name="settings_fingerprint_superpoint">SuperPoint</string>
     <string name="settings_fingerprint_half_sphere">Halve bol</string>
     <string name="settings_fingerprint_both">Beide</string>
-    <string name="settings_fingerprint_superpoint_desc">Alleen SuperPoint-kenmerken van de opname. Bestand tegen licht en slijtage; ongeveer 1,5 MB per doel. Geldt vanaf het volgende doel.</string>
-    <string name="settings_fingerprint_half_sphere_desc">ORB-kenmerken van de opname en haar 49 close-ups. Sterk van dichtbij en klein, onder 0,1 MB per doel. Geldt vanaf het volgende doel.</string>
-    <string name="settings_fingerprint_both_desc">SuperPoint-kenmerken van de opname en haar 49 close-ups. Het sterkst; ongeveer 2–3 MB per doel. Geldt vanaf het volgende doel.</string>
+    <string name="settings_fingerprint_superpoint_desc">Alleen SuperPoint-kenmerken van de opname. Bestand tegen licht en slijtage; ongeveer 1,5 MB per Krabbel. Geldt vanaf de volgende Krabbel.</string>
+    <string name="settings_fingerprint_half_sphere_desc">ORB-kenmerken van de opname en haar 49 close-ups. Sterk van dichtbij en klein, onder 0,1 MB per Krabbel. Geldt vanaf de volgende Krabbel.</string>
+    <string name="settings_fingerprint_both_desc">SuperPoint-kenmerken van de opname en haar 49 close-ups. Het sterkst; ongeveer 2–3 MB per Krabbel. Geldt vanaf de volgende Krabbel.</string>
     <string name="settings_power_section">Energie</string>
     <string name="settings_privacy_section">Privacy</string>
     <string name="settings_developer_section">Ontwikkelaar</string>
@@ -430,11 +430,11 @@
     <string name="save_project_hint">Projectnaam</string>
 
 
-    <string name="target_guide_desc">Gids voor doeluitlijning</string>
-    <string name="target_captured_desc">Gevangen doel</string>
-    <string name="target_review_desc">Bekijk het geëxtraheerde doel</string>
+    <string name="target_guide_desc">Uitlijningsgids voor Krabbel</string>
+    <string name="target_captured_desc">Vastgelegde Krabbel</string>
+    <string name="target_review_desc">Geëxtraheerde Krabbel bekijken</string>
     <string name="target_unwarp_hint">Versleep hoeken om de vervorming te herstellen</string>
-    <string name="target_review_title">Bekijk de geëxtraheerde markeringen</string>
+    <string name="target_review_title">KRABBEL VERGRENDELD</string>
     <string name="fingerprint_closeups_progress">De muur leren: fase %1$d van %2$d · stap %3$d van %4$d</string>
 
     <string name="target_exclude">Uitsluiten</string>
@@ -455,7 +455,7 @@
     <string name="scan_hint_build_map">Loop naar links en rechts om een ​​kaart te bouwen</string>
     <string name="scan_hint_closer">Ga dichter bij de muur staan</string>
     <string name="scan_hint_higher_lower">Scan hoger en lager</string>
-    <string name="reacquiring_target">Doel opnieuw zoeken…</string>
+    <string name="reacquiring_target">Krabbel opnieuw zoeken…</string>
 
 
     <string name="desc_bg_mockup">Achtergrondmodel</string>
@@ -706,9 +706,9 @@
     <string name="standalone_failure_persisted_target_corrupt">Het opgeslagen muurdoel ontbreekt of is onleesbaar. Neem een nieuw doel op.</string>
     <string name="standalone_failure_internal">SphereSLAM kon dit doel niet blijven volgen.</string>
     <string name="standalone_tracking_stopped">De SphereSLAM-tracking is gestopt. Neem het doel opnieuw op om opnieuw te starten.</string>
-    <string name="standalone_status_mapping">SphereSLAM brengt in kaart • tik op Doel om een vingerafdruk toe te voegen</string>
-    <string name="standalone_status_preparing">Vingerafdrukdoel voorbereiden…</string>
-    <string name="standalone_status_finding">Vingerafdrukdoel zoeken…</string>
+    <string name="standalone_status_mapping">SphereSLAM brengt in kaart • tik op Krabbel om je Krabbel toe te voegen</string>
+    <string name="standalone_status_preparing">Muurdoel voorbereiden…</string>
+    <string name="standalone_status_finding">Muurdoel zoeken…</string>
     <string name="standalone_quality_too_small">Dat muurdoel is na het rechtzetten te klein. Neem een groter stuk op.</string>
     <string name="standalone_quality_low_contrast">Dat muurdoel heeft te weinig visueel contrast. Neem meer textuur of detail mee.</string>
     <string name="standalone_quality_blurry">Dat muurdoel is te onscherp voor betrouwbare tracking. Houd de telefoon stil en neem opnieuw op.</string>
@@ -734,15 +734,15 @@
     <string name="ar_feedback_guest_edit_dropped">Die wijziging kan niet met de host worden gedeeld – ze blijft op dit apparaat</string>
     <string name="ar_feedback_backend_resolving">De AR-backend wordt nog bepaald – probeer over een moment opnieuw te hosten</string>
     <string name="ar_feedback_open_project_first">Open een project voordat je deelt – er is nog niets om naar een gast te sturen</string>
-    <string name="ar_feedback_host_need_target_arcore">Leg een actueel muurdoel vast en vergrendel het voordat je host</string>
+    <string name="ar_feedback_host_need_target_arcore">Leg een actuele Krabbel vast en vergrendel die voordat je host</string>
     <string name="ar_feedback_host_need_target_standalone">Leg een zelfstandig muurdoel vast voordat je host</string>
-    <string name="ar_feedback_fingerprint_not_ready">De muurvingerafdruk is nog niet klaar – houd het doel in beeld en probeer opnieuw te hosten</string>
+    <string name="ar_feedback_fingerprint_not_ready">Krabbel is nog niet klaar — houd hem in beeld en probeer Hosten opnieuw</string>
     <string name="ar_feedback_package_failed">Dit project kon niet worden ingepakt om te delen – sla het eerst op</string>
     <string name="ar_feedback_host_failed">Delen starten is mislukt: %1$s</string>
     <string name="ar_feedback_join_load_failed">Het project van de host kon niet worden geladen – de sessie is beëindigd.</string>
     <string name="ar_feedback_join_no_geometry">De host heeft geen geometrie geleverd waarop ARCore zich kan uitlijnen.</string>
     <string name="ar_feedback_join_failed">Deelnemen is mislukt: %1$s</string>
-    <string name="ar_feedback_wall_target_changed">Het muurdoel is gewijzigd – het delen is beëindigd. Start Hosten opnieuw voor de nieuwe muur.</string>
+    <string name="ar_feedback_wall_target_changed">Krabbel gewijzigd — delen beëindigd. Start Hosten opnieuw voor de nieuwe muur.</string>
     <string name="ar_feedback_backend_changed">De tracking-backend is gewijzigd – het delen is beëindigd. Start het delen opnieuw.</string>
     <string name="ar_feedback_camera_busy">De camera is bezet of niet beschikbaar – sluit andere camera-apps en ga daarna opnieuw naar AR</string>
     <string name="ar_feedback_ar_start_failed">AR starten is mislukt – je camera wordt mogelijk door een andere app gebruikt</string>
@@ -751,21 +751,21 @@
     <string name="ar_feedback_camera_not_resumed">De AR-camera is niet hervat – verlaat de AR-modus en ga er opnieuw in</string>
     <string name="ar_feedback_camera_permission">Camera niet beschikbaar – controleer de cameratoestemming en ga daarna opnieuw naar AR</string>
     <string name="ar_feedback_camera_not_paused">De AR-camera is niet netjes gepauzeerd – ze blijft mogelijk op de achtergrond actief</string>
-    <string name="ar_feedback_backbone_warning">Het kunstwerk bedekt bijna de hele zichtbare muur – slechts %1$d gevolgde kenmerken liggen erbuiten. Maak het kleiner of stap achteruit, anders vergrendelt het doel mogelijk niet.</string>
-    <string name="ar_feedback_legacy_target_geometry">Het opgeslagen doel van dit project is gemaakt met een oudere versie en de 3D-geometrie ervan kan niet worden gecorrigeerd. Maak het doel opnieuw aan om het te gebruiken.</string>
+    <string name="ar_feedback_backbone_warning">Het kunstwerk bedekt bijna de hele zichtbare muur — slechts %1$d gevolgde kenmerken liggen erbuiten. Maak het kleiner of stap achteruit, anders vergrendelt de Krabbel mogelijk niet.</string>
+    <string name="ar_feedback_legacy_target_geometry">De opgeslagen Krabbel van dit project is gemaakt met een oudere versie en de 3D-geometrie ervan kan niet worden gecorrigeerd. Maak de Krabbel opnieuw aan om hem te gebruiken.</string>
     <string name="ar_feedback_camera_no_frames">De camera levert geen beelden – verlaat AR en probeer het opnieuw</string>
     <string name="ar_feedback_camera_recovery_timeout">Het herstel van de AR-camera is veilig verlopen – verlaat AR en ga opnieuw naar AR</string>
     <string name="ar_feedback_target_prepare_failed">Het vastgelegde doel kon niet worden voorbereid. Probeer het opnieuw.</string>
     <string name="ar_feedback_wall_width_save_failed">De muurbreedte kon niet worden opgeslagen. Probeer opnieuw op te slaan.</string>
     <string name="ar_feedback_unknown_error">onbekende fout</string>
-    <string name="reloc_looking">Je doel zoeken…</string>
+    <string name="reloc_looking">Je Krabbel zoeken…</string>
     <string name="reloc_turn_right">Draai %1$d° naar rechts</string>
     <string name="reloc_turn_left">Draai %1$d° naar links</string>
     <string name="reloc_tilt_up">Kantel %1$d° omhoog</string>
     <string name="reloc_tilt_down">Kantel %1$d° omlaag</string>
     <string name="reloc_facing_it">Je kijkt ernaar — beweeg langzaam heen en weer</string>
-    <string name="reloc_recapture">Doel opnieuw vastleggen</string>
-    <string name="ar_feedback_capture_failed">Doel vastleggen mislukt. Tik om het opnieuw te proberen.</string>
+    <string name="reloc_recapture">Krabbel opnieuw vastleggen</string>
+    <string name="ar_feedback_capture_failed">Krabbel vastleggen mislukt. Tik om het opnieuw te proberen.</string>
 
     <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
     <string name="nav_stencil">Stencil</string>
@@ -778,9 +778,9 @@
 
     <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
     <string name="settings_change_pass">Wijzigingsdetectie (heeft een foto van de schone muur nodig)</string>
-    <string name="target_clean_wall_text">Nog niet gemarkeerd? Fotografeer eerst de kale muur met de knop hieronder en schilder dan je markeringen. Al gemarkeerd? Tik gewoon op je markeringen.</string>
-    <string name="target_clean_wall_photo">Foto van schone muur</string>
-    <string name="target_clean_wall_saved">Foto van schone muur bewaard. Opnieuw</string>
+    <!-- Spoken labels for the round shutter on the Doodle grid screen, which photographs the bare wall. -->
+    <string name="target_shutter_cd">Fotografeer de kale muur</string>
+    <string name="target_shutter_retake_cd">Foto van de kale muur opnieuw maken</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">CV-weergave</string>

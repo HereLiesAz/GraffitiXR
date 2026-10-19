@@ -37,9 +37,9 @@
     <!-- Description of the Stencil tool, explaining how it creates multi-layer printable templates. -->
 
     <!-- Label for the Target/Grid management menu in AR mode. -->
-    <string name="nav_grid">Bersaglio</string>
+    <string name="nav_grid">Scarabocchio</string>
     <!-- Description of Target management, used for anchor creation and management. -->
-    <string name="nav_grid_info">Crea e gestisci i bersagli di ancoraggio AR. Fotografa segni di riferimento dipinti sul muro per bloccare la proiezione in posizione.</string>
+    <string name="nav_grid_info">Crea e gestisci il tuo Scarabocchio. Fotografa i segni di riferimento dipinti sul muro per bloccare la proiezione in posizione.</string>
 
     <!-- Label for the wall survey tool, used to improve AR tracking. -->
     <!-- Description of the Survey tool, explaining its role in tracking accuracy. -->
@@ -52,7 +52,7 @@
     <!-- Label for the action to refine an existing AR anchor. -->
     <string name="nav_refine">Affina</string>
     <!-- Description of the anchor refinement process. -->
-    <string name="nav_refine_info">Regola con precisione la posizione di un bersaglio di ancoraggio AR esistente.</string>
+    <string name="nav_refine_info">Regola con precisione la posizione di uno Scarabocchio esistente.</string>
 
     <!-- Label for the progress tracking tool. -->
     <string name="nav_update">Progresso</string>
@@ -273,9 +273,9 @@
     <string name="open_settings">Apri Impostazioni</string>
 
     <!-- Title for target creation overlay. -->
-    <string name="target_creation_title">CREAZIONE BERSAGLIO</string>
+    <string name="target_creation_title">GRIGLIA DELLO SCARABOCCHIO</string>
     <!-- Instructions for creating a target by tapping on reference marks. -->
-    <string name="target_creation_text">Tocca direttamente i tuoi segni di riferimento dipinti sullo schermo. L\'app li isolerà immediatamente.</string>
+    <string name="target_creation_text">Se non hai ancora creato la griglia del tuo Scarabocchio, scatta una foto del muro premendo il pulsante di acquisizione. Altrimenti premi Annulla.</string>
     <!-- Generic cancel action. -->
     <string name="cancel">Annulla</string>
 
@@ -289,7 +289,7 @@
     <!-- Coaching step 1 for scanning. -->
     <string name="scan_step_1">Passo 1: Mappa i tuoi dintorni</string>
     <!-- Coaching step 2 for scanning. -->
-    <string name="scan_step_2">Passo 2: Scansiona il muro di destinazione</string>
+    <string name="scan_step_2">Passo 2: Scansiona il muro</string>
 
     <!-- Question asking if the AR artwork is correctly placed on the wall. -->
     <string name="plane_confirm_question">L\'opera d\'arte è sul muro corretto?</string>
@@ -356,7 +356,7 @@
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">Bagliore di copertura</string>
     <string name="settings_anticipation_section">Anticipazione</string>
-    <string name="settings_anticipation_desc">Viste del soggetto da ogni lato, perché una sovrapposizione persa ritrovi il muro. Più viste riagganciano da più angoli e costano più batteria e calore.</string>
+    <string name="settings_anticipation_desc">Viste dello Scarabocchio da ogni lato, perché una sovrapposizione persa ritrovi il muro. Più viste lo riagganciano da più angoli e costano più batteria e calore.</string>
     <string name="settings_anticipation_distance">Distanza</string>
     <string name="settings_anticipation_latitude">Latitudine</string>
     <string name="settings_anticipation_longitude">Longitudine</string>
@@ -365,13 +365,13 @@
     <string name="settings_anticipation_heat">Il calore riduce di</string>
     <string name="settings_anticipation_compute">Il carico riduce di</string>
     <string name="settings_anticipation_views">Al massimo %1$d viste per pagina</string>
-    <string name="settings_fingerprint_features">Impronta</string>
+    <string name="settings_fingerprint_features">Scarabocchio</string>
     <string name="settings_fingerprint_superpoint">SuperPoint</string>
     <string name="settings_fingerprint_half_sphere">Semisfera</string>
     <string name="settings_fingerprint_both">Entrambi</string>
-    <string name="settings_fingerprint_superpoint_desc">Solo i tratti SuperPoint della cattura. Regge a luce e usura; circa 1,5 MB per soggetto. Vale dal prossimo soggetto.</string>
-    <string name="settings_fingerprint_half_sphere_desc">Tratti ORB della cattura e dei suoi 49 primi piani. Forte da vicino e leggero, meno di 0,1 MB per soggetto. Vale dal prossimo soggetto.</string>
-    <string name="settings_fingerprint_both_desc">Tratti SuperPoint della cattura e dei suoi 49 primi piani. Il più forte; circa 2–3 MB per soggetto. Vale dal prossimo soggetto.</string>
+    <string name="settings_fingerprint_superpoint_desc">Solo i tratti SuperPoint della cattura. Regge a luce e usura; circa 1,5 MB per Scarabocchio. Vale dal prossimo Scarabocchio.</string>
+    <string name="settings_fingerprint_half_sphere_desc">Tratti ORB della cattura e dei suoi 49 primi piani. Forte da vicino e leggero, meno di 0,1 MB per Scarabocchio. Vale dal prossimo Scarabocchio.</string>
+    <string name="settings_fingerprint_both_desc">Tratti SuperPoint della cattura e dei suoi 49 primi piani. Il più forte; circa 2–3 MB per Scarabocchio. Vale dal prossimo Scarabocchio.</string>
     <string name="settings_power_section">Energia</string>
     <string name="settings_privacy_section">Privacy</string>
     <string name="settings_developer_section">Sviluppatore</string>
@@ -425,11 +425,11 @@
     <string name="save_project_hint">Nome Progetto</string>
 
     <!-- Target Creation -->
-    <string name="target_guide_desc">Guida all\'Allineamento del Bersaglio</string>
-    <string name="target_captured_desc">Bersaglio Catturato</string>
-    <string name="target_review_desc">Rivedi Bersaglio Estratto</string>
+    <string name="target_guide_desc">Guida all\'Allineamento dello Scarabocchio</string>
+    <string name="target_captured_desc">Scarabocchio Catturato</string>
+    <string name="target_review_desc">Rivedi Scarabocchio Estratto</string>
     <string name="target_unwarp_hint">Trascina gli angoli per distorcere</string>
-    <string name="target_review_title">Rivedi Segni Estratti</string>
+    <string name="target_review_title">SCARABOCCHIO BLOCCATO</string>
     <string name="fingerprint_closeups_progress">Studio del muro: fase %1$d di %2$d · passo %3$d di %4$d</string>
 
     <string name="target_exclude">Escludi</string>
@@ -450,7 +450,7 @@
     <string name="scan_hint_build_map">Cammina a sinistra e a destra per costruire la mappa</string>
     <string name="scan_hint_closer">Avvicinati al muro</string>
     <string name="scan_hint_higher_lower">Scansiona più in alto e più in basso</string>
-    <string name="reacquiring_target">Riacquisizione del bersaglio…</string>
+    <string name="reacquiring_target">Riacquisizione dello Scarabocchio…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Mockup di Sfondo</string>
@@ -701,9 +701,9 @@
     <string name="standalone_failure_persisted_target_corrupt">Il bersaglio a muro salvato manca o non è leggibile. Acquisisci un nuovo bersaglio.</string>
     <string name="standalone_failure_internal">SphereSLAM non è riuscito a continuare a tracciare questo bersaglio.</string>
     <string name="standalone_tracking_stopped">Il tracciamento di SphereSLAM si è interrotto. Acquisisci di nuovo il bersaglio per riavviarlo.</string>
-    <string name="standalone_status_mapping">Mappatura SphereSLAM • tocca Bersaglio per aggiungere un\'impronta</string>
-    <string name="standalone_status_preparing">Preparazione del bersaglio a impronta…</string>
-    <string name="standalone_status_finding">Ricerca del bersaglio a impronta…</string>
+    <string name="standalone_status_mapping">Mappatura SphereSLAM • tocca Scarabocchio per aggiungere il tuo Scarabocchio</string>
+    <string name="standalone_status_preparing">Preparazione del bersaglio a muro…</string>
+    <string name="standalone_status_finding">Ricerca del bersaglio a muro…</string>
     <string name="standalone_quality_too_small">Questo bersaglio a muro è troppo piccolo dopo il raddrizzamento. Acquisisci una porzione più grande.</string>
     <string name="standalone_quality_low_contrast">Questo bersaglio a muro ha poco contrasto visivo. Includi più texture o dettagli.</string>
     <string name="standalone_quality_blurry">Questo bersaglio a muro è troppo sfocato per un tracciamento affidabile. Tieni fermo e acquisisci di nuovo.</string>
@@ -729,15 +729,15 @@
     <string name="ar_feedback_guest_edit_dropped">Questa modifica non può essere condivisa con l\'host: resta su questo dispositivo</string>
     <string name="ar_feedback_backend_resolving">Il backend AR è ancora in fase di selezione: riprova a fare da host tra un attimo</string>
     <string name="ar_feedback_open_project_first">Apri un progetto prima di condividere: non c\'è ancora nulla da inviare a un ospite</string>
-    <string name="ar_feedback_host_need_target_arcore">Acquisisci e blocca un target parete aggiornato prima di fare da host</string>
+    <string name="ar_feedback_host_need_target_arcore">Acquisisci e blocca uno Scarabocchio aggiornato prima di avviare «Ospita»</string>
     <string name="ar_feedback_host_need_target_standalone">Acquisisci un target parete standalone prima di fare da host</string>
-    <string name="ar_feedback_fingerprint_not_ready">L\'impronta della parete non è ancora pronta: tieni il target inquadrato e riprova a fare da host</string>
+    <string name="ar_feedback_fingerprint_not_ready">Lo Scarabocchio non è ancora pronto — tienilo inquadrato e riprova «Ospita»</string>
     <string name="ar_feedback_package_failed">Impossibile preparare questo progetto per la condivisione: prova prima a salvarlo</string>
     <string name="ar_feedback_host_failed">Impossibile avviare la condivisione: %1$s</string>
     <string name="ar_feedback_join_load_failed">Impossibile caricare il progetto dell\'host: la sessione è stata terminata.</string>
     <string name="ar_feedback_join_no_geometry">L\'host non ha fornito una geometria a cui ARCore possa allinearsi.</string>
     <string name="ar_feedback_join_failed">Impossibile partecipare: %1$s</string>
-    <string name="ar_feedback_wall_target_changed">Il target parete è cambiato: la condivisione è terminata. Avvia di nuovo l\'host per la nuova parete.</string>
+    <string name="ar_feedback_wall_target_changed">Lo Scarabocchio è cambiato — la condivisione è terminata. Avvia di nuovo «Ospita» per la nuova parete.</string>
     <string name="ar_feedback_backend_changed">Il backend di tracciamento è cambiato: la condivisione è terminata. Avvia di nuovo la condivisione.</string>
     <string name="ar_feedback_camera_busy">La fotocamera è occupata o non disponibile: chiudi le altre app che la usano, poi rientra in AR</string>
     <string name="ar_feedback_ar_start_failed">Impossibile avviare AR: la fotocamera potrebbe essere in uso da un\'altra app</string>
@@ -746,21 +746,21 @@
     <string name="ar_feedback_camera_not_resumed">La fotocamera AR non è ripartita: prova a uscire dalla modalità AR e a rientrare</string>
     <string name="ar_feedback_camera_permission">Fotocamera non disponibile: controlla l\'autorizzazione della fotocamera, poi rientra in AR</string>
     <string name="ar_feedback_camera_not_paused">La fotocamera AR non si è messa in pausa correttamente: potrebbe restare attiva in background</string>
-    <string name="ar_feedback_backbone_warning">L\'opera copre quasi tutta la parete inquadrata: solo %1$d caratteristiche tracciate restano all\'esterno. Rimpiccioliscila o fai un passo indietro, altrimenti il target potrebbe non agganciarsi.</string>
-    <string name="ar_feedback_legacy_target_geometry">Il target salvato di questo progetto è stato creato da una versione precedente e la sua geometria 3D non può essere corretta. Crea di nuovo il target per usarlo.</string>
+    <string name="ar_feedback_backbone_warning">L\'opera copre quasi tutta la parete inquadrata — solo %1$d caratteristiche tracciate restano all\'esterno. Rimpiccioliscila o fai un passo indietro, altrimenti lo Scarabocchio potrebbe non agganciarsi.</string>
+    <string name="ar_feedback_legacy_target_geometry">Lo Scarabocchio salvato di questo progetto è stato creato da una versione precedente e la sua geometria 3D non può essere corretta. Crea di nuovo lo Scarabocchio per usarlo.</string>
     <string name="ar_feedback_camera_no_frames">La fotocamera non sta fornendo fotogrammi: esci da AR e riprova</string>
     <string name="ar_feedback_camera_recovery_timeout">Il ripristino della fotocamera AR è scaduto in modo sicuro: esci da AR e rientra</string>
     <string name="ar_feedback_target_prepare_failed">Impossibile preparare il target acquisito. Riprova.</string>
     <string name="ar_feedback_wall_width_save_failed">Impossibile salvare la larghezza della parete. Riprova a salvare.</string>
     <string name="ar_feedback_unknown_error">errore sconosciuto</string>
-    <string name="reloc_looking">Ricerca del tuo bersaglio…</string>
+    <string name="reloc_looking">Ricerca del tuo Scarabocchio…</string>
     <string name="reloc_turn_right">Gira a destra di %1$d°</string>
     <string name="reloc_turn_left">Gira a sinistra di %1$d°</string>
     <string name="reloc_tilt_up">Inclina in alto di %1$d°</string>
     <string name="reloc_tilt_down">Inclina in basso di %1$d°</string>
     <string name="reloc_facing_it">Lo hai di fronte — muoviti lentamente da un lato all\'altro</string>
-    <string name="reloc_recapture">Ricattura bersaglio</string>
-    <string name="ar_feedback_capture_failed">Acquisizione del bersaglio non riuscita. Tocca per riprovare.</string>
+    <string name="reloc_recapture">Ricattura lo Scarabocchio</string>
+    <string name="ar_feedback_capture_failed">Acquisizione dello Scarabocchio non riuscita. Tocca per riprovare.</string>
 
     <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
     <string name="nav_stencil">Stencil</string>
@@ -771,11 +771,11 @@
     <string name="nav_stencil_view_white">Bianco</string>
     <string name="nav_stencil_view_info">Cambia quali fogli sono mostrati: tutti, nero, grigio o bianco.</string>
 
-    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <!-- Pass B: the Settings switch. -->
     <string name="settings_change_pass">Rilevamento dei cambiamenti (richiede una foto del muro pulito)</string>
-    <string name="target_clean_wall_text">Non ancora segnato? Prima fotografa il muro pulito con il pulsante qui sotto, poi dipingi i tuoi segni. Già segnato? Tocca i tuoi segni.</string>
-    <string name="target_clean_wall_photo">Foto del muro pulito</string>
-    <string name="target_clean_wall_saved">Foto del muro pulito salvata. Rifai</string>
+    <!-- Spoken labels for the round shutter on the Doodle grid screen, which photographs the bare wall. -->
+    <string name="target_shutter_cd">Fotografa il muro spoglio</string>
+    <string name="target_shutter_retake_cd">Rifai la foto del muro spoglio</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">Vista CV</string>

@@ -33,9 +33,9 @@
     <!-- Description of the Stencil tool, explaining how it creates multi-layer printable templates. -->
 
     <!-- Label for the Target/Grid management menu in AR mode. -->
-    <string name="nav_grid">Target</string>
+    <string name="nav_grid">Doodle</string>
     <!-- Description of Target management, used for anchor creation and management. -->
-    <string name="nav_grid_info">Create and manage AR anchor targets. Photograph painted reference marks on the wall to lock the projection in place.</string>
+    <string name="nav_grid_info">Create and manage your Doodle. Photograph the painted reference marks on the wall to lock the projection in place.</string>
 
     <!-- Label for the wall survey tool, used to improve AR tracking. -->
     <!-- Description of the Survey tool, explaining its role in tracking accuracy. -->
@@ -63,7 +63,7 @@
     <!-- Label for the action to refine an existing AR anchor. -->
     <string name="nav_refine">Refine</string>
     <!-- Description of the anchor refinement process. -->
-    <string name="nav_refine_info">Fine-tune the position of an existing AR anchor target.</string>
+    <string name="nav_refine_info">Fine-tune the position of an existing Doodle.</string>
 
     <!-- Label for the progress tracking tool. -->
     <string name="nav_update">Progress</string>
@@ -302,10 +302,10 @@
     <!-- Action to open system settings. -->
     <string name="open_settings">Open Settings</string>
 
-    <!-- Title for target creation overlay. -->
-    <string name="target_creation_title">TARGET CREATION</string>
-    <!-- Instructions for creating a target by tapping on reference marks. -->
-    <string name="target_creation_text">Tap directly on your painted reference marks on the screen. The app will immediately isolate them.</string>
+    <!-- Title for the Doodle grid overlay. -->
+    <string name="target_creation_title">DOODLE GRID</string>
+    <!-- Instructions on the Doodle grid overlay: the bare-wall photo first, or Cancel to put the card away. -->
+    <string name="target_creation_text">If you haven\'t created your Doodle grid, then take a picture of the wall by pressing the capture button. Otherwise press Cancel.</string>
     <!-- Generic cancel action. -->
     <string name="cancel">Cancel</string>
 
@@ -319,7 +319,7 @@
     <!-- Coaching step 1 for scanning. -->
     <string name="scan_step_1">Step 1: Map your surroundings</string>
     <!-- Coaching step 2 for scanning. -->
-    <string name="scan_step_2">Step 2: Scan the target wall</string>
+    <string name="scan_step_2">Step 2: Scan the wall</string>
 
     <!-- Question asking if the AR artwork is correctly placed on the wall. -->
     <string name="plane_confirm_question">Is the artwork on the correct wall?</string>
@@ -396,7 +396,7 @@
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">Coverage glow</string>
     <string name="settings_anticipation_section">Anticipation</string>
-    <string name="settings_anticipation_desc">Views of the target from all around, so a lost overlay finds the wall again. More views relock from more angles and cost more battery and heat.</string>
+    <string name="settings_anticipation_desc">Views of the Doodle from all around, so a lost overlay finds the wall again. More views relock from more angles and cost more battery and heat.</string>
     <string name="settings_anticipation_distance">Distance</string>
     <string name="settings_anticipation_latitude">Latitude</string>
     <string name="settings_anticipation_longitude">Longitude</string>
@@ -405,13 +405,13 @@
     <string name="settings_anticipation_heat">Heat throttles by</string>
     <string name="settings_anticipation_compute">Load throttles by</string>
     <string name="settings_anticipation_views">%1$d views per page at most</string>
-    <string name="settings_fingerprint_features">Fingerprint</string>
+    <string name="settings_fingerprint_features">Doodle</string>
     <string name="settings_fingerprint_superpoint">SuperPoint</string>
     <string name="settings_fingerprint_half_sphere">Half sphere</string>
     <string name="settings_fingerprint_both">Both</string>
-    <string name="settings_fingerprint_superpoint_desc">SuperPoint features of the capture only. Holds through light and wear; about 1.5 MB per target. Applies to the next target.</string>
-    <string name="settings_fingerprint_half_sphere_desc">ORB features of the capture and its 49 close-ups. Strong up close and small, under 0.1 MB per target. Applies to the next target.</string>
-    <string name="settings_fingerprint_both_desc">SuperPoint features of the capture and its 49 close-ups. The strongest; about 2–3 MB per target. Applies to the next target.</string>
+    <string name="settings_fingerprint_superpoint_desc">SuperPoint features of the capture only. Holds through light and wear; about 1.5 MB per Doodle. Applies to the next Doodle.</string>
+    <string name="settings_fingerprint_half_sphere_desc">ORB features of the capture and its 49 close-ups. Strong up close and small, under 0.1 MB per Doodle. Applies to the next Doodle.</string>
+    <string name="settings_fingerprint_both_desc">SuperPoint features of the capture and its 49 close-ups. The strongest; about 2–3 MB per Doodle. Applies to the next Doodle.</string>
     <string name="settings_power_section">Power</string>
     <string name="settings_privacy_section">Privacy</string>
     <string name="settings_developer_section">Developer</string>
@@ -479,11 +479,11 @@
     <string name="save_project_hint">Project Name</string>
 
     <!-- Target Creation -->
-    <string name="target_guide_desc">Target Alignment Guide</string>
-    <string name="target_captured_desc">Captured Target</string>
-    <string name="target_review_desc">Review Extracted Target</string>
+    <string name="target_guide_desc">Doodle Alignment Guide</string>
+    <string name="target_captured_desc">Captured Doodle</string>
+    <string name="target_review_desc">Review Extracted Doodle</string>
     <string name="target_unwarp_hint">Drag corners to unwarp</string>
-    <string name="target_review_title">TARGET LOCKED</string>
+    <string name="target_review_title">DOODLE LOCKED</string>
     <string name="fingerprint_closeups_progress">Learning the wall: stage %1$d of %2$d · step %3$d of %4$d</string>
 
     <string name="target_exclude">Exclude</string>
@@ -504,7 +504,7 @@
     <string name="scan_hint_build_map">Walk left and right to build map</string>
     <string name="scan_hint_closer">Move closer to the wall</string>
     <string name="scan_hint_higher_lower">Scan higher and lower</string>
-    <string name="reacquiring_target">Reacquiring target…</string>
+    <string name="reacquiring_target">Reacquiring Doodle…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Background Mockup</string>
@@ -727,9 +727,9 @@
     <string name="standalone_failure_persisted_target_corrupt">Saved wall target is missing or unreadable. Capture a new target.</string>
     <string name="standalone_failure_internal">SphereSLAM couldn\'t continue tracking this target.</string>
     <string name="standalone_tracking_stopped">SphereSLAM tracking stopped. Recapture the target to restart it.</string>
-    <string name="standalone_status_mapping">SphereSLAM mapping • tap Target to add fingerprint</string>
-    <string name="standalone_status_preparing">Preparing fingerprint target…</string>
-    <string name="standalone_status_finding">Finding fingerprint target…</string>
+    <string name="standalone_status_mapping">SphereSLAM mapping • tap Doodle to add your Doodle</string>
+    <string name="standalone_status_preparing">Preparing wall target…</string>
+    <string name="standalone_status_finding">Finding wall target…</string>
     <string name="standalone_quality_too_small">That wall target is too small after rectification. Capture a larger patch.</string>
     <string name="standalone_quality_low_contrast">That wall target has too little visual contrast. Include more texture or detail.</string>
     <string name="standalone_quality_blurry">That wall target is too blurry for reliable tracking. Hold steady and recapture.</string>
@@ -751,15 +751,15 @@
     <string name="ar_feedback_guest_edit_dropped">That change can\'t be shared with the host — it stays on this device</string>
     <string name="ar_feedback_backend_resolving">AR backend is still being resolved — try Host again in a moment</string>
     <string name="ar_feedback_open_project_first">Open a project before sharing — there\'s nothing to send to a guest yet</string>
-    <string name="ar_feedback_host_need_target_arcore">Capture and lock a current wall target before hosting</string>
+    <string name="ar_feedback_host_need_target_arcore">Capture and lock a current Doodle before hosting</string>
     <string name="ar_feedback_host_need_target_standalone">Capture a standalone Wall Target before hosting</string>
-    <string name="ar_feedback_fingerprint_not_ready">Wall fingerprint is not ready yet — keep the target in view and try Host again</string>
+    <string name="ar_feedback_fingerprint_not_ready">Doodle is not ready yet — keep it in view and try Host again</string>
     <string name="ar_feedback_package_failed">Couldn\'t package this project to share — try saving it first</string>
     <string name="ar_feedback_host_failed">Couldn\'t start sharing: %1$s</string>
     <string name="ar_feedback_join_load_failed">Couldn\'t load the host\'s project — the session was ended.</string>
     <string name="ar_feedback_join_no_geometry">The host did not provide geometry ARCore can align to.</string>
     <string name="ar_feedback_join_failed">Couldn\'t join: %1$s</string>
-    <string name="ar_feedback_wall_target_changed">Wall target changed — sharing ended. Start Host again for the new wall.</string>
+    <string name="ar_feedback_wall_target_changed">Doodle changed — sharing ended. Start Host again for the new wall.</string>
     <string name="ar_feedback_backend_changed">Tracking backend changed — sharing ended. Start sharing again.</string>
     <string name="ar_feedback_camera_busy">Camera is busy or unavailable — close other camera apps, then re-enter AR</string>
     <string name="ar_feedback_ar_start_failed">Couldn\'t start AR — your camera may be in use by another app</string>
@@ -768,21 +768,21 @@
     <string name="ar_feedback_camera_not_resumed">AR camera did not resume — try leaving and re-entering AR mode</string>
     <string name="ar_feedback_camera_permission">Camera unavailable — check the camera permission, then re-enter AR</string>
     <string name="ar_feedback_camera_not_paused">AR camera did not pause cleanly — it may keep running in the background</string>
-    <string name="ar_feedback_backbone_warning">The artwork covers nearly all the wall in view — only %1$d tracked features sit outside it. Make it smaller or step back, or the target may not lock.</string>
-    <string name="ar_feedback_legacy_target_geometry">This project\'s saved target was made by an older version and its 3D geometry can\'t be corrected. Create the target again to use it.</string>
+    <string name="ar_feedback_backbone_warning">The artwork covers nearly all the wall in view — only %1$d tracked features sit outside it. Make it smaller or step back, or the Doodle may not lock.</string>
+    <string name="ar_feedback_legacy_target_geometry">This project\'s saved Doodle was made by an older version and its 3D geometry can\'t be corrected. Create the Doodle again to use it.</string>
     <string name="ar_feedback_camera_no_frames">Camera isn\'t delivering frames — exit AR and try again</string>
     <string name="ar_feedback_camera_recovery_timeout">AR camera recovery timed out safely — exit and re-enter AR</string>
     <string name="ar_feedback_target_prepare_failed">Couldn\'t prepare the captured target. Try again.</string>
     <string name="ar_feedback_wall_width_save_failed">Couldn\'t save the wall width. Try Save again.</string>
     <string name="ar_feedback_unknown_error">unknown error</string>
-    <string name="reloc_looking">Looking for your target…</string>
+    <string name="reloc_looking">Looking for your Doodle…</string>
     <string name="reloc_turn_right">Turn right %1$d°</string>
     <string name="reloc_turn_left">Turn left %1$d°</string>
     <string name="reloc_tilt_up">Tilt up %1$d°</string>
     <string name="reloc_tilt_down">Tilt down %1$d°</string>
     <string name="reloc_facing_it">You\'re facing it — move slowly side to side</string>
-    <string name="reloc_recapture">Recapture target</string>
-    <string name="ar_feedback_capture_failed">Target capture failed. Tap to try again.</string>
+    <string name="reloc_recapture">Recapture Doodle</string>
+    <string name="ar_feedback_capture_failed">Doodle capture failed. Tap to try again.</string>
 
     <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
     <string name="nav_stencil">Stencil</string>
@@ -793,11 +793,11 @@
     <string name="nav_stencil_view_white">White</string>
     <string name="nav_stencil_view_info">Cycles which stencil sheets are shown: all, black, grey or white.</string>
 
-    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <!-- Pass B: the Settings switch. -->
     <string name="settings_change_pass">Change detection (needs a clean-wall photo)</string>
-    <string name="target_clean_wall_text">Not marked yet? First photograph the bare wall with the button below, then paint your marks. Already marked? Just tap your marks.</string>
-    <string name="target_clean_wall_photo">Clean wall photo</string>
-    <string name="target_clean_wall_saved">Clean wall photo saved. Retake</string>
+    <!-- Spoken labels for the round shutter on the Doodle grid screen, which photographs the bare wall. -->
+    <string name="target_shutter_cd">Photograph the bare wall</string>
+    <string name="target_shutter_retake_cd">Retake the bare-wall photo</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">CV view</string>
