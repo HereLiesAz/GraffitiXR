@@ -1447,7 +1447,6 @@ class MainActivity : AppCompatActivity() {
                                     val dashboardState by dashboardViewModel.uiState.collectAsState()
                                     LaunchedEffect(Unit) { dashboardViewModel.loadAvailableProjects() }
                                     ProjectLibraryScreen(
-                                        isRightHanded = editorUiState.isRightHanded,
                                         projects = dashboardState.availableProjects,
                                         onLoadProject = { project ->
                                             // Switching projects ends any active guest co-op session
