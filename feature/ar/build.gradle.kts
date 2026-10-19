@@ -130,7 +130,6 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
 
-    // Removed MLKit segmentation dependency here
     implementation(libs.kotlinx.coroutines.play.services)
 
     // Logging
