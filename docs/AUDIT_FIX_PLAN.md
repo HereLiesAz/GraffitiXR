@@ -171,4 +171,53 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
 
 ## F. Persistence and Link
 
-(Pending the last audit.)
+The self-grown rows not being saved is B1, and standalone paint marks and grid not being saved is C3. Both appear here too.
+
+- [ ] **F1. The save on app exit loses the race with engine teardown.**
+  - Where: `MainActivity.kt:2218-2219` starts `destroyArSession()` asynchronously, then calls `slamManager.destroy()`. The save (`ArViewModel.kt:3825-3827`, after up to 1.5 s in `detachSessionBounded`) finds a null engine (`GraffitiJNI.cpp:321`) and returns silently (`:4004`).
+  - Fix: wait for the teardown save to finish before destroying native.
+- [ ] **F2. Screen-off and backgrounding don't save.**
+  - Where: the pause path `ArViewModel.kt:2832-2833` → `pauseArSessionInternal` (`:3770`). Autosave runs every 30 s, past thresholds only.
+  - Fix: save on `ON_STOP`.
+- [ ] **F3. Switching projects, or joining Link, drops the outgoing project's unsaved native state.**
+  - Where: `ArViewModel.kt:2001-2013`; `alignToPeer` (`:586`).
+  - Fix: run `saveMapBlocking` for the current project before the switch or `alignToPeer`.
+- [ ] **F4. The angled-view rectification compares camera poses from two sessions on a return visit.**
+  - Where: `ArViewModel.kt:4517-4525` restores the capture view; `computeRectifyHomography` (`MobileGS.cpp:1330-1380`) assumes a shared VIO world.
+  - Fix: rectify only once a lock in the current session gives the capture view in the current world.
+- [ ] **F5. A depth-path capture can never re-anchor on reopen, yet says "Doodle Saved & Locked".**
+  - Where: `MainViewModel.kt:585-595, 664, 690-693, 711`; reload at `ArViewModel.kt:4539-4548`; `ArRenderer.kt:1728-1729, 2242-2247`; hosting refused at `CoopSpatialFrameFactory.kt:58-63`.
+  - Fix: record `captureAnchorCam` (and intrinsics and view) from the anchor on the depth path.
+- [ ] **F6. A Link guest gets none of the host's paint-derived references.**
+  - Where: host sends Doodle rows only (`ArViewModel.kt:462`); `alignToDoodle` clears the guest's paint marks and map (`MobileGS.cpp:2585-2587, 2622-2628`); the archive's `paintMarks` are never installed (`ArViewModel.kt:116-123, 2222-2230`).
+  - Fix: after `alignToPeer`, install the host's paint marks (they are in the Doodle frame), and send the grown rows (B1).
+- [ ] **F7. Entering AR as a guest skips the guest guard.**
+  - Where: `ArViewModel.kt:2653-2654` → `loadDoodleIfExists()` bypasses `shouldRestoreLocalArCoreDoodle`, restoring the host's copy with host intrinsics, anchor, view, map and photos (`:4519-4530`).
+  - Fix: apply the guard in `setArMode`, and re-run `alignToPeer` for guests.
+- [ ] **F8. The guest keeps its previous wall's normal.**
+  - Where: `alignToDoodle` doesn't reset `mHasWallNormalEnu` (`MobileGS.cpp:2581-2633`), so `wallOrientationRejects` (`ArRenderer.kt:3576-3603`) rejects the host wall.
+  - Fix: clear it at join, or set it from the host project.
+- [ ] **F9. The wrong capture photo can be used for the grid.**
+  - Where: `ArViewModel.kt:4602-4608` uses `doodleImageUris.lastOrNull()` with the ARCore intrinsics, but standalone captures append to the same list (`MainViewModel.kt:346, 387`) and a rejected candidate's image stays (`:498-536`).
+  - Fix: keep a dedicated ARCore capture-photo reference, and drop rejected candidates' images.
+- [ ] **F10. A standalone capture nulls the ARCore paint marks and grid.**
+  - Where: `MainViewModel.kt:385-386`.
+  - Fix: keep them (they belong to the ARCore frame).
+- [ ] **F11. Silent and lossy failures.**
+  - Wall-map and paint save errors only go to logs (`ArViewModel.kt:3901-3908, 3922-3926`).
+  - The partition write at `:4303` has no try/catch in a `viewModelScope` launch, so a write error crashes the app.
+  - Any decode or `require` failure drops the whole project from the library (`ProjectManager.kt:731-736`).
+  - Projects of 256–512 MiB export but can't be hosted (`Limits.kt` vs `ProjectManager`).
+  - Fix: surface save failures to the user; catch the partition write; keep an undecodable project listed as damaged with its files intact; align the size limits.
+
+## Order of work
+
+Fixes land in commits that group related findings:
+1. A1, A2, A3, A4, A5, A7, A8, A10.
+2. B1, F1, F2, F3, F6.
+3. B2, B3, B4, B5, B6, B9, B10, B11, B13.
+4. C1 to C10, F10.
+5. F4, F5, F7, F8, F9, F11, A9, A11, B7, B8, B12.
+6. A6, D1 to D12, E1.
+
+Each commit carries its tests and docs and ticks its boxes here.
