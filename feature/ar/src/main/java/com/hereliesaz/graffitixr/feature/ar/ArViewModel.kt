@@ -1846,6 +1846,29 @@ class ArViewModel @Inject constructor(
 
     private val visitedSectors = BooleanArray(36) // 10 degree sectors for higher resolution feedback
 
+    // Declared ABOVE the init block below, on purpose. That block launches coroutines on IO, and
+    // viewModelScope's Main.immediate runs the rest synchronously inside the constructor, so code it
+    // reaches can execute before any property declared further down the class is initialized. A
+    // non-null holder read that early is null: monocularDepthMutex was, and the 1.48.44.1 startup
+    // crash was its NPE in reconcileMonocularDepth. A nullable one declared below would be
+    // overwritten by its own `= null` initializer after init had already set it.
+
+    // ArAvailabilityChecker's verdict, resolved once per process (a later ARCore install isn't
+    // auto-detected). Cached so a "Use ARCore" toggle re-derives the backend without re-running the
+    // checker, and so monocular depth knows whether ARCore depth can be the source. Null until resolved.
+    @Volatile private var arCoreCheckResult: ArAvailabilityChecker.Result? = null
+
+    // Serializes monocular-depth load/unload so rapid toggles can't interleave a self-test and a close.
+    private val monocularDepthMutex = Mutex()
+
+    /** Loader runs between their start and their `finally`; see [loadFingerprintIfExists]. */
+    private val fingerprintLoadsInFlight = java.util.concurrent.atomic.AtomicInteger(0)
+
+    // A page frozen this session, waiting for ITS fingerprint to commit. Guards [pendingHybridPage]
+    // and its capture keys: written from the GL thread (renderer callbacks) and read from the
+    // project collector.
+    private val hybridLock = Any()
+
     init {
         NativeLibLoader.loadAll()
         startSystemThrottleMonitoring()
@@ -2202,10 +2225,7 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    // ArAvailabilityChecker's verdict, resolved once per process (a later ARCore install isn't
-    // auto-detected). Cached so a "Use ARCore" toggle re-derives the backend without re-running the
-    // checker, and so monocular depth knows whether ARCore depth can be the source. Null until resolved.
-    @Volatile private var arCoreCheckResult: ArAvailabilityChecker.Result? = null
+    // arCoreCheckResult is declared above the init block that sets it; see the note there.
 
     /**
      * Selects the AR backend from the cached checker [result] and the "Use ARCore" setting. Runs at
@@ -2298,8 +2318,7 @@ class ArViewModel @Inject constructor(
         sessionMutex.withLock { }
     }
 
-    // Serializes monocular-depth load/unload so rapid toggles can't interleave a self-test and a close.
-    private val monocularDepthMutex = Mutex()
+    // monocularDepthMutex is declared above the init block; see the note there.
 
     /**
      * Loads + self-tests, or unloads, the monocular depth model to match its settings, immediately.
@@ -4332,8 +4351,7 @@ class ArViewModel @Inject constructor(
 
     @Volatile private var loadedFingerprint: LoadedFingerprint? = null
 
-    /** Loader runs between their start and their `finally`; see [loadFingerprintIfExists]. */
-    private val fingerprintLoadsInFlight = java.util.concurrent.atomic.AtomicInteger(0)
+    // fingerprintLoadsInFlight is declared above the init block; see the note there.
 
     /**
      * Restore (or clear) the wall fingerprint for the current project.
@@ -4660,9 +4678,8 @@ class ArViewModel @Inject constructor(
     private fun hybridRestoreKey(project: com.hereliesaz.graffitixr.common.model.GraffitiProject) =
         project.id to project.hybridKpmPageUri
 
-    // A page frozen this session, waiting for ITS fingerprint to commit. Guarded by [hybridLock]:
-    // written from the GL thread (renderer callbacks) and read from the project collector.
-    private val hybridLock = Any()
+    // A page frozen this session, waiting for ITS fingerprint to commit. Guarded by [hybridLock]
+    // (declared above the init block; see the note there).
     private var pendingHybridPage: HybridKpmPage? = null
     // `fingerprint.captureAnchorCam` as it stood when the current capture started. The pending page
     // commits only once the project's fingerprint has moved off this value — i.e. the capture that
