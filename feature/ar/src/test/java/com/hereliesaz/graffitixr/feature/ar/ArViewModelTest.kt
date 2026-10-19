@@ -17,7 +17,7 @@ import android.graphics.Paint
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.feature.ar.anchor.DoodlePartition
-import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneDoodleBuilder
+import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder
 import com.hereliesaz.sphereslam.SphereSlam
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -83,9 +83,9 @@ class ArViewModelTest {
         // Reference-persistence tests exercise the atomic URI/metadata transaction, not feature
         // extraction. Supply a valid doodle so the mandatory teleological-SLAM precondition is
         // satisfied without making those tests depend on OpenCV/native descriptor extraction.
-        mockkObject(StandaloneDoodleBuilder)
+        mockkObject(StandaloneFingerprintBuilder)
         every {
-            StandaloneDoodleBuilder.build(any(), any(), any())
+            StandaloneFingerprintBuilder.build(any(), any(), any())
         } returns mockk(relaxed = true)
         mockkStatic(Bitmap::class)
         mockkStatic(Canvas::class)
@@ -132,7 +132,7 @@ class ArViewModelTest {
         unmockkStatic(Matrix::class)
         unmockkStatic(Paint::class)
         unmockkConstructor(Paint::class)
-        unmockkObject(StandaloneDoodleBuilder)
+        unmockkObject(StandaloneFingerprintBuilder)
         unmockkObject(SphereSlam)
         unmockkObject(NativeLibLoader)
     }
@@ -395,7 +395,7 @@ class ArViewModelTest {
         assertTrue(updated.sphereSlamReferencePhysicallyMetric)
         assertEquals(8L, updated.sphereSlamAnchorGeneration)
         assertEquals(
-            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
             updated.sphereSlamAnchorFrameVersion,
         )
         coVerify {

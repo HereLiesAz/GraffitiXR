@@ -10,8 +10,8 @@ import com.hereliesaz.graffitixr.common.model.SphereSlamAtlasPage
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
-import com.hereliesaz.graffitixr.feature.ar.StandaloneDoodlePlacement
-import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneDoodleBuilder
+import com.hereliesaz.graffitixr.feature.ar.StandaloneFingerprintPlacement
+import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.sphereslam.TileId
 import io.mockk.coEvery
@@ -62,8 +62,8 @@ class MainViewModelStandaloneReplacementTest {
         sphereSlamReferenceWidthMeters = 2f,
         sphereSlamAnchorGeneration = 3L,
         sphereSlamPlacementAnchorGeneration = 3L,
-        sphereSlamDoodle = oldDoodle,
-        sphereSlamMapFromDoodle = List(16) { 1f },
+        sphereSlamFingerprint = oldDoodle,
+        sphereSlamMapFromFingerprint = List(16) { 1f },
         sphereSlamAtlasPages = listOf(
             SphereSlamAtlasPage(
                 pageNo = 1,
@@ -97,14 +97,14 @@ class MainViewModelStandaloneReplacementTest {
         every { Toast.makeText(any(), any<CharSequence>(), any()) } returns mockk(relaxed = true)
         mockkStatic(Bitmap::class)
         every { Bitmap.createScaledBitmap(any(), any(), any(), any()) } returns mockk(relaxed = true)
-        mockkObject(StandaloneDoodleBuilder)
-        every { StandaloneDoodleBuilder.build(any(), any(), any(), any(), any()) } returns mockk(relaxed = true)
+        mockkObject(StandaloneFingerprintBuilder)
+        every { StandaloneFingerprintBuilder.build(any(), any(), any(), any(), any()) } returns mockk(relaxed = true)
         viewModel = MainViewModel(projectRepository, slamManager, projectManager, settingsRepository, context)
     }
 
     @After
     fun tearDown() {
-        unmockkObject(StandaloneDoodleBuilder)
+        unmockkObject(StandaloneFingerprintBuilder)
         unmockkStatic(Toast::class)
         unmockkStatic(Bitmap::class)
         Dispatchers.resetMain()
@@ -115,7 +115,7 @@ class MainViewModelStandaloneReplacementTest {
         viewModel.onConfirmStandaloneTargetCreation(
             bitmap = mockk(relaxed = true),
             selectionMask = null,
-            placement = StandaloneDoodlePlacement(FloatArray(16), 1.5f, false, TileId(0, 0)),
+            placement = StandaloneFingerprintPlacement(FloatArray(16), 1.5f, false, TileId(0, 0)),
         )
         val deadline = System.currentTimeMillis() + 5_000
         while (viewModel.uiState.value.isConfirmingDoodle && System.currentTimeMillis() < deadline) Thread.sleep(10)
@@ -148,8 +148,8 @@ class MainViewModelStandaloneReplacementTest {
         val restored = current.value!!
         assertSame(oldUri, restored.sphereSlamReferenceUri)
         assertEquals(2f, restored.sphereSlamReferenceWidthMeters)
-        assertSame(oldDoodle, restored.sphereSlamDoodle)
-        assertEquals(previous.sphereSlamMapFromDoodle, restored.sphereSlamMapFromDoodle)
+        assertSame(oldDoodle, restored.sphereSlamFingerprint)
+        assertEquals(previous.sphereSlamMapFromFingerprint, restored.sphereSlamMapFromFingerprint)
         assertEquals(previous.sphereSlamAtlasPages, restored.sphereSlamAtlasPages)
         // A new generation (everything re-solves for the page), still placed.
         assertEquals(5L, restored.sphereSlamAnchorGeneration)

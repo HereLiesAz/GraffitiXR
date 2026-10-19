@@ -312,15 +312,15 @@ data class ArUiState(
      */
     val isSphereSlamReferenceRegistered: Boolean = false,
     val sphereSlamAnchorGeneration: Long = 0L,
-    val sphereSlamAnchorFrameVersion: Int = SPHERE_SLAM_DOODLE_FRAME_VERSION,
+    val sphereSlamAnchorFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     val sphereSlamPlacementAnchorGeneration: Long = 0L,
-    // Separate from the ARCore/capture-camera doodle; see GraffitiProject.sphereSlamDoodle.
-    val sphereSlamDoodle: Doodle? = null,
-    val sphereSlamDoodleFrameVersion: Int = SPHERE_SLAM_DOODLE_FRAME_VERSION,
+    // Separate from the ARCore/capture-camera doodle; see GraffitiProject.sphereSlamFingerprint.
+    val sphereSlamFingerprint: Doodle? = null,
+    val sphereSlamFingerprintFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     /** Column-major GL map_from_doodle; empty until the precision target is localized in-map. */
-    val sphereSlamMapFromDoodle: List<Float> = emptyList(),
+    val sphereSlamMapFromFingerprint: List<Float> = emptyList(),
     val sphereSlamWallFeatureMap: WallFeatureMap? = null,
-    val sphereSlamWallFeatureMapFrameVersion: Int = SPHERE_SLAM_DOODLE_FRAME_VERSION,
+    val sphereSlamWallFeatureMapFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     val sphereSlamAtlasPages: List<SphereSlamAtlasPage> = emptyList(),
 
     // Mirrors the runtime camera permission state so AR overlays can react without

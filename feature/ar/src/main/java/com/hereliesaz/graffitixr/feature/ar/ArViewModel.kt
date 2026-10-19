@@ -24,7 +24,7 @@ import com.hereliesaz.graffitixr.common.util.imageStats
 import com.hereliesaz.graffitixr.feature.ar.anchor.DoodlePartition
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricDoodleBuilder
 import com.hereliesaz.sphereslam.math.RigidMath
-import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneDoodleBuilder
+import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
@@ -146,7 +146,7 @@ internal fun standaloneTapInFrame(
     ) ?: floatArrayOf(tap.first, tap.second)
 }
 
-data class StandaloneDoodlePlacement(
+data class StandaloneFingerprintPlacement(
     /** Column-major GL map_from_doodle transform. */
     val mapFromFingerprint: FloatArray,
     /** Width of the captured doodle plane in photosphere map units. */
@@ -1163,7 +1163,7 @@ class ArViewModel @Inject constructor(
     private val spherePhotosphereKeyframes =
         com.hereliesaz.sphereslam.PhotosphereKeyframeStore(spherePhotosphere)
     @Volatile private var standalonePhotosphereActive: Boolean = false
-    @Volatile private var sphereDoodleAnchorTile: com.hereliesaz.sphereslam.TileId? = null
+    @Volatile private var sphereFingerprintAnchorTile: com.hereliesaz.sphereslam.TileId? = null
 
     /**
      * Timestamped attitude history of the standalone attitude sensor (`elapsedRealtimeNanos` base),
@@ -1325,16 +1325,16 @@ class ArViewModel @Inject constructor(
                     kotlin.math.abs(a[i] - b[i]) <= epsilon
             }
 
-    fun onStandaloneMapFromDoodleSolved(mapFromFingerprint: FloatArray) {
+    fun onStandaloneMapFromFingerprintSolved(mapFromFingerprint: FloatArray) {
         if (
             mapFromFingerprint.size != 16 ||
             mapFromFingerprint.any { !it.isFinite() }
         ) return
 
         val starting = projectRepository.currentProject.value ?: return
-        if (starting.sphereSlamDoodle == null) return
+        if (starting.sphereSlamFingerprint == null) return
         val solved = mapFromFingerprint.toList()
-        if (sameStandaloneTransform(solved, starting.sphereSlamMapFromDoodle)) return
+        if (sameStandaloneTransform(solved, starting.sphereSlamMapFromFingerprint)) return
 
         val projectId = starting.id
         val anchorGeneration = starting.sphereSlamAnchorGeneration
@@ -1343,11 +1343,11 @@ class ArViewModel @Inject constructor(
             projectRepository.updateProject { current ->
                 if (
                     current.id != projectId ||
-                    current.sphereSlamDoodle == null ||
+                    current.sphereSlamFingerprint == null ||
                     current.sphereSlamAnchorGeneration != anchorGeneration
                 ) {
                     current
-                } else if (sameStandaloneTransform(solved, current.sphereSlamMapFromDoodle)) {
+                } else if (sameStandaloneTransform(solved, current.sphereSlamMapFromFingerprint)) {
                     current
                 } else {
                     committed = true
@@ -1356,10 +1356,10 @@ class ArViewModel @Inject constructor(
                     // provisional transform cannot survive the rigid-frame correction, so discard
                     // only that derived precision map; it will rebuild in the solved map frame.
                     current.copy(
-                        sphereSlamMapFromDoodle = solved,
+                        sphereSlamMapFromFingerprint = solved,
                         sphereSlamWallFeatureMap = null,
                         sphereSlamWallFeatureMapFrameVersion =
-                            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+                            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                     )
                 }
             }
@@ -1842,7 +1842,7 @@ class ArViewModel @Inject constructor(
     private var pendingTapViewSize: Pair<Int, Int>? = null
 
     @Volatile
-    private var pendingStandaloneDoodlePlacement: StandaloneDoodlePlacement? = null
+    private var pendingStandaloneFingerprintPlacement: StandaloneFingerprintPlacement? = null
 
     private val visitedSectors = BooleanArray(36) // 10 degree sectors for higher resolution feedback
 
@@ -1956,19 +1956,19 @@ class ArViewModel @Inject constructor(
                         sphereSlamAnchorGeneration = project?.sphereSlamAnchorGeneration ?: 0L,
                         sphereSlamAnchorFrameVersion =
                             project?.sphereSlamAnchorFrameVersion
-                                ?: com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+                                ?: com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                         sphereSlamPlacementAnchorGeneration =
                             project?.sphereSlamPlacementAnchorGeneration ?: 0L,
-                        sphereSlamDoodle = project?.sphereSlamDoodle,
-                        sphereSlamDoodleFrameVersion =
-                            project?.sphereSlamDoodleFrameVersion
-                                ?: com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
-                        sphereSlamMapFromDoodle =
-                            project?.sphereSlamMapFromDoodle.orEmpty(),
+                        sphereSlamFingerprint = project?.sphereSlamFingerprint,
+                        sphereSlamFingerprintFrameVersion =
+                            project?.sphereSlamFingerprintFrameVersion
+                                ?: com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                        sphereSlamMapFromFingerprint =
+                            project?.sphereSlamMapFromFingerprint.orEmpty(),
                         sphereSlamWallFeatureMap = project?.sphereSlamWallFeatureMap,
                         sphereSlamWallFeatureMapFrameVersion =
                             project?.sphereSlamWallFeatureMapFrameVersion
-                                ?: com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+                                ?: com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                         sphereSlamAtlasPages = project?.sphereSlamAtlasPages.orEmpty(),
                         wallWidthMeters = project?.wallWidthMeters,
                     )
@@ -2214,7 +2214,7 @@ class ArViewModel @Inject constructor(
     /**
      * Restores the current project's ARCore-frame state into native — the gated half of the
      * currentProject collector, and the reverse half of a live "Use ARCore" switch back on (standalone
-     * had its own page-frame doodle installed in the process-global MobileGS).
+     * had its own page-frame fingerprint installed in the process-global MobileGS).
      */
     private fun restoreLocalArCoreProjectState(
         project: com.hereliesaz.graffitixr.common.model.GraffitiProject,
@@ -2252,7 +2252,7 @@ class ArViewModel @Inject constructor(
      *   binds CameraX for the standalone path (the two racing for the device is the crash described in
      *   MainScreen's AR-entry effect). Its ARCore-frame wall map is persisted while saves still route to
      *   the ARCore branch, then the native ARCore frame is cleared — the same cleanup the startup path
-     *   does — so the standalone analyzer installs its page-frame doodle deterministically.
+     *   does — so the standalone analyzer installs its page-frame fingerprint deterministically.
      * - **standalone → ARCore.** Publishing the state is enough for MainScreen: the standalone branch
      *   leaves composition (its analyzer stops, CameraX unbinds) and the ARCore branch's AR-entry
      *   effect opens the Session behind the camera-availability gate. The project's ARCore-frame
@@ -2275,7 +2275,7 @@ class ArViewModel @Inject constructor(
             // an ARCore/capture-camera doodle while ARCore capability was still UNKNOWN (or, on a
             // live switch, while ARCore was the backend). Clear that frame BEFORE publishing "ARCore
             // unavailable"; the standalone analyzer starts only after this state update and will then
-            // install the centered page-frame doodle deterministically.
+            // install the centered page-frame fingerprint deterministically.
             loadedDoodle = null
             nativeStateOwner.clear()
             slamManager.clearWallDoodle()
@@ -3374,13 +3374,13 @@ class ArViewModel @Inject constructor(
                 // Doodling is part of target creation, not an optional enhancement.
                 // Teleological SLAM consumes this seed for relocalization/progress, so never persist a
                 // standalone reference that cannot also produce its canonical-page doodle.
-                val standaloneDoodle =
-                    StandaloneDoodleBuilder.build(
+                val standaloneFingerprint =
+                    StandaloneFingerprintBuilder.build(
                         slam = slamManager,
                         bitmap = bitmap,
                         referenceWidthMeters = referenceWidthMeters,
                         features = _uiState.value.doodleFeatures,
-                    ) ?: error("Standalone target produced no teleological SLAM doodle")
+                    ) ?: error("Standalone target produced no teleological SLAM fingerprint")
 
                 newUri = projectManager.saveSphereSlamReference(appContext, projectId, bitmap)
                 val candidateUri = newUri
@@ -3401,26 +3401,26 @@ class ArViewModel @Inject constructor(
                             sphereSlamReferencePhysicallyMetric = physicallyMetric,
                             sphereSlamAnchorGeneration = current.sphereSlamAnchorGeneration + 1L,
                             sphereSlamAnchorFrameVersion =
-                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                             sphereSlamPlacementAnchorGeneration = 0L,
-                            sphereSlamDoodle = standaloneDoodle,
+                            sphereSlamFingerprint = standaloneFingerprint,
                             // A new target may be another wall: its normal is learned afresh.
                             doodleWallNormalEnu = emptyList(),
-                            sphereSlamDoodleFrameVersion =
-                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+                            sphereSlamFingerprintFrameVersion =
+                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                             // Precision target replacement never resets the base photosphere. Attach
                             // the new doodle with the capture-time provisional transform when
                             // available; otherwise leave it unresolved until the same-frame solver
                             // publishes an exact bridge.
-                            sphereSlamMapFromDoodle =
-                                pendingStandaloneDoodlePlacement
+                            sphereSlamMapFromFingerprint =
+                                pendingStandaloneFingerprintPlacement
                                     ?.mapFromFingerprint
                                     ?.takeIf { it.size == 16 && it.all(Float::isFinite) }
                                     ?.toList()
                                     ?: emptyList(),
                             sphereSlamWallFeatureMap = null,
                             sphereSlamWallFeatureMapFrameVersion =
-                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                             sphereSlamAtlasPages = emptyList(),
                         )
                     }
@@ -3537,16 +3537,16 @@ class ArViewModel @Inject constructor(
                             sphereSlamReferencePhysicallyMetric = false,
                             sphereSlamAnchorGeneration = current.sphereSlamAnchorGeneration + 1L,
                             sphereSlamAnchorFrameVersion =
-                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                             sphereSlamPlacementAnchorGeneration = 0L,
                             // The seed's object points are defined by this exact page. Keeping it
                             // after the page is gone would let a later standalone runtime restore a
                             // coordinate frame it can no longer reconstruct or verify.
-                            sphereSlamDoodle = null,
-                            sphereSlamMapFromDoodle = emptyList(),
+                            sphereSlamFingerprint = null,
+                            sphereSlamMapFromFingerprint = emptyList(),
                             sphereSlamWallFeatureMap = null,
                             sphereSlamWallFeatureMapFrameVersion =
-                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                             sphereSlamAtlasPages = emptyList(),
                         )
                     }
@@ -3867,7 +3867,7 @@ class ArViewModel @Inject constructor(
      */
     private fun clearCaptureState() {
         pendingTapPosition = null
-        pendingStandaloneDoodlePlacement = null
+        pendingStandaloneFingerprintPlacement = null
         resetCapturePipeline()
         _uiState.update {
             it.copy(
@@ -3942,7 +3942,7 @@ class ArViewModel @Inject constructor(
             ui.isArCoreAvailabilityResolved &&
                 !ui.isArCoreAvailable &&
                 currentProject.sphereSlamReferenceUri != null &&
-                currentProject.sphereSlamDoodle != null
+                currentProject.sphereSlamFingerprint != null
         // ARCore-frame state (wall normal, wall map, paint marks, grid) is what the loader swaps in;
         // between a project switch and the end of that swap native still holds the PREVIOUS
         // project's, and writing it here would put project A's map into project B. Skip until the
@@ -3959,7 +3959,7 @@ class ArViewModel @Inject constructor(
 
         if (standaloneBackend) {
             if (map == null) return
-            val mapFromFingerprint = currentProject.sphereSlamMapFromDoodle
+            val mapFromFingerprint = currentProject.sphereSlamMapFromFingerprint
             if (
                 mapFromFingerprint.size != 16 ||
                 !sameStandaloneTransform(map.anchor, mapFromFingerprint)
@@ -3978,7 +3978,7 @@ class ArViewModel @Inject constructor(
                     project.copy(
                         sphereSlamWallFeatureMap = map,
                         sphereSlamWallFeatureMapFrameVersion =
-                            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+                            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                         // Phase 1b: persist the per-keyframe orientation log alongside the map it is
                         // co-registered with. Null snapshot (flag off / nothing recorded) keeps the
                         // project's existing value (docs/SPHERESLAM_SPHERE_MAP.md).
@@ -5325,14 +5325,14 @@ class ArViewModel @Inject constructor(
         val wasRegistered = _uiState.value.isSphereSlamReferenceRegistered
         _uiState.update { it.copy(isSphereSlamReferenceRegistered = registered) }
         if (registered && !wasRegistered) {
-            sphereDoodleAnchorTile = currentPhotosphereTile()
+            sphereFingerprintAnchorTile = currentPhotosphereTile()
             appendDiag(
-                "SphereSLAM doodle attached to base photosphere tile=" +
-                    (sphereDoodleAnchorTile?.let { "${it.sector}:${it.band}" } ?: "unknown")
+                "SphereSLAM fingerprint attached to base photosphere tile=" +
+                    (sphereFingerprintAnchorTile?.let { "${it.sector}:${it.band}" } ?: "unknown")
             )
         } else if (!registered && wasRegistered) {
             // Removing/replacing the precision doodle does not destroy the base SphereSLAM map.
-            sphereDoodleAnchorTile = null
+            sphereFingerprintAnchorTile = null
         }
         val state = _uiState.value
         if (!state.isArCoreAvailabilityResolved || state.isArCoreAvailable) return
@@ -5421,13 +5421,13 @@ class ArViewModel @Inject constructor(
         ) return
         val startingProject = projectRepository.currentProject.value ?: return
         val referenceUri = startingProject.sphereSlamReferenceUri ?: return
-        if (startingProject.sphereSlamDoodle == null) return
+        if (startingProject.sphereSlamFingerprint == null) return
         if (!standaloneMapSaveInFlight.compareAndSet(false, true)) return
 
         viewModelScope.launch(dispatchers.io) {
             try {
                 val map = slamManager.getWallFeatureMap() ?: return@launch
-                val mapFromFingerprint = startingProject.sphereSlamMapFromDoodle
+                val mapFromFingerprint = startingProject.sphereSlamMapFromFingerprint
                 if (
                     mapFromFingerprint.size != 16 ||
                     !sameStandaloneTransform(map.anchor, mapFromFingerprint)
@@ -5443,7 +5443,7 @@ class ArViewModel @Inject constructor(
                     if (
                         current.id != startingProject.id ||
                         current.sphereSlamReferenceUri != referenceUri ||
-                        current.sphereSlamDoodle == null
+                        current.sphereSlamFingerprint == null
                     ) {
                         current
                     } else {
@@ -5451,7 +5451,7 @@ class ArViewModel @Inject constructor(
                         current.copy(
                             sphereSlamWallFeatureMap = map,
                             sphereSlamWallFeatureMapFrameVersion =
-                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                         )
                     }
                 }
@@ -5463,7 +5463,7 @@ class ArViewModel @Inject constructor(
                     appendDiag(
                         "SphereSLAM MobileGS map saved frame=photosphere-map " +
                             "version=" +
-                            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION +
+                            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION +
                             " points=" + map.pointCount,
                     )
                 }
@@ -5477,15 +5477,15 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    fun standaloneDoodlePlacementForConfirm(): StandaloneDoodlePlacement? {
-        val placement = pendingStandaloneDoodlePlacement ?: return null
+    fun standaloneFingerprintPlacementForConfirm(): StandaloneFingerprintPlacement? {
+        val placement = pendingStandaloneFingerprintPlacement ?: return null
         return placement.copy(mapFromFingerprint = placement.mapFromFingerprint.copyOf())
     }
 
-    private fun buildStandaloneDoodlePlacement(
+    private fun buildStandaloneFingerprintPlacement(
         tap: Pair<Float, Float>?,
         tapViewSize: Pair<Int, Int>?,
-    ): StandaloneDoodlePlacement? {
+    ): StandaloneFingerprintPlacement? {
         // Heading, elevation and the roll of the display-upright frame the keyframes and the capture
         // tap live in — one sample, so the triple stays exact looking down at a floor.
         val attitude = latestCameraAttitude(
@@ -5510,7 +5510,7 @@ class ArViewModel @Inject constructor(
                 nx = frameTap[0],
                 ny = frameTap[1],
             ) ?: return@synchronized null
-            StandaloneDoodlePlacement(
+            StandaloneFingerprintPlacement(
                 mapFromFingerprint = placement.mapFromFingerprint,
                 referenceWidthUnits = placement.referenceWidthUnits,
                 physicallyMetric = placement.physicallyMetric,
@@ -5534,19 +5534,19 @@ class ArViewModel @Inject constructor(
      *
      * Doodle capture sits above the pose backend, so standalone feeds the exact same review
      * state (raw image + removable-mark mask) instead of mounting a second capture workflow.
-     * Geometry is supplied later by the standalone doodle builder in its canonical page frame.
+     * Geometry is supplied later by the standalone fingerprint builder in its canonical page frame.
      */
     fun onStandaloneTargetCaptured(bitmap: Bitmap) {
         val captureTap = pendingTapPosition
         val captureTapViewSize = pendingTapViewSize
         pendingTapPosition = null
         pendingTapViewSize = null
-        pendingStandaloneDoodlePlacement =
-            buildStandaloneDoodlePlacement(captureTap, captureTapViewSize)
-        pendingStandaloneDoodlePlacement?.let { placement ->
-            sphereDoodleAnchorTile = placement.tileId
+        pendingStandaloneFingerprintPlacement =
+            buildStandaloneFingerprintPlacement(captureTap, captureTapViewSize)
+        pendingStandaloneFingerprintPlacement?.let { placement ->
+            sphereFingerprintAnchorTile = placement.tileId
             appendDiag(
-                "SphereSLAM doodle capture bound to photosphere tile=" +
+                "SphereSLAM fingerprint capture bound to photosphere tile=" +
                     "${placement.tileId.sector}:${placement.tileId.band} " +
                     "widthUnits=${"%.4f".format(placement.referenceWidthUnits)} " +
                     "metric=${placement.physicallyMetric}"
@@ -5554,7 +5554,7 @@ class ArViewModel @Inject constructor(
         } ?: run {
             val blocker = standalonePlacementBlocker()
             appendDiag(
-                "SphereSLAM doodle capture has no photosphere transform" +
+                "SphereSLAM fingerprint capture has no photosphere transform" +
                     (blocker?.let { " reason=$it" } ?: "") +
                     "; confirmation will fail closed"
             )
@@ -5587,7 +5587,7 @@ class ArViewModel @Inject constructor(
                 if (reviewBitmap !== bitmap) {
                     // The CameraX JPEG can be 12+ MP. Once the bounded review/reference copy exists,
                     // keeping that original allocation only burns tens of MB and serves no runtime
-                    // purpose; the standalone doodle/page geometry is resolution-independent.
+                    // purpose; the standalone fingerprint/page geometry is resolution-independent.
                     bitmap.recycle()
                 }
                 _uiState.update {
@@ -6090,7 +6090,7 @@ class ArViewModel @Inject constructor(
 
     fun clearTapHighlights() {
         pendingTapPosition = null
-        pendingStandaloneDoodlePlacement = null
+        pendingStandaloneFingerprintPlacement = null
         _uiState.update {
             it.copy(
                 tapMarks = emptyList(),
@@ -6108,7 +6108,7 @@ class ArViewModel @Inject constructor(
     fun clearCaptureForRetry() {
         slamManager.abortDoodleReplacement()
         pendingTapPosition = null
-        pendingStandaloneDoodlePlacement = null
+        pendingStandaloneFingerprintPlacement = null
         resetCapturePipeline()
         _uiState.update {
             it.copy(

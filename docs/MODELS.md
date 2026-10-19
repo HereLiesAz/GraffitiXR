@@ -21,7 +21,7 @@ Third-party weights keep their upstream license (see `docs/LICENSING.md`, "Bundl
   HPatches it reached 5.6% homography accuracy @3 px against 72.8% for the corrected export. Full
   provenance, verification and benchmark: `docs/models/SUPERPOINT_PROVENANCE.md`.
 - Bundled file: 5,236,740 B, sha256 `a95d3b7ae1e21833e5eb5cc7e7a99b07b04a9be0ed628f173171d82ec92a7107`.
-- SuperPoint descriptors saved by the previous asset (`doodle`, `sphereSlamDoodle`,
+- SuperPoint descriptors saved by the previous asset (`doodle`, `sphereSlamFingerprint`,
   `wallFeatureMap`, `sphereSlamWallFeatureMap`, `paintMarks` in `project.json`) no longer match;
   recapture the target. There is no migration.
 - `distortion_head.onnx` takes raw images and embeds its own backbone, so it is unaffected.

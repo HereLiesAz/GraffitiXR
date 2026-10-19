@@ -141,7 +141,7 @@ TEST(MobileGSReloc, LocksOnTheDoodledWallAndPublishesTheLiveCamera) {
 // identity doodle anchor — no capture camera. A live camera square-on to the page must lock
 // and report camera_from_doodle in that frame: page x → image right, page y (up) → image down,
 // so R = diag(1, −1, −1) and the page lies `distance` ahead.
-TEST(MobileGSReloc, LocksOnAStandalonePageFrameDoodle) {
+TEST(MobileGSReloc, LocksOnAStandalonePageFrameFingerprint) {
     MobileGS g;
     g.initialize(0, 0);
     const cv::Mat page = makeWall(640, 480);

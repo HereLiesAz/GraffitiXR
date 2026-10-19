@@ -257,12 +257,12 @@ fun SphereSlamStandaloneOverlay(
     slamManager: SlamManager,
     mobileGsDoodle: Doodle? = null,
     mobileGsDoodleFrameVersion: Int =
-        com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+        com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     /** Explicit GL map_from_doodle bridge into the base SphereSLAM photosphere. */
     mobileGsMapFromDoodle: List<Float> = emptyList(),
     mobileGsWallFeatureMap: WallFeatureMap? = null,
     mobileGsWallFeatureMapFrameVersion: Int =
-        com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+        com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     persistedReferenceUri: Uri? = null,
     persistedReferenceWidthMeters: Float = 1f,
     persistedReferencePhysicallyMetric: Boolean = false,
@@ -790,7 +790,7 @@ fun SphereSlamStandaloneOverlay(
         initialPersistedAtlasPages,
     ) {
         val expectedFrame =
-            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION
+            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION
         val loaded = withContext(Dispatchers.IO) {
             val valid = mutableListOf<SphereSlamStandaloneAtlasReferenceImage>()
             val invalid = mutableListOf<Pair<Int, Uri>>()

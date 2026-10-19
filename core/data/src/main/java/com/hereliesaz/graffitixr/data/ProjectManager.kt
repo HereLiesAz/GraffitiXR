@@ -261,37 +261,37 @@ class ProjectManager @Inject constructor(
                         projectData.sphereSlamModeAdjustment ?: existing.sphereSlamModeAdjustment,
                     // A new canonical page defines a new standalone object frame. Preserve an old
                     // seed only while the canonical reference URI itself is unchanged.
-                    sphereSlamDoodle =
+                    sphereSlamFingerprint =
                         if (
                             projectData.sphereSlamReferenceUri != null &&
                             projectData.sphereSlamReferenceUri != existing.sphereSlamReferenceUri
                         ) {
-                            projectData.sphereSlamDoodle
+                            projectData.sphereSlamFingerprint
                         } else {
-                            projectData.sphereSlamDoodle ?: existing.sphereSlamDoodle
+                            projectData.sphereSlamFingerprint ?: existing.sphereSlamFingerprint
                         },
-                    sphereSlamDoodleFrameVersion =
+                    sphereSlamFingerprintFrameVersion =
                         if (
                             projectData.sphereSlamReferenceUri != null &&
                             projectData.sphereSlamReferenceUri != existing.sphereSlamReferenceUri
                         ) {
-                            projectData.sphereSlamDoodleFrameVersion
+                            projectData.sphereSlamFingerprintFrameVersion
                         } else {
-                            existing.sphereSlamDoodleFrameVersion
+                            existing.sphereSlamFingerprintFrameVersion
                         },
-                    sphereSlamMapFromDoodle =
+                    sphereSlamMapFromFingerprint =
                         if (
                             projectData.sphereSlamReferenceUri != null &&
                             projectData.sphereSlamReferenceUri != existing.sphereSlamReferenceUri
                         ) {
-                            projectData.sphereSlamMapFromDoodle
-                        } else if (projectData.sphereSlamMapFromDoodle.size == 16) {
-                            projectData.sphereSlamMapFromDoodle
+                            projectData.sphereSlamMapFromFingerprint
+                        } else if (projectData.sphereSlamMapFromFingerprint.size == 16) {
+                            projectData.sphereSlamMapFromFingerprint
                         } else {
-                            existing.sphereSlamMapFromDoodle
+                            existing.sphereSlamMapFromFingerprint
                         },
                     // The standalone wide-wall map is expressed in the SAME centred page frame as
-                    // sphereSlamDoodle. A new canonical page must never inherit the old map.
+                    // sphereSlamFingerprint. A new canonical page must never inherit the old map.
                     sphereSlamWallFeatureMap =
                         if (
                             projectData.sphereSlamReferenceUri != null &&

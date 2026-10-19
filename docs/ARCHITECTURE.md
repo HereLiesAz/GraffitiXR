@@ -223,7 +223,7 @@ ARCore/SphereSLAM world origin. The wire descriptor is
 
 For an ARCore host, `doodleFromWall` is the persisted
 `Doodle.captureAnchorCam = V_cv(capture) * anchorModel`. For a standalone host it is identity,
-because standalone doodle points already live directly in the centered canonical KPM wall
+because standalone fingerprint points already live directly in the centered canonical KPM wall
 frame.
 
 A peer MobileGS solve is therefore backend-neutral:

@@ -13,12 +13,12 @@ import kotlinx.serialization.Serializable
 import java.util.UUID
 
 /**
- * Persisted frame contract for [GraffitiProject.sphereSlamDoodle].
+ * Persisted frame contract for [GraffitiProject.sphereSlamFingerprint].
  *
  * v1 = centered rectified KPM page: +X image-right, +Y image-up, +Z wall normal, with the exact
  * artoolkitX half-pixel page mapping. Bump this BEFORE changing point semantics.
  */
-const val SPHERE_SLAM_DOODLE_FRAME_VERSION: Int = 1
+const val SPHERE_SLAM_FINGERPRINT_FRAME_VERSION: Int = 1
 
 /**
  * One additional standalone KPM page registered into the canonical centered-wall frame.
@@ -35,7 +35,7 @@ data class SphereSlamAtlasPage(
     val referenceWidthMeters: Float,
     val physicallyMetric: Boolean,
     val canonicalFromPage: List<Float>,
-    val frameVersion: Int = SPHERE_SLAM_DOODLE_FRAME_VERSION,
+    val frameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
 ) {
     init {
         require(pageNo > 0) { "grown SphereSLAM atlas pages use positive page IDs" }
@@ -161,7 +161,7 @@ data class GraffitiProject(
      * deterministically. [sphereSlamAnchorFrameVersion] declares the coordinate semantics.
      */
     val sphereSlamAnchorGeneration: Long = 0L,
-    val sphereSlamAnchorFrameVersion: Int = SPHERE_SLAM_DOODLE_FRAME_VERSION,
+    val sphereSlamAnchorFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     /**
      * Anchor generation the persisted AR-mode design adjustment was authored against.
      * A mismatch means the adjustment belongs to an older standalone wall frame and must not render.
@@ -186,9 +186,9 @@ data class GraffitiProject(
      * the wrong frame semantics.
      */
     @SerialName("sphereSlamFingerprint")
-    val sphereSlamDoodle: Doodle? = null,
+    val sphereSlamFingerprint: Doodle? = null,
     @SerialName("sphereSlamFingerprintFrameVersion")
-    val sphereSlamDoodleFrameVersion: Int = SPHERE_SLAM_DOODLE_FRAME_VERSION,
+    val sphereSlamFingerprintFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
 
     /**
      * Column-major GL 4x4 `map_from_doodle` transform for standalone SphereSLAM.
@@ -199,17 +199,17 @@ data class GraffitiProject(
      * than being silently treated as identity.
      */
     @SerialName("sphereSlamMapFromFingerprint")
-    val sphereSlamMapFromDoodle: List<Float> = emptyList(),
+    val sphereSlamMapFromFingerprint: List<Float> = emptyList(),
 
     /**
      * Wide-area MobileGS feature map for the standalone SphereSLAM backend.
      *
      * Kept separate from [wallFeatureMap], whose points are in the legacy ARCore doodle frame.
-     * These points are in the exact same centred KPM-page frame as [sphereSlamDoodle]. A new
+     * These points are in the exact same centred KPM-page frame as [sphereSlamFingerprint]. A new
      * standalone reference therefore invalidates both together.
      */
     val sphereSlamWallFeatureMap: WallFeatureMap? = null,
-    val sphereSlamWallFeatureMapFrameVersion: Int = SPHERE_SLAM_DOODLE_FRAME_VERSION,
+    val sphereSlamWallFeatureMapFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
 
     /**
      * Per-keyframe device orientation samples recorded during standalone tracking — the angular glue

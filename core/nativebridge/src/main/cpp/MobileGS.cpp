@@ -886,7 +886,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
     // check purely for local readability -- this attempt is known reachable at this point.)
     mLastRelocObliquityDeg.store(-1, std::memory_order_relaxed);
     mLastRelocRectifiedCorr.store(0, std::memory_order_relaxed);
-    // Standalone doodles deliberately do not set hasFpView: their object points already live in
+    // Standalone fingerprints deliberately do not set hasFpView: their object points already live in
     // the durable centred page frame, so there is no ARCore capture-camera view to rectify against.
     // The backend-neutral validity flag only says relocView is current; hasFpView separately proves
     // the stored capture-view contract exists and is compatible.
@@ -2064,7 +2064,7 @@ void MobileGS::tryUpdateDoodle(const cv::Mat& grayClean,
     // Wall plane (n·X = pdist) in the doodle frame, fit to the existing marks.
     //
     // Do NOT require pdist>0. The legacy ARCore doodle lives in capture-camera coordinates and
-    // naturally puts a wall in front of the origin, but the standalone SphereSLAM doodle is a
+    // naturally puts a wall in front of the origin, but the standalone SphereSLAM fingerprint is a
     // CENTERED WALL frame by design: all canonical page points lie on z=0, so its valid wall plane
     // passes exactly through the object-frame origin. Ray/plane intersection below only requires
     // that the CAMERA centre not lie on the wall and that the ray not be parallel to it.
@@ -3409,7 +3409,7 @@ bool MobileGS::autoFitDesign(float* out5) {
     }
     // Everything below casts photo rays from the doodle frame's ORIGIN, i.e. assumes the
     // doodle frame is the capture camera's. That holds for ARCore metric/depth doodles and
-    // is false for a standalone SphereSLAM doodle (the centred page frame: the wall plane
+    // is false for a standalone SphereSLAM fingerprint (the centred page frame: the wall plane
     // passes through the origin, so every ray/plane intersection is at lambda = 0 and the fit could
     // only ever fail -- after two detector passes). Today no standalone flow calls setCaptureImage,
     // but a project that also carries an ARCore capture photo can leave one loaded under a
@@ -3632,7 +3632,7 @@ void MobileGS::updatePaintGrid(const cv::Mat& colorFrame) {
 
     // 1. Bare-wall colours from the capture photo. For a capture-camera doodle (ARCore
     //    metric/depth) the doodle frame IS the capture camera's, so camFromFp at capture is the
-    //    identity. A standalone doodle's frame is the centred PAGE frame instead: projecting
+    //    identity. A standalone fingerprint's frame is the centred PAGE frame instead: projecting
     //    through an identity "camera" there puts every sample at depth 0, so it could never
     //    contribute -- and a capture photo left loaded from an ARCore capture of the same project
     //    would be sampled through a camera that does not exist. Skipped for that frame; step 3's

@@ -12,7 +12,7 @@ import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.sphereslam.camera.CaptureRotation
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricDoodleBuilder
 import com.hereliesaz.sphereslam.reloc.MetricMarks
-import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneDoodleBuilder
+import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
@@ -109,7 +109,7 @@ class MainViewModel @Inject constructor(
                 if (project != null) {
                     val hasArCoreDoodle = project.doodle != null
                     val hasSphereSlamTarget =
-                        project.sphereSlamReferenceUri != null && project.sphereSlamDoodle != null
+                        project.sphereSlamReferenceUri != null && project.sphereSlamFingerprint != null
                     _uiState.update {
                         it.copy(
                             hasExistingDoodle = hasArCoreDoodle || hasSphereSlamTarget,
@@ -268,7 +268,7 @@ class MainViewModel @Inject constructor(
     fun onConfirmStandaloneTargetCreation(
         bitmap: Bitmap?,
         selectionMask: Bitmap?,
-        placement: com.hereliesaz.graffitixr.feature.ar.StandaloneDoodlePlacement?,
+        placement: com.hereliesaz.graffitixr.feature.ar.StandaloneFingerprintPlacement?,
     ) {
         if (bitmap == null) {
             resetCaptureUi()
@@ -311,7 +311,7 @@ class MainViewModel @Inject constructor(
                 // Doodle geometry is authored in the already-running photosphere's units.
                 // Without metric range those units are normalized; the explicit map transform still
                 // places the page correctly in the base SphereSLAM frame.
-                val fp = StandaloneDoodleBuilder.build(
+                val fp = StandaloneFingerprintBuilder.build(
                     slam = slamManager,
                     bitmap = bitmap,
                     referenceWidthMeters = placement.referenceWidthUnits,
@@ -320,7 +320,7 @@ class MainViewModel @Inject constructor(
                 )
                 if (fp == null) {
                     MetricDoodleBuilder.recordPreconditionFailure(
-                        "standalone target produced too few selected SphereSLAM doodle features",
+                        "standalone target produced too few selected SphereSLAM fingerprint features",
                     )
                     withContext(Dispatchers.Main) {
                         Toast.makeText(
@@ -367,17 +367,17 @@ class MainViewModel @Inject constructor(
                             sphereSlamReferencePhysicallyMetric = placement.physicallyMetric,
                             sphereSlamAnchorGeneration = current.sphereSlamAnchorGeneration + 1L,
                             sphereSlamAnchorFrameVersion =
-                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                             sphereSlamPlacementAnchorGeneration = 0L,
-                            sphereSlamDoodle = doodle,
+                            sphereSlamFingerprint = doodle,
                             // A new target may be another wall: its normal is learned afresh.
                             doodleWallNormalEnu = emptyList(),
-                            sphereSlamDoodleFrameVersion =
-                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
-                            sphereSlamMapFromDoodle = placement.mapFromFingerprint.toList(),
+                            sphereSlamFingerprintFrameVersion =
+                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                            sphereSlamMapFromFingerprint = placement.mapFromFingerprint.toList(),
                             sphereSlamWallFeatureMap = null,
                             sphereSlamWallFeatureMapFrameVersion =
-                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+                                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                             // Base photosphere history belongs to SphereSLAM and survives precision
                             // doodle creation/recapture. Only the doodle-relative KPM atlas
                             // is replaced here.
@@ -523,9 +523,9 @@ class MainViewModel @Inject constructor(
                             } else {
                                 p.sphereSlamPlacementAnchorGeneration
                             },
-                        sphereSlamDoodle = p.sphereSlamDoodle,
-                        sphereSlamDoodleFrameVersion = p.sphereSlamDoodleFrameVersion,
-                        sphereSlamMapFromDoodle = p.sphereSlamMapFromDoodle,
+                        sphereSlamFingerprint = p.sphereSlamFingerprint,
+                        sphereSlamFingerprintFrameVersion = p.sphereSlamFingerprintFrameVersion,
+                        sphereSlamMapFromFingerprint = p.sphereSlamMapFromFingerprint,
                         sphereSlamWallFeatureMap = p.sphereSlamWallFeatureMap,
                         sphereSlamWallFeatureMapFrameVersion = p.sphereSlamWallFeatureMapFrameVersion,
                         sphereSlamAtlasPages = p.sphereSlamAtlasPages,

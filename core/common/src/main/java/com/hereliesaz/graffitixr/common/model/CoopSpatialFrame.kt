@@ -37,7 +37,7 @@ enum class CoopSpatialScale {
  *
  * The transform is `doodle_from_wall`:
  * - ARCore host: `Doodle.captureAnchorCam = V_cv(capture) * anchorModel`;
- * - standalone host: identity, because the SphereSLAM doodle already stores points directly in
+ * - standalone host: identity, because the SphereSLAM fingerprint already stores points directly in
  *   the canonical centered KPM wall frame.
  *
  * A peer PnP solve therefore becomes one backend-neutral wall view:

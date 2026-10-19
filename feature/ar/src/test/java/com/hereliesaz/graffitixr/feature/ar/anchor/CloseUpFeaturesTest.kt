@@ -1,6 +1,6 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
-import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneDoodleBuilder.DetectedFeatures
+import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder.DetectedFeatures
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

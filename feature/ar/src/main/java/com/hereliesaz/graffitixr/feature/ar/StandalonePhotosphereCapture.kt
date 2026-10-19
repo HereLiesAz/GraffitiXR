@@ -1,7 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 /**
- * Pure capture-time seam between a standalone doodle capture and the base SphereSLAM
+ * Pure capture-time seam between a standalone fingerprint capture and the base SphereSLAM
  * photosphere (docs/SPHERESLAM_SPHERE_MAP.md §5.3).
  *
  * A doodle is bound to the photosphere through the camera view it was captured from: the
@@ -14,7 +14,7 @@ package com.hereliesaz.graffitixr.feature.ar
  */
 internal object StandalonePhotosphereCapture {
 
-    /** Why a standalone doodle capture cannot be bound to the photosphere. */
+    /** Why a standalone fingerprint capture cannot be bound to the photosphere. */
     enum class Blocker {
         /** The device has no magnetometer-fused rotation-vector sensor. Not recoverable. */
         ATTITUDE_SENSOR_MISSING,

@@ -27,7 +27,7 @@ import com.hereliesaz.sphereslam.PhotosphereFingerprintFrame
  * will then use its CV_32F SuperPoint path. ORB(1500) + CLAHE is the fallback and intentionally
  * matches MobileGS::normalizeForFeatures + mFeatureDetector.
  */
-object StandaloneDoodleBuilder {
+object StandaloneFingerprintBuilder {
     private const val DEFAULT_MIN_POINTS = 16
     private const val ORB_FEATURES = 1500
 
@@ -156,7 +156,7 @@ object StandaloneDoodleBuilder {
             descriptorsType = detected.type,
             markCenterLocal = listOf(sx / keep.size, sy / keep.size, 0f),
             // This is NOT an ARCore display-rotation capture. The value deliberately remains
-            // unknown; this doodle lives in the separate sphereSlamDoodle project field
+            // unknown; this doodle lives in the separate sphereSlamFingerprint project field
             // and is never passed through the ARCore legacy-frame loader.
             captureRotationDeg = -1,
         )

@@ -68,7 +68,7 @@ internal fun normalizeCoopSpectatorProject(
                 sphereSlamAnchorGeneration = 0L,
                 sphereSlamPlacementAnchorGeneration = 0L,
                 sphereSlamModeAdjustment = hostAdjustment,
-                sphereSlamDoodle = null,
+                sphereSlamFingerprint = null,
                 sphereSlamWallFeatureMap = null,
                 sphereSlamAtlasPages = emptyList(),
             )

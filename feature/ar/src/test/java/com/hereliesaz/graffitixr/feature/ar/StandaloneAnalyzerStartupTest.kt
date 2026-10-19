@@ -7,7 +7,7 @@ import org.junit.Test
 class StandaloneAnalyzerStartupTest {
 
     @Test
-    fun localStandaloneStartsBeforeDoodleExists() {
+    fun localStandaloneStartsBeforeFingerprintExists() {
         assertTrue(
             shouldStartStandaloneAnalyzer(
                 cameraIdPresent = true,

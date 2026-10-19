@@ -112,14 +112,14 @@ class GraffitiProjectTest {
             id = "standalone-map",
             sphereSlamWallFeatureMap = map,
             sphereSlamWallFeatureMapFrameVersion =
-                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
         )
 
         val decoded = json.decodeFromString<GraffitiProject>(json.encodeToString(project))
 
         assertEquals(map, decoded.sphereSlamWallFeatureMap)
         assertEquals(
-            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
             decoded.sphereSlamWallFeatureMapFrameVersion,
         )
     }
@@ -157,7 +157,7 @@ class GraffitiProjectTest {
             id = "standalone-anchor",
             sphereSlamAnchorGeneration = 9L,
             sphereSlamAnchorFrameVersion =
-                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
             sphereSlamPlacementAnchorGeneration = 8L,
             sphereSlamModeAdjustment = com.hereliesaz.graffitixr.common.model.ModeAdjustment(
                 offsetX = 0.6f,
@@ -172,7 +172,7 @@ class GraffitiProjectTest {
 
         assertEquals(9L, decoded.sphereSlamAnchorGeneration)
         assertEquals(
-            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
             decoded.sphereSlamAnchorFrameVersion,
         )
         assertEquals(8L, decoded.sphereSlamPlacementAnchorGeneration)

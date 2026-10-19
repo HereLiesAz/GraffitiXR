@@ -64,7 +64,7 @@ internal data class StandaloneDesignPlacement(
 /**
  * Build the exact rigid design placement consumed by MobileGS corroboration/self-grow.
  *
- * The standalone doodle frame IS the renderer wall frame, so the only rigid transform is the
+ * The standalone fingerprint frame IS the renderer wall frame, so the only rigid transform is the
  * user's in-plane pan + Z spin. GraffitiXR stores ModeAdjustment.rotation as screen-space CW+ while
  * the wall frame is right-handed CCW+, hence the sign flip. Scale belongs in the extents, matching
  * ArRenderer/DoodlePartition; putting it into this matrix would corrupt Φ classification.

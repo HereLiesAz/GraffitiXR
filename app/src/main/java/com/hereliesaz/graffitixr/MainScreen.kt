@@ -325,12 +325,12 @@ fun MainScreen(
                         // re-registers the same design against the new MobileGS wall frame.
                         LaunchedEffect(
                             standaloneDesign,
-                            arUiState.sphereSlamDoodle,
+                            arUiState.sphereSlamFingerprint,
                             arUiState.sphereSlamReferenceUri,
                         ) {
                             if (
                                 standaloneDesign != null &&
-                                arUiState.sphereSlamDoodle != null
+                                arUiState.sphereSlamFingerprint != null
                             ) {
                                 val guide = withContext(Dispatchers.Default) {
                                     compositeDesignForAr(standaloneDesign)
@@ -349,11 +349,11 @@ fun MainScreen(
                             cameraController = cameraController,
                             designBitmap = standaloneTexture,
                             slamManager = slamManager,
-                            mobileGsDoodle = arUiState.sphereSlamDoodle,
+                            mobileGsDoodle = arUiState.sphereSlamFingerprint,
                             mobileGsDoodleFrameVersion =
-                                arUiState.sphereSlamDoodleFrameVersion,
+                                arUiState.sphereSlamFingerprintFrameVersion,
                             mobileGsMapFromDoodle =
-                                arUiState.sphereSlamMapFromDoodle,
+                                arUiState.sphereSlamMapFromFingerprint,
                             mobileGsWallFeatureMap = arUiState.sphereSlamWallFeatureMap,
                             mobileGsWallFeatureMapFrameVersion =
                                 arUiState.sphereSlamWallFeatureMapFrameVersion,
@@ -431,7 +431,7 @@ fun MainScreen(
                                 arViewModel.onStandalonePhotosphereKeyframe(keyframe)
                             },
                             onMapFromFingerprintSolved = { mapFromFingerprint ->
-                                arViewModel.onStandaloneMapFromDoodleSolved(mapFromFingerprint)
+                                arViewModel.onStandaloneMapFromFingerprintSolved(mapFromFingerprint)
                             },
                             depthEstimator = arViewModel.standaloneDepthEstimatorOrNull(),
                             sweepCoverage = sweepCoverageValue,

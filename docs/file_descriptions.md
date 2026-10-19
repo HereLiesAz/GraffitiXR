@@ -190,7 +190,7 @@ the real (non-stub) tracker is packaged.
     luma buffer (not the preview viewport's cropRect) and publishes each frame's display-upright
     intrinsics for the renderer's `FILL_CENTER` projection.
 *   `StandaloneWallHitTest.kt`: ARCore-independent screen-pixel → canonical wall intersection.
-*   `StandalonePhotosphereCapture.kt`: names why a standalone doodle cannot be bound to the
+*   `StandalonePhotosphereCapture.kt`: names why a standalone fingerprint cannot be bound to the
     base photosphere (no rotation sensor / attitude not ready / no keyframe yet) and the
     artist-facing message. The capture view and placement are SphereSLAM's
     (`PhotosphereKeyframeStore.view`, `PhotosphereFingerprintFrame.placement`, roll-aware); the

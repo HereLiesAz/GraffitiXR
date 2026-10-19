@@ -5,7 +5,7 @@ import com.hereliesaz.graffitixr.common.model.CoopSpatialScale
 import com.hereliesaz.graffitixr.common.model.CoopTrackingBackend
 import com.hereliesaz.graffitixr.common.model.Doodle
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
-import com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION
+import com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION
 
 /**
  * Builds the durable host wall-frame descriptor used by co-op protocol v3.
@@ -26,21 +26,21 @@ internal object CoopSpatialFrameFactory {
     private fun fromSphereSlamProject(project: GraffitiProject): CoopSpatialFrame? {
         if (project.sphereSlamReferenceUri == null) return null
         if (
-            project.sphereSlamAnchorFrameVersion != SPHERE_SLAM_DOODLE_FRAME_VERSION ||
+            project.sphereSlamAnchorFrameVersion != SPHERE_SLAM_FINGERPRINT_FRAME_VERSION ||
             project.sphereSlamReferenceWidthMeters <= 0f ||
             !project.sphereSlamReferenceWidthMeters.isFinite()
         ) return null
 
-        val fp = project.sphereSlamDoodle
+        val fp = project.sphereSlamFingerprint
         val doodleAvailable =
             fp != null &&
-                project.sphereSlamDoodleFrameVersion == SPHERE_SLAM_DOODLE_FRAME_VERSION &&
+                project.sphereSlamFingerprintFrameVersion == SPHERE_SLAM_FINGERPRINT_FRAME_VERSION &&
                 fp.descriptorsRows > 0 &&
                 fp.points3d.size == fp.descriptorsRows * 3
 
         return CoopSpatialFrame(
             hostBackend = CoopTrackingBackend.SPHERESLAM,
-            doodleFrameVersion = SPHERE_SLAM_DOODLE_FRAME_VERSION,
+            doodleFrameVersion = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
             scale = if (project.sphereSlamReferencePhysicallyMetric) {
                 CoopSpatialScale.METRIC
             } else {

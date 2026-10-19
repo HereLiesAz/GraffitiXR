@@ -643,7 +643,7 @@ public:
      * True when the doodle's 3D points can be in a CAMERA frame, i.e. the wall plane they fit
      * does not pass through the frame's origin. A capture-camera frame (ARCore metric/depth
      * doodles) has its origin at the camera centre, a wall-distance away from the wall; the
-     * standalone SphereSLAM doodle is the CENTRED PAGE frame, whose points all lie on z = 0,
+     * standalone SphereSLAM fingerprint is the CENTRED PAGE frame, whose points all lie on z = 0,
      * so the plane passes through the origin. Anything that treats the doodle frame as the
      * capture camera's (autoFitDesign, the paint grid's capture-photo sampling) must refuse the
      * second kind rather than project through a camera that is not there. Pure, for tests.

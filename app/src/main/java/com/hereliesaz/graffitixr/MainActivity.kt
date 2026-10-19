@@ -1912,7 +1912,7 @@ class MainActivity : AppCompatActivity() {
                                             mainViewModel.onConfirmStandaloneTargetCreation(
                                                 bitmap,
                                                 mask,
-                                                arViewModel.standaloneDoodlePlacementForConfirm(),
+                                                arViewModel.standaloneFingerprintPlacementForConfirm(),
                                             )
                                         } else {
                                             arViewModel.setInitialAnchorFromCapture()

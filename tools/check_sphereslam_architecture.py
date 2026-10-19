@@ -9,7 +9,7 @@ invariants that are easy to accidentally regress during UI/renderer refactors:
 3. Hybrid SphereSLAM may correct the artwork only through the explicit metric/timestamp/PoseFusion
    seam; it must never replace the primary ARCore view/projection matrices.
 4. MobileGS tracking validity is backend-neutral, and standalone self-grow/map points remain in the
-   centred SphereSLAM doodle frame rather than passing through an ARCore-world conversion.
+   centred SphereSLAM fingerprint frame rather than passing through an ARCore-world conversion.
 5. The standalone runtime never reaches ARCore-only hit-test/depth/anchor/perception APIs and exposes
    an explicit canonical-wall hit-test seam instead.
 6. Co-op never installs peer geometry without a protocol-v3 backend/scale/wall-frame contract.

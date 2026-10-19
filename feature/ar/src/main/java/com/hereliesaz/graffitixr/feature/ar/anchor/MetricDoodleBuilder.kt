@@ -274,7 +274,7 @@ object MetricDoodleBuilder {
                 if (features.closeUps) early.installBase(basePixels, baseDescs, bitmap)
                 val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps,
                     onQuickSet = { p, d -> early.install(p, d) }, firstStage = 2, stages = 3, stepsBefore = 1) { view, _ ->
-                    StandaloneDoodleBuilder.detectSuperPoint(slam, view)
+                    StandaloneFingerprintBuilder.detectSuperPoint(slam, view)
                 }
                 if (baseDescs !== descs && baseDescs !== mDescs) baseDescs.release()
                 val fp = try {
@@ -313,7 +313,7 @@ object MetricDoodleBuilder {
             if (features.closeUps) early.installBase(basePixels, baseDescs, bitmap)
             val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps,
                 onQuickSet = { p, dd -> early.install(p, dd) }, firstStage = 2, stages = 3, stepsBefore = 1) { view, n ->
-                StandaloneDoodleBuilder.detectOrb(view, null, n)
+                StandaloneFingerprintBuilder.detectOrb(view, null, n)
             }
             if (baseDescs !== d && baseDescs !== mDescs) baseDescs.release()
             try {
@@ -378,10 +378,10 @@ object MetricDoodleBuilder {
          */
         onQuickSet: ((List<Pixel>, Mat) -> Unit)? = null,
         firstStage: Int = 1, stages: Int = 2, stepsBefore: Int = 0,
-        detect: (Bitmap, Int) -> StandaloneDoodleBuilder.DetectedFeatures?,
+        detect: (Bitmap, Int) -> StandaloneFingerprintBuilder.DetectedFeatures?,
     ): Pair<List<Pixel>, Mat> {
         if (!enabled || pixels.isEmpty() || descs.empty()) return pixels to descs
-        val quick: ((StandaloneDoodleBuilder.DetectedFeatures?) -> Unit)? = onQuickSet?.let { cb ->
+        val quick: ((StandaloneFingerprintBuilder.DetectedFeatures?) -> Unit)? = onQuickSet?.let { cb ->
             { partial ->
                 mergeCloseUps(bitmap, mask, pixels, descs, partial)?.let { (p, d) ->
                     try { cb(p, d) } finally { d.release() }
@@ -395,10 +395,10 @@ object MetricDoodleBuilder {
     /** [pixels]/[descs] plus [extra] (kept to [mask]); null when [extra] adds nothing usable. */
     private fun mergeCloseUps(
         bitmap: Bitmap, mask: Bitmap?, pixels: List<Pixel>, descs: Mat,
-        extra0: StandaloneDoodleBuilder.DetectedFeatures?,
+        extra0: StandaloneFingerprintBuilder.DetectedFeatures?,
     ): Pair<List<Pixel>, Mat>? {
         val extra = extra0
-            ?.let { StandaloneDoodleBuilder.filterByMask(it, mask, bitmap.width, bitmap.height) }
+            ?.let { StandaloneFingerprintBuilder.filterByMask(it, mask, bitmap.width, bitmap.height) }
             ?.takeIf { it.rows > 0 && it.cols == descs.cols() && it.type == descs.type() }
             ?: return null
         val extraDescs = Mat(extra.rows, extra.cols, extra.type)

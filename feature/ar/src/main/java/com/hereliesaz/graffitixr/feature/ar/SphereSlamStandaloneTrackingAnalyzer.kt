@@ -174,11 +174,11 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private val slamManager: SlamManager? = null,
     @Volatile private var mobileGsDoodle: Doodle? = null,
     @Volatile private var mobileGsDoodleFrameVersion: Int =
-        com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+        com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     @Volatile private var mobileGsMapFromDoodle: FloatArray? = null,
     @Volatile private var mobileGsWallFeatureMap: WallFeatureMap? = null,
     @Volatile private var mobileGsWallFeatureMapFrameVersion: Int =
-        com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
+        com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
     private val onFrameTracked: (SphereSlamStandaloneFrame?) -> Unit,
     /**
      * Heading, elevation and the tracked image's roll for a given body->camera rotation, from ONE
@@ -927,7 +927,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
 
         val fp = mobileGsDoodle
         val expectedFrameVersion =
-            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION
+            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION
         if (fp != null && mobileGsDoodleFrameVersion != expectedFrameVersion) {
             slam.clearWallDoodle()
             slam.clearWallFeatureMap()

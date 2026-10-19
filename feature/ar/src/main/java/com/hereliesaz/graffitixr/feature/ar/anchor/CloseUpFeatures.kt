@@ -2,7 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
 
 import android.graphics.Bitmap
 import com.hereliesaz.graffitixr.common.model.AnticipationSettings
-import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneDoodleBuilder.DetectedFeatures
+import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder.DetectedFeatures
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt

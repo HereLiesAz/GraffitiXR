@@ -66,7 +66,7 @@ persisted page images on reopen/import/co-op project transfer.
 #### MobileGS boundary — connected through the centered page frame
 
 Standalone MobileGS no longer reuses the ARCore `doodle` slot. It has its own
-`sphereSlamDoodle` and `sphereSlamWallFeatureMap`, both versioned against the canonical
+`sphereSlamFingerprint` and `sphereSlamWallFeatureMap`, both versioned against the canonical
 centered KPM page frame. For standalone:
 
 - KPM page 0, renderer wall coordinates, MobileGS doodle object coordinates, and persisted

@@ -8,7 +8,7 @@
 ### 1. The wall doodle
 A doodle is ORB (`cv::ORB::create(1500)`) or SuperPoint descriptors paired with the triangulated 3D positions of the marks the artist drew, captured once when the target is confirmed (`restoreWallDoodleMetric`). It optionally carries a per-point region tag (`Footprint::Region` — INSIDE/BAND/OUTSIDE) so relocalization can exclude points that sit under the artwork itself and will be painted over.
 
-Both app builders (`MetricDoodleBuilder`, `StandaloneDoodleBuilder`) add the capture
+Both app builders (`MetricDoodleBuilder`, `StandaloneFingerprintBuilder`) add the capture
 photo's **close-ups** (`CloseUpFeatures`): crops at zooms 6×, 3× and 2× (the anticipation
 half-spheres, square-on), each tiled by its grid of aim points, enlarged to about a live frame's size
 and run through the base doodle's own detector. Their features map back to the photo's pixels
@@ -75,7 +75,7 @@ Both are reachable only from the diagnostic overlay (Settings > diagnostic overl
 `WallFeatureMap` (`setMapRelocEnabled`/`setMapBuildEnabled`, `IMPLEMENTATION.md` phases 2b/3) is a second, longer-lived relocalization source that can be built and matched against across sessions. Off by default like the two mechanisms above. The **map path** of the reloc pass is additive and prior-gated: it needs a previous published pose (`mapPriorSeq > 0`, i.e. the doodle has locked at least once), frustum-gates the map to the points that pose says are in view (never a brute-force match of the whole map), and appends those correspondences to the doodle's before the single PnP solve.
 
 For standalone SphereSLAM, both self-grown doodle points and feature-map growth are written
-directly in the centered KPM-page doodle frame (+X right, +Y up, +Z wall normal). The
+directly in the centered KPM-page fingerprint frame (+X right, +Y up, +Z wall normal). The
 standalone map is persisted separately from the ARCore-frame map and must carry an identity
 doodle-anchor transform on save and restore; incompatible anchors are refused rather than
 implicitly converted.

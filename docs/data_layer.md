@@ -24,7 +24,7 @@ it without depending on `app/`).
   - `doodleImageUris`, ARCore `doodle`/`wallFeatureMap`/`captureEnvironment`,
     `doodleIntrinsics`/`doodleAnchor`/`doodleViewMatrix`, plus the separate
     standalone SphereSLAM fields (`sphereSlamReferenceUri`, physical-scale flag/width, anchor
-    generation, `sphereSlamDoodle`, `sphereSlamWallFeatureMap`, and atlas-page metadata) —
+    generation, `sphereSlamFingerprint`, `sphereSlamWallFeatureMap`, and atlas-page metadata) —
     everything durable about either AR backend's wall target. ARCore and standalone target frames
     are intentionally persisted separately rather than inferred interchangeable.
     `CaptureEnvironment.kt` documents why the capture-side groups are independently optional.
