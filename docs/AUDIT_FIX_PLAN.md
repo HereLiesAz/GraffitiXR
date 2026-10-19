@@ -146,7 +146,7 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
 - [x] **D5. Controls at the top of the screen.**
   - Where: AR Recapture (`MainActivity.kt:1665-1680, 3991`); guest Leave (`:2127-2134`, `CoopSpectatorBanner.kt:33`); glasses Reconnect/Leave (`:2150-2166`).
   - Fix: move them to the bottom, on the rail's side.
-  - Not the library: it is used before a project is under way, so the thumb rule does not apply. Its New / Import / Settings stay at the top.
+  - Not the library: it is used before a project is under way, so the thumb rule does not apply. Its New / Import / Settings sit together between the intro and the project list.
 - [x] **D6. Adjustment knobs ignore handedness.**
   - Where: `AdjustmentsPanel.kt:32` (`isRightHanded` is never read), `:113-200`.
   - Fix: anchor the knob rows to the thumb's side.

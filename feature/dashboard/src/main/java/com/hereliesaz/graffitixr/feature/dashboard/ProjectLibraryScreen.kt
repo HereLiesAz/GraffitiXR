@@ -123,7 +123,7 @@ fun ProjectLibraryScreen(
                     .padding(bottom = 20.dp),
                 verticalAlignment = Alignment.Top,
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = strings.lib.title,
                         style = MaterialTheme.typography.headlineLarge,
@@ -139,13 +139,9 @@ fun ProjectLibraryScreen(
                         textAlign = TextAlign.Justify
                     )
                 }
-                // The only route to Settings before a project exists — see onOpenSettings' doc.
-                IconButton(onClick = onOpenSettings) {
-                    Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Color.White)
-                }
             }
 
-            // New & Import Project Buttons
+            // New, Import and Settings, between the intro and the project list
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                 horizontalArrangement = Arrangement.Center,
@@ -164,6 +160,11 @@ fun ProjectLibraryScreen(
                     modifier = Modifier.width(120.dp),
                     shape = com.hereliesaz.aznavrail.model.AzButtonShape.RECTANGLE
                 )
+                Spacer(modifier = Modifier.width(16.dp))
+                // The only route to Settings before a project exists — see onOpenSettings' doc.
+                IconButton(onClick = onOpenSettings) {
+                    Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Color.White)
+                }
             }
 
             if (projects.isEmpty()) {
