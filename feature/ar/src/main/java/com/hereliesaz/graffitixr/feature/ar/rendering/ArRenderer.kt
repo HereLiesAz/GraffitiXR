@@ -49,11 +49,11 @@ class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
     // Last arg is the camera→point distance (meters) at the tapped pixel, or -1f when unavailable.
-    private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int, Float, FloatArray?, com.hereliesaz.graffitixr.common.model.CaptureEnvironment) -> Unit,
+    private val onDoodleCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int, Float, FloatArray?, com.hereliesaz.graffitixr.common.model.CaptureEnvironment) -> Unit,
     private val onTrackingUpdated: (Boolean, Int, Boolean, Float, Float, Triple<Float, Float, Float>?, Boolean, Float) -> Unit,
     private val onLightUpdated: (Float) -> Unit,
     private val onDiag: (String) -> Unit = {},
-    // Fired on the GL thread when a requested target capture threw before reaching onTargetCaptured,
+    // Fired on the GL thread when a requested target capture threw before reaching onDoodleCaptured,
     // so the ViewModel can drop the request (otherwise isCaptureRequested stays up forever and no
     // later tap can re-arm it) and tell the artist.
     private val onCaptureFailed: (Throwable) -> Unit = {},
@@ -719,7 +719,7 @@ class ArRenderer(
     @Volatile private var surfaceHeight: Int = 0
     // EMA-smoothed center depth (meters) for the live reticle; raw per-pixel ARCore depth is too noisy.
     @Volatile private var smoothedCenterDepth: Float = -1f
-    @Volatile var isCapturingTarget: Boolean = false
+    @Volatile var isCapturingDoodle: Boolean = false
     @Volatile var pendingAnchorEstablishment: Boolean = false
     // The wall plane the artist tapped to create this target, [px,py,pz, nx,ny,nz] in world space.
     // The anchor is placed ON it: that is the surface the doodle is back-projected onto, so an
@@ -941,7 +941,7 @@ class ArRenderer(
     // from an earlier session; after a capture it can only be older than what this session holds,
     // so restores are refused for the rest of the renderer's life (also closes the window where a
     // slow IO read lands after the capture already discarded the queued restore).
-    @Volatile private var targetCaptureStarted = false
+    @Volatile private var doodleCaptureStarted = false
     // Bumped every time an artwork anchor is established (capture confirm OR return-visit reloc).
     // The page↔artwork relation may only freeze against an anchor established AFTER the hybrid
     // page was captured: on a re-capture the old anchor is still live for a few frames and freezing
@@ -972,7 +972,7 @@ class ArRenderer(
      * always newer than anything on disk.
      */
     fun restoreHybridPage(page: com.hereliesaz.graffitixr.feature.ar.HybridKpmPage?) {
-        if (targetCaptureStarted) return
+        if (doodleCaptureStarted) return
         // Flag first: the GL thread reads it before the page, so it never arms a page unreplaced.
         pendingHybridRestoreReplace = true
         pendingHybridRestore = page?.takeIf { it.isValid() }
@@ -1568,7 +1568,7 @@ class ArRenderer(
      */
     private fun shouldRunHeavyThisFrame(view: FloatArray, tracking: Boolean): Boolean {
         val now = android.os.SystemClock.elapsedRealtime()
-        val active = !anchorEstablished || captureRequested || isCapturingTarget ||
+        val active = !anchorEstablished || captureRequested || isCapturingDoodle ||
             scanPhase == ScanPhase.AMBIENT || gestureInProgress || !tracking
         val moved = !haveIdlePose || idlePoseChanged(view)
         if (active || moved) {
@@ -1721,7 +1721,7 @@ class ArRenderer(
                 doodleAutoAnchorRequested = true
                 pendingAnchorEstablishment = true
             }
-            if (!anchorEstablished && !pendingAnchorEstablishment && !isCapturingTarget &&
+            if (!anchorEstablished && !pendingAnchorEstablishment && !isCapturingDoodle &&
                 !slamManager.awaitingNewDoodle &&
                 frame.camera.trackingState == TrackingState.TRACKING
             ) {
@@ -2042,7 +2042,7 @@ class ArRenderer(
 
             // mappingViewMatrix is NOT what ARCore's own getViewMatrix() returns above — it's built
             // from camera.pose.inverse() so its translation is expressed in the "mapping" convention
-            // the target-capture path below (onTargetCaptured) expects. Kept only for that one use; a
+            // the target-capture path below (onDoodleCaptured) expects. Kept only for that one use; a
             // sibling mappingProjMatrix that used to accompany it fed nothing but dead native storage
             // (MobileGS::updateMappingCamera wrote it and nothing ever read it back) and was removed.
             val mappingViewMatrix = mappingViewMatrixScratch
@@ -2121,7 +2121,7 @@ class ArRenderer(
                     pendingHybridRestore = null
                     if (
                         !captureRequested &&
-                        !targetCaptureStarted &&
+                        !doodleCaptureStarted &&
                         hybridReferenceGeometry == null &&
                         hybridPageFromArtworkAnchor == null
                     ) {
@@ -2689,7 +2689,7 @@ class ArRenderer(
                 // against. Drop the queued restore and tell the owner; persistence is bound to the
                 // doodle, so nothing on disk needs touching here.
                 pendingHybridRestore = null
-                targetCaptureStarted = true
+                doodleCaptureStarted = true
                 onHybridPageInvalidated?.invoke()
                 try {
                     frame.acquireCameraImage().use { image ->
@@ -2922,7 +2922,7 @@ class ArRenderer(
                             location = locationSampler?.invoke(),
                         )
 
-                        onTargetCaptured(
+                        onDoodleCaptured(
                             bitmap, image.width, image.height,
                             depthBuffer,
                             depthWidth, depthHeight, depthStride,
@@ -3383,7 +3383,7 @@ class ArRenderer(
                 )
             }
 
-            val showBorder = !anchorEstablished && !isCapturingTarget && showAnchorBoundary
+            val showBorder = !anchorEstablished && !isCapturingDoodle && showAnchorBoundary
             if (showBorder) {
                 overlayRenderer.drawAnchorBorder(viewMatrix, projMatrix, anchorMatrix)
             }

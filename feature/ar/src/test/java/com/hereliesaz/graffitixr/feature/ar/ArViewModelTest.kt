@@ -199,9 +199,9 @@ class ArViewModelTest {
 
     // ==================== Capture Workflow Tests ====================
 
-    /** Drives a (non-tap) capture through onTargetCaptured and lets its off-thread preparation land. */
+    /** Drives a (non-tap) capture through onDoodleCaptured and lets its off-thread preparation land. */
     private fun captureBitmap(bitmap: Bitmap) {
-        viewModel.onTargetCaptured(
+        viewModel.onDoodleCaptured(
             bitmap = bitmap, depthBuffer = null,
             colorW = 100, colorH = 100,
             depthBufW = 0, depthBufH = 0, depthBufStride = 0,
@@ -211,7 +211,7 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `onTargetCaptured stores the prepared capture in state`() = runTest {
+    fun `onDoodleCaptured stores the prepared capture in state`() = runTest {
         val mockBitmap = mockk<Bitmap>(relaxed = true)
 
         assertNull(viewModel.uiState.value.tempCaptureBitmap)
@@ -222,11 +222,11 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `awaitLatestTargetCapture returns the staged capture and mask`() = runTest {
+    fun `awaitLatestDoodleCapture returns the staged capture and mask`() = runTest {
         val mockBitmap = mockk<Bitmap>(relaxed = true)
         captureBitmap(mockBitmap)
 
-        val (raw, mask) = viewModel.awaitLatestTargetCapture()
+        val (raw, mask) = viewModel.awaitLatestDoodleCapture()
 
         assertEquals(mockBitmap, raw)
         assertEquals(viewModel.uiState.value.annotatedCaptureBitmap, mask)
@@ -297,7 +297,7 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `onScreenTap triggers capture request and onTargetCaptured clears it`() = runTest {
+    fun `onScreenTap triggers capture request and onDoodleCaptured clears it`() = runTest {
         assertFalse(viewModel.uiState.value.isCaptureRequested)
 
         viewModel.onScreenTap(0.5f, 0.5f)
@@ -305,7 +305,7 @@ class ArViewModelTest {
 
         // Simulate frame arrival for a tap (non-null depth buffer to trigger logic)
         val bmp = mockk<Bitmap>(relaxed = true).also { every { it.width } returns 100; every { it.height } returns 100 }
-        viewModel.onTargetCaptured(
+        viewModel.onDoodleCaptured(
             bitmap = bmp,
             depthBuffer = java.nio.ByteBuffer.allocate(10),
             colorW = 100, colorH = 100,
@@ -640,11 +640,11 @@ class ArViewModelTest {
     // ==================== ORB Annotation Tests ====================
 
     @Test
-    fun `onTargetCaptured normal path annotates keypoints asynchronously`() = runTest {
+    fun `onDoodleCaptured normal path annotates keypoints asynchronously`() = runTest {
         val rawBmp = mockk<Bitmap>(relaxed = true)
         every { slamManager.getKeypoints(any()) } returns emptyList()
 
-        viewModel.onTargetCaptured(
+        viewModel.onDoodleCaptured(
             bitmap = rawBmp, depthBuffer = null,
             colorW = 100, colorH = 100,
             depthBufW = 0, depthBufH = 0, depthBufStride = 0,
@@ -772,12 +772,12 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `onTargetCaptured tap path sets annotatedCaptureBitmap to isolated markings and populates unwarpPoints`() = runTest {
+    fun `onDoodleCaptured tap path sets annotatedCaptureBitmap to isolated markings and populates unwarpPoints`() = runTest {
         val rawBmp = mockk<Bitmap>(relaxed = true)
         viewModel.onScreenTap(0.5f, 0.5f)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        viewModel.onTargetCaptured(
+        viewModel.onDoodleCaptured(
             bitmap = rawBmp, depthBuffer = null,
             colorW = 100, colorH = 100,
             depthBufW = 0, depthBufH = 0, depthBufStride = 0,

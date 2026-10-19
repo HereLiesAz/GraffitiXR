@@ -272,10 +272,10 @@ fun SphereSlamStandaloneOverlay(
     /** Host MobileGS doodle; required for ARCore-host -> standalone-guest alignment. */
     coopPeerDoodle: ByteArray? = null,
     onReferenceCaptured: (Bitmap, Float, Boolean) -> Unit = { _, _, _ -> },
-    /** Normal app path: TargetCreationUi above both AR backends owns capture/review/doodle UX. */
+    /** Normal app path: DoodleCreationUi above both AR backends owns capture/review/doodle UX. */
     sharedTargetCapture: Boolean = false,
     /**
-     * With [sharedTargetCapture]: New Target / Recapture open the host's TargetCreationUi through
+     * With [sharedTargetCapture]: New Target / Recapture open the host's DoodleCreationUi through
      * this. The current target keeps tracking until the replacement is persisted (a cancelled capture
      * changes nothing). Null hides those buttons (e.g. a co-op guest, who must not re-anchor).
      * Without [sharedTargetCapture] the buttons use this overlay's own capture flow.
@@ -1583,7 +1583,7 @@ fun SphereSlamStandaloneOverlay(
                             ?: if (trackingState == StandaloneTrackingState.LOST) {
                                 stringResource(DesignR.string.standalone_wall_target_lost)
                             } else {
-                                strings.ar.reacquiringTarget
+                                strings.ar.reacquiringDoodle
                             },
                         color = Color.White,
                         modifier = Modifier

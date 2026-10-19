@@ -41,7 +41,7 @@ class HelpItemsBuilderTest {
         listOf(
             "item.open",
             "mode.ar", "mode.overlay", "mode.mockup", "mode.trace",
-            "target.create", "mockup.wall", "mode.trace.freeze",
+            "doodle.create", "mockup.wall", "mode.trace.freeze",
             "host.project", "proj.new", "proj.save", "proj.export", "proj.load", "proj.settings",
             "item.help",
         ).forEach { id ->

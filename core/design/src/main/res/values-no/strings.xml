@@ -273,9 +273,9 @@
     <string name="open_settings">Åpne Innstillinger</string>
 
     <!-- Title for target creation overlay. -->
-    <string name="target_creation_title">KRUSEDULL-RUTENETT</string>
+    <string name="doodle_creation_title">KRUSEDULL-RUTENETT</string>
     <!-- Instructions for creating a target by tapping on reference marks. -->
-    <string name="target_creation_text">Hvis du ikke har laget Krusedull-rutenettet ditt ennå, tar du et bilde av veggen ved å trykke på utløserknappen. Ellers trykker du på Avbryt.</string>
+    <string name="doodle_creation_text">Hvis du ikke har laget Krusedull-rutenettet ditt ennå, tar du et bilde av veggen ved å trykke på utløserknappen. Ellers trykker du på Avbryt.</string>
     <!-- Generic cancel action. -->
     <string name="cancel">Avbryt</string>
 
@@ -425,17 +425,17 @@
     <string name="save_project_hint">Prosjektnavn</string>
 
     <!-- Target Creation -->
-    <string name="target_guide_desc">Justeringsveiledning for Krusedull</string>
-    <string name="target_captured_desc">Fotografert Krusedull</string>
-    <string name="target_review_desc">Gjennomgå uttrukket Krusedull</string>
-    <string name="target_unwarp_hint">Dra hjørnene for å løsne</string>
-    <string name="target_review_title">KRUSEDULL LÅST</string>
+    <string name="doodle_guide_desc">Justeringsveiledning for Krusedull</string>
+    <string name="doodle_captured_desc">Fotografert Krusedull</string>
+    <string name="doodle_review_desc">Gjennomgå uttrukket Krusedull</string>
+    <string name="doodle_unwarp_hint">Dra hjørnene for å løsne</string>
+    <string name="doodle_review_title">KRUSEDULL LÅST</string>
     <string name="doodle_closeups_progress">Lærer veggen: trinn %1$d av %2$d · steg %3$d av %4$d</string>
 
-    <string name="target_exclude">Utelukke</string>
-    <string name="target_include">Inkludere</string>
-    <string name="target_erase_marks">Slett merker</string>
-    <string name="target_show_features">Vis funksjoner</string>
+    <string name="doodle_exclude">Utelukke</string>
+    <string name="doodle_include">Inkludere</string>
+    <string name="doodle_erase_marks">Slett merker</string>
+    <string name="doodle_show_features">Vis funksjoner</string>
     <string name="reset_button">Tilbakestill</string>
 
     <string name="poster_title">GENERER PLAKAT</string>
@@ -450,7 +450,7 @@
     <string name="scan_hint_build_map">Gå til venstre og høyre for å bygge kart</string>
     <string name="scan_hint_closer">Gå nærmere veggen</string>
     <string name="scan_hint_higher_lower">Skann høyere og lavere</string>
-    <string name="reacquiring_target">Finner Krusedullen igjen…</string>
+    <string name="reacquiring_doodle">Finner Krusedullen igjen…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Bakgrunn mockup</string>
@@ -713,14 +713,14 @@
     <string name="standalone_photosphere_no_sensor">Denne telefonen har ingen rotasjonssensor, så SphereSLAM kan ikke plassere et mål her.</string>
     <string name="standalone_photosphere_compass_not_ready">Kompasset er ikke klart ennå – hold telefonen i ro et sekund, og ta deretter på nytt.</string>
     <string name="standalone_photosphere_not_mapped">SphereSLAM har ikke kartlagt dette utsnittet ennå – hold kameraet i ro et sekund mot en opplyst, detaljrik del av overflaten, og ta deretter på nytt.</string>
-    <string name="target_rectify_title">Rett opp flaten</string>
-    <string name="target_rectify_text">Dra nå i hjørnene til den turkise rammen ligger langs den flate veggoverflaten.</string>
-    <string name="target_remove_marks_title">Fjern merker</string>
-    <string name="target_erase_hint">Trykk på et merke for å fjerne det, eller dra over flere merker.</string>
-    <string name="target_cd_raw_capture">Råopptak</string>
-    <string name="target_cd_detected_marks">Oppdagede merker</string>
-    <string name="target_cd_confirm">Bekreft</string>
-    <string name="target_cd_unwarp_base">Fotografert veggbilde med hjørnehåndtak</string>
+    <string name="doodle_rectify_title">Rett opp flaten</string>
+    <string name="doodle_rectify_text">Dra nå i hjørnene til den turkise rammen ligger langs den flate veggoverflaten.</string>
+    <string name="doodle_remove_marks_title">Fjern merker</string>
+    <string name="doodle_erase_hint">Trykk på et merke for å fjerne det, eller dra over flere merker.</string>
+    <string name="doodle_cd_raw_capture">Råopptak</string>
+    <string name="doodle_cd_detected_marks">Oppdagede merker</string>
+    <string name="doodle_cd_confirm">Bekreft</string>
+    <string name="doodle_cd_unwarp_base">Fotografert veggbilde med hjørnehåndtak</string>
     <string name="guidance_open_via_design_overlay">Trykk på «Design» i raden, og deretter «Åpne», for å legge til et lag – velg et bilde, så vises det her, svevende over kameravisningen.</string>
     <string name="guidance_open_via_design_mockup">Trykk på «Design» i raden, og deretter «Åpne», for å legge til et lag oppå veggbildet. Knip og dra for å justere størrelse og plassering.</string>
     <string name="guidance_open_via_design_trace">Trykk på «Design» i raden, og deretter «Åpne», for å legge til ditt første lag. Når det er på plass, knip og dra på lerretet for å justere størrelse og plassering.</string>
@@ -729,7 +729,7 @@
     <string name="ar_feedback_guest_edit_dropped">Denne endringen kan ikke deles med verten – den blir værende på denne enheten</string>
     <string name="ar_feedback_backend_resolving">AR-motoren velges fortsatt – prøv å være vert igjen om litt</string>
     <string name="ar_feedback_open_project_first">Åpne et prosjekt før du deler – det er ikke noe å sende til en gjest ennå</string>
-    <string name="ar_feedback_host_need_target_arcore">Ta opp og lås en oppdatert Krusedull før du er vert</string>
+    <string name="ar_feedback_host_need_doodle_arcore">Ta opp og lås en oppdatert Krusedull før du er vert</string>
     <string name="ar_feedback_host_need_target_standalone">Ta opp et frittstående veggmål før du er vert</string>
     <string name="ar_feedback_doodle_not_ready">Krusedullen er ikke klar ennå — hold den i bildet og prøv Vert igjen</string>
     <string name="ar_feedback_package_failed">Kunne ikke pakke dette prosjektet for deling – prøv å lagre det først</string>
@@ -737,7 +737,7 @@
     <string name="ar_feedback_join_load_failed">Kunne ikke laste vertens prosjekt – økten ble avsluttet.</string>
     <string name="ar_feedback_join_no_geometry">Verten ga ikke geometri som ARCore kan justere mot.</string>
     <string name="ar_feedback_join_failed">Kunne ikke bli med: %1$s</string>
-    <string name="ar_feedback_wall_target_changed">Krusedullen ble endret — delingen er avsluttet. Start Vert på nytt for den nye veggen.</string>
+    <string name="ar_feedback_wall_doodle_changed">Krusedullen ble endret — delingen er avsluttet. Start Vert på nytt for den nye veggen.</string>
     <string name="ar_feedback_backend_changed">Sporingsmotoren ble endret – delingen er avsluttet. Start deling på nytt.</string>
     <string name="ar_feedback_camera_busy">Kameraet er opptatt eller utilgjengelig – lukk andre kameraapper og gå inn i AR igjen</string>
     <string name="ar_feedback_ar_start_failed">Kunne ikke starte AR – kameraet kan være i bruk av en annen app</string>
@@ -747,7 +747,7 @@
     <string name="ar_feedback_camera_permission">Kameraet er utilgjengelig – sjekk kameratillatelsen og gå inn i AR igjen</string>
     <string name="ar_feedback_camera_not_paused">AR-kameraet ble ikke satt ordentlig på pause – det kan fortsette å kjøre i bakgrunnen</string>
     <string name="ar_feedback_backbone_warning">Kunstverket dekker nesten hele veggen i bildet — bare %1$d sporede kjennetegn ligger utenfor. Gjør det mindre eller gå bakover, ellers låser Krusedullen seg kanskje ikke.</string>
-    <string name="ar_feedback_legacy_target_geometry">Den lagrede Krusedullen i dette prosjektet ble laget av en eldre versjon, og 3D-geometrien kan ikke korrigeres. Opprett Krusedullen på nytt for å bruke den.</string>
+    <string name="ar_feedback_legacy_doodle_geometry">Den lagrede Krusedullen i dette prosjektet ble laget av en eldre versjon, og 3D-geometrien kan ikke korrigeres. Opprett Krusedullen på nytt for å bruke den.</string>
     <string name="ar_feedback_camera_no_frames">Kameraet leverer ingen bilder – gå ut av AR og prøv igjen</string>
     <string name="ar_feedback_camera_recovery_timeout">Gjenopprettingen av AR-kameraet ble trygt tidsavbrutt – gå ut av AR og inn igjen</string>
     <string name="ar_feedback_target_prepare_failed">Kunne ikke klargjøre det opptatte målet. Prøv igjen.</string>
@@ -774,8 +774,8 @@
     <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
     <string name="settings_change_pass">Endringsgjenkjenning (trenger et bilde av den rene veggen)</string>
     <!-- Spoken labels for the round shutter on the Doodle grid screen, which photographs the bare wall. -->
-    <string name="target_shutter_cd">Fotografer den bare veggen</string>
-    <string name="target_shutter_retake_cd">Ta bildet av den bare veggen på nytt</string>
+    <string name="doodle_shutter_cd">Fotografer den bare veggen</string>
+    <string name="doodle_shutter_retake_cd">Ta bildet av den bare veggen på nytt</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">CV-visning</string>

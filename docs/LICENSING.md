@@ -45,7 +45,7 @@ The engine is **not** contained in one module; the protective boundary must cove
 
 **Borderline glue left under PolyForm by default** (pull into a stricter posture only if you want maximal
 lockdown): `feature/ar/rendering/ArRenderer.kt`, `feature/ar/ArViewModel.kt`,
-`feature/ar/TargetCreationFlow.kt`. These *use* the engine but don't contain the novel method.
+`feature/ar/DoodleCreationFlow.kt`. These *use* the engine but don't contain the novel method.
 
 ## MIT — the open extension layer *(declared ahead of implementation)*
 

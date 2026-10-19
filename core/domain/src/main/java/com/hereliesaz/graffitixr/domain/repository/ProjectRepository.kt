@@ -100,7 +100,7 @@ interface ProjectRepository {
      * @param projectId The project ID.
      * @param path The file path to the ORB descriptor file.
      */
-    suspend fun updateTargetDoodle(projectId: String, path: String)
+    suspend fun updateDoodleData(projectId: String, path: String)
 
     /**
      * Imports a project from a .gxr zip file.

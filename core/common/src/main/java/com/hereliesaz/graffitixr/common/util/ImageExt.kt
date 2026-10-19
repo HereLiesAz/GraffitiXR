@@ -59,7 +59,7 @@ internal fun fitWithinPixelBudget(
  * The returned bitmap is the receiver itself when no resize is needed; callers must therefore only
  * recycle the original when the returned instance is different.
  */
-fun Bitmap.forTargetReview(
+fun Bitmap.forDoodleReview(
     maxPixels: Long = TARGET_REVIEW_MAX_PIXELS,
 ): Bitmap {
     val (targetWidth, targetHeight) = fitWithinPixelBudget(width, height, maxPixels)

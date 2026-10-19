@@ -50,7 +50,7 @@ class GraffitiProjectTest {
                     isImageLocked = true
                 )
             ),
-            targetDoodlePath = "/path/to/doodle"
+            doodleDataPath = "/path/to/doodle"
         )
 
         assertEquals("test-id", project.id)

@@ -92,7 +92,7 @@ fixed this pass:
 
 The audit's "Dead / unreachable features" section is closed. Actions:
 
-- **Deleted** (~700 LOC): `CrashHandler` + `CrashActivity` (unregistered), the empty placeholder `MockupScreen`/`OverlayScreen`/`TraceScreen` (real rendering is in `MainScreen`), `MaskingScreen` + `ArViewModel.updateMaskPath` + `UiState.maskPath` (unrouted), `ArViewModel.setPlaneConfirmationBorder` + the renderer flag (dead), `ArViewModel.applyEraseToMask` (redundant with `TargetCreationFlow.eraseColorBlob`), `CollaborationManager.stopHosting()` (`leaveSession` is a strict superset), the `Tool.LIQUIFY` branch + `applyLiquifyNative` stub in `ImageProcessor` (unreachable — `DrawingEngine.composite` routes LIQUIFY through `SlamManager.applyLiquify`), Kotlin `WarpableImage`/`VirtualCamera`/`SurfaceUnroller` research code, Vulkan `splat.{vert,frag}[.spv]` assets (Vulkan backend removed), and the four unused transform-lock companion helpers in `EditorViewModel`.
+- **Deleted** (~700 LOC): `CrashHandler` + `CrashActivity` (unregistered), the empty placeholder `MockupScreen`/`OverlayScreen`/`TraceScreen` (real rendering is in `MainScreen`), `MaskingScreen` + `ArViewModel.updateMaskPath` + `UiState.maskPath` (unrouted), `ArViewModel.setPlaneConfirmationBorder` + the renderer flag (dead), `ArViewModel.applyEraseToMask` (redundant with `DoodleCreationFlow.eraseColorBlob`), `CollaborationManager.stopHosting()` (`leaveSession` is a strict superset), the `Tool.LIQUIFY` branch + `applyLiquifyNative` stub in `ImageProcessor` (unreachable — `DrawingEngine.composite` routes LIQUIFY through `SlamManager.applyLiquify`), Kotlin `WarpableImage`/`VirtualCamera`/`SurfaceUnroller` research code, Vulkan `splat.{vert,frag}[.spv]` assets (Vulkan backend removed), and the four unused transform-lock companion helpers in `EditorViewModel`.
 - **Deleted enum:** `EditorMode.STENCIL` — auto-bounced to MOCKUP and had no route; per-layer stencil generation (`onGenerateStencil`) is untouched.
 - **Wired up:** AR tap-to-distance UI now gates on `(isDualLensActive || currentCenterDepth > 0f)` instead of the deliberately-disabled ARCore Depth API — the reticle + distance chips light up on capable devices. Per-mode transform-lock toggle: a **Lock** rail sub-item under each non-Design mode folder (AR/OVERLAY/MOCKUP/TRACE), turning cyan when engaged — the reducer already respected `isTransformLocked`.
 - **Fixed:** `LocalIp.discover()` now picks the source address of the default route via the UDP-connect trick, so QR pairing advertises a LAN-reachable IP on multi-interface (cellular + Wi-Fi, VPN) devices.
@@ -359,11 +359,11 @@ than after.
 ### Phase 4 — AR core-workflow bugs (Kotlin/Compose, highest user impact)
 
 - [x] **Retake is a no-op loop**: `onRetakeCapture()`/`clearTapHighlights()` don't clear
-  `tempCaptureBitmap`/`annotatedCaptureBitmap`/`targetWallPlane`, so the review screen
+  `tempCaptureBitmap`/`annotatedCaptureBitmap`/`doodleCaptureWallPlane`, so the review screen
   immediately re-renders the same rejected capture. Use `clearCaptureForRetry()` (which already
   does this correctly) instead of `clearTapHighlights()` on this path.
 - [x] **Re-arming Target after a successful capture replays the stale one**: same root cause —
-  `startTargetCapture()` doesn't clear the previous capture's state, so the artist can confirm an
+  `startDoodleCapture()` doesn't clear the previous capture's state, so the artist can confirm an
   old photo against a freshly-established anchor. Same fix as above, applied to this entry point.
 - [x] **"Tap 'Open' on the rail" instructions are wrong in AR**: both post-target-lock prompts
   point at `item.open`, hosted under `mode.design`'s `expandWhen`-gated accordion, which
@@ -442,10 +442,10 @@ than after.
   `MainActivity.kt`'s own comment already claims exists. Spot-check the authored copy against
   current UI before flipping it on (it was written before some of the Phase 4 changes above).
   **Post-merge review on the PR (Codex) caught two real bugs in the first landing, both fixed
-  before merge:** (1) AR's own `TargetCreationUi` capture modal isn't covered by
+  before merge:** (1) AR's own `DoodleCreationUi` capture modal isn't covered by
   `MainActivity`'s `anyModalActive` gate (that only guards its own `onscreen{}` overlays; this
   reactive guidance renders separately via `AzHostActivityLayout`) — added a second
-  `azSuppressGuide` predicate on `isCapturingTarget` so the rail callout stops stacking over the
+  `azSuppressGuide` predicate on `isCapturingDoodle` so the rail callout stops stacking over the
   capture card. (2) Every mode's goal shared `gx.hasDesign` as its completion target, so a
   returning user who already had a design (the common case) skipped a mode's tour entirely on
   first entry — worst for Mockup, which lost its wall-photo steps. Gave Mockup its own

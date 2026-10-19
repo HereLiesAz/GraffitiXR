@@ -300,19 +300,19 @@ class ProjectManagerTest {
         var project = GraffitiProject(id = "many_targets", name = "Many targets")
         // One capture at a time, as the real capture flow does — 35 captures against a cap of 30.
         repeat(35) {
-            pruningManager.saveProject(mockContext, project, targetImages = listOf(bitmap))
+            pruningManager.saveProject(mockContext, project, doodleImages = listOf(bitmap))
             project = pruningManager.loadProjectMetadata(mockContext, "many_targets")!!
         }
 
-        assertEquals(30, project.targetImageUris.size)
+        assertEquals(30, project.doodleImageUris.size)
         // Nothing beyond the cap remains on disk — pruned entries are deleted, not merely dropped
         // from the list.
-        val targetFiles = File(tempFilesDir, "projects/many_targets").listFiles { f -> f.name.startsWith("target_") }
-        assertEquals(30, targetFiles?.size ?: -1)
+        val doodleFiles = File(tempFilesDir, "projects/many_targets").listFiles { f -> f.name.startsWith("target_") }
+        assertEquals(30, doodleFiles?.size ?: -1)
     }
 
     @Test
-    fun `appendTargetImage prunes the list but leaves the files to the caller's commit`() = runTest {
+    fun `appendDoodleImage prunes the list but leaves the files to the caller's commit`() = runTest {
         val projectRepositoryProvider = mockk<javax.inject.Provider<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>>(relaxed = true)
         val pruningManager = ProjectManager(mockContext, uriProvider, projectRepositoryProvider)
         val bitmap = mockk<Bitmap>(relaxed = true) {
@@ -323,20 +323,20 @@ class ProjectManagerTest {
         var uris = emptyList<Uri>()
         val dropped = mutableListOf<Uri>()
         repeat(35) {
-            val next = pruningManager.appendTargetImage(mockContext, "capture_only", uris, bitmap)
+            val next = pruningManager.appendDoodleImage(mockContext, "capture_only", uris, bitmap)
             dropped += uris - next.toSet()
             uris = next
         }
 
         assertEquals(30, uris.size)
         assertEquals(5, dropped.size)
-        // Pure file IO: appendTargetImage must never create project.json.
+        // Pure file IO: appendDoodleImage must never create project.json.
         assertFalse(File(tempFilesDir, "projects/capture_only/project.json").exists())
-        fun targetFiles() = File(tempFilesDir, "projects/capture_only").listFiles { f -> f.name.startsWith("target_") }?.size
+        fun doodleFiles() = File(tempFilesDir, "projects/capture_only").listFiles { f -> f.name.startsWith("target_") }?.size
         // A dropped file is still referenced until the caller commits the list: nothing deleted yet.
-        assertEquals(35, targetFiles())
-        pruningManager.deleteTargetImages(dropped)
-        assertEquals(30, targetFiles())
+        assertEquals(35, doodleFiles())
+        pruningManager.deleteDoodleImages(dropped)
+        assertEquals(30, doodleFiles())
     }
 
 
@@ -989,13 +989,13 @@ class ProjectManagerTest {
         val saved = manager.saveProject(
             mockContext,
             GraffitiProject(id = "png_atomic", name = "Wall"),
-            targetImages = listOf(bitmap),
+            doodleImages = listOf(bitmap),
             thumbnail = bitmap,
         )
         val root = File(tempFilesDir, "projects/png_atomic")
         assertTrue(File(root, "thumbnail.png").isFile)
-        assertEquals(1, saved.targetImageUris.size)
-        assertTrue(File(requireNotNull(saved.targetImageUris[0].path)).isFile)
+        assertEquals(1, saved.doodleImageUris.size)
+        assertTrue(File(requireNotNull(saved.doodleImageUris[0].path)).isFile)
         assertTrue(root.listFiles { f -> f.name.endsWith(".tmp") }.isNullOrEmpty())
     }
 

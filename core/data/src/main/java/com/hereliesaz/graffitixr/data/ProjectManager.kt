@@ -94,13 +94,13 @@ class ProjectManager @Inject constructor(
 
         /**
          * Cap on how many captured target images a single project keeps, enforced by
-         * [pruneTargetImages]. Nothing previously pruned this list, so repeated re-captures could grow
+         * [pruneDoodleImages]. Nothing previously pruned this list, so repeated re-captures could grow
          * it, and its on-disk PNGs, without bound short of deleting the whole project. No existing
          * precedent in this codebase for the right number, so 30 is chosen as generous headroom for a
          * real capture session while still bounding worst-case storage to a few dozen PNGs.
          *
-         * Note: the live capture flow appends via [appendTargetImage], which does its own pruning and
-         * never routes through [saveProject]'s `targetImages` parameter — this cap/path is exercised by
+         * Note: the live capture flow appends via [appendDoodleImage], which does its own pruning and
+         * never routes through [saveProject]'s `doodleImages` parameter — this cap/path is exercised by
          * tests and direct API use, not production captures.
          */
         private const val MAX_TARGET_IMAGES = 30
@@ -122,12 +122,12 @@ class ProjectManager @Inject constructor(
     suspend fun saveProject(
         context: Context,
         projectData: GraffitiProject,
-        targetImages: List<Bitmap>? = null,
+        doodleImages: List<Bitmap>? = null,
         thumbnail: Bitmap? = null,
     ): GraffitiProject = saveProjectInternal(
         context = context,
         projectData = projectData,
-        targetImages = targetImages,
+        doodleImages = doodleImages,
         thumbnail = thumbnail,
         preserveExistingCaptureState = true,
     )
@@ -148,7 +148,7 @@ class ProjectManager @Inject constructor(
     ): GraffitiProject = saveProjectInternal(
         context = context,
         projectData = projectData,
-        targetImages = null,
+        doodleImages = null,
         thumbnail = null,
         preserveExistingCaptureState = false,
     )
@@ -156,7 +156,7 @@ class ProjectManager @Inject constructor(
     private suspend fun saveProjectInternal(
         context: Context,
         projectData: GraffitiProject,
-        targetImages: List<Bitmap>?,
+        doodleImages: List<Bitmap>?,
         thumbnail: Bitmap?,
         preserveExistingCaptureState: Boolean,
     ): GraffitiProject = withContext(Dispatchers.IO) {
@@ -191,9 +191,9 @@ class ProjectManager @Inject constructor(
                 null
             }
             if (existing != null) {
-                val replacesTarget =
+                val replacesDoodle =
                     projectData.doodle != null && projectData.doodle != existing.doodle
-                val withTarget = if (replacesTarget) projectData else projectData.copy(
+                val withTarget = if (replacesDoodle) projectData else projectData.copy(
                     doodle = existing.doodle,
                     doodleIntrinsics = existing.doodleIntrinsics,
                     doodleAnchor = existing.doodleAnchor,
@@ -207,8 +207,8 @@ class ProjectManager @Inject constructor(
                     captureEnvironment = projectData.captureEnvironment ?: existing.captureEnvironment,
                     // Preserve the legacy target-doodle references too, so no save without them
                     // can wipe an existing target.
-                    targetDoodle = projectData.targetDoodle ?: existing.targetDoodle,
-                    targetDoodlePath = projectData.targetDoodlePath ?: existing.targetDoodlePath,
+                    doodleData = projectData.doodleData ?: existing.doodleData,
+                    doodleDataPath = projectData.doodleDataPath ?: existing.doodleDataPath,
                     wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
                     paintMarks = projectData.paintMarks ?: existing.paintMarks,
                     paintGrid = projectData.paintGrid ?: existing.paintGrid,
@@ -344,20 +344,20 @@ class ProjectManager @Inject constructor(
         // repeated captures can't grow this list (and its on-disk PNGs) without bound. Filenames are
         // unique (not size-indexed): once the list is pruned to the cap its size stops growing, so an
         // index derived from it would collide with — and silently overwrite — a still-kept file.
-        val savedTargetUris = if (targetImages != null) {
-            val newUris = targetImages.map { bitmap ->
+        val savedDoodleUris = if (doodleImages != null) {
+            val newUris = doodleImages.map { bitmap ->
                 val file = File(root, "target_${UUID.randomUUID()}.png")
                 writePngAtomically(bitmap, file, "target image")
                 uriProvider.getUriForFile(file)
             }
-            pruneTargetImages(incoming.targetImageUris + newUris)
+            pruneDoodleImages(incoming.doodleImageUris + newUris)
         } else {
-            incoming.targetImageUris
+            incoming.doodleImageUris
         }
 
         val updatedGraffitiProject = incoming.copy(
             thumbnailUri = thumbnailUri,
-            targetImageUris = savedTargetUris,
+            doodleImageUris = savedDoodleUris,
             lastModified = System.currentTimeMillis()
         )
 
@@ -423,7 +423,7 @@ class ProjectManager @Inject constructor(
      * Drops the oldest entries once [uris] exceeds [MAX_TARGET_IMAGES], deleting their backing files
      * so a pruned entry doesn't leak a PNG that nothing references any more.
      */
-    private fun pruneTargetImages(uris: List<Uri>): List<Uri> {
+    private fun pruneDoodleImages(uris: List<Uri>): List<Uri> {
         if (uris.size <= MAX_TARGET_IMAGES) return uris
         val overflow = uris.size - MAX_TARGET_IMAGES
         uris.take(overflow).forEach { uri ->
@@ -638,7 +638,7 @@ class ProjectManager @Inject constructor(
      * capture paths, which used to call [saveProject] directly and could silently clobber a concurrent
      * AR wall-map or editor design save).
      */
-    suspend fun appendTargetImage(
+    suspend fun appendDoodleImage(
         context: Context,
         projectId: String,
         existingUris: List<Uri>,
@@ -650,15 +650,15 @@ class ProjectManager @Inject constructor(
         val file = File(root, "target_${UUID.randomUUID()}.png")
         writePngAtomically(bitmap, file, "target image")
         // Only the LIST is pruned here: the dropped files are still referenced by project.json until the
-        // caller commits this list, so the caller deletes them afterwards ([deleteTargetImages]).
+        // caller commits this list, so the caller deletes them afterwards ([deleteDoodleImages]).
         (existingUris + uriProvider.getUriForFile(file)).takeLast(MAX_TARGET_IMAGES)
     }
 
     /**
      * Delete target-image files that the committed project no longer references (the entries
-     * [appendTargetImage] pruned), or a new one whose commit lost the race. Best-effort.
+     * [appendDoodleImage] pruned), or a new one whose commit lost the race. Best-effort.
      */
-    suspend fun deleteTargetImages(uris: Collection<Uri>) = withContext(Dispatchers.IO) {
+    suspend fun deleteDoodleImages(uris: Collection<Uri>) = withContext(Dispatchers.IO) {
         uris.forEach { uri ->
             try {
                 uri.path?.let { File(it).delete() }
@@ -674,7 +674,7 @@ class ProjectManager @Inject constructor(
      * Loads a project's metadata, applying [migrateInMemory] purely in memory.
      *
      * This used to be two functions: this read-only one (used everywhere — dashboard listing, repo
-     * `getProject`/`loadProject`, `updateTargetDoodle`) plus a `loadProject(): LoadedProject?`
+     * `getProject`/`loadProject`, `updateDoodleData`) plus a `loadProject(): LoadedProject?`
      * that additionally loaded every target-image bitmap and — its one distinguishing behavior —
      * persisted the migration back to project.json. That second function had no caller anywhere in
      * the codebase (nothing ever consumed a `LoadedProject`'s bitmaps either), so the "persist on
@@ -755,13 +755,13 @@ class ProjectManager @Inject constructor(
             overlayImageUri = uri(project.overlayImageUri),
             originalOverlayImageUri = uri(project.originalOverlayImageUri),
             thumbnailUri = uri(project.thumbnailUri),
-            targetImageUris = project.targetImageUris.map { uri(it) },
+            doodleImageUris = project.doodleImageUris.map { uri(it) },
             cleanWallUri = uri(project.cleanWallUri),
             sphereSlamReferenceUri = uri(project.sphereSlamReferenceUri),
             sphereSlamAtlasPages = project.sphereSlamAtlasPages.map { it.copy(referenceUri = uri(it.referenceUri)) },
             evolutionImageUris = project.evolutionImageUris.map { uri(it) },
             hybridKpmPageUri = uri(project.hybridKpmPageUri),
-            targetDoodlePath = project.targetDoodlePath?.let { path(it) },
+            doodleDataPath = project.doodleDataPath?.let { path(it) },
         )
     }
 
@@ -1094,14 +1094,14 @@ class ProjectManager @Inject constructor(
                 overlayImageUri = localUri(migrated.overlayImageUri),
                 originalOverlayImageUri = localUri(migrated.originalOverlayImageUri),
                 thumbnailUri = localUri(migrated.thumbnailUri),
-                targetImageUris = migrated.targetImageUris.map { localUri(it)!! },
+                doodleImageUris = migrated.doodleImageUris.map { localUri(it)!! },
                 cleanWallUri = localUri(migrated.cleanWallUri),
                 sphereSlamReferenceUri = localUri(migrated.sphereSlamReferenceUri),
                 sphereSlamAtlasPages = migrated.sphereSlamAtlasPages.map { page ->
                     page.copy(referenceUri = localUri(page.referenceUri)!!)
                 },
                 evolutionImageUris = migrated.evolutionImageUris.map { localUri(it)!! },
-                targetDoodlePath = migrated.targetDoodlePath?.let { localPath(it).absolutePath },
+                doodleDataPath = migrated.doodleDataPath?.let { localPath(it).absolutePath },
             ).let { relocated ->
                 // The hybrid page is an optional accelerator, not project content: a sender's
                 // archive that lacks the file drops the page rather than failing the whole import.

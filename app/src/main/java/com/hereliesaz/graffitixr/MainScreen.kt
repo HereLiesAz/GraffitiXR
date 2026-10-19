@@ -146,26 +146,26 @@ fun MainScreen(
         }
 
         if (hasCameraPermission && isCameraActive && uiState.editorMode != EditorMode.TRACE) {
-            val selectedBackendHasTarget: Boolean? = when {
+            val selectedBackendHasDoodle: Boolean? = when {
             !arUiState.isArCoreAvailabilityResolved -> null
-            arUiState.isArCoreAvailable -> mainUiState.hasArCoreTarget
+            arUiState.isArCoreAvailable -> mainUiState.hasArCoreDoodle
             !arUiState.isSphereSlamAvailabilityResolved -> null
             arUiState.isSphereSlamAvailable -> mainUiState.hasSphereSlamTarget
             else -> null
         }
         LaunchedEffect(
             uiState.editorMode,
-            selectedBackendHasTarget,
-            mainUiState.isCapturingTarget,
-            mainUiState.isConfirmingTarget,
+            selectedBackendHasDoodle,
+            mainUiState.isCapturingDoodle,
+            mainUiState.isConfirmingDoodle,
         ) {
             if (
                 uiState.editorMode == EditorMode.AR &&
-                selectedBackendHasTarget == false &&
-                !mainUiState.isCapturingTarget &&
-                !mainUiState.isConfirmingTarget
+                selectedBackendHasDoodle == false &&
+                !mainUiState.isCapturingDoodle &&
+                !mainUiState.isConfirmingDoodle
             ) {
-                mainViewModel.startTargetCapture()
+                mainViewModel.startDoodleCapture()
             }
         }
 
@@ -377,7 +377,7 @@ fun MainScreen(
                                     // Same reset as the rail's Target action, then the shared flow.
                                     arViewModel.clearCaptureForRetry()
                                     arViewModel.cancelMeasure()
-                                    mainViewModel.startTargetCapture()
+                                    mainViewModel.startDoodleCapture()
                                 }
                             },
                             onReferenceCaptured = { bitmap, widthMeters, physicallyMetric ->
@@ -674,8 +674,8 @@ fun MainScreen(
                                 val renderer = ArRenderer(
                                     context = ctx,
                                     slamManager = slamManager,
-                                    onTargetCaptured = { bmp, cw, ch, depth, dw, dh, stride, intr, viewMat, rot, tapDist, wallPlane, environment ->
-                                        arViewModel.onTargetCaptured(
+                                    onDoodleCaptured = { bmp, cw, ch, depth, dw, dh, stride, intr, viewMat, rot, tapDist, wallPlane, environment ->
+                                        arViewModel.onDoodleCaptured(
                                             bmp, depth,
                                             cw, ch,
                                             dw, dh, stride,
@@ -742,7 +742,7 @@ fun MainScreen(
                                     if (requested && !captureRequestApplied.get()) r.captureRequested = true
                                     if (!requested) r.captureRequested = false
                                     captureRequestApplied.set(requested)
-                                    r.isCapturingTarget = mainUiState.isCapturingTarget
+                                    r.isCapturingDoodle = mainUiState.isCapturingDoodle
                                     r.hideVisualization = isExporting
                                     r.scanPhase = arUiState.scanPhase
                                     r.doodleLockActive = doodleDetectActive

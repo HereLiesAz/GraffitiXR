@@ -77,16 +77,16 @@ data class ArUiState(
     // Grayscale + ORB keypoint overlay computed after capture so the artist can
     // judge whether the surface has enough visual texture before confirming.
     val annotatedCaptureBitmap: Bitmap? = null,
-    val targetDepthBuffer: ByteBuffer? = null,
-    val targetDepthWidth: Int = 0,
-    val targetDepthHeight: Int = 0,
-    val targetIntrinsics: FloatArray? = null,
+    val doodleDepthBuffer: ByteBuffer? = null,
+    val doodleDepthWidth: Int = 0,
+    val doodleDepthHeight: Int = 0,
+    val doodleCaptureIntrinsics: FloatArray? = null,
     // The green (parallel, in-range) ARCore wall plane under the capture tap, as 6 floats
     // [pointX,pointY,pointZ, normalX,normalY,normalZ] in world space. Null when the tap wasn't on a
     // qualifying (MATCH/green) plane — single-capture target creation requires one (back-projection).
-    val targetWallPlane: FloatArray? = null,
-    val capturedTargetUris: List<Uri> = emptyList(),
-    val capturedTargetImages: List<Bitmap> = emptyList(),
+    val doodleCaptureWallPlane: FloatArray? = null,
+    val capturedDoodleUris: List<Uri> = emptyList(),
+    val capturedDoodleImages: List<Bitmap> = emptyList(),
     val gpsData: GpsData? = null,
     val sensorData: SensorData? = null,
     val pendingKeyframePath: String? = null,
@@ -109,25 +109,25 @@ data class ArUiState(
     // ── Anchor overlay data (populated when target is captured) ──────────────
 
     // Actual depth image dimensions (not color image dimensions).
-    val targetDepthBufferWidth: Int = 0,
-    val targetDepthBufferHeight: Int = 0,
-    val targetDepthStride: Int = 0,
+    val doodleDepthBufferWidth: Int = 0,
+    val doodleDepthBufferHeight: Int = 0,
+    val doodleDepthStride: Int = 0,
 
     // Column-major 4×4 view matrix captured at the moment the target was photographed.
     // Used to unproject depth pixels to 3D world positions for layer feature baking.
-    val targetCaptureViewMatrix: FloatArray? = null,
+    val doodleCaptureViewMatrix: FloatArray? = null,
 
     // Store the raw sensor-aligned bitmap for addLayerFeatures mapping
-    val targetRawBitmap: Bitmap? = null,
+    val doodleRawBitmap: Bitmap? = null,
     // Store the rotation applied to the display bitmap
-    val targetDisplayRotation: Int = 0,
+    val doodleDisplayRotation: Int = 0,
     /**
      * How and where the device was held when the active target was captured.
      *
      * Null until a capture happens this session. Persisted onto the project at save, because the
      * conditions a doodle was built under are not recoverable from the doodle.
      */
-    val targetCaptureEnvironment: CaptureEnvironment? = null,
+    val doodleCaptureEnvironment: CaptureEnvironment? = null,
     /**
      * Set when a saved wall doodle was refused at load because it predates Phase 0 and its 3D
      * points are in the sensor frame with no recorded capture rotation (IMPLEMENTATION.md 0.7).

@@ -842,7 +842,7 @@ order.** Work top to bottom.
       defect. Plumbed from `MainActivity` → `MainViewModel` and from the doodle path.
 - [x] **0.5** Audit *every* consumer of the capture view matrix for the same
       convention — `MetricDoodleBuilder`, `PlaneMarks` callers,
-      `targetCaptureViewMatrix` in `ArViewModel`, `doodleViewMatrix` in
+      `doodleCaptureViewMatrix` in `ArViewModel`, `doodleViewMatrix` in
       `MainViewModel`, and `restoreWallDoodleMetric`'s `viewMatrix16`.
       List each site in the commit message with its verdict.
 - [x] **0.6** Confirm `PoseFusion.composeCorrected` is consistent under the chosen

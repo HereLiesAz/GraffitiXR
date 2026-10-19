@@ -276,9 +276,9 @@
     <string name="open_settings">設定を開く</string>
 
 
-    <string name="target_creation_title">らくがきグリッド</string>
+    <string name="doodle_creation_title">らくがきグリッド</string>
 
-    <string name="target_creation_text">らくがきグリッドをまだ作成していない場合は、撮影ボタンを押して壁の写真を撮ってください。作成済みの場合は「キャンセル」を押してください。</string>
+    <string name="doodle_creation_text">らくがきグリッドをまだ作成していない場合は、撮影ボタンを押して壁の写真を撮ってください。作成済みの場合は「キャンセル」を押してください。</string>
 
     <string name="cancel">キャンセル</string>
 
@@ -442,17 +442,17 @@
     <string name="save_project_hint">プロジェクト名</string>
 
 
-    <string name="target_guide_desc">らくがき位置合わせガイド</string>
-    <string name="target_captured_desc">撮影したらくがき</string>
-    <string name="target_review_desc">抽出したらくがきを確認</string>
-    <string name="target_unwarp_hint">コーナーをドラッグして歪みを修正</string>
-    <string name="target_review_title">らくがきをロックしました</string>
+    <string name="doodle_guide_desc">らくがき位置合わせガイド</string>
+    <string name="doodle_captured_desc">撮影したらくがき</string>
+    <string name="doodle_review_desc">抽出したらくがきを確認</string>
+    <string name="doodle_unwarp_hint">コーナーをドラッグして歪みを修正</string>
+    <string name="doodle_review_title">らくがきをロックしました</string>
     <string name="doodle_closeups_progress">壁を学習中: ステージ %1$d / %2$d · ステップ %3$d / %4$d</string>
 
-    <string name="target_exclude">除外</string>
-    <string name="target_include">含める</string>
-    <string name="target_erase_marks">マークを消去</string>
-    <string name="target_show_features">特徴を表示</string>
+    <string name="doodle_exclude">除外</string>
+    <string name="doodle_include">含める</string>
+    <string name="doodle_erase_marks">マークを消去</string>
+    <string name="doodle_show_features">特徴を表示</string>
     <string name="reset_button">リセット</string>
 
     <string name="poster_title">ポスターを生成</string>
@@ -467,7 +467,7 @@
     <string name="scan_hint_build_map">左右に歩いてマップを構築します</string>
     <string name="scan_hint_closer">壁に近づいてください</string>
     <string name="scan_hint_higher_lower">上下をスキャンします</string>
-    <string name="reacquiring_target">らくがきを再検出中…</string>
+    <string name="reacquiring_doodle">らくがきを再検出中…</string>
 
 
     <string name="desc_bg_mockup">背景のモックアップ</string>
@@ -730,14 +730,14 @@
     <string name="standalone_photosphere_no_sensor">この端末には回転センサーがないため、SphereSLAM はここにターゲットを配置できません。</string>
     <string name="standalone_photosphere_compass_not_ready">コンパスの準備がまだできていません。端末を 1 秒ほど動かさずに持ち、もう一度撮影してください。</string>
     <string name="standalone_photosphere_not_mapped">SphereSLAM はまだこのビューをマッピングしていません。明るく細部の多い面にカメラを 1 秒ほど固定してから、もう一度撮影してください。</string>
-    <string name="target_rectify_title">面を補正</string>
-    <string name="target_rectify_text">角をドラッグして、シアンの枠を壁の平らな面に合わせてください。</string>
-    <string name="target_remove_marks_title">マークを削除</string>
-    <string name="target_erase_hint">マークをタップして削除するか、複数のマークをなぞって削除します。</string>
-    <string name="target_cd_raw_capture">未加工の撮影画像</string>
-    <string name="target_cd_detected_marks">検出されたマーク</string>
-    <string name="target_cd_confirm">確認</string>
-    <string name="target_cd_unwarp_base">角のハンドル付きで撮影した壁の写真</string>
+    <string name="doodle_rectify_title">面を補正</string>
+    <string name="doodle_rectify_text">角をドラッグして、シアンの枠を壁の平らな面に合わせてください。</string>
+    <string name="doodle_remove_marks_title">マークを削除</string>
+    <string name="doodle_erase_hint">マークをタップして削除するか、複数のマークをなぞって削除します。</string>
+    <string name="doodle_cd_raw_capture">未加工の撮影画像</string>
+    <string name="doodle_cd_detected_marks">検出されたマーク</string>
+    <string name="doodle_cd_confirm">確認</string>
+    <string name="doodle_cd_unwarp_base">角のハンドル付きで撮影した壁の写真</string>
     <string name="guidance_open_via_design_overlay">レールの「デザイン」をタップし、続けて「開く」をタップしてレイヤーを追加します。写真を選ぶと、ライブカメラ映像の上に浮かんで表示されます。</string>
     <string name="guidance_open_via_design_mockup">レールの「デザイン」をタップし、続けて「開く」をタップして、壁の写真の上にレイヤーを追加します。ピンチとドラッグで大きさと位置を調整します。</string>
     <string name="guidance_open_via_design_trace">レールの「デザイン」をタップし、続けて「開く」をタップして、最初のレイヤーを追加します。追加後は、キャンバス上でピンチとドラッグをして大きさと位置を決めます。</string>
@@ -746,7 +746,7 @@
     <string name="ar_feedback_guest_edit_dropped">この変更はホストと共有できません。この端末にのみ残ります</string>
     <string name="ar_feedback_backend_resolving">AR バックエンドを判定中です。しばらくしてからもう一度ホストを試してください</string>
     <string name="ar_feedback_open_project_first">共有する前にプロジェクトを開いてください。ゲストに送るものがまだありません</string>
-    <string name="ar_feedback_host_need_target_arcore">ホストする前に、最新のらくがきを撮影してロックしてください</string>
+    <string name="ar_feedback_host_need_doodle_arcore">ホストする前に、最新のらくがきを撮影してロックしてください</string>
     <string name="ar_feedback_host_need_target_standalone">ホストする前に、スタンドアロンの壁ターゲットを撮影してください</string>
     <string name="ar_feedback_doodle_not_ready">らくがきの準備がまだできていません — 画面内に保ったまま、もう一度「ホスト」を試してください</string>
     <string name="ar_feedback_package_failed">このプロジェクトを共有用にパッケージできませんでした。先に保存してみてください</string>
@@ -754,7 +754,7 @@
     <string name="ar_feedback_join_load_failed">ホストのプロジェクトを読み込めませんでした。セッションを終了しました。</string>
     <string name="ar_feedback_join_no_geometry">ホストが ARCore で位置合わせできるジオメトリを提供しませんでした。</string>
     <string name="ar_feedback_join_failed">参加できませんでした：%1$s</string>
-    <string name="ar_feedback_wall_target_changed">らくがきが変わりました — 共有を終了しました。新しい壁で、もう一度「ホスト」を開始してください。</string>
+    <string name="ar_feedback_wall_doodle_changed">らくがきが変わりました — 共有を終了しました。新しい壁で、もう一度「ホスト」を開始してください。</string>
     <string name="ar_feedback_backend_changed">トラッキングバックエンドが変わったため、共有を終了しました。もう一度共有を開始してください。</string>
     <string name="ar_feedback_camera_busy">カメラが使用中か利用できません。他のカメラアプリを閉じてから、AR にもう一度入ってください</string>
     <string name="ar_feedback_ar_start_failed">AR を開始できませんでした。カメラが他のアプリで使用されている可能性があります</string>
@@ -764,7 +764,7 @@
     <string name="ar_feedback_camera_permission">カメラを利用できません。カメラの権限を確認してから、AR にもう一度入ってください</string>
     <string name="ar_feedback_camera_not_paused">AR カメラを正常に一時停止できませんでした。バックグラウンドで動き続ける可能性があります</string>
     <string name="ar_feedback_backbone_warning">作品が視野内の壁のほぼ全体を覆っており、その外側にある追跡特徴は %1$d 個だけです。小さくするか、少し下がってください。そうしないとらくがきがロックされない場合があります。</string>
-    <string name="ar_feedback_legacy_target_geometry">このプロジェクトに保存されているらくがきは古いバージョンで作成されたもので、3D ジオメトリを補正できません。使用するにはらくがきを作成し直してください。</string>
+    <string name="ar_feedback_legacy_doodle_geometry">このプロジェクトに保存されているらくがきは古いバージョンで作成されたもので、3D ジオメトリを補正できません。使用するにはらくがきを作成し直してください。</string>
     <string name="ar_feedback_camera_no_frames">カメラからフレームが届いていません。AR を終了して、もう一度試してください</string>
     <string name="ar_feedback_camera_recovery_timeout">AR カメラの復旧は安全にタイムアウトしました。AR を終了して、もう一度入ってください</string>
     <string name="ar_feedback_target_prepare_failed">撮影したターゲットを準備できませんでした。もう一度お試しください。</string>
@@ -791,8 +791,8 @@
     <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
     <string name="settings_change_pass">変化の検出（きれいな壁の写真が必要）</string>
     <!-- Spoken labels for the round shutter on the Doodle grid screen, which photographs the bare wall. -->
-    <string name="target_shutter_cd">何もない壁を撮影</string>
-    <string name="target_shutter_retake_cd">何もない壁の写真を撮り直す</string>
+    <string name="doodle_shutter_cd">何もない壁を撮影</string>
+    <string name="doodle_shutter_retake_cd">何もない壁の写真を撮り直す</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">CVビュー</string>

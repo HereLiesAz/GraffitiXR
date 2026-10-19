@@ -73,7 +73,7 @@ We extend the Rail with Content {} blocks to render the Vertical Slider directly
 
 As of AzNavRail 10.18 the onboarding tutorial is a **reactive, status-driven guidance graph**, not a scripted walkthrough and not a hand-built coach overlay. GraffitiXR declares the graph in `app/.../GuidanceDefinitions.kt` (`ConfigureGuidance`), called inside the same `AzHostActivityLayout { }` lambda as the rail items:
 
-* `azStatus(id) { predicate }` — milestone nodes derived from app state (`gx.hasLayers`, `gx.hasActiveLayer`, `gx.hasWallPhoto`, `gx.hasTarget`, …).
+* `azStatus(id) { predicate }` — milestone nodes derived from app state (`gx.hasLayers`, `gx.hasActiveLayer`, `gx.hasWallPhoto`, `gx.hasDoodle`, …).
 * `azEdge(from, to, …)` — transitions carrying the existing localized onboarding text; multi-line steps use `AzInstructionStep` with `advanceWhen`, and `AZ_ITEM_ACTIVE` / `highlightSelector` to point at the active layer.
 * `azGoal(id, target, label, autoStartWhen = "az.screen.<MODE>")` — per-mode goals that self-activate on mode entry and complete (persisted by the library under `az_navrail_completed_goals`) once their milestone is reached.
 * `azSuppressGuide(700) { gestureInProgress }` keeps callouts hidden during gestures.
@@ -87,11 +87,11 @@ The instruction overlay is mounted automatically by `AzHostActivityLayout`. The 
 
 The guidance graph is the tutorial. Everything else that explains something yields or is gone:
 
-* **Capture step:** `TargetCreationUi`'s own card is the only instruction while a target is being captured; the guidance graph is suppressed (`azSuppressGuide { isCapturingTarget || ownTutorialActive }`). There is no separate in-capture hint.
-* **After the anchor lands:** the `gx.hasTarget -> gx.arReady` edge ("open a design via Design") is the only instruction. The old "Design your mural" dialog and "Target established" card were removed. The AR goal ends at `gx.arReady` (target AND design), not at `gx.hasTarget`, so the controller does not complete it before that edge has run.
+* **Capture step:** `DoodleCreationUi`'s own card is the only instruction while a target is being captured; the guidance graph is suppressed (`azSuppressGuide { isCapturingDoodle || ownTutorialActive }`). There is no separate in-capture hint.
+* **After the anchor lands:** the `gx.hasDoodle -> gx.arReady` edge ("open a design via Design") is the only instruction. The old "Design your mural" dialog and "Target established" card were removed. The AR goal ends at `gx.arReady` (target AND design), not at `gx.hasDoodle`, so the controller does not complete it before that edge has run.
 * **First launch:** the photo explainer, the DRAW/DETECT walkthrough and the no-ARCore explainer are the app's own first-run surfaces; `MainActivity` reports them as `ownTutorialActive`, so the graph waits until they are done.
 
-`TargetIncompleteOverlay` ("Target not locked") is an error state, not a tutorial, and stays.
+`DoodleIncompleteOverlay` ("Target not locked") is an error state, not a tutorial, and stays.
 
 ### Where app UI goes (AzNavRail layout layers)
 

@@ -273,9 +273,9 @@
     <string name="open_settings">Apri Impostazioni</string>
 
     <!-- Title for target creation overlay. -->
-    <string name="target_creation_title">GRIGLIA DELLO SCARABOCCHIO</string>
+    <string name="doodle_creation_title">GRIGLIA DELLO SCARABOCCHIO</string>
     <!-- Instructions for creating a target by tapping on reference marks. -->
-    <string name="target_creation_text">Se non hai ancora creato la griglia del tuo Scarabocchio, scatta una foto del muro premendo il pulsante di acquisizione. Altrimenti premi Annulla.</string>
+    <string name="doodle_creation_text">Se non hai ancora creato la griglia del tuo Scarabocchio, scatta una foto del muro premendo il pulsante di acquisizione. Altrimenti premi Annulla.</string>
     <!-- Generic cancel action. -->
     <string name="cancel">Annulla</string>
 
@@ -425,17 +425,17 @@
     <string name="save_project_hint">Nome Progetto</string>
 
     <!-- Target Creation -->
-    <string name="target_guide_desc">Guida all\'Allineamento dello Scarabocchio</string>
-    <string name="target_captured_desc">Scarabocchio Catturato</string>
-    <string name="target_review_desc">Rivedi Scarabocchio Estratto</string>
-    <string name="target_unwarp_hint">Trascina gli angoli per distorcere</string>
-    <string name="target_review_title">SCARABOCCHIO BLOCCATO</string>
+    <string name="doodle_guide_desc">Guida all\'Allineamento dello Scarabocchio</string>
+    <string name="doodle_captured_desc">Scarabocchio Catturato</string>
+    <string name="doodle_review_desc">Rivedi Scarabocchio Estratto</string>
+    <string name="doodle_unwarp_hint">Trascina gli angoli per distorcere</string>
+    <string name="doodle_review_title">SCARABOCCHIO BLOCCATO</string>
     <string name="doodle_closeups_progress">Studio del muro: fase %1$d di %2$d · passo %3$d di %4$d</string>
 
-    <string name="target_exclude">Escludi</string>
-    <string name="target_include">Includi</string>
-    <string name="target_erase_marks">Cancella Segni</string>
-    <string name="target_show_features">Mostra Funzionalità</string>
+    <string name="doodle_exclude">Escludi</string>
+    <string name="doodle_include">Includi</string>
+    <string name="doodle_erase_marks">Cancella Segni</string>
+    <string name="doodle_show_features">Mostra Funzionalità</string>
     <string name="reset_button">Ripristina</string>
 
     <string name="poster_title">GENERA POSTER</string>
@@ -450,7 +450,7 @@
     <string name="scan_hint_build_map">Cammina a sinistra e a destra per costruire la mappa</string>
     <string name="scan_hint_closer">Avvicinati al muro</string>
     <string name="scan_hint_higher_lower">Scansiona più in alto e più in basso</string>
-    <string name="reacquiring_target">Riacquisizione dello Scarabocchio…</string>
+    <string name="reacquiring_doodle">Riacquisizione dello Scarabocchio…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Mockup di Sfondo</string>
@@ -713,14 +713,14 @@
     <string name="standalone_photosphere_no_sensor">Questo telefono non ha un sensore di rotazione, quindi SphereSLAM non può posizionare un bersaglio qui.</string>
     <string name="standalone_photosphere_compass_not_ready">La bussola non è ancora pronta: tieni il telefono fermo per un secondo, poi riprova.</string>
     <string name="standalone_photosphere_not_mapped">SphereSLAM non ha ancora mappato questa vista: tieni la fotocamera ferma per un secondo su una parte illuminata e ricca di dettagli della superficie, poi riprova.</string>
-    <string name="target_rectify_title">Raddrizza la superficie</string>
-    <string name="target_rectify_text">Ora trascina gli angoli per allineare la cornice ciano alla superficie piana del tuo muro.</string>
-    <string name="target_remove_marks_title">Rimuovi segni</string>
-    <string name="target_erase_hint">Tocca un segno per rimuoverlo, oppure trascina su più segni per rimuoverne diversi.</string>
-    <string name="target_cd_raw_capture">Acquisizione grezza</string>
-    <string name="target_cd_detected_marks">Segni rilevati</string>
-    <string name="target_cd_confirm">Conferma</string>
-    <string name="target_cd_unwarp_base">Foto del muro acquisita con maniglie agli angoli</string>
+    <string name="doodle_rectify_title">Raddrizza la superficie</string>
+    <string name="doodle_rectify_text">Ora trascina gli angoli per allineare la cornice ciano alla superficie piana del tuo muro.</string>
+    <string name="doodle_remove_marks_title">Rimuovi segni</string>
+    <string name="doodle_erase_hint">Tocca un segno per rimuoverlo, oppure trascina su più segni per rimuoverne diversi.</string>
+    <string name="doodle_cd_raw_capture">Acquisizione grezza</string>
+    <string name="doodle_cd_detected_marks">Segni rilevati</string>
+    <string name="doodle_cd_confirm">Conferma</string>
+    <string name="doodle_cd_unwarp_base">Foto del muro acquisita con maniglie agli angoli</string>
     <string name="guidance_open_via_design_overlay">Tocca «Design» nella barra, poi «Apri», per aggiungere un livello: scegli una foto e apparirà qui, sospesa sulla vista dal vivo della fotocamera.</string>
     <string name="guidance_open_via_design_mockup">Tocca «Design» nella barra, poi «Apri», per aggiungere un livello sopra la foto del muro. Pizzica e trascina per regolarne dimensioni e posizione.</string>
     <string name="guidance_open_via_design_trace">Tocca «Design» nella barra, poi «Apri», per aggiungere il tuo primo livello. Una volta inserito, pizzica e trascina sulla tela per regolarne dimensioni e posizione.</string>
@@ -729,7 +729,7 @@
     <string name="ar_feedback_guest_edit_dropped">Questa modifica non può essere condivisa con l\'host: resta su questo dispositivo</string>
     <string name="ar_feedback_backend_resolving">Il backend AR è ancora in fase di selezione: riprova a fare da host tra un attimo</string>
     <string name="ar_feedback_open_project_first">Apri un progetto prima di condividere: non c\'è ancora nulla da inviare a un ospite</string>
-    <string name="ar_feedback_host_need_target_arcore">Acquisisci e blocca uno Scarabocchio aggiornato prima di avviare «Ospita»</string>
+    <string name="ar_feedback_host_need_doodle_arcore">Acquisisci e blocca uno Scarabocchio aggiornato prima di avviare «Ospita»</string>
     <string name="ar_feedback_host_need_target_standalone">Acquisisci un target parete standalone prima di fare da host</string>
     <string name="ar_feedback_doodle_not_ready">Lo Scarabocchio non è ancora pronto — tienilo inquadrato e riprova «Ospita»</string>
     <string name="ar_feedback_package_failed">Impossibile preparare questo progetto per la condivisione: prova prima a salvarlo</string>
@@ -737,7 +737,7 @@
     <string name="ar_feedback_join_load_failed">Impossibile caricare il progetto dell\'host: la sessione è stata terminata.</string>
     <string name="ar_feedback_join_no_geometry">L\'host non ha fornito una geometria a cui ARCore possa allinearsi.</string>
     <string name="ar_feedback_join_failed">Impossibile partecipare: %1$s</string>
-    <string name="ar_feedback_wall_target_changed">Lo Scarabocchio è cambiato — la condivisione è terminata. Avvia di nuovo «Ospita» per la nuova parete.</string>
+    <string name="ar_feedback_wall_doodle_changed">Lo Scarabocchio è cambiato — la condivisione è terminata. Avvia di nuovo «Ospita» per la nuova parete.</string>
     <string name="ar_feedback_backend_changed">Il backend di tracciamento è cambiato: la condivisione è terminata. Avvia di nuovo la condivisione.</string>
     <string name="ar_feedback_camera_busy">La fotocamera è occupata o non disponibile: chiudi le altre app che la usano, poi rientra in AR</string>
     <string name="ar_feedback_ar_start_failed">Impossibile avviare AR: la fotocamera potrebbe essere in uso da un\'altra app</string>
@@ -747,7 +747,7 @@
     <string name="ar_feedback_camera_permission">Fotocamera non disponibile: controlla l\'autorizzazione della fotocamera, poi rientra in AR</string>
     <string name="ar_feedback_camera_not_paused">La fotocamera AR non si è messa in pausa correttamente: potrebbe restare attiva in background</string>
     <string name="ar_feedback_backbone_warning">L\'opera copre quasi tutta la parete inquadrata — solo %1$d caratteristiche tracciate restano all\'esterno. Rimpiccioliscila o fai un passo indietro, altrimenti lo Scarabocchio potrebbe non agganciarsi.</string>
-    <string name="ar_feedback_legacy_target_geometry">Lo Scarabocchio salvato di questo progetto è stato creato da una versione precedente e la sua geometria 3D non può essere corretta. Crea di nuovo lo Scarabocchio per usarlo.</string>
+    <string name="ar_feedback_legacy_doodle_geometry">Lo Scarabocchio salvato di questo progetto è stato creato da una versione precedente e la sua geometria 3D non può essere corretta. Crea di nuovo lo Scarabocchio per usarlo.</string>
     <string name="ar_feedback_camera_no_frames">La fotocamera non sta fornendo fotogrammi: esci da AR e riprova</string>
     <string name="ar_feedback_camera_recovery_timeout">Il ripristino della fotocamera AR è scaduto in modo sicuro: esci da AR e rientra</string>
     <string name="ar_feedback_target_prepare_failed">Impossibile preparare il target acquisito. Riprova.</string>
@@ -774,8 +774,8 @@
     <!-- Pass B: the Settings switch. -->
     <string name="settings_change_pass">Rilevamento dei cambiamenti (richiede una foto del muro pulito)</string>
     <!-- Spoken labels for the round shutter on the Doodle grid screen, which photographs the bare wall. -->
-    <string name="target_shutter_cd">Fotografa il muro spoglio</string>
-    <string name="target_shutter_retake_cd">Rifai la foto del muro spoglio</string>
+    <string name="doodle_shutter_cd">Fotografa il muro spoglio</string>
+    <string name="doodle_shutter_retake_cd">Rifai la foto del muro spoglio</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">Vista CV</string>

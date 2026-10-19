@@ -14,7 +14,7 @@ Its contents, all produced by `ProjectManager`:
 | :--- | :--- | :--- |
 | `project.json` | `ProjectManager.saveProject` | The full `GraffitiProject` (see below), kotlinx.serialization JSON, pretty-printed. |
 | `thumbnail.png` | `saveProject` (when a thumbnail bitmap is passed), editor thumbnail job via `saveArtifact` | PNG. Installed atomically (see below). |
-| `target_<uuid>.png` | `saveProject` / `ProjectManager.appendTargetImage` | One PNG per captured target image (quality 100), installed atomically. Filenames are unique per file (random UUID), not sequentially numbered — nothing round-trips the filename itself, only the URI stored in `project.json`. |
+| `target_<uuid>.png` | `saveProject` / `ProjectManager.appendDoodleImage` | One PNG per captured target image (quality 100), installed atomically. Filenames are unique per file (random UUID), not sequentially numbered — nothing round-trips the filename itself, only the URI stored in `project.json`. |
 | `sphereslam_reference_<uuid>.png` | `ProjectManager.saveSphereSlamReference` | Versioned canonical rectified wall page for ARCore-independent SphereSLAM/KPM tracking. `project.json` stores URI, scale, anchor generation/frame version, and placement generation; recapture installs a new file, bumps the anchor generation, invalidates old spatial placement, then deletes superseded page/atlas files best-effort. |
 | `sphereslam_page_<pageNo>_<uuid>.png` | `ProjectManager.saveSphereSlamAtlasPage` | Additional rectified KPM atlas pages. Each project record stores a stable page id plus `canonicalFromPage`, so every page matches back into page 0's immutable canonical wall frame. |
 | `design_<uuid>.png` | `EditorViewModel` via `ProjectRepository.saveArtifact` | The design image: one per import and per co-op pixel replacement. Only the one `project.json` references is live; superseded ones are deleted by the editor once nothing (saved project, live design, undo/redo history) points at them, and are left out of exports and co-op transfers (§2). |
@@ -84,7 +84,7 @@ missing from an old file just uses its Kotlin default). Notably:
   documented "not measured" sentinel (e.g. `LocationFix.bearingDeg`, `DeviceAttitude.azimuthDeg`),
   and that sentinel is genuinely produced at runtime by an ordinary capture (GPS fix, no bearing —
   a stationary user). Without the flag, `Json.encodeToString` throws on a `NaN` field.
-- URIs (`backgroundImageUri`, `targetImageUris`, etc.) are strings via `UriSerializer`
+- URIs (`backgroundImageUri`, `doodleImageUris`, etc.) are strings via `UriSerializer`
   (`Uri.toString()` / `Uri.parse()`), always local `file://` paths under the project directory.
 - `doodle: Doodle?` carries the marks-region ORB/SuperPoint descriptor blob as a
   base64-ish byte array field (kotlinx.serialization's default `ByteArray` encoding), plus

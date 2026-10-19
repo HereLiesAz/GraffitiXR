@@ -6,7 +6,7 @@ import com.hereliesaz.graffitixr.design.R as DesignR
 internal data class ArRailBackendPolicy(
     val backendResolved: Boolean,
     val standalone: Boolean,
-    val targetRailEnabled: Boolean,
+    val doodleRailEnabled: Boolean,
     val coopCalibrationAvailable: Boolean,
     val modePreviewExportAvailable: Boolean,
     /**
@@ -19,7 +19,7 @@ internal data class ArRailBackendPolicy(
 /**
  * Capability policy for AR-only rail tools.
  *
- * Target uses the shared capture flow (MainViewModel / TargetCreationUi) on both backends; standalone
+ * Target uses the shared capture flow (MainViewModel / DoodleCreationUi) on both backends; standalone
  * enables it once its runtime is ready — without it, a stale or wrong target had no way out (the
  * current target keeps tracking until the replacement is saved). A standalone co-op guest gets no
  * Target (MainActivity), since it must keep the session's frame. Co-op uses the
@@ -36,7 +36,7 @@ internal fun arRailBackendPolicy(
         return ArRailBackendPolicy(
             backendResolved = false,
             standalone = false,
-            targetRailEnabled = false,
+            doodleRailEnabled = false,
             coopCalibrationAvailable = false,
             modePreviewExportAvailable = false,
             exportDisabledReason = DesignR.string.rail_checking_ar_backend,
@@ -46,7 +46,7 @@ internal fun arRailBackendPolicy(
         return ArRailBackendPolicy(
             backendResolved = true,
             standalone = false,
-            targetRailEnabled = true,
+            doodleRailEnabled = true,
             coopCalibrationAvailable = true,
             modePreviewExportAvailable = true,
             exportDisabledReason = null,
@@ -57,7 +57,7 @@ internal fun arRailBackendPolicy(
     return ArRailBackendPolicy(
         backendResolved = true,
         standalone = true,
-        targetRailEnabled = standaloneRuntimeReady,
+        doodleRailEnabled = standaloneRuntimeReady,
         coopCalibrationAvailable = standaloneRuntimeReady,
         modePreviewExportAvailable = false,
         exportDisabledReason = DesignR.string.export_standalone_ar_unavailable,

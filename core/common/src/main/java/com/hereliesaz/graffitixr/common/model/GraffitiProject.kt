@@ -129,7 +129,9 @@ data class GraffitiProject(
     @Serializable(with = UriSerializer::class)
     val thumbnailUri: Uri? = null,
 
-    val targetImageUris: List<@Serializable(with = UriSerializer::class) Uri> = emptyList(),
+    @SerialName("targetImageUris")
+
+    val doodleImageUris: List<@Serializable(with = UriSerializer::class) Uri> = emptyList(),
 
     /**
      * The clean-wall photo: the bare wall BEFORE it was marked or painted (pass B compares the live
@@ -141,7 +143,7 @@ data class GraffitiProject(
     /**
      * Rectified wall reference used by the ARCore-independent SphereSLAM/KPM tracker.
      *
-     * Kept separate from [targetImageUris]: this is the canonical page that must be restored on a
+     * Kept separate from [doodleImageUris]: this is the canonical page that must be restored on a
      * later visit, not capture-history UI. The width may be a real measurement or a normalized
      * renderer unit; [sphereSlamReferencePhysicallyMetric] tells consumers which.
      */
@@ -262,7 +264,7 @@ data class GraffitiProject(
 
     // Teleological Doodling
     @SerialName("targetFingerprintPath")
-    val targetDoodlePath: String? = null,
+    val doodleDataPath: String? = null,
 
     val drawingPaths: List<List<Pair<Float, Float>>> = emptyList(),
 
@@ -291,7 +293,7 @@ data class GraffitiProject(
 
     @SerialName("targetFingerprint")
 
-    val targetDoodle: String? = null,
+    val doodleData: String? = null,
     // Per-mode whole-design adjustments, keyed by EditorMode.name. Defaulted for back-compat with
     // projects saved before this field existed.
     val modeAdjustments: Map<String, ModeAdjustment> = emptyMap(),

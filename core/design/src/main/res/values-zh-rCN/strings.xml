@@ -276,9 +276,9 @@
     <string name="open_settings">打开设置</string>
 
 
-    <string name="target_creation_title">随手画网格</string>
+    <string name="doodle_creation_title">随手画网格</string>
 
-    <string name="target_creation_text">如果您还没有创建随手画网格，请按拍摄按钮拍一张墙面照片。否则请按“取消”。</string>
+    <string name="doodle_creation_text">如果您还没有创建随手画网格，请按拍摄按钮拍一张墙面照片。否则请按“取消”。</string>
 
     <string name="cancel">取消</string>
 
@@ -442,17 +442,17 @@
     <string name="save_project_hint">项目名称</string>
 
 
-    <string name="target_guide_desc">随手画对齐指南</string>
-    <string name="target_captured_desc">已捕获的随手画</string>
-    <string name="target_review_desc">查看提取的随手画</string>
-    <string name="target_unwarp_hint">拖动角以取消扭曲</string>
-    <string name="target_review_title">随手画已锁定</string>
+    <string name="doodle_guide_desc">随手画对齐指南</string>
+    <string name="doodle_captured_desc">已捕获的随手画</string>
+    <string name="doodle_review_desc">查看提取的随手画</string>
+    <string name="doodle_unwarp_hint">拖动角以取消扭曲</string>
+    <string name="doodle_review_title">随手画已锁定</string>
     <string name="doodle_closeups_progress">正在学习墙面：第 %1$d / %2$d 阶段 · 第 %3$d / %4$d 步</string>
 
-    <string name="target_exclude">排除</string>
-    <string name="target_include">包含</string>
-    <string name="target_erase_marks">擦除标记</string>
-    <string name="target_show_features">显示特征</string>
+    <string name="doodle_exclude">排除</string>
+    <string name="doodle_include">包含</string>
+    <string name="doodle_erase_marks">擦除标记</string>
+    <string name="doodle_show_features">显示特征</string>
     <string name="reset_button">重置</string>
 
     <string name="poster_title">生成海报</string>
@@ -467,7 +467,7 @@
     <string name="scan_hint_build_map">向左和向右走动以构建地图</string>
     <string name="scan_hint_closer">靠近墙壁</string>
     <string name="scan_hint_higher_lower">扫描更高和更低的位置</string>
-    <string name="reacquiring_target">正在重新识别随手画…</string>
+    <string name="reacquiring_doodle">正在重新识别随手画…</string>
 
 
     <string name="desc_bg_mockup">背景效果图</string>
@@ -730,14 +730,14 @@
     <string name="standalone_photosphere_no_sensor">此手机没有旋转传感器，因此 SphereSLAM 无法在此放置目标。</string>
     <string name="standalone_photosphere_compass_not_ready">指南针尚未就绪 — 请将手机静止一秒钟，然后重新拍摄。</string>
     <string name="standalone_photosphere_not_mapped">SphereSLAM 尚未对此视角建图 — 请将相机对准表面上光线充足、细节丰富的部分并保持稳定一秒钟，然后重新拍摄。</string>
-    <string name="target_rectify_title">校正表面</string>
-    <string name="target_rectify_text">现在拖动四个角，使青色边框对齐你墙面上的平整区域。</string>
-    <string name="target_remove_marks_title">移除标记</string>
-    <string name="target_erase_hint">点按标记即可移除，或在多个标记上滑动以一次移除多个。</string>
-    <string name="target_cd_raw_capture">原始拍摄图像</string>
-    <string name="target_cd_detected_marks">检测到的标记</string>
-    <string name="target_cd_confirm">确认</string>
-    <string name="target_cd_unwarp_base">带角点手柄的墙面照片</string>
+    <string name="doodle_rectify_title">校正表面</string>
+    <string name="doodle_rectify_text">现在拖动四个角，使青色边框对齐你墙面上的平整区域。</string>
+    <string name="doodle_remove_marks_title">移除标记</string>
+    <string name="doodle_erase_hint">点按标记即可移除，或在多个标记上滑动以一次移除多个。</string>
+    <string name="doodle_cd_raw_capture">原始拍摄图像</string>
+    <string name="doodle_cd_detected_marks">检测到的标记</string>
+    <string name="doodle_cd_confirm">确认</string>
+    <string name="doodle_cd_unwarp_base">带角点手柄的墙面照片</string>
     <string name="guidance_open_via_design_overlay">点按导轨上的“设计”，再点按“打开”以添加图层 — 选择一张照片，它会显示在这里，悬浮在实时相机画面之上。</string>
     <string name="guidance_open_via_design_mockup">点按导轨上的“设计”，再点按“打开”，在墙面照片上方添加图层。双指捏合并拖动以调整大小和位置。</string>
     <string name="guidance_open_via_design_trace">点按导轨上的“设计”，再点按“打开”以添加你的第一个图层。添加后，在画布上双指捏合并拖动以调整大小和位置。</string>
@@ -746,7 +746,7 @@
     <string name="ar_feedback_guest_edit_dropped">该更改无法与主机共享，只会保留在此设备上</string>
     <string name="ar_feedback_backend_resolving">AR 后端仍在确定中，请稍后再次尝试托管</string>
     <string name="ar_feedback_open_project_first">分享前请先打开一个项目，目前没有可发送给访客的内容</string>
-    <string name="ar_feedback_host_need_target_arcore">托管前请先捕获并锁定当前的随手画</string>
+    <string name="ar_feedback_host_need_doodle_arcore">托管前请先捕获并锁定当前的随手画</string>
     <string name="ar_feedback_host_need_target_standalone">托管前请先捕获独立的墙面目标</string>
     <string name="ar_feedback_doodle_not_ready">随手画尚未就绪 — 请让它保持在画面中，然后再次尝试 “主持”</string>
     <string name="ar_feedback_package_failed">无法打包此项目以供分享，请先尝试保存</string>
@@ -754,7 +754,7 @@
     <string name="ar_feedback_join_load_failed">无法加载主机的项目，会话已结束。</string>
     <string name="ar_feedback_join_no_geometry">主机未提供 ARCore 可用于对齐的几何数据。</string>
     <string name="ar_feedback_join_failed">无法加入：%1$s</string>
-    <string name="ar_feedback_wall_target_changed">随手画已更改 — 分享已结束。请为新的墙面重新开始 “主持”。</string>
+    <string name="ar_feedback_wall_doodle_changed">随手画已更改 — 分享已结束。请为新的墙面重新开始 “主持”。</string>
     <string name="ar_feedback_backend_changed">跟踪后端已更改，分享已结束。请重新开始分享。</string>
     <string name="ar_feedback_camera_busy">相机正忙或不可用，请关闭其他相机应用，然后重新进入 AR</string>
     <string name="ar_feedback_ar_start_failed">无法启动 AR，您的相机可能正被其他应用使用</string>
@@ -764,7 +764,7 @@
     <string name="ar_feedback_camera_permission">相机不可用，请检查相机权限，然后重新进入 AR</string>
     <string name="ar_feedback_camera_not_paused">AR 相机未能正常暂停，可能会在后台继续运行</string>
     <string name="ar_feedback_backbone_warning">作品几乎遮住了视野中的整面墙 — 只有 %1$d 个跟踪特征位于其外。请将其缩小或后退一些，否则随手画可能无法锁定。</string>
-    <string name="ar_feedback_legacy_target_geometry">此项目已保存的随手画由旧版本创建，其 3D 几何数据无法校正。请重新创建随手画后再使用。</string>
+    <string name="ar_feedback_legacy_doodle_geometry">此项目已保存的随手画由旧版本创建，其 3D 几何数据无法校正。请重新创建随手画后再使用。</string>
     <string name="ar_feedback_camera_no_frames">相机没有输出画面，请退出 AR 后重试</string>
     <string name="ar_feedback_camera_recovery_timeout">AR 相机恢复已安全超时，请退出 AR 后重新进入</string>
     <string name="ar_feedback_target_prepare_failed">无法准备已捕获的目标，请重试。</string>
@@ -790,8 +790,8 @@
 
     <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
     <string name="settings_change_pass">变化检测（需要一张干净墙面的照片）</string>
-    <string name="target_shutter_cd">拍摄空白墙面</string>
-    <string name="target_shutter_retake_cd">重拍空白墙面照片</string>
+    <string name="doodle_shutter_cd">拍摄空白墙面</string>
+    <string name="doodle_shutter_retake_cd">重拍空白墙面照片</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">CV 视图</string>

@@ -397,7 +397,7 @@ is for — the failure shows up in the data instead of being averaged into a nul
 result.
 
 **Precondition — turn the Depth API OFF, or E0b does not test §8 at all.**
-`MainViewModel.onConfirmTargetCreation` branches on whether a depth buffer was
+`MainViewModel.onConfirmDoodleCreation` branches on whether a depth buffer was
 captured, and the two branches do not share a line of geometry:
 
 | Depth API | Capture path | Reaches `PlaneMarks.backProject`? |

@@ -86,7 +86,7 @@ class MainViewModelStandaloneReplacementTest {
             current.value = firstArg<(GraffitiProject) -> GraffitiProject>()(current.value!!)
         }
         coEvery { projectManager.saveSphereSlamReference(any(), any(), any()) } answers { candidates.removeFirst() }
-        coEvery { projectManager.appendTargetImage(any(), any(), any(), any()) } returns emptyList()
+        coEvery { projectManager.appendDoodleImage(any(), any(), any(), any()) } returns emptyList()
         coEvery { projectManager.deleteSphereSlamReference(any(), any(), any()) } coAnswers {
             synchronized(deleted) { deleted += thirdArg<Uri?>() }
         }
@@ -118,8 +118,8 @@ class MainViewModelStandaloneReplacementTest {
             placement = StandaloneDoodlePlacement(FloatArray(16), 1.5f, false, TileId(0, 0)),
         )
         val deadline = System.currentTimeMillis() + 5_000
-        while (viewModel.uiState.value.isConfirmingTarget && System.currentTimeMillis() < deadline) Thread.sleep(10)
-        assertFalse("save never finished", viewModel.uiState.value.isConfirmingTarget)
+        while (viewModel.uiState.value.isConfirmingDoodle && System.currentTimeMillis() < deadline) Thread.sleep(10)
+        assertFalse("save never finished", viewModel.uiState.value.isConfirmingDoodle)
         assertSame(candidate, current.value!!.sphereSlamReferenceUri)
     }
 

@@ -91,8 +91,8 @@
     <string name="install_arcore">I-install ang ARCore</string>
     <string name="camera_permission_required">Kinakailangan ang pahintulot sa camera para sa AR mode.</string>
     <string name="open_settings">Buksan ang Mga Setting</string>
-    <string name="target_creation_title">GRID NG GUHIT-GUHIT</string>
-    <string name="target_creation_text">Kung hindi mo pa nagagawa ang iyong grid ng Guhit-guhit, kunan ng larawan ang pader sa pagpindot sa capture button. Kung hindi, pindutin ang Kanselahin.</string>
+    <string name="doodle_creation_title">GRID NG GUHIT-GUHIT</string>
+    <string name="doodle_creation_text">Kung hindi mo pa nagagawa ang iyong grid ng Guhit-guhit, kunan ng larawan ang pader sa pagpindot sa capture button. Kung hindi, pindutin ang Kanselahin.</string>
     <string name="cancel">Kanselahin</string>
     <string name="diag_copied">KINOPYA ✓</string>
     <string name="diag_title">DEPTH DIAG (i-tap para kopyahin)</string>
@@ -209,16 +209,16 @@
     <string name="layers_title">Mga layer</string>
     <string name="brush_size_title">Laki ng Brush</string>
     <string name="save_project_hint">Pangalan ng Proyekto</string>
-    <string name="target_guide_desc">Gabay sa Pag-align ng Guhit-guhit</string>
-    <string name="target_captured_desc">Nakuhang Guhit-guhit</string>
-    <string name="target_review_desc">Suriin ang Hinangong Guhit-guhit</string>
-    <string name="target_unwarp_hint">I-drag ang mga sulok upang i-unwarp</string>
-    <string name="target_review_title">NAKA-LOCK ANG GUHIT-GUHIT</string>
+    <string name="doodle_guide_desc">Gabay sa Pag-align ng Guhit-guhit</string>
+    <string name="doodle_captured_desc">Nakuhang Guhit-guhit</string>
+    <string name="doodle_review_desc">Suriin ang Hinangong Guhit-guhit</string>
+    <string name="doodle_unwarp_hint">I-drag ang mga sulok upang i-unwarp</string>
+    <string name="doodle_review_title">NAKA-LOCK ANG GUHIT-GUHIT</string>
     <string name="doodle_closeups_progress">Pinag-aaralan ang pader: yugto %1$d sa %2$d · hakbang %3$d sa %4$d</string>
-    <string name="target_exclude">Ibukod</string>
-    <string name="target_include">Isama</string>
-    <string name="target_erase_marks">Burahin ang Marks</string>
-    <string name="target_show_features">Ipakita ang Mga Tampok</string>
+    <string name="doodle_exclude">Ibukod</string>
+    <string name="doodle_include">Isama</string>
+    <string name="doodle_erase_marks">Burahin ang Marks</string>
+    <string name="doodle_show_features">Ipakita ang Mga Tampok</string>
     <string name="reset_button">I-reset</string>
     <string name="poster_title">GUMAWA NG POSTER</string>
     <string name="poster_select_layers">Pumili ng mga layer na isasama:</string>
@@ -230,7 +230,7 @@
     <string name="scan_hint_build_map">Maglakad pakaliwa at pakanan upang bumuo ng mapa</string>
     <string name="scan_hint_closer">Lumapit sa pader</string>
     <string name="scan_hint_higher_lower">I-scan ang mas mataas at mas mababa</string>
-    <string name="reacquiring_target">Hinahanap muli ang Guhit-guhit…</string>
+    <string name="reacquiring_doodle">Hinahanap muli ang Guhit-guhit…</string>
     <string name="desc_bg_mockup">Background Mockup</string>
     <string name="desc_segmentation_preview">Preview ng Segmentation</string>
     <string name="help_mode_host">Mode Switcher: Lumipat sa pagitan ng mga mode ng app. Mga Tagubilin: I-tap para palawakin, pagkatapos ay piliin ang AR, Overlay, Mockup, o Lightbox.</string>
@@ -428,14 +428,14 @@
     <string name="standalone_photosphere_no_sensor">Walang rotation sensor ang teleponong ito, kaya hindi makapaglagay ng target dito ang SphereSLAM.</string>
     <string name="standalone_photosphere_compass_not_ready">Hindi pa handa ang compass — ihawak nang matatag ang telepono nang isang segundo, saka kumuha muli.</string>
     <string name="standalone_photosphere_not_mapped">Hindi pa namamapa ng SphereSLAM ang view na ito — ihawak nang matatag ang camera nang isang segundo sa maliwanag at detalyadong bahagi ng ibabaw, saka kumuha muli.</string>
-    <string name="target_rectify_title">Ituwid ang ibabaw</string>
-    <string name="target_rectify_text">Ngayon, i-drag ang mga sulok para iayon ang cyan na frame sa patag na ibabaw ng iyong pader.</string>
-    <string name="target_remove_marks_title">Alisin ang mga marka</string>
-    <string name="target_erase_hint">I-tap ang isang marka para alisin ito, o mag-drag sa ibabaw ng ilang marka para alisin ang marami.</string>
-    <string name="target_cd_raw_capture">Hilaw na kuha</string>
-    <string name="target_cd_detected_marks">Mga natukoy na marka</string>
-    <string name="target_cd_confirm">Kumpirmahin</string>
-    <string name="target_cd_unwarp_base">Nakuhang larawan ng pader na may mga hawakan sa sulok</string>
+    <string name="doodle_rectify_title">Ituwid ang ibabaw</string>
+    <string name="doodle_rectify_text">Ngayon, i-drag ang mga sulok para iayon ang cyan na frame sa patag na ibabaw ng iyong pader.</string>
+    <string name="doodle_remove_marks_title">Alisin ang mga marka</string>
+    <string name="doodle_erase_hint">I-tap ang isang marka para alisin ito, o mag-drag sa ibabaw ng ilang marka para alisin ang marami.</string>
+    <string name="doodle_cd_raw_capture">Hilaw na kuha</string>
+    <string name="doodle_cd_detected_marks">Mga natukoy na marka</string>
+    <string name="doodle_cd_confirm">Kumpirmahin</string>
+    <string name="doodle_cd_unwarp_base">Nakuhang larawan ng pader na may mga hawakan sa sulok</string>
     <string name="guidance_open_via_design_overlay">I-tap ang \'Disenyo\' sa rail, pagkatapos ang \'Bukas\', para magdagdag ng layer — pumili ng larawan at lalabas ito rito, lumulutang sa ibabaw ng live na tanaw ng camera.</string>
     <string name="guidance_open_via_design_mockup">I-tap ang \'Disenyo\' sa rail, pagkatapos ang \'Bukas\', para magdagdag ng layer sa ibabaw ng larawan ng pader. I-pinch at i-drag para itakda ang laki at posisyon nito.</string>
     <string name="guidance_open_via_design_trace">I-tap ang \'Disenyo\' sa rail, pagkatapos ang \'Bukas\', para idagdag ang una mong layer. Kapag nailagay na, mag-pinch at mag-drag sa canvas para itakda ang laki at lugar nito.</string>
@@ -444,7 +444,7 @@
     <string name="ar_feedback_guest_edit_dropped">Hindi maibabahagi sa host ang pagbabagong iyon — mananatili ito sa device na ito</string>
     <string name="ar_feedback_backend_resolving">Tinutukoy pa ang AR backend — subukang mag-host ulit sa ilang saglit</string>
     <string name="ar_feedback_open_project_first">Magbukas ng proyekto bago magbahagi — wala pang maipapadala sa bisita</string>
-    <string name="ar_feedback_host_need_target_arcore">Kunan at i-lock ang kasalukuyang Guhit-guhit bago mag-host</string>
+    <string name="ar_feedback_host_need_doodle_arcore">Kunan at i-lock ang kasalukuyang Guhit-guhit bago mag-host</string>
     <string name="ar_feedback_host_need_target_standalone">Kumuha ng standalone na Wall Target bago mag-host</string>
     <string name="ar_feedback_doodle_not_ready">Hindi pa handa ang Guhit-guhit — panatilihin ito sa view at subukan muli ang \"I-host\"</string>
     <string name="ar_feedback_package_failed">Hindi ma-package ang proyektong ito para ibahagi — subukan munang i-save ito</string>
@@ -452,7 +452,7 @@
     <string name="ar_feedback_join_load_failed">Hindi ma-load ang proyekto ng host — natapos ang session.</string>
     <string name="ar_feedback_join_no_geometry">Hindi nagbigay ang host ng geometry na maaaring pagtugmaan ng ARCore.</string>
     <string name="ar_feedback_join_failed">Hindi nakasali: %1$s</string>
-    <string name="ar_feedback_wall_target_changed">Nagbago ang Guhit-guhit — natapos ang pagbabahagi. Simulan muli ang \"I-host\" para sa bagong pader.</string>
+    <string name="ar_feedback_wall_doodle_changed">Nagbago ang Guhit-guhit — natapos ang pagbabahagi. Simulan muli ang \"I-host\" para sa bagong pader.</string>
     <string name="ar_feedback_backend_changed">Nagbago ang tracking backend — natapos ang pagbabahagi. Simulan muli ang pagbabahagi.</string>
     <string name="ar_feedback_camera_busy">Abala o hindi available ang camera — isara ang iba pang camera app, saka muling pumasok sa AR</string>
     <string name="ar_feedback_ar_start_failed">Hindi masimulan ang AR — maaaring ginagamit ng ibang app ang iyong camera</string>
@@ -462,7 +462,7 @@
     <string name="ar_feedback_camera_permission">Hindi available ang camera — suriin ang permiso sa camera, saka muling pumasok sa AR</string>
     <string name="ar_feedback_camera_not_paused">Hindi maayos na na-pause ang AR camera — maaari itong magpatuloy sa background</string>
     <string name="ar_feedback_backbone_warning">Halos natatakpan ng likhang-sining ang buong pader na nakikita — %1$d na tracked feature lang ang nasa labas nito. Paliitin ito o umatras, kung hindi ay maaaring hindi mag-lock ang Guhit-guhit.</string>
-    <string name="ar_feedback_legacy_target_geometry">Ang naka-save na Guhit-guhit ng proyektong ito ay ginawa ng mas lumang bersyon at hindi maitatama ang 3D geometry nito. Gawin muli ang Guhit-guhit para magamit ito.</string>
+    <string name="ar_feedback_legacy_doodle_geometry">Ang naka-save na Guhit-guhit ng proyektong ito ay ginawa ng mas lumang bersyon at hindi maitatama ang 3D geometry nito. Gawin muli ang Guhit-guhit para magamit ito.</string>
     <string name="ar_feedback_camera_no_frames">Hindi nagpapadala ng mga frame ang camera — lumabas sa AR at subukan muli</string>
     <string name="ar_feedback_camera_recovery_timeout">Ligtas na nag-time out ang pagbawi ng AR camera — lumabas sa AR at muling pumasok</string>
     <string name="ar_feedback_target_prepare_failed">Hindi nahanda ang nakuhang target. Subukan muli.</string>
@@ -488,8 +488,8 @@
 
     <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
     <string name="settings_change_pass">Pagtukoy ng pagbabago (kailangan ng larawan ng malinis na pader)</string>
-    <string name="target_shutter_cd">Kunan ng larawan ang hubad na pader</string>
-    <string name="target_shutter_retake_cd">Kunan muli ang larawan ng hubad na pader</string>
+    <string name="doodle_shutter_cd">Kunan ng larawan ang hubad na pader</string>
+    <string name="doodle_shutter_retake_cd">Kunan muli ang larawan ng hubad na pader</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">CV view</string>

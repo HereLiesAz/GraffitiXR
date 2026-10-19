@@ -1,4 +1,4 @@
-// FILE: feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/TargetCreationFlow.kt
+// FILE: feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/DoodleCreationFlow.kt
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.graphics.Bitmap
@@ -57,12 +57,12 @@ import com.hereliesaz.graffitixr.design.theme.HotPink
  *   modes, so tapping the painted marks works the whole time, with or without the card. Doodle
  *   capture itself is left from the rail item or Back.
  * @param latestCapture the photo and mask as they stand when Confirm is tapped, after every queued
- *   mark erase has been applied (`ArViewModel.awaitLatestTargetCapture`). Erases are asynchronous, so
+ *   mark erase has been applied (`ArViewModel.awaitLatestDoodleCapture`). Erases are asynchronous, so
  *   the composition's own bitmaps can predate the last tap; Confirm uses this instead. The default
  *   just returns the composition's bitmaps (previews, tests).
  */
 @Composable
-fun TargetCreationUi(
+fun DoodleCreationUi(
     rawBitmap: Bitmap?,
     annotatedBitmap: Bitmap?,
     captureStep: CaptureStep,
@@ -70,14 +70,14 @@ fun TargetCreationUi(
     hasCleanWall: Boolean = false,
     onCleanWallPhoto: (() -> Unit)? = null,
     strings: AppStrings,
-    onConfirmTarget: (bitmap: Bitmap?, mask: Bitmap?) -> Unit,
+    onConfirmDoodle: (bitmap: Bitmap?, mask: Bitmap?) -> Unit,
     onRetake: () -> Unit,
     onEraseAtPoint: (Float, Float) -> Unit,
     latestCapture: suspend () -> Pair<Bitmap?, Bitmap?> = { rawBitmap to annotatedBitmap },
 ) {
     val scope = rememberCoroutineScope()
     val currentLatestCapture by rememberUpdatedState(latestCapture)
-    val currentOnConfirmTarget by rememberUpdatedState(onConfirmTarget)
+    val currentOnConfirmDoodle by rememberUpdatedState(onConfirmDoodle)
     var confirming by remember { mutableStateOf(false) }
     Box(modifier = Modifier.fillMaxSize()) {
         // CaptureStep.RECTIFY (a manual 4-corner unwarp step) is never set by any writer of
@@ -103,7 +103,7 @@ fun TargetCreationUi(
                                     // annotated bitmap IS the mask — its alpha channel
                                     // (opaque = detect, transparent = skip) drives native ORB masking.
                                     val (raw, mask) = currentLatestCapture()
-                                    currentOnConfirmTarget(raw, mask)
+                                    currentOnConfirmDoodle(raw, mask)
                                 } finally {
                                     confirming = false
                                 }
@@ -120,7 +120,7 @@ fun TargetCreationUi(
                 var cardDismissed by remember(isWaitingForTap) { mutableStateOf(false) }
                 if (isWaitingForTap && !cardDismissed) {
                     Box(Modifier.fillMaxSize()) {
-                        TargetInstructionCard(
+                        DoodleInstructionCard(
                             isWaitingForTap = true,
                             captureStep = CaptureStep.NONE,
                             strings = strings,
@@ -149,7 +149,7 @@ fun TargetCreationUi(
 }
 
 @Composable
-private fun TargetInstructionCard(
+private fun DoodleInstructionCard(
     isWaitingForTap: Boolean,
     captureStep: CaptureStep,
     strings: AppStrings,
@@ -158,14 +158,14 @@ private fun TargetInstructionCard(
     modifier: Modifier = Modifier,
 ) {
     val data = when {
-        isWaitingForTap -> Pair(strings.ar.targetCreationTitle, strings.ar.targetCreationText)
+        isWaitingForTap -> Pair(strings.ar.doodleCreationTitle, strings.ar.doodleCreationText)
         captureStep == CaptureStep.RECTIFY -> Pair(
-            stringResource(DesignR.string.target_rectify_title).uppercase(),
-            stringResource(DesignR.string.target_rectify_text)
+            stringResource(DesignR.string.doodle_rectify_title).uppercase(),
+            stringResource(DesignR.string.doodle_rectify_text)
         )
         captureStep == CaptureStep.MASK || captureStep == CaptureStep.REVIEW -> Pair(
-            stringResource(DesignR.string.target_remove_marks_title).uppercase(),
-            stringResource(DesignR.string.target_erase_hint)
+            stringResource(DesignR.string.doodle_remove_marks_title).uppercase(),
+            stringResource(DesignR.string.doodle_erase_hint)
         )
         else -> Pair("", "")
     }
@@ -226,7 +226,7 @@ private fun TargetInstructionCard(
 @Composable
 private fun ShutterButton(saved: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val label = stringResource(
-        if (saved) DesignR.string.target_shutter_retake_cd else DesignR.string.target_shutter_cd
+        if (saved) DesignR.string.doodle_shutter_retake_cd else DesignR.string.doodle_shutter_cd
     )
     Box(
         modifier = modifier
@@ -279,7 +279,7 @@ private fun FeatureSelectionReview(
             val image = remember(bmp) { bmp.asImageBitmap() }
             Image(
                 bitmap = image,
-                contentDescription = stringResource(DesignR.string.target_cd_raw_capture),
+                contentDescription = stringResource(DesignR.string.doodle_cd_raw_capture),
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
             )
@@ -295,7 +295,7 @@ private fun FeatureSelectionReview(
             val image = remember(bmp) { bmp.asImageBitmap() }
             Image(
                 bitmap = image,
-                contentDescription = stringResource(DesignR.string.target_cd_detected_marks),
+                contentDescription = stringResource(DesignR.string.doodle_cd_detected_marks),
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
             )
@@ -366,7 +366,7 @@ private fun FeatureSelectionReview(
 
         // -- Hint: tap/drag removes a whole mark --
         Text(
-            text = stringResource(DesignR.string.target_erase_hint),
+            text = stringResource(DesignR.string.doodle_erase_hint),
             color = Color.White,
             style = MaterialTheme.typography.labelMedium,
             textAlign = TextAlign.Center,
@@ -395,7 +395,7 @@ private fun FeatureSelectionReview(
                 onClick = onConfirm,
                 containerColor = MaterialTheme.colorScheme.primaryContainer
             ) {
-                Icon(Icons.Default.Check, contentDescription = stringResource(DesignR.string.target_cd_confirm))
+                Icon(Icons.Default.Check, contentDescription = stringResource(DesignR.string.doodle_cd_confirm))
             }
         }
     }
@@ -427,7 +427,7 @@ internal fun UnwarpScreen(
             val baseImage = remember(bitmap) { bitmap.asImageBitmap() }
             Image(
                 bitmap = baseImage,
-                contentDescription = stringResource(DesignR.string.target_cd_unwarp_base),
+                contentDescription = stringResource(DesignR.string.doodle_cd_unwarp_base),
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
             )
@@ -442,7 +442,7 @@ internal fun UnwarpScreen(
             }
         }
 
-        TargetInstructionCard(
+        DoodleInstructionCard(
             isWaitingForTap = false,
             captureStep = CaptureStep.RECTIFY,
             strings = strings,

@@ -61,7 +61,7 @@ experiment **E0b**, which has not been run — it needs a physical ARCore device
 What has been settled without one:
 
 - The source chain is confirmed. Capture rotates the bitmap
-  (`ArViewModel.onTargetCaptured`) and the intrinsics (`ArRenderer`'s
+  (`ArViewModel.onDoodleCaptured`) and the intrinsics (`ArRenderer`'s
   `rotationNeeded` branches) into display orientation, and pairs them with a view
   matrix built from `camera.pose.inverse()`, which is not rotated.
 - **The assumption §8.2 flagged as load-bearing is closed by ARCore's own

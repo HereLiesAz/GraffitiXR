@@ -43,7 +43,7 @@ import com.hereliesaz.graffitixr.common.sensor.Vec3
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.common.util.MarkEraser
-import com.hereliesaz.graffitixr.common.util.forTargetReview
+import com.hereliesaz.graffitixr.common.util.forDoodleReview
 import com.hereliesaz.graffitixr.common.wearable.ConnectionState
 import com.hereliesaz.graffitixr.common.wearable.WearableManager
 import com.hereliesaz.graffitixr.feature.ar.coop.calibration.Mat4
@@ -417,7 +417,7 @@ class ArViewModel @Inject constructor(
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
                             if (st.isArCoreAvailable) {
-                                appContext.getString(DesignR.string.ar_feedback_host_need_target_arcore)
+                                appContext.getString(DesignR.string.ar_feedback_host_need_doodle_arcore)
                             } else {
                                 appContext.getString(DesignR.string.ar_feedback_host_need_target_standalone)
                             }
@@ -1988,7 +1988,7 @@ class ArViewModel @Inject constructor(
                         if (current != hosted) {
                             _feedback.tryEmit(
                                 com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                                    appContext.getString(DesignR.string.ar_feedback_wall_target_changed)
+                                    appContext.getString(DesignR.string.ar_feedback_wall_doodle_changed)
                                 )
                             )
                             leaveSession()
@@ -3860,7 +3860,7 @@ class ArViewModel @Inject constructor(
     /**
      * Drops the large capture bitmaps and the native depth buffer held in [ArUiState], letting
      * GC reclaim them. We deliberately do NOT call recycle(): on AR-mode teardown a background
-     * doodle/save coroutine (onConfirmTargetCreation, updatePaintingGuide)
+     * doodle/save coroutine (onConfirmDoodleCreation, updatePaintingGuide)
      * may still hold these same bitmap instances, and recycling them out from under it would
      * cause a "trying to use a recycled bitmap" crash. Nulling the references is deterministic
      * and safe; the platform reclaims the memory once no coroutine references them.
@@ -3873,8 +3873,8 @@ class ArViewModel @Inject constructor(
             it.copy(
                 tempCaptureBitmap = null,
                 annotatedCaptureBitmap = null,
-                targetRawBitmap = null,
-                targetDepthBuffer = null,
+                doodleRawBitmap = null,
+                doodleDepthBuffer = null,
                 tapMarks = emptyList(),
                 unwarpPoints = emptyList()
             )
@@ -4498,7 +4498,7 @@ class ArViewModel @Inject constructor(
                         // like bad tracking.
                         _feedback.tryEmit(
                             com.hereliesaz.graffitixr.common.model.FeedbackEvent.Toast(
-                                appContext.getString(DesignR.string.ar_feedback_legacy_target_geometry),
+                                appContext.getString(DesignR.string.ar_feedback_legacy_doodle_geometry),
                             ),
                         )
                     }
@@ -4599,7 +4599,7 @@ class ArViewModel @Inject constructor(
                     runCatching { java.util.Base64.getDecoder().decode(encoded) }.getOrNull()
                         ?.let { slamManager.restorePaintGrid(it) }
                 }
-                val photo = project.targetImageUris.lastOrNull()
+                val photo = project.doodleImageUris.lastOrNull()
                 val intr = project.doodleIntrinsics
                 if (photo != null && intr.size == 4) {
                     val bmp = runCatching {
@@ -5254,8 +5254,8 @@ class ArViewModel @Inject constructor(
             deferArtworkGuide(bitmap, designKey, standalone = false)
             return
         }
-        val intr = _uiState.value.targetIntrinsics ?: FloatArray(4)
-        val view = _uiState.value.targetCaptureViewMatrix ?: FloatArray(16)
+        val intr = _uiState.value.doodleCaptureIntrinsics ?: FloatArray(4)
+        val view = _uiState.value.doodleCaptureViewMatrix ?: FloatArray(16)
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 slamManager.setArtworkDoodle(bitmap, null, 0, 0, 0, intr, view)
@@ -5530,7 +5530,7 @@ class ArViewModel @Inject constructor(
         )
 
     /**
-     * CameraX/SphereSLAM counterpart to [onTargetCaptured].
+     * CameraX/SphereSLAM counterpart to [onDoodleCaptured].
      *
      * Doodle capture sits above the pose backend, so standalone feeds the exact same review
      * state (raw image + removable-mark mask) instead of mounting a second capture workflow.
@@ -5581,7 +5581,7 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.default) {
             val sourceWidth = bitmap.width
             val sourceHeight = bitmap.height
-            val reviewBitmap = bitmap.forTargetReview()
+            val reviewBitmap = bitmap.forDoodleReview()
             try {
                 val markings = reviewBitmap.isolateMarkings()
                 if (reviewBitmap !== bitmap) {
@@ -5592,16 +5592,16 @@ class ArViewModel @Inject constructor(
                 }
                 _uiState.update {
                     it.copy(
-                        targetRawBitmap = reviewBitmap,
-                        targetDepthBuffer = null,
-                        targetDepthWidth = reviewBitmap.width,
-                        targetDepthHeight = reviewBitmap.height,
-                        targetDepthBufferWidth = 0,
-                        targetDepthBufferHeight = 0,
-                        targetDepthStride = 0,
-                        targetIntrinsics = null,
-                        targetCaptureViewMatrix = null,
-                        targetWallPlane = null,
+                        doodleRawBitmap = reviewBitmap,
+                        doodleDepthBuffer = null,
+                        doodleDepthWidth = reviewBitmap.width,
+                        doodleDepthHeight = reviewBitmap.height,
+                        doodleDepthBufferWidth = 0,
+                        doodleDepthBufferHeight = 0,
+                        doodleDepthStride = 0,
+                        doodleCaptureIntrinsics = null,
+                        doodleCaptureViewMatrix = null,
+                        doodleCaptureWallPlane = null,
                         targetPhysicalExtent = null,
                         tempCaptureBitmap = reviewBitmap,
                         annotatedCaptureBitmap = markings,
@@ -5689,7 +5689,7 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    fun onTargetCaptured(
+    fun onDoodleCaptured(
         bitmap: Bitmap,
         depthBuffer: ByteBuffer?,
         colorW: Int,
@@ -5789,18 +5789,18 @@ class ArViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         tapMarks = it.tapMarks + com.hereliesaz.graffitixr.common.model.TapMark(tapPos.first, tapPos.second, tapDistanceMeters),
-                        targetRawBitmap = bitmap,
-                        targetDisplayRotation = displayRotation,
-                        targetCaptureEnvironment = environment,
-                        targetDepthBuffer = depthBuffer,
-                        targetDepthWidth = colorW,
-                        targetDepthHeight = colorH,
-                        targetDepthBufferWidth = depthBufW,
-                        targetDepthBufferHeight = depthBufH,
-                        targetDepthStride = depthBufStride,
-                        targetIntrinsics = intrinsics,
-                        targetCaptureViewMatrix = viewMatrix,
-                        targetWallPlane = wallPlane,
+                        doodleRawBitmap = bitmap,
+                        doodleDisplayRotation = displayRotation,
+                        doodleCaptureEnvironment = environment,
+                        doodleDepthBuffer = depthBuffer,
+                        doodleDepthWidth = colorW,
+                        doodleDepthHeight = colorH,
+                        doodleDepthBufferWidth = depthBufW,
+                        doodleDepthBufferHeight = depthBufH,
+                        doodleDepthStride = depthBufStride,
+                        doodleCaptureIntrinsics = intrinsics,
+                        doodleCaptureViewMatrix = viewMatrix,
+                        doodleCaptureWallPlane = wallPlane,
                         targetPhysicalExtent = extent,
                         isCaptureRequested = false,
                         tempCaptureBitmap = rotatedBmp,
@@ -5813,18 +5813,18 @@ class ArViewModel @Inject constructor(
                     it.copy(
                         tempCaptureBitmap = rotatedBmp,
                         annotatedCaptureBitmap = markings,
-                        targetRawBitmap = bitmap,
-                        targetDisplayRotation = displayRotation,
-                        targetCaptureEnvironment = environment,
-                        targetDepthBuffer = depthBuffer,
-                        targetDepthWidth = colorW,
-                        targetDepthHeight = colorH,
-                        targetDepthBufferWidth = depthBufW,
-                        targetDepthBufferHeight = depthBufH,
-                        targetDepthStride = depthBufStride,
-                        targetIntrinsics = intrinsics,
-                        targetCaptureViewMatrix = viewMatrix,
-                        targetWallPlane = wallPlane,
+                        doodleRawBitmap = bitmap,
+                        doodleDisplayRotation = displayRotation,
+                        doodleCaptureEnvironment = environment,
+                        doodleDepthBuffer = depthBuffer,
+                        doodleDepthWidth = colorW,
+                        doodleDepthHeight = colorH,
+                        doodleDepthBufferWidth = depthBufW,
+                        doodleDepthBufferHeight = depthBufH,
+                        doodleDepthStride = depthBufStride,
+                        doodleCaptureIntrinsics = intrinsics,
+                        doodleCaptureViewMatrix = viewMatrix,
+                        doodleCaptureWallPlane = wallPlane,
                         targetPhysicalExtent = extent,
                         isCaptureRequested = false
                     )
@@ -5838,7 +5838,7 @@ class ArViewModel @Inject constructor(
     }
 
     /**
-     * A target capture failed (the renderer threw before reaching [onTargetCaptured], or preparing
+     * A target capture failed (the renderer threw before reaching [onDoodleCaptured], or preparing
      * the frame did). Drops the request so the capture button / tap re-arms (a request left up
      * blocks every later tap), logs it, and tells the artist to try again. Safe from any thread.
      */
@@ -5853,7 +5853,7 @@ class ArViewModel @Inject constructor(
         )
     }
 
-    // The in-flight rotate + isolateMarkings of the latest capture (see onTargetCaptured).
+    // The in-flight rotate + isolateMarkings of the latest capture (see onDoodleCaptured).
     private var captureComputeJob: Job? = null
 
     /**
@@ -5887,7 +5887,7 @@ class ArViewModel @Inject constructor(
      * the mark simply stops contributing.
      *
      * Asynchronous: the mask in [uiState] lags the touches by the queue. Anything that consumes the
-     * mask (Confirm) must go through [awaitLatestTargetCapture], which applies every queued erase first.
+     * mask (Confirm) must go through [awaitLatestDoodleCapture], which applies every queued erase first.
      */
     // Serializes the batches so each starts from the LATEST mask rather than a snapshot taken when the
     // gesture sample fired. Without this, two rapid removals both read the same bitmap and the later
@@ -5946,7 +5946,7 @@ class ArViewModel @Inject constructor(
      * predate erases still in flight — the artist taps the last mark and Confirm immediately, and the
      * doodle was built with that mark still in it.
      */
-    suspend fun awaitLatestTargetCapture(): Pair<Bitmap?, Bitmap?> {
+    suspend fun awaitLatestDoodleCapture(): Pair<Bitmap?, Bitmap?> {
         withContext(dispatchers.default) {
             markRemovalMutex.withLock { applyPendingMarkRemovalsLocked() }
         }
@@ -6114,7 +6114,7 @@ class ArViewModel @Inject constructor(
             it.copy(
                 tempCaptureBitmap = null,
                 annotatedCaptureBitmap = null,
-                targetWallPlane = null,
+                doodleCaptureWallPlane = null,
                 tapMarks = emptyList(),
                 unwarpPoints = emptyList()
             )
@@ -6185,7 +6185,7 @@ class ArViewModel @Inject constructor(
         // project load) installs the new doodle AND the new pose.
         slamManager.beginDoodleReplacement()
         // Anchor on the wall plane the artist tapped, not wherever the centre hit test happens to land.
-        renderer?.pendingCapturedWallPlane = _uiState.value.targetWallPlane?.copyOf()
+        renderer?.pendingCapturedWallPlane = _uiState.value.doodleCaptureWallPlane?.copyOf()
         renderer?.pendingAnchorEstablishment = true
     }
 
@@ -6355,7 +6355,7 @@ class ArViewModel @Inject constructor(
         const val LOCK_TIMEOUT_RETRY_DELAY_MS = 200L
     }
     // @Volatile: written on main (setDoodlePhase) / IO (build result) and read on the GL thread
-    // (onTargetCaptured), so the GL thread must observe the latest value.
+    // (onDoodleCaptured), so the GL thread must observe the latest value.
     @Volatile private var doodlePhaseActive = false
     @Volatile private var doodleBuilt = false
     // Guards against re-entrant builds if captures arrive faster than a build completes.
@@ -6412,7 +6412,7 @@ class ArViewModel @Inject constructor(
                         onDoodleLocked()
                         break
                     }
-                    requestCapture() // no onScreenTap → no tap; onTargetCaptured builds headlessly
+                    requestCapture() // no onScreenTap → no tap; onDoodleCaptured builds headlessly
                     // Graceful fallback: on a featureless wall relocalization may never converge. Rather
                     // than hang forever, after the budget is spent place the artwork on the plain anchor
                     // so the user still ends up with art stuck to the wall.
@@ -6527,7 +6527,7 @@ class ArViewModel @Inject constructor(
     }
 
     // setArtworkDoodleFromComposite removed: nothing called it, and it bailed on its first line
-    // (`targetDepthBuffer ?: return`) because the ARCore depth API is disabled, so it could not have
+    // (`doodleDepthBuffer ?: return`) because the ARCore depth API is disabled, so it could not have
     // registered an artwork base even if something had. [updatePaintingGuide] is the live path — it
     // re-registers the design composite whenever the design changes, descriptors-only, which is all
     // the teleological corroboration test needs.

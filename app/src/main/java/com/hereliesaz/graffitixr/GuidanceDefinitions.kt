@@ -13,7 +13,7 @@ import com.hereliesaz.graffitixr.design.R as DesignR
  * Per-mode guidance goal ids. Each [azGoal] below auto-starts on entry to its mode (`autoStartWhen`
  * bound to that mode's `az.screen.*` status) — AzGuidanceController persists completed/dismissed
  * goals in SharedPreferences, so this is a one-time first-run tour per mode, not a repeat nag. AR's
- * capture screen keeps its own card (`TargetCreationUi`); the old hard-coded post-target overlays are
+ * capture screen keeps its own card (`DoodleCreationUi`); the old hard-coded post-target overlays are
  * gone, so this graph is the tutorial. Overlay/Mockup/Trace/Design had none — this wires the ~155 lines
  * of authored, localized per-mode guidance below (previously declared and never reachable, since
  * the Help rail item opens AzNavRail's built-in help overlay instead of toggling this tour) to
@@ -28,7 +28,7 @@ internal val GUIDANCE_GOAL_IDS = listOf("gx.design", "gx.overlay", "gx.mockup", 
  * nowhere — the bug that made the old coach aim at the non-existent `mode.mockup.wall`.
  */
 internal val GUIDANCE_HIGHLIGHT_IDS =
-    setOf("item.open", "mockup.wall", "target.create", "mode.design")
+    setOf("item.open", "mockup.wall", "doodle.create", "mode.design")
 
 /**
  * Rail-item ids addressed by [azHighlight] and [azItemState] post-hoc decorators in
@@ -37,7 +37,7 @@ internal val GUIDANCE_HIGHLIGHT_IDS =
  */
 internal val DECORATED_IDS = setOf(
     "item.open",
-    "target.create", "mode.ar.light", "mode.ar.lock", "mode.ar.measure",
+    "doodle.create", "mode.ar.light", "mode.ar.lock", "mode.ar.measure",
     "coop", "coop.host", "coop.join",
     "mode.ar",
     "mode.overlay.light", "mode.overlay.lock", "mode.overlay.gyro",
@@ -66,7 +66,7 @@ internal val DECORATED_IDS = setOf(
 internal fun AzNavHostScope.ConfigureGuidance(
     editorUiState: EditorUiState,
     arUiState: ArUiState,
-    isCapturingTarget: Boolean,
+    isCapturingDoodle: Boolean,
     ownTutorialActive: Boolean,
     context: Context,
     strings: AppStrings,
@@ -92,15 +92,15 @@ internal fun AzNavHostScope.ConfigureGuidance(
     }
     // One tutorial surface at a time. This reactive graph is rendered by AzHostActivityLayout and is
     // not covered by MainActivity's anyModalActive gate, so it must yield explicitly to:
-    //  - the target-capture screen: TargetCreationUi's own card is the one instruction there;
+    //  - the target-capture screen: DoodleCreationUi's own card is the one instruction there;
     //  - the app's own first-run surfaces (the photo explainer, the DRAW/DETECT walkthrough and the
     //    no-ARCore explainer), which MainActivity reports through [ownTutorialActive].
-    azSuppressGuide(settleMs = 0L) { isCapturingTarget || ownTutorialActive }
+    azSuppressGuide(settleMs = 0L) { isCapturingDoodle || ownTutorialActive }
 
     // --- Milestone statuses: the exact predicates rememberCoachStep derived steps from. ---
     azStatus("gx.hasDesign") { editorUiState.design != null }
     azStatus("gx.hasWallPhoto") { editorUiState.backgroundBitmap != null }
-    azStatus("gx.hasTarget") { arUiState.isAnchorEstablished }
+    azStatus("gx.hasDoodle") { arUiState.isAnchorEstablished }
     // A goal's own target status must NOT already be true the moment it auto-starts, or the
     // routing engine finds itself already at the destination and shows nothing — the concrete bug
     // this caused: a returning user who already has a design (the common case, since Design is
@@ -112,8 +112,8 @@ internal fun AzNavHostScope.ConfigureGuidance(
     // why those three keep the shared target as a documented, real, un-fixed gap rather than a
     // guessed-at one.
     azStatus("gx.mockupReady") { editorUiState.backgroundBitmap != null && editorUiState.design != null }
-    // AR's goal target, for the same reason: the goal used to end at gx.hasTarget, so the controller
-    // completed (and persisted) it the moment the anchor landed and the gx.hasTarget -> design edge
+    // AR's goal target, for the same reason: the goal used to end at gx.hasDoodle, so the controller
+    // completed (and persisted) it the moment the anchor landed and the gx.hasDoodle -> design edge
     // below never ran. A first-time user who confirmed a target with no design open was told nothing
     // about adding one. Ending at "target and design" keeps the goal alive through that edge.
     azStatus("gx.arReady") { arUiState.isAnchorEstablished && editorUiState.design != null }
@@ -187,21 +187,21 @@ internal fun AzNavHostScope.ConfigureGuidance(
     )
 
     // --- AR: scan & lock a wall target, then add layers. The capture step itself is explained by
-    // TargetCreationUi's card (this graph is suppressed there), so ar[2] ("just tap the screen") is
-    // not used. Once the anchor lands, the gx.hasTarget -> gx.arReady edge below is the ONLY
+    // DoodleCreationUi's card (this graph is suppressed there), so ar[2] ("just tap the screen") is
+    // not used. Once the anchor lands, the gx.hasDoodle -> gx.arReady edge below is the ONLY
     // "now open a design" instruction: the old modal dialog and "Target established" card are gone. ---
     azEdge(
         from = ar0,
-        to = "gx.hasTarget",
+        to = "gx.hasDoodle",
         text = "",
         steps = listOf(
-            AzInstructionStep(text = ln(ar, 0), title = strings.ar.targetCreationTitle, highlightItemId = "target.create"),
-            AzInstructionStep(text = ln(ar, 1), highlightItemId = "target.create"),
-            AzInstructionStep(text = ln(ar, 4), highlightItemId = "target.create", advanceWhen = "gx.hasTarget"),
+            AzInstructionStep(text = ln(ar, 0), title = strings.ar.doodleCreationTitle, highlightItemId = "doodle.create"),
+            AzInstructionStep(text = ln(ar, 1), highlightItemId = "doodle.create"),
+            AzInstructionStep(text = ln(ar, 4), highlightItemId = "doodle.create", advanceWhen = "gx.hasDoodle"),
         ),
     )
     azEdge(
-        from = "gx.hasTarget",
+        from = "gx.hasDoodle",
         to = "gx.arReady",
         text = res(DesignR.string.guidance_open_via_design_ar),
         highlightItemId = "mode.design",
@@ -211,7 +211,7 @@ internal fun AzNavHostScope.ConfigureGuidance(
     // to that mode's screen status) and routes from the current screen to that mode's milestone.
     // AzGuidanceController tracks completed/dismissed goals in SharedPreferences, so a goal the
     // user already finished or dismissed does not restart on a later visit. Mockup's target is
-    // gx.mockupReady and AR's gx.arReady, not the shared gx.hasDesign / gx.hasTarget — see those statuses'
+    // gx.mockupReady and AR's gx.arReady, not the shared gx.hasDesign / gx.hasDoodle — see those statuses'
     // own comments above for why. ---
     azGoal(id = "gx.design", target = "gx.hasDesign", label = nav.design, autoStartWhen = design0)
     azGoal(id = "gx.overlay", target = "gx.hasDesign", label = nav.overlay, autoStartWhen = overlay0)

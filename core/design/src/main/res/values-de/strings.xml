@@ -273,9 +273,9 @@
     <string name="open_settings">Einstellungen öffnen</string>
 
     <!-- Title for target creation overlay. -->
-    <string name="target_creation_title">KRITZELEI-RASTER</string>
+    <string name="doodle_creation_title">KRITZELEI-RASTER</string>
     <!-- Instructions for creating a target by tapping on reference marks. -->
-    <string name="target_creation_text">Wenn Sie Ihr Kritzelei-Raster noch nicht erstellt haben, fotografieren Sie die Wand, indem Sie die Aufnahmetaste drücken. Andernfalls tippen Sie auf Abbrechen.</string>
+    <string name="doodle_creation_text">Wenn Sie Ihr Kritzelei-Raster noch nicht erstellt haben, fotografieren Sie die Wand, indem Sie die Aufnahmetaste drücken. Andernfalls tippen Sie auf Abbrechen.</string>
     <!-- Generic cancel action. -->
     <string name="cancel">Abbrechen</string>
 
@@ -425,17 +425,17 @@
     <string name="save_project_hint">Projektname</string>
 
     <!-- Target Creation -->
-    <string name="target_guide_desc">Ausrichtungshilfe für die Kritzelei</string>
-    <string name="target_captured_desc">Erfasste Kritzelei</string>
-    <string name="target_review_desc">Extrahierte Kritzelei überprüfen</string>
-    <string name="target_unwarp_hint">Ecken ziehen zum Entzerren</string>
-    <string name="target_review_title">KRITZELEI FIXIERT</string>
+    <string name="doodle_guide_desc">Ausrichtungshilfe für die Kritzelei</string>
+    <string name="doodle_captured_desc">Erfasste Kritzelei</string>
+    <string name="doodle_review_desc">Extrahierte Kritzelei überprüfen</string>
+    <string name="doodle_unwarp_hint">Ecken ziehen zum Entzerren</string>
+    <string name="doodle_review_title">KRITZELEI FIXIERT</string>
     <string name="doodle_closeups_progress">Die Wand lernen: Phase %1$d von %2$d · Schritt %3$d von %4$d</string>
 
-    <string name="target_exclude">Ausschließen</string>
-    <string name="target_include">Einschließen</string>
-    <string name="target_erase_marks">Markierungen löschen</string>
-    <string name="target_show_features">Merkmale anzeigen</string>
+    <string name="doodle_exclude">Ausschließen</string>
+    <string name="doodle_include">Einschließen</string>
+    <string name="doodle_erase_marks">Markierungen löschen</string>
+    <string name="doodle_show_features">Merkmale anzeigen</string>
     <string name="reset_button">Zurücksetzen</string>
 
     <string name="poster_title">POSTER GENERIEREN</string>
@@ -450,7 +450,7 @@
     <string name="scan_hint_build_map">Gehen Sie nach links und rechts, um die Karte zu erstellen</string>
     <string name="scan_hint_closer">Gehen Sie näher an die Wand</string>
     <string name="scan_hint_higher_lower">Scannen Sie höher und niedriger</string>
-    <string name="reacquiring_target">Kritzelei wird wiedererkannt…</string>
+    <string name="reacquiring_doodle">Kritzelei wird wiedererkannt…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Hintergrund-Mockup</string>
@@ -713,14 +713,14 @@
     <string name="standalone_photosphere_no_sensor">Dieses Telefon hat keinen Rotationssensor, daher kann SphereSLAM hier kein Ziel platzieren.</string>
     <string name="standalone_photosphere_compass_not_ready">Der Kompass ist noch nicht bereit – halte das Telefon eine Sekunde ruhig und nimm dann erneut auf.</string>
     <string name="standalone_photosphere_not_mapped">SphereSLAM hat diese Ansicht noch nicht kartiert – halte die Kamera eine Sekunde ruhig auf einen hellen, detailreichen Teil der Oberfläche und nimm dann erneut auf.</string>
-    <string name="target_rectify_title">Fläche entzerren</string>
-    <string name="target_rectify_text">Ziehe nun die Ecken, bis der cyanfarbene Rahmen an der ebenen Fläche deiner Wand ausgerichtet ist.</string>
-    <string name="target_remove_marks_title">Markierungen entfernen</string>
-    <string name="target_erase_hint">Tippe auf eine Markierung, um sie zu entfernen, oder wische über mehrere Markierungen.</string>
-    <string name="target_cd_raw_capture">Rohaufnahme</string>
-    <string name="target_cd_detected_marks">Erkannte Markierungen</string>
-    <string name="target_cd_confirm">Bestätigen</string>
-    <string name="target_cd_unwarp_base">Aufgenommenes Wandfoto mit Eckgriffen</string>
+    <string name="doodle_rectify_title">Fläche entzerren</string>
+    <string name="doodle_rectify_text">Ziehe nun die Ecken, bis der cyanfarbene Rahmen an der ebenen Fläche deiner Wand ausgerichtet ist.</string>
+    <string name="doodle_remove_marks_title">Markierungen entfernen</string>
+    <string name="doodle_erase_hint">Tippe auf eine Markierung, um sie zu entfernen, oder wische über mehrere Markierungen.</string>
+    <string name="doodle_cd_raw_capture">Rohaufnahme</string>
+    <string name="doodle_cd_detected_marks">Erkannte Markierungen</string>
+    <string name="doodle_cd_confirm">Bestätigen</string>
+    <string name="doodle_cd_unwarp_base">Aufgenommenes Wandfoto mit Eckgriffen</string>
     <string name="guidance_open_via_design_overlay">Tippe in der Leiste auf „Design“ und dann auf „Öffnen“, um eine Ebene hinzuzufügen – wähle ein Foto, und es erscheint hier und schwebt über der Live-Kameraansicht.</string>
     <string name="guidance_open_via_design_mockup">Tippe in der Leiste auf „Design“ und dann auf „Öffnen“, um eine Ebene über dem Wandfoto hinzuzufügen. Zum Anpassen von Größe und Position zusammenziehen und ziehen.</string>
     <string name="guidance_open_via_design_trace">Tippe in der Leiste auf „Design“ und dann auf „Öffnen“, um deine erste Ebene hinzuzufügen. Sobald sie drin ist, ziehe und zoome auf der Leinwand, um sie zu skalieren und zu platzieren.</string>
@@ -729,7 +729,7 @@
     <string name="ar_feedback_guest_edit_dropped">Diese Änderung kann nicht mit dem Host geteilt werden – sie bleibt auf diesem Gerät</string>
     <string name="ar_feedback_backend_resolving">Das AR-Backend wird noch ermittelt – versuche es in einem Moment erneut mit „Hosten“</string>
     <string name="ar_feedback_open_project_first">Öffne ein Projekt, bevor du teilst – es gibt noch nichts, was an einen Gast gesendet werden könnte</string>
-    <string name="ar_feedback_host_need_target_arcore">Erfasse und fixiere eine aktuelle Kritzelei, bevor du „Hosten“ startest</string>
+    <string name="ar_feedback_host_need_doodle_arcore">Erfasse und fixiere eine aktuelle Kritzelei, bevor du „Hosten“ startest</string>
     <string name="ar_feedback_host_need_target_standalone">Erfasse vor dem Hosten ein eigenständiges Wandziel</string>
     <string name="ar_feedback_doodle_not_ready">Die Kritzelei ist noch nicht bereit — halte sie im Bild und versuche es erneut mit „Hosten“</string>
     <string name="ar_feedback_package_failed">Dieses Projekt konnte nicht zum Teilen gepackt werden – speichere es zuerst</string>
@@ -737,7 +737,7 @@
     <string name="ar_feedback_join_load_failed">Das Projekt des Hosts konnte nicht geladen werden – die Sitzung wurde beendet.</string>
     <string name="ar_feedback_join_no_geometry">Der Host hat keine Geometrie bereitgestellt, an der ARCore sich ausrichten kann.</string>
     <string name="ar_feedback_join_failed">Beitritt nicht möglich: %1$s</string>
-    <string name="ar_feedback_wall_target_changed">Die Kritzelei hat sich geändert — das Teilen wurde beendet. Starte „Hosten“ für die neue Wand erneut.</string>
+    <string name="ar_feedback_wall_doodle_changed">Die Kritzelei hat sich geändert — das Teilen wurde beendet. Starte „Hosten“ für die neue Wand erneut.</string>
     <string name="ar_feedback_backend_changed">Das Tracking-Backend hat sich geändert – das Teilen wurde beendet. Starte das Teilen erneut.</string>
     <string name="ar_feedback_camera_busy">Die Kamera ist belegt oder nicht verfügbar – schließe andere Kamera-Apps und öffne AR dann erneut</string>
     <string name="ar_feedback_ar_start_failed">AR konnte nicht gestartet werden – deine Kamera wird möglicherweise von einer anderen App verwendet</string>
@@ -747,7 +747,7 @@
     <string name="ar_feedback_camera_permission">Kamera nicht verfügbar – prüfe die Kameraberechtigung und öffne AR dann erneut</string>
     <string name="ar_feedback_camera_not_paused">Die AR-Kamera wurde nicht sauber pausiert – sie läuft möglicherweise im Hintergrund weiter</string>
     <string name="ar_feedback_backbone_warning">Das Kunstwerk deckt fast die gesamte sichtbare Wand ab — nur %1$d verfolgte Merkmale liegen außerhalb. Mach es kleiner oder tritt zurück, sonst rastet die Kritzelei möglicherweise nicht ein.</string>
-    <string name="ar_feedback_legacy_target_geometry">Die gespeicherte Kritzelei dieses Projekts stammt von einer älteren Version und ihre 3D-Geometrie lässt sich nicht korrigieren. Erstelle die Kritzelei neu, um sie zu verwenden.</string>
+    <string name="ar_feedback_legacy_doodle_geometry">Die gespeicherte Kritzelei dieses Projekts stammt von einer älteren Version und ihre 3D-Geometrie lässt sich nicht korrigieren. Erstelle die Kritzelei neu, um sie zu verwenden.</string>
     <string name="ar_feedback_camera_no_frames">Die Kamera liefert keine Bilder – verlasse AR und versuche es erneut</string>
     <string name="ar_feedback_camera_recovery_timeout">Die Wiederherstellung der AR-Kamera ist sicher abgelaufen – verlasse AR und öffne es erneut</string>
     <string name="ar_feedback_target_prepare_failed">Das erfasste Ziel konnte nicht vorbereitet werden. Versuche es erneut.</string>
@@ -774,8 +774,8 @@
     <!-- Pass B: the Settings switch. -->
     <string name="settings_change_pass">Änderungserkennung (braucht ein Foto der sauberen Wand)</string>
     <!-- Spoken labels for the round shutter on the Doodle grid screen, which photographs the bare wall. -->
-    <string name="target_shutter_cd">Die leere Wand fotografieren</string>
-    <string name="target_shutter_retake_cd">Foto der leeren Wand neu aufnehmen</string>
+    <string name="doodle_shutter_cd">Die leere Wand fotografieren</string>
+    <string name="doodle_shutter_retake_cd">Foto der leeren Wand neu aufnehmen</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">CV-Ansicht</string>

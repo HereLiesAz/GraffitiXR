@@ -23,23 +23,23 @@ import kotlin.math.sqrt
  * accuracy of -1 (not reported) is treated as trusted: absence of a figure is not evidence of a
  * bad one, and the common case of devices that never report it would otherwise never get a hint.
  */
-sealed interface TargetSearchHint {
+sealed interface DoodleSearchHint {
     /** No usable saved attitude, live sample, or trustworthy heading. */
-    data class Unknown(val reason: Reason) : TargetSearchHint
+    data class Unknown(val reason: Reason) : DoodleSearchHint
 
-    /** Looking roughly the same way as at capture (within [TargetSearchHintMath.ALIGNED_DEG]). */
-    data object Aligned : TargetSearchHint
+    /** Looking roughly the same way as at capture (within [DoodleSearchHintMath.ALIGNED_DEG]). */
+    data object Aligned : DoodleSearchHint
 
     /**
      * [turnDeg]: positive = turn right (clockwise from above), negative = left, rounded to 5.
      * [tiltDeg]: positive = tilt up, negative = down, rounded to 5. Either may be 0.
      */
-    data class Adjust(val turnDeg: Int, val tiltDeg: Int) : TargetSearchHint
+    data class Adjust(val turnDeg: Int, val tiltDeg: Int) : DoodleSearchHint
 
     enum class Reason { NO_SAVED_ATTITUDE, NO_LIVE_ATTITUDE, UNTRUSTED_HEADING }
 }
 
-object TargetSearchHintMath {
+object DoodleSearchHintMath {
     const val ALIGNED_DEG = 20.0
     const val ROUND_TO_DEG = 5
 
@@ -98,13 +98,13 @@ object TargetSearchHintMath {
         savedMagneticAccuracy: Int,
         live: List<Float>?,
         liveMagneticAccuracy: Int,
-    ): TargetSearchHint {
+    ): DoodleSearchHint {
         val s = saved?.let { lookDirectionEnu(it) }
-            ?: return TargetSearchHint.Unknown(TargetSearchHint.Reason.NO_SAVED_ATTITUDE)
+            ?: return DoodleSearchHint.Unknown(DoodleSearchHint.Reason.NO_SAVED_ATTITUDE)
         val l = live?.let { lookDirectionEnu(it) }
-            ?: return TargetSearchHint.Unknown(TargetSearchHint.Reason.NO_LIVE_ATTITUDE)
+            ?: return DoodleSearchHint.Unknown(DoodleSearchHint.Reason.NO_LIVE_ATTITUDE)
         if (!isHeadingTrusted(savedMagneticAccuracy) || !isHeadingTrusted(liveMagneticAccuracy)) {
-            return TargetSearchHint.Unknown(TargetSearchHint.Reason.UNTRUSTED_HEADING)
+            return DoodleSearchHint.Unknown(DoodleSearchHint.Reason.UNTRUSTED_HEADING)
         }
         val elS = Math.toDegrees(asin(s[2].coerceIn(-1.0, 1.0)))
         val elL = Math.toDegrees(asin(l[2].coerceIn(-1.0, 1.0)))
@@ -116,8 +116,8 @@ object TargetSearchHintMath {
         } else {
             wrapDeg(Math.toDegrees(atan2(s[0], s[1])) - Math.toDegrees(atan2(l[0], l[1])))
         }
-        if (abs(turn) <= ALIGNED_DEG && abs(tilt) <= ALIGNED_DEG) return TargetSearchHint.Aligned
-        return TargetSearchHint.Adjust(roundDeg(turn), roundDeg(tilt))
+        if (abs(turn) <= ALIGNED_DEG && abs(tilt) <= ALIGNED_DEG) return DoodleSearchHint.Aligned
+        return DoodleSearchHint.Adjust(roundDeg(turn), roundDeg(tilt))
     }
 
     private fun roundDeg(d: Double): Int =
@@ -125,14 +125,14 @@ object TargetSearchHintMath {
 }
 
 /** How the "looking for your target" status escalates with time spent unmatched. */
-enum class TargetSearchPhase { LOOKING, HINT, OFFER_RECAPTURE }
+enum class DoodleSearchPhase { LOOKING, HINT, OFFER_RECAPTURE }
 
 /**
- * Elapsed-time state machine for [TargetSearchPhase]. Resets whenever [update] sees
- * `searching == false` (target locked or no anchor) or a different [targetKey] (project/target
+ * Elapsed-time state machine for [DoodleSearchPhase]. Resets whenever [update] sees
+ * `searching == false` (target locked or no anchor) or a different [doodleSearchKey] (project/target
  * changed). [clock] returns milliseconds and is injectable for tests.
  */
-class TargetSearchPhaseTracker(
+class DoodleSearchPhaseTracker(
     private val clock: () -> Long,
     private val hintAfterMs: Long = HINT_AFTER_MS,
     private val recaptureAfterMs: Long = RECAPTURE_AFTER_MS,
@@ -140,19 +140,19 @@ class TargetSearchPhaseTracker(
     private var startedAt: Long? = null
     private var key: Any? = null
 
-    fun update(searching: Boolean, targetKey: Any?): TargetSearchPhase {
-        if (!searching || targetKey != key) {
+    fun update(searching: Boolean, doodleSearchKey: Any?): DoodleSearchPhase {
+        if (!searching || doodleSearchKey != key) {
             startedAt = null
-            key = targetKey
+            key = doodleSearchKey
         }
-        if (!searching) return TargetSearchPhase.LOOKING
+        if (!searching) return DoodleSearchPhase.LOOKING
         val now = clock()
         val start = startedAt ?: now.also { startedAt = it }
         val elapsed = now - start
         return when {
-            elapsed > recaptureAfterMs -> TargetSearchPhase.OFFER_RECAPTURE
-            elapsed >= hintAfterMs -> TargetSearchPhase.HINT
-            else -> TargetSearchPhase.LOOKING
+            elapsed > recaptureAfterMs -> DoodleSearchPhase.OFFER_RECAPTURE
+            elapsed >= hintAfterMs -> DoodleSearchPhase.HINT
+            else -> DoodleSearchPhase.LOOKING
         }
     }
 

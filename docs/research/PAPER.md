@@ -188,7 +188,7 @@ seconds:
 |---|---|---|
 | Confidence weighting | `confGlobal` passed as literal `1f` | one line in `ArRenderer.kt`; $p$ reached the HUD and nothing else, so fusion behaved identically at 0% and 100% painted |
 | Oblique robustness | `mHasDoodleView` assigned in exactly one function — `generateDoodle`, on the ARCore-depth path, which is disabled | the rectification pass could not run on any doodle the app builds |
-| Artwork registration | `setArtworkDoodleFromComposite` had zero callers and returned on its first line (`targetDepthBuffer ?: return`, always null) | dead |
+| Artwork registration | `setArtworkDoodleFromComposite` had zero callers and returned on its first line (`doodleDepthBuffer ?: return`, always null) | dead |
 | Self-grow | required `inliers >= 20` | a half-covered wall rarely reaches 20 raw inliers, so $F$ could only grow when already strong — exactly when it needed to least |
 
 Compounding this, every failure was silent. `mPnpMatchCount` and
@@ -656,7 +656,7 @@ interchangeable with the one that was written here.
 ### 8.2b A second frame inconsistency, on the path §8 does not describe
 
 Everything above concerns the no-depth capture path, the one that reaches
-`PlaneMarks.backProject`. `MainViewModel.onConfirmTargetCreation` branches on
+`PlaneMarks.backProject`. `MainViewModel.onConfirmDoodleCreation` branches on
 whether a depth buffer was captured, and the depth branch does not call
 `backProject` at all — it hands the bitmap, the depth image and the intrinsics to
 native `generateDoodle`, which unprojects keypoints with the supplied

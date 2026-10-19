@@ -170,9 +170,9 @@ fun rememberAppStrings(): AppStrings {
             installArcore = stringResource(R.string.install_arcore),
             cameraPermissionRequired = stringResource(R.string.camera_permission_required),
             openSettings = stringResource(R.string.open_settings),
-            targetCreationTitle = stringResource(R.string.target_creation_title),
-            targetCreationText = stringResource(R.string.target_creation_text),
-            targetReviewTitle = stringResource(R.string.target_review_title),
+            doodleCreationTitle = stringResource(R.string.doodle_creation_title),
+            doodleCreationText = stringResource(R.string.doodle_creation_text),
+            doodleReviewTitle = stringResource(R.string.doodle_review_title),
             doodleCloseUpsProgress = { stage, stages, done, total -> context.getString(R.string.doodle_closeups_progress, stage, stages, done, total) },
             diagCopied = stringResource(R.string.diag_copied),
             diagTitle = stringResource(R.string.diag_title),
@@ -196,12 +196,12 @@ fun rememberAppStrings(): AppStrings {
             scanHintBuildMap = stringResource(R.string.scan_hint_build_map),
             scanHintCloser = stringResource(R.string.scan_hint_closer),
             scanHintHigherLower = stringResource(R.string.scan_hint_higher_lower),
-            targetExclude = stringResource(R.string.target_exclude),
-            targetInclude = stringResource(R.string.target_include),
-            targetEraseMarks = stringResource(R.string.target_erase_marks),
-            targetShowFeatures = stringResource(R.string.target_show_features),
+            doodleExclude = stringResource(R.string.doodle_exclude),
+            doodleInclude = stringResource(R.string.doodle_include),
+            doodleEraseMarks = stringResource(R.string.doodle_erase_marks),
+            doodleShowFeatures = stringResource(R.string.doodle_show_features),
             syncing = stringResource(R.string.syncing),
-            reacquiringTarget = stringResource(R.string.reacquiring_target)
+            reacquiringDoodle = stringResource(R.string.reacquiring_doodle)
         ),
         help = AppStrings.Help(
             modeHost = R.string.help_mode_host,
@@ -445,9 +445,9 @@ data class AppStrings(
         val installArcore: String,
         val cameraPermissionRequired: String,
         val openSettings: String,
-        val targetCreationTitle: String,
-        val targetCreationText: String,
-        val targetReviewTitle: String,
+        val doodleCreationTitle: String,
+        val doodleCreationText: String,
+        val doodleReviewTitle: String,
         /** "Learning the wall: stage [stage] of [stages] · step [done] of [total]" while the doodle builds. */
         val doodleCloseUpsProgress: (stage: Int, stages: Int, done: Int, total: Int) -> String =
             { stage, stages, done, total -> "$stage/$stages \u00B7 $done/$total" },
@@ -474,12 +474,12 @@ data class AppStrings(
         val scanHintBuildMap: String,
         val scanHintCloser: String,
         val scanHintHigherLower: String,
-        val targetExclude: String,
-        val targetInclude: String,
-        val targetEraseMarks: String,
-        val targetShowFeatures: String,
+        val doodleExclude: String,
+        val doodleInclude: String,
+        val doodleEraseMarks: String,
+        val doodleShowFeatures: String,
         val syncing: String,
-        val reacquiringTarget: String
+        val reacquiringDoodle: String
     ) {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -490,9 +490,9 @@ data class AppStrings(
                 installArcore == other.installArcore &&
                 cameraPermissionRequired == other.cameraPermissionRequired &&
                 openSettings == other.openSettings &&
-                targetCreationTitle == other.targetCreationTitle &&
-                targetCreationText == other.targetCreationText &&
-                targetReviewTitle == other.targetReviewTitle &&
+                doodleCreationTitle == other.doodleCreationTitle &&
+                doodleCreationText == other.doodleCreationText &&
+                doodleReviewTitle == other.doodleReviewTitle &&
                 diagCopied == other.diagCopied &&
                 diagTitle == other.diagTitle &&
                 diagWaiting == other.diagWaiting &&
@@ -509,12 +509,12 @@ data class AppStrings(
                 scanHintBuildMap == other.scanHintBuildMap &&
                 scanHintCloser == other.scanHintCloser &&
                 scanHintHigherLower == other.scanHintHigherLower &&
-                targetExclude == other.targetExclude &&
-                targetInclude == other.targetInclude &&
-                targetEraseMarks == other.targetEraseMarks &&
-                targetShowFeatures == other.targetShowFeatures &&
+                doodleExclude == other.doodleExclude &&
+                doodleInclude == other.doodleInclude &&
+                doodleEraseMarks == other.doodleEraseMarks &&
+                doodleShowFeatures == other.doodleShowFeatures &&
                 syncing == other.syncing &&
-                reacquiringTarget == other.reacquiringTarget
+                reacquiringDoodle == other.reacquiringDoodle
         }
 
         override fun hashCode(): Int {
@@ -524,9 +524,9 @@ data class AppStrings(
             result = 31 * result + installArcore.hashCode()
             result = 31 * result + cameraPermissionRequired.hashCode()
             result = 31 * result + openSettings.hashCode()
-            result = 31 * result + targetCreationTitle.hashCode()
-            result = 31 * result + targetCreationText.hashCode()
-            result = 31 * result + targetReviewTitle.hashCode()
+            result = 31 * result + doodleCreationTitle.hashCode()
+            result = 31 * result + doodleCreationText.hashCode()
+            result = 31 * result + doodleReviewTitle.hashCode()
             result = 31 * result + diagCopied.hashCode()
             result = 31 * result + diagTitle.hashCode()
             result = 31 * result + diagWaiting.hashCode()
@@ -543,12 +543,12 @@ data class AppStrings(
             result = 31 * result + scanHintBuildMap.hashCode()
             result = 31 * result + scanHintCloser.hashCode()
             result = 31 * result + scanHintHigherLower.hashCode()
-            result = 31 * result + targetExclude.hashCode()
-            result = 31 * result + targetInclude.hashCode()
-            result = 31 * result + targetEraseMarks.hashCode()
-            result = 31 * result + targetShowFeatures.hashCode()
+            result = 31 * result + doodleExclude.hashCode()
+            result = 31 * result + doodleInclude.hashCode()
+            result = 31 * result + doodleEraseMarks.hashCode()
+            result = 31 * result + doodleShowFeatures.hashCode()
             result = 31 * result + syncing.hashCode()
-            result = 31 * result + reacquiringTarget.hashCode()
+            result = 31 * result + reacquiringDoodle.hashCode()
             return result
         }
     }

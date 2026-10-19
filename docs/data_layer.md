@@ -21,7 +21,7 @@ it without depending on `app/`).
   - `layers: List<OverlayLayer>` — read-only migration path for projects saved when this app still
     held a layer list; collapsed into `design` on load (`ProjectManager.migrateInMemory`) and never
     written again.
-  - `targetImageUris`, ARCore `doodle`/`wallFeatureMap`/`captureEnvironment`,
+  - `doodleImageUris`, ARCore `doodle`/`wallFeatureMap`/`captureEnvironment`,
     `doodleIntrinsics`/`doodleAnchor`/`doodleViewMatrix`, plus the separate
     standalone SphereSLAM fields (`sphereSlamReferenceUri`, physical-scale flag/width, anchor
     generation, `sphereSlamDoodle`, `sphereSlamWallFeatureMap`, and atlas-page metadata) —

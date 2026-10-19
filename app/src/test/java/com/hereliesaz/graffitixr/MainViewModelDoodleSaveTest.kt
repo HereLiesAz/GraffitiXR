@@ -38,7 +38,7 @@ import java.nio.ByteBuffer
  * project), and the write itself throws (it must be reported, not crash the app).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-class MainViewModelTargetSaveTest {
+class MainViewModelDoodleSaveTest {
 
     private val projectRepository: ProjectRepository = mockk(relaxed = true)
     private val slamManager: SlamManager = mockk(relaxed = true)
@@ -80,7 +80,7 @@ class MainViewModelTargetSaveTest {
 
     /** The depth-buffer path (no wall plane): no anchor wait, straight to the save. */
     private fun confirmDepthCapture() {
-        viewModel.onConfirmTargetCreation(
+        viewModel.onConfirmDoodleCreation(
             bitmap = bitmap(),
             depthBuffer = ByteBuffer.allocateDirect(16),
             depthW = 2, depthH = 2, depthStride = 4,
@@ -92,10 +92,10 @@ class MainViewModelTargetSaveTest {
 
     private fun awaitSaveFinished() {
         val deadline = System.currentTimeMillis() + 5_000
-        while (viewModel.uiState.value.isConfirmingTarget && System.currentTimeMillis() < deadline) {
+        while (viewModel.uiState.value.isConfirmingDoodle && System.currentTimeMillis() < deadline) {
             Thread.sleep(10)
         }
-        assertFalse("save never finished", viewModel.uiState.value.isConfirmingTarget)
+        assertFalse("save never finished", viewModel.uiState.value.isConfirmingDoodle)
     }
 
     @Test
@@ -118,7 +118,7 @@ class MainViewModelTargetSaveTest {
 
     @Test
     fun `an IOException while saving the target is reported instead of crashing`() {
-        coEvery { projectManager.appendTargetImage(any(), any(), any(), any()) } throws IOException("disk full")
+        coEvery { projectManager.appendDoodleImage(any(), any(), any(), any()) } throws IOException("disk full")
 
         confirmDepthCapture()
         awaitSaveFinished()

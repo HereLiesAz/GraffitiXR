@@ -144,14 +144,14 @@ class ProjectRepositoryImpl @Inject constructor(
         file.absolutePath
     }
 
-    override suspend fun updateTargetDoodle(projectId: String, path: String) {
+    override suspend fun updateDoodleData(projectId: String, path: String) {
         // Transform-based overload: the read-modify-write happens under saveMutex, atomically
         // against the CURRENT in-memory project, instead of racing a read taken outside the lock
         // against a concurrent whole-object write (e.g. an AR wallFeatureMap save) that could clobber
         // it. No-ops (matching the transform overload's own guard) when no project with this id is
         // the one currently loaded.
         updateProject { current ->
-            if (current.id == projectId) current.copy(targetDoodlePath = path) else current
+            if (current.id == projectId) current.copy(doodleDataPath = path) else current
         }
     }
 

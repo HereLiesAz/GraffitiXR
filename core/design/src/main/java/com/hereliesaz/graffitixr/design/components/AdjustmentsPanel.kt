@@ -30,7 +30,7 @@ data class AdjustmentsState(
     /** True once a Reset press has flattened placement, so the next press restores it. */
     val isResetActive: Boolean = false,
     val isRightHanded: Boolean = true,
-    val isCapturingTarget: Boolean = false,
+    val isCapturingDoodle: Boolean = false,
     val activeLayer: OverlayLayer? = null,
     // Undo/redo belongs to the Design screen only; Modes show the finished design (no history controls).
     val showUndoRedo: Boolean = true,
@@ -88,7 +88,7 @@ fun AdjustmentsPanel(
     // or if we are in AR mode (to provide access to the action row while anchoring),
     // or if there's any history to undo/redo.
     // HOWEVER, we hide the action row (Undo, Reset, Redo) during Target Creation.
-    val canShowActionRow = !state.isCapturingTarget
+    val canShowActionRow = !state.isCapturingDoodle
     val isVisible = showKnobs || showColorBalance || (canShowActionRow && (hasImage || isArMode || hasHistory))
 
     if (!isVisible) return

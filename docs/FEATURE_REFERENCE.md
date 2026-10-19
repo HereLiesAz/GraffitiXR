@@ -455,7 +455,7 @@ If either the saved or live magnetometer accuracy is UNRELIABLE or LOW, or no at
 hint is shown (a wrong "turn right 90" is worse than none). It is a coarse compass/gravity prior
 only: it cannot place the overlay and does not influence relocalization or tracking. ARCore's world
 frame resets every session, so the ARCore poses saved at capture cannot be reused; only the
-compass/attitude survives between sessions. Logic: `feature/ar/.../TargetSearchHint.kt`.
+compass/attitude survives between sessions. Logic: `feature/ar/.../DoodleSearchHint.kt`.
 
 ## 7. Settings (persisted — `core/data` DataStore)
 

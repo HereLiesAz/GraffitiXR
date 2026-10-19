@@ -111,7 +111,7 @@ import com.hereliesaz.graffitixr.ui.coop.CoopHostQrOverlay
 import com.hereliesaz.graffitixr.ui.coop.CoopJoinQrScannerOverlay
 import com.hereliesaz.graffitixr.ui.coop.CoopSpectatorBanner
 import com.hereliesaz.graffitixr.ui.coop.CoopTripodView
-import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
+import com.hereliesaz.graffitixr.feature.ar.DoodleCreationUi
 import com.hereliesaz.graffitixr.feature.ar.rememberCameraController
 import com.hereliesaz.graffitixr.feature.ar.takePictureAsBitmap
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
@@ -126,10 +126,10 @@ import com.hereliesaz.graffitixr.common.model.RelocDiagnostics
 import com.hereliesaz.graffitixr.common.model.FusionState
 import com.hereliesaz.graffitixr.common.model.RelocReject
 import com.hereliesaz.graffitixr.common.model.RelocState
-import com.hereliesaz.graffitixr.feature.ar.TargetSearchHint
-import com.hereliesaz.graffitixr.feature.ar.TargetSearchHintMath
-import com.hereliesaz.graffitixr.feature.ar.TargetSearchPhase
-import com.hereliesaz.graffitixr.feature.ar.TargetSearchPhaseTracker
+import com.hereliesaz.graffitixr.feature.ar.DoodleSearchHint
+import com.hereliesaz.graffitixr.feature.ar.DoodleSearchHintMath
+import com.hereliesaz.graffitixr.feature.ar.DoodleSearchPhase
+import com.hereliesaz.graffitixr.feature.ar.DoodleSearchPhaseTracker
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import javax.inject.Inject
@@ -657,15 +657,15 @@ class MainActivity : AppCompatActivity() {
                         // (The plane no longer has to be green — see the hit-test in ArRenderer.)
                         // STANDALONE has no ARCore planes: its geometry comes from the photosphere
                         // placement bound at capture, so the wall-plane gate never applies there.
-                        val depthOff = arUiState.targetDepthBuffer == null
-                        val plane = arUiState.targetWallPlane
+                        val depthOff = arUiState.doodleDepthBuffer == null
+                        val plane = arUiState.doodleCaptureWallPlane
                         val onWall = plane != null && plane.size >= 6
                         val isStandalone = arUiState.sphereSlamRuntimeStatus.mode ==
                             com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.STANDALONE
                         if (tapPath && depthOff && !onWall && !isStandalone) {
                             arViewModel.appendDiag("Target capture discarded: no ARCore wall plane at tap")
                             arViewModel.clearCaptureForRetry()
-                            mainViewModel.notifyTargetNotOnWall()
+                            mainViewModel.notifyDoodleNotOnWall()
                         } else if (tapPath) {
                             mainViewModel.setCaptureStep(CaptureStep.REVIEW)
                         } else if (currentCaptureStep == CaptureStep.CAPTURE) {
@@ -771,7 +771,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 BackHandler(enabled = showSettings) { showSettings = false }
-                BackHandler(enabled = mainUiState.isCapturingTarget) {
+                BackHandler(enabled = mainUiState.isCapturingDoodle) {
                     mainViewModel.cancelTapMode()
                     arViewModel.clearTapHighlights()
                 }
@@ -789,7 +789,7 @@ class MainActivity : AppCompatActivity() {
                 // confirmation. Route back to the Library instead, matching "proj.load"'s handler.
                 BackHandler(
                     enabled = !showLibrary && !showSettings &&
-                        !mainUiState.isCapturingTarget && !mainUiState.isTouchLocked
+                        !mainUiState.isCapturingDoodle && !mainUiState.isTouchLocked
                 ) {
                     // Pop the editor route being left, not just push Library on top of it — a plain
                     // navigate() here left [Editor, Library] on the stack, so the NEXT Back press
@@ -815,8 +815,8 @@ class MainActivity : AppCompatActivity() {
                 // when location is granted. Ask at that moment — once per launch, so a refusal isn't
                 // re-asked on every capture — rather than at startup or for unrelated camera use.
                 var locationAskedThisLaunch by rememberSaveable { mutableStateOf(false) }
-                LaunchedEffect(mainUiState.isCapturingTarget, editorUiState.editorMode) {
-                    if (mainUiState.isCapturingTarget &&
+                LaunchedEffect(mainUiState.isCapturingDoodle, editorUiState.editorMode) {
+                    if (mainUiState.isCapturingDoodle &&
                         editorUiState.editorMode == EditorMode.AR &&
                         !locationAskedThisLaunch &&
                         !(isGranted(Manifest.permission.ACCESS_FINE_LOCATION) &&
@@ -1069,7 +1069,7 @@ class MainActivity : AppCompatActivity() {
                     ConfigureGuidance(
                         editorUiState,
                         arUiState,
-                        isCapturingTarget = mainUiState.isCapturingTarget,
+                        isCapturingDoodle = mainUiState.isCapturingDoodle,
                         // The first-run walkthrough and the no-ARCore explainer are tutorials in their
                         // own right; the reactive per-mode guidance waits until they are done.
                         ownTutorialActive = firstRunStage != FirstRunStage.NONE ||
@@ -1157,7 +1157,7 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     // Registered UNCONDITIONALLY. This used to be gated on an isRailVisible built from
-                    // hideUiForCapture / isTouchLocked / isCapturingTarget / showSettings /
+                    // hideUiForCapture / isTouchLocked / isCapturingDoodle / showSettings /
                     // isExporting, which emptied the rail outright in those states. The app icon stays
                     // on screen regardless, so tapping it to bring the rail back did nothing — and
                     // some of those states are reached FROM the rail (Trace ▸ Freeze locks touch;
@@ -1181,8 +1181,8 @@ class MainActivity : AppCompatActivity() {
                         coopState = coopState,
                         isTouchLocked = mainUiState.isTouchLocked,
                         isWaitingForTap = mainUiState.isWaitingForTap,
-                        isCapturingTarget = mainUiState.isCapturingTarget,
-                        isConfirmingTarget = mainUiState.isConfirmingTarget,
+                        isCapturingDoodle = mainUiState.isCapturingDoodle,
+                        isConfirmingDoodle = mainUiState.isConfirmingDoodle,
                         isOverlayGyroActive = mainUiState.isOverlayGyroActive,
                         onShowJoinScanner = { showJoinScanner = true },
                         onWallPhoto = {
@@ -1263,7 +1263,7 @@ class MainActivity : AppCompatActivity() {
                         // early-return on EVERY modal, not just one — collapsing the repeated
                         // boolean chains here prevents a future overlay from forgetting one.
                         val anyModalActive = showLibrary || showSettings || isExporting ||
-                            mainUiState.isCapturingTarget || showSaveDialog || pendingCrashReport != null ||
+                            mainUiState.isCapturingDoodle || showSaveDialog || pendingCrashReport != null ||
                             dashboardUiState.showNewProjectDialog
 
                         // The wall's close-ups are being learned ("Learning the wall up close: 17 of 49"). Per
@@ -1277,7 +1277,7 @@ class MainActivity : AppCompatActivity() {
                         // while a confirmed target is still saving, so no second capture can start.
                         if (
                             editorUiState.editorMode == EditorMode.AR && !anyModalActive &&
-                            !mainUiState.isConfirmingTarget
+                            !mainUiState.isConfirmingDoodle
                         ) {
                             com.hereliesaz.graffitixr.feature.ar.StandaloneOverlayUi(standaloneUiHost)
                         }
@@ -1524,12 +1524,12 @@ class MainActivity : AppCompatActivity() {
                                 }
                             }
 
-                            // Confirming a target unmounts TargetCreationUi right away, and the
+                            // Confirming a target unmounts DoodleCreationUi right away, and the
                             // doodle build (awaitAnchorTransform, the ORB/SuperPoint pass, the
                             // close-ups) carries on in the background. There is deliberately NO spinner
                             // or "Saving target" cover here: the artist can keep using the AR overlay
                             // while the wall is learned, and the only indicator is the close-up progress
-                            // bar at the top of the screen (MainScreen). isConfirmingTarget still blocks
+                            // bar at the top of the screen (MainScreen). isConfirmingDoodle still blocks
                             // a SECOND capture from racing the save (see its uses).
 
                             // isAnchorEstablished means ARCore made an anchor. It says NOTHING about
@@ -1540,24 +1540,24 @@ class MainActivity : AppCompatActivity() {
                             // Gate on the thing that actually has to exist.
                             val basePostTargetVisible = arUiState.isAnchorEstablished
                                     && editorUiState.design == null
-                                    && !mainUiState.isCapturingTarget
+                                    && !mainUiState.isCapturingDoodle
                                     && editorUiState.editorMode == EditorMode.AR
                                     && !showLibrary && !showSettings
                             val hasWallDoodle = arUiState.wallDoodlePoints > 0
                             if (basePostTargetVisible && !hasWallDoodle) {
-                                TargetIncompleteOverlay(
+                                DoodleIncompleteOverlay(
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
                                         .padding(bottom = 140.dp)
                                 )
                             }
                             // With a doodle there is nothing to add here: the rail's guidance callout
-                            // (gx.hasTarget -> gx.arReady) is the one "now open a design" instruction.
+                            // (gx.hasDoodle -> gx.arReady) is the one "now open a design" instruction.
 
                             val showProgress = editorUiState.editorMode == EditorMode.AR
                                     && arUiState.isAnchorEstablished
                                     && arUiState.paintingProgress > 0.01f
-                                    && !mainUiState.isCapturingTarget
+                                    && !mainUiState.isCapturingDoodle
                                     && !showLibrary && !showSettings
                             if (showProgress) {
                                 // TopEnd is RelocStatusBadge's corner (below), and both can be visible
@@ -1664,21 +1664,21 @@ class MainActivity : AppCompatActivity() {
                                     arUiState.fusionDiagnostics.state in setOf(
                                         FusionState.COLD_SNAP, FusionState.BLENDING, FusionState.HOLDING
                                     )
-                                if (mainUiState.hasArCoreTarget == true && !relocLocked) {
+                                if (mainUiState.hasArCoreDoodle == true && !relocLocked) {
                                     // A saved target exists but is not matched: say so, point the
                                     // artist the way the saved compass attitude says, and after a
                                     // while offer to recapture. Sensors run only while this is shown.
-                                    SavedTargetSearchStatus(
-                                        savedQuaternion = mainUiState.savedTargetQuaternion,
-                                        savedMagneticAccuracy = mainUiState.savedTargetMagneticAccuracy,
-                                        targetKey = mainUiState.loadedProjectId,
-                                        canRecapture = !mainUiState.isConfirmingTarget &&
-                                            !mainUiState.isCapturingTarget && !mainUiState.isWaitingForTap,
+                                    SavedDoodleSearchStatus(
+                                        savedQuaternion = mainUiState.savedDoodleQuaternion,
+                                        savedMagneticAccuracy = mainUiState.savedDoodleMagneticAccuracy,
+                                        doodleSearchKey = mainUiState.loadedProjectId,
+                                        canRecapture = !mainUiState.isConfirmingDoodle &&
+                                            !mainUiState.isCapturingDoodle && !mainUiState.isWaitingForTap,
                                         onRecapture = {
                                             // Same effect as the rail's Target item.
                                             arViewModel.clearCaptureForRetry()
                                             arViewModel.cancelMeasure()
-                                            mainViewModel.startTargetCapture()
+                                            mainViewModel.startDoodleCapture()
                                         },
                                         modifier = Modifier
                                             .align(Alignment.TopEnd)
@@ -1764,7 +1764,7 @@ class MainActivity : AppCompatActivity() {
                             // is it missing" is the question an artist in the field needs answered,
                             // and it was only reachable through logcat on a debug build.
                             if (editorUiState.showDiagOverlay && editorUiState.editorMode == EditorMode.AR &&
-                                !showLibrary && !showSettings && !mainUiState.isCapturingTarget) {
+                                !showLibrary && !showSettings && !mainUiState.isCapturingDoodle) {
                                 RelocDiagnosticsOverlay(
                                     diagnostics = arUiState.relocDiagnostics,
                                     corroboration = arUiState.corroborationDiagnostics,
@@ -1798,7 +1798,7 @@ class MainActivity : AppCompatActivity() {
 
                             // Dev/eval overlay: debug builds only, and off unless the user opts in
                             // via the Diagnostic Overlay setting (hidden by default).
-                            if (EVAL_OVERLAY_ENABLED && editorUiState.showDiagOverlay && editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && !mainUiState.isCapturingTarget) {
+                            if (EVAL_OVERLAY_ENABLED && editorUiState.showDiagOverlay && editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && !mainUiState.isCapturingDoodle) {
                                 EvalOverlay(
                                     metrics = arUiState.evalLiveMetrics,
                                     onStartRecord = { arViewModel.evalStartRecording() },
@@ -1890,21 +1890,21 @@ class MainActivity : AppCompatActivity() {
                                 )
                             }
 
-                            // No separate "just tap the screen" hint here: TargetCreationUi's own card is the one
+                            // No separate "just tap the screen" hint here: DoodleCreationUi's own card is the one
                             // instruction while a capture is up (the guidance graph is suppressed for it too).
-                            if (mainUiState.isCapturingTarget) {
-                                TargetCreationUi(
+                            if (mainUiState.isCapturingDoodle) {
+                                DoodleCreationUi(
                                     rawBitmap = arUiState.tempCaptureBitmap,
                                     annotatedBitmap = arUiState.annotatedCaptureBitmap,
                                     // Confirm reads the mask AFTER the queued mark erases are applied,
                                     // not from this composition's snapshot.
-                                    latestCapture = { arViewModel.awaitLatestTargetCapture() },
+                                    latestCapture = { arViewModel.awaitLatestDoodleCapture() },
                                     captureStep = mainUiState.captureStep,
                                     isWaitingForTap = mainUiState.isWaitingForTap,
                                     hasCleanWall = arUiState.hasCleanWall,
                                     onCleanWallPhoto = { arViewModel.requestCleanWallPhoto() },
                                     strings = strings,
-                                    onConfirmTarget = { bitmap, mask ->
+                                    onConfirmDoodle = { bitmap, mask ->
                                         if (
                                             arUiState.sphereSlamRuntimeStatus.mode ==
                                                 com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.STANDALONE
@@ -1916,28 +1916,28 @@ class MainActivity : AppCompatActivity() {
                                             )
                                         } else {
                                             arViewModel.setInitialAnchorFromCapture()
-                                            mainViewModel.onConfirmTargetCreation(
+                                            mainViewModel.onConfirmDoodleCreation(
                                                 bitmap,
                                                 mask,
-                                                arUiState.targetDepthBuffer,
-                                                arUiState.targetDepthBufferWidth,
-                                                arUiState.targetDepthBufferHeight,
-                                                arUiState.targetDepthStride,
-                                                arUiState.targetIntrinsics,
-                                                arUiState.targetCaptureViewMatrix,
-                                                arUiState.targetWallPlane,
+                                                arUiState.doodleDepthBuffer,
+                                                arUiState.doodleDepthBufferWidth,
+                                                arUiState.doodleDepthBufferHeight,
+                                                arUiState.doodleDepthStride,
+                                                arUiState.doodleCaptureIntrinsics,
+                                                arUiState.doodleCaptureViewMatrix,
+                                                arUiState.doodleCaptureWallPlane,
                                                 // rotationNeeded, as recorded at capture. The bitmap
                                                 // and intrinsics above were already rotated by it; the
                                                 // view matrix now follows (Phase 0, convention B).
-                                                arUiState.targetDisplayRotation,
-                                                arUiState.targetCaptureEnvironment,
+                                                arUiState.doodleDisplayRotation,
+                                                arUiState.doodleCaptureEnvironment,
                                             )
                                         }
                                     },
                                     onRetake = {
                                         mainViewModel.onRetakeCapture()
                                         // clearCaptureForRetry (not clearTapHighlights) — it also nulls
-                                        // tempCaptureBitmap/annotatedCaptureBitmap/targetWallPlane.
+                                        // tempCaptureBitmap/annotatedCaptureBitmap/doodleCaptureWallPlane.
                                         // Without that, the LaunchedEffect above sees the SAME rejected
                                         // capture still non-null and immediately re-fires straight back
                                         // to Review with the identical bitmap: Retake was a no-op loop.
@@ -2208,7 +2208,7 @@ class MainActivity : AppCompatActivity() {
             uiState = uiState,
             isTouchLocked = mainUiState.isTouchLocked,
             strings = strings,
-            isCapturingTarget = mainUiState.isCapturingTarget
+            isCapturingDoodle = mainUiState.isCapturingDoodle
         )
     }
 
@@ -2242,8 +2242,8 @@ class MainActivity : AppCompatActivity() {
         coopState: CoopSessionState = CoopSessionState.Idle,
         isTouchLocked: Boolean,
         isWaitingForTap: Boolean = false,
-        isCapturingTarget: Boolean = false,
-        isConfirmingTarget: Boolean = false,
+        isCapturingDoodle: Boolean = false,
+        isConfirmingDoodle: Boolean = false,
         isOverlayGyroActive: Boolean = false,
         onShowJoinScanner: () -> Unit = {},
         onWallPhoto: () -> Unit = {},
@@ -2437,15 +2437,15 @@ class MainActivity : AppCompatActivity() {
                     // disabled, reason-labelled button): if it can't act, it isn't on the rail.
                     val standaloneGuest =
                         arRailPolicy.standalone && arUiState.coopRole == CoopRole.GUEST
-                    if (arRailPolicy.targetRailEnabled && !standaloneGuest) azRailSubItem(
-                        id = "target.create",
-                        hostId = railHostOf("target.create"),
+                    if (arRailPolicy.doodleRailEnabled && !standaloneGuest) azRailSubItem(
+                        id = "doodle.create",
+                        hostId = railHostOf("doodle.create"),
                         text = navStrings.grid,
                         color = navItemColor,
                         classifiers = setOf("toggle"),
                         shape = AzButtonShape.NONE,
                         // Not while a confirmed target is still saving: a second capture would race it.
-                        disabled = showLibrary || isConfirmingTarget,
+                        disabled = showLibrary || isConfirmingDoodle,
                         onClick = {
                             if (isWaitingForTap) {
                                 mainViewModel.cancelTapMode()
@@ -2459,7 +2459,7 @@ class MainActivity : AppCompatActivity() {
                                 arViewModel.clearCaptureForRetry()
                                 // Target and Measure both own screen taps; only one at a time.
                                 arViewModel.cancelMeasure()
-                                mainViewModel.startTargetCapture()
+                                mainViewModel.startDoodleCapture()
                             } else {
                                 requestPermissions()
                             }
@@ -2492,7 +2492,7 @@ class MainActivity : AppCompatActivity() {
                     // Hidden while a target capture is under way: both own screen taps.
                     if (
                         arUiState.isAnchorEstablished && arUiState.measureAvailable &&
-                        !arRailPolicy.standalone && !isCapturingTarget
+                        !arRailPolicy.standalone && !isCapturingDoodle
                     ) azRailSubItem(
                         id = "mode.ar.measure",
                         hostId = railHostOf("mode.ar.measure"),
@@ -2844,7 +2844,7 @@ class MainActivity : AppCompatActivity() {
 
             if (isDesignMode) azHighlight("item.open", active = Cyan)
             if (editorUiState.editorMode == EditorMode.AR) {
-                if (isWaitingForTap) azHighlight("target.create", active = Cyan)
+                if (isWaitingForTap) azHighlight("doodle.create", active = Cyan)
                 if (arUiState.isFlashlightOn) azHighlight("mode.ar.light", active = Cyan)
                 if (arUiState.measure.active) azHighlight("mode.ar.measure", active = Cyan)
                 if (editorUiState.modeAdjustments[EditorMode.AR]?.isTransformLocked == true)
@@ -3687,7 +3687,7 @@ private fun DiagnosticRow(label: String, value: String, color: Color) {
  * doesn't work".
  */
 @Composable
-private fun TargetIncompleteOverlay(modifier: Modifier = Modifier) {
+private fun DoodleIncompleteOverlay(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .background(Color(0xEE1A1A1A), RoundedCornerShape(20.dp))
@@ -3874,27 +3874,27 @@ private fun MeasurePanel(
 /**
  * Status for "this project has a saved ARCore target but it is not matched yet".
  *
- * "Looking for your target..." first; after [TargetSearchPhase.HINT] a second line with a coarse
+ * "Looking for your target..." first; after [DoodleSearchPhase.HINT] a second line with a coarse
  * turn/tilt hint from the compass attitude saved with the target (a sensor prior only; it cannot
- * place the overlay); after [TargetSearchPhase.OFFER_RECAPTURE] a Recapture button. The
+ * place the overlay); after [DoodleSearchPhase.OFFER_RECAPTURE] a Recapture button. The
  * TYPE_ROTATION_VECTOR listener is registered only while this composable is shown and updates state
  * at most ~5 Hz, and only when the (5-degree-rounded) hint changes.
  */
 @Composable
-private fun SavedTargetSearchStatus(
+private fun SavedDoodleSearchStatus(
     savedQuaternion: List<Float>?,
     savedMagneticAccuracy: Int,
-    targetKey: String?,
+    doodleSearchKey: String?,
     canRecapture: Boolean,
     onRecapture: () -> Unit,
     modifier: Modifier = Modifier,
     strings: AppStrings
 ) {
     val context = LocalContext.current
-    var hint by remember(targetKey) {
-        mutableStateOf<TargetSearchHint>(TargetSearchHint.Unknown(TargetSearchHint.Reason.NO_LIVE_ATTITUDE))
+    var hint by remember(doodleSearchKey) {
+        mutableStateOf<DoodleSearchHint>(DoodleSearchHint.Unknown(DoodleSearchHint.Reason.NO_LIVE_ATTITUDE))
     }
-    var phase by remember(targetKey) { mutableStateOf(TargetSearchPhase.LOOKING) }
+    var phase by remember(doodleSearchKey) { mutableStateOf(DoodleSearchPhase.LOOKING) }
 
     DisposableEffect(context, savedQuaternion, savedMagneticAccuracy) {
         val sm = context.getSystemService(android.content.Context.SENSOR_SERVICE) as? android.hardware.SensorManager
@@ -3905,8 +3905,8 @@ private fun SavedTargetSearchStatus(
                 val now = android.os.SystemClock.elapsedRealtime()
                 if (now - lastMs < 200L) return
                 lastMs = now
-                val live = TargetSearchHintMath.quaternionFromSensorValues(event.values)
-                val next = TargetSearchHintMath.compute(savedQuaternion, savedMagneticAccuracy, live, event.accuracy)
+                val live = DoodleSearchHintMath.quaternionFromSensorValues(event.values)
+                val next = DoodleSearchHintMath.compute(savedQuaternion, savedMagneticAccuracy, live, event.accuracy)
                 if (next != hint) hint = next
             }
             override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) {}
@@ -3917,18 +3917,18 @@ private fun SavedTargetSearchStatus(
         onDispose { sm?.unregisterListener(listener) }
     }
 
-    LaunchedEffect(targetKey) {
-        val tracker = TargetSearchPhaseTracker({ android.os.SystemClock.elapsedRealtime() })
+    LaunchedEffect(doodleSearchKey) {
+        val tracker = DoodleSearchPhaseTracker({ android.os.SystemClock.elapsedRealtime() })
         while (true) {
-            phase = tracker.update(searching = true, targetKey = targetKey)
+            phase = tracker.update(searching = true, doodleSearchKey = doodleSearchKey)
             kotlinx.coroutines.delay(500L)
         }
     }
 
-    val hintText: String? = if (phase == TargetSearchPhase.LOOKING) null else when (val h = hint) {
-        is TargetSearchHint.Unknown -> null
-        is TargetSearchHint.Aligned -> strings.ar.relocFacingIt
-        is TargetSearchHint.Adjust -> listOfNotNull(
+    val hintText: String? = if (phase == DoodleSearchPhase.LOOKING) null else when (val h = hint) {
+        is DoodleSearchHint.Unknown -> null
+        is DoodleSearchHint.Aligned -> strings.ar.relocFacingIt
+        is DoodleSearchHint.Adjust -> listOfNotNull(
             when {
                 h.turnDeg > 0 -> strings.ar.relocTurnRight(h.turnDeg)
                 h.turnDeg < 0 -> strings.ar.relocTurnLeft(-h.turnDeg)
@@ -3942,7 +3942,7 @@ private fun SavedTargetSearchStatus(
         ).joinToString(" \u00B7 ").ifEmpty { null }
     }
 
-    val infinite = rememberInfiniteTransition(label = "saved_target_search")
+    val infinite = rememberInfiniteTransition(label = "saved_doodle_search")
     val pulse by infinite.animateFloat(
         initialValue = 0.4f, targetValue = 1f, label = "pulse",
         animationSpec = infiniteRepeatable(animation = tween(700, easing = LinearEasing), repeatMode = RepeatMode.Reverse)
@@ -3964,7 +3964,7 @@ private fun SavedTargetSearchStatus(
         if (hintText != null) {
             Text(hintText, fontSize = 12.sp, color = Color(0xFFE0E0E0))
         }
-        if (phase == TargetSearchPhase.OFFER_RECAPTURE) {
+        if (phase == DoodleSearchPhase.OFFER_RECAPTURE) {
             androidx.compose.material3.TextButton(onClick = onRecapture, enabled = canRecapture) {
                 Text(strings.ar.relocRecapture, fontSize = 12.sp, color = Color.Cyan)
             }
