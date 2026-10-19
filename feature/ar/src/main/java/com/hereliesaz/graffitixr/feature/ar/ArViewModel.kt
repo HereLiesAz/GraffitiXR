@@ -1850,8 +1850,8 @@ class ArViewModel @Inject constructor(
     // viewModelScope's Main.immediate runs the rest synchronously inside the constructor, so code it
     // reaches can execute before any property declared further down the class is initialized. A
     // non-null holder read that early is null: monocularDepthMutex was, and the 1.48.44.1 startup
-    // crash was its NPE in reconcileMonocularDepth. A nullable one declared below would be
-    // overwritten by its own `= null` initializer after init had already set it.
+    // crash was its NPE in reconcileMonocularDepth. (A `= null` initializer is harmless either way:
+    // Kotlin emits none for a default value. A non-default one, like `= -1`, would overwrite.)
 
     // ArAvailabilityChecker's verdict, resolved once per process (a later ARCore install isn't
     // auto-detected). Cached so a "Use ARCore" toggle re-derives the backend without re-running the
@@ -1868,6 +1868,21 @@ class ArViewModel @Inject constructor(
     // and its capture keys: written from the GL thread (renderer callbacks) and read from the
     // project collector.
     private val hybridLock = Any()
+
+    // System-throttle monitoring (see startSystemThrottleMonitoring), declared above the init block
+    // that starts it. Declared further down, a recomputeSystemThrottle() during construction read
+    // batteryPct as 0 (a real 0%, so the lowest battery tier) instead of -1 (unknown), and the tier
+    // thresholds as 0, until a later recompute. (The `= null` holders were never at risk: Kotlin
+    // emits no initializer for a default value, so the registration init makes is kept.)
+    private var thermalListener: android.os.PowerManager.OnThermalStatusChangedListener? = null
+    private var powerReceiver: android.content.BroadcastReceiver? = null
+    @Volatile private var thermalHot = false
+    @Volatile private var batteryLow = false
+    /** Live battery level [0..100], or -1 when unknown. Sampled from ACTION_BATTERY_CHANGED. */
+    @Volatile private var batteryPct = -1
+    /** Battery-level thresholds (%) for the medium / low degradation tiers. */
+    private val BATTERY_TIER_MED = 30
+    private val BATTERY_TIER_LOW = 15
 
     init {
         NativeLibLoader.loadAll()
@@ -6552,15 +6567,8 @@ class ArViewModel @Inject constructor(
         get() = appContext.getSystemService(android.os.PowerManager::class.java)
     private val batteryManager: android.os.BatteryManager?
         get() = appContext.getSystemService(android.os.BatteryManager::class.java)
-    private var thermalListener: android.os.PowerManager.OnThermalStatusChangedListener? = null
-    private var powerReceiver: android.content.BroadcastReceiver? = null
-    @Volatile private var thermalHot = false
-    @Volatile private var batteryLow = false
-    /** Live battery level [0..100], or -1 when unknown. Sampled from ACTION_BATTERY_CHANGED. */
-    @Volatile private var batteryPct = -1
-    /** Battery-level thresholds (%) for the medium / low degradation tiers. */
-    private val BATTERY_TIER_MED = 30
-    private val BATTERY_TIER_LOW = 15
+    // The throttle-monitoring state (thermalListener … BATTERY_TIER_LOW) is declared above the init
+    // block that registers it; see the note there.
 
     /**
      * Folds device-stress signals into the AR rate policy. The existing perception floor (30fps via
