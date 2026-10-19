@@ -3401,6 +3401,9 @@ bool MobileGS::autoFitDesign(float* out5) {
     // version of the design (a stencil, a posterized fill, a sketch) is found by that filter's set.
     struct FitSet { std::vector<cv::Point2f> pts; cv::Mat descs; };
     std::vector<FitSet> sets;
+    // A design registered just now is still having its filter sets built; the slow filters (sketch,
+    // stencil) finish last and may be the only ones that find the paint. Wait for that build.
+    joinFilterBuild();
     {
         std::lock_guard<std::mutex> lock(mMutex);
         if (mCaptureRgb.empty() || mArtworkGray.empty() || !mHasDesignPlacement ||
@@ -3495,6 +3498,16 @@ bool MobileGS::autoFitDesign(float* out5) {
         if (n >= 15 && n * 4 >= (int)src.size() && n > bestInl) { bestInl = n; bestM = M; }
     }
     if (bestM.empty()) return false;
+    // The fit is relative to the placement snapshotted above. A placement moved while matching would
+    // have it applied to the wrong transform.
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        if (!mHasDesignPlacement || mDesignHalfW != halfW || mDesignHalfH != halfH ||
+            memcmp(mDesignFpFromDesign, fpFromDesign, sizeof(fpFromDesign)) != 0) {
+            LOGI("autoFitDesign: the placement moved while matching; fit dropped");
+            return false;
+        }
+    }
     const double a = bestM.at<double>(0, 0), b = bestM.at<double>(1, 0);
     const double k = std::sqrt(a * a + b * b);
     if (!(k > 0.05 && k < 20.0)) return false;

@@ -875,7 +875,8 @@ public:
      * on the wall). Matches the capture photo against the Doodle builder's design features -- the
      * artwork's own, each design filter's target set (mTargetSets), and the inverted design, since
      * paint rarely keeps the design's colours -- takes the set with the most inliers, back-projects the photo side onto the wall plane, and solves
-     * a RANSAC similarity in the CURRENT design's local frame. out5 = {dx, dy (m), dTheta (rad, CCW
+     * a RANSAC similarity in the CURRENT design's local frame. Waits for a filter build in flight, and
+     * returns no fit when the placement moved while matching. out5 = {dx, dy (m), dTheta (rad, CCW
      * in the design plane), scale ratio, inliers}. Returns false when there is no confident fit.
      */
     bool autoFitDesign(float* out5);

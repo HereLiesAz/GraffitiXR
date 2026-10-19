@@ -2515,7 +2515,10 @@ class MainActivity : AppCompatActivity() {
                             // Fit the design to paint already on the wall, or say that nothing
                             // matched. Never a resize to a guess, never a tone change.
                             if (!editorViewModel.arPlacementLocked()) {
+                                // The fit is relative to the placement at the tap; moved since, it is dropped.
+                                val placedAtTap = editorViewModel.uiState.value.modeAdjustments[EditorMode.AR]
                                 arViewModel.alignToPaint { fit ->
+                                    if (editorViewModel.uiState.value.modeAdjustments[EditorMode.AR] != placedAtTap) return@alignToPaint
                                     val applied = fit != null &&
                                         editorViewModel.applyArFit(fit.dx, fit.dy, fit.dThetaRad, fit.scale)
                                     // Pinned while matching: the locked notice, not a success.

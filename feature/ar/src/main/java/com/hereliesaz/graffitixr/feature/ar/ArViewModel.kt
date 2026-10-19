@@ -5234,8 +5234,9 @@ class ArViewModel @Inject constructor(
     /**
      * Align: fit the design to paint already on the wall (the same native match the automatic fit
      * runs), on demand. [onResult] gets the fit, or null when there is no match (bare wall, no capture
-     * photo, standalone page frame, too few agreeing features); it runs on the main thread. A tap
-     * while one is matching is ignored: two fits from the same placement would both be applied. The
+     * photo, standalone page frame, too few agreeing features, the placement moved while matching);
+     * it runs on the main thread. A tap while a match (this one or the automatic fit) is running is
+     * ignored: two fits from the same placement would both be applied. The
      * fit is only reported for the design that is registered: a registration in flight is waited out,
      * and a design that changed during the match voids the result. A success also disarms the
      * automatic fit, which would only repeat it.
@@ -5262,11 +5263,17 @@ class ArViewModel @Inject constructor(
 
     private fun tryAutoFit() {
         if (!autoFitArmed) return
+        // Shares Align's single flight: two matches from the same placement would both be applied.
+        if (!alignInFlight.compareAndSet(false, true)) return   // stays armed: retried on the next placement change
         viewModelScope.launch(Dispatchers.IO) {
-            val r = slamManager.autoFitDesign() ?: return@launch   // stays armed: retried on the next placement change
-            autoFitArmed = false
-            _designFits.tryEmit(DesignFit(r[0], r[1], r[2], r[3]))
-            Timber.i("Auto-fit applied: ${r[4].toInt()} inliers")
+            try {
+                val r = slamManager.autoFitDesign() ?: return@launch   // stays armed: retried on the next placement change
+                autoFitArmed = false
+                _designFits.tryEmit(DesignFit(r[0], r[1], r[2], r[3]))
+                Timber.i("Auto-fit applied: ${r[4].toInt()} inliers")
+            } finally {
+                alignInFlight.set(false)
+            }
         }
     }
 
