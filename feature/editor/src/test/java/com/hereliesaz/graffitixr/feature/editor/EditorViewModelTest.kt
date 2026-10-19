@@ -901,63 +901,15 @@ class EditorViewModelTest {
         )
 
     @Test
-    fun `Align in AR fits only the AR adjustment to the anchor and emits it`() = runTest {
-        // Quad half-width 0.5 m at scale 1; the 100x100 test bitmap makes the quad 0.5 x 0.5 m.
-        currentProjectFlow.value = GraffitiProject(id = "test-project", arDesignHalfWidthM = 0.5f)
-        testDispatcher.scheduler.advanceUntilIdle()
+    fun `Align refuses a pinned AR placement and shows the locked notice`() = runTest {
         viewModel.setEditorMode(EditorMode.AR)
         addDesign()
-        val designBefore = viewModel.uiState.value.design!!
-        viewModel.setAnchorExtent(1.0f, 0.25f)
-        io.mockk.clearMocks(opEmitter, answers = false)
-
-        assertEquals(AlignToAnchorResult.FITTED, viewModel.alignToAnchor())
+        assertFalse(viewModel.arPlacementLocked())
+        viewModel.onToggleModeTransformLocked(EditorMode.AR)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        val ar = viewModel.uiState.value.modeAdjustments[EditorMode.AR]!!
-        // 80% of the tighter axis: 0.8 * min(1.0 / 0.5, 0.25 / 0.5) = 0.4
-        assertEquals(0.4f, ar.scale, 1e-4f)
-        assertEquals(0f, ar.offsetX, 0f)
-        assertEquals(0f, ar.offsetY, 0f)
-        val designAfter = viewModel.uiState.value.design!!
-        assertEquals("the global design transform must not move", designBefore.scale, designAfter.scale, 0f)
-        assertEquals(designBefore.offset, designAfter.offset)
-        io.mockk.verify(exactly = 1) { opEmitter.emit(modeOp(EditorMode.AR)) }
-
-        viewModel.onUndoClicked()
-        testDispatcher.scheduler.advanceUntilIdle()
-        assertEquals(1f, viewModel.uiState.value.modeAdjustments[EditorMode.AR]?.scale ?: 1f, 1e-4f)
-    }
-
-    @Test
-    fun `Align outside AR or without an anchor moves nothing and changes no tone`() = runTest {
-        currentProjectFlow.value = GraffitiProject(id = "test-project", arDesignHalfWidthM = 0.5f)
-        testDispatcher.scheduler.advanceUntilIdle()
-        viewModel.setEditorMode(EditorMode.OVERLAY)
-        addDesign()
-        viewModel.setAnchorExtent(1.0f, 1.0f)
-        io.mockk.clearMocks(opEmitter, answers = false)
-
-        assertEquals(AlignToAnchorResult.NO_ANCHOR, viewModel.alignToAnchor())
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        val overlay = viewModel.uiState.value.modeAdjustments[EditorMode.OVERLAY] ?: ModeAdjustment()
-        assertEquals("Align is not a tone lift", 1f, overlay.contrast, 0f)
-        assertEquals(1f, overlay.scale, 0f)
-        io.mockk.verify(exactly = 0) { opEmitter.emit(any()) }
-    }
-
-    @Test
-    fun `the anchor extent Align fits to is restored from the project on load`() = runTest {
-        currentProjectFlow.value = GraffitiProject(
-            id = "other-project", arDesignHalfWidthM = 0.5f, anchorHalfExtentM = listOf(1.0f, 0.25f),
-        )
-        testDispatcher.scheduler.advanceUntilIdle()
-        viewModel.setEditorMode(EditorMode.AR)
-        addDesign()
-
-        assertEquals(AlignToAnchorResult.FITTED, viewModel.alignToAnchor())
-        assertEquals(0.4f, viewModel.uiState.value.modeAdjustments[EditorMode.AR]!!.scale, 1e-4f)
+        assertTrue(viewModel.arPlacementLocked())
+        assertTrue(viewModel.uiState.value.showLockedFeedback)
     }
 
     @Test

@@ -333,8 +333,7 @@
     <string name="adj_redo">Rehacer</string>
     <string name="adj_magic_align">Alinear</string>
     <string name="align_done_paint">Alineado con la pintura de la pared.</string>
-    <string name="align_done_doodle">Aún no hay pintura que coincida, así que el diseño se ajustó a tu Garabato.</string>
-    <string name="align_unavailable">Captura primero un Garabato y luego alinea.</string>
+    <string name="align_unavailable">Aún no hay pintura en la pared que coincida con el diseño.</string>
 
     <!-- Overlays & Status -->
     <string name="status_create_grid">Crea una Cuadrícula para comenzar.</string>

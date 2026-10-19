@@ -338,8 +338,7 @@
     <string name="adj_redo">Повторить</string>
     <string name="adj_magic_align">Выровнять</string>
     <string name="align_done_paint">Выровнено по краске на стене.</string>
-    <string name="align_done_doodle">Совпадающей краски пока нет, поэтому дизайн подогнан под ваши Каракули.</string>
-    <string name="align_unavailable">Сначала снимите Каракули, затем выровняйте.</string>
+    <string name="align_unavailable">На стене пока нет краски, совпадающей с дизайном.</string>
 
 
     <string name="status_create_grid">Для начала создайте сетку.</string>

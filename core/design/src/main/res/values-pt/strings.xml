@@ -333,8 +333,7 @@
     <string name="adj_redo">Refazer</string>
     <string name="adj_magic_align">Alinhar</string>
     <string name="align_done_paint">Alinhado à tinta na parede.</string>
-    <string name="align_done_doodle">Ainda não há tinta correspondente, então o design foi ajustado ao seu Rabisco.</string>
-    <string name="align_unavailable">Capture um Rabisco primeiro e depois alinhe.</string>
+    <string name="align_unavailable">Ainda não há tinta na parede que corresponda ao design.</string>
 
     <!-- Overlays & Status -->
     <string name="status_create_grid">Crie uma Grade para iniciar.</string>

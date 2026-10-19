@@ -333,8 +333,7 @@
     <string name="adj_redo">Wiederholen</string>
     <string name="adj_magic_align">Ausrichten</string>
     <string name="align_done_paint">An der Farbe auf der Wand ausgerichtet.</string>
-    <string name="align_done_doodle">Noch keine passende Farbe – das Design wurde an deine Kritzelei angepasst.</string>
-    <string name="align_unavailable">Erfasse zuerst eine Kritzelei, dann richte aus.</string>
+    <string name="align_unavailable">Noch keine Farbe auf der Wand passt zum Design.</string>
 
     <!-- Overlays & Status -->
     <string name="status_create_grid">Erstellen Sie ein Raster, um zu beginnen.</string>

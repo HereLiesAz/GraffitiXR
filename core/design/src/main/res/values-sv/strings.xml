@@ -338,8 +338,7 @@
     <string name="adj_redo">Göra om</string>
     <string name="adj_magic_align">Rikta in</string>
     <string name="align_done_paint">Inriktad efter färgen på väggen.</string>
-    <string name="align_done_doodle">Ingen matchande färg än, så designen anpassades till din Krumelur.</string>
-    <string name="align_unavailable">Fånga en Krumelur först och rikta sedan in.</string>
+    <string name="align_unavailable">Ingen färg på väggen matchar designen än.</string>
 
 
     <string name="status_create_grid">Skapa ett rutnät för att börja.</string>

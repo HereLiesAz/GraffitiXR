@@ -5617,7 +5617,6 @@ class ArViewModel @Inject constructor(
                         doodleCaptureIntrinsics = null,
                         doodleCaptureViewMatrix = null,
                         doodleCaptureWallPlane = null,
-                        targetPhysicalExtent = null,
                         tempCaptureBitmap = reviewBitmap,
                         annotatedCaptureBitmap = markings,
                         unwarpPoints = initialPoints,
@@ -5816,7 +5815,6 @@ class ArViewModel @Inject constructor(
                         doodleCaptureIntrinsics = intrinsics,
                         doodleCaptureViewMatrix = viewMatrix,
                         doodleCaptureWallPlane = wallPlane,
-                        targetPhysicalExtent = extent,
                         isCaptureRequested = false,
                         tempCaptureBitmap = rotatedBmp,
                         annotatedCaptureBitmap = markings,
@@ -5840,7 +5838,6 @@ class ArViewModel @Inject constructor(
                         doodleCaptureIntrinsics = intrinsics,
                         doodleCaptureViewMatrix = viewMatrix,
                         doodleCaptureWallPlane = wallPlane,
-                        targetPhysicalExtent = extent,
                         isCaptureRequested = false
                     )
                 }

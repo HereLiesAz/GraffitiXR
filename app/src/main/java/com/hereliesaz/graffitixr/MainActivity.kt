@@ -1518,12 +1518,6 @@ class MainActivity : AppCompatActivity() {
                                 )
                             }
 
-                            LaunchedEffect(arUiState.targetPhysicalExtent) {
-                                arUiState.targetPhysicalExtent?.let { (w, h) ->
-                                    editorViewModel.setAnchorExtent(w, h)
-                                }
-                            }
-
                             // Confirming a target unmounts DoodleCreationUi right away, and the
                             // doodle build (awaitAnchorTransform, the ORB/SuperPoint pass, the
                             // close-ups) carries on in the background. There is deliberately NO spinner
@@ -2506,8 +2500,7 @@ class MainActivity : AppCompatActivity() {
                             arViewModel.toggleMeasure()
                         },
                     )
-                    // Align — fit the design to paint already on the wall (ArViewModel.alignToPaint), else to
-                    // the Doodle's anchor border (EditorViewModel.alignToAnchor).
+                    // Align — fit the design to paint already on the wall (ArViewModel.alignToPaint).
                     azRailSubItem(
                         id = "mode.ar.magic",
                         hostId = railHostOf("mode.ar.magic"),
@@ -2516,21 +2509,15 @@ class MainActivity : AppCompatActivity() {
                         shape = AzButtonShape.NONE,
                         disabled = showLibrary,
                         onClick = {
-                            // Paint already on the wall first; failing that, the Doodle's anchor
-                            // border; failing that, say why nothing moved. Never a tone change.
+                            // Fit the design to paint already on the wall, or say that nothing
+                            // matched. Never a resize to a guess, never a tone change.
                             if (!editorViewModel.arPlacementLocked()) {
                                 arViewModel.alignToPaint { fit ->
-                                    val msg = if (fit != null) {
+                                    if (fit != null) {
                                         editorViewModel.applyArFit(fit.dx, fit.dy, fit.dThetaRad, fit.scale)
-                                        DesignR.string.align_done_paint
-                                    } else when (editorViewModel.alignToAnchor()) {
-                                        com.hereliesaz.graffitixr.feature.editor.AlignToAnchorResult.FITTED ->
-                                            DesignR.string.align_done_doodle
-                                        com.hereliesaz.graffitixr.feature.editor.AlignToAnchorResult.LOCKED -> null
-                                        com.hereliesaz.graffitixr.feature.editor.AlignToAnchorResult.NO_ANCHOR ->
-                                            DesignR.string.align_unavailable
                                     }
-                                    msg?.let { Toast.makeText(context, context.getString(it), Toast.LENGTH_SHORT).show() }
+                                    val msg = if (fit != null) DesignR.string.align_done_paint else DesignR.string.align_unavailable
+                                    Toast.makeText(context, context.getString(msg), Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
