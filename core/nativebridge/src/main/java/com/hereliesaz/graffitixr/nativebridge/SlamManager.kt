@@ -200,9 +200,10 @@ class SlamManager @Inject constructor(
         hasAnchor = false
         sessionEpoch += 1
         _anchorGeneration.value = _anchorGeneration.value + 1
-        // The next session is another tracking world: the loaded doodle's capture view is not in it.
-        nativeMarkDoodleViewStale()
     }
+
+    /** The loaded doodle's capture view is from another tracking world (see MobileGS::mDoodleViewStale). */
+    fun markDoodleViewStale() = nativeMarkDoodleViewStale()
 
     /** The session epoch the loaded doodle was captured in; -1 for one loaded from a project. */
     @Volatile private var doodleViewEpoch = -1

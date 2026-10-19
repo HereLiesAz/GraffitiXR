@@ -4832,6 +4832,8 @@ class ArViewModel @Inject constructor(
         // `awaitAnchorTransform` returns immediately with the previous session's pose, which is the
         // identity-shaped bug it was written to prevent, wearing different numbers.
         slamManager.clearAnchorEstablished()
+        // The next session is another tracking world: the loaded doodle's capture view is not in it.
+        slamManager.markDoodleViewStale()
         // The partition's in-memory state belongs to the session that built it: the retained design
         // footprint is expressed relative to an anchor that is about to stop existing.
         latestDesignFootprint = null
