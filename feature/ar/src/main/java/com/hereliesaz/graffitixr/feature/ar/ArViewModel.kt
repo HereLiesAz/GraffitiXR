@@ -5229,17 +5229,78 @@ class ArViewModel @Inject constructor(
     @Volatile private var autoFitArmed = false
     @Volatile private var lastGuideKey: String? = null
 
-    private fun tryAutoFit() {
-        if (!autoFitArmed) return
+    private val alignInFlight = AtomicBoolean(false)
+
+    /**
+     * Align: fit the design to paint already on the wall (the same native match the automatic fit
+     * runs), on demand. [onResult] gets the fit, or null when there is no match (notReady: nothing to
+     * match yet -- no design, Doodle photo or placement -- rather than a match that failed) (bare wall, no capture
+     * photo, standalone page frame, too few agreeing features, the placement moved while matching);
+     * it runs on the main thread. A tap while a match (this one or the automatic fit) is running is
+     * ignored: two fits from the same placement would both be applied. The
+     * fit is only reported for the design that is registered: a registration in flight is waited out,
+     * and a design that changed during the match voids the result. A success also disarms the
+     * automatic fit, which would only repeat it.
+     */
+    fun alignToPaint(onResult: (fit: DesignFit?, notReady: Boolean) -> Unit) {
+        if (!alignInFlight.compareAndSet(false, true)) return
         viewModelScope.launch(Dispatchers.IO) {
-            val r = slamManager.autoFitDesign() ?: return@launch   // stays armed: retried on the next placement change
-            autoFitArmed = false
-            _designFits.tryEmit(DesignFit(r[0], r[1], r[2], r[3]))
-            Timber.i("Auto-fit applied: ${r[4].toInt()} inliers")
+            try {
+                val settled = kotlinx.coroutines.withTimeoutOrNull(ALIGN_REGISTRATION_WAIT_MS) {
+                    while (artworkRegInFlight.get() || pendingArtworkGuide.get() != null || !guideSettled()) kotlinx.coroutines.delay(50)
+                    true
+                } == true
+                val key = lastGuideKey
+                val guideAtStart = guideRequested.get()
+                val r = if (settled) slamManager.autoFitDesign(minimumEvidence = true) else null   // asked for: any possible fit
+                val notReady = !settled || (r == null && slamManager.lastAutoFitWasNotReady())
+                val current = key == lastGuideKey && guideRequested.get() == guideAtStart && guideSettled() &&
+                    !artworkRegInFlight.get() && pendingArtworkGuide.get() == null
+                val fit = if (current) r?.let { DesignFit(it[0], it[1], it[2], it[3]) } else null
+                if (fit != null) autoFitArmed = false
+                withContext(Dispatchers.Main) { onResult(fit, notReady) }
+            } finally {
+                alignInFlight.set(false)
+                if (autoFitRetryPending) tryAutoFit()
+            }
         }
     }
 
+    /** An automatic fit wanted while a match or a registration was running: run when that ends. */
+    @Volatile private var autoFitRetryPending = false
+
+    private fun tryAutoFit() {
+        if (!autoFitArmed) return
+        // A design still registering would be matched half-built (old features, no filter sets yet);
+        // updatePaintingGuide calls back here once it has registered.
+        if (artworkRegInFlight.get() || pendingArtworkGuide.get() != null || !guideSettled()) { autoFitRetryPending = true; return }
+        // Shares Align's single flight: two matches from the same placement would both be applied.
+        if (!alignInFlight.compareAndSet(false, true)) { autoFitRetryPending = true; return }
+        autoFitRetryPending = false
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val r = slamManager.autoFitDesign() ?: return@launch   // stays armed: retried on the next placement change
+                autoFitArmed = false
+                _designFits.tryEmit(DesignFit(r[0], r[1], r[2], r[3]))
+                Timber.i("Auto-fit applied: ${r[4].toInt()} inliers")
+            } finally {
+                alignInFlight.set(false)
+                if (autoFitRetryPending) tryAutoFit()
+            }
+        }
+    }
+
+    /**
+     * Guide registrations asked for, and the last one that finished. Equal means native holds the
+     * newest design asked for: a deferred one handed over to its registration is still unequal.
+     */
+    private val guideRequested = java.util.concurrent.atomic.AtomicLong(0)
+    @Volatile private var guideRegistered = 0L
+
+    private fun guideSettled() = guideRegistered == guideRequested.get()
+
     fun updatePaintingGuide(bitmap: Bitmap, designKey: String? = null) {
+        val request = guideRequested.incrementAndGet()
         if (designKey != null && designKey != lastGuideKey) {
             lastGuideKey = designKey
             autoFitArmed = true
@@ -5260,6 +5321,7 @@ class ArViewModel @Inject constructor(
             try {
                 slamManager.setArtworkDoodle(bitmap, null, 0, 0, 0, intr, view)
             } finally {
+                guideRegistered = maxOf(guideRegistered, request)
                 artworkRegInFlight.set(false)
             }
             drainPendingArtworkGuide()
@@ -5602,7 +5664,6 @@ class ArViewModel @Inject constructor(
                         doodleCaptureIntrinsics = null,
                         doodleCaptureViewMatrix = null,
                         doodleCaptureWallPlane = null,
-                        targetPhysicalExtent = null,
                         tempCaptureBitmap = reviewBitmap,
                         annotatedCaptureBitmap = markings,
                         unwarpPoints = initialPoints,
@@ -5801,7 +5862,6 @@ class ArViewModel @Inject constructor(
                         doodleCaptureIntrinsics = intrinsics,
                         doodleCaptureViewMatrix = viewMatrix,
                         doodleCaptureWallPlane = wallPlane,
-                        targetPhysicalExtent = extent,
                         isCaptureRequested = false,
                         tempCaptureBitmap = rotatedBmp,
                         annotatedCaptureBitmap = markings,
@@ -5825,7 +5885,6 @@ class ArViewModel @Inject constructor(
                         doodleCaptureIntrinsics = intrinsics,
                         doodleCaptureViewMatrix = viewMatrix,
                         doodleCaptureWallPlane = wallPlane,
-                        targetPhysicalExtent = extent,
                         isCaptureRequested = false
                     )
                 }
@@ -6298,6 +6357,9 @@ class ArViewModel @Inject constructor(
          * always [com.hereliesaz.graffitixr.feature.ar.rendering.OverlayRenderer.QUAD_HALF_EXTENT].
          */
         const val ANCHOR_BORDER_FRAME_FRACTION = 0.18f
+
+        /** Longest Align waits for a design registration in flight before giving up as "no match". */
+        const val ALIGN_REGISTRATION_WAIT_MS = 5_000L
 
         /**
          * How many new cloud points must accumulate since the last save before the autosave rewrites.

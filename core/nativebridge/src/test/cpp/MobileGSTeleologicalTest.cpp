@@ -493,6 +493,57 @@ TEST(MobileGSTeleological, PaintedDesignCorroboratesAndTheBareWallDoesNot) {
     EXPECT_LE(bare.g.corrobMatched() * 4, painted.g.corrobMatched()) << "the bare wall corroborated like paint";
 }
 
+// The Doodle is for reloc, never bare wall: a Doodle captured on a wall that already carries the
+// painted design must not veto that paint. (Bare wall comes only from a clean-wall photo; none here.)
+TEST(MobileGSTeleological, ADoodleOfPaintedWallDoesNotVetoThePaint) {
+    MobileGS g;
+    g.initialize(0, 0);
+    const float K[4] = {700.f, 700.f, 400.f, 300.f};
+    const cv::Mat bare = makeWall(800, 600, 0x51de), design = makeWall(800, 600, 0xbeef);
+    cv::Mat painted = bare.clone();
+    const cv::Rect mid(150, 100, 500, 400);
+    design(mid).copyTo(painted(mid));
+    doodleFrontalWall(g, painted, K);   // captured with the paint already up
+    g.setArtworkDoodle(design, nullptr, 0, 0, 0, nullptr, nullptr);
+    const float hw = 800.f / (2.0f * K[0]), hh = 600.f / (2.0f * K[1]);
+    const float place[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0.0f, 0.0f, 1.0f, 1};
+    g.setDesignPlacement(place, hw, hh);
+    g.setLiveIntrinsics(K);
+    g.setEvalSyncReloc(true, 1);
+    g.scheduleRelocCheck(painted);
+    ASSERT_EQ(MobileGS::kRelocOk, g.lastRelocReject());
+    ASSERT_EQ(MobileGS::kCorrobGated, g.corrobGateReason());
+    // As the Doodle's rows used to be the exclusion list, they vetoed about 70% of this paint (324 / 1500).
+    EXPECT_GT(g.corrobMatched() * 3, g.corrobPredicted() * 2)
+        << "the Doodle vetoed the paint it was captured with: " << g.corrobMatched() << " / " << g.corrobPredicted();
+    g.setEvalSyncReloc(false, 1);
+    g.destroy();
+}
+
+// Once paint covers the doodles, the Doodle's rows are paint, already on the wall plane: Align fits
+// the design to them with no capture photo. The paint is the design 30 px (= 30/700 m at 1 m) right
+// of where it is placed.
+TEST(MobileGSTeleological, AlignFitsTheDesignToAPaintedDoodleWithoutAPhoto) {
+    MobileGS g;
+    g.initialize(0, 0);
+    const float K[4] = {700.f, 700.f, 400.f, 300.f};
+    const cv::Mat design = makeWall(400, 300, 0xbeef);
+    cv::Mat wall(600, 800, CV_8UC3, cv::Scalar(150, 150, 150));
+    design.copyTo(wall(cv::Rect(200 + 30, 150, 400, 300)));
+    doodleFrontalWall(g, wall, K);
+    g.setArtworkDoodle(design, nullptr, 0, 0, 0, nullptr, nullptr);
+    g.awaitFilterTargets();
+    const float place[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0.0f, 0.0f, 1.0f, 1};
+    g.setDesignPlacement(place, 200.f / K[0], 150.f / K[1]);
+    float out5[5];
+    ASSERT_TRUE(g.autoFitDesign(out5));
+    EXPECT_NEAR(30.f / 700.f, out5[0], 0.005f);
+    EXPECT_NEAR(0.0f, out5[1], 0.005f);
+    EXPECT_NEAR(0.0f, out5[2], 0.02f);
+    EXPECT_NEAR(1.0f, out5[3], 0.03f);
+    g.destroy();
+}
+
 // A design that repeats itself at the baseline's displacement agrees with the wall just as well at the
 // displaced placements as at the true one: that is chance-level agreement, not evidence, and the pass
 // must not count it. (Tile 120x90 px = the baseline's shift of 30% of the design's half-extent.)

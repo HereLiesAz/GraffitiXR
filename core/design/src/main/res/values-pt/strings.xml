@@ -94,6 +94,7 @@
     <string name="nav_adjust">Ajustar</string>
     <!-- Description of the image adjustment tools. -->
     <string name="nav_adjust_info">Ajuste o brilho, contraste, saturação e equilíbrio de cores para esta camada.</string>
+    <string name="nav_edit">Editar</string>
 
     <!-- Label for color balance and tinting tools. -->
     <string name="nav_balance">Cor</string>
@@ -330,7 +331,10 @@
     <string name="adj_blue">Azul</string>
     <string name="adj_undo">Desfazer</string>
     <string name="adj_redo">Refazer</string>
-    <string name="adj_magic_align">Alinhamento Mágico</string>
+    <string name="adj_magic_align">Alinhar</string>
+    <string name="align_done_paint">Alinhado à tinta na parede.</string>
+    <string name="align_unavailable">Ainda não há tinta na parede que corresponda ao design.</string>
+    <string name="align_not_ready">Alinhar precisa primeiro de um Doodle e de um design posicionado.</string>
 
     <!-- Overlays & Status -->
     <string name="status_create_grid">Crie uma Grade para iniciar.</string>
@@ -558,7 +562,7 @@
     <string name="nav_wearable_info">Conecte-se a óculos inteligentes para uma experiência AR sem as mãos, com entrada de câmera alinhada à sua perspectiva.</string>
     <string name="nav_wall_clear">Remover</string>
     <string name="nav_wall_clear_info">Remove a foto de fundo da parede usada no modo Maquete.</string>
-    <string name="nav_magic">Mágica</string>
+    <string name="nav_magic">Alinhar</string>
     <string name="nav_edges">Bordas</string>
     <string name="nav_filter">Filtro</string>
     <string name="nav_photo">Foto</string>

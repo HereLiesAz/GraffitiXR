@@ -34,6 +34,7 @@
     <string name="nav_outline_info">I-convert ang layer na ito sa black line art sa isang transparent na background — perpekto para sa paggawa ng mga template ng stencil.</string>
     <string name="nav_adjust">Ayusin</string>
     <string name="nav_adjust_info">I-fine-tune ang liwanag, contrast, saturation, at balanse ng kulay para sa layer na ito.</string>
+    <string name="nav_edit">I-edit</string>
     <string name="nav_balance">Kulay</string>
     <string name="nav_balance_info">Tint ang mga kulay ng layer gamit ang pula, berde, at asul na mga slider ng channel.</string>
     <string name="nav_blending">Haluin</string>
@@ -124,7 +125,10 @@
     <string name="adj_blue">Asul</string>
     <string name="adj_undo">I-undo</string>
     <string name="adj_redo">Gawin muli</string>
-    <string name="adj_magic_align">Magic Align</string>
+    <string name="adj_magic_align">Ihanay</string>
+    <string name="align_done_paint">Inihanay sa pintura sa pader.</string>
+    <string name="align_unavailable">Wala pang pintura sa pader na tumutugma sa disenyo.</string>
+    <string name="align_not_ready">Kailangan muna ng Ihanay ng Doodle at nakalagay na disenyo.</string>
     <string name="status_create_grid">Gumawa ng Grid para magsimula.</string>
     <string name="status_scan_surfaces">I-scan ang mga surface sa paligid mo.</string>
     <string name="status_tap_surface">I-tap ang isang ibabaw upang ilagay ang anchor.</string>
@@ -270,7 +274,7 @@
     <string name="nav_wearable_info">Kumonekta sa smart glasses para sa hands-free na AR na karanasan na may camera input na naka-align sa iyong perspektibo.</string>
     <string name="nav_wall_clear">Alisin</string>
     <string name="nav_wall_clear_info">Inaalis ang larawan ng pader sa background na ginagamit sa Mockup mode.</string>
-    <string name="nav_magic">Mahika</string>
+    <string name="nav_magic">Ihanay</string>
     <string name="nav_edges">Gilid</string>
     <string name="nav_filter">Filter</string>
     <string name="nav_photo">Larawan</string>

@@ -147,9 +147,6 @@ data class ArUiState(
      */
     val backboneTooSmall: Boolean = false,
 
-    // Physical half-extents of the overlay quad in meters (computed from depth center pixel).
-    // OverlayRenderer sizes its textured quad to (halfW*2) × (halfH*2) meters.
-    val targetPhysicalExtent: Pair<Float, Float>? = null,
 
     // Which 3-D mapping mode is active. Defaults to MURAL.
     /**

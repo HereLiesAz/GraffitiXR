@@ -892,7 +892,7 @@ class EditorViewModelTest {
         coVerify { settingsRepository.setRightHanded(!before) }
     }
 
-    // ==================== Magic in AR / per-mode co-op ops ====================
+    // ==================== Align in AR / per-mode co-op ops ====================
 
     private fun modeOp(mode: EditorMode) =
         com.hereliesaz.graffitixr.common.model.Op.ModeTransform(
@@ -901,52 +901,30 @@ class EditorViewModelTest {
         )
 
     @Test
-    fun `Magic in AR fits only the AR adjustment to the anchor and emits it`() = runTest {
-        // Quad half-width 0.5 m at scale 1; the 100x100 test bitmap makes the quad 0.5 x 0.5 m.
-        currentProjectFlow.value = GraffitiProject(id = "test-project", arDesignHalfWidthM = 0.5f)
-        testDispatcher.scheduler.advanceUntilIdle()
+    fun `Align refuses a pinned AR placement and shows the locked notice`() = runTest {
         viewModel.setEditorMode(EditorMode.AR)
         addDesign()
-        val designBefore = viewModel.uiState.value.design!!
-        viewModel.setAnchorExtent(1.0f, 0.25f)
-        io.mockk.clearMocks(opEmitter, answers = false)
-
-        viewModel.onMagicClicked()
+        assertFalse(viewModel.arPlacementLocked())
+        viewModel.onToggleModeTransformLocked(EditorMode.AR)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        val ar = viewModel.uiState.value.modeAdjustments[EditorMode.AR]!!
-        // 80% of the tighter axis: 0.8 * min(1.0 / 0.5, 0.25 / 0.5) = 0.4
-        assertEquals(0.4f, ar.scale, 1e-4f)
-        assertEquals(0f, ar.offsetX, 0f)
-        assertEquals(0f, ar.offsetY, 0f)
-        val designAfter = viewModel.uiState.value.design!!
-        assertEquals("the global design transform must not move", designBefore.scale, designAfter.scale, 0f)
-        assertEquals(designBefore.offset, designAfter.offset)
-        io.mockk.verify(exactly = 1) { opEmitter.emit(modeOp(EditorMode.AR)) }
-
-        viewModel.onUndoClicked()
-        testDispatcher.scheduler.advanceUntilIdle()
-        assertEquals(1f, viewModel.uiState.value.modeAdjustments[EditorMode.AR]?.scale ?: 1f, 1e-4f)
+        assertTrue(viewModel.arPlacementLocked())
+        assertTrue(viewModel.uiState.value.showLockedFeedback)
     }
 
     @Test
-    fun `Magic outside AR ignores the anchor extent and tones the active mode`() = runTest {
-        currentProjectFlow.value = GraffitiProject(id = "test-project", arDesignHalfWidthM = 0.5f)
-        testDispatcher.scheduler.advanceUntilIdle()
-        viewModel.setEditorMode(EditorMode.OVERLAY)
+    fun `applyArFit reports whether it moved the design`() = runTest {
+        viewModel.setEditorMode(EditorMode.AR)
         addDesign()
-        viewModel.setAnchorExtent(1.0f, 1.0f)
-        val designScale = viewModel.uiState.value.design!!.scale
-        io.mockk.clearMocks(opEmitter, answers = false)
-
-        viewModel.onMagicClicked()
+        assertTrue(viewModel.applyArFit(dx = 0.1f, dy = 0f, dThetaRad = 0f, scaleRatio = 1f))
+        assertFalse(viewModel.applyArFit(dx = Float.NaN, dy = 0f, dThetaRad = 0f, scaleRatio = 1f))
+        // No scale bounds: a large ratio is applied whole.
+        assertTrue(viewModel.applyArFit(dx = 0f, dy = 0f, dThetaRad = 0f, scaleRatio = 20f))
+        assertEquals(20f, viewModel.uiState.value.modeAdjustments[EditorMode.AR]!!.scale, 1e-4f)
+        viewModel.onToggleModeTransformLocked(EditorMode.AR)
         testDispatcher.scheduler.advanceUntilIdle()
-
-        val overlay = viewModel.uiState.value.modeAdjustments[EditorMode.OVERLAY]!!
-        assertEquals(1.2f, overlay.contrast, 1e-4f)
-        assertEquals(1f, overlay.scale, 0f)
-        assertEquals(designScale, viewModel.uiState.value.design!!.scale, 0f)
-        io.mockk.verify(exactly = 1) { opEmitter.emit(modeOp(EditorMode.OVERLAY)) }
+        // Pinned while Align was matching: nothing moves, and the caller must not report success.
+        assertFalse(viewModel.applyArFit(dx = 0.1f, dy = 0f, dThetaRad = 0f, scaleRatio = 1f))
     }
 
     @Test

@@ -812,12 +812,6 @@ private:
     std::atomic<bool> mFilterCancel{false};
     void startFilterBuild(cv::Mat composite, cv::Mat gray, int descType, long generation);
     void joinFilterBuild();
-    /**
-     * How many rows at the front of mWallDescriptors / mWallKeypoints3D are the wall as captured
-     * (the bare wall, before any paint). Self-grow only appends, so everything after is grown. The
-     * wall exclusion list is these rows. Guarded by mMutex.
-     */
-    size_t mBareWallCount = 0;
     // Bumped whenever the artwork is replaced or cleared. tryUpdateDoodle snapshots the
     // descriptors under the lock, spends milliseconds matching outside it, and then merges its
     // result back in; without this it would merge into whatever artwork is registered by then. The
@@ -866,18 +860,45 @@ private:
     std::atomic<int> mCleanWallStatus{kCleanNone};
     std::atomic<bool> mChangePassEnabled{false};
     void registerCleanWallLocked();                // needs mMutex; mCleanWallRaw -> mCleanWallRgb
+    /**
+     * The bare wall: features of the clean-wall photo (the wall before any doodle or paint), in the
+     * capture photo's pixels, in the wall doodle's descriptor type. Detected when the photo registers;
+     * [mCleanFeatSrc] shares the registered photo's buffer, so they are current only while it is the
+     * registered one. The wall's own texture stays to the end, so these are the exclusion list for
+     * the whole job (and are dropped from the photo before Align matches it). The Doodle is NOT bare
+     * wall: it is for reloc. Guarded by mMutex.
+     */
+    std::vector<cv::Point2f> mCleanFeatPx;
+    cv::Mat mCleanFeatDescs;
+    cv::Mat mCleanFeatSrc;
+    const uchar* mCleanFeatTriedFor = nullptr; int mCleanFeatTriedType = -1;   // last detection attempt
+    /** mCleanFeat* on the wall plane (doodle frame), rows kept; rebuilt when the doodle changes. */
+    cv::Mat mCleanExclDescs;
+    std::vector<cv::Point3f> mCleanExclPts;
+    const uchar* mCleanExclFor = nullptr; size_t mCleanExclWallN = 0; uint64_t mCleanExclDoodleGen = 0;
+    void detectCleanWallFeaturesLocked();
+    void cleanWallExclusionLocked(cv::Mat& descs, std::vector<cv::Point3f>& pts);
     float mCaptureIntr[4] = {0,0,0,0};
     std::vector<uint8_t> mPendingGridRestore;      // applied when a grid of matching shape is built
     cv::Mat mArtworkGray;                          // normalised design composite, for autoFitDesign
 public:
     /**
      * Fit the registered design to paint already on the wall (a project restarted in the app but not
-     * on the wall). Matches the design against the capture photo (in both polarities, since paint
-     * rarely keeps the design's colours), back-projects the photo side onto the wall plane, and solves
-     * a RANSAC similarity in the CURRENT design's local frame. out5 = {dx, dy (m), dTheta (rad, CCW
-     * in the design plane), scale ratio, inliers}. Returns false when there is no confident fit.
+     * on the wall). Matches the Doodle builder's design features -- the artwork's own, each design
+     * filter's target set (mTargetSets), and the inverted design, since paint rarely keeps the
+     * design's colours -- against the capture photo (back-projected onto the wall plane), less its
+     * unchanged bare wall when a clean-wall photo is registered, and against the Doodle (on the wall
+     * plane; once paint covers the doodles its rows are paint). Either alone is enough. Takes the
+     * pairing with the most inliers of a RANSAC similarity in the CURRENT design's local frame. Waits for a
+     * filter build in flight, and returns no fit when the placement, design, Doodle or capture photo
+     * changed while matching (the Doodle may grow). out5 = {dx, dy (m), dTheta (rad, CCW in the
+     * design plane), scale ratio, inliers}. Returns false when there is no fit.
+     *
+     * [minimumEvidence] (Align on request): any fit is taken unless one is impossible -- fewer than
+     * three matches agreeing on one similarity (two define any similarity, so they prove nothing).
+     * Without it (the automatic fit, which nobody asked for) a fit also needs a confident consensus.
      */
-    bool autoFitDesign(float* out5);
+    bool autoFitDesign(float* out5, bool minimumEvidence = false);
     /** Waits for the filter targets of the registered design to finish building (tests; shutdown does it too). */
     void awaitFilterTargets() { joinFilterBuild(); }
     /** How many filters' targets are installed and usable right now. */

@@ -48,7 +48,6 @@ interface EditorActions {
      * again to put it back exactly where it was. Adjustments and effects are untouched by both.
      */
     fun onResetClicked()
-    fun onMagicClicked()
 
     fun toggleImageLock()
 

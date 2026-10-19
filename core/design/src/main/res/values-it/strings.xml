@@ -94,6 +94,7 @@
     <string name="nav_adjust">Regola</string>
     <!-- Description of the image adjustment tools. -->
     <string name="nav_adjust_info">Regola finemente luminosità, contrasto, saturazione e bilanciamento del colore per questo livello.</string>
+    <string name="nav_edit">Modifica</string>
 
     <!-- Label for color balance and tinting tools. -->
     <string name="nav_balance">Colore</string>
@@ -330,7 +331,10 @@
     <string name="adj_blue">Blu</string>
     <string name="adj_undo">Annulla</string>
     <string name="adj_redo">Ripeti</string>
-    <string name="adj_magic_align">Allineamento Magico</string>
+    <string name="adj_magic_align">Allinea</string>
+    <string name="align_done_paint">Allineato alla vernice sul muro.</string>
+    <string name="align_unavailable">Nessuna vernice sul muro corrisponde ancora al design.</string>
+    <string name="align_not_ready">Allinea richiede prima un Doodle e un design posizionato.</string>
 
     <!-- Overlays & Status -->
     <string name="status_create_grid">Crea una Griglia per iniziare.</string>
@@ -558,7 +562,7 @@
     <string name="nav_wearable_info">Connettiti a un visore smart per un\'esperienza AR a mani libere con input della fotocamera allineato alla tua prospettiva.</string>
     <string name="nav_wall_clear">Rimuovi</string>
     <string name="nav_wall_clear_info">Rimuove la foto del muro di sfondo usata nella modalità Mockup.</string>
-    <string name="nav_magic">Magia</string>
+    <string name="nav_magic">Allinea</string>
     <string name="nav_edges">Bordi</string>
     <string name="nav_filter">Filtro</string>
     <string name="nav_photo">Foto</string>

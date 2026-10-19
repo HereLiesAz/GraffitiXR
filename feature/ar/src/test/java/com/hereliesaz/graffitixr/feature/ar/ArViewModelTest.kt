@@ -1047,7 +1047,7 @@ class ArViewModelTest {
         // The registration ends by trying an auto-fit on another IO thread. A relaxed mock would return
         // an empty array there and the resulting exception would surface in a LATER test
         // (UncaughtExceptionsBeforeTest), so say plainly that there is no fit.
-        every { slamManager.autoFitDesign() } returns null
+        every { slamManager.autoFitDesign(any()) } returns null
         every { slamManager.setArtworkDoodle(a, any(), any(), any(), any(), any(), any()) } answers {
             started.countDown()
             release.await(5, java.util.concurrent.TimeUnit.SECONDS)

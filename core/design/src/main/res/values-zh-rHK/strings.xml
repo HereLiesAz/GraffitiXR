@@ -96,6 +96,7 @@
     <string name="nav_adjust">調整</string>
 
     <string name="nav_adjust_info">微調此圖層的亮度、對比、飽和度和色彩平衡。</string>
+    <string name="nav_edit">編輯</string>
 
 
     <string name="nav_balance">顏色</string>
@@ -335,7 +336,10 @@
     <string name="adj_blue">藍色的</string>
     <string name="adj_undo">撤銷</string>
     <string name="adj_redo">重做</string>
-    <string name="adj_magic_align">魔法對齊</string>
+    <string name="adj_magic_align">對齊</string>
+    <string name="align_done_paint">已與牆上的顏料對齊。</string>
+    <string name="align_unavailable">牆上仍未有與設計相符的顏料。</string>
+    <string name="align_not_ready">對齊需要先有 Doodle 和已放置的設計。</string>
 
 
     <string name="status_create_grid">建立一個網格以開始。</string>
@@ -563,7 +567,7 @@
     <string name="nav_wearable_info">連接智能眼鏡，透過與視角對齊的鏡頭輸入，獲得免持AR體驗。</string>
     <string name="nav_wall_clear">清除</string>
     <string name="nav_wall_clear_info">移除小樣模式中使用的牆面背景相片。</string>
-    <string name="nav_magic">魔法</string>
+    <string name="nav_magic">對齊</string>
     <string name="nav_edges">邊緣</string>
     <string name="nav_filter">濾鏡</string>
     <string name="nav_photo">相片</string>

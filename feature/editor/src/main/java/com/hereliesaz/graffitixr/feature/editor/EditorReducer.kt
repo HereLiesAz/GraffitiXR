@@ -78,7 +78,7 @@ internal object EditorReducer {
                 val updated = rotated.copy(
                     offsetX = rotated.offsetX + intent.pan.x,
                     offsetY = rotated.offsetY + intent.pan.y,
-                    scale = (rotated.scale * intent.zoom).coerceIn(0.1f, 10f),
+                    scale = (rotated.scale * intent.zoom).takeIf { it.isFinite() && it > 0f } ?: rotated.scale,   // no bounds
                 )
                 state.copy(modeAdjustments = state.modeAdjustments + (intent.mode to updated))
                     .movedSinceReset()

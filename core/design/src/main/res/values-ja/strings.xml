@@ -96,6 +96,7 @@
     <string name="nav_adjust">調整</string>
 
     <string name="nav_adjust_info">このレイヤーの明るさ、コントラスト、彩度、カラーバランスを微調整します。</string>
+    <string name="nav_edit">編集</string>
 
 
     <string name="nav_balance">カラー</string>
@@ -336,7 +337,10 @@
     <string name="adj_blue">青</string>
     <string name="adj_undo">元に戻す</string>
     <string name="adj_redo">やり直し</string>
-    <string name="adj_magic_align">マジックアライン</string>
+    <string name="adj_magic_align">位置合わせ</string>
+    <string name="align_done_paint">壁のペイントに合わせて位置合わせしました。</string>
+    <string name="align_unavailable">壁にはまだデザインと一致するペイントがありません。</string>
+    <string name="align_not_ready">位置合わせには、まず Doodle と配置済みのデザインが必要です。</string>
 
 
     <string name="status_create_grid">ターゲットを作成して開始します。</string>
@@ -575,7 +579,7 @@
     <string name="nav_wearable_info">スマートグラスに接続して、視点に合わせたカメラ入力によるハンズフリーのAR体験を実現します。</string>
     <string name="nav_wall_clear">消去</string>
     <string name="nav_wall_clear_info">モックアップモードで使用されている壁の背景写真を削除します。</string>
-    <string name="nav_magic">マジック</string>
+    <string name="nav_magic">位置合わせ</string>
     <string name="nav_edges">エッジ</string>
     <string name="nav_filter">フィルター</string>
     <string name="nav_photo">写真</string>

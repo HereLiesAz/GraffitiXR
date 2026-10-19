@@ -42,7 +42,7 @@ class StandaloneRenderTransformSanitizerTest {
     }
 
     @Test
-    fun extremeFiniteValuesAreBoundedAndRotationsNormalized() {
+    fun extremeFiniteValuesPassUnboundedAndRotationsNormalize() {
         val t = StandaloneRenderTransformSanitizer.sanitize(
             panX = Float.MAX_VALUE,
             panY = -Float.MAX_VALUE,
@@ -51,19 +51,19 @@ class StandaloneRenderTransformSanitizerTest {
             rotationXDeg = -740f,
             rotationYDeg = 540f,
         )
-        assertEquals(10_000f, t.panX, 0f)
-        assertEquals(-10_000f, t.panY, 0f)
-        assertEquals(10f, t.scale, 0f)
+        assertEquals(Float.MAX_VALUE, t.panX, 0f)
+        assertEquals(-Float.MAX_VALUE, t.panY, 0f)
+        assertEquals(1_000_000f, t.scale, 0f)
         assertEquals(20f, t.rotationZDeg, 0f)
         assertEquals(-20f, t.rotationXDeg, 0f)
         assertEquals(180f, t.rotationYDeg, 0f)
     }
 
     @Test
-    fun scaleUsesSameBoundsAsEditorModeGesture() {
-        val low = StandaloneRenderTransformSanitizer.sanitize(0f, 0f, 0f, 0f, 0f, 0f)
-        val high = StandaloneRenderTransformSanitizer.sanitize(0f, 0f, 100f, 0f, 0f, 0f)
-        assertEquals(0.1f, low.scale, 0f)
-        assertEquals(10f, high.scale, 0f)
+    fun scaleHasNoBoundsOnlyUnusableValuesAreReplaced() {
+        assertEquals(1f, StandaloneRenderTransformSanitizer.sanitize(0f, 0f, 0f, 0f, 0f, 0f).scale, 0f)
+        assertEquals(1f, StandaloneRenderTransformSanitizer.sanitize(0f, 0f, -2f, 0f, 0f, 0f).scale, 0f)
+        assertEquals(0.001f, StandaloneRenderTransformSanitizer.sanitize(0f, 0f, 0.001f, 0f, 0f, 0f).scale, 0f)
+        assertEquals(100f, StandaloneRenderTransformSanitizer.sanitize(0f, 0f, 100f, 0f, 0f, 0f).scale, 0f)
     }
 }

@@ -59,12 +59,25 @@ Each filter's places form a target set (`MobileGS::TargetSet`) that corroborates
 the same pose-gated match (`gatedMatchSet`), consecutive confirmations, reset when the design moves
 or is replaced. A cell's vote is "present" when at least half of that filter's places inside it are
 confirmed, "absent" when some are not, and no data when it has none. Filter targets never become
-reloc marks: they judge progress only.
+reloc marks: they judge progress, and Align uses them too. `MobileGS::autoFitDesign` matches the artwork's
+features, every installed target set and the inverted design against the capture photo (rays onto
+the wall plane) and against the Doodle (its rows are on the wall plane already), and keeps the
+pairing whose similarity fit has the most inliers; either source alone is enough. The Doodle starts
+as marks drawn for reloc, but once paint covers them (rows grown from live frames that matched the
+design, or a Doodle captured over paint) its rows are paint. With a clean-wall photo, the photo's unchanged
+bare wall (a feature the clean-wall photo has at the same place, uniquely) is dropped before
+matching, so the wall's own texture can neither answer for the design nor make real paint look
+ambiguous.
 
 ## Guards on every set
 
-- **Wall exclusion list**: the wall as captured (the bare doodle, before any paint or self-grow)
-  is projected into the live frame through the lock's pose. A design feature's live match is not
+- **Wall exclusion list**: the bare wall, which is the **clean-wall photo** only (the wall before
+  any doodle or paint). Its features are detected when it registers to the capture photo, placed
+  on the wall plane through the capture camera, and projected into the live frame through the
+  lock's pose. The wall's own texture is there from start to finish, so this list holds for the
+  whole job. The Doodle (base features and close-ups) is never bare wall: it is for reloc, placing,
+  sizing and transforming the overlay. Without a clean-wall photo
+  there is no exclusion list. A design feature's live match is not
   counted when a bare-wall feature near it describes that live keypoint at least as well as the
   design does: that is the wall's own texture. The row stays observed, so its confirmation count
   resets.

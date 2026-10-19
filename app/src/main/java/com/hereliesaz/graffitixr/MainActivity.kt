@@ -1518,12 +1518,6 @@ class MainActivity : AppCompatActivity() {
                                 )
                             }
 
-                            LaunchedEffect(arUiState.targetPhysicalExtent) {
-                                arUiState.targetPhysicalExtent?.let { (w, h) ->
-                                    editorViewModel.setAnchorExtent(w, h)
-                                }
-                            }
-
                             // Confirming a target unmounts DoodleCreationUi right away, and the
                             // doodle build (awaitAnchorTransform, the ORB/SuperPoint pass, the
                             // close-ups) carries on in the background. There is deliberately NO spinner
@@ -2342,7 +2336,7 @@ class MainActivity : AppCompatActivity() {
                     onClick = { editorViewModel.onCycleStencilView() }
                 )
             }
-            // Adjust ▸ the per-design controls. Every one of these drives an EditorViewModel action
+            // Edit ▸ the per-design controls. Every one of these drives an EditorViewModel action
             // that was already implemented and tested but had no way to be invoked: the layer list had
             // no opener (so add-a-layer was one-way — nothing could remove, rename, reorder or hide
             // one), the adjust and colour-balance panels had no toggle outside a Mode, and per-layer
@@ -2350,7 +2344,7 @@ class MainActivity : AppCompatActivity() {
             azRailSubHostItem(
                 id = "host.design",
                 hostId = railHostOf("host.design"),
-                text = navStrings.adjust,
+                text = navStrings.edit,
                 color = navItemColor,
                 shape = AzButtonShape.NONE,
                 disabled = showLibrary,
@@ -2506,18 +2500,47 @@ class MainActivity : AppCompatActivity() {
                             arViewModel.toggleMeasure()
                         },
                     )
-                    // Magic — fit the design to the established anchor's extent (falling back to a
-                    // legibility auto-tune when there is no anchor yet). onMagicClicked was
-                    // implemented and unreachable: the "Magic Wand" the adjustments panel's doc
-                    // still described had been removed from that panel's action row.
+                    // Align — fit the design to paint already on the wall (ArViewModel.alignToPaint).
                     azRailSubItem(
                         id = "mode.ar.magic",
                         hostId = railHostOf("mode.ar.magic"),
                         text = navStrings.magic,
                         color = navItemColor,
                         shape = AzButtonShape.NONE,
-                        disabled = showLibrary,
-                        onClick = { editorViewModel.onMagicClicked() },
+                        // Standalone's Doodle is a centred page frame, which the paint match
+                        // cannot fit (MobileGS::autoFitDesign refuses it), so Align is off there.
+                        // With no visible design there is nothing to align (native may still hold the
+                        // last one registered).
+                        disabled = showLibrary || arUiState.sphereSlamRuntimeStatus.mode ==
+                            com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.STANDALONE ||
+                            editorUiState.design?.let { it.isVisible && it.bitmap != null } != true,
+                        onClick = {
+                            // Fit the design to paint already on the wall, or say that nothing
+                            // matched. Never a resize to a guess, never a tone change.
+                            if (!editorViewModel.arPlacementLocked()) {
+                                // The fit is relative to the placement at the tap; moved since, it is
+                                // dropped. Only the spatial fields count: a tone edit moves nothing, and
+                                // a pin is answered below with the locked notice.
+                                // No entry yet is the default placement, which a first tone edit creates.
+                                fun placement() = (editorViewModel.uiState.value.modeAdjustments[EditorMode.AR]
+                                    ?: com.hereliesaz.graffitixr.common.model.ModeAdjustment())
+                                    .let { listOf(it.offsetX, it.offsetY, it.scale, it.rotation, it.rotationX, it.rotationY) }
+                                val placedAtTap = placement()
+                                arViewModel.alignToPaint { fit, notReady ->
+                                    if (placement() != placedAtTap && !editorViewModel.arPlacementLocked()) return@alignToPaint
+                                    val applied = fit != null &&
+                                        editorViewModel.applyArFit(fit.dx, fit.dy, fit.dThetaRad, fit.scale)
+                                    // Pinned while matching: the locked notice, not a success.
+                                    if (!applied && fit != null && editorViewModel.arPlacementLocked()) return@alignToPaint
+                                    val msg = when {
+                                        applied -> DesignR.string.align_done_paint
+                                        notReady -> DesignR.string.align_not_ready
+                                        else -> DesignR.string.align_unavailable
+                                    }
+                                    Toast.makeText(context, context.getString(msg), Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
                     )
                     // CV view — a composited preview of everything the computer vision is looking for,
                     // drawn over the design, with a legend of what each colour is and how much of it

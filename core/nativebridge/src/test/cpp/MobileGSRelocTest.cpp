@@ -390,6 +390,98 @@ TEST(MobileGSFrames, AutoFitRefusesAPageFrameDoodleWithAReason) {
     EXPECT_EQ(MobileGS::kAutoFitPageFrame, g.lastAutoFitResult());
 }
 
+TEST(MobileGSFrames, AutoFitFindsPaintWithTheDoodleBuildersDesignFeatures) {
+    // Capture-camera doodle: the wall 2 m ahead. The design is placed 1 m x 0.8 m, centred, upright;
+    // the paint in the photo is the same design 6 cm to the right.
+    MobileGS g;
+    std::vector<cv::Point3f> wall;
+    for (int i = 0; i < 40; ++i) wall.emplace_back(-0.6f + 0.03f * i, (i % 8) * 0.1f - 0.35f, 2.0f);
+    const float anchor[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    const float K[4] = {500.f, 500.f, 320.f, 240.f};
+    g.restoreWallDoodleMetric(cv::Mat(40, 32, CV_8U, cv::Scalar(4)), wall, anchor, K);   // ORB doodle
+    const cv::Mat design = makeWall(320, 256);
+    g.setArtworkDoodle(design, nullptr, 0, 0, 0, nullptr, nullptr);
+    g.awaitFilterTargets();
+    ASSERT_GT(g.readyFilterTargets(), 0);
+    const float fpFromDesign[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0,0,2,1};   // local y up, facing the camera
+    g.setDesignPlacement(fpFromDesign, 0.5f, 0.4f);
+
+    // 1 m at 2 m is 250 px; 6 cm is 15 px.
+    cv::Mat photo(480, 640, CV_8UC3, cv::Scalar(150, 150, 150)), paint;
+    cv::resize(design, paint, cv::Size(250, 200), 0, 0, cv::INTER_AREA);
+    paint.copyTo(photo(cv::Rect(320 - 125 + 15, 240 - 100, 250, 200)));
+    g.setCaptureImage(photo, K);
+
+    float out5[5];
+    ASSERT_TRUE(g.autoFitDesign(out5));
+    EXPECT_EQ(MobileGS::kAutoFitOk, g.lastAutoFitResult());
+    EXPECT_NEAR(0.06f, out5[0], 0.01f);
+    EXPECT_NEAR(0.0f, out5[1], 0.01f);
+    EXPECT_NEAR(0.0f, out5[2], 0.02f);
+    EXPECT_NEAR(1.0f, out5[3], 0.03f);
+
+    // Align on request takes the same fit.
+    float req5[5];
+    ASSERT_TRUE(g.autoFitDesign(req5, /*minimumEvidence=*/true));
+    EXPECT_NEAR(0.06f, req5[0], 0.01f);
+}
+
+// The wall's own texture is there from start to finish. The design here is a crop of the bare wall
+// at A (where it is placed); paint copies it at B. Every match at A is the wall itself, which
+// the clean-wall photo explains as well as the design does, so Align goes to the paint at B.
+TEST(MobileGSFrames, AlignIgnoresTheWallsOwnTextureWithACleanWallPhoto) {
+    const float K[4] = {500.f, 500.f, 320.f, 240.f};   // wall 2 m ahead: 1 px = 4 mm
+    const cv::Mat bare = makeWall(640, 480);
+    const cv::Rect A(40, 40, 240, 180), B(360, 260, 240, 180);
+    const cv::Mat design = bare(A).clone();
+    cv::Mat photo = bare.clone();
+    design.copyTo(photo(B));
+    auto run = [&](bool clean, float out5[5]) {
+        MobileGS g;
+        g.initialize(0, 0);
+        std::vector<cv::Point3f> wall;
+        for (int i = 0; i < 40; ++i) wall.emplace_back(-1.2f + 0.06f * i, (i % 8) * 0.12f - 0.4f, 2.0f);
+        const float anchor[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+        g.restoreWallDoodleMetric(cv::Mat(40, 32, CV_8U, cv::Scalar(4)), wall, anchor, K);   // ORB doodle
+        g.setArtworkDoodle(design, nullptr, 0, 0, 0, nullptr, nullptr);
+        g.awaitFilterTargets();
+        // Placed over A: centre pixel (160, 130) -> (-0.64, -0.44, 2) m; local y up.
+        const float fpFromDesign[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0, -0.64f,-0.44f,2,1};
+        g.setDesignPlacement(fpFromDesign, 0.48f, 0.36f);
+        g.setCaptureImage(photo, K);
+        if (clean) EXPECT_TRUE(g.setCleanWallImage(bare));
+        const bool ok = g.autoFitDesign(out5);
+        g.destroy();
+        return ok;
+    };
+    float without[5], with[5];
+    // Without a clean-wall photo the texture at A and the paint at B are ambiguous to the ratio test:
+    // whatever comes out, it is not the paint.
+    if (run(false, without)) EXPECT_GT(std::abs(without[0] - 1.28f), 0.1f);
+    ASSERT_TRUE(run(true, with));
+    // B is 320 px right and 220 px down of A: (+1.28, -0.88) m in design-local (y up).
+    EXPECT_NEAR(1.28f, with[0], 0.02f);
+    EXPECT_NEAR(-0.88f, with[1], 0.02f);
+    EXPECT_NEAR(1.0f, with[3], 0.03f);
+}
+
+TEST(MobileGSFrames, AutoFitOnRequestStillRefusesAnImpossibleMatch) {
+    // A blank photo has nothing to match: no fit even when any possible fit would be taken.
+    MobileGS g;
+    std::vector<cv::Point3f> wall;
+    for (int i = 0; i < 40; ++i) wall.emplace_back(-0.6f + 0.03f * i, (i % 8) * 0.1f - 0.35f, 2.0f);
+    const float anchor[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    const float K[4] = {500.f, 500.f, 320.f, 240.f};
+    g.restoreWallDoodleMetric(cv::Mat(40, 32, CV_8U, cv::Scalar(4)), wall, anchor, K);
+    g.setArtworkDoodle(makeWall(320, 256), nullptr, 0, 0, 0, nullptr, nullptr);
+    g.awaitFilterTargets();
+    const float fpFromDesign[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0,0,2,1};
+    g.setDesignPlacement(fpFromDesign, 0.5f, 0.4f);
+    g.setCaptureImage(cv::Mat(480, 640, CV_8UC3, cv::Scalar(150, 150, 150)), K);
+    float out5[5];
+    EXPECT_FALSE(g.autoFitDesign(out5, /*minimumEvidence=*/true));
+}
+
 TEST(MobileGSRelocScales, SuperPointPassesAreRelativeToWhatThePlainPassSaw) {
     // 640x480 is exactly at the network cap: plain pass sees 1.0, so 0.5x full frame and a 2x
     // magnified centred half-size window (which fits the cap after magnification).

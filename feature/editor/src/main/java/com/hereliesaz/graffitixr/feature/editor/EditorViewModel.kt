@@ -193,14 +193,12 @@ class EditorViewModel @Inject constructor(
         railExpansionJob?.cancel()
         pendingRailExpansion.clear()
         designSourceBitmap = null
-        anchorHalfExtentMeters = null
     }
 
     // Debounced project-preview thumbnail generation. saveProject() fires on nearly every edit,
     // so the thumbnail is regenerated at most once the edits settle, off the main thread.
     private var thumbnailJob: kotlinx.coroutines.Job? = null
 
-    private var anchorHalfExtentMeters: Pair<Float, Float>? = null
 
     /**
      * Wall generation the in-memory AR spatial adjustment is currently authored against.
@@ -344,7 +342,7 @@ class EditorViewModel @Inject constructor(
         // leaks into the new one. Undo history is the sharpest case: left uncleared, pressing
         // Undo in the new project restored and persisted the OLD project's design (it was never
         // cleared anywhere but the null-project path, which a switch never hits). The decoded
-        // "before effects" cache and the AR target extent from Magic are the same class of bug —
+        // "before effects" cache is the same class of bug —
         // silently applying stale, previous-project state to the one now on screen.
         history.clear()
         updateHistoryCounts()
@@ -352,7 +350,6 @@ class EditorViewModel @Inject constructor(
         // judge them against this one's design.
         writtenDesignPaths.clear()
         designSourceBitmap = null
-        anchorHalfExtentMeters = null
 
         // Reclaim design images superseded in earlier sessions (the in-memory tracking above only
         // knows this session's writes). Best-effort; the age bound keeps it clear of a new import.
@@ -1234,72 +1231,11 @@ class EditorViewModel @Inject constructor(
         standaloneArPlacementGeneration = generation
     }
 
-    fun setAnchorExtent(halfW: Float, halfH: Float) {
-        anchorHalfExtentMeters = Pair(halfW, halfH)
-    }
-
-    /**
-     * The AR mode adjustment that fits the design to 80% of the captured anchor region, centred and
-     * square-on — or null when the fit can't be computed (no design bitmap, or the AR quad's
-     * real-world size has not been established yet).
-     *
-     * Only the AR [ModeAdjustment] changes (FEATURE_REFERENCE.md §1.1: design edits are global,
-     * mode adjustments are per-mode). This used to rewrite the design layer's own scale, which
-     * moved the artwork in every mode and shrank the composite the AR texture is sampled from.
-     *
-     * Geometry: at `ModeAdjustment.scale == 1` the AR quad is `arDesignHalfWidthM` wide (half-width,
-     * metres — the ArRenderer screen-fit, persisted on the project) with the design bitmap's aspect;
-     * the renderer multiplies that by the AR adjustment's scale. So the scale that makes the quad
-     * span 80% of the anchor's half-extents is `0.8 · min(anchorW / quadW, anchorH / quadH)`.
-     * The old formula assumed a 2048² composite canvas and the 5 m placeholder quad
-     * (`OverlayRenderer.QUAD_HALF_EXTENT`), neither of which is what the renderer draws.
-     */
-    private fun anchorFitAdjustment(anchorHalfW: Float, anchorHalfH: Float): ModeAdjustment? {
-        val bmp = _uiState.value.design?.bitmap ?: return null
-        if (bmp.width <= 0 || bmp.height <= 0) return null
-        if (!(anchorHalfW > 0f && anchorHalfH > 0f && anchorHalfW.isFinite() && anchorHalfH.isFinite())) return null
-        val quadHalfW = projectRepository.currentProject.value?.arDesignHalfWidthM ?: return null
-        if (!(quadHalfW > 0f && quadHalfW.isFinite())) return null
-        val quadHalfH = quadHalfW * bmp.height / bmp.width
-        val scale = (ANCHOR_FIT_FRACTION * minOf(anchorHalfW / quadHalfW, anchorHalfH / quadHalfH))
-            .coerceIn(0.1f, 10f) // the same range every AR pinch/fit is clamped to
-        val cur = _uiState.value.modeAdjustments[EditorMode.AR] ?: ModeAdjustment()
-        return cur.copy(offsetX = 0f, offsetY = 0f, scale = scale, rotation = 0f, rotationX = 0f, rotationY = 0f)
-    }
-
-    override fun onMagicClicked() {
-        val mode = _uiState.value.editorMode
-        val extent = anchorHalfExtentMeters
-        if (mode == EditorMode.AR && extent != null) {
-            prepareArPlacementEdit()
-            val cur = _uiState.value.modeAdjustments[EditorMode.AR] ?: ModeAdjustment()
-            if (cur.isTransformLocked) {
-                _uiState.update { it.copy(showLockedFeedback = true) }
-                return
-            }
-            val fitted = anchorFitAdjustment(extent.first, extent.second)
-            if (fitted != null) {
-                pushHistory()
-                clearTransformStash()
-                dispatch(EditorIntent.SetModeAdjustment(EditorMode.AR, fitted))
-                saveProject()
-                emitModeTransform(EditorMode.AR)
-                return
-            }
-            // No quad size yet (the renderer hasn't fitted the design): fall through to the tone lift.
-        }
-        pushHistory()
-        clearTransformStash()
-        if (dispatchModeAdjustIfInMode { it.copy(brightness = 0.1f, contrast = 1.2f, saturation = 1.1f) }) {
-            // Outside DESIGN the tone lift is a per-mode overlay like every other tone control.
-            saveProject()
-            emitModeTransform(mode)
-        } else {
-            // Only in DESIGN does it edit the design itself.
-            updateDesign { it.copy(brightness = 0.1f, contrast = 1.2f, saturation = 1.1f) }
-            saveProject()
-            emitActiveLayerProps()
-        }
+    /** True (and the locked notice shown) when the AR placement is pinned, so Align must not move it. */
+    fun arPlacementLocked(): Boolean {
+        val locked = _uiState.value.modeAdjustments[EditorMode.AR]?.isTransformLocked == true
+        if (locked) _uiState.update { it.copy(showLockedFeedback = true) }
+        return locked
     }
 
     override fun onAdjustClicked() = dispatch(EditorIntent.ToggleAdjustPanel)
@@ -1336,7 +1272,7 @@ class EditorViewModel @Inject constructor(
             val rz = if (axis == RotationAxis.Z) layer.rotationZ + rotationDelta else layer.rotationZ
             // Clamped to the same [0.1, 10] range ApplyModeTransformGesture already enforces for
             // every non-Design mode's pinch — the same gesture source had two different contracts.
-            layer.copy(scale = (layer.scale * zoom).coerceIn(0.1f, 10f), offset = layer.offset + pan, rotationX = rx, rotationY = ry, rotationZ = rz)
+            layer.copy(scale = (layer.scale * zoom).takeIf { it.isFinite() && it > 0f } ?: layer.scale, offset = layer.offset + pan, rotationX = rx, rotationY = ry, rotationZ = rz)
         }
     }
 
@@ -1400,12 +1336,18 @@ class EditorViewModel @Inject constructor(
      * adjustment, as one undoable step. [dx]/[dy] metres, [dThetaRad] CCW and [scaleRatio] are the
      * design's move in its CURRENT local frame. The renderer composes T(pan) · Rz(-rotation) · S(scale),
      * so the offset is rotated into the pan frame and the rotation sign flipped to match.
+     * Returns whether the fit was applied (false for a pinned placement or a malformed fit). A move
+     * voids a pending Reset restore, like any other direct placement edit.
      */
-    fun applyArFit(dx: Float, dy: Float, dThetaRad: Float, scaleRatio: Float) {
-        if (!scaleRatio.isFinite() || scaleRatio <= 0f || !dx.isFinite() || !dy.isFinite() || !dThetaRad.isFinite()) return
+    fun applyArFit(dx: Float, dy: Float, dThetaRad: Float, scaleRatio: Float): Boolean {
+        if (!scaleRatio.isFinite() || scaleRatio <= 0f || !dx.isFinite() || !dy.isFinite() || !dThetaRad.isFinite()) return false
         prepareArPlacementEdit()
         val cur = _uiState.value.modeAdjustments[EditorMode.AR] ?: ModeAdjustment()
-        if (cur.isTransformLocked) return
+        if (cur.isTransformLocked) return false
+        // Applied whole: no clamp, no bounds.
+        val nextScale = cur.scale * scaleRatio
+        if (!nextScale.isFinite() || nextScale <= 0f) return false
+        clearTransformStash()
         // Snapshot AR explicitly: the fit may land while another mode is on screen.
         history.pushProperty(currentDesignSnapshot(), EditorMode.AR, cur)
         updateHistoryCounts()
@@ -1415,11 +1357,12 @@ class EditorViewModel @Inject constructor(
             offsetX = cur.offsetX + c * dx - sn * dy,
             offsetY = cur.offsetY + sn * dx + c * dy,
             rotation = cur.rotation - Math.toDegrees(dThetaRad.toDouble()).toFloat(),
-            scale = (cur.scale * scaleRatio).coerceIn(0.1f, 10f),
+            scale = nextScale,
         )
         dispatch(EditorIntent.SetModeAdjustment(EditorMode.AR, next))
         saveProject()
         emitModeTransform(EditorMode.AR)
+        return true
     }
 
     /**
@@ -1793,7 +1736,7 @@ class EditorViewModel @Inject constructor(
 
     /**
      * Voids a pending Reset restore. The reducer does this for the intents it owns; this is for the
-     * paths that mutate the design directly (gesture transform, magic align).
+     * paths that mutate the design directly (gesture transform, Align).
      */
     private fun clearTransformStash() {
         if (_uiState.value.transformStash != null) _uiState.update { it.copy(transformStash = null) }
@@ -1828,7 +1771,6 @@ class EditorViewModel @Inject constructor(
 }
 
 /** Magic's AR fit makes the design span this fraction of the captured anchor region. */
-private const val ANCHOR_FIT_FRACTION = 0.8f
 
 /** Blend modes offered by [EditorViewModel.onCycleBlendMode], Normal first. */
 private val BLEND_CYCLE = listOf(

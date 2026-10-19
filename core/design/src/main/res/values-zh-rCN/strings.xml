@@ -96,6 +96,7 @@
     <string name="nav_adjust">调整</string>
 
     <string name="nav_adjust_info">微调此图层的亮度、对比度、饱和度和色彩平衡。</string>
+    <string name="nav_edit">编辑</string>
 
 
     <string name="nav_balance">颜色</string>
@@ -336,7 +337,10 @@
     <string name="adj_blue">蓝色</string>
     <string name="adj_undo">撤销</string>
     <string name="adj_redo">重做</string>
-    <string name="adj_magic_align">魔法对齐</string>
+    <string name="adj_magic_align">对齐</string>
+    <string name="align_done_paint">已与墙上的颜料对齐。</string>
+    <string name="align_unavailable">墙上还没有与设计匹配的颜料。</string>
+    <string name="align_not_ready">对齐需要先有 Doodle 和已放置的设计。</string>
 
 
     <string name="status_create_grid">创建一个网格以开始。</string>
@@ -575,7 +579,7 @@
     <string name="nav_wearable_info">连接智能眼镜，获得与视角对齐的摄像头输入，实现免提AR体验。</string>
     <string name="nav_wall_clear">清除</string>
     <string name="nav_wall_clear_info">移除效果图模式中使用的背景墙面照片。</string>
-    <string name="nav_magic">魔法</string>
+    <string name="nav_magic">对齐</string>
     <string name="nav_edges">边缘</string>
     <string name="nav_filter">滤镜</string>
     <string name="nav_photo">照片</string>
