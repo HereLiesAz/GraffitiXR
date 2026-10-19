@@ -371,6 +371,7 @@
     <!-- Toasts after Align: fitted to the paint on the wall, or nothing matched. -->
     <string name="align_done_paint">Aligned to the paint on the wall.</string>
     <string name="align_unavailable">No paint on the wall matches the design yet.</string>
+    <string name="align_not_ready">Align needs a Doodle and a placed design first.</string>
 
     <!-- Overlays & Status -->
     <string name="status_create_grid">Create a Grid to start.</string>

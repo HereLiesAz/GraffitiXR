@@ -334,6 +334,7 @@
     <string name="adj_magic_align">Rett inn</string>
     <string name="align_done_paint">Rettet inn etter malingen på veggen.</string>
     <string name="align_unavailable">Ingen maling på veggen samsvarer med designet ennå.</string>
+    <string name="align_not_ready">Rett inn trenger først en Doodle og et plassert design.</string>
 
     <!-- Overlays & Status -->
     <string name="status_create_grid">Lag et rutenett for å starte.</string>

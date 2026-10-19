@@ -1418,6 +1418,14 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCleanWallStatus
     return gSlamEngine ? gSlamEngine->cleanWallStatus() : 0;
 }
 
+// Why the last autoFitDesign gave no fit (MobileGS::kAutoFit*), so Align can say "not ready" apart from
+// "no paint matches".
+JNIEXPORT jint JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetLastAutoFitResult(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    return gSlamEngine ? gSlamEngine->lastAutoFitResult() : MobileGS::kAutoFitNotReady;
+}
+
 // The Settings switch for pass B. Off unless the user turned it on.
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetChangePassEnabled(

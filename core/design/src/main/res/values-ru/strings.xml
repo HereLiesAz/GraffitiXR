@@ -339,6 +339,7 @@
     <string name="adj_magic_align">Выровнять</string>
     <string name="align_done_paint">Выровнено по краске на стене.</string>
     <string name="align_unavailable">На стене пока нет краски, совпадающей с дизайном.</string>
+    <string name="align_not_ready">Чтобы выровнять, сначала нужны Doodle и размещённый дизайн.</string>
 
 
     <string name="status_create_grid">Для начала создайте сетку.</string>

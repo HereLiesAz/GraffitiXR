@@ -339,6 +339,7 @@
     <string name="adj_magic_align">Rikta in</string>
     <string name="align_done_paint">Inriktad efter färgen på väggen.</string>
     <string name="align_unavailable">Ingen färg på väggen matchar designen än.</string>
+    <string name="align_not_ready">Rikta in behöver först en Doodle och en placerad design.</string>
 
 
     <string name="status_create_grid">Skapa ett rutnät för att börja.</string>

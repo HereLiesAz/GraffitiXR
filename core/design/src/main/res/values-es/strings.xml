@@ -334,6 +334,7 @@
     <string name="adj_magic_align">Alinear</string>
     <string name="align_done_paint">Alineado con la pintura de la pared.</string>
     <string name="align_unavailable">Aún no hay pintura en la pared que coincida con el diseño.</string>
+    <string name="align_not_ready">Alinear necesita primero un Doodle y un diseño colocado.</string>
 
     <!-- Overlays & Status -->
     <string name="status_create_grid">Crea una Cuadrícula para comenzar.</string>

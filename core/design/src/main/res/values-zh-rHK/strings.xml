@@ -339,6 +339,7 @@
     <string name="adj_magic_align">對齊</string>
     <string name="align_done_paint">已與牆上的顏料對齊。</string>
     <string name="align_unavailable">牆上仍未有與設計相符的顏料。</string>
+    <string name="align_not_ready">對齊需要先有 Doodle 和已放置的設計。</string>
 
 
     <string name="status_create_grid">建立一個網格以開始。</string>

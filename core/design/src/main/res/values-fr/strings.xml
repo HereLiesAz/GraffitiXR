@@ -24,6 +24,7 @@
     <string name="adj_magic_align">Aligner</string>
     <string name="align_done_paint">Aligné sur la peinture du mur.</string>
     <string name="align_unavailable">Aucune peinture sur le mur ne correspond encore au design.</string>
+    <string name="align_not_ready">Aligner a d’abord besoin d’un Doodle et d’un design placé.</string>
 
     <!-- Overlays & Status -->
     <string name="status_create_grid">Créez une Grille pour commencer.</string>

@@ -339,6 +339,7 @@
     <string name="adj_magic_align">Illesztés</string>
     <string name="align_done_paint">Igazítva a falon lévő festékhez.</string>
     <string name="align_unavailable">A falon még nincs a tervvel egyező festék.</string>
+    <string name="align_not_ready">Az illesztéshez előbb Doodle és elhelyezett terv kell.</string>
 
 
     <string name="status_create_grid">Hozz létre egy Rácsot a kezdéshez.</string>

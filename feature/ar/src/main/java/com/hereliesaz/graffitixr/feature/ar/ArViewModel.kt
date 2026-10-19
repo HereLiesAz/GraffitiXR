@@ -5233,7 +5233,8 @@ class ArViewModel @Inject constructor(
 
     /**
      * Align: fit the design to paint already on the wall (the same native match the automatic fit
-     * runs), on demand. [onResult] gets the fit, or null when there is no match (bare wall, no capture
+     * runs), on demand. [onResult] gets the fit, or null when there is no match (notReady: nothing to
+     * match yet -- no design, Doodle photo or placement -- rather than a match that failed) (bare wall, no capture
      * photo, standalone page frame, too few agreeing features, the placement moved while matching);
      * it runs on the main thread. A tap while a match (this one or the automatic fit) is running is
      * ignored: two fits from the same placement would both be applied. The
@@ -5241,7 +5242,7 @@ class ArViewModel @Inject constructor(
      * and a design that changed during the match voids the result. A success also disarms the
      * automatic fit, which would only repeat it.
      */
-    fun alignToPaint(onResult: (DesignFit?) -> Unit) {
+    fun alignToPaint(onResult: (fit: DesignFit?, notReady: Boolean) -> Unit) {
         if (!alignInFlight.compareAndSet(false, true)) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -5251,10 +5252,11 @@ class ArViewModel @Inject constructor(
                 } == true
                 val key = lastGuideKey
                 val r = if (settled) slamManager.autoFitDesign(minimumEvidence = true) else null   // asked for: any possible fit
+                val notReady = !settled || (r == null && slamManager.lastAutoFitWasNotReady())
                 val current = key == lastGuideKey && !artworkRegInFlight.get() && pendingArtworkGuide.get() == null
                 val fit = if (current) r?.let { DesignFit(it[0], it[1], it[2], it[3]) } else null
                 if (fit != null) autoFitArmed = false
-                withContext(Dispatchers.Main) { onResult(fit) }
+                withContext(Dispatchers.Main) { onResult(fit, notReady) }
             } finally {
                 alignInFlight.set(false)
                 if (autoFitRetryPending) tryAutoFit()

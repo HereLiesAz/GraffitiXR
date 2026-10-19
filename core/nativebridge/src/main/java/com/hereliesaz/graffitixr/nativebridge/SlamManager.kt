@@ -580,6 +580,9 @@ class SlamManager @Inject constructor(
      */
     fun autoFitDesign(minimumEvidence: Boolean = false): FloatArray? = nativeAutoFitDesign(minimumEvidence)
 
+    /** True when the last [autoFitDesign] had nothing to match yet (no design, Doodle photo or placement). */
+    fun lastAutoFitWasNotReady(): Boolean = nativeGetLastAutoFitResult() == AUTO_FIT_NOT_READY
+
     /** Opaque per-project progress state (painted cells + learned paint colours), or null. */
     fun exportPaintGrid(): ByteArray? = nativeExportPaintGrid()
 
@@ -1095,6 +1098,7 @@ class SlamManager @Inject constructor(
     private external fun nativeSetChangePassEnabled(enabled: Boolean)
     private external fun nativeExportPaintGrid(): ByteArray?
     private external fun nativeAutoFitDesign(minimumEvidence: Boolean): FloatArray?
+    private external fun nativeGetLastAutoFitResult(): Int
     private external fun nativeRestorePaintGrid(state: ByteArray)
     private external fun nativeGetFeatureProgress(): Float
     private external fun nativeRestoreWallFeatureMap(
@@ -1157,6 +1161,9 @@ class SlamManager @Inject constructor(
 
     companion object {
         private const val TAG = "SlamManager"
+
+        /** MobileGS::kAutoFitNotReady. */
+        private const val AUTO_FIT_NOT_READY = 1
 
         /** Floats in a full reloc result: 19 pose/counter slots + the 16-float solve-frame view + the inlier spread. */
         const val RELOC_RESULT_SIZE = 36

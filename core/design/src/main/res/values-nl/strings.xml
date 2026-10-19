@@ -339,6 +339,7 @@
     <string name="adj_magic_align">Uitlijnen</string>
     <string name="align_done_paint">Uitgelijnd op de verf op de muur.</string>
     <string name="align_unavailable">Nog geen verf op de muur die bij het ontwerp past.</string>
+    <string name="align_not_ready">Uitlijnen heeft eerst een Doodle en een geplaatst ontwerp nodig.</string>
 
 
     <string name="status_create_grid">Maak een raster om te beginnen.</string>

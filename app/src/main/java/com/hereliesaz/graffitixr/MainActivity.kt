@@ -2521,13 +2521,17 @@ class MainActivity : AppCompatActivity() {
                                 fun placement() = editorViewModel.uiState.value.modeAdjustments[EditorMode.AR]
                                     ?.let { listOf(it.offsetX, it.offsetY, it.scale, it.rotation, it.rotationX, it.rotationY) }
                                 val placedAtTap = placement()
-                                arViewModel.alignToPaint { fit ->
+                                arViewModel.alignToPaint { fit, notReady ->
                                     if (placement() != placedAtTap && !editorViewModel.arPlacementLocked()) return@alignToPaint
                                     val applied = fit != null &&
                                         editorViewModel.applyArFit(fit.dx, fit.dy, fit.dThetaRad, fit.scale)
                                     // Pinned while matching: the locked notice, not a success.
                                     if (!applied && fit != null && editorViewModel.arPlacementLocked()) return@alignToPaint
-                                    val msg = if (applied) DesignR.string.align_done_paint else DesignR.string.align_unavailable
+                                    val msg = when {
+                                        applied -> DesignR.string.align_done_paint
+                                        notReady -> DesignR.string.align_not_ready
+                                        else -> DesignR.string.align_unavailable
+                                    }
                                     Toast.makeText(context, context.getString(msg), Toast.LENGTH_SHORT).show()
                                 }
                             }

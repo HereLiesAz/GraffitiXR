@@ -340,6 +340,7 @@
     <string name="adj_magic_align">位置合わせ</string>
     <string name="align_done_paint">壁のペイントに合わせて位置合わせしました。</string>
     <string name="align_unavailable">壁にはまだデザインと一致するペイントがありません。</string>
+    <string name="align_not_ready">位置合わせには、まず Doodle と配置済みのデザインが必要です。</string>
 
 
     <string name="status_create_grid">ターゲットを作成して開始します。</string>
