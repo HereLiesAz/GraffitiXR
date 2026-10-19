@@ -55,8 +55,9 @@ engine" and is a no-op). There is no `VoxelMap`, `ConfidenceMap`, `PersistentVox
 
 ## 3. THE DOODLE GRID (The Grid Ritual)
 **Definition:** The workflow to establish the initial wall anchor. **Doodle** is the user's name for
-the painted reference marks and what the app captures from them (formerly "target" /
-"doodle"); SphereSLAM's own wall reference keeps the name **target**.
+the painted reference marks and what GraffitiXR's engine captures from them (formerly "target" /
+"fingerprint"). SphereSLAM keeps its own **target** and **fingerprint**, which differ; see
+[SphereSLAM terminology](../SPHERESLAM_ARCORE_SIDECAR.md#terminology).
 
 ### A. The Workflow Logic
 0.  **Instructions:** the **DOODLE GRID** card: if the grid isn't painted yet, photograph the bare

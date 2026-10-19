@@ -10,6 +10,26 @@ Status: dual-backend foundation is on `main`; co-op protocol-v3 calibration is m
 PR #1968; metric hybrid KPM→PoseFusion correction is implemented on
 `feat/sphereslam-hybrid-posefusion` / PR #1970.
 
+## Terminology
+
+GraffitiXR's own engine (MobileGS) calls the painted reference marks and what it captures from them
+the **Doodle**. SphereSLAM uses three words of its own. They are stages of one pipeline and are not
+interchangeable (from SphereSLAM 0.26.6's sources):
+
+| Word | What it is in SphereSLAM | Where it shows |
+| :--- | :--- | :--- |
+| **Target** | The physical flat patch of wall the camera aims at: the thing tracking holds or loses. Judged as an image only, never as features. | `TargetQuality` / `TargetQualityReport` (size, contrast, sharpness, clipping); "while the target is lost"; the standalone **Wall Target** capture. |
+| **Reference** | The target's rectified photo, registered with KPM as a page. | `referenceWidthUnits`, `referenceDpi`, `ReferenceTooWeakException`. |
+| **Fingerprint** | The matchable data distilled for relocalization: feature descriptors plus the 3D point each sits at. One interface, two kinds. | `Fingerprint`; `PlanarFingerprint` (from a reference page, points on the wall plane); `TileFingerprint` (from off-page photosphere tiles, genuinely 3D points); `PhotosphereFingerprintFrame` (where a planar fingerprint sits in the map). |
+
+A target yields a fingerprint (through its reference page), but a fingerprint needs no target: tile
+fingerprints come from the surroundings. The relocalizer treats both kinds the same.
+
+In GraffitiXR code the split follows the owner. Names for SphereSLAM's data keep SphereSLAM's
+words, for example `StandaloneFingerprintBuilder`, `sphereSlamFingerprint` and the standalone
+"Wall target" strings. Names for the engine's own capture say Doodle, for example
+`common.model.Doodle`, `MetricDoodleBuilder`, `DoodleCreationFlow` and the `doodle.create` rail item.
+
 ## Non-negotiable architecture
 
 SphereSLAM has **two required roles**, selected by device capability.
