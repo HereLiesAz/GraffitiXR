@@ -22,6 +22,9 @@
     <string name="adj_undo">Annuler</string>
     <string name="adj_redo">Rétablir</string>
     <string name="adj_magic_align">Aligner</string>
+    <string name="align_done_paint">Aligné sur la peinture du mur.</string>
+    <string name="align_done_doodle">Aucune peinture correspondante pour l\'instant : le design a été ajusté à ton Gribouillis.</string>
+    <string name="align_unavailable">Capture d\'abord un Gribouillis, puis aligne.</string>
 
     <!-- Overlays & Status -->
     <string name="status_create_grid">Créez une Grille pour commencer.</string>

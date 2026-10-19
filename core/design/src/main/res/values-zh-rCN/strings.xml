@@ -338,6 +338,9 @@
     <string name="adj_undo">撤销</string>
     <string name="adj_redo">重做</string>
     <string name="adj_magic_align">对齐</string>
+    <string name="align_done_paint">已与墙上的颜料对齐。</string>
+    <string name="align_done_doodle">尚无匹配的颜料，因此设计已适配到你的随手画。</string>
+    <string name="align_unavailable">请先捕获随手画，再进行对齐。</string>
 
 
     <string name="status_create_grid">创建一个网格以开始。</string>

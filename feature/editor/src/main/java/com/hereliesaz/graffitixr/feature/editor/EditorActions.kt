@@ -48,7 +48,11 @@ interface EditorActions {
      * again to put it back exactly where it was. Adjustments and effects are untouched by both.
      */
     fun onResetClicked()
-    fun onMagicClicked()
+    /**
+     * Align's fallback: fit the AR placement to the Doodle's anchor border. The first choice,
+     * matching paint already on the wall, lives in the AR layer and is applied with applyArFit.
+     */
+    fun alignToAnchor(): AlignToAnchorResult
 
     fun toggleImageLock()
 
@@ -80,4 +84,14 @@ interface EditorActions {
 
     fun onAdjustClicked()
     fun onDismissPanel()
+}
+
+/** What [EditorActions.alignToAnchor] did. */
+enum class AlignToAnchorResult {
+    /** The AR placement now fits the anchor border. */
+    FITTED,
+    /** The AR placement is pinned; the locked notice was shown and nothing moved. */
+    LOCKED,
+    /** No anchor size (no Doodle captured on this project) or nothing to fit yet. */
+    NO_ANCHOR,
 }

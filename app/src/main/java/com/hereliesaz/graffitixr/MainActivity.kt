@@ -2506,10 +2506,8 @@ class MainActivity : AppCompatActivity() {
                             arViewModel.toggleMeasure()
                         },
                     )
-                    // Align (onMagicClicked) — fit the design to the established anchor's extent (falling back to a
-                    // legibility auto-tune when there is no anchor yet). onMagicClicked was
-                    // implemented and unreachable: the "Magic Wand" the adjustments panel's doc
-                    // still described had been removed from that panel's action row.
+                    // Align — fit the design to paint already on the wall (ArViewModel.alignToPaint), else to
+                    // the Doodle's anchor border (EditorViewModel.alignToAnchor).
                     azRailSubItem(
                         id = "mode.ar.magic",
                         hostId = railHostOf("mode.ar.magic"),
@@ -2517,7 +2515,25 @@ class MainActivity : AppCompatActivity() {
                         color = navItemColor,
                         shape = AzButtonShape.NONE,
                         disabled = showLibrary,
-                        onClick = { editorViewModel.onMagicClicked() },
+                        onClick = {
+                            // Paint already on the wall first; failing that, the Doodle's anchor
+                            // border; failing that, say why nothing moved. Never a tone change.
+                            if (!editorViewModel.arPlacementLocked()) {
+                                arViewModel.alignToPaint { fit ->
+                                    val msg = if (fit != null) {
+                                        editorViewModel.applyArFit(fit.dx, fit.dy, fit.dThetaRad, fit.scale)
+                                        DesignR.string.align_done_paint
+                                    } else when (editorViewModel.alignToAnchor()) {
+                                        com.hereliesaz.graffitixr.feature.editor.AlignToAnchorResult.FITTED ->
+                                            DesignR.string.align_done_doodle
+                                        com.hereliesaz.graffitixr.feature.editor.AlignToAnchorResult.LOCKED -> null
+                                        com.hereliesaz.graffitixr.feature.editor.AlignToAnchorResult.NO_ANCHOR ->
+                                            DesignR.string.align_unavailable
+                                    }
+                                    msg?.let { Toast.makeText(context, context.getString(it), Toast.LENGTH_SHORT).show() }
+                                }
+                            }
+                        },
                     )
                     // CV view — a composited preview of everything the computer vision is looking for,
                     // drawn over the design, with a legend of what each colour is and how much of it

@@ -5229,6 +5229,21 @@ class ArViewModel @Inject constructor(
     @Volatile private var autoFitArmed = false
     @Volatile private var lastGuideKey: String? = null
 
+    /**
+     * Align, first choice: fit the design to paint already on the wall (the same native match the
+     * automatic fit runs), on demand. [onResult] gets the fit, or null when there is no match (bare
+     * wall, no capture photo, standalone page frame, too few agreeing features); it runs on the main
+     * thread. A success also disarms the automatic fit, which would only repeat it.
+     */
+    fun alignToPaint(onResult: (DesignFit?) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val r = slamManager.autoFitDesign()
+            if (r != null) autoFitArmed = false
+            val fit = r?.let { DesignFit(it[0], it[1], it[2], it[3]) }
+            withContext(Dispatchers.Main) { onResult(fit) }
+        }
+    }
+
     private fun tryAutoFit() {
         if (!autoFitArmed) return
         viewModelScope.launch(Dispatchers.IO) {

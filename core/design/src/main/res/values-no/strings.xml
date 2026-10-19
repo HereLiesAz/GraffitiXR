@@ -332,6 +332,9 @@
     <string name="adj_undo">Angre</string>
     <string name="adj_redo">Gjenta</string>
     <string name="adj_magic_align">Rett inn</string>
+    <string name="align_done_paint">Rettet inn etter malingen på veggen.</string>
+    <string name="align_done_doodle">Ingen samsvarende maling ennå, så designet ble tilpasset Krusedullen din.</string>
+    <string name="align_unavailable">Ta først et bilde av en Krusedull, og rett deretter inn.</string>
 
     <!-- Overlays & Status -->
     <string name="status_create_grid">Lag et rutenett for å starte.</string>

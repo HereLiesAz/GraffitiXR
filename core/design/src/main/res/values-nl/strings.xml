@@ -337,6 +337,9 @@
     <string name="adj_undo">Ongedaan maken</string>
     <string name="adj_redo">Opnieuw uitvoeren</string>
     <string name="adj_magic_align">Uitlijnen</string>
+    <string name="align_done_paint">Uitgelijnd op de verf op de muur.</string>
+    <string name="align_done_doodle">Nog geen overeenkomende verf, dus het ontwerp is op je Krabbel afgestemd.</string>
+    <string name="align_unavailable">Leg eerst een Krabbel vast en lijn dan uit.</string>
 
 
     <string name="status_create_grid">Maak een raster om te beginnen.</string>

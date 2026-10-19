@@ -344,7 +344,7 @@ class EditorViewModel @Inject constructor(
         // leaks into the new one. Undo history is the sharpest case: left uncleared, pressing
         // Undo in the new project restored and persisted the OLD project's design (it was never
         // cleared anywhere but the null-project path, which a switch never hits). The decoded
-        // "before effects" cache and the AR target extent from Magic are the same class of bug —
+        // "before effects" cache and the AR anchor extent Align fits to are the same class of bug —
         // silently applying stale, previous-project state to the one now on screen.
         history.clear()
         updateHistoryCounts()
@@ -352,7 +352,8 @@ class EditorViewModel @Inject constructor(
         // judge them against this one's design.
         writtenDesignPaths.clear()
         designSourceBitmap = null
-        anchorHalfExtentMeters = null
+        anchorHalfExtentMeters = project.anchorHalfExtentM.takeIf { it.size == 2 && it[0] > 0f && it[1] > 0f }
+            ?.let { it[0] to it[1] }
 
         // Reclaim design images superseded in earlier sessions (the in-memory tracking above only
         // knows this session's writes). Best-effort; the age bound keeps it clear of a new import.
@@ -1235,7 +1236,14 @@ class EditorViewModel @Inject constructor(
     }
 
     fun setAnchorExtent(halfW: Float, halfH: Float) {
+        if (!(halfW > 0f && halfH > 0f && halfW.isFinite() && halfH.isFinite())) return
         anchorHalfExtentMeters = Pair(halfW, halfH)
+        val id = projectRepository.currentProject.value?.id ?: return
+        launchIoCatching {
+            projectRepository.updateProject { p ->
+                if (p.id == id) p.copy(anchorHalfExtentM = listOf(halfW, halfH)) else p
+            }
+        }
     }
 
     /**
@@ -1267,39 +1275,26 @@ class EditorViewModel @Inject constructor(
         return cur.copy(offsetX = 0f, offsetY = 0f, scale = scale, rotation = 0f, rotationX = 0f, rotationY = 0f)
     }
 
-    override fun onMagicClicked() {
-        val mode = _uiState.value.editorMode
-        val extent = anchorHalfExtentMeters
-        if (mode == EditorMode.AR && extent != null) {
-            prepareArPlacementEdit()
-            val cur = _uiState.value.modeAdjustments[EditorMode.AR] ?: ModeAdjustment()
-            if (cur.isTransformLocked) {
-                _uiState.update { it.copy(showLockedFeedback = true) }
-                return
-            }
-            val fitted = anchorFitAdjustment(extent.first, extent.second)
-            if (fitted != null) {
-                pushHistory()
-                clearTransformStash()
-                dispatch(EditorIntent.SetModeAdjustment(EditorMode.AR, fitted))
-                saveProject()
-                emitModeTransform(EditorMode.AR)
-                return
-            }
-            // No quad size yet (the renderer hasn't fitted the design): fall through to the tone lift.
-        }
+    override fun alignToAnchor(): AlignToAnchorResult {
+        if (_uiState.value.editorMode != EditorMode.AR) return AlignToAnchorResult.NO_ANCHOR
+        val extent = anchorHalfExtentMeters ?: return AlignToAnchorResult.NO_ANCHOR
+        prepareArPlacementEdit()
+        if (arPlacementLocked()) return AlignToAnchorResult.LOCKED
+        // No quad size yet (the renderer hasn't fitted the design), or no design: nothing to fit.
+        val fitted = anchorFitAdjustment(extent.first, extent.second) ?: return AlignToAnchorResult.NO_ANCHOR
         pushHistory()
         clearTransformStash()
-        if (dispatchModeAdjustIfInMode { it.copy(brightness = 0.1f, contrast = 1.2f, saturation = 1.1f) }) {
-            // Outside DESIGN the tone lift is a per-mode overlay like every other tone control.
-            saveProject()
-            emitModeTransform(mode)
-        } else {
-            // Only in DESIGN does it edit the design itself.
-            updateDesign { it.copy(brightness = 0.1f, contrast = 1.2f, saturation = 1.1f) }
-            saveProject()
-            emitActiveLayerProps()
-        }
+        dispatch(EditorIntent.SetModeAdjustment(EditorMode.AR, fitted))
+        saveProject()
+        emitModeTransform(EditorMode.AR)
+        return AlignToAnchorResult.FITTED
+    }
+
+    /** True (and the locked notice shown) when the AR placement is pinned, so Align must not move it. */
+    fun arPlacementLocked(): Boolean {
+        val locked = _uiState.value.modeAdjustments[EditorMode.AR]?.isTransformLocked == true
+        if (locked) _uiState.update { it.copy(showLockedFeedback = true) }
+        return locked
     }
 
     override fun onAdjustClicked() = dispatch(EditorIntent.ToggleAdjustPanel)

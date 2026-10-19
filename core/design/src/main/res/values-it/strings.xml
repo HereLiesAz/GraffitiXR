@@ -332,6 +332,9 @@
     <string name="adj_undo">Annulla</string>
     <string name="adj_redo">Ripeti</string>
     <string name="adj_magic_align">Allinea</string>
+    <string name="align_done_paint">Allineato alla vernice sul muro.</string>
+    <string name="align_done_doodle">Nessuna vernice corrispondente per ora: il design è stato adattato al tuo Scarabocchio.</string>
+    <string name="align_unavailable">Acquisisci prima uno Scarabocchio, poi allinea.</string>
 
     <!-- Overlays & Status -->
     <string name="status_create_grid">Crea una Griglia per iniziare.</string>

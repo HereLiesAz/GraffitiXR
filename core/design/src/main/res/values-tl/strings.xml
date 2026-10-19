@@ -126,6 +126,9 @@
     <string name="adj_undo">I-undo</string>
     <string name="adj_redo">Gawin muli</string>
     <string name="adj_magic_align">Ihanay</string>
+    <string name="align_done_paint">Inihanay sa pintura sa pader.</string>
+    <string name="align_done_doodle">Wala pang tumutugmang pintura, kaya iniangkop ang disenyo sa iyong Guhit-guhit.</string>
+    <string name="align_unavailable">Kumuha muna ng Guhit-guhit, saka ihanay.</string>
     <string name="status_create_grid">Gumawa ng Grid para magsimula.</string>
     <string name="status_scan_surfaces">I-scan ang mga surface sa paligid mo.</string>
     <string name="status_tap_surface">I-tap ang isang ibabaw upang ilagay ang anchor.</string>

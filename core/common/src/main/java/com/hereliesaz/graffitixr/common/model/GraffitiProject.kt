@@ -344,6 +344,12 @@ data class GraffitiProject(
     // keeps the mural the same real-world size on every later visit instead of re-fitting to wherever
     // the artist happens to stand. Height follows the design's aspect. -1 = never placed.
     val arDesignHalfWidthM: Float = -1f,
+    /**
+     * Half-width and half-height, in metres, of the anchor border measured at the last Doodle
+     * capture (empty when unknown). Align's fallback fit scales the design to it; kept here so the
+     * fit still works after the project is reopened.
+     */
+    val anchorHalfExtentM: List<Float> = emptyList(),
 
     /**
      * Real wall width in metres, measured by the artist with AR Measure (two taps on the plane the

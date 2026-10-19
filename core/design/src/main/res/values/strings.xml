@@ -368,6 +368,10 @@
     <string name="adj_reset">Reset placement</string>
     <string name="adj_restore_placement">Restore placement</string>
     <string name="adj_magic_align">Align</string>
+    <!-- Toasts after Align: matched paint on the wall, fell back to the Doodle's anchor border, or could not align. -->
+    <string name="align_done_paint">Aligned to the paint on the wall.</string>
+    <string name="align_done_doodle">No matching paint yet, so the design was fitted to your Doodle.</string>
+    <string name="align_unavailable">Capture a Doodle first, then Align.</string>
 
     <!-- Overlays & Status -->
     <string name="status_create_grid">Create a Grid to start.</string>
