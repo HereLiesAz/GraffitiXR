@@ -348,6 +348,8 @@ class ArRenderer(
     private var haveIdlePose = false
     private var noMotionSinceMs = 0L
     private var resumeHoldUntilMs = 0L
+    // Set by [requestResume]; the next frame re-arms PoseFusion's cold snap.
+    @Volatile private var resumedSinceLastFrame = false
     private var lastHeavyWorkMs = 0L
 
     private val anchorOrchestrator = AnchorOrchestrator()
@@ -2088,7 +2090,8 @@ class ArRenderer(
             }
             // Re-arm the hard cold-snap whenever ARCore isn't tracking (pocket / screen-off / loss), so
             // the next confident relocalization snaps the overlay back instantly rather than easing in.
-            if (!isTracking) poseFusion.markRelocalizing()
+            if (!isTracking || resumedSinceLastFrame) poseFusion.markRelocalizing()
+            resumedSinceLastFrame = false
             val depthSupported = depthApiEnabled && activeSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
 
             val yawRad = kotlin.math.atan2(-viewMatrix[2].toDouble(), -viewMatrix[10].toDouble())
@@ -3911,6 +3914,9 @@ class ArRenderer(
         try {
             val s = session ?: return SessionLifecycleOutcome.NoSession
             s.resume()
+            // The phone may have moved anywhere while paused (pocket, screen off). ARCore does not
+            // always report a non-tracking frame first, so arm the cold snap here as well.
+            resumedSinceLastFrame = true
             return SessionLifecycleOutcome.Applied
         } catch (e: Exception) {
             return SessionLifecycleOutcome.Failed(e)
