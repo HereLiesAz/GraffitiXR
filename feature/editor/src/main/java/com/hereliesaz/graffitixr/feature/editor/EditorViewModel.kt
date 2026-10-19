@@ -86,6 +86,10 @@ internal fun standaloneArAdjustmentForProject(project: GraffitiProject): ModeAdj
     }
 }
 
+/** The AR scale range a fit may land in; the same bounds the gesture transform clamps to. */
+internal const val AR_FIT_MIN_SCALE = 0.1f
+internal const val AR_FIT_MAX_SCALE = 10f
+
 @HiltViewModel
 class EditorViewModel @Inject constructor(
     private val projectRepository: ProjectRepository,
@@ -1336,7 +1340,8 @@ class EditorViewModel @Inject constructor(
      * adjustment, as one undoable step. [dx]/[dy] metres, [dThetaRad] CCW and [scaleRatio] are the
      * design's move in its CURRENT local frame. The renderer composes T(pan) · Rz(-rotation) · S(scale),
      * so the offset is rotated into the pan frame and the rotation sign flipped to match.
-     * Returns whether the fit was applied (false for a pinned placement or a malformed fit). A move
+     * Returns whether the fit was applied (false for a pinned placement, a malformed fit, or one whose
+     * scale would leave [AR_FIT_MIN_SCALE]..[AR_FIT_MAX_SCALE]). A move
      * voids a pending Reset restore, like any other direct placement edit.
      */
     fun applyArFit(dx: Float, dy: Float, dThetaRad: Float, scaleRatio: Float): Boolean {
@@ -1344,6 +1349,9 @@ class EditorViewModel @Inject constructor(
         prepareArPlacementEdit()
         val cur = _uiState.value.modeAdjustments[EditorMode.AR] ?: ModeAdjustment()
         if (cur.isTransformLocked) return false
+        // A fit needing a scale past the bounds would be applied only in part: refused whole.
+        val nextScale = cur.scale * scaleRatio
+        if (nextScale < AR_FIT_MIN_SCALE || nextScale > AR_FIT_MAX_SCALE) return false
         clearTransformStash()
         // Snapshot AR explicitly: the fit may land while another mode is on screen.
         history.pushProperty(currentDesignSnapshot(), EditorMode.AR, cur)
@@ -1354,7 +1362,7 @@ class EditorViewModel @Inject constructor(
             offsetX = cur.offsetX + c * dx - sn * dy,
             offsetY = cur.offsetY + sn * dx + c * dy,
             rotation = cur.rotation - Math.toDegrees(dThetaRad.toDouble()).toFloat(),
-            scale = (cur.scale * scaleRatio).coerceIn(0.1f, 10f),
+            scale = nextScale,
         )
         dispatch(EditorIntent.SetModeAdjustment(EditorMode.AR, next))
         saveProject()
