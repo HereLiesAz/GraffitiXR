@@ -308,10 +308,12 @@ class PoseFusion {
             val spreadOk = !(spread >= 0f) || spread >= MIN_SNAP_SPREAD   // unmeasured does not block
             val highConf = inlierRatio >= COLD_SNAP_INLIER_RATIO && inliers >= COLD_SNAP_MIN_INLIERS && spreadOk
 
-            // A fix that diverges from the standing correction but lacks the confidence to snap: hold
-            // it until enough consecutive fixes agree. The first lock (no correction yet) and a
-            // tracking-loss relock (coldStart) are exempt, they have nothing to disagree with.
-            val needsAgreement = !coldStart && applied != null && cold && !highConf
+            // A fix that DISAGREES with the standing correction but lacks the confidence to snap: hold
+            // it until enough consecutive fixes agree. Only the very first lock (no correction yet) is
+            // exempt -- it has nothing to disagree with. A relock after a tracking loss is not exempt:
+            // coming out of a pocket is exactly when a "false twin" on brick or tile shows up.
+            val disagrees = applied != null && diverged(applied, corrected)
+            val needsAgreement = disagrees && !highConf
             var agreed = true
             if (needsAgreement) {
                 val pending = pendingDivergent
@@ -324,7 +326,10 @@ class PoseFusion {
             correction = if (!agreed) {
                 lastState = FusionState.RELOCK_REFUSED
                 correction              // the standing correction is unchanged
-            } else if (cold && highConf) {
+            } else if (cold && (highConf || (coldStart && applied != null && spreadOk && inliers >= COLD_SNAP_MIN_INLIERS))) {
+                // After a loss, a fix that is spread-gated and agrees (with the drawn pose, or with
+                // the fixes before it) is the wall found again: snap to it, don't ease in over many
+                // relocks while the overlay sits in the wrong place.
                 coldStart = false
                 lastState = FusionState.COLD_SNAP
                 lastAlpha = -1f          // a snap has no blend rate; -1 says so rather than 1.0

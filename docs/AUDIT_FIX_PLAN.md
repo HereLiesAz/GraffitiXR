@@ -13,38 +13,39 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
 
 ## A. Pocket, screen-off and snap-back
 
-- [ ] **A1. The relocalizer gets no frames while ARCore is lost.**
+- [x] **A1. The relocalizer gets no frames while ARCore is lost.**
   - Where: `ArRenderer.kt:2949-2950` (`if (isTracking && frameCount % throttleRate == 0)` wraps `feedYuvFrame`).
   - Effect: snap-back waits for ARCore to recover on its own first. The lost-case sensor-turn pass (`MobileGS.cpp:915-936`) can never fire on ARCore.
   - Fix: feed frames whether or not ARCore is tracking (the native side's `relocWantsFrame` already bounds the rate), and use the native hunt cadence after a loss.
-- [ ] **A2. Frame feed is too slow after the anchor exists.**
+- [x] **A2. Frame feed is too slow after the anchor exists.**
   - Where: `ArRenderer.kt:2949` feeds every 10th render frame (about 3–6 Hz), below the native hunt pace (60 ms, `MobileGS.h:103`).
   - Fix: let `relocWantsFrame` pace it instead of a fixed divisor.
-- [ ] **A3. A dark pocket trips the "broken stereo" recovery.**
+- [x] **A3. A dark pocket trips the "broken stereo" recovery.**
   - Where: `ArViewModel.kt:5044-5054` → `recoverFromBrokenStereo()` (`:5137`). The point count reads 0 once the anchor exists (`ArRenderer.kt:2647`, `:3066`, `:579-588`).
   - Effect: the session is reconfigured mid-mural and stereo depth is turned off for good.
   - Fix: never trigger it once `isAnchorEstablished`.
-- [ ] **A4. Weak, disagreeing fixes skip the agreement check after any loss.**
+- [x] **A4. Weak, disagreeing fixes skip the agreement check after any loss.**
   - Where: `PoseFusion.kt:314` (`needsAgreement = !coldStart && …`). `coldStart` is set again on every non-tracking frame (`ArRenderer.kt:2086`).
   - Effect: a "false twin" on brick or tile moves the overlay.
   - Fix: exempt only the very first lock (no correction yet), not every relock after a loss.
 - [ ] **A5. A correct relock after a loss eases in instead of snapping.**
   - Where: `PoseFusion.kt:309, 327-337`. Below COLD_SNAP the blend is about 0.07 per relock. The ratio's denominator (`MobileGS.cpp:1222`) counts every pass plus the map and paint correspondences.
   - Fix: on a cold start, snap on a spread-gated bar, and compute the inlier ratio per correspondence source.
+  - Done: the snap bar. The per-source ratio lands with B10.
 - [ ] **A6. No touch lock in AR while pocketed.**
   - Where: `MainActivity.kt:741` keeps the screen on, but Freeze exists only in TRACE (`:2758-2770`).
   - Effect: fabric touches drag the overlay, switch modes (tearing AR down) or re-capture.
   - Fix: block input while the proximity sensor is covered, and offer Freeze in AR.
-- [ ] **A7. A pocket longer than 10 s raises a tracking-failure warning.**
+- [x] **A7. A pocket longer than 10 s raises a tracking-failure warning.**
   - Where: `ArViewModel.kt:4976-4979`, shown at `MainActivity.kt:2902`.
   - Fix: only while `!isAnchorEstablished`.
-- [ ] **A8. The badge says "locked" before any relock.**
+- [x] **A8. The badge says "locked" before any relock.**
   - Where: `MainActivity.kt:1656-1660` counts HOLDING as locked.
   - Fix: HOLDING after a loss reads as searching until a relock lands.
 - [ ] **A9. The overlay can jump when ARCore's own anchor resumes after a doodle relock.**
   - Where: `AnchorOrchestrator.kt:167-179`. The correction is stored relative to a frozen last-good base.
   - Fix: when the ARCore anchor resumes, re-base the correction so the composed pose is continuous.
-- [ ] **A10. A config-change `onDestroy` leaves `isAnchorEstablished` true with no session.**
+- [x] **A10. A config-change `onDestroy` leaves `isAnchorEstablished` true with no session.**
   - Where: `MainActivity.kt:2218` → `destroyArSession()`.
   - Fix: reset the anchor state there as `exitArMode` does.
 - [ ] **A11. Pre-Phase-2 projects (no capture pose) can never snap back without a re-capture.**

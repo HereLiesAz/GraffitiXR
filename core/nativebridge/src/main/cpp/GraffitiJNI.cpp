@@ -500,6 +500,15 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateAnchorTransf
     }
 }
 
+// Whether the reloc worker would take a frame now (it is idle and there is a Doodle). Lets the
+// caller skip acquiring and assembling a camera image the worker would only drop, so it can offer
+// every frame and let the worker's own pace (hunting / locked back-off) set the rate.
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRelocWantsFrame(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    return (gSlamEngine && gSlamEngine->relocWantsFrame()) ? JNI_TRUE : JNI_FALSE;
+}
+
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
         JNIEnv* env, jobject thiz, jobject yBuffer, jobject uBuffer, jobject vBuffer,

@@ -816,6 +816,9 @@ class SlamManager @Inject constructor(
         nativeUpdateCamera(viewMatrix, projectionMatrix, timestampNs)
     }
 
+    /** Whether the reloc worker would take a frame now: idle, with a Doodle to match. Cheap. */
+    fun relocWantsFrame(): Boolean = nativeRelocWantsFrame()
+
     fun feedYuvFrame(
         yBuffer: ByteBuffer,
         uBuffer: ByteBuffer,
@@ -1097,6 +1100,7 @@ class SlamManager @Inject constructor(
     private external fun nativeGetCleanWallStatus(): Int
     private external fun nativeSetChangePassEnabled(enabled: Boolean)
     private external fun nativeExportPaintGrid(): ByteArray?
+    private external fun nativeRelocWantsFrame(): Boolean
     private external fun nativeAutoFitDesign(minimumEvidence: Boolean): FloatArray?
     private external fun nativeGetLastAutoFitResult(): Int
     private external fun nativeRestorePaintGrid(state: ByteArray)

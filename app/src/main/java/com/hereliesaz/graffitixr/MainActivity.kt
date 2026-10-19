@@ -1652,12 +1652,14 @@ class MainActivity : AppCompatActivity() {
                             // returned immediately, per RelocStatusBadge's own state machine below).
                             if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && arUiState.isAnchorEstablished) {
                                 // Locked = relocalization has actually matched the saved target. Painting
-                                // progress is NOT a lock signal: it is 0 on an unpainted wall.
-                                val relocLocked = arUiState.paintingProgress > 0f ||
-                                    arUiState.relocDiagnostics.reject == RelocReject.OK ||
-                                    arUiState.fusionDiagnostics.state in setOf(
+                                // progress is NOT a lock signal (it is 0 on an unpainted wall, and it stays
+                                // up after a loss). A standing fusion correction counts only while ARCore
+                                // tracks (isScanning): out of a pocket it is HOLDING the pre-loss pose,
+                                // which is searching, not locked, until a relock lands.
+                                val relocLocked = arUiState.relocDiagnostics.reject == RelocReject.OK ||
+                                    (arUiState.isScanning && arUiState.fusionDiagnostics.state in setOf(
                                         FusionState.COLD_SNAP, FusionState.BLENDING, FusionState.HOLDING
-                                    )
+                                    ))
                                 if (mainUiState.hasArCoreDoodle == true && !relocLocked) {
                                     // A saved target exists but is not matched: say so, point the
                                     // artist the way the saved compass attitude says, and after a

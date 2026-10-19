@@ -1808,6 +1808,8 @@ class ArViewModel @Inject constructor(
     // every AR-mode entry; updated each time setTrackingState reports tracking.
     @Volatile private var arEntryTimestampMs: Long = 0L
     @Volatile private var lastTrackingTimestampMs: Long = 0L
+    /** ARCore has tracked at least once since this AR entry: whatever comes after is a loss, not a broken start. */
+    @Volatile private var trackedSinceArEntry: Boolean = false
     private val trackingFailureGraceMs: Long = 10_000L
     // Forced-stereo "stuck" detection must beat the 5s input-timeout ANR, so it's much shorter
     // than the general tracking-failure grace.
@@ -2656,6 +2658,7 @@ class ArViewModel @Inject constructor(
             val now = System.currentTimeMillis()
             arEntryTimestampMs = now
             lastTrackingTimestampMs = now
+            trackedSinceArEntry = false
             // A fresh AR session gets a fresh watcher. This view model outlives the session — AR is
             // a mode switch inside it — so without this the previous session's edge state, latches
             // and spent budget carry over: the first tick of session two compares against session
@@ -2708,30 +2711,7 @@ class ArViewModel @Inject constructor(
         // against the DEAD session's design pose. Ordering is the whole fix.
         renderer?.isDestroying = true
         lastMappingPausedCmd = null
-        // Drop the marks-centering override so a later AR re-entry (or a different project) doesn't
-        // center the overlay on a stale target's marks before a new one is built/restored.
-        slamManager.overlayMarkCenterLocal = null
-        // 0.9 — same lifetime: without it PoseFusion cannot compose a correction at all.
-        slamManager.captureAnchorCam = null
-        // Same argument, for the anchor. The ARCore session and its anchors do not survive this, so
-        // "an anchor has been established" must not either — otherwise the next capture's
-        // `awaitAnchorTransform` returns immediately with the previous session's pose, which is the
-        // identity-shaped bug it was written to prevent, wearing different numbers.
-        slamManager.clearAnchorEstablished()
-        // The partition's in-memory state belongs to the session that built it: the retained design
-        // footprint is expressed relative to an anchor that is about to stop existing.
-        latestDesignFootprint = null
-        dropPartitionState()
-        // The UI's copy of "an anchor exists" is a separate latch, set true in
-        // onPrimaryAnchorEstablished and — until this line — never set false anywhere in the
-        // repository. Left standing it made the NEXT session pause splat mapping on its first
-        // tracking frame (updateAutoMapping gates on it) and report scanPhase COMPLETE on a session
-        // that never scanned. Sixth field to be cleared in one place and not its sibling.
-        _uiState.update {
-            it.copy(isAnchorEstablished = false, backboneTooSmall = false, measure = MeasureUi())
-        }
-        // The scan progression (visited yaw sectors, the COMPLETE latch) belongs to this session too.
-        resetScanProgress()
+        resetSessionAnchorState()
         // Anchor gone — clear any manual override and return the live mode to the artist's saved
         // preference, which re-arms acquire-then-lock for an AUTO preference. The preference itself
         // (UI state and DataStore) is untouched.
@@ -4671,6 +4651,39 @@ class ArViewModel @Inject constructor(
         autoSaveJob = null
     }
 
+    /**
+     * Everything that belongs to the AR session's anchor, cleared when the session goes away: by
+     * [exitArMode], and by [destroyArSession] (a finishing Activity, or a recreation the manifest
+     * does not absorb -- font scale, locale, density -- which used to close the session yet leave the
+     * UI saying an anchor existed).
+     */
+    private fun resetSessionAnchorState() {
+        // Drop the marks-centering override so a later AR re-entry (or a different project) doesn't
+        // center the overlay on a stale target's marks before a new one is built/restored.
+        slamManager.overlayMarkCenterLocal = null
+        // 0.9 — same lifetime: without it PoseFusion cannot compose a correction at all.
+        slamManager.captureAnchorCam = null
+        // Same argument, for the anchor. The ARCore session and its anchors do not survive this, so
+        // "an anchor has been established" must not either — otherwise the next capture's
+        // `awaitAnchorTransform` returns immediately with the previous session's pose, which is the
+        // identity-shaped bug it was written to prevent, wearing different numbers.
+        slamManager.clearAnchorEstablished()
+        // The partition's in-memory state belongs to the session that built it: the retained design
+        // footprint is expressed relative to an anchor that is about to stop existing.
+        latestDesignFootprint = null
+        dropPartitionState()
+        // The UI's copy of "an anchor exists" is a separate latch, set true in
+        // onPrimaryAnchorEstablished and — until this line — never set false anywhere in the
+        // repository. Left standing it made the NEXT session pause splat mapping on its first
+        // tracking frame (updateAutoMapping gates on it) and report scanPhase COMPLETE on a session
+        // that never scanned. Sixth field to be cleared in one place and not its sibling.
+        _uiState.update {
+            it.copy(isAnchorEstablished = false, backboneTooSmall = false, measure = MeasureUi())
+        }
+        // The scan progression (visited yaw sectors, the COMPLETE latch) belongs to this session too.
+        resetScanProgress()
+    }
+
     fun destroyArSession(): Job {
         // Off-main for the same reason as exitArMode: session.close() blocks until any
         // in-flight session.update() returns, which never happens when the GL thread is
@@ -4681,6 +4694,8 @@ class ArViewModel @Inject constructor(
         // Latch isDestroying synchronously so a renderer created before the teardown takes the
         // mutex (activity recreation) is never handed the session that is about to close.
         isDestroying = true
+        renderer?.isDestroying = true
+        resetSessionAnchorState()
         val ownedRenderer = renderer
         return teardownScope.launch {
             performFullCleanupLocked(ownedRenderer)
@@ -4972,9 +4987,12 @@ class ArViewModel @Inject constructor(
             }
         }
 
-        if (isTracking) lastTrackingTimestampMs = nowMs
+        if (isTracking) { lastTrackingTimestampMs = nowMs; trackedSinceArEntry = true }
+        // "Tracking failed" is for an AR start that never got going. Once the wall is anchored, a
+        // long loss is the phone in a pocket, which the Doodle relocks from; it is not a failure.
         val trackingFailed = isInArMode &&
                 !isTracking &&
+                !_uiState.value.isAnchorEstablished &&
                 arEntryTimestampMs > 0L &&
                 (nowMs - lastTrackingTimestampMs) > trackingFailureGraceMs
 
@@ -5041,10 +5059,15 @@ class ArViewModel @Inject constructor(
         // (ARCore motion-stereo ComputeDisparity / spherical_rectifier fails). Detect it FAST —
         // well before the 5s input-timeout ANR — and reconfigure the LIVE session to mono so the
         // first AR entry recovers instead of crashing. Persisted so future sessions skip stereo too.
+        // Only a start that NEVER tracked: a loss after tracking (a dark pocket, screen-off) also reads
+        // zero points, and reconfiguring the session then -- and dropping stereo for good -- would
+        // break the very relock the Doodle is there for.
         if (!forcedStereoUnstable &&
             isInArMode &&
             isHardwareStereo &&
             !isTracking &&
+            !trackedSinceArEntry &&
+            !_uiState.value.isAnchorEstablished &&
             splatCount == 0 &&
             _uiState.value.ambientScanEnabled &&
             arEntryTimestampMs > 0L &&

@@ -2945,12 +2945,23 @@ class ArRenderer(
             // relocWantsFrame() now rejects that work up front, so a feed the reloc worker isn't ready
             // for costs only the YUV assembly. The worker itself self-limits (200 ms between attempts),
             // so feeding at ~6 Hz keeps it saturated without ever queueing.
+            //
+            // Once the anchor exists the worker sets the pace: every frame is offered and only one it
+            // is ready for (relocWantsFrame) is assembled, so it relocks at its own hunting / locked
+            // back-off. That includes frames while ARCore has LOST tracking -- out of a pocket, after
+            // screen-off -- which is exactly when the Doodle has to find the wall again; gating the
+            // feed on isTracking meant snap-back waited for ARCore to recover by itself first.
             lastStep = "slamFeed"
-            val throttleRate = if (anchorEstablished) 10 else 3 // 6Hz vs 20Hz
-            if (isTracking && frameCount % throttleRate == 0) {
-                // Calculate device motion (linear and angular velocity) for deblurring
+            val throttleRate = 3 // pre-anchor: 20 Hz at 60 fps
+            val feedThisFrame = if (anchorEstablished) slamManager.relocWantsFrame()
+                else isTracking && frameCount % throttleRate == 0
+            if (feedThisFrame) {
+                // Calculate device motion (linear and angular velocity) for deblurring. A lost frame's
+                // pose is ARCore's last guess, not a measurement: no motion from it.
                 val currentPose = camera.displayOrientedPose
-                if (frameCount > 0) {
+                // After a loss (lastQuat null) the first tracked sample only seeds the deltas: the
+                // stored position is from before the loss, so a velocity against it would be a jump.
+                if (isTracking && frameCount > 0 && lastQuat != null) {
                     // Delta-based velocity estimation, over the MEASURED interval. This was hardcoded
                     // to 1/20 s "approx 20Hz throttle", which only ever matched the pre-anchor rate —
                     // post-anchor the same divisor was applied to a 2 Hz sample interval, inflating
@@ -2976,7 +2987,12 @@ class ArRenderer(
                     slamManager.updateDeviceMotion(angVel, linVel)
                     lastQuat = q
                 }
-                lastPoseX = currentPose.tx(); lastPoseY = currentPose.ty(); lastPoseZ = currentPose.tz()
+                if (isTracking) {
+                    lastPoseX = currentPose.tx(); lastPoseY = currentPose.ty(); lastPoseZ = currentPose.tz()
+                    if (lastQuat == null) { lastQuat = currentPose.rotationQuaternion; lastMotionSampleNs = frame.timestamp }
+                } else {
+                    lastMotionSampleNs = 0L; lastQuat = null   // the next tracked sample starts fresh
+                }
 
                 // Calculate rotation code to align sensor-native data with display orientation
                 val displayRotation = displayRotationHelper.getRotation()

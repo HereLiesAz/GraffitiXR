@@ -7,7 +7,8 @@ maintain — there is no voxel/splat rendering loop; see [`NATIVE_ENGINE.md`](NA
 ## Relocalization
 
 The native engine's background thread (`relocThreadFunc`) matches the live camera against the wall
-doodle and re-attempts at two cadences: ~5 Hz once locked, ~16 Hz while hunting for a lock — see
+doodle and re-attempts at two cadences: ~5 Hz once locked, ~16 Hz while hunting for a lock. The
+renderer offers every frame, tracked or lost, and builds only the ones the worker is ready for — see
 [`TELEOLOGICAL_SLAM.md`](TELEOLOGICAL_SLAM.md). This runs off the render thread; heavier one-off work
 (doodle generation at target-capture time, SuperPoint inference) currently shares a single
 engine-wide native lock with the per-frame camera/YUV feed, so a capture can visibly stall rendering

@@ -160,7 +160,16 @@ while a thousand features that don't match is an aiming problem.
 
 The reloc thread runs at 5 Hz once locked and ~16 Hz while hunting, since the
 cost of an extra attempt is far smaller than the cost of the overlay staying
-adrift.
+adrift. Once the anchor exists, the renderer offers every camera frame and
+assembles only the ones the worker is ready for (`relocWantsFrame`), so the
+worker's own pace is the real rate. Frames keep coming while ARCore has lost
+tracking (out of a pocket, after screen-off), which is when the Doodle has to
+find the wall.
+
+After a loss, PoseFusion snaps to a spread-gated relock with at least
+`COLD_SNAP_MIN_INLIERS` inliers instead of easing in. A weak fix that disagrees
+with the standing correction still needs `DIVERGED_AGREEMENT` agreeing fixes
+first; only the very first lock is exempt.
 
 ## Open question: the display-rotation convention
 
