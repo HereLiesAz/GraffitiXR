@@ -5257,14 +5257,22 @@ class ArViewModel @Inject constructor(
                 withContext(Dispatchers.Main) { onResult(fit) }
             } finally {
                 alignInFlight.set(false)
+                if (autoFitRetryPending) tryAutoFit()
             }
         }
     }
 
+    /** An automatic fit wanted while a match or a registration was running: run when that ends. */
+    @Volatile private var autoFitRetryPending = false
+
     private fun tryAutoFit() {
         if (!autoFitArmed) return
+        // A design still registering would be matched half-built (old features, no filter sets yet);
+        // updatePaintingGuide calls back here once it has registered.
+        if (artworkRegInFlight.get() || pendingArtworkGuide.get() != null) { autoFitRetryPending = true; return }
         // Shares Align's single flight: two matches from the same placement would both be applied.
-        if (!alignInFlight.compareAndSet(false, true)) return   // stays armed: retried on the next placement change
+        if (!alignInFlight.compareAndSet(false, true)) { autoFitRetryPending = true; return }
+        autoFitRetryPending = false
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val r = slamManager.autoFitDesign() ?: return@launch   // stays armed: retried on the next placement change
@@ -5273,6 +5281,7 @@ class ArViewModel @Inject constructor(
                 Timber.i("Auto-fit applied: ${r[4].toInt()} inliers")
             } finally {
                 alignInFlight.set(false)
+                if (autoFitRetryPending) tryAutoFit()
             }
         }
     }

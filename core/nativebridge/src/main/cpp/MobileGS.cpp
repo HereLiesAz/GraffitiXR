@@ -2940,6 +2940,11 @@ void MobileGS::setArtworkDoodle(const cv::Mat& composite, const uint8_t* depthDa
     }
     if (kps.empty() || descs.empty()) {
         LOGE("setArtworkDoodle: no keypoints detected on target");
+        // The previous design's features stay for progress, but Align must not fit them to this one:
+        // without its grey, autoFitDesign reports not-ready, and the generation voids a fit in flight.
+        std::lock_guard<std::mutex> lock(mMutex);
+        mArtworkGray.release();
+        ++mArtworkGeneration;
         return;
     }
 
