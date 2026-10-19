@@ -11,12 +11,12 @@
     <string name="nav_mockup_info">I-preview ang iyong disenyo na pinagsama-sama sa isang larawan ng isang pader. Walang kinakailangang camera o pag-scan.</string>
     <string name="nav_trace">Bakas</string>
     <string name="nav_trace_info">Gamitin ang iyong disenyo bilang light-table overlay upang masubaybayan ang mga reference na linya sa isang pisikal na ibabaw.</string>
-    <string name="nav_grid">Target</string>
-    <string name="nav_grid_info">Lumikha at pamahalaan ang mga target na AR anchor. Kuhanan ng larawan ang mga reference mark sa dingding upang i-lock ang projection sa lugar.</string>
+    <string name="nav_grid">Guhit-guhit</string>
+    <string name="nav_grid_info">Gumawa at pamahalaan ang iyong Guhit-guhit. Kunan ng larawan ang mga pininturahang reference mark sa pader para i-lock sa lugar ang projection.</string>
     <string name="nav_create">Lumikha</string>
     <string name="nav_create_info">Kuhanan ng larawan ang isang reference mark sa dingding upang lumikha ng bagong AR anchor. Susubaybayan ng app ang markang ito upang panatilihing nakahanay ang iyong projection.</string>
     <string name="nav_refine">Pinuhin</string>
-    <string name="nav_refine_info">I-fine-tune ang posisyon ng isang kasalukuyang AR anchor target.</string>
+    <string name="nav_refine_info">I-fine-tune ang posisyon ng isang umiiral na Guhit-guhit.</string>
     <string name="nav_update">Pag-unlad</string>
     <string name="nav_update_info">Markahan ang mga natapos na bahagi ng iyong mural upang subaybayan ang pag-unlad ng pagpipinta.</string>
     <string name="nav_design">Disenyo</string>
@@ -91,14 +91,14 @@
     <string name="install_arcore">I-install ang ARCore</string>
     <string name="camera_permission_required">Kinakailangan ang pahintulot sa camera para sa AR mode.</string>
     <string name="open_settings">Buksan ang Mga Setting</string>
-    <string name="target_creation_title">TARGET NA PAGLIKHA</string>
-    <string name="target_creation_text">Direktang mag-tap sa iyong mga pininturahan na reference mark sa screen. Ihihiwalay agad sila ng app.</string>
+    <string name="target_creation_title">GRID NG GUHIT-GUHIT</string>
+    <string name="target_creation_text">Kung hindi mo pa nagagawa ang iyong grid ng Guhit-guhit, kunan ng larawan ang pader sa pagpindot sa capture button. Kung hindi, pindutin ang Kanselahin.</string>
     <string name="cancel">Kanselahin</string>
     <string name="diag_copied">KINOPYA ✓</string>
     <string name="diag_title">DEPTH DIAG (i-tap para kopyahin)</string>
     <string name="diag_waiting">Naghihintay para sa unang frame…</string>
     <string name="scan_step_1">Hakbang 1: I-map ang iyong kapaligiran</string>
-    <string name="scan_step_2">Hakbang 2: I-scan ang target na pader</string>
+    <string name="scan_step_2">Hakbang 2: I-scan ang pader</string>
     <string name="plane_confirm_question">Nasa dingding ba ang likhang sining?</string>
     <string name="looks_correct">Mukhang tama</string>
     <string name="redetect">Re-detect</string>
@@ -144,7 +144,7 @@
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">Liwanag ng saklaw</string>
     <string name="settings_anticipation_section">Pag-asam</string>
-    <string name="settings_anticipation_desc">Mga tanaw ng target mula sa lahat ng panig, para mahanap muli ng nawalang overlay ang pader. Mas maraming tanaw ang nakakabalik mula sa mas maraming anggulo pero mas magastos sa baterya at init.</string>
+    <string name="settings_anticipation_desc">Mga tanaw ng Guhit-guhit mula sa lahat ng panig, para mahanap muli ng nawalang overlay ang pader. Mas maraming tanaw ang nakakapag-lock muli mula sa mas maraming anggulo pero mas malakas sa baterya at init.</string>
     <string name="settings_anticipation_distance">Layo</string>
     <string name="settings_anticipation_latitude">Latitud</string>
     <string name="settings_anticipation_longitude">Longhitud</string>
@@ -153,13 +153,13 @@
     <string name="settings_anticipation_heat">Binabawasan ng init nang</string>
     <string name="settings_anticipation_compute">Binabawasan ng load nang</string>
     <string name="settings_anticipation_views">Hanggang %1$d tanaw bawat pahina</string>
-    <string name="settings_fingerprint_features">Fingerprint</string>
+    <string name="settings_fingerprint_features">Guhit-guhit</string>
     <string name="settings_fingerprint_superpoint">SuperPoint</string>
     <string name="settings_fingerprint_half_sphere">Kalahating globo</string>
     <string name="settings_fingerprint_both">Pareho</string>
-    <string name="settings_fingerprint_superpoint_desc">SuperPoint na tampok ng kuha lamang. Matibay sa ilaw at pagkaluma; mga 1.5 MB bawat target. Para sa susunod na target.</string>
-    <string name="settings_fingerprint_half_sphere_desc">ORB na tampok ng kuha at ng 49 na malapitang tanaw nito. Malakas sa malapitan at maliit, wala pang 0.1 MB bawat target. Para sa susunod na target.</string>
-    <string name="settings_fingerprint_both_desc">SuperPoint na tampok ng kuha at ng 49 na malapitang tanaw nito. Pinakamalakas; mga 2–3 MB bawat target. Para sa susunod na target.</string>
+    <string name="settings_fingerprint_superpoint_desc">SuperPoint na tampok ng kuha lamang. Matibay sa ilaw at pagkaluma; mga 1.5 MB bawat Guhit-guhit. Para sa susunod na Guhit-guhit.</string>
+    <string name="settings_fingerprint_half_sphere_desc">ORB na tampok ng kuha at ng 49 na malapitang tanaw nito. Malakas sa malapitan at maliit, wala pang 0.1 MB bawat Guhit-guhit. Para sa susunod na Guhit-guhit.</string>
+    <string name="settings_fingerprint_both_desc">SuperPoint na tampok ng kuha at ng 49 na malapitang tanaw nito. Pinakamalakas; mga 2–3 MB bawat Guhit-guhit. Para sa susunod na Guhit-guhit.</string>
     <string name="settings_power_section">Power</string>
     <string name="settings_privacy_section">Privacy</string>
     <string name="settings_developer_section">Developer</string>
@@ -209,11 +209,11 @@
     <string name="layers_title">Mga layer</string>
     <string name="brush_size_title">Laki ng Brush</string>
     <string name="save_project_hint">Pangalan ng Proyekto</string>
-    <string name="target_guide_desc">Gabay sa Pag-align ng Target</string>
-    <string name="target_captured_desc">Nakuha na Target</string>
-    <string name="target_review_desc">Suriin ang Extracted Target</string>
+    <string name="target_guide_desc">Gabay sa Pag-align ng Guhit-guhit</string>
+    <string name="target_captured_desc">Nakuhang Guhit-guhit</string>
+    <string name="target_review_desc">Suriin ang Hinangong Guhit-guhit</string>
     <string name="target_unwarp_hint">I-drag ang mga sulok upang i-unwarp</string>
-    <string name="target_review_title">Suriin ang Mga Nakuhang Marka</string>
+    <string name="target_review_title">NAKA-LOCK ANG GUHIT-GUHIT</string>
     <string name="fingerprint_closeups_progress">Pinag-aaralan ang pader: yugto %1$d sa %2$d · hakbang %3$d sa %4$d</string>
     <string name="target_exclude">Ibukod</string>
     <string name="target_include">Isama</string>
@@ -230,7 +230,7 @@
     <string name="scan_hint_build_map">Maglakad pakaliwa at pakanan upang bumuo ng mapa</string>
     <string name="scan_hint_closer">Lumapit sa pader</string>
     <string name="scan_hint_higher_lower">I-scan ang mas mataas at mas mababa</string>
-    <string name="reacquiring_target">Hinahanap muli ang target…</string>
+    <string name="reacquiring_target">Hinahanap muli ang Guhit-guhit…</string>
     <string name="desc_bg_mockup">Background Mockup</string>
     <string name="desc_segmentation_preview">Preview ng Segmentation</string>
     <string name="help_mode_host">Mode Switcher: Lumipat sa pagitan ng mga mode ng app. Mga Tagubilin: I-tap para palawakin, pagkatapos ay piliin ang AR, Overlay, Mockup, o Lightbox.</string>
@@ -416,9 +416,9 @@
     <string name="standalone_failure_persisted_target_corrupt">Nawawala o hindi mabasa ang naka-save na target sa pader. Kumuha ng bagong target.</string>
     <string name="standalone_failure_internal">Hindi na naipagpatuloy ng SphereSLAM ang pagsubaybay sa target na ito.</string>
     <string name="standalone_tracking_stopped">Huminto ang tracking ng SphereSLAM. Kunin muli ang target para i-restart ito.</string>
-    <string name="standalone_status_mapping">Nagma-map ang SphereSLAM • i-tap ang Target para magdagdag ng fingerprint</string>
-    <string name="standalone_status_preparing">Inihahanda ang fingerprint target…</string>
-    <string name="standalone_status_finding">Hinahanap ang fingerprint target…</string>
+    <string name="standalone_status_mapping">Nagma-map ang SphereSLAM • i-tap ang Guhit-guhit para idagdag ang iyong Guhit-guhit</string>
+    <string name="standalone_status_preparing">Inihahanda ang target sa pader…</string>
+    <string name="standalone_status_finding">Hinahanap ang target sa pader…</string>
     <string name="standalone_quality_too_small">Masyadong maliit ang target sa pader na iyon pagkatapos ng pagtuwid. Kumuha ng mas malaking bahagi.</string>
     <string name="standalone_quality_low_contrast">Masyadong mababa ang visual contrast ng target sa pader na iyon. Magsama ng mas maraming texture o detalye.</string>
     <string name="standalone_quality_blurry">Masyadong malabo ang target sa pader na iyon para sa maaasahang tracking. Ihawak nang matatag at kunin muli.</string>
@@ -444,15 +444,15 @@
     <string name="ar_feedback_guest_edit_dropped">Hindi maibabahagi sa host ang pagbabagong iyon — mananatili ito sa device na ito</string>
     <string name="ar_feedback_backend_resolving">Tinutukoy pa ang AR backend — subukang mag-host ulit sa ilang saglit</string>
     <string name="ar_feedback_open_project_first">Magbukas ng proyekto bago magbahagi — wala pang maipapadala sa bisita</string>
-    <string name="ar_feedback_host_need_target_arcore">Kumuha at i-lock ang kasalukuyang target sa pader bago mag-host</string>
+    <string name="ar_feedback_host_need_target_arcore">Kunan at i-lock ang kasalukuyang Guhit-guhit bago mag-host</string>
     <string name="ar_feedback_host_need_target_standalone">Kumuha ng standalone na Wall Target bago mag-host</string>
-    <string name="ar_feedback_fingerprint_not_ready">Hindi pa handa ang fingerprint ng pader — panatilihin ang target sa view at subukang mag-host ulit</string>
+    <string name="ar_feedback_fingerprint_not_ready">Hindi pa handa ang Guhit-guhit — panatilihin ito sa view at subukan muli ang \"I-host\"</string>
     <string name="ar_feedback_package_failed">Hindi ma-package ang proyektong ito para ibahagi — subukan munang i-save ito</string>
     <string name="ar_feedback_host_failed">Hindi masimulan ang pagbabahagi: %1$s</string>
     <string name="ar_feedback_join_load_failed">Hindi ma-load ang proyekto ng host — natapos ang session.</string>
     <string name="ar_feedback_join_no_geometry">Hindi nagbigay ang host ng geometry na maaaring pagtugmaan ng ARCore.</string>
     <string name="ar_feedback_join_failed">Hindi nakasali: %1$s</string>
-    <string name="ar_feedback_wall_target_changed">Nagbago ang target sa pader — natapos ang pagbabahagi. Simulan muli ang Host para sa bagong pader.</string>
+    <string name="ar_feedback_wall_target_changed">Nagbago ang Guhit-guhit — natapos ang pagbabahagi. Simulan muli ang \"I-host\" para sa bagong pader.</string>
     <string name="ar_feedback_backend_changed">Nagbago ang tracking backend — natapos ang pagbabahagi. Simulan muli ang pagbabahagi.</string>
     <string name="ar_feedback_camera_busy">Abala o hindi available ang camera — isara ang iba pang camera app, saka muling pumasok sa AR</string>
     <string name="ar_feedback_ar_start_failed">Hindi masimulan ang AR — maaaring ginagamit ng ibang app ang iyong camera</string>
@@ -461,21 +461,21 @@
     <string name="ar_feedback_camera_not_resumed">Hindi nagpatuloy ang AR camera — subukang lumabas sa AR mode at muling pumasok</string>
     <string name="ar_feedback_camera_permission">Hindi available ang camera — suriin ang permiso sa camera, saka muling pumasok sa AR</string>
     <string name="ar_feedback_camera_not_paused">Hindi maayos na na-pause ang AR camera — maaari itong magpatuloy sa background</string>
-    <string name="ar_feedback_backbone_warning">Halos natatakpan ng likhang-sining ang buong pader na nakikita — %1$d na tracked feature lang ang nasa labas nito. Paliitin ito o umatras, kung hindi ay maaaring hindi mag-lock ang target.</string>
-    <string name="ar_feedback_legacy_target_geometry">Ang naka-save na target ng proyektong ito ay ginawa ng mas lumang bersyon at hindi maitatama ang 3D geometry nito. Gawin muli ang target para magamit ito.</string>
+    <string name="ar_feedback_backbone_warning">Halos natatakpan ng likhang-sining ang buong pader na nakikita — %1$d na tracked feature lang ang nasa labas nito. Paliitin ito o umatras, kung hindi ay maaaring hindi mag-lock ang Guhit-guhit.</string>
+    <string name="ar_feedback_legacy_target_geometry">Ang naka-save na Guhit-guhit ng proyektong ito ay ginawa ng mas lumang bersyon at hindi maitatama ang 3D geometry nito. Gawin muli ang Guhit-guhit para magamit ito.</string>
     <string name="ar_feedback_camera_no_frames">Hindi nagpapadala ng mga frame ang camera — lumabas sa AR at subukan muli</string>
     <string name="ar_feedback_camera_recovery_timeout">Ligtas na nag-time out ang pagbawi ng AR camera — lumabas sa AR at muling pumasok</string>
     <string name="ar_feedback_target_prepare_failed">Hindi nahanda ang nakuhang target. Subukan muli.</string>
     <string name="ar_feedback_wall_width_save_failed">Hindi na-save ang lapad ng pader. Subukang mag-save ulit.</string>
     <string name="ar_feedback_unknown_error">hindi kilalang error</string>
-    <string name="reloc_looking">Hinahanap ang iyong target…</string>
+    <string name="reloc_looking">Hinahanap ang iyong Guhit-guhit…</string>
     <string name="reloc_turn_right">Lumiko pakanan nang %1$d°</string>
     <string name="reloc_turn_left">Lumiko pakaliwa nang %1$d°</string>
     <string name="reloc_tilt_up">Itagilid pataas nang %1$d°</string>
     <string name="reloc_tilt_down">Itagilid pababa nang %1$d°</string>
     <string name="reloc_facing_it">Nakaharap ka na rito — dahan-dahang gumalaw pakaliwa at pakanan</string>
-    <string name="reloc_recapture">I-capture muli ang target</string>
-    <string name="ar_feedback_capture_failed">Nabigo ang pagkuha ng target. I-tap para subukan muli.</string>
+    <string name="reloc_recapture">Kunan muli ang Guhit-guhit</string>
+    <string name="ar_feedback_capture_failed">Nabigo ang pagkuha ng Guhit-guhit. I-tap para subukan muli.</string>
 
     <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
     <string name="nav_stencil">Stencil</string>
@@ -488,9 +488,8 @@
 
     <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
     <string name="settings_change_pass">Pagtukoy ng pagbabago (kailangan ng larawan ng malinis na pader)</string>
-    <string name="target_clean_wall_text">Hindi pa namamarkahan? Kunan muna ng larawan ang hubad na pader gamit ang button sa ibaba, saka ipinta ang iyong mga marka. Namarkahan na? I-tap lang ang iyong mga marka.</string>
-    <string name="target_clean_wall_photo">Larawan ng malinis na pader</string>
-    <string name="target_clean_wall_saved">Na-save ang larawan ng malinis na pader. Ulitin</string>
+    <string name="target_shutter_cd">Kunan ng larawan ang hubad na pader</string>
+    <string name="target_shutter_retake_cd">Kunan muli ang larawan ng hubad na pader</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">CV view</string>

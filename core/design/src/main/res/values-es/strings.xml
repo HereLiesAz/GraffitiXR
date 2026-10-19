@@ -37,9 +37,9 @@
     <!-- Description of the Stencil tool, explaining how it creates multi-layer printable templates. -->
 
     <!-- Label for the Target/Grid management menu in AR mode. -->
-    <string name="nav_grid">Objetivo</string>
+    <string name="nav_grid">Garabato</string>
     <!-- Description of Target management, used for anchor creation and management. -->
-    <string name="nav_grid_info">Crea y gestiona objetivos de anclaje AR. Fotografía marcas de referencia pintadas en la pared para bloquear la proyección en su lugar.</string>
+    <string name="nav_grid_info">Crea y gestiona tu Garabato. Fotografía las marcas de referencia pintadas en la pared para fijar la proyección en su lugar.</string>
 
     <!-- Label for the wall survey tool, used to improve AR tracking. -->
     <!-- Description of the Survey tool, explaining its role in tracking accuracy. -->
@@ -52,7 +52,7 @@
     <!-- Label for the action to refine an existing AR anchor. -->
     <string name="nav_refine">Refinar</string>
     <!-- Description of the anchor refinement process. -->
-    <string name="nav_refine_info">Ajusta con precisión la posición de un objetivo de anclaje AR existente.</string>
+    <string name="nav_refine_info">Ajusta con precisión la posición de un Garabato existente.</string>
 
     <!-- Label for the progress tracking tool. -->
     <string name="nav_update">Progreso</string>
@@ -273,9 +273,9 @@
     <string name="open_settings">Abrir Ajustes</string>
 
     <!-- Title for target creation overlay. -->
-    <string name="target_creation_title">CREACIÓN DE OBJETIVO</string>
+    <string name="target_creation_title">CUADRÍCULA DEL GARABATO</string>
     <!-- Instructions for creating a target by tapping on reference marks. -->
-    <string name="target_creation_text">Toca directamente tus marcas de referencia pintadas en la pantalla. La aplicación las aislará inmediatamente.</string>
+    <string name="target_creation_text">Si aún no has creado la cuadrícula de tu Garabato, toma una foto de la pared pulsando el botón de captura. De lo contrario, pulsa Cancelar.</string>
     <!-- Generic cancel action. -->
     <string name="cancel">Cancelar</string>
 
@@ -289,7 +289,7 @@
     <!-- Coaching step 1 for scanning. -->
     <string name="scan_step_1">Paso 1: Mapea tu entorno</string>
     <!-- Coaching step 2 for scanning. -->
-    <string name="scan_step_2">Paso 2: Escanea la pared objetivo</string>
+    <string name="scan_step_2">Paso 2: Escanea la pared</string>
 
     <!-- Question asking if the AR artwork is correctly placed on the wall. -->
     <string name="plane_confirm_question">¿La obra está en la pared correcta?</string>
@@ -356,7 +356,7 @@
     <string name="settings_ar_section">RA</string>
     <string name="settings_glow_section">Brillo de cobertura</string>
     <string name="settings_anticipation_section">Anticipación</string>
-    <string name="settings_anticipation_desc">Vistas del objetivo desde todos los lados, para que una superposición perdida vuelva a encontrar el muro. Más vistas recuperan desde más ángulos y cuestan más batería y calor.</string>
+    <string name="settings_anticipation_desc">Vistas del Garabato desde todos los lados, para que una superposición perdida vuelva a encontrar la pared. Más vistas lo recuperan desde más ángulos y cuestan más batería y calor.</string>
     <string name="settings_anticipation_distance">Distancia</string>
     <string name="settings_anticipation_latitude">Latitud</string>
     <string name="settings_anticipation_longitude">Longitud</string>
@@ -365,13 +365,13 @@
     <string name="settings_anticipation_heat">El calor reduce en</string>
     <string name="settings_anticipation_compute">La carga reduce en</string>
     <string name="settings_anticipation_views">Como máximo %1$d vistas por página</string>
-    <string name="settings_fingerprint_features">Huella</string>
+    <string name="settings_fingerprint_features">Garabato</string>
     <string name="settings_fingerprint_superpoint">SuperPoint</string>
     <string name="settings_fingerprint_half_sphere">Media esfera</string>
     <string name="settings_fingerprint_both">Ambos</string>
-    <string name="settings_fingerprint_superpoint_desc">Solo rasgos SuperPoint de la captura. Resiste luz y desgaste; unos 1,5 MB por objetivo. Se aplica al próximo objetivo.</string>
-    <string name="settings_fingerprint_half_sphere_desc">Rasgos ORB de la captura y de sus 49 primeros planos. Fuerte de cerca y pequeño, menos de 0,1 MB por objetivo. Se aplica al próximo objetivo.</string>
-    <string name="settings_fingerprint_both_desc">Rasgos SuperPoint de la captura y de sus 49 primeros planos. El más fuerte; unos 2–3 MB por objetivo. Se aplica al próximo objetivo.</string>
+    <string name="settings_fingerprint_superpoint_desc">Solo rasgos SuperPoint de la captura. Resiste luz y desgaste; unos 1,5 MB por Garabato. Se aplica al próximo Garabato.</string>
+    <string name="settings_fingerprint_half_sphere_desc">Rasgos ORB de la captura y de sus 49 primeros planos. Fuerte de cerca y pequeño, menos de 0,1 MB por Garabato. Se aplica al próximo Garabato.</string>
+    <string name="settings_fingerprint_both_desc">Rasgos SuperPoint de la captura y de sus 49 primeros planos. El más fuerte; unos 2–3 MB por Garabato. Se aplica al próximo Garabato.</string>
     <string name="settings_power_section">Energía</string>
     <string name="settings_privacy_section">Privacidad</string>
     <string name="settings_developer_section">Desarrollador</string>
@@ -425,11 +425,11 @@
     <string name="save_project_hint">Nombre del Proyecto</string>
 
     <!-- Target Creation -->
-    <string name="target_guide_desc">Guía de Alineación de Objetivo</string>
-    <string name="target_captured_desc">Objetivo Capturado</string>
-    <string name="target_review_desc">Revisar Objetivo Extraído</string>
+    <string name="target_guide_desc">Guía de Alineación del Garabato</string>
+    <string name="target_captured_desc">Garabato Capturado</string>
+    <string name="target_review_desc">Revisar Garabato Extraído</string>
     <string name="target_unwarp_hint">Arrastra las esquinas para eliminar la deformación</string>
-    <string name="target_review_title">Revisar Marcas Extraídas</string>
+    <string name="target_review_title">GARABATO FIJADO</string>
     <string name="fingerprint_closeups_progress">Aprendiendo el muro: etapa %1$d de %2$d · paso %3$d de %4$d</string>
 
     <string name="target_exclude">Excluir</string>
@@ -450,7 +450,7 @@
     <string name="scan_hint_build_map">Camina hacia la izquierda y derecha para construir el mapa</string>
     <string name="scan_hint_closer">Acércate a la pared</string>
     <string name="scan_hint_higher_lower">Escanea más alto y más bajo</string>
-    <string name="reacquiring_target">Recuperando el objetivo…</string>
+    <string name="reacquiring_target">Recuperando el Garabato…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Fondo de Maqueta</string>
@@ -701,9 +701,9 @@
     <string name="standalone_failure_persisted_target_corrupt">El objetivo de pared guardado falta o no se puede leer. Captura un objetivo nuevo.</string>
     <string name="standalone_failure_internal">SphereSLAM no pudo seguir rastreando este objetivo.</string>
     <string name="standalone_tracking_stopped">El seguimiento de SphereSLAM se detuvo. Vuelve a capturar el objetivo para reiniciarlo.</string>
-    <string name="standalone_status_mapping">SphereSLAM mapeando • toca Objetivo para añadir una huella</string>
-    <string name="standalone_status_preparing">Preparando el objetivo de huella…</string>
-    <string name="standalone_status_finding">Buscando el objetivo de huella…</string>
+    <string name="standalone_status_mapping">SphereSLAM mapeando • toca Garabato para añadir tu Garabato</string>
+    <string name="standalone_status_preparing">Preparando el objetivo de pared…</string>
+    <string name="standalone_status_finding">Buscando el objetivo de pared…</string>
     <string name="standalone_quality_too_small">Ese objetivo de pared es demasiado pequeño tras la rectificación. Captura una zona más grande.</string>
     <string name="standalone_quality_low_contrast">Ese objetivo de pared tiene muy poco contraste visual. Incluye más textura o detalle.</string>
     <string name="standalone_quality_blurry">Ese objetivo de pared está demasiado borroso para un seguimiento fiable. Mantén firme el teléfono y captúralo de nuevo.</string>
@@ -729,15 +729,15 @@
     <string name="ar_feedback_guest_edit_dropped">Ese cambio no se puede compartir con el anfitrión: se queda en este dispositivo</string>
     <string name="ar_feedback_backend_resolving">El motor de AR aún se está determinando: vuelve a probar Alojar en un momento</string>
     <string name="ar_feedback_open_project_first">Abre un proyecto antes de compartir: todavía no hay nada que enviar a un invitado</string>
-    <string name="ar_feedback_host_need_target_arcore">Captura y bloquea un objetivo de pared actual antes de alojar</string>
+    <string name="ar_feedback_host_need_target_arcore">Captura y fija un Garabato actual antes de usar «Anfitrión»</string>
     <string name="ar_feedback_host_need_target_standalone">Captura un objetivo de pared independiente antes de alojar</string>
-    <string name="ar_feedback_fingerprint_not_ready">La huella de la pared aún no está lista: mantén el objetivo a la vista y vuelve a probar Alojar</string>
+    <string name="ar_feedback_fingerprint_not_ready">El Garabato aún no está listo — mantenlo a la vista y vuelve a probar «Anfitrión»</string>
     <string name="ar_feedback_package_failed">No se pudo empaquetar este proyecto para compartirlo: prueba a guardarlo primero</string>
     <string name="ar_feedback_host_failed">No se pudo iniciar el uso compartido: %1$s</string>
     <string name="ar_feedback_join_load_failed">No se pudo cargar el proyecto del anfitrión: se cerró la sesión.</string>
     <string name="ar_feedback_join_no_geometry">El anfitrión no proporcionó geometría con la que ARCore pueda alinearse.</string>
     <string name="ar_feedback_join_failed">No se pudo unir: %1$s</string>
-    <string name="ar_feedback_wall_target_changed">El objetivo de pared cambió: se terminó el uso compartido. Vuelve a iniciar Alojar para la nueva pared.</string>
+    <string name="ar_feedback_wall_target_changed">El Garabato cambió — se terminó el uso compartido. Vuelve a iniciar «Anfitrión» para la nueva pared.</string>
     <string name="ar_feedback_backend_changed">El motor de seguimiento cambió: se terminó el uso compartido. Vuelve a empezar a compartir.</string>
     <string name="ar_feedback_camera_busy">La cámara está ocupada o no disponible: cierra otras apps de cámara y vuelve a entrar en AR</string>
     <string name="ar_feedback_ar_start_failed">No se pudo iniciar AR: es posible que otra app esté usando la cámara</string>
@@ -746,21 +746,21 @@
     <string name="ar_feedback_camera_not_resumed">La cámara de AR no se reanudó: prueba a salir del modo AR y volver a entrar</string>
     <string name="ar_feedback_camera_permission">Cámara no disponible: revisa el permiso de la cámara y vuelve a entrar en AR</string>
     <string name="ar_feedback_camera_not_paused">La cámara de AR no se pausó correctamente: puede seguir funcionando en segundo plano</string>
-    <string name="ar_feedback_backbone_warning">La obra cubre casi toda la pared a la vista: solo %1$d características rastreadas quedan fuera. Hazla más pequeña o aléjate, o es posible que el objetivo no se bloquee.</string>
-    <string name="ar_feedback_legacy_target_geometry">El objetivo guardado de este proyecto se creó con una versión anterior y su geometría 3D no se puede corregir. Crea el objetivo de nuevo para usarlo.</string>
+    <string name="ar_feedback_backbone_warning">La obra cubre casi toda la pared a la vista — solo %1$d características rastreadas quedan fuera. Hazla más pequeña o aléjate, o es posible que el Garabato no se fije.</string>
+    <string name="ar_feedback_legacy_target_geometry">El Garabato guardado de este proyecto se creó con una versión anterior y su geometría 3D no se puede corregir. Crea el Garabato de nuevo para usarlo.</string>
     <string name="ar_feedback_camera_no_frames">La cámara no está entregando fotogramas: sal de AR e inténtalo de nuevo</string>
     <string name="ar_feedback_camera_recovery_timeout">La recuperación de la cámara de AR agotó el tiempo de forma segura: sal de AR y vuelve a entrar</string>
     <string name="ar_feedback_target_prepare_failed">No se pudo preparar el objetivo capturado. Inténtalo de nuevo.</string>
     <string name="ar_feedback_wall_width_save_failed">No se pudo guardar el ancho de la pared. Vuelve a probar Guardar.</string>
     <string name="ar_feedback_unknown_error">error desconocido</string>
-    <string name="reloc_looking">Buscando tu objetivo…</string>
+    <string name="reloc_looking">Buscando tu Garabato…</string>
     <string name="reloc_turn_right">Gira a la derecha %1$d°</string>
     <string name="reloc_turn_left">Gira a la izquierda %1$d°</string>
     <string name="reloc_tilt_up">Inclina hacia arriba %1$d°</string>
     <string name="reloc_tilt_down">Inclina hacia abajo %1$d°</string>
     <string name="reloc_facing_it">Lo tienes enfrente — muévete despacio de lado a lado</string>
-    <string name="reloc_recapture">Volver a capturar objetivo</string>
-    <string name="ar_feedback_capture_failed">Falló la captura del objetivo. Toca para intentarlo de nuevo.</string>
+    <string name="reloc_recapture">Volver a capturar el Garabato</string>
+    <string name="ar_feedback_capture_failed">Falló la captura del Garabato. Toca para intentarlo de nuevo.</string>
 
     <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
     <string name="nav_stencil">Plantilla</string>
@@ -771,11 +771,11 @@
     <string name="nav_stencil_view_white">Blanco</string>
     <string name="nav_stencil_view_info">Cambia qué plantillas se muestran: todas, negro, gris o blanco.</string>
 
-    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <!-- Pass B: the Settings switch. -->
     <string name="settings_change_pass">Detección de cambios (necesita una foto de la pared limpia)</string>
-    <string name="target_clean_wall_text">¿Aún sin marcar? Primero fotografía la pared limpia con el botón de abajo y luego pinta tus marcas. ¿Ya marcada? Toca tus marcas.</string>
-    <string name="target_clean_wall_photo">Foto de la pared limpia</string>
-    <string name="target_clean_wall_saved">Foto de la pared limpia guardada. Repetir</string>
+    <!-- Spoken labels for the round shutter on the Doodle grid screen, which photographs the bare wall. -->
+    <string name="target_shutter_cd">Fotografiar la pared vacía</string>
+    <string name="target_shutter_retake_cd">Repetir la foto de la pared vacía</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">Vista CV</string>

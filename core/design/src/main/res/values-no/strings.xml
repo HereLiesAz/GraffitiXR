@@ -37,9 +37,9 @@
     <!-- Description of the Stencil tool, explaining how it creates multi-layer printable templates. -->
 
     <!-- Label for the Target/Grid management menu in AR mode. -->
-    <string name="nav_grid">Mål</string>
+    <string name="nav_grid">Krusedull</string>
     <!-- Description of Target management, used for anchor creation and management. -->
-    <string name="nav_grid_info">Opprett og administrer AR-ankermål. Fotografer malte referansemerker på veggen for å låse projeksjonen på plass.</string>
+    <string name="nav_grid_info">Opprett og administrer Krusedullen din. Fotografer de malte referansemerkene på veggen for å låse projeksjonen på plass.</string>
 
     <!-- Label for the wall survey tool, used to improve AR tracking. -->
     <!-- Description of the Survey tool, explaining its role in tracking accuracy. -->
@@ -52,7 +52,7 @@
     <!-- Label for the action to refine an existing AR anchor. -->
     <string name="nav_refine">Raffinere</string>
     <!-- Description of the anchor refinement process. -->
-    <string name="nav_refine_info">Finjuster posisjonen til et eksisterende AR-ankermål.</string>
+    <string name="nav_refine_info">Finjuster posisjonen til en eksisterende Krusedull.</string>
 
     <!-- Label for the progress tracking tool. -->
     <string name="nav_update">Framgang</string>
@@ -273,9 +273,9 @@
     <string name="open_settings">Åpne Innstillinger</string>
 
     <!-- Title for target creation overlay. -->
-    <string name="target_creation_title">MÅLSKAPELSE</string>
+    <string name="target_creation_title">KRUSEDULL-RUTENETT</string>
     <!-- Instructions for creating a target by tapping on reference marks. -->
-    <string name="target_creation_text">Trykk direkte på dine malte referansemerker på skjermen. Appen vil umiddelbart isolere dem.</string>
+    <string name="target_creation_text">Hvis du ikke har laget Krusedull-rutenettet ditt ennå, tar du et bilde av veggen ved å trykke på utløserknappen. Ellers trykker du på Kansellere.</string>
     <!-- Generic cancel action. -->
     <string name="cancel">Kansellere</string>
 
@@ -289,7 +289,7 @@
     <!-- Coaching step 1 for scanning. -->
     <string name="scan_step_1">Trinn 1: Kartlegg omgivelsene dine</string>
     <!-- Coaching step 2 for scanning. -->
-    <string name="scan_step_2">Trinn 2: Skann målveggen</string>
+    <string name="scan_step_2">Trinn 2: Skann veggen</string>
 
     <!-- Question asking if the AR artwork is correctly placed on the wall. -->
     <string name="plane_confirm_question">Er kunstverket på riktig vegg?</string>
@@ -356,7 +356,7 @@
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">Dekningsglød</string>
     <string name="settings_anticipation_section">Forutseelse</string>
-    <string name="settings_anticipation_desc">Visninger av målet fra alle kanter, så et tapt overlegg finner veggen igjen. Flere visninger låser fra flere vinkler og koster mer batteri og varme.</string>
+    <string name="settings_anticipation_desc">Visninger av Krusedullen fra alle kanter, så et tapt overlegg finner veggen igjen. Flere visninger låser på nytt fra flere vinkler og koster mer batteri og varme.</string>
     <string name="settings_anticipation_distance">Avstand</string>
     <string name="settings_anticipation_latitude">Breddegrad</string>
     <string name="settings_anticipation_longitude">Lengdegrad</string>
@@ -365,13 +365,13 @@
     <string name="settings_anticipation_heat">Varme struper med</string>
     <string name="settings_anticipation_compute">Belastning struper med</string>
     <string name="settings_anticipation_views">Høyst %1$d visninger per side</string>
-    <string name="settings_fingerprint_features">Fingeravtrykk</string>
+    <string name="settings_fingerprint_features">Krusedull</string>
     <string name="settings_fingerprint_superpoint">SuperPoint</string>
     <string name="settings_fingerprint_half_sphere">Halvkule</string>
     <string name="settings_fingerprint_both">Begge</string>
-    <string name="settings_fingerprint_superpoint_desc">Bare SuperPoint-trekk fra opptaket. Tåler lys og slitasje; omtrent 1,5 MB per mål. Gjelder fra neste mål.</string>
-    <string name="settings_fingerprint_half_sphere_desc">ORB-trekk fra opptaket og dets 49 nærbilder. Sterkt på nært hold og lite, under 0,1 MB per mål. Gjelder fra neste mål.</string>
-    <string name="settings_fingerprint_both_desc">SuperPoint-trekk fra opptaket og dets 49 nærbilder. Sterkest; omtrent 2–3 MB per mål. Gjelder fra neste mål.</string>
+    <string name="settings_fingerprint_superpoint_desc">Bare SuperPoint-trekk fra opptaket. Tåler lys og slitasje; omtrent 1,5 MB per Krusedull. Gjelder fra neste Krusedull.</string>
+    <string name="settings_fingerprint_half_sphere_desc">ORB-trekk fra opptaket og dets 49 nærbilder. Sterkt på nært hold og lite, under 0,1 MB per Krusedull. Gjelder fra neste Krusedull.</string>
+    <string name="settings_fingerprint_both_desc">SuperPoint-trekk fra opptaket og dets 49 nærbilder. Sterkest; omtrent 2–3 MB per Krusedull. Gjelder fra neste Krusedull.</string>
     <string name="settings_power_section">Strøm</string>
     <string name="settings_privacy_section">Personvern</string>
     <string name="settings_developer_section">Utvikler</string>
@@ -425,11 +425,11 @@
     <string name="save_project_hint">Prosjektnavn</string>
 
     <!-- Target Creation -->
-    <string name="target_guide_desc">Måljusteringsveiledning</string>
-    <string name="target_captured_desc">Fanget mål</string>
-    <string name="target_review_desc">Gjennomgå uttrukket mål</string>
+    <string name="target_guide_desc">Justeringsveiledning for Krusedull</string>
+    <string name="target_captured_desc">Fotografert Krusedull</string>
+    <string name="target_review_desc">Gjennomgå uttrukket Krusedull</string>
     <string name="target_unwarp_hint">Dra hjørnene for å løsne</string>
-    <string name="target_review_title">Gjennomgå ekstraherte markeringer</string>
+    <string name="target_review_title">KRUSEDULL LÅST</string>
     <string name="fingerprint_closeups_progress">Lærer veggen: trinn %1$d av %2$d · steg %3$d av %4$d</string>
 
     <string name="target_exclude">Utelukke</string>
@@ -450,7 +450,7 @@
     <string name="scan_hint_build_map">Gå til venstre og høyre for å bygge kart</string>
     <string name="scan_hint_closer">Gå nærmere veggen</string>
     <string name="scan_hint_higher_lower">Skann høyere og lavere</string>
-    <string name="reacquiring_target">Finner målet igjen…</string>
+    <string name="reacquiring_target">Finner Krusedullen igjen…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Bakgrunn mockup</string>
@@ -701,9 +701,9 @@
     <string name="standalone_failure_persisted_target_corrupt">Det lagrede veggmålet mangler eller kan ikke leses. Ta et nytt mål.</string>
     <string name="standalone_failure_internal">SphereSLAM kunne ikke fortsette å spore dette målet.</string>
     <string name="standalone_tracking_stopped">SphereSLAM-sporingen stoppet. Ta målet på nytt for å starte den igjen.</string>
-    <string name="standalone_status_mapping">SphereSLAM kartlegger • trykk på Mål for å legge til et fingeravtrykk</string>
-    <string name="standalone_status_preparing">Forbereder fingeravtrykkmål…</string>
-    <string name="standalone_status_finding">Finner fingeravtrykkmål…</string>
+    <string name="standalone_status_mapping">SphereSLAM kartlegger • trykk på Krusedull for å legge til Krusedullen din</string>
+    <string name="standalone_status_preparing">Forbereder veggmål…</string>
+    <string name="standalone_status_finding">Finner veggmål…</string>
     <string name="standalone_quality_too_small">Det veggmålet er for lite etter oppretting. Ta et større utsnitt.</string>
     <string name="standalone_quality_low_contrast">Det veggmålet har for lite visuell kontrast. Ta med mer tekstur eller detaljer.</string>
     <string name="standalone_quality_blurry">Det veggmålet er for uskarpt til pålitelig sporing. Hold stødig og ta det på nytt.</string>
@@ -729,15 +729,15 @@
     <string name="ar_feedback_guest_edit_dropped">Denne endringen kan ikke deles med verten – den blir værende på denne enheten</string>
     <string name="ar_feedback_backend_resolving">AR-motoren velges fortsatt – prøv å være vert igjen om litt</string>
     <string name="ar_feedback_open_project_first">Åpne et prosjekt før du deler – det er ikke noe å sende til en gjest ennå</string>
-    <string name="ar_feedback_host_need_target_arcore">Ta opp og lås et oppdatert veggmål før du er vert</string>
+    <string name="ar_feedback_host_need_target_arcore">Ta opp og lås en oppdatert Krusedull før du er vert</string>
     <string name="ar_feedback_host_need_target_standalone">Ta opp et frittstående veggmål før du er vert</string>
-    <string name="ar_feedback_fingerprint_not_ready">Veggfingeravtrykket er ikke klart ennå – hold målet i bildet og prøv å være vert igjen</string>
+    <string name="ar_feedback_fingerprint_not_ready">Krusedullen er ikke klar ennå — hold den i bildet og prøv Vert igjen</string>
     <string name="ar_feedback_package_failed">Kunne ikke pakke dette prosjektet for deling – prøv å lagre det først</string>
     <string name="ar_feedback_host_failed">Kunne ikke starte deling: %1$s</string>
     <string name="ar_feedback_join_load_failed">Kunne ikke laste vertens prosjekt – økten ble avsluttet.</string>
     <string name="ar_feedback_join_no_geometry">Verten ga ikke geometri som ARCore kan justere mot.</string>
     <string name="ar_feedback_join_failed">Kunne ikke bli med: %1$s</string>
-    <string name="ar_feedback_wall_target_changed">Veggmålet ble endret – delingen er avsluttet. Start vertskap på nytt for den nye veggen.</string>
+    <string name="ar_feedback_wall_target_changed">Krusedullen ble endret — delingen er avsluttet. Start Vert på nytt for den nye veggen.</string>
     <string name="ar_feedback_backend_changed">Sporingsmotoren ble endret – delingen er avsluttet. Start deling på nytt.</string>
     <string name="ar_feedback_camera_busy">Kameraet er opptatt eller utilgjengelig – lukk andre kameraapper og gå inn i AR igjen</string>
     <string name="ar_feedback_ar_start_failed">Kunne ikke starte AR – kameraet kan være i bruk av en annen app</string>
@@ -746,21 +746,21 @@
     <string name="ar_feedback_camera_not_resumed">AR-kameraet startet ikke igjen – prøv å gå ut av AR-modus og inn igjen</string>
     <string name="ar_feedback_camera_permission">Kameraet er utilgjengelig – sjekk kameratillatelsen og gå inn i AR igjen</string>
     <string name="ar_feedback_camera_not_paused">AR-kameraet ble ikke satt ordentlig på pause – det kan fortsette å kjøre i bakgrunnen</string>
-    <string name="ar_feedback_backbone_warning">Kunstverket dekker nesten hele veggen i bildet – bare %1$d sporede kjennetegn ligger utenfor. Gjør det mindre eller gå bakover, ellers låser målet seg kanskje ikke.</string>
-    <string name="ar_feedback_legacy_target_geometry">Det lagrede målet i dette prosjektet ble laget av en eldre versjon, og 3D-geometrien kan ikke korrigeres. Opprett målet på nytt for å bruke det.</string>
+    <string name="ar_feedback_backbone_warning">Kunstverket dekker nesten hele veggen i bildet — bare %1$d sporede kjennetegn ligger utenfor. Gjør det mindre eller gå bakover, ellers låser Krusedullen seg kanskje ikke.</string>
+    <string name="ar_feedback_legacy_target_geometry">Den lagrede Krusedullen i dette prosjektet ble laget av en eldre versjon, og 3D-geometrien kan ikke korrigeres. Opprett Krusedullen på nytt for å bruke den.</string>
     <string name="ar_feedback_camera_no_frames">Kameraet leverer ingen bilder – gå ut av AR og prøv igjen</string>
     <string name="ar_feedback_camera_recovery_timeout">Gjenopprettingen av AR-kameraet ble trygt tidsavbrutt – gå ut av AR og inn igjen</string>
     <string name="ar_feedback_target_prepare_failed">Kunne ikke klargjøre det opptatte målet. Prøv igjen.</string>
     <string name="ar_feedback_wall_width_save_failed">Kunne ikke lagre veggbredden. Prøv å lagre igjen.</string>
     <string name="ar_feedback_unknown_error">ukjent feil</string>
-    <string name="reloc_looking">Leter etter målet ditt…</string>
+    <string name="reloc_looking">Leter etter Krusedullen din…</string>
     <string name="reloc_turn_right">Snu %1$d° til høyre</string>
     <string name="reloc_turn_left">Snu %1$d° til venstre</string>
     <string name="reloc_tilt_up">Vipp %1$d° opp</string>
     <string name="reloc_tilt_down">Vipp %1$d° ned</string>
     <string name="reloc_facing_it">Du ser mot det — beveg deg sakte fra side til side</string>
-    <string name="reloc_recapture">Ta opp målet på nytt</string>
-    <string name="ar_feedback_capture_failed">Opptak av målet mislyktes. Trykk for å prøve igjen.</string>
+    <string name="reloc_recapture">Ta opp Krusedullen på nytt</string>
+    <string name="ar_feedback_capture_failed">Opptak av Krusedullen mislyktes. Trykk for å prøve igjen.</string>
 
     <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
     <string name="nav_stencil">Sjablong</string>
@@ -773,9 +773,9 @@
 
     <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
     <string name="settings_change_pass">Endringsgjenkjenning (trenger et bilde av den rene veggen)</string>
-    <string name="target_clean_wall_text">Ikke markert ennå? Ta først et bilde av den bare veggen med knappen under, og mal deretter markeringene dine. Allerede markert? Trykk på markeringene dine.</string>
-    <string name="target_clean_wall_photo">Bilde av ren vegg</string>
-    <string name="target_clean_wall_saved">Bilde av ren vegg lagret. Ta på nytt</string>
+    <!-- Spoken labels for the round shutter on the Doodle grid screen, which photographs the bare wall. -->
+    <string name="target_shutter_cd">Fotografer den bare veggen</string>
+    <string name="target_shutter_retake_cd">Ta bildet av den bare veggen på nytt</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">CV-visning</string>

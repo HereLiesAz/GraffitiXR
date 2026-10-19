@@ -37,9 +37,9 @@
 
 
 
-    <string name="nav_grid">Célpont</string>
+    <string name="nav_grid">Firka</string>
 
-    <string name="nav_grid_info">AR horgony célpontok létrehozása és kezelése. Fényképezz le festett referenciajelöléseket a falon, hogy a vetítést a helyére rögzítsd.</string>
+    <string name="nav_grid_info">A Firkád létrehozása és kezelése. Fényképezd le a festett referenciajelöléseket a falon, hogy a vetítést a helyére rögzítsd.</string>
 
 
 
@@ -52,7 +52,7 @@
 
     <string name="nav_refine">Finomítás</string>
 
-    <string name="nav_refine_info">Egy meglévő AR horgony célpont pozíciójának finomhangolása.</string>
+    <string name="nav_refine_info">Egy meglévő Firka pozíciójának finomhangolása.</string>
 
 
     <string name="nav_update">Folyamat</string>
@@ -275,9 +275,9 @@
     <string name="open_settings">Beállítások megnyitása</string>
 
 
-    <string name="target_creation_title">CÉLPONT LÉTREHOZÁSA</string>
+    <string name="target_creation_title">FIRKA-RÁCS</string>
 
-    <string name="target_creation_text">Koppints közvetlenül a festett referenciajelölésekre a képernyőn. Az alkalmazás azonnal elszigeteli őket.</string>
+    <string name="target_creation_text">Ha még nem hoztad létre a Firka-rácsodat, készíts fényképet a falról a rögzítés gomb megnyomásával. Ellenkező esetben nyomd meg a Mégse gombot.</string>
 
     <string name="cancel">Mégse</string>
 
@@ -291,7 +291,7 @@
 
     <string name="scan_step_1">1. lépés: Térképezd fel a környezeted</string>
 
-    <string name="scan_step_2">2. lépés: Szkenneld a célfalat</string>
+    <string name="scan_step_2">2. lépés: Szkenneld a falat</string>
 
 
     <string name="plane_confirm_question">A mű a megfelelő falon van?</string>
@@ -361,7 +361,7 @@
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">Lefedettségi fény</string>
     <string name="settings_anticipation_section">Előrelátás</string>
-    <string name="settings_anticipation_desc">A cél nézetei minden irányból, hogy az elveszett átfedés újra megtalálja a falat. Több nézet több szögből talál vissza, de több akkut és hőt igényel.</string>
+    <string name="settings_anticipation_desc">A Firka nézetei minden irányból, hogy az elveszett átfedés újra megtalálja a falat. Több nézet több szögből talál vissza, de több akkut és hőt igényel.</string>
     <string name="settings_anticipation_distance">Távolság</string>
     <string name="settings_anticipation_latitude">Szélesség</string>
     <string name="settings_anticipation_longitude">Hosszúság</string>
@@ -370,13 +370,13 @@
     <string name="settings_anticipation_heat">A hő ennyivel fojt</string>
     <string name="settings_anticipation_compute">A terhelés ennyivel fojt</string>
     <string name="settings_anticipation_views">Legfeljebb %1$d nézet oldalanként</string>
-    <string name="settings_fingerprint_features">Ujjlenyomat</string>
+    <string name="settings_fingerprint_features">Firka</string>
     <string name="settings_fingerprint_superpoint">SuperPoint</string>
     <string name="settings_fingerprint_half_sphere">Félgömb</string>
     <string name="settings_fingerprint_both">Mindkettő</string>
-    <string name="settings_fingerprint_superpoint_desc">Csak a felvétel SuperPoint jellemzői. Bírja a fényt és a kopást; kb. 1,5 MB célonként. A következő célra érvényes.</string>
-    <string name="settings_fingerprint_half_sphere_desc">A felvétel és 49 közeli nézetének ORB jellemzői. Közelről erős és kicsi, 0,1 MB alatt célonként. A következő célra érvényes.</string>
-    <string name="settings_fingerprint_both_desc">A felvétel és 49 közeli nézetének SuperPoint jellemzői. A legerősebb; kb. 2–3 MB célonként. A következő célra érvényes.</string>
+    <string name="settings_fingerprint_superpoint_desc">Csak a felvétel SuperPoint jellemzői. Bírja a fényt és a kopást; kb. 1,5 MB Firkánként. A következő Firkára érvényes.</string>
+    <string name="settings_fingerprint_half_sphere_desc">A felvétel és 49 közeli nézetének ORB jellemzői. Közelről erős és kicsi, 0,1 MB alatt Firkánként. A következő Firkára érvényes.</string>
+    <string name="settings_fingerprint_both_desc">A felvétel és 49 közeli nézetének SuperPoint jellemzői. A legerősebb; kb. 2–3 MB Firkánként. A következő Firkára érvényes.</string>
     <string name="settings_power_section">Energia</string>
     <string name="settings_privacy_section">Adatvédelem</string>
     <string name="settings_developer_section">Fejlesztő</string>
@@ -430,11 +430,11 @@
     <string name="save_project_hint">Projekt neve</string>
 
 
-    <string name="target_guide_desc">Célpont illesztési útmutató</string>
-    <string name="target_captured_desc">Rögzített célpont</string>
-    <string name="target_review_desc">Kinyert célpont áttekintése</string>
+    <string name="target_guide_desc">Firka illesztési útmutató</string>
+    <string name="target_captured_desc">Rögzített Firka</string>
+    <string name="target_review_desc">Kinyert Firka áttekintése</string>
     <string name="target_unwarp_hint">Húzd a sarkokat a kiegyenesítéshez</string>
-    <string name="target_review_title">Kinyert jelölések áttekintése</string>
+    <string name="target_review_title">FIRKA RÖGZÍTVE</string>
     <string name="fingerprint_closeups_progress">A fal megismerése: %1$d. szakasz / %2$d · %3$d. lépés / %4$d</string>
 
     <string name="target_exclude">Kizárás</string>
@@ -455,7 +455,7 @@
     <string name="scan_hint_build_map">Sétálj balra és jobbra a térkép felépítéséhez</string>
     <string name="scan_hint_closer">Menj közelebb a falhoz</string>
     <string name="scan_hint_higher_lower">Szkennelj magasabbra és alacsonyabbra</string>
-    <string name="reacquiring_target">Célpont újrakeresése…</string>
+    <string name="reacquiring_target">Firka újrakeresése…</string>
 
 
     <string name="desc_bg_mockup">Háttér makett</string>
@@ -706,9 +706,9 @@
     <string name="standalone_failure_persisted_target_corrupt">A mentett falcélpont hiányzik vagy nem olvasható. Rögzíts új célpontot.</string>
     <string name="standalone_failure_internal">A SphereSLAM nem tudta folytatni a célpont követését.</string>
     <string name="standalone_tracking_stopped">A SphereSLAM-követés leállt. Az újraindításhoz rögzítsd újra a célpontot.</string>
-    <string name="standalone_status_mapping">SphereSLAM térképez • koppints a Célpontra ujjlenyomat hozzáadásához</string>
-    <string name="standalone_status_preparing">Ujjlenyomat-célpont előkészítése…</string>
-    <string name="standalone_status_finding">Ujjlenyomat-célpont keresése…</string>
+    <string name="standalone_status_mapping">SphereSLAM térképez • koppints a Firkára a Firkád hozzáadásához</string>
+    <string name="standalone_status_preparing">Falcélpont előkészítése…</string>
+    <string name="standalone_status_finding">Falcélpont keresése…</string>
     <string name="standalone_quality_too_small">Ez a falcélpont a kiegyenesítés után túl kicsi. Rögzíts nagyobb részt.</string>
     <string name="standalone_quality_low_contrast">Ennek a falcélpontnak túl kicsi a vizuális kontrasztja. Vonj be több textúrát vagy részletet.</string>
     <string name="standalone_quality_blurry">Ez a falcélpont túl homályos a megbízható követéshez. Tartsd nyugodtan, és rögzítsd újra.</string>
@@ -734,15 +734,15 @@
     <string name="ar_feedback_guest_edit_dropped">Ezt a módosítást nem lehet megosztani a házigazdával – csak ezen az eszközön marad meg</string>
     <string name="ar_feedback_backend_resolving">Az AR-háttér még kiválasztás alatt áll – próbáld újra a házigazdaként indítást egy pillanat múlva</string>
     <string name="ar_feedback_open_project_first">Megosztás előtt nyiss meg egy projektet – még nincs mit küldeni a vendégnek</string>
-    <string name="ar_feedback_host_need_target_arcore">Házigazdaként indítás előtt rögzíts és zárolj egy aktuális falcélpontot</string>
+    <string name="ar_feedback_host_need_target_arcore">A „Hoszt” indítása előtt rögzíts és zárolj egy aktuális Firkát</string>
     <string name="ar_feedback_host_need_target_standalone">Házigazdaként indítás előtt rögzíts egy önálló falcélpontot</string>
-    <string name="ar_feedback_fingerprint_not_ready">A fal ujjlenyomata még nem áll készen – tartsd a célpontot a képben, és próbáld újra a házigazdaként indítást</string>
+    <string name="ar_feedback_fingerprint_not_ready">A Firka még nem áll készen — tartsd a képben, és próbáld újra a „Hoszt” indítását</string>
     <string name="ar_feedback_package_failed">Nem sikerült becsomagolni a projektet a megosztáshoz – próbáld előbb elmenteni</string>
     <string name="ar_feedback_host_failed">Nem sikerült elindítani a megosztást: %1$s</string>
     <string name="ar_feedback_join_load_failed">Nem sikerült betölteni a házigazda projektjét – a munkamenet véget ért.</string>
     <string name="ar_feedback_join_no_geometry">A házigazda nem adott meg olyan geometriát, amelyhez az ARCore igazodni tud.</string>
     <string name="ar_feedback_join_failed">Nem sikerült csatlakozni: %1$s</string>
-    <string name="ar_feedback_wall_target_changed">A falcélpont megváltozott – a megosztás véget ért. Indítsd újra a házigazdaként indítást az új falhoz.</string>
+    <string name="ar_feedback_wall_target_changed">A Firka megváltozott — a megosztás véget ért. Indítsd újra a „Hoszt” funkciót az új falhoz.</string>
     <string name="ar_feedback_backend_changed">A követési háttér megváltozott – a megosztás véget ért. Indítsd újra a megosztást.</string>
     <string name="ar_feedback_camera_busy">A kamera foglalt vagy nem érhető el – zárd be a többi kamera-alkalmazást, majd lépj be újra az AR-ba</string>
     <string name="ar_feedback_ar_start_failed">Nem sikerült elindítani az AR-t – lehet, hogy a kamerát egy másik alkalmazás használja</string>
@@ -751,21 +751,21 @@
     <string name="ar_feedback_camera_not_resumed">Az AR-kamera nem indult újra – próbálj kilépni az AR módból, majd belépni újra</string>
     <string name="ar_feedback_camera_permission">A kamera nem érhető el – ellenőrizd a kamera-engedélyt, majd lépj be újra az AR-ba</string>
     <string name="ar_feedback_camera_not_paused">Az AR-kamera nem állt le tisztán – előfordulhat, hogy a háttérben tovább fut</string>
-    <string name="ar_feedback_backbone_warning">A műalkotás szinte az egész látható falat lefedi – csak %1$d követett jellemző esik rajta kívül. Kicsinyítsd le, vagy lépj hátrébb, különben a célpont lehet, hogy nem záródik be.</string>
-    <string name="ar_feedback_legacy_target_geometry">A projekt mentett célpontját egy régebbi verzió készítette, és a 3D-geometriája nem javítható. A használatához hozd létre újra a célpontot.</string>
+    <string name="ar_feedback_backbone_warning">A műalkotás szinte az egész látható falat lefedi — csak %1$d követett jellemző esik rajta kívül. Kicsinyítsd le, vagy lépj hátrébb, különben a Firka lehet, hogy nem rögzül.</string>
+    <string name="ar_feedback_legacy_target_geometry">A projekt mentett Firkáját egy régebbi verzió készítette, és a 3D-geometriája nem javítható. A használatához hozd létre újra a Firkát.</string>
     <string name="ar_feedback_camera_no_frames">A kamera nem ad képkockákat – lépj ki az AR-ból, és próbáld újra</string>
     <string name="ar_feedback_camera_recovery_timeout">Az AR-kamera helyreállítása biztonságosan időtúllépést kapott – lépj ki az AR-ból, majd lépj be újra</string>
     <string name="ar_feedback_target_prepare_failed">Nem sikerült előkészíteni a rögzített célpontot. Próbáld újra.</string>
     <string name="ar_feedback_wall_width_save_failed">Nem sikerült elmenteni a fal szélességét. Próbáld újra a mentést.</string>
     <string name="ar_feedback_unknown_error">ismeretlen hiba</string>
-    <string name="reloc_looking">A célpont keresése…</string>
+    <string name="reloc_looking">A Firkád keresése…</string>
     <string name="reloc_turn_right">Fordulj jobbra %1$d°-kal</string>
     <string name="reloc_turn_left">Fordulj balra %1$d°-kal</string>
     <string name="reloc_tilt_up">Döntsd felfelé %1$d°-kal</string>
     <string name="reloc_tilt_down">Döntsd lefelé %1$d°-kal</string>
     <string name="reloc_facing_it">Szemben vagy vele — lassan mozogj oldalirányba</string>
-    <string name="reloc_recapture">Célpont újrarögzítése</string>
-    <string name="ar_feedback_capture_failed">A célpont rögzítése sikertelen. Érintsd meg az újrapróbáláshoz.</string>
+    <string name="reloc_recapture">Firka újrarögzítése</string>
+    <string name="ar_feedback_capture_failed">A Firka rögzítése sikertelen. Érintsd meg az újrapróbáláshoz.</string>
 
     <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
     <string name="nav_stencil">Sablon</string>
@@ -776,11 +776,11 @@
     <string name="nav_stencil_view_white">Fehér</string>
     <string name="nav_stencil_view_info">Váltja, melyik sablonok láthatók: mind, fekete, szürke vagy fehér.</string>
 
-    <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
+    <!-- Pass B: the Settings switch. -->
     <string name="settings_change_pass">Változásészlelés (tiszta fal fotó kell hozzá)</string>
-    <string name="target_clean_wall_text">Még nincs megjelölve? Előbb fotózd le a tiszta falat az alábbi gombbal, aztán fesd fel a jeleket. Már meg van jelölve? Koppints a jelekre.</string>
-    <string name="target_clean_wall_photo">Tiszta fal fotó</string>
-    <string name="target_clean_wall_saved">Tiszta fal fotó elmentve. Újra</string>
+    <!-- Spoken labels for the round shutter on the Doodle grid screen, which photographs the bare wall. -->
+    <string name="target_shutter_cd">Fotózd le a csupasz falat</string>
+    <string name="target_shutter_retake_cd">Készítsd el újra a csupasz fal fotóját</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">CV nézet</string>

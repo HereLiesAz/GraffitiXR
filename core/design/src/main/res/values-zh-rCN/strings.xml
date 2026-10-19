@@ -37,9 +37,9 @@
 
 
 
-    <string name="nav_grid">目标</string>
+    <string name="nav_grid">随手画</string>
 
-    <string name="nav_grid_info">创建和管理 AR 锚点目标。拍摄墙上绘制的参考标记照片以将投影锁定到位。</string>
+    <string name="nav_grid_info">创建和管理您的随手画。拍摄墙上绘制的参考标记，将投影锁定到位。</string>
 
 
 
@@ -52,7 +52,7 @@
 
     <string name="nav_refine">微调</string>
 
-    <string name="nav_refine_info">微调现有 AR 锚点目标的位置。</string>
+    <string name="nav_refine_info">微调现有随手画的位置。</string>
 
 
     <string name="nav_update">进度</string>
@@ -276,9 +276,9 @@
     <string name="open_settings">打开设置</string>
 
 
-    <string name="target_creation_title">目标创建</string>
+    <string name="target_creation_title">随手画网格</string>
 
-    <string name="target_creation_text">直接在屏幕上点按您绘制的参考标记。应用程序将立即分离它们。</string>
+    <string name="target_creation_text">如果您还没有创建随手画网格，请按拍摄按钮拍一张墙面照片。否则请按“取消”。</string>
 
     <string name="cancel">取消</string>
 
@@ -292,7 +292,7 @@
 
     <string name="scan_step_1">步骤 1：映射您的周围环境</string>
 
-    <string name="scan_step_2">步骤 2：扫描目标墙壁</string>
+    <string name="scan_step_2">步骤 2：扫描墙面</string>
 
 
     <string name="plane_confirm_question">艺术品在正确的墙上吗？</string>
@@ -373,7 +373,7 @@
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">覆盖光晕</string>
     <string name="settings_anticipation_section">预判</string>
-    <string name="settings_anticipation_desc">从各个方向观察目标的视图，让丢失的叠加层重新找到墙面。视图越多，可从越多角度恢复，但耗电和发热也越多。</string>
+    <string name="settings_anticipation_desc">从各个方向观察随手画的视图，让丢失的叠加层重新找到墙面。视图越多，可从越多角度重新锁定，但耗电和发热也越多。</string>
     <string name="settings_anticipation_distance">距离</string>
     <string name="settings_anticipation_latitude">纬度</string>
     <string name="settings_anticipation_longitude">经度</string>
@@ -382,13 +382,13 @@
     <string name="settings_anticipation_heat">发热限制幅度</string>
     <string name="settings_anticipation_compute">负载限制幅度</string>
     <string name="settings_anticipation_views">每页最多 %1$d 个视图</string>
-    <string name="settings_fingerprint_features">指纹</string>
+    <string name="settings_fingerprint_features">随手画</string>
     <string name="settings_fingerprint_superpoint">SuperPoint</string>
     <string name="settings_fingerprint_half_sphere">半球</string>
     <string name="settings_fingerprint_both">两者</string>
-    <string name="settings_fingerprint_superpoint_desc">仅采集图像的 SuperPoint 特征。耐光照与磨损；每个目标约 1.5 MB。从下一个目标起生效。</string>
-    <string name="settings_fingerprint_half_sphere_desc">采集图像及其 49 个特写的 ORB 特征。近距离强且小，每个目标不到 0.1 MB。从下一个目标起生效。</string>
-    <string name="settings_fingerprint_both_desc">采集图像及其 49 个特写的 SuperPoint 特征。最强；每个目标约 2–3 MB。从下一个目标起生效。</string>
+    <string name="settings_fingerprint_superpoint_desc">仅采集图像的 SuperPoint 特征。耐光照与磨损；每个随手画约 1.5 MB。从下一个随手画起生效。</string>
+    <string name="settings_fingerprint_half_sphere_desc">采集图像及其 49 个特写的 ORB 特征。近距离强且小，每个随手画不到 0.1 MB。从下一个随手画起生效。</string>
+    <string name="settings_fingerprint_both_desc">采集图像及其 49 个特写的 SuperPoint 特征。最强；每个随手画约 2–3 MB。从下一个随手画起生效。</string>
     <string name="settings_power_section">电源</string>
     <string name="settings_privacy_section">隐私</string>
     <string name="settings_developer_section">开发者</string>
@@ -442,11 +442,11 @@
     <string name="save_project_hint">项目名称</string>
 
 
-    <string name="target_guide_desc">目标对齐指南</string>
-    <string name="target_captured_desc">捕获的目标</string>
-    <string name="target_review_desc">查看提取的目标</string>
+    <string name="target_guide_desc">随手画对齐指南</string>
+    <string name="target_captured_desc">已捕获的随手画</string>
+    <string name="target_review_desc">查看提取的随手画</string>
     <string name="target_unwarp_hint">拖动角以取消扭曲</string>
-    <string name="target_review_title">查看提取的标记</string>
+    <string name="target_review_title">随手画已锁定</string>
     <string name="fingerprint_closeups_progress">正在学习墙面：第 %1$d / %2$d 阶段 · 第 %3$d / %4$d 步</string>
 
     <string name="target_exclude">排除</string>
@@ -467,7 +467,7 @@
     <string name="scan_hint_build_map">向左和向右走动以构建地图</string>
     <string name="scan_hint_closer">靠近墙壁</string>
     <string name="scan_hint_higher_lower">扫描更高和更低的位置</string>
-    <string name="reacquiring_target">正在重新识别目标…</string>
+    <string name="reacquiring_target">正在重新识别随手画…</string>
 
 
     <string name="desc_bg_mockup">背景效果图</string>
@@ -718,9 +718,9 @@
     <string name="standalone_failure_persisted_target_corrupt">已保存的墙面目标丢失或无法读取。请拍摄新的目标。</string>
     <string name="standalone_failure_internal">SphereSLAM 无法继续追踪此目标。</string>
     <string name="standalone_tracking_stopped">SphereSLAM 追踪已停止。请重新拍摄目标以重新启动。</string>
-    <string name="standalone_status_mapping">SphereSLAM 建图中 • 点按“目标”以添加指纹</string>
-    <string name="standalone_status_preparing">正在准备指纹目标…</string>
-    <string name="standalone_status_finding">正在查找指纹目标…</string>
+    <string name="standalone_status_mapping">SphereSLAM 建图中 • 点按“随手画”以添加您的随手画</string>
+    <string name="standalone_status_preparing">正在准备墙面目标…</string>
+    <string name="standalone_status_finding">正在查找墙面目标…</string>
     <string name="standalone_quality_too_small">该墙面目标校正后太小。请拍摄更大的区域。</string>
     <string name="standalone_quality_low_contrast">该墙面目标的视觉对比度太低。请包含更多纹理或细节。</string>
     <string name="standalone_quality_blurry">该墙面目标太模糊，无法可靠追踪。请保持稳定后重新拍摄。</string>
@@ -746,15 +746,15 @@
     <string name="ar_feedback_guest_edit_dropped">该更改无法与主机共享，只会保留在此设备上</string>
     <string name="ar_feedback_backend_resolving">AR 后端仍在确定中，请稍后再次尝试托管</string>
     <string name="ar_feedback_open_project_first">分享前请先打开一个项目，目前没有可发送给访客的内容</string>
-    <string name="ar_feedback_host_need_target_arcore">托管前请先捕获并锁定当前的墙面目标</string>
+    <string name="ar_feedback_host_need_target_arcore">托管前请先捕获并锁定当前的随手画</string>
     <string name="ar_feedback_host_need_target_standalone">托管前请先捕获独立的墙面目标</string>
-    <string name="ar_feedback_fingerprint_not_ready">墙面指纹尚未就绪，请让目标保持在画面中，然后再次尝试托管</string>
+    <string name="ar_feedback_fingerprint_not_ready">随手画尚未就绪 — 请让它保持在画面中，然后再次尝试 “主持”</string>
     <string name="ar_feedback_package_failed">无法打包此项目以供分享，请先尝试保存</string>
     <string name="ar_feedback_host_failed">无法开始分享：%1$s</string>
     <string name="ar_feedback_join_load_failed">无法加载主机的项目，会话已结束。</string>
     <string name="ar_feedback_join_no_geometry">主机未提供 ARCore 可用于对齐的几何数据。</string>
     <string name="ar_feedback_join_failed">无法加入：%1$s</string>
-    <string name="ar_feedback_wall_target_changed">墙面目标已更改，分享已结束。请为新的墙面重新开始托管。</string>
+    <string name="ar_feedback_wall_target_changed">随手画已更改 — 分享已结束。请为新的墙面重新开始 “主持”。</string>
     <string name="ar_feedback_backend_changed">跟踪后端已更改，分享已结束。请重新开始分享。</string>
     <string name="ar_feedback_camera_busy">相机正忙或不可用，请关闭其他相机应用，然后重新进入 AR</string>
     <string name="ar_feedback_ar_start_failed">无法启动 AR，您的相机可能正被其他应用使用</string>
@@ -763,21 +763,21 @@
     <string name="ar_feedback_camera_not_resumed">AR 相机未能恢复，请尝试退出 AR 模式后重新进入</string>
     <string name="ar_feedback_camera_permission">相机不可用，请检查相机权限，然后重新进入 AR</string>
     <string name="ar_feedback_camera_not_paused">AR 相机未能正常暂停，可能会在后台继续运行</string>
-    <string name="ar_feedback_backbone_warning">作品几乎遮住了视野中的整面墙，只有 %1$d 个跟踪特征位于其外。请将其缩小或后退一些，否则目标可能无法锁定。</string>
-    <string name="ar_feedback_legacy_target_geometry">此项目已保存的目标由旧版本创建，其 3D 几何数据无法校正。请重新创建目标后再使用。</string>
+    <string name="ar_feedback_backbone_warning">作品几乎遮住了视野中的整面墙 — 只有 %1$d 个跟踪特征位于其外。请将其缩小或后退一些，否则随手画可能无法锁定。</string>
+    <string name="ar_feedback_legacy_target_geometry">此项目已保存的随手画由旧版本创建，其 3D 几何数据无法校正。请重新创建随手画后再使用。</string>
     <string name="ar_feedback_camera_no_frames">相机没有输出画面，请退出 AR 后重试</string>
     <string name="ar_feedback_camera_recovery_timeout">AR 相机恢复已安全超时，请退出 AR 后重新进入</string>
     <string name="ar_feedback_target_prepare_failed">无法准备已捕获的目标，请重试。</string>
     <string name="ar_feedback_wall_width_save_failed">无法保存墙面宽度，请再次尝试保存。</string>
     <string name="ar_feedback_unknown_error">未知错误</string>
-    <string name="reloc_looking">正在寻找您的目标…</string>
+    <string name="reloc_looking">正在寻找您的随手画…</string>
     <string name="reloc_turn_right">向右转 %1$d°</string>
     <string name="reloc_turn_left">向左转 %1$d°</string>
     <string name="reloc_tilt_up">向上倾斜 %1$d°</string>
     <string name="reloc_tilt_down">向下倾斜 %1$d°</string>
     <string name="reloc_facing_it">您正对着它 — 请缓慢左右移动</string>
-    <string name="reloc_recapture">重新捕获目标</string>
-    <string name="ar_feedback_capture_failed">目标捕获失败。请点按重试。</string>
+    <string name="reloc_recapture">重新捕获随手画</string>
+    <string name="ar_feedback_capture_failed">随手画捕获失败。请点按重试。</string>
 
     <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
     <string name="nav_stencil">模板</string>
@@ -790,9 +790,8 @@
 
     <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
     <string name="settings_change_pass">变化检测（需要一张干净墙面的照片）</string>
-    <string name="target_clean_wall_text">还没有做标记？请先用下方按钮拍一张干净的墙面，然后再画上标记。已经做了标记？直接点击标记即可。</string>
-    <string name="target_clean_wall_photo">干净墙面照片</string>
-    <string name="target_clean_wall_saved">干净墙面照片已保存。重拍</string>
+    <string name="target_shutter_cd">拍摄空白墙面</string>
+    <string name="target_shutter_retake_cd">重拍空白墙面照片</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">CV 视图</string>
