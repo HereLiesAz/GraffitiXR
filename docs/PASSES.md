@@ -61,8 +61,10 @@ or is replaced. A cell's vote is "present" when at least half of that filter's p
 confirmed, "absent" when some are not, and no data when it has none. Filter targets never become
 reloc marks: they judge progress, and Align uses them too. `MobileGS::autoFitDesign` matches the artwork's
 features, every installed target set and the inverted design against the capture photo (rays onto
-the wall plane), and keeps the set whose similarity fit has the most inliers. The Doodle is not a
-source: it is marks drawn for reloc, not the design. With a clean-wall photo, the photo's unchanged
+the wall plane) and against the Doodle (its rows are on the wall plane already), and keeps the
+pairing whose similarity fit has the most inliers; either source alone is enough. The Doodle starts
+as marks drawn for reloc, but once paint covers them (rows grown from live frames that matched the
+design, or a Doodle captured over paint) its rows are paint. With a clean-wall photo, the photo's unchanged
 bare wall (a feature the clean-wall photo has at the same place, uniquely) is dropped before
 matching, so the wall's own texture can neither answer for the design nor make real paint look
 ambiguous.

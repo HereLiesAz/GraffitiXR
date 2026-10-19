@@ -887,8 +887,9 @@ public:
      * on the wall). Matches the Doodle builder's design features -- the artwork's own, each design
      * filter's target set (mTargetSets), and the inverted design, since paint rarely keeps the
      * design's colours -- against the capture photo (back-projected onto the wall plane), less its
-     * unchanged bare wall when a clean-wall photo is registered. The Doodle is not a source: it is
-     * marks drawn for reloc, not the design. Takes the set with the most inliers of a RANSAC similarity in the CURRENT design's local frame. Waits for a
+     * unchanged bare wall when a clean-wall photo is registered, and against the Doodle (on the wall
+     * plane; once paint covers the doodles its rows are paint). Either alone is enough. Takes the
+     * pairing with the most inliers of a RANSAC similarity in the CURRENT design's local frame. Waits for a
      * filter build in flight, and returns no fit when the placement, design, Doodle or capture photo
      * changed while matching (the Doodle may grow). out5 = {dx, dy (m), dTheta (rad, CCW in the
      * design plane), scale ratio, inliers}. Returns false when there is no fit.

@@ -3391,7 +3391,7 @@ void MobileGS::buildPaintGridLocked(const cv::Mat& composite, const std::vector<
 bool MobileGS::autoFitDesign(float* out5, bool minimumEvidence) {
     // Fewest agreeing matches for a fit to be possible at all: two fix any similarity, a third tests it.
     constexpr int kPossible = 3;
-    cv::Mat photoRgb, designGray, cleanDescs; float K[4]; float fpFromDesign[16]; float halfW, halfH;
+    cv::Mat photoRgb, designGray, cleanDescs, wallDescs; float K[4] = {0, 0, 0, 0}; float fpFromDesign[16]; float halfW, halfH;
     std::vector<cv::Point2f> cleanPx;   // the bare wall (clean-wall photo) in the capture photo's pixels
     std::vector<cv::Point3f> wall;
     // The Doodle builder's design features: the artwork's own, then each filter's target set (places
@@ -3407,19 +3407,26 @@ bool MobileGS::autoFitDesign(float* out5, bool minimumEvidence) {
     joinFilterBuild();
     {
         std::lock_guard<std::mutex> lock(mMutex);
-        // The paint is looked for in the capture photo. The Doodle is not a source: it is marks drawn
-        // on the wall for reloc, not the design, so it has nothing to match in the overlaid image.
-        if (mCaptureRgb.empty() || !(mCaptureIntr[0] > 0) || !(mCaptureIntr[1] > 0) || mArtworkGray.empty() ||
-            !mHasDesignPlacement || !(mDesignHalfW > 0) || !(mDesignHalfH > 0) || mWallKeypoints3D.size() < 12) {
+        // The paint is looked for in two places: the capture photo, and the Doodle itself. The Doodle
+        // starts as marks drawn for reloc, but once paint covers them (a Doodle grown from live frames
+        // that matched the design, or one captured over paint) its rows are paint, on the wall plane.
+        // Either one is enough.
+        const bool havePhoto = !mCaptureRgb.empty() && mCaptureIntr[0] > 0 && mCaptureIntr[1] > 0;
+        const bool haveDoodle = !mWallDescriptors.empty() && (size_t)mWallDescriptors.rows == mWallKeypoints3D.size();
+        if (mArtworkGray.empty() || !mHasDesignPlacement || !(mDesignHalfW > 0) || !(mDesignHalfH > 0) ||
+            mWallKeypoints3D.size() < 12 || !(havePhoto || haveDoodle)) {
             mLastAutoFitResult.store(kAutoFitNotReady, std::memory_order_relaxed);
             return false;
         }
-        photoRgb = mCaptureRgb.clone(); photoRef = mCaptureRgb;
-        memcpy(K, mCaptureIntr, sizeof(K));
-        // The bare wall, when a clean-wall photo is registered to this capture photo.
-        if (!mCleanWallRgb.empty() && mCleanFeatSrc.data == mCleanWallRgb.data && mCleanWallRgb.size() == mCaptureRgb.size()) {
-            cleanPx = mCleanFeatPx; cleanDescs = mCleanFeatDescs.clone();
+        if (havePhoto) {
+            photoRgb = mCaptureRgb.clone(); photoRef = mCaptureRgb;
+            memcpy(K, mCaptureIntr, sizeof(K));
+            // The bare wall, when a clean-wall photo is registered to this capture photo.
+            if (!mCleanWallRgb.empty() && mCleanFeatSrc.data == mCleanWallRgb.data && mCleanWallRgb.size() == mCaptureRgb.size()) {
+                cleanPx = mCleanFeatPx; cleanDescs = mCleanFeatDescs.clone();
+            }
         }
+        if (haveDoodle) wallDescs = mWallDescriptors.clone();
         designGray = mArtworkGray.clone(); artworkGen = mArtworkGeneration;
         memcpy(fpFromDesign, mDesignFpFromDesign, sizeof(fpFromDesign));
         halfW = mDesignHalfW; halfH = mDesignHalfH; wall = mWallKeypoints3D;
@@ -3448,7 +3455,7 @@ bool MobileGS::autoFitDesign(float* out5, bool minimumEvidence) {
 
     // The photo is described in the design features' type (ORB when the Doodle is ORB), so every set
     // can be matched against it.
-    const int descType = !sets.empty() ? sets.front().descs.type() : CV_32F;
+    const int descType = !wallDescs.empty() ? wallDescs.type() : (!sets.empty() ? sets.front().descs.type() : CV_32F);
     const bool wantOrb = descType == CV_8U;
     auto detect = [&](const cv::Mat& g, std::vector<cv::KeyPoint>& k, cv::Mat& d) {
         if (wantOrb || !(mSuperPoint.isLoaded() && mSuperPoint.detect(g, k, d)) || k.empty())
@@ -3457,7 +3464,7 @@ bool MobileGS::autoFitDesign(float* out5, bool minimumEvidence) {
     // The capture photo: each feature's ray from the capture camera, onto the wall plane fitted to the
     // Doodle's points (in design-local metres; NaN where a ray misses the plane).
     std::vector<cv::KeyPoint> pk; cv::Mat photoDescs; std::vector<cv::Point2f> photoLocal;
-    {
+    if (!photoRgb.empty()) {
         cv::Mat data((int)wall.size(), 3, CV_32F);
         for (int i = 0; i < (int)wall.size(); ++i) {
             data.at<float>(i, 0) = wall[i].x; data.at<float>(i, 1) = wall[i].y; data.at<float>(i, 2) = wall[i].z;
@@ -3468,14 +3475,17 @@ bool MobileGS::autoFitDesign(float* out5, bool minimumEvidence) {
         cv::Mat photoGray; cv::cvtColor(photoRgb, photoGray, cv::COLOR_RGB2GRAY);
         normalizeForFeatures(photoGray);
         detect(photoGray, pk, photoDescs);
-        if (!(cv::norm(nrm) > 1e-6) || (int)pk.size() < (minimumEvidence ? kPossible : 20)) return false;
-        nrm /= cv::norm(nrm);
-        const double pd = nrm.dot(cen);
-        for (const auto& kp : pk) {
-            const cv::Vec3d dir((kp.pt.x - K[2]) / K[0], (kp.pt.y - K[3]) / K[1], 1.0);
-            const double den = nrm.dot(dir);
-            const double lam = std::abs(den) < 1e-6 ? -1.0 : pd / den;
-            photoLocal.push_back(lam > 0 ? toDesign(lam * dir[0], lam * dir[1], lam * dir[2]) : kNoPoint);
+        if (cv::norm(nrm) > 1e-6 && (int)pk.size() >= (minimumEvidence ? kPossible : 20)) {
+            nrm /= cv::norm(nrm);
+            const double pd = nrm.dot(cen);
+            for (const auto& kp : pk) {
+                const cv::Vec3d dir((kp.pt.x - K[2]) / K[0], (kp.pt.y - K[3]) / K[1], 1.0);
+                const double den = nrm.dot(dir);
+                const double lam = std::abs(den) < 1e-6 ? -1.0 : pd / den;
+                photoLocal.push_back(lam > 0 ? toDesign(lam * dir[0], lam * dir[1], lam * dir[2]) : kNoPoint);
+            }
+        } else {
+            pk.clear(); photoDescs.release();
         }
     }
     // Drop the photo's unchanged bare wall before matching: a photo feature the clean-wall photo has
@@ -3501,8 +3511,16 @@ bool MobileGS::autoFitDesign(float* out5, bool minimumEvidence) {
             keepK.push_back(pk[q]); keepD.push_back(photoDescs.row((int)q)); keepL.push_back(photoLocal[q]);
         }
         pk.swap(keepK); photoDescs = keepD; photoLocal.swap(keepL);
-        if (photoDescs.empty()) return false;
     }
+
+    // What the design is matched against, each row with its place on the wall in the CURRENT
+    // design-local frame: the photo (above), and the Doodle (its rows are on the wall plane already).
+    struct Target { const cv::Mat* descs; const std::vector<cv::Point2f>* local; };
+    std::vector<cv::Point2f> wallLocal;
+    for (const auto& p : wall) wallLocal.push_back(toDesign(p.x, p.y, p.z));
+    std::vector<Target> targets;
+    if (!photoDescs.empty()) targets.push_back({&photoDescs, &photoLocal});
+    if (!wallDescs.empty()) targets.push_back({&wallDescs, &wallLocal});
 
     // Paint in the opposite tone of the design (light on dark): the inverted design, described as is.
     {
@@ -3513,43 +3531,49 @@ bool MobileGS::autoFitDesign(float* out5, bool minimumEvidence) {
 
     const float W = (float)designGray.cols, Hh = (float)designGray.rows;
     int bestInl = 0; cv::Mat bestM;
-    for (const FitSet& fs : sets) {
-        const cv::Mat& dd = fs.descs;
-        if ((int)fs.pts.size() < (minimumEvidence ? kPossible : 20) || dd.type() != photoDescs.type() || dd.cols != photoDescs.cols) continue;
-        cv::Ptr<cv::DescriptorMatcher> m = dd.type() == CV_32F
-            ? cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE)
-            : cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
-        std::vector<std::vector<cv::DMatch>> km; m->knnMatch(dd, photoDescs, km, 2);
-        std::vector<cv::Point2f> src, dst;
-        for (auto& mm : km) {
-            if (mm.size() < 2 || !(mm[0].distance < 0.8f * mm[1].distance)) continue;
-            const cv::Point2f& to = photoLocal[(size_t)mm[0].trainIdx];
-            if (!std::isfinite(to.x) || !std::isfinite(to.y)) continue;
-            // Design pixel -> design-local metres at the CURRENT extents.
-            const cv::Point2f dp = fs.pts[mm[0].queryIdx];
-            src.emplace_back(halfW * (2.0f * dp.x / W - 1.0f), halfH * (1.0f - 2.0f * dp.y / Hh));
-            dst.push_back(to);
+    for (const Target& t : targets) {
+        const cv::Mat& td = *t.descs;
+        for (const FitSet& fs : sets) {
+            const cv::Mat& dd = fs.descs;
+            if ((int)fs.pts.size() < (minimumEvidence ? kPossible : 20) || dd.type() != td.type() || dd.cols != td.cols) continue;
+            cv::Ptr<cv::DescriptorMatcher> m = dd.type() == CV_32F
+                ? cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE)
+                : cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
+            std::vector<std::vector<cv::DMatch>> km; m->knnMatch(dd, td, km, 2);
+            std::vector<cv::Point2f> src, dst;
+            for (auto& mm : km) {
+                if (mm.size() < 2 || !(mm[0].distance < 0.8f * mm[1].distance)) continue;
+                const cv::Point2f& to = (*t.local)[(size_t)mm[0].trainIdx];
+                if (!std::isfinite(to.x) || !std::isfinite(to.y)) continue;
+                // Design pixel -> design-local metres at the CURRENT extents.
+                const cv::Point2f dp = fs.pts[mm[0].queryIdx];
+                src.emplace_back(halfW * (2.0f * dp.x / W - 1.0f), halfH * (1.0f - 2.0f * dp.y / Hh));
+                dst.push_back(to);
+            }
+            if ((int)src.size() < (minimumEvidence ? kPossible : 12)) continue;
+            std::vector<uchar> inl;
+            cv::Mat M = cv::estimateAffinePartial2D(src, dst, inl, cv::RANSAC, 0.03, 2000, 0.995);
+            const int n = M.empty() ? 0 : cv::countNonZero(inl);
+            // Confidence: enough agreeing matches, and a fair share of those that survived the ratio test.
+            const bool confident = minimumEvidence ? n >= kPossible : (n >= 15 && n * 4 >= (int)src.size());
+            if (confident && n > bestInl) { bestInl = n; bestM = M; }
         }
-        if ((int)src.size() < (minimumEvidence ? kPossible : 12)) continue;
-        std::vector<uchar> inl;
-        cv::Mat M = cv::estimateAffinePartial2D(src, dst, inl, cv::RANSAC, 0.03, 2000, 0.995);
-        const int n = M.empty() ? 0 : cv::countNonZero(inl);
-        // Confidence: enough agreeing matches, and a fair share of those that survived the ratio test.
-        const bool confident = minimumEvidence ? n >= kPossible : (n >= 15 && n * 4 >= (int)src.size());
-        if (confident && n > bestInl) { bestInl = n; bestM = M; }
     }
     if (bestM.empty()) return false;
-    // The fit is relative to the placement, design, wall plane and photo snapshotted above. Any of
-    // them replaced while matching would have it applied to the wrong thing. The Doodle may only have
-    // GROWN meanwhile (self-grow appends): the points the wall plane was fitted to are still there.
+    // The fit is relative to the placement, design, Doodle and photo snapshotted above. Any of them
+    // replaced while matching would have it applied to the wrong thing. The Doodle may only have GROWN
+    // meanwhile (self-grow appends): the rows matched against are still there, unchanged.
     {
         std::lock_guard<std::mutex> lock(mMutex);
         const bool wallKept = mWallKeypoints3D.size() >= wall.size() &&
-            std::equal(wall.begin(), wall.end(), mWallKeypoints3D.begin());
+            std::equal(wall.begin(), wall.end(), mWallKeypoints3D.begin()) &&
+            (wallDescs.empty() || (mWallDescriptors.rows >= wallDescs.rows && mWallDescriptors.type() == wallDescs.type() &&
+                                   mWallDescriptors.cols == wallDescs.cols &&
+                                   cv::norm(mWallDescriptors.rowRange(0, wallDescs.rows), wallDescs, cv::NORM_INF) == 0.0));
         if (!mHasDesignPlacement || mDesignHalfW != halfW || mDesignHalfH != halfH ||
             memcmp(mDesignFpFromDesign, fpFromDesign, sizeof(fpFromDesign)) != 0 ||
             mArtworkGeneration != artworkGen || mCaptureRgb.data != photoRef.data ||
-            memcmp(mCaptureIntr, K, sizeof(K)) != 0 || !wallKept) {
+            (!photoRef.empty() && memcmp(mCaptureIntr, K, sizeof(K)) != 0) || !wallKept) {
             LOGI("autoFitDesign: placement, design, Doodle or photo changed while matching; fit dropped");
             return false;
         }
