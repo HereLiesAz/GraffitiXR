@@ -142,10 +142,10 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
 - [x] **D4. Freeze doesn't lock orientation.**
   - Where: `AndroidManifest.xml:82`; `requestedOrientation` is never set.
   - Fix: lock to the current orientation on Freeze and release it on unlock.
-- [ ] **D5. Controls at the top of the screen.**
+- [x] **D5. Controls at the top of the screen.**
   - Where: AR Recapture (`MainActivity.kt:1665-1680, 3991`); guest Leave (`:2127-2134`, `CoopSpectatorBanner.kt:33`); glasses Reconnect/Leave (`:2150-2166`); library header (`ProjectLibraryScreen.kt:120-160`).
   - Fix: move them to the bottom, on the rail's side.
-- [ ] **D6. Adjustment knobs ignore handedness.**
+- [x] **D6. Adjustment knobs ignore handedness.**
   - Where: `AdjustmentsPanel.kt:32` (`isRightHanded` is never read), `:113-200`.
   - Fix: anchor the knob rows to the thumb's side.
 - [x] **D7. GPS runs at high accuracy for the whole AR session.**

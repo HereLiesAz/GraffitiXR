@@ -180,6 +180,8 @@ private val VOLUME_UNLOCK_SEQUENCE = intArrayOf(
     KeyEvent.KEYCODE_VOLUME_DOWN,
 )
 private const val VOLUME_UNLOCK_WINDOW_MS = 1500L
+/** Bottom offset of the rail-side controls column: clear of the adjustment knobs and undo row. */
+private val RAIL_SIDE_CONTROLS_BOTTOM = 220.dp
 /** Proximity readings under this (cm) are "covered": a pocket, a jacket, the phone face-down. */
 private const val PROXIMITY_NEAR_CM = 3f
 
@@ -1445,6 +1447,7 @@ class MainActivity : AppCompatActivity() {
                                     val dashboardState by dashboardViewModel.uiState.collectAsState()
                                     LaunchedEffect(Unit) { dashboardViewModel.loadAvailableProjects() }
                                     ProjectLibraryScreen(
+                                        isRightHanded = editorUiState.isRightHanded,
                                         projects = dashboardState.availableProjects,
                                         onLoadProject = { project ->
                                             // Switching projects ends any active guest co-op session
@@ -1675,6 +1678,11 @@ class MainActivity : AppCompatActivity() {
                             // anchor. This badge is therefore only meaningful once anchored; gating it on
                             // `!isAnchorEstablished` made every branch but IDLE dead (the badge always
                             // returned immediately, per RelocStatusBadge's own state machine below).
+                            // Controls that take a tap sit at the bottom on the rail's side, in reach of the
+                            // thumb holding the phone (docs/UI_UX.md "Thumb Range Only"); badges that are
+                            // only read stay at the top.
+                            val railBottom = if (editorUiState.isRightHanded) Alignment.BottomStart else Alignment.BottomEnd
+                            var showDoodleSearch = false
                             if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && arUiState.isAnchorEstablished) {
                                 // Locked = relocalization has actually matched the saved target. Painting
                                 // progress is NOT a lock signal (it is 0 on an unpainted wall, and it stays
@@ -1686,26 +1694,8 @@ class MainActivity : AppCompatActivity() {
                                         FusionState.COLD_SNAP, FusionState.BLENDING, FusionState.HOLDING
                                     ))
                                 if (mainUiState.hasArCoreDoodle == true && !relocLocked) {
-                                    // A saved target exists but is not matched: say so, point the
-                                    // artist the way the saved compass attitude says, and after a
-                                    // while offer to recapture. Sensors run only while this is shown.
-                                    SavedDoodleSearchStatus(
-                                        savedQuaternion = mainUiState.savedDoodleQuaternion,
-                                        savedMagneticAccuracy = mainUiState.savedDoodleMagneticAccuracy,
-                                        doodleSearchKey = mainUiState.loadedProjectId,
-                                        canRecapture = !mainUiState.isConfirmingDoodle &&
-                                            !mainUiState.isCapturingDoodle && !mainUiState.isWaitingForTap,
-                                        onRecapture = {
-                                            // Same effect as the rail's Target item.
-                                            arViewModel.clearCaptureForRetry()
-                                            arViewModel.cancelMeasure()
-                                            mainViewModel.startDoodleCapture()
-                                        },
-                                        modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .padding(top = 16.dp, end = 16.dp),
-                                        strings = strings
-                                    )
+                                    // Shown with the bottom rail-side controls below (it carries Recapture).
+                                    showDoodleSearch = true
                                 } else {
                                     RelocStatusBadge(
                                         isAnchorEstablished = arUiState.isAnchorEstablished,
@@ -2151,17 +2141,59 @@ class MainActivity : AppCompatActivity() {
                                     waiting = stringResource(DesignR.string.link_tripod_waiting),
                                 )
                             }
-                            if (arUiState.coopRole == CoopRole.GUEST &&
-                                (coopState is CoopSessionState.Connected || coopState is CoopSessionState.Reconnecting)) {
-                                CoopSpectatorBanner(
-                                    peerName = (coopState as? CoopSessionState.Connected)?.peerName ?: "host",
-                                    isReconnecting = coopState is CoopSessionState.Reconnecting,
-                                    onLeave = { arViewModel.leaveSession() },
-                                    modifier = Modifier.align(Alignment.TopCenter),
-                                )
-                            }
-
                             val glassesState by arViewModel.glassesSessionState.collectAsState()
+                            Column(
+                                modifier = Modifier
+                                    .align(railBottom)
+                                    .padding(start = 16.dp, end = 16.dp, bottom = RAIL_SIDE_CONTROLS_BOTTOM),
+                                horizontalAlignment = if (editorUiState.isRightHanded) Alignment.Start else Alignment.End,
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                if (showDoodleSearch) {
+                                    // A saved target exists but is not matched: say so, point the
+                                    // artist the way the saved compass attitude says, and after a
+                                    // while offer to recapture. Sensors run only while this is shown.
+                                    SavedDoodleSearchStatus(
+                                        savedQuaternion = mainUiState.savedDoodleQuaternion,
+                                        savedMagneticAccuracy = mainUiState.savedDoodleMagneticAccuracy,
+                                        doodleSearchKey = mainUiState.loadedProjectId,
+                                        canRecapture = !mainUiState.isConfirmingDoodle &&
+                                            !mainUiState.isCapturingDoodle && !mainUiState.isWaitingForTap,
+                                        onRecapture = {
+                                            // Same effect as the rail's Target item.
+                                            arViewModel.clearCaptureForRetry()
+                                            arViewModel.cancelMeasure()
+                                            mainViewModel.startDoodleCapture()
+                                        },
+                                        strings = strings
+                                    )
+                                }
+                                if (arUiState.coopRole == CoopRole.GUEST &&
+                                    (coopState is CoopSessionState.Connected || coopState is CoopSessionState.Reconnecting)) {
+                                    CoopSpectatorBanner(
+                                        peerName = (coopState as? CoopSessionState.Connected)?.peerName ?: "host",
+                                        isReconnecting = coopState is CoopSessionState.Reconnecting,
+                                        onLeave = { arViewModel.leaveSession() },
+                                    )
+                                }
+                                when (val s = glassesState) {
+                                    is com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.Active ->
+                                        com.hereliesaz.graffitixr.ui.glasses.GlassesStatusBanner(
+                                            isFallback = false,
+                                            fallbackReason = null,
+                                            onReconnect = {},
+                                            onLeave = { arViewModel.endGlassesSession() },
+                                        )
+                                    is com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.Fallback ->
+                                        com.hereliesaz.graffitixr.ui.glasses.GlassesStatusBanner(
+                                            isFallback = true,
+                                            fallbackReason = s.reason,
+                                            onReconnect = { arViewModel.startGlassesSession() },
+                                            onLeave = { arViewModel.endGlassesSession() },
+                                        )
+                                    else -> Unit
+                                }
+                            }
                             when (val s = glassesState) {
                                 is com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.PairingPrompt -> {
                                     com.hereliesaz.graffitixr.ui.glasses.GlassesPairingOverlay(
@@ -2174,25 +2206,8 @@ class MainActivity : AppCompatActivity() {
                                         onTap = { point -> arViewModel.submitCalibrationTap(point) },
                                     )
                                 }
-                                is com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.Active -> {
-                                    com.hereliesaz.graffitixr.ui.glasses.GlassesStatusBanner(
-                                        isFallback = false,
-                                        fallbackReason = null,
-                                        onReconnect = {},
-                                        onLeave = { arViewModel.endGlassesSession() },
-                                        modifier = Modifier.align(Alignment.TopCenter),
-                                    )
-                                }
-                                is com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.Fallback -> {
-                                    com.hereliesaz.graffitixr.ui.glasses.GlassesStatusBanner(
-                                        isFallback = true,
-                                        fallbackReason = s.reason,
-                                        onReconnect = { arViewModel.startGlassesSession() },
-                                        onLeave = { arViewModel.endGlassesSession() },
-                                        modifier = Modifier.align(Alignment.TopCenter),
-                                    )
-                                }
-                                com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.Idle -> Unit
+                                // Active and Fallback banners are in the rail-side column above.
+                                else -> Unit
                             }
                         }
                     }

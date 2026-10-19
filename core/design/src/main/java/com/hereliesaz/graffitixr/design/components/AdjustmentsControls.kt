@@ -143,13 +143,21 @@ fun AdjustmentsKnobsRow(
     strings: AppStrings,
     modifier: Modifier = Modifier,
     /** See [Knob]'s labelColor: defaults to white, pass a luminance-aware color for light canvases. */
-    labelColor: Color = Color.White
+    labelColor: Color = Color.White,
+    /**
+     * The knobs sit on the side of the thumb that holds the phone, which is the off hand (the rail
+     * docks there too): left for a right-handed artist, right otherwise.
+     */
+    isRightHanded: Boolean = true,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
+        horizontalArrangement = Arrangement.spacedBy(
+            KNOB_GAP,
+            if (isRightHanded) Alignment.Start else Alignment.End,
+        )
     ) {
         Knob(
             value = opacity,
@@ -215,13 +223,21 @@ fun ColorBalanceKnobsRow(
     strings: AppStrings,
     modifier: Modifier = Modifier,
     /** See [Knob]'s labelColor: defaults to white, pass a luminance-aware color for light canvases. */
-    labelColor: Color = Color.White
+    labelColor: Color = Color.White,
+    /**
+     * The knobs sit on the side of the thumb that holds the phone, which is the off hand (the rail
+     * docks there too): left for a right-handed artist, right otherwise.
+     */
+    isRightHanded: Boolean = true,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
+        horizontalArrangement = Arrangement.spacedBy(
+            KNOB_GAP,
+            if (isRightHanded) Alignment.Start else Alignment.End,
+        )
     ) {
         // Red Knob
         Knob(
@@ -264,3 +280,6 @@ fun ColorBalanceKnobsRow(
         )
     }
 }
+
+/** Space between knobs in a row anchored to the phone-holding thumb's side. */
+private val KNOB_GAP = 12.dp
