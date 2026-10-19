@@ -228,7 +228,7 @@ Every layer carries the full property set below; all except the runtime `bitmap`
 | `scale` | `1.0` | multiplier | Uniform scale |
 | `isInverted` | `false` | Bool | Colour invert |
 | `isSketch` | `false` | Bool | **Outline** effect — render as a traceable pencil sketch (dark lines opaque, light areas transparent); re-derived from `uri` each time, not baked in |
-| `isSubjectIsolated` | `false` | Bool | **Subject isolation** — ML Kit segmentation drops everything but the subject to transparent (see §4) |
+| `isSubjectIsolated` | `false` | Bool | **Subject isolation** — the bundled U²-Net segmenter drops everything but the subject to transparent (see §4) |
 | `isStencil` | `false` | Bool | **Stencil** — the design is split into three tonal sheets (black, grey, white); exclusive with `isSketch` (§5) |
 | `stencilView` | `ALL` | `ALL`/`BASE`/`MIDTONE`/`SECONDARY` | Which sheets are shown while `isStencil` is on |
 | `stencilDark` | `true` | Bool | The last run's dark-or-light call, which names the cycler's options |
@@ -290,7 +290,7 @@ These act on the design (contrast with §1.1, which acts on the whole design **p
 | `SetColorBalanceR/G/B` | `1.0` each | multiplier | Surfaced in the `COLOR` panel (`onColorBalance{R,G,B}Changed`) |
 | `ToggleInvert` | `false` | — | |
 | `onToggleOutline` | `isSketch = false` | — | The traceable-sketch effect (§2.1) |
-| `onToggleSubjectIsolation` | `isSubjectIsolated = false` | — | Drop everything but the ML Kit-segmented subject (§4) |
+| `onToggleSubjectIsolation` | `isSubjectIsolated = false` | — | Drop everything but the segmented subject (§4) |
 | `onToggleStencil` | `isStencil = false` | — | Three tonal sheets; turns Outline off (§5) |
 | `onCycleStencilView` | `stencilView = ALL` | `ALL` → `BASE` → `MIDTONE` → `SECONDARY` → `ALL` | Only while a stencil exists (§5) |
 
@@ -331,8 +331,10 @@ The enum still declares `NONE`, `LAYERS`, `ADJUSTMENTS`, `TRANSFORM`, `COLOR`, `
 
 ## 4. Subject isolation & Outline effects
 
-`SubjectIsolator` (`feature/editor/.../SubjectIsolator.kt`) wraps ML Kit's `SubjectSegmentation`
-client to cut the design's subject out, making everything else transparent. There is no
+`SubjectIsolator` (`feature/editor/.../SubjectIsolator.kt`) runs U²-Net (small, `assets/u2netp.onnx`,
+bundled; see `docs/MODELS.md`) through OpenCV's DNN module, on the device and offline, to cut the
+design's subject out, making everything else transparent. A model that fails to load or run is
+reported as unavailable, never as a fault of the image, and no failure is cached. There is no
 `BackgroundRemover` class, and no stencil pipeline to feed (§5) — isolation exists solely as one of
 the design's two toggleable rendering effects.
 

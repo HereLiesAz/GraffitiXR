@@ -51,7 +51,8 @@ See `TELEOLOGICAL_SLAM.md` ("Correction sources").
 
 MobileGS does not consume the hybrid KPM page frame and KPM does not mutate MobileGS doodle
 coordinates. The only shared downstream object is PoseFusion's **anchor-local correction**, which is
-frame-invariant under ARCore global world rebases. The correction switch remains off by default.
+frame-invariant under ARCore global world rebases. The correction switch (drift correction) is on by
+default and remembered; it can be switched off from the AR diagnostics panel.
 
 ### 2a'. Frames, worlds and light
 - Every doodle native holds is in the display-oriented capture camera's CV frame, with display
@@ -83,15 +84,15 @@ averaged in, saved with the project (`doodleWallNormalEnu`) and restored on load
 there for the first relocalization of the next session; a new target forgets it. Diagnostics:
 `lastRelocTurnDeg`, `lastRelocTurnCorr`.
 
-### 3. Teleological corroboration and self-grow (both off by default)
-Two optional, separately-gated mechanisms sit on top of relocalization:
+### 3. Teleological corroboration and self-grow
+Two mechanisms sit on top of relocalization:
 - **Corroboration**: compares descriptors from the design composite against the live wall to produce a confidence signal (Lowe ratio `kCorrobLoweRatio = 0.85`) — see `docs/TELEOLOGICAL_SLAM.md` for what it does and does not measure.
-- **Self-grow** (`mSelfGrowEnabled`, default **off**, `setSelfGrowEnabled`): lets validated new marks extend the doodle as the artist paints, so relocalization can survive the original reference being covered. Grown rows are capped at `kMaxGrownRows = 5000` behind the captured Doodle, and past it the least recently seen grown rows are evicted, so growth never stops. Two further, independent 5000 caps exist: `kMaxPaintMarks = 5000` (painted-design reference marks) and `kMapCap = 5000` (the persistent feature map, which confidence-prunes when full).
+- **Self-grow** (`mSelfGrowEnabled`, `setSelfGrowEnabled`; the engine starts off and the app turns it on from its setting, default **on**): lets validated new marks extend the doodle as the artist paints, so relocalization can survive the original reference being covered. Grown rows are capped at `kMaxGrownRows = 5000` behind the captured Doodle, and past it the least recently seen grown rows are evicted, so growth never stops. Two further, independent 5000 caps exist: `kMaxPaintMarks = 5000` (painted-design reference marks) and `kMapCap = 5000` (the persistent feature map, which confidence-prunes when full).
 
-Both are reachable only from the diagnostic overlay (Settings > diagnostic overlay), not the artist-facing UI — see that doc for why, and for the open questions around self-grow's promotion gate.
+Self-grow's switch is in the AR diagnostics panel, not the artist-facing UI; corroboration always runs once a design is registered. See that doc for the open questions around self-grow's promotion gate.
 
 ### 4. Optional persistent wall feature map
-`WallFeatureMap` (`setMapRelocEnabled`/`setMapBuildEnabled`, `IMPLEMENTATION.md` phases 2b/3) is a second, longer-lived relocalization source that can be built and matched against across sessions. Off by default like the two mechanisms above. The **map path** of the reloc pass is additive and prior-gated: it needs a previous published pose (`mapPriorSeq > 0`, i.e. the doodle has locked at least once), frustum-gates the map to the points that pose says are in view (never a brute-force match of the whole map), and appends those correspondences to the doodle's before the single PnP solve.
+`WallFeatureMap` (`setMapRelocEnabled`/`setMapBuildEnabled`, `IMPLEMENTATION.md` phases 2b/3) is a second, longer-lived relocalization source that can be built and matched against across sessions. On by default (the AR diagnostics panel switches it off, remembered); the engine starts off until the app applies the setting. The **map path** of the reloc pass is additive and prior-gated: it needs a previous published pose (`mapPriorSeq > 0`, i.e. the doodle has locked at least once), frustum-gates the map to the points that pose says are in view (never a brute-force match of the whole map), and appends those correspondences to the doodle's before the single PnP solve.
 
 For standalone SphereSLAM, both self-grown doodle points and feature-map growth are written
 directly in the centered KPM-page fingerprint frame (+X right, +Y up, +Z wall normal). The
@@ -112,7 +113,7 @@ A representative subset of the real, currently-exported surface (see `SlamManage
 | `updateAnchorTransform(mat)` | Hands the engine the current ARCore anchor pose. (The relocalization correction itself is computed Kotlin-side by `PoseFusion` from `getRelocResult`.) |
 | `getRelocDiagnostics()` | Structured relocalization state (inliers, reprojection error, reject reason). |
 | `getCorroborationConfidence()` | Teleological corroboration's confidence signal (see `TELEOLOGICAL_SLAM.md`). |
-| `setSelfGrowEnabled(enabled)` | Toggles self-grow (default off). |
+| `setSelfGrowEnabled(enabled)` | Toggles self-grow (engine starts off; the app applies its setting, default on). |
 | `feedYuvFrame(...)` | Per-frame camera feed into the reloc thread. |
 | `setCameraAttitude(earthFromCamera)` | The frame's north-referenced camera attitude, for the sensor turn. |
 | `getWallNormalEnu()` / `setWallNormalEnu(n)` | The wall's normal learned at locks; saved with and restored from the project. |

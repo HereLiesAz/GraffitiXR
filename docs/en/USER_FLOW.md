@@ -16,7 +16,7 @@ per-mode placement/adjustments are shared across AR/Overlay/Mockup/Trace/Design.
       (`onTransformGesture`/`onModeTransformGesture`/`onCycleRotationAxis`), not per-field setters.
       There is no `warpMesh`/Liquify field — that pipeline was removed; no implementing code remains.
     * **`ColorAdjustment` fields**: opacity, brightness, contrast, saturation, colour balance.
-    * **Effect flags**: `isInverted`, `isSketch` (outline extraction), `isSubjectIsolated` (MLKit
+    * **Effect flags**: `isInverted`, `isSketch` (outline extraction), `isSubjectIsolated` (U²-Net
       subject isolation) — booleans, not a separate blend-mode-stack concept.
 
 ### B. Implementation Logic

@@ -67,8 +67,9 @@ painting, warp/Liquify) does not live here — see [`FEATURE_REFERENCE.md`](FEAT
 ### `:core:nativebridge`
 C++17 `MobileGS` engine and JNI boundary (`GraffitiJNI.cpp`). Handles doodle-based
 relocalization (ORB/SuperPoint descriptors, Lowe-ratio matching, `solvePnPRansac`), the
-distortion-head model for painting-progress/confidence (`docs/DISTORTION_HEAD.md`), and — opt-in,
-off by default — drift correction and self-growing doodle (`docs/TELEOLOGICAL_SLAM.md`). OpenCV
+distortion-head model for painting-progress/confidence (`docs/DISTORTION_HEAD.md`), and drift
+correction and the self-growing doodle (`docs/TELEOLOGICAL_SLAM.md`): on by default, each switched
+off from the AR diagnostic overlay. OpenCV
 is a Maven Central dependency (`org.opencv:opencv`), not a vendored/embedded copy.
 
 ### `:sphereslam`

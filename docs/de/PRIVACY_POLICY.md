@@ -1,6 +1,6 @@
 # Datenschutzerklärung für GraffitiXR
 
-**Zuletzt aktualisiert:** 2026-09-04
+**Zuletzt aktualisiert:** 2026-10-19
 
 HereLiesAZ hat die GraffitiXR-App als Source-Available-App entwickelt (Details zu den Lizenzbedingungen siehe die LICENSE-Datei und docs/LICENSING.md im Repository). Dieser DIENST wird von HereLiesAZ kostenlos zur Verfügung gestellt und ist für die Nutzung im Ist-Zustand vorgesehen.
 
@@ -14,7 +14,7 @@ Für ein besseres Erlebnis können wir bei der Nutzung unseres Dienstes verlange
 
 *   **Kameradaten:** Die App benötigt Zugriff auf die Kamera Ihres Geräts, um die Augmented-Reality-Ansicht (AR), den Overlay-Modus und die Aufnahme von Bildern für Projektziele anzuzeigen. Kameradaten werden lokal auf Ihrem Gerät verarbeitet und nicht an unsere Server übertragen, es sei denn, Sie entscheiden sich ausdrücklich dafür, eine Projektdatei zu teilen.
 *   **Speicher / Fotos:** Die App fordert keine Speicherberechtigung an. Bilder, die Sie hinzufügen, kommen über die Fotoauswahl oder Dateiauswahl des Android-Systems, die der App nur Zugriff auf die von Ihnen gewählte Datei geben. Projekte werden im privaten Speicher der App gespeichert, exportierte Bilder in der Fotogalerie Ihres Geräts.
-*   **Standortdaten (Optional):** Die App fragt nur dann nach der Standortberechtigung, wenn Sie mit der Aufnahme eines AR-Ziels beginnen. Wenn Sie sie erteilen, speichert der Aufnahmedatensatz dieses Ziels, wo es aufgenommen wurde (Breitengrad, Längengrad, Höhe und Genauigkeit). Er wird lokal in der Projektdatei gespeichert und verlässt Ihr Gerät nur, wenn Sie diese Projektdatei selbst teilen oder exportieren.
+*   **Standortdaten (Optional):** Die App fragt nur dann nach der Standortberechtigung, wenn Sie mit der Aufnahme eines AR-Ziels beginnen. Wenn Sie sie erteilen, speichert der Aufnahmedatensatz dieses Ziels, wo es aufgenommen wurde (Breitengrad, Längengrad, Höhe und Genauigkeit). Er wird lokal in der Projektdatei gespeichert und verlässt Ihr Gerät nur, wenn Sie diese Projektdatei selbst teilen oder exportieren. Link (eine Sitzung mit einem zweiten Gerät teilen) sendet ihn nie: Das andere Gerät erhält das Projekt ohne jede Standortangabe.
 
 ## Absturzberichte (Opt-In)
 
@@ -40,7 +40,9 @@ Wir können Drittunternehmen und -personen aus folgenden Gründen beschäftigen:
 *   Um dienstbezogene Dienstleistungen zu erbringen; oder
 *   Um uns bei der Analyse der Nutzung unseres Dienstes zu unterstützen.
 
-Wir verwenden **Google ML Kit** für die Motivsegmentierung (Hintergrundentfernung). Diese Verarbeitung erfolgt lokal auf Ihrem Gerät.
+Die Motivfreistellung (Hintergrundentfernung) nutzt **U²-Net**, ein in die App eingebautes Modell, vollständig auf Ihrem Gerät. Dafür wird nichts heruntergeladen, und kein Bild verlässt das Gerät.
+
+Auf unterstützten Geräten läuft der AR-Modus mit **Google Play-Dienste für AR (ARCore)**, bereitgestellt von Google LLC und geregelt durch die [Datenschutzerklärung von Google](https://policies.google.com/privacy). ARCore verarbeitet Kamerabilder und Bewegungssensordaten, um das Gerät zu verfolgen; was es erhebt, steht in Googles [ARCore-Datenschutzanforderungen](https://developers.google.com/ar/develop/privacy-requirements). Auf Geräten ohne ARCore nutzt die App ihr eigenes Tracking, und ARCore ist nie beteiligt.
 
 ## Updates
 

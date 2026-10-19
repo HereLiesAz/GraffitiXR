@@ -1078,7 +1078,10 @@ class ArViewModel @Inject constructor(
     /** Same arrangement for self-grow, which had the identical shadowing problem. */
     val evalSelfGrowEnabled: StateFlow<Boolean> = _evalSelfGrowEnabled.asStateFlow()
 
-    /** A/B switch for teleological self-grow (default OFF): promote validated new marks into the doodle. */
+    /**
+     * A/B switch for teleological self-grow (default ON, from SettingsRepository.selfGrowEnabled):
+     * promote validated new marks into the doodle.
+     */
     fun evalSetSelfGrowEnabled(on: Boolean) {
         slamManager.setSelfGrowEnabled(on)
         _evalSelfGrowEnabled.value = on
@@ -1091,7 +1094,8 @@ class ArViewModel @Inject constructor(
     val evalFeatureMapEnabled: StateFlow<Boolean> = _evalFeatureMapEnabled.asStateFlow()
 
     /**
-     * A/B switch for the persistent wall feature map (default OFF): grow it from locked frames and
+     * A/B switch for the persistent wall feature map (default ON, from
+     * SettingsRepository.featureMapEnabled): grow it from locked frames and
      * match against it. Both native flags had no caller before this, so the map — and the `.gxr`
      * persistence built for it — could never do anything.
      */
@@ -2581,7 +2585,7 @@ class ArViewModel @Inject constructor(
      */
     private var attitudeProvider: DeviceAttitudeProvider? = null
 
-    /** Last known location, cached while AR is active. Null until a fix arrives or if denied. */
+    /** The fix taken for the latest capture. Null until one arrives, or if denied. */
     @Volatile
     private var lastLocation: android.location.Location? = null
     private var locationTracker: com.hereliesaz.graffitixr.common.LocationTracker? = null
@@ -2589,10 +2593,10 @@ class ArViewModel @Inject constructor(
     /**
      * Begin sampling attitude and location for capture records. Idempotent.
      *
-     * Location is cached from a low-rate subscription rather than requested at capture: the capture
-     * happens on the GL thread inside a frame callback and cannot wait on a fix. A cached value with
-     * its age recorded is strictly better than a blocking call that would drop frames — and the age
-     * is what makes a stale fix visible instead of silently wrong.
+     * Location is one fix taken when a capture begins ([requestCaptureLocationFix]) and cached: the
+     * capture happens on the GL thread inside a frame callback and cannot wait on a fix. A cached
+     * value with its age recorded is strictly better than a blocking call that would drop frames —
+     * and the age is what makes a stale fix visible instead of silently wrong.
      */
     private fun startEnvironmentSampling(context: Context) {
         // Each source is guarded separately, and neither can stop AR mode.
@@ -2619,15 +2623,8 @@ class ArViewModel @Inject constructor(
             if (locationTracker == null) {
                 locationTracker = com.hereliesaz.graffitixr.common.LocationTracker(context)
             }
-            locationTracker?.let { tracker ->
-                // Without permission the tracker defers the start and begins once the artist grants
-                // it — location is asked for when target capture begins, after this has run.
-                // Not an error either way: location is optional and a capture never depends on it.
-                if (!tracker.hasPermissions()) {
-                    Timber.i("Location permission not granted yet; captures record no location until it is")
-                }
-                tracker.startLocationUpdates { loc -> lastLocation = loc }
-            }
+            // No subscription: one fix is taken when a capture begins (requestCaptureLocationFix),
+            // not GPS held hot for the whole session.
         } catch (t: Throwable) {
             Timber.w(t, "location sampling unavailable; captures will record no location")
             locationTracker = null
@@ -2650,6 +2647,19 @@ class ArViewModel @Inject constructor(
             locationTracker?.stopLocationUpdates()
         } catch (t: Throwable) {
             Timber.w(t, "location sampling teardown failed")
+        }
+    }
+
+    /**
+     * A target capture is starting: take one balanced-accuracy fix for its record. The capture itself
+     * runs on the GL thread and cannot wait, so the fix lands in [lastLocation] while the artist taps
+     * the marks. Without permission it waits for the grant (asked for at this same moment).
+     */
+    fun requestCaptureLocationFix() {
+        try {
+            locationTracker?.requestSingleFix { loc -> lastLocation = loc }
+        } catch (t: Throwable) {
+            Timber.w(t, "location fix unavailable; the capture records no location")
         }
     }
 

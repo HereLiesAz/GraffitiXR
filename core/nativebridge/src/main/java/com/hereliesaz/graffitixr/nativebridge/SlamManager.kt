@@ -634,9 +634,12 @@ class SlamManager @Inject constructor(
     fun getMapPointCount(): Int = nativeGetMapPointCount()
     /** Monotonic content revision; changes for point, descriptor, confidence, or observation updates. */
     fun getWallFeatureMapRevision(): Long = nativeGetWallFeatureMapRevision()
-    /** Phase 2b: enable live map-matching in reloc. Default OFF — experimental until device-validated. */
+    /**
+     * Phase 2b: enable live map-matching in reloc. The engine starts OFF; the app turns it on from the
+     * saved setting (default ON) as soon as it starts.
+     */
     fun setMapRelocEnabled(enabled: Boolean) = nativeSetMapRelocEnabled(enabled)
-    /** Phase 3: passively grow the feature map from reloc-locked frames. Default OFF; independent of matching. */
+    /** Phase 3: passively grow the feature map from reloc-locked frames. Engine OFF, app setting ON; independent of matching. */
     fun setMapBuildEnabled(enabled: Boolean) = nativeSetMapBuildEnabled(enabled)
 
     /**
@@ -732,7 +735,7 @@ class SlamManager @Inject constructor(
     fun setViewportSize(width: Int, height: Int) = nativeSetViewportSize(width, height)
 
     fun setRelocEnabled(enabled: Boolean) = nativeSetRelocEnabled(enabled)
-    /** Teleological self-grow (default OFF): promote validated new marks into the live doodle. */
+    /** Teleological self-grow: promote validated new marks into the live doodle. Engine OFF until the app applies its setting (default ON). */
     fun setSelfGrowEnabled(enabled: Boolean) = nativeSetSelfGrowEnabled(enabled)
 
     /**

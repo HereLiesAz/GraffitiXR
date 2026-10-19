@@ -1230,13 +1230,29 @@ class ProjectManager @Inject constructor(
         val sourceFolder = File(appContext.filesDir, "projects/${project.id}")
         if (!sourceFolder.exists()) return@withContext ByteArray(0)
 
+        // Where the wall is stays on this device: the peer gets project.json with every location
+        // (the capture's fix, the project's and the calibration snapshots' GPS) removed.
+        val manifest = File(sourceFolder, "project.json")
+        val stripped = runCatching {
+            json.encodeToString(withoutLocation(json.decodeFromString<GraffitiProject>(manifest.readText())))
+        }.getOrNull() ?: return@withContext ByteArray(0)
         ByteArrayOutputStream().use { baos ->
             ZipOutputStream(baos).use { zos ->
-                zipFolder(sourceFolder, "", zos, unreferencedDesignFiles(sourceFolder))
+                zipFolder(sourceFolder, "", zos, unreferencedDesignFiles(sourceFolder) + "project.json")
+                zos.putNextEntry(ZipEntry("project.json"))
+                zos.write(stripped.toByteArray(Charsets.UTF_8))
+                zos.closeEntry()
             }
             baos.toByteArray()
         }
     }
+
+    /** [project] with no location in it, for anything that leaves the device over Link. */
+    internal fun withoutLocation(project: GraffitiProject): GraffitiProject = project.copy(
+        gpsData = null,
+        captureEnvironment = project.captureEnvironment?.copy(location = null),
+        calibrationSnapshots = project.calibrationSnapshots.map { it.copy(gpsData = null) },
+    )
 
     /**
      * Loads a project received as raw bytes from a host device (spectator/guest path).

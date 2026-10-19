@@ -822,6 +822,10 @@ class MainActivity : AppCompatActivity() {
                 // re-asked on every capture — rather than at startup or for unrelated camera use.
                 var locationAskedThisLaunch by rememberSaveable { mutableStateOf(false) }
                 LaunchedEffect(mainUiState.isCapturingDoodle, editorUiState.editorMode) {
+                    // One fix for this capture (waits for the grant below if there is none yet).
+                    if (mainUiState.isCapturingDoodle && editorUiState.editorMode == EditorMode.AR) {
+                        arViewModel.requestCaptureLocationFix()
+                    }
                     if (mainUiState.isCapturingDoodle &&
                         editorUiState.editorMode == EditorMode.AR &&
                         !locationAskedThisLaunch &&

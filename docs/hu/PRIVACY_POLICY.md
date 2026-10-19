@@ -1,6 +1,6 @@
 # Adatvédelmi Irányelvek a GraffitiXR-hez
 
-**Utolsó frissítés:** 2026-09-04
+**Utolsó frissítés:** 2026-10-19
 
 A HereLiesAZ a GraffitiXR alkalmazást forráskód-elérhető alkalmazásként készítette (lásd a tároló LICENSE és docs/LICENSING.md fájljait a feltételekért). Ezt a SZOLGÁLTATÁST a HereLiesAZ ingyenesen nyújtja, és "ahogy van" (as is) használatra szánták.
 
@@ -14,7 +14,7 @@ A jobb élmény érdekében a Szolgáltatásunk használata során megkövetelhe
 
 *   **Kamera Adatok:** Az alkalmazásnak hozzá kell férnie az eszközöd kamerájához a Kiterjesztett Valóság (AR) nézet, a Rétegzés mód megjelenítéséhez, és a projekt célpontjaihoz szükséges képek rögzítéséhez. A kamera adatai helyileg, az eszközödön kerülnek feldolgozásra, és nem továbbítódnak a szervereinkre, hacsak nem döntesz kifejezetten egy projektfájl megosztása mellett.
 *   **Tárhely / Fotók:** Az alkalmazás semmilyen tárhely-engedélyt nem kér. A hozzáadott képek az Android rendszer fotó- vagy fájlválasztóján keresztül érkeznek, amelyek csak az általad kiválasztott fájlhoz adnak hozzáférést. A projektek az alkalmazás privát tárhelyére, az exportált képek pedig az eszközöd fotógalériájába kerülnek.
-*   **Helyadatok (Opcionális):** Az alkalmazás csak akkor kér helymeghatározási engedélyt, amikor elkezdesz egy AR-célpontot rögzíteni. Ha megadod, a célpont rögzítési adatai eltárolják, hol készült (szélesség, hosszúság, magasság és pontosság). Ez helyileg, a projektfájlban kerül mentésre, és csak akkor hagyja el az eszközödet, ha te magad osztod meg vagy exportálod a projektfájlt.
+*   **Helyadatok (Opcionális):** Az alkalmazás csak akkor kér helymeghatározási engedélyt, amikor elkezdesz egy AR-célpontot rögzíteni. Ha megadod, a célpont rögzítési adatai eltárolják, hol készült (szélesség, hosszúság, magasság és pontosság). Ez helyileg, a projektfájlban kerül mentésre, és csak akkor hagyja el az eszközödet, ha te magad osztod meg vagy exportálod a projektfájlt. A Link (munkamenet megosztása egy második eszközzel) soha nem küldi el: a másik eszköz minden helyadat nélkül kapja meg a projektet.
 
 ## Hibajelentések (Opt-In)
 
@@ -40,7 +40,9 @@ Az alábbi okokból alkalmazhatunk harmadik fél cégeket és magánszemélyeket
 *   A Szolgáltatáshoz kapcsolódó szolgáltatások elvégzése; vagy
 *   Annak elemzése, hogy hogyan használják a Szolgáltatásunkat.
 
-A **Google ML Kit**-et használjuk a téma szegmentálására (háttér eltávolítása). Ez a feldolgozás helyileg, az eszközödön történik.
+Az alany kiemelése (háttér eltávolítása) a **U²-Net** nevű, az alkalmazásba épített modellt futtatja, teljesen az eszközödön. Ehhez semmi sem töltődik le, és egyetlen kép sem hagyja el az eszközt.
+
+A támogatott eszközökön az AR mód a **Google Play-szolgáltatások AR-hez (ARCore)** segítségével fut, amelyet a Google LLC biztosít, és a [Google adatvédelmi irányelvei](https://policies.google.com/privacy) szabályoznak. Az ARCore a kamera képkockáit és a mozgásérzékelők adatait dolgozza fel az eszköz követéséhez; hogy mit gyűjt, azt a Google [ARCore adatvédelmi követelményei](https://developers.google.com/ar/develop/privacy-requirements) írják le. ARCore nélküli eszközökön az alkalmazás saját követést használ, és az ARCore sosem vesz részt.
 
 ## Frissítések
 

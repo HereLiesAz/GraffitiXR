@@ -130,10 +130,10 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
 
 ## D. Modes, offline and design scope
 
-- [ ] **D1. Subject isolation downloads its model from Google Play services.**
+- [x] **D1. Subject isolation downloads its model from Google Play services.**
   - Where: `feature/editor/build.gradle.kts:55` (unbundled `play-services-mlkit-subject-segmentation`), `SubjectIsolator.kt:22-38`. Offline it fails, blames the image, and caches the failure (`EditorViewModel.kt:679-682, 717-723`). The stencil tool uses it too (`:697`).
   - Fix: a segmentation model bundled in the APK. Until then, never cache a failure, and say the model is unavailable rather than blaming the image.
-- [ ] **D2. Link sends the capture's GPS location to the peer.**
+- [x] **D2. Link sends the capture's GPS location to the peer.**
   - Where: `ArViewModel.kt:465-468` → `ProjectManager.kt:1190-1197` zips `project.json`, including `captureEnvironment` lat/long (`GraffitiProject.kt:359`).
   - Fix: strip the location from the co-op snapshot.
 - [ ] **D3. Overlay has no no-ARCore tracking fallback, despite the README.**
@@ -148,7 +148,7 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
 - [ ] **D6. Adjustment knobs ignore handedness.**
   - Where: `AdjustmentsPanel.kt:32` (`isRightHanded` is never read), `:113-200`.
   - Fix: anchor the knob rows to the thumb's side.
-- [ ] **D7. GPS runs at high accuracy for the whole AR session.**
+- [x] **D7. GPS runs at high accuracy for the whole AR session.**
   - Where: `LocationTracker.kt:53`; started at AR entry (`ArViewModel.kt:2668`).
   - Fix: one balanced-accuracy fix at capture time.
 - [ ] **D8. UI text describes several layers.**
@@ -163,12 +163,12 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
 - [ ] **D11. Dialogs can take touches during Freeze.**
   - Where: a shared-in image raises the replace dialog (`MainActivity.kt:349-356, 625-629`).
   - Fix: defer incoming shares until unlock.
-- [ ] **D12. The privacy policy doesn't disclose ARCore (Google Play Services for AR).**
+- [x] **D12. The privacy policy doesn't disclose ARCore (Google Play Services for AR).**
   - Fix: add the disclosure to `PRIVACY_POLICY.md` in every locale.
 
 ## E. Documentation and defaults
 
-- [ ] **E1. README and KDocs say drift correction and self-grow are off by default under Settings.** In the code they default ON and live in the AR diagnostics panel (`SettingsRepositoryImpl.kt:166, 176, 209`; `ArViewModel.kt:983-991, 1027-1057, 1040, 1050, 1062, 4884`).
+- [x] **E1. README and KDocs say drift correction and self-grow are off by default under Settings.** In the code they default ON and live in the AR diagnostics panel (`SettingsRepositoryImpl.kt:166, 176, 209`; `ArViewModel.kt:983-991, 1027-1057, 1040, 1050, 1062, 4884`).
   - Fix: make the docs match the code.
 
 ## F. Persistence and Link

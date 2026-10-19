@@ -679,7 +679,7 @@ class EditorViewModel @Inject constructor(
         if (design.isSubjectIsolated) {
             val isolated = isolateCached(out)
             if (isolated != null) out = isolated
-            else failure = "Couldn't isolate a subject in this image."
+            else failure = isolationFailureMessage
         }
         if (design.isSketch) {
             val sketched = SketchProcessor.sketchEffect(out)
@@ -710,16 +710,27 @@ class EditorViewModel @Inject constructor(
         operator fun component2() = failure
     }
 
-    // Subject isolation of one source bitmap (null inside = no subject found), kept so toggling Isolate
-    // or cycling the Stencil view does not repeat the slow ML Kit segmentation for the same image.
+    // Subject isolation of one source bitmap, kept so toggling Isolate or cycling the Stencil view does
+    // not repeat the slow segmentation for the same image. Only a success is kept: a failure is tried
+    // again next time, and says whether the image or the segmenter was the problem.
     private var isolatedFor: Bitmap? = null
     private var isolatedResult: Bitmap? = null
+    private var isolationFailureMessage: String = NO_SUBJECT_MESSAGE
 
     private suspend fun isolateCached(source: Bitmap): Bitmap? {
-        if (isolatedFor === source) return isolatedResult
-        val isolated = subjectIsolator.isolate(source).getOrNull()?.isolatedBitmap
-        isolatedFor = source
-        isolatedResult = isolated
+        if (isolatedFor === source) isolatedResult?.let { return it }
+        val result = subjectIsolator.isolate(source)
+        val isolated = result.getOrNull()?.isolatedBitmap
+        if (isolated != null) {
+            isolatedFor = source
+            isolatedResult = isolated
+        } else {
+            isolationFailureMessage = if (result.exceptionOrNull() is SegmenterUnavailableException) {
+                "Subject isolation isn't available right now. The image is fine; try again."
+            } else {
+                NO_SUBJECT_MESSAGE
+            }
+        }
         return isolated
     }
 
@@ -1781,3 +1792,6 @@ private val BLEND_CYCLE = listOf(
     androidx.compose.ui.graphics.BlendMode.Darken,
     androidx.compose.ui.graphics.BlendMode.Lighten,
 )
+
+/** Subject isolation found nothing to cut out. */
+private const val NO_SUBJECT_MESSAGE = "Couldn't isolate a subject in this image."

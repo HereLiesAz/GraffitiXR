@@ -31,6 +31,7 @@ add_executable(native_host_tests
     SuperPointDetectorTest.cpp
     FrameBufferGuardTest.cpp
     DepthScaleFitTest.cpp
+    SubjectModelTest.cpp
     ${SRC}/MobileGS.cpp
     ${SRC}/DesignFilters.cpp
     ${SRC}/SuperPointDetector.cpp
@@ -45,6 +46,8 @@ target_include_directories(native_host_tests PRIVATE
     ${GLM_DIR}
     ${OpenCV_INCLUDE_DIRS}
 )
+target_compile_definitions(native_host_tests PRIVATE
+    GRAFFITIXR_EDITOR_ASSETS="${CMAKE_CURRENT_SOURCE_DIR}/../../../../../feature/editor/src/main/assets")
 target_link_libraries(native_host_tests PRIVATE ${OpenCV_LIBS} GTest::gtest GTest::gtest_main Threads::Threads)
 
 enable_testing()
