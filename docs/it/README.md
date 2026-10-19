@@ -25,10 +25,10 @@ E poi c'è una discreta suite di strumenti di progettazione pertinenti per prepa
 *   **UI AzNavRail:** navigazione guidata dal pollice, a una mano, pensata per artisti che tengono in mano una bomboletta spray.
 
 ## Modalità
-*   **Murale AR:** Lo strumento di precisione principale per ancorare concetti digitali a superfici fisiche, tracciato tramite il rilocalizzatore a impronta digitale descritto sopra.
-*   **Modalità Mockup:** Strumenti rapidi per visualizzare livelli e modalità di fusione sopra foto statiche del muro.
+*   **Murale AR:** Lo strumento di precisione principale per ancorare concetti digitali a superfici fisiche, tracciato tramite il rilocalizzatore a impronta digitale descritto sopra. Sul piccolo numero di dispositivi privi di ARCore, l'immagine sovrapposta traccia invece una forma marcata sul muro, usando la stessa pipeline OpenCV (CameraX + SphereSLAM, solo in modalità planare).
+*   **Modalità Mockup:** Strumenti rapidi per visualizzare in anteprima il design e la sua modalità di fusione sopra una foto statica del muro.
 *   **Ricalco (Lightbox):** Superficie a piena luminosità per ricalcare su carta, con blocco tocco, ritrazione automatica della rail e uscita tramite i pulsanti fisici del volume (Su, Giù, Su, Giù).
-*   **Overlay:** Ricalco immagine non AR — la tua immagine di riferimento sovrapposta alla fotocamera in tempo reale (CameraX) con opacità regolabile. Sul piccolo numero di dispositivi privi di ARCore, questa modalità può invece tracciare una forma marcata sul muro usando la stessa pipeline OpenCV, solo in modalità planare.
+*   **Overlay:** Ricalco immagine non AR — la tua immagine di riferimento sovrapposta alla fotocamera in tempo reale (CameraX) con opacità regolabile, fissata allo schermo.
 *   **Design:** Strumenti di posizionamento e leggibilità per l'unica immagine di design che si sta ricalcando — opacità/luminosità/contrasto/saturazione/bilanciamento colore, inversione, estrazione dei contorni e isolamento del soggetto. Esiste esattamente un'immagine di design; comporre più immagini in una sola è compito dell'app di design complementare, non di questa app.
 
 ## Licenza

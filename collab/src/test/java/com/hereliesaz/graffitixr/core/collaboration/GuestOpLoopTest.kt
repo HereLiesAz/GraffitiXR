@@ -38,7 +38,7 @@ class GuestOpLoopTest {
             host = HostSession(
                 token = "tok", protocolVersion = 4, localDeviceName = "host", projectId = "p",
                 snapshotProvider = {
-                    ProjectSnapshot(ByteArray(8), ByteArray(8), 0, testSpatialFrame(backend = hostBackend))
+                    ProjectSnapshot(ByteArray(8), ByteArray(8), testSpatialFrame(backend = hostBackend))
                 },
                 // What the app does (EditorViewModel.applyGuestOp): apply, then emit like a local edit.
                 onGuestOp = { op -> hostApplied.trySend(op); host.enqueueOp(op) },
@@ -72,7 +72,7 @@ class GuestOpLoopTest {
     fun `edits before the host snapshot is installed are refused, not queued`() = runBlocking {
         val host = HostSession(
             token = "tok", protocolVersion = 4, localDeviceName = "host", projectId = "p",
-            snapshotProvider = { ProjectSnapshot(ByteArray(8), ByteArray(8), 0, testSpatialFrame()) },
+            snapshotProvider = { ProjectSnapshot(ByteArray(8), ByteArray(8), testSpatialFrame()) },
             onGuestOp = {},
         )
         val port = host.startListening()

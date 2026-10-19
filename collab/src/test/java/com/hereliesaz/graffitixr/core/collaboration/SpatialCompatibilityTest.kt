@@ -30,7 +30,6 @@ class SpatialCompatibilityTest {
                 ProjectSnapshot(
                     doodleBytes = ByteArray(64) { it.toByte() },
                     projectBytes = ByteArray(64),
-                    layerCount = 0,
                     spatialFrame = normalized,
                 )
             },
@@ -93,7 +92,6 @@ class SpatialCompatibilityTest {
                 ProjectSnapshot(
                     doodleBytes = ByteArray(64) { it.toByte() },
                     projectBytes = ByteArray(64),
-                    layerCount = 0,
                     spatialFrame = currentFrame,
                 )
             },

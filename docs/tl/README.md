@@ -25,10 +25,10 @@ At pagkatapos, mayroong isang disenteng suite ng mga nauugnay na tool sa disenyo
 *   **AzNavRail UI:** thumb-driven, isang-kamay na navigation na dinisenyo para sa mga artist na hawak ang spray can.
 
 ## Mga Mode
-*   **AR Mural:** Ang pangunahing precision instrument para sa pag-anchor ng digital na konsepto sa pisikal na ibabaw, sinusubaybayan gamit ang doodle relocalizer sa itaas.
-*   **Mockup Mode:** Mabilis na mga tool para sa pag-visualize ng mga layer at blend mode sa ibabaw ng static na larawan ng dingding.
+*   **AR Mural:** Ang pangunahing precision instrument para sa pag-anchor ng digital na konsepto sa pisikal na ibabaw, sinusubaybayan gamit ang doodle relocalizer sa itaas. Sa iilang device na walang ARCore, ang naka-overlay na larawan ay sumusubaybay sa halip sa isang hugis na minarkahan mo sa dingding, gamit ang parehong OpenCV pipeline (CameraX + SphereSLAM, planar-only).
+*   **Mockup Mode:** Mabilis na mga tool para sa pag-preview ng disenyo at ng blend mode nito sa ibabaw ng isang static na larawan ng dingding.
 *   **Trace (Lightbox):** Full-brightness na ibabaw para sa pagkopya sa papel na may touch-lock, awtomatikong pag-retract ng rail, at physical-volume-button exit (Up, Down, Up, Down).
-*   **Overlay:** Non-AR na pag-trace ng larawan — ang reference image mo ay naka-overlay sa live camera (CameraX) na may nasasaayos na opacity. Sa iilang device na walang ARCore, maaari nitong subaybayan sa halip ang isang hugis na minarkahan mo sa dingding gamit ang parehong OpenCV pipeline, planar-only.
+*   **Overlay:** Non-AR na pag-trace ng larawan — ang reference image mo ay naka-overlay sa live camera (CameraX) na may nasasaayos na opacity, nakapirmi sa screen.
 *   **Design:** Pag-edit at paghahanda ng isang solong larawan — mga adjustment sa blend mode, opacity/kulay, at outline extraction — bago ito ilipat sa alinman sa itaas na mga mode.
 
 ## Arkitektura

@@ -87,7 +87,7 @@ below is a purpose summary, not a literal hierarchy diagram:
 | Group | Item | Action / Logic |
 | :--- | :--- | :--- |
 | **Modes** | `AR` | Switch to the AR viewport, tracked via the doodle relocalizer. Dual-lens hardware depth is used when the device exposes it, but is **not mandatory** — devices without it get metric scale from step-in/step-back triangulation, not a lesser fallback. |
-| | `Overlay` | Switch to non-AR image tracing over the live camera (CameraX, or a planar homography tracker on the small number of devices without ARCore). |
+| | `Overlay` | Switch to non-AR image tracing over the live camera (CameraX), fixed to the screen. |
 | | `Mockup` | Switch to compositing over a static reference photo. |
 | | `Trace` | Switch to lightbox mode (full brightness, touch-locked). |
 | **Modes ▸ AR** | `Doodle` | Arms tap-to-place for Doodle (wall anchor) capture. |

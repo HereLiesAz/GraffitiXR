@@ -25,10 +25,10 @@ Og så er det en solid samling relevante designverktøy for å klargjøre det en
 *   **AzNavRail UI:** tommeldrevet, enhånds navigasjon designet for artister som holder en spraybokse.
 
 ## Moduser
-*   **AR-veggmaleri:** Kjerneinstrumentet for presis forankring av digitale konsepter til fysiske overflater, sporet via fingeravtrykk-relokaliseringen beskrevet ovenfor.
-*   **Mockup-modus:** Raske verktøy for å visualisere lag og blandingsmoduser oppå statiske veggfotoer.
+*   **AR-veggmaleri:** Kjerneinstrumentet for presis forankring av digitale konsepter til fysiske overflater, sporet via fingeravtrykk-relokaliseringen beskrevet ovenfor. På det lille antallet enheter uten ARCore sporer det overlagte bildet i stedet en form du markerer på veggen, ved hjelp av samme OpenCV-pipeline (CameraX + SphereSLAM, kun planar).
+*   **Mockup-modus:** Raske verktøy for å forhåndsvise designet og dets blandingsmodus oppå et statisk veggfoto.
 *   **Trace (lysboks):** Fullt opplyst flate for å kopiere over på papir, med berøringslås, automatisk innkjørende skinne og fysisk volumknapp-utgang (Opp, Ned, Opp, Ned).
-*   **Overlay:** Ikke-AR bildesporing — referansebildet ditt legges over live kamera (CameraX) med justerbar gjennomsiktighet. På det lille antallet enheter uten ARCore kan denne modusen i stedet spore en form du markerer på veggen, ved hjelp av samme OpenCV-pipeline, kun planar.
+*   **Overlay:** Ikke-AR bildesporing — referansebildet ditt legges over live kamera (CameraX) med justerbar gjennomsiktighet, festet til skjermen.
 *   **Design:** Plasserings- og lesbarhetsverktøy for det ene designbildet som spores — gjennomsiktighet/lysstyrke/kontrast/metning/fargebalanse, inverter, konturuttrekking og motivisolasjon. Det finnes nøyaktig ett designbilde; å sette sammen flere bilder til ett er jobben til søsterappen for design, ikke denne appens.
 
 ## Lisensiering

@@ -11,7 +11,7 @@
 
     <string name="nav_ar_mode">擴增實境</string>
 
-    <string name="nav_ar_mode_info">使用擴增實境將您的藝術作品投影到真實的牆上。首先掃描牆壁以放置錨點，然後添加您的設計圖層。</string>
+    <string name="nav_ar_mode_info">使用擴增實境將您的藝術作品投影到真實的牆上。首先掃描牆壁以放置錨點，然後添加您的設計。</string>
 
 
     <string name="nav_overlay">覆蓋</string>
@@ -55,19 +55,17 @@
     <string name="nav_refine_info">微調現有隨手畫的位置。</string>
 
 
-    <string name="nav_update">進步</string>
 
-    <string name="nav_update_info">標記壁畫的已完成區域以追蹤繪畫進度。</string>
 
 
     <string name="nav_design">設計</string>
 
-    <string name="nav_design_info">新增和管理設計圖層。每個圖層可以是匯入的影像或手繪圖。</string>
+    <string name="nav_design_info">您的工作空間。透過「打開」加入、並用下方工具編輯的設計，會延續到每一種模式中。</string>
 
 
     <string name="nav_open">打開</string>
 
-    <string name="nav_open_info">新增圖庫中的圖像作為新圖層。</string>
+    <string name="nav_open_info">新增圖庫中的圖像作為設計。</string>
 
 
     <string name="nav_wall">牆</string>
@@ -85,7 +83,7 @@
 
     <string name="nav_blend">混合</string>
 
-    <string name="nav_invert_info">建立目前圖層的負片。黑色變成白色，顏色翻轉為相反的顏色 - 對於模板和疊加分析非常有用。</string>
+    <string name="nav_invert_info">建立設計的負片。黑色變成白色，顏色翻轉為相反的顏色 - 對於模板和疊加分析非常有用。</string>
 
 
     <string name="nav_outline">大綱</string>
@@ -95,18 +93,18 @@
 
     <string name="nav_adjust">調整</string>
 
-    <string name="nav_adjust_info">微調此圖層的亮度、對比、飽和度和色彩平衡。</string>
+    <string name="nav_adjust_info">微調設計的亮度、對比、飽和度和色彩平衡。</string>
     <string name="nav_edit">編輯</string>
 
 
     <string name="nav_balance">顏色</string>
 
-    <string name="nav_balance_info">使用紅色、綠色和藍色通道滑桿對圖層顏色進行著色。</string>
+    <string name="nav_balance_info">使用紅色、綠色和藍色通道滑桿對設計的顏色進行著色。</string>
 
 
     <string name="nav_blending">混合</string>
 
-    <string name="nav_blending_info">循環切換混合模式（普通、正片疊底、濾色、疊加…）以控制此圖層與下方圖層的合成方式。</string>
+    <string name="nav_blending_info">循環切換混合模式（普通、正片疊底、濾色、疊加…）以控制設計與其後方內容的合成方式。</string>
 
 
     <string name="nav_settings">設定</string>
@@ -136,7 +134,7 @@
 
     <string name="nav_export">匯出</string>
 
-    <string name="nav_export_info">將所有可見圖層的平面合併影像匯出到您的照片庫。</string>
+    <string name="nav_export_info">將設計匯出為平面影像到您的照片庫。</string>
 
 
     <string name="nav_help">幫助</string>
@@ -220,7 +218,6 @@
 
     <string name="generating">正在生成...</string>
 
-    <string name="stencil_hint">再次按下可新增圖層。</string>
 
     <string name="rename_hint">重新命名</string>
 
@@ -234,13 +231,9 @@
 
     <string name="duplicate">複製</string>
 
-    <string name="unlink_layer">取消連結層</string>
 
-    <string name="link_layer">連結層</string>
 
-    <string name="hide_layer">隱藏層</string>
 
-    <string name="show_layer">顯示圖層</string>
 
     <string name="flatten_all">全部展平</string>
 
@@ -355,7 +348,7 @@
     <string name="lib_new_project">新的</string>
     <string name="lib_import_project">進口</string>
     <string name="lib_no_projects">還沒有項目</string>
-    <string name="lib_no_projects_hint">點擊上面的「新建」即可開始創作您的第一幅壁畫。 \n\n您將進入編輯器，您可以在其中執行以下操作：\n \u2022 從「設計」選單中新增圖稿\n \u2022 切換到 AR 模式以投影到真實的牆壁上\n \u2022 使用疊加將您的設計浮動在牆壁上描繪成對圖2022</string>
+    <string name="lib_no_projects_hint">點擊下面的「新建」即可開始創作您的第一件作品。\n\n您將進入編輯器，您可以在其中執行以下操作：\n • 從「設計」選單中新增圖稿\n • 切換到 AR 模式以投影到真實的牆壁上\n • 使用「覆蓋」將您的設計浮動在即時鏡頭畫面上\n • 使用「小樣」在牆壁相片上預覽\n • 使用「痕跡」將您的設計描畫到紙上</string>
     <string name="lib_project_thumbnail">項目縮圖</string>
     <string name="lib_project_damaged">已損壞：開唔到</string>
     <string name="lib_delete_project_desc">刪除項目%1$s</string>
@@ -430,8 +423,6 @@
     <string name="settings_copyright">塗鴉XR © 2025</string>
 
 
-    <string name="layers_title">層數</string>
-    <string name="brush_size_title">刷子尺寸</string>
     <string name="save_project_hint">項目名稱</string>
 
 
@@ -449,7 +440,6 @@
     <string name="reset_button">重置</string>
 
     <string name="poster_title">生成海報</string>
-    <string name="poster_select_layers">選擇要包含的圖層：</string>
     <string name="poster_physical_size">物理尺寸（寬度，單位：毫米）：</string>
     <string name="poster_generate_pdf">產生 PDF</string>
 
@@ -474,7 +464,7 @@
 
     <string name="help_overlay">疊加模式：在即時攝影機上顯示設計，無需空間追蹤。說明：手動縮放和移動設計以適合您的框架。</string>
 
-    <string name="help_mockup">樣機模式：在靜態照片上預覽設計。說明：使用「牆」設定背景影像，然後在上面排列圖層。</string>
+    <string name="help_mockup">樣機模式：在靜態照片上預覽設計。說明：使用「牆」設定背景影像，然後將設計放在上面。</string>
 
     <string name="help_trace">燈箱模式：高亮度追蹤表面。說明：將紙放在螢幕上並描畫。快速按 音量上、下、上、下 即可退出。</string>
 
@@ -483,21 +473,21 @@
     <string name="help_create">建立錨點：在牆上拍攝一個標記以鎖定投影。說明：指向明顯的紋理並點擊。該應用程式將追蹤該標記。</string>
 
 
-    <string name="help_add_img">匯入影像：新增草圖或參考照片。說明：從您的圖庫中選擇一張圖像。它將作為一個新的設計層出現。</string>
+    <string name="help_add_img">匯入影像：新增草圖或參考照片。說明：從您的圖庫中選擇一張圖像。它將成為您的設計。</string>
 
 
 
     <string name="help_wall">更改牆：設定樣機模式的背景。說明：選擇您打算在其上繪畫的實體牆的照片。</string>
 
-    <string name="help_project_host">專案管理：儲存、載入和匯出工作。說明： 點選即可存取壁畫的管理任務。</string>
+    <string name="help_project_host">專案管理：儲存、載入和匯出工作。說明： 點選即可存取專案的管理任務。</string>
 
-    <string name="help_new">新項目：開始一幅新的壁畫。說明：點擊即可重置。警告：這將清除所有當前工作。先保存！</string>
+    <string name="help_new">新項目：開始一件新作品。說明：點擊即可重置。警告：這將清除所有當前工作。先保存！</string>
 
-    <string name="help_save">保存項目：儲存壁畫和AR地圖。說明：輸入專案名稱並點選儲存以儲存進度。</string>
+    <string name="help_save">保存項目：儲存作品和AR地圖。說明：輸入專案名稱並點選儲存以儲存進度。</string>
 
-    <string name="help_load">項目庫：訪問保存的壁畫。說明：瀏覽庫以恢復工作或匯入共享項目文件。</string>
+    <string name="help_load">項目庫：訪問保存的項目。說明：瀏覽庫以恢復工作或匯入共享項目文件。</string>
 
-    <string name="help_export">匯出影像：儲存高解析度快照。說明： 將所有可見圖層渲染為照片庫中的單一 PNG。</string>
+    <string name="help_export">匯出影像：儲存高解析度快照。說明： 將設計渲染為照片庫中的單一 PNG。</string>
 
     <string name="help_settings">應用程式設定：配置首選項。說明：開啟可調整慣用手、單位和掃描參數。</string>
 
@@ -550,7 +540,6 @@
 
     <string name="settings_scan_mode_voxel_hash">體素雜湊</string>
     <string name="settings_scan_mode_surface_mesh">表面網格</string>
-    <string name="settings_mural_method_label">壁畫引擎</string>
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
@@ -597,8 +586,8 @@
     <string name="settings_reset_tutorials_value">重新顯示新手指南</string>
     <string-array name="onboarding_trace">
         <item>這是痕跡模式。</item>
-        <item>點按「開啟」加入您的第一個圖層。加入後，可在畫布上雙指縮放和拖曳來調整大小和位置。</item>
-        <item>當圖層處於您想要的位置和狀態後，按下凍結按鈕，把手機變成用於拓印到紙上的透光台。</item>
+        <item>點按「開啟」加入您的設計。加入後，可在畫布上雙指縮放和拖曳來調整大小和位置。</item>
+        <item>當設計處於您想要的位置和狀態後，按下凍結按鈕，把手機變成用於拓印到紙上的透光台。</item>
         <item>我們建議使用痕跡模式或小樣模式進行編輯。</item>
         <item>這樣您的圖像就準備就緒，按下AR按鈕時手機就能專注於擴增實境。</item>
     </string-array>
@@ -606,12 +595,12 @@
         <item>AR投影 — 利用手機的深度感應器和空間追蹤，將您的設計投影到真實牆面上。</item>
         <item>將手機對準牆面並緩慢左右移動。隨著引擎對表面進行建圖，會出現彩色圖形。請等待牆面區域被完全覆蓋。</item>
         <item>只需點按螢幕。應用程式會拍攝牆面相片，擷取追蹤特徵，並立即鎖定錨點。</item>
-        <item>點按「開啟」加入設計圖層 — 它會使用您剛設定的錨點投影到牆面上。</item>
+        <item>點按「開啟」加入您的設計 — 它會使用您剛設定的錨點投影到牆面上。</item>
         <item>提示 — 空白的白牆、光滑的混凝土和純色表面無法被追蹤。請將錨點對準塗鴉、粗糙的灰泥或任何明顯的標記。</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>即時覆蓋 — 您的設計懸浮在即時鏡頭畫面上方，無需掃描任何表面。</item>
-        <item>點按「開啟」加入圖層 — 選擇一張相片，它會懸浮在即時鏡頭畫面上方顯示於此。</item>
+        <item>點按「開啟」加入您的設計 — 選擇一張相片，它會懸浮在即時鏡頭畫面上方顯示於此。</item>
         <item>雙指縮放以調整大小，拖曳以重新定位。覆蓋層會固定在螢幕上 — 後退一步查看它與牆面的貼合效果。</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
@@ -620,18 +609,15 @@
         <item>痕跡、小樣和覆蓋模式可照常使用。點按即可關閉。</item>
     </string-array>
     <string-array name="onboarding_mockup">
-        <item>相片小樣 — 在動筆之前，先在相片上預覽您的設計。</item>
+        <item>相片小樣 — 在拿起噴漆罐之前，先在相片上預覽您的設計。</item>
         <item>點按「牆」以選擇或拍攝您的表面相片。請先完成此步驟！</item>
-        <item>點按「開啟」在牆面相片上方加入圖層。雙指縮放和拖曳以調整大小和位置。</item>
+        <item>點按「開啟」將您的設計放到牆面相片上方。雙指縮放和拖曳以調整大小和位置。</item>
     </string-array>
     <string-array name="onboarding_design">
         <item>這是設計畫面 — 您的工作空間。您在這裡建立的內容會延續到其他所有模式中。</item>
-        <item>點按「開啟」加入您的第一個圖層 — 從相簿中選擇一張相片，它會作為您的作品出現在這裡。</item>
-        <item>點按圖層以開啟其工具 — 分組在繪畫、修飾、調整和效果資料夾中。在畫布上雙指縮放和拖曳以調整大小和位置。</item>
+        <item>點按「開啟」加入您的設計 — 從相簿中選擇一張相片，它會作為您的作品出現在這裡。</item>
+        <item>使用「編輯」工具對其進行調整、倒置、勾勒輪廓或隔離。在畫布上雙指縮放和拖曳以調整大小和位置。</item>
         <item>滿意效果後，選擇使用方式：「痕跡」將手機變為透光台，「小樣」在相片上預覽，或「AR」將其投影到牆面上。</item>
-    </string-array>
-    <string-array name="onboarding_design_layers">
-        <item>開啟 — 從相簿匯入一張相片；它會作為新圖層放置。</item>
     </string-array>
     <string name="nav_measure">量度</string>
     <string name="nav_measure_info">量度真實的牆面:在放置設計的牆上先點一邊邊緣,再點另一邊。寬度會隨項目儲存——是量度值,而非估計值。</string>
@@ -732,10 +718,10 @@
     <string name="doodle_cd_detected_marks">偵測到的標記</string>
     <string name="doodle_cd_confirm">確認</string>
     <string name="doodle_cd_unwarp_base">附角位控點的牆壁相片</string>
-    <string name="guidance_open_via_design_overlay">點按導軌上的「設計」，再點按「打開」以新增圖層 — 選擇一張相片，它會顯示在這裡，懸浮在即時相機畫面之上。</string>
-    <string name="guidance_open_via_design_mockup">點按導軌上的「設計」，再點按「打開」，在牆壁相片上方新增圖層。雙指捏合並拖曳以調整大小和位置。</string>
-    <string name="guidance_open_via_design_trace">點按導軌上的「設計」，再點按「打開」以新增你的第一個圖層。加入後，在畫布上雙指捏合並拖曳以調整大小和位置。</string>
-    <string name="guidance_open_via_design_ar">點按導軌上的「設計」，再點按「打開」以新增設計圖層 — 它會借助你剛設定的錨點投影到牆上。</string>
+    <string name="guidance_open_via_design_overlay">點按導軌上的「設計」，再點按「打開」以新增你的設計 — 選擇一張相片，它會顯示在這裡，懸浮在即時相機畫面之上。</string>
+    <string name="guidance_open_via_design_mockup">點按導軌上的「設計」，再點按「打開」，將你的設計放到牆壁相片上方。雙指捏合並拖曳以調整大小和位置。</string>
+    <string name="guidance_open_via_design_trace">點按導軌上的「設計」，再點按「打開」以新增你的設計。加入後，在畫布上雙指捏合並拖曳以調整大小和位置。</string>
+    <string name="guidance_open_via_design_ar">點按導軌上的「設計」，再點按「打開」以新增你的設計 — 它會借助你剛設定的錨點投影到牆上。</string>
     <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
     <string name="ar_feedback_guest_edit_dropped">該變更無法與主機共用，只會保留在此裝置上</string>
     <string name="ar_feedback_backend_resolving">AR 後端仍在確定中，請稍後再次嘗試主持</string>

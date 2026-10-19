@@ -467,7 +467,6 @@ class ArViewModel @Inject constructor(
                         projectBytes = kotlinx.coroutines.runBlocking {
                             projectManager.serializeCurrentProject()
                         },
-                        layerCount = current.layers.size,
                         spatialFrame = currentSpatial.copy(
                             doodleAvailable = wireDoodle.isNotEmpty(),
                         ),

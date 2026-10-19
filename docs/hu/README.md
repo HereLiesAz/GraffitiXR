@@ -25,10 +25,10 @@ Ezen kívül pedig ott van egy tisztességes, a témához illő tervezőeszköz-
 *   **AzNavRail Felület:** hüvelykujjal vezérelt, egykezes navigáció művészeknek, akik festékszóróval a kezükben dolgoznak.
 
 ## Módok
-*   **AR Falfestmény:** A digitális koncepciók fizikai felületekhez rögzítésének fő precíziós eszköze, a fenti ujjlenyomat-alapú újralokalizátorral követve.
-*   **Makett mód:** Gyors eszközök rétegek és keverési módok megjelenítéséhez statikus falfotókon.
+*   **AR Falfestmény:** A digitális koncepciók fizikai felületekhez rögzítésének fő precíziós eszköze, a fenti ujjlenyomat-alapú újralokalizátorral követve. Azon kevés eszközön, ahol nincs ARCore, a ráhelyezett kép ehelyett egy, a falra rajzolt alakzatot követ ugyanazzal az OpenCV pipeline-nal (CameraX + SphereSLAM, csak síkban).
+*   **Makett mód:** Gyors eszközök a terv és keverési módjának előnézetéhez egy statikus falfotón.
 *   **Rajzolás (fénydoboz):** Teljes fényerejű felület papírra másoláshoz, érintés-zárral, a sín automatikus visszahúzásával és fizikai hangerő-gombos kilépéssel (Fel, Le, Fel, Le).
-*   **Rétegzés (Overlay):** Nem-AR képkövetés — a referenciaképed ráhelyezve az élő kamerára (CameraX), állítható átlátszósággal. Azon kevés eszközön, ahol nincs ARCore, ez a mód helyette egy, a falra rajzolt alakzatot tud követni ugyanazzal az OpenCV pipeline-nal, csak síkban.
+*   **Rétegzés (Overlay):** Nem-AR képkövetés — a referenciaképed ráhelyezve az élő kamerára (CameraX), állítható átlátszósággal, a képernyőhöz rögzítve.
 *   **Tervezés:** Elhelyezési és olvashatósági eszközök az egyetlen, átrajzolandó tervezőképhez — átlátszóság/fényerő/kontraszt/telítettség/színegyensúly, invertálás, körvonal-kinyerés és téma-elkülönítés. Pontosan egy tervezőkép van; több kép egybe rendezése a társ-tervezőalkalmazás feladata, nem ezé.
 
 ## Licencelés

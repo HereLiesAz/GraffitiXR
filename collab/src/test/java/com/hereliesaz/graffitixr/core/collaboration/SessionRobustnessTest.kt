@@ -39,7 +39,6 @@ class SessionRobustnessTest {
         snapshotProvider = { ProjectSnapshot(
             doodleBytes = doodle,
             projectBytes = project,
-            layerCount = 0,
             spatialFrame = testSpatialFrame(),
         ) },
     )

@@ -25,10 +25,10 @@ Och sen finns det en anständig svit av relevanta designverktyg för att förber
 *   **AzNavRail-gränssnitt:** tumdriven, enhandsnavigering utformad för konstnärer med en sprayburk i handen.
 
 ## Lägen
-*   **AR-väggmålning (AR Mural):** kärninstrumentet för att förankra digitala koncept i fysiska ytor, spårat via fingeravtrycksbaserad omlokalisering enligt ovan.
-*   **Mockup-läge:** snabba verktyg för att visualisera lager och blandningslägen ovanpå stillbilder av väggen.
+*   **AR-väggmålning (AR Mural):** kärninstrumentet för att förankra digitala koncept i fysiska ytor, spårat via fingeravtrycksbaserad omlokalisering enligt ovan. På det fåtal enheter som saknar ARCore spårar den överlagda bilden i stället en form du markerar på väggen, med samma OpenCV-pipeline (CameraX + SphereSLAM, endast planärt).
+*   **Mockup-läge:** snabba verktyg för att förhandsgranska designen och dess blandningsläge ovanpå en stillbild av väggen.
 *   **Trace (ljuslåda):** helt upplyst yta för att kopiera till papper, med beröringslås, automatisk indragning av rail och avslut med volymknapparna (upp, ner, upp, ner).
-*   **Overlay:** icke-AR-bildspårning — din referensbild läggs över den levande kamerabilden (CameraX) med justerbar opacitet. På det fåtal enheter som saknar ARCore kan detta läge i stället spåra en form du markerar på väggen med samma OpenCV-pipeline, endast planärt.
+*   **Overlay:** icke-AR-bildspårning — din referensbild läggs över den levande kamerabilden (CameraX) med justerbar opacitet, fäst vid skärmen.
 *   **Design:** placerings- och läsbarhetsverktyg för den enda designbilden som spåras — opacitet/ljusstyrka/kontrast/mättnad/färgbalans, invertering, konturextraktion och motivisolering. Det finns exakt en designbild; att sätta samman flera bilder till en är kompanjonappens jobb för design, inte den här appens.
 
 ## Licensiering

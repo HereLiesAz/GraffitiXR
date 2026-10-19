@@ -33,7 +33,6 @@ class InterruptedBulkTest {
                 ProjectSnapshot(
                     doodleBytes = doodle,
                     projectBytes = projectBytes,
-                    layerCount = 0,
                     spatialFrame = testSpatialFrame(),
                 )
             },

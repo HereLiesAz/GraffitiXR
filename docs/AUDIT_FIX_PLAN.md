@@ -136,9 +136,10 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
 - [x] **D2. Link sends the capture's GPS location to the peer.**
   - Where: `ArViewModel.kt:465-468` → `ProjectManager.kt:1190-1197` zips `project.json`, including `captureEnvironment` lat/long (`GraffitiProject.kt:359`).
   - Fix: strip the location from the co-op snapshot.
-- [ ] **D3. Overlay has no no-ARCore tracking fallback, despite the README.**
+- [x] **D3. Overlay has no no-ARCore tracking fallback, despite the README.**
   - Where: `MainScreen.kt:783-792`, `MainActivity.kt:2642-2680`.
   - Fix: add the marked-shape planar tracking (the standalone OpenCV pipeline) to Overlay when ARCore is absent.
+  - Done (as clarified): the README sentence was about AR mode's overlaid image, which already tracks the marked shape on no-ARCore devices (standalone path). The README now says so under AR; Overlay is screen-fixed.
 - [x] **D4. Freeze doesn't lock orientation.**
   - Where: `AndroidManifest.xml:82`; `requestedOrientation` is never set.
   - Fix: lock to the current orientation on Freeze and release it on unlock.
@@ -151,10 +152,11 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
 - [x] **D7. GPS runs at high accuracy for the whole AR session.**
   - Where: `LocationTracker.kt:53`; started at AR entry (`ArViewModel.kt:2668`).
   - Fix: one balanced-accuracy fix at capture time.
-- [ ] **D8. UI text describes several layers.**
+- [x] **D8. UI text describes several layers.**
   - Where: `strings.xml` `nav_design_info`, `nav_blending_info`, `help_mockup`, `help_add_img`, `help_export`, `onboarding_design`, `guidance_open_via_design_*`, `nav_open_info`, `nav_export_info`. Also `layerCount` (`ArViewModel.kt:470`) and README "Multi-layer image manipulation".
   - Fix: reword everywhere to the one design, in all 15 locales; remove dead strings and `layerCount`.
-- [ ] **D9. UI text frames the app as murals only.**
+  - Done. `layerCount` is gone from the app; the protocol-7 wire field stays, sent as 1, until the next protocol bump (older peers require it).
+- [x] **D9. UI text frames the app as murals only.**
   - Where: `lib_no_projects_hint`, `help_project_host`, `help_new`, `help_save`, `help_load`, `onboarding_mockup[0]` ("brush"), dead `settings_mural_method_label` and `nav_update_info`.
   - Fix: say piece/project and spray can, in all 15 locales.
 - [x] **D10. Guest edits can land during Freeze.**

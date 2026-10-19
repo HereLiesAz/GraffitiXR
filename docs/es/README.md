@@ -25,10 +25,10 @@ Y luego hay un buen conjunto de herramientas de diseño pertinentes para prepara
 *   **Interfaz AzNavRail:** navegación con el pulgar, pensada para usarse con una sola mano por artistas que sostienen un aerosol.
 
 ## Modos
-*   **Mural AR:** El instrumento de precisión principal para anclar conceptos digitales a superficies físicas, con seguimiento mediante el relocalizador por huella digital descrito arriba.
-*   **Modo Maqueta:** Herramientas rápidas para visualizar capas y modos de fusión sobre fotos estáticas de paredes.
+*   **Mural AR:** El instrumento de precisión principal para anclar conceptos digitales a superficies físicas, con seguimiento mediante el relocalizador por huella digital descrito arriba. En el pequeño número de dispositivos sin ARCore, la imagen superpuesta sigue en su lugar una forma que marques en la pared, usando el mismo pipeline de OpenCV (CameraX + SphereSLAM, solo en modo plano).
+*   **Modo Maqueta:** Herramientas rápidas para previsualizar el diseño y su modo de fusión sobre una foto estática de la pared.
 *   **Trace (Mesa de luz):** Superficie a brillo máximo para calcar sobre papel, con bloqueo táctil, retracción automática del riel de navegación y salida mediante los botones físicos de volumen (Subir, Bajar, Subir, Bajar).
-*   **Superposición:** Calcado de imagen sin RA — tu imagen de referencia se superpone a la cámara en vivo (CameraX) con opacidad ajustable. En el pequeño número de dispositivos sin ARCore, este modo puede en su lugar seguir una forma que marques en la pared usando el mismo pipeline de OpenCV, solo en modo plano.
+*   **Superposición:** Calcado de imagen sin RA — tu imagen de referencia se superpone a la cámara en vivo (CameraX) con opacidad ajustable, fija en la pantalla.
 *   **Diseño:** Herramientas de colocación y legibilidad para la única imagen de diseño que se está calcando — opacidad/brillo/contraste/saturación/balance de color, inversión, extracción de contornos y aislamiento de sujeto. Hay exactamente una imagen de diseño; componer varias imágenes en una sola es tarea de la app de diseño complementaria, no de esta app.
 
 ## Licencia

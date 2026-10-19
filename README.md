@@ -25,10 +25,10 @@ And then, there's a decent suite of pertinent design tools for prepping the one 
 *   **AzNavRail UI:** thumb-driven, one-handed navigation designed for artists holding a spray can.
 
 ## Modes
-*   **AR Mural:** The core precision instrument for anchoring digital concepts to physical surfaces, tracked via the doodle relocalizer above.
-*   **Mockup Mode:** Fast tools for visualizing layers and blend modes on top of static wall photos.
+*   **AR Mural:** The core precision instrument for anchoring digital concepts to physical surfaces, tracked via the doodle relocalizer above. On the small number of devices without ARCore, the overlaid image tracks a shape you mark on the wall instead, using the same OpenCV pipeline (CameraX + SphereSLAM, planar-only).
+*   **Mockup Mode:** Fast tools for previewing the design and its blend mode on top of a still wall photo.
 *   **Trace (Lightbox):** Full-brightness surface for copying onto paper with touch-lock, rail auto-retract, and physical-volume-button exit (Up, Down, Up, Down).
-*   **Overlay:** Non-AR image tracing — your reference image overlaid on the live camera (CameraX) with adjustable opacity. On the small number of devices without ARCore, this mode can instead track a shape you mark on the wall using the same OpenCV pipeline, planar-only.
+*   **Overlay:** Non-AR image tracing — your reference image overlaid on the live camera (CameraX) with adjustable opacity, fixed to the screen.
 *   **Design:** Placement and legibility tools for the one design image being traced — opacity/brightness/contrast/saturation/colour-balance, invert, outline extraction, and subject isolation. There is exactly one design image; compositing several images into one is the companion design app's job, not this app's.
 
 ## Licensing
@@ -38,7 +38,7 @@ GraffitiXR is **source-available, not open source.** The app, the `core:*` modul
 Strictly decoupled multi-module Clean Architecture:
 *   `:app` — Navigation, camera orchestration, and Hilt dependency injection.
 *   `:feature:ar` — ARCore session management, `ArRenderer`, and SLAM data processing.
-*   `:feature:editor` — Multi-layer image manipulation and adjustments.
+*   `:feature:editor` — Editing and adjusting the one design image.
 *   `:feature:dashboard` — Project library, onboarding, and settings.
 *   `:core:nativebridge` — Native C++ engine (`MobileGS`), JNI bridge, and relocalization threads. OpenCV itself is a Maven Central dependency (`org.opencv:opencv`), not a vendored module.
 *   `:android_collaboration_module` — peer-to-peer networking for Link (host ↔ guest; see Key Features above).

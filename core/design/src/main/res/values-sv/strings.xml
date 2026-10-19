@@ -11,12 +11,12 @@
 
     <string name="nav_ar_mode">AR</string>
 
-    <string name="nav_ar_mode_info">Projicera ditt konstverk på en riktig vägg med hjälp av förstärkt verklighet. Skanna väggen först för att placera ankaret och lägg sedan till dina designlager.</string>
+    <string name="nav_ar_mode_info">Projicera ditt konstverk på en riktig vägg med hjälp av förstärkt verklighet. Skanna väggen först för att placera ankaret och lägg sedan till din design.</string>
 
 
     <string name="nav_overlay">Täcka över</string>
 
-    <string name="nav_overlay_info">Lägg din design i lager över livekameraflödet utan AR-förankring. Perfekt för snabb inramning och placeringskontroller.</string>
+    <string name="nav_overlay_info">Lägg din design över livekameraflödet utan AR-förankring. Perfekt för snabb inramning och placeringskontroller.</string>
 
 
     <string name="nav_mockup">Mockup</string>
@@ -55,19 +55,17 @@
     <string name="nav_refine_info">Finjustera positionen för en befintlig Krumelur.</string>
 
 
-    <string name="nav_update">Framsteg</string>
 
-    <string name="nav_update_info">Markera färdiga delar av din väggmålning för att spåra målningens framsteg.</string>
 
 
     <string name="nav_design">Design</string>
 
-    <string name="nav_design_info">Lägg till och hantera designlager. Varje lager kan vara en importerad bild eller en frihandsteckning.</string>
+    <string name="nav_design_info">Din arbetsyta. Designen du lägger till med ”Öppna” – och redigerar med verktygen nedan – följer med till alla lägen.</string>
 
 
     <string name="nav_open">Öppna</string>
 
-    <string name="nav_open_info">Lägg till en bild från ditt galleri som ett nytt lager.</string>
+    <string name="nav_open_info">Lägg till en bild från ditt galleri som designen.</string>
 
 
     <string name="nav_wall">Vägg</string>
@@ -85,7 +83,7 @@
 
     <string name="nav_blend">Blandning</string>
 
-    <string name="nav_invert_info">Skapa ett negativ av det aktuella lagret. Svarta blir vita och färger vänds till sina motsatser - användbart för stencil- och överlagringsanalys.</string>
+    <string name="nav_invert_info">Skapa ett negativ av designen. Svarta blir vita och färger vänds till sina motsatser - användbart för stencil- och överlagringsanalys.</string>
 
 
     <string name="nav_outline">Skissera</string>
@@ -95,18 +93,18 @@
 
     <string name="nav_adjust">Justera</string>
 
-    <string name="nav_adjust_info">Finjustera ljusstyrka, kontrast, mättnad och färgbalans för detta lager.</string>
+    <string name="nav_adjust_info">Finjustera ljusstyrka, kontrast, mättnad och färgbalans för designen.</string>
     <string name="nav_edit">Redigera</string>
 
 
     <string name="nav_balance">Färg</string>
 
-    <string name="nav_balance_info">Färga lagrets färger med rött, grönt och blått kanalreglage.</string>
+    <string name="nav_balance_info">Tona designens färger med reglagen för röd, grön och blå kanal.</string>
 
 
     <string name="nav_blending">Blandning</string>
 
-    <string name="nav_blending_info">Bläddra genom blandningslägen (Normal, Multiplicera, Skärm, Överlagring...) för att kontrollera hur detta lager sammansätts med lager nedan.</string>
+    <string name="nav_blending_info">Bläddra genom blandningslägen (Normal, Multiplicera, Skärm, Överlagring...) för att styra hur designen sammansätts med det som ligger bakom den.</string>
 
 
     <string name="nav_settings">Inställningar</string>
@@ -136,7 +134,7 @@
 
     <string name="nav_export">Exportera</string>
 
-    <string name="nav_export_info">Exportera en platt sammanslagen bild av alla synliga lager till ditt fotogalleri.</string>
+    <string name="nav_export_info">Exportera designen som en platt bild till ditt fotogalleri.</string>
 
 
     <string name="nav_help">Hjälp</string>
@@ -220,7 +218,6 @@
 
     <string name="generating">ALSTRANDE...</string>
 
-    <string name="stencil_hint">Tryck igen för att lägga till ett lager.</string>
 
     <string name="rename_hint">Döpa om</string>
 
@@ -234,13 +231,9 @@
 
     <string name="duplicate">Duplicera</string>
 
-    <string name="unlink_layer">Ta bort länken lager</string>
 
-    <string name="link_layer">Länklager</string>
 
-    <string name="hide_layer">Dölj lager</string>
 
-    <string name="show_layer">Visa lager</string>
 
     <string name="flatten_all">Platta till alla</string>
 
@@ -355,7 +348,7 @@
     <string name="lib_new_project">Ny</string>
     <string name="lib_import_project">Importera</string>
     <string name="lib_no_projects">Inga projekt ännu</string>
-    <string name="lib_no_projects_hint">Tryck på Ny ovan för att starta din första väggmålning.\n\nDu tas in i redigeraren där du kan:\n  \u2022 Lägg till konstverk från Design-menyn\n  \u2022 Byt till AR-läge för att projicera på en riktig vägg\n  \u2022 Använd Overlay för att flytta din design på livekameran\n  \u2022 Använd Mockup för att förhandsgranska ett väggfoto\n  \u2022 Använd Lightbox för att spåra din design på papper</string>
+    <string name="lib_no_projects_hint">Tryck på Ny nedan för att starta ditt första verk.\n\nDu tas in i redigeraren där du kan:\n  • Lägga till konstverk från Design-menyn\n  • Byta till AR-läge för att projicera på en riktig vägg\n  • Använda Overlay för att låta din design sväva över livekameran\n  • Använda Mockup för att förhandsgranska på ett väggfoto\n  • Använda Spåra för att överföra din design till papper</string>
     <string name="lib_project_thumbnail">Projektets miniatyrbild</string>
     <string name="lib_project_damaged">Skadad: kan inte öppnas</string>
     <string name="lib_delete_project_desc">Ta bort projekt %1$s</string>
@@ -430,8 +423,6 @@
     <string name="settings_copyright">GraffitiXR © 2025</string>
 
 
-    <string name="layers_title">Lager</string>
-    <string name="brush_size_title">Borststorlek</string>
     <string name="save_project_hint">Projektnamn</string>
 
 
@@ -449,7 +440,6 @@
     <string name="reset_button">Återställa</string>
 
     <string name="poster_title">GENERERA AFFISCH</string>
-    <string name="poster_select_layers">Välj lager att inkludera:</string>
     <string name="poster_physical_size">Fysisk storlek (bredd i mm):</string>
     <string name="poster_generate_pdf">GENERERA PDF</string>
 
@@ -474,7 +464,7 @@
 
     <string name="help_overlay">Överlagringsläge: Displaydesign över livekamera utan rumslig spårning. Instruktioner: Skala och flytta motivet manuellt så att det passar din ram.</string>
 
-    <string name="help_mockup">Mockup-läge: Förhandsgranska design på ett statiskt foto. Instruktioner: Använd \'Vägg\' för att ställa in en bakgrundsbild och arrangera sedan lager ovanpå.</string>
+    <string name="help_mockup">Mockup-läge: Förhandsgranska designen på ett statiskt foto. Instruktioner: Använd \'Vägg\' för att ställa in en bakgrundsbild och placera sedan designen ovanpå.</string>
 
     <string name="help_trace">Lightbox-läge: Spårningsyta med hög ljusstyrka. Instruktioner: Lägg papper över skärmen och rita. Tryck snabbt Volym Upp, Ner, Upp, Ner för att avsluta.</string>
 
@@ -483,21 +473,21 @@
     <string name="help_create">Skapa ankare: Fotografera ett märke på väggen för att låsa projektionen. Instruktioner: Peka på en distinkt textur och tryck. Appen kommer att spåra detta märke.</string>
 
 
-    <string name="help_add_img">Importera bild: Lägg till en skiss eller referensfoto. Instruktioner: Välj en bild från ditt galleri. Det kommer att visas som ett nytt designlager.</string>
+    <string name="help_add_img">Importera bild: Lägg till en skiss eller referensfoto. Instruktioner: Välj en bild från ditt galleri. Den blir din design.</string>
 
 
 
     <string name="help_wall">Byt vägg: Ställ in bakgrund för mockup-läge. Instruktioner: Välj ett foto av den fysiska väggen du planerar att måla på.</string>
 
-    <string name="help_project_host">Projektledning: Spara, ladda och exportera arbete. Instruktioner: Tryck för att komma åt administrativa uppgifter för din väggmålning.</string>
+    <string name="help_project_host">Projektledning: Spara, ladda och exportera arbete. Instruktioner: Tryck för att komma åt administrativa uppgifter för ditt projekt.</string>
 
-    <string name="help_new">Nytt projekt: Starta en ny väggmålning. Instruktioner: Tryck för att återställa. Varning: Detta rensar allt pågående arbete. Spara först!</string>
+    <string name="help_new">Nytt projekt: Starta ett nytt verk. Instruktioner: Tryck för att återställa. Varning: Detta rensar allt pågående arbete. Spara först!</string>
 
-    <string name="help_save">Spara projekt: Lagra väggmålning och AR-karta. Instruktioner: Ange ett projektnamn och tryck på Spara för att bevara dina framsteg.</string>
+    <string name="help_save">Spara projekt: Lagra verket och AR-kartan. Instruktioner: Ange ett projektnamn och tryck på Spara för att bevara dina framsteg.</string>
 
-    <string name="help_load">Projektbibliotek: Få tillgång till sparade väggmålningar. Instruktioner: Bläddra i biblioteket för att återuppta arbetet eller importera delade projektfiler.</string>
+    <string name="help_load">Projektbibliotek: Få tillgång till sparade projekt. Instruktioner: Bläddra i biblioteket för att återuppta arbetet eller importera delade projektfiler.</string>
 
-    <string name="help_export">Exportera bild: Spara högupplöst ögonblicksbild. Instruktioner: Gör alla synliga lager till en enda PNG i ditt fotogalleri.</string>
+    <string name="help_export">Exportera bild: Spara högupplöst ögonblicksbild. Instruktioner: Renderar designen till en enda PNG i ditt fotogalleri.</string>
 
     <string name="help_settings">Appinställningar: Konfigurera inställningar. Instruktioner: Öppna för att justera handenhet, enheter och skanningsparametrar.</string>
 
@@ -550,7 +540,6 @@
 
     <string name="settings_scan_mode_voxel_hash">Voxel-hash</string>
     <string name="settings_scan_mode_surface_mesh">Ytnät</string>
-    <string name="settings_mural_method_label">Väggmålningsmotor</string>
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
@@ -597,8 +586,8 @@
     <string name="settings_reset_tutorials_value">Visa introduktionsguiderna igen</string>
     <string-array name="onboarding_trace">
         <item>Det här är Spåra-läget.</item>
-        <item>Tryck på \"Öppna\" för att lägga till ditt första lager. När det är tillagt kan du nypa och dra på duken för att skala och placera det.</item>
-        <item>När de är där och som du vill ha dem, tryck på Frys-knappen för att göra din telefon till ett ljusbord för att spåra på papper.</item>
+        <item>Tryck på \"Öppna\" för att lägga till din design. När den är tillagd kan du nypa och dra på duken för att skala och placera den.</item>
+        <item>När den är där och som du vill ha den, tryck på Frys-knappen för att göra din telefon till ett ljusbord för att spåra på papper.</item>
         <item>Vi rekommenderar att du använder antingen Spåra-läget eller Mockup-läget för redigering.</item>
         <item>På så sätt är din bildmaterial redo, och din telefon kan fokusera på förstärkt verklighet när du trycker på AR-knappen.</item>
     </string-array>
@@ -606,12 +595,12 @@
         <item>AR-projicering — projicerar din design på en riktig vägg med hjälp av telefonens djupsensor och rumsliga spårning.</item>
         <item>Rikta mot väggen och rör dig långsamt i sidled. Färgade former dyker upp allt eftersom motorn kartlägger ytan. Vänta tills väggytan är täckt.</item>
         <item>Tryck bara på skärmen. Appen fotograferar väggen, extraherar spårningsfunktioner och låser ankaret direkt.</item>
-        <item>Tryck på \"Öppna\" för att lägga till ett designlager — det projiceras på väggen med hjälp av ankaret du just ställde in.</item>
+        <item>Tryck på \"Öppna\" för att lägga till din design — den projiceras på väggen med hjälp av ankaret du just ställde in.</item>
         <item>Tips — tomma vita väggar, slät betong och enfärgade ytor kan inte spåras. Rikta ditt ankarpunkt mot graffiti, grov puts eller något annat tydligt märke.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Live-täckning — din design svävar över den direktsända kamerabilden, utan att behöva skanna någon yta.</item>
-        <item>Tryck på \"Öppna\" för att lägga till ett lager — välj ett foto så visas det här, svävande över den direktsända kamerabilden.</item>
+        <item>Tryck på \"Öppna\" för att lägga till din design — välj ett foto så visas det här, svävande över den direktsända kamerabilden.</item>
         <item>Nyp för att skala, dra för att flytta. Täckningen förblir fast på din skärm — kliv bakåt för att se hur den passar väggen.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
@@ -620,18 +609,15 @@
         <item>Spåra, Mockup och Täcka över fungerar som vanligt. Tryck för att stänga.</item>
     </string-array>
     <string-array name="onboarding_mockup">
-        <item>Foto-mockup — förhandsgranska din design på ett foto innan du ens tar fram en pensel.</item>
+        <item>Foto-mockup — förhandsgranska din design på ett foto innan du ens tar fram en sprayburk.</item>
         <item>Tryck på \"Vägg\" för att välja eller ta ett foto av din yta. Gör det här först!</item>
-        <item>Tryck på \"Öppna\" för att lägga till ett lager ovanpå väggfotot. Nyp och dra för att skala och placera det.</item>
+        <item>Tryck på \"Öppna\" för att lägga din design ovanpå väggfotot. Nyp och dra för att skala och placera den.</item>
     </string-array>
     <string-array name="onboarding_design">
         <item>Det här är Design — din arbetsyta. Allt du bygger här förs vidare till alla andra lägen.</item>
-        <item>Tryck på \"Öppna\" för att lägga till ditt första lager — välj ett foto från ditt galleri, och det hamnar här som ditt konstverk.</item>
-        <item>Tryck på ett lager för att öppna dess verktyg — grupperade i mapparna Måla, Retuschera, Justera och Effekter. Nyp och dra på duken för att skala och placera det.</item>
+        <item>Tryck på \"Öppna\" för att lägga till din design — välj ett foto från ditt galleri, och det hamnar här som ditt konstverk.</item>
+        <item>Använd Redigera-verktygen för att justera, invertera, konturera eller isolera den. Nyp och dra på duken för att skala och placera den.</item>
         <item>När det ser rätt ut, välj hur du vill använda det: \"Spåra\" för att göra din telefon till ett ljusbord, \"Mockup\" för att förhandsgranska på ett foto, eller \"AR\" för att projicera det på en vägg.</item>
-    </string-array>
-    <string-array name="onboarding_design_layers">
-        <item>Öppna — importerar ett foto från ditt galleri; det hamnar som ett nytt lager.</item>
     </string-array>
     <string name="nav_measure">Mät</string>
     <string name="nav_measure_info">Mät den riktiga väggen: tryck på ena kanten, sedan den andra, på väggen där designen sitter. Bredden sparas i projektet – uppmätt, inte gissad.</string>
@@ -732,10 +718,10 @@
     <string name="doodle_cd_detected_marks">Upptäckta markeringar</string>
     <string name="doodle_cd_confirm">Bekräfta</string>
     <string name="doodle_cd_unwarp_base">Fångat väggfoto med hörnhandtag</string>
-    <string name="guidance_open_via_design_overlay">Tryck på ”Design” i fältet och sedan på ”Öppna” för att lägga till ett lager – välj ett foto så visas det här, svävande över kameravyn.</string>
-    <string name="guidance_open_via_design_mockup">Tryck på ”Design” i fältet och sedan på ”Öppna” för att lägga till ett lager ovanpå väggfotot. Nyp och dra för att ändra storlek och läge.</string>
-    <string name="guidance_open_via_design_trace">Tryck på ”Design” i fältet och sedan på ”Öppna” för att lägga till ditt första lager. När det är på plats nyper och drar du på duken för att ändra storlek och placera det.</string>
-    <string name="guidance_open_via_design_ar">Tryck på ”Design” i fältet och sedan på ”Öppna” för att lägga till ett designlager – det projiceras på väggen med ankaret du just satte.</string>
+    <string name="guidance_open_via_design_overlay">Tryck på ”Design” i fältet och sedan på ”Öppna” för att lägga till din design – välj ett foto så visas det här, svävande över kameravyn.</string>
+    <string name="guidance_open_via_design_mockup">Tryck på ”Design” i fältet och sedan på ”Öppna” för att lägga din design ovanpå väggfotot. Nyp och dra för att ändra storlek och läge.</string>
+    <string name="guidance_open_via_design_trace">Tryck på ”Design” i fältet och sedan på ”Öppna” för att lägga till din design. När den är på plats nyper och drar du på duken för att ändra storlek och placera den.</string>
+    <string name="guidance_open_via_design_ar">Tryck på ”Design” i fältet och sedan på ”Öppna” för att lägga till din design – den projiceras på väggen med ankaret du just satte.</string>
     <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
     <string name="ar_feedback_guest_edit_dropped">Ändringen kan inte delas med värden – den stannar på den här enheten</string>
     <string name="ar_feedback_backend_resolving">AR-backend fastställs fortfarande – försök vara värd igen om en stund</string>

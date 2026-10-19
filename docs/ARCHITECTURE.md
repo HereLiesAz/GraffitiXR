@@ -159,8 +159,8 @@ documented in
 - `EditorMode.AR`, standalone mode → CameraX owns the camera; calibrated KPM supplies the
   wall-relative pose while the page is visible and a short fused-gyro bridge covers brief visual
   misses. The remaining parity work is tracked in `docs/SPHERESLAM_TODO.md`.
-- `EditorMode.OVERLAY` → CameraX owns the camera (devices without ARCore can continue using the
-  planar homography/OpenCV overlay path described in `docs/UI_UX.md`).
+- `EditorMode.OVERLAY` → CameraX owns the camera; the image is fixed to the screen on every device
+  (tracking a marked wall without ARCore is AR mode's standalone path, above).
 
 **Standalone AR capability boundary:** the centered KPM page/atlas is the wall anchor. Core placement
 does not construct an ARCore `Anchor` or depend on `Frame.hitTest`; when a screen-space wall query

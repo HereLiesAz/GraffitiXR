@@ -25,10 +25,10 @@ Além disso, há um bom conjunto de ferramentas de design pertinentes para prepa
 *   **Interface AzNavRail:** navegação acionada pelo polegar, com uma mão só, projetada para artistas segurando uma lata de spray.
 
 ## Modos
-*   **Mural AR:** O instrumento central de precisão para ancorar conceitos digitais a superfícies físicas, rastreado pelo relocalizador com impressão digital descrito acima.
-*   **Modo Maquete (Mockup):** Ferramentas rápidas para visualizar camadas e modos de mesclagem sobre fotos estáticas da parede.
+*   **Mural AR:** O instrumento central de precisão para ancorar conceitos digitais a superfícies físicas, rastreado pelo relocalizador com impressão digital descrito acima. No pequeno número de dispositivos sem ARCore, a imagem sobreposta rastreia em vez disso uma forma que você marca na parede, usando o mesmo pipeline do OpenCV (CameraX + SphereSLAM, apenas de forma planar).
+*   **Modo Maquete (Mockup):** Ferramentas rápidas para pré-visualizar o design e seu modo de mesclagem sobre uma foto estática da parede.
 *   **Traçar (Mesa de luz):** Superfície com brilho máximo para copiar no papel, com bloqueio de toque, retração automática da barra de navegação e saída por botão físico de volume (Cima, Baixo, Cima, Baixo).
-*   **Sobreposição (Overlay):** Traçado de imagem sem AR — sua imagem de referência é sobreposta à câmera ao vivo (CameraX) com opacidade ajustável. No pequeno número de dispositivos sem ARCore, esse modo pode em vez disso rastrear uma forma que você marca na parede, usando o mesmo pipeline do OpenCV, apenas de forma planar.
+*   **Sobreposição (Overlay):** Traçado de imagem sem AR — sua imagem de referência é sobreposta à câmera ao vivo (CameraX) com opacidade ajustável, fixa na tela.
 *   **Design:** Ferramentas de posicionamento e legibilidade para a única imagem de design sendo traçada — opacidade/brilho/contraste/saturação/balanço de cores, inverter, extração de contorno e isolamento de assunto. Existe exatamente uma imagem de design; compor várias imagens em uma só é trabalho do aplicativo de design complementar, não deste aplicativo.
 
 ## Licenciamento

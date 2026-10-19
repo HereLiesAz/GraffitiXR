@@ -575,7 +575,7 @@ internal class HostSession(
             OpCodec.encode(
                 BulkBeginPayload(
                     projectId = projectId,
-                    layerCount = snapshot.layerCount,
+                    layerCount = BulkBeginPayload.ONE_DESIGN,
                     doodleBytes = snapshot.doodleBytes.size,
                     projectBytes = snapshot.projectBytes.size,
                     spatialFrame = snapshot.spatialFrame,

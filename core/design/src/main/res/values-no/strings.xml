@@ -11,12 +11,12 @@
     <!-- Label for the Augmented Reality (AR) projection mode. -->
     <string name="nav_ar_mode">AR</string>
     <!-- Instructions for AR mode, explaining how to project artwork onto a wall. -->
-    <string name="nav_ar_mode_info">Projiser kunstverket ditt på en ekte vegg ved hjelp av utvidet virkelighet. Skann veggen først for å plassere ankeret, og legg deretter til designlagene dine.</string>
+    <string name="nav_ar_mode_info">Projiser kunstverket ditt på en ekte vegg ved hjelp av utvidet virkelighet. Skann veggen først for å plassere ankeret, og legg deretter til designet ditt.</string>
 
     <!-- Label for the camera overlay mode, which doesn't use AR tracking. -->
     <string name="nav_overlay">Overlegg</string>
     <!-- Description of Overlay mode, used for quick checks without spatial tracking. -->
-    <string name="nav_overlay_info">Legg designen din over live-kamerastrømmen uten AR-forankring. Flott for rask innramming og plasseringssjekker.</string>
+    <string name="nav_overlay_info">Legg designet ditt over live-kamerastrømmen uten AR-forankring. Flott for rask innramming og plasseringssjekker.</string>
 
     <!-- Label for the Mockup mode, used for previewing on a static background. -->
     <string name="nav_mockup">Mockup</string>
@@ -55,19 +55,17 @@
     <string name="nav_refine_info">Finjuster posisjonen til en eksisterende Krusedull.</string>
 
     <!-- Label for the progress tracking tool. -->
-    <string name="nav_update">Framgang</string>
     <!-- Description of the progress tool, used for marking completed parts of a mural. -->
-    <string name="nav_update_info">Merk fullførte områder av veggmaleriet ditt for å spore fremdriften i maleriet.</string>
 
     <!-- Label for the design and layer management menu. -->
     <string name="nav_design">Design</string>
     <!-- Description of the design menu, where layers are added and managed. -->
-    <string name="nav_design_info">Legg til og administrer designlag. Hvert lag kan være et importert bilde eller en frihåndstegning.</string>
+    <string name="nav_design_info">Arbeidsområdet ditt. Designet du legger til med «Åpne» – og redigerer med verktøyene nedenfor – følger med til alle moduser.</string>
 
     <!-- Action label to open or import an image. -->
     <string name="nav_open">Åpne</string>
     <!-- Description of the Open action, used to add an image layer from the gallery. -->
-    <string name="nav_open_info">Legg til et bilde fra galleriet ditt som et nytt lag.</string>
+    <string name="nav_open_info">Legg til et bilde fra galleriet ditt som designet.</string>
 
     <!-- Label for the background wall image in Mockup mode. -->
     <string name="nav_wall">Vegg</string>
@@ -83,7 +81,7 @@
     <string name="nav_invert">Inverter</string>
     <string name="nav_blend">Blanding</string>
     <!-- Description of the Invert tool, explaining its use for stencil and overlay analysis. -->
-    <string name="nav_invert_info">Lag en negativ av det gjeldende laget. Svarte blir hvite, og farger blir snudd til motsetningene sine – nyttig for sjablong- og overleggsanalyse.</string>
+    <string name="nav_invert_info">Lag en negativ av designet. Svarte blir hvite, og farger blir snudd til motsetningene sine – nyttig for sjablong- og overleggsanalyse.</string>
 
     <!-- Label for the outline filter. -->
     <string name="nav_outline">Disposisjon</string>
@@ -93,18 +91,18 @@
     <!-- Label for image adjustment tools (brightness, contrast, etc.). -->
     <string name="nav_adjust">Justere</string>
     <!-- Description of the image adjustment tools. -->
-    <string name="nav_adjust_info">Finjuster lysstyrke, kontrast, metning og fargebalanse for dette laget.</string>
+    <string name="nav_adjust_info">Finjuster lysstyrke, kontrast, metning og fargebalanse for designet.</string>
     <string name="nav_edit">Rediger</string>
 
     <!-- Label for color balance and tinting tools. -->
     <string name="nav_balance">Farge</string>
     <!-- Description of the color balance tool, mentioning RGB sliders. -->
-    <string name="nav_balance_info">Farge lagfargene ved å bruke røde, grønne og blå kanalglidere.</string>
+    <string name="nav_balance_info">Gi designets farger et fargeskjær med glidebryterne for rød, grønn og blå kanal.</string>
 
     <!-- Label for layer blending mode selection. -->
     <string name="nav_blending">Blanding</string>
     <!-- Description of blending modes, used to control how layers composite. -->
-    <string name="nav_blending_info">Bla gjennom blandingsmodusene (Normal, Multiplisere, Skjerm, Overlegg ...) for å kontrollere hvordan dette laget kompositterer med lagene under.</string>
+    <string name="nav_blending_info">Bla gjennom blandingsmodusene (Normal, Multiplisere, Skjerm, Overlegg ...) for å kontrollere hvordan designet kompositteres med det som ligger bak.</string>
 
     <!-- Label for the application settings menu. -->
     <string name="nav_settings">Innstillinger</string>
@@ -134,7 +132,7 @@
     <!-- Action label to export the final image. -->
     <string name="nav_export">Eksport</string>
     <!-- Description of the Export action, explaining it merges layers into one image. -->
-    <string name="nav_export_info">Eksporter et flatt sammenslått bilde av alle synlige lag til fotogalleriet ditt.</string>
+    <string name="nav_export_info">Eksporter designet som et flatt bilde til fotogalleriet ditt.</string>
 
     <!-- Label for the interactive help system. -->
     <string name="nav_help">Hjelp</string>
@@ -218,7 +216,6 @@
 
     <string name="generating">GENERERER...</string>
     <!-- Hint shown when user can add a layer by pressing again. -->
-    <string name="stencil_hint">Trykk igjen for å legge til et lag.</string>
     <!-- Hint for renaming a layer. -->
     <string name="rename_hint">Gi nytt navn</string>
     <!-- Hint for editing text content. -->
@@ -232,13 +229,9 @@
     <!-- Action to duplicate a layer. -->
     <string name="duplicate">Kopiere</string>
     <!-- Action to unlink a layer from others. -->
-    <string name="unlink_layer">Koble fra lag</string>
     <!-- Action to link a layer with others. -->
-    <string name="link_layer">Linklag</string>
     <!-- Action to hide a layer. -->
-    <string name="hide_layer">Skjul lag</string>
     <!-- Action to show a layer. -->
-    <string name="show_layer">Vis lag</string>
     <!-- Action to flatten all layers. -->
     <string name="flatten_all">Flat ut alle</string>
     <!-- Action to delete a layer. -->
@@ -350,7 +343,7 @@
     <string name="lib_new_project">Ny</string>
     <string name="lib_import_project">Import</string>
     <string name="lib_no_projects">Ingen prosjekter ennå</string>
-    <string name="lib_no_projects_hint">Trykk på Ny ovenfor for å starte ditt første veggmaleri.\n\nDu blir tatt inn i redigeringsprogrammet der du kan:\n  \u2022 Legg til kunstverk fra Design-menyen\n  \u2022 Bytt til AR-modus for å projisere på en ekte vegg\n  \u2022 Bruk Overlegg til å flyte designet ditt på live-kameraet\n  \u2022 Bruk Mockup for å forhåndsvise på et veggbilde\n  \u2022 Bruk Lightbox til å spore designet ditt på papir</string>
+    <string name="lib_no_projects_hint">Trykk på Ny nedenfor for å starte ditt første verk.\n\nDu blir tatt inn i redigeringsprogrammet der du kan:\n  • Legge til kunstverk fra Design-menyen\n  • Bytte til AR-modus for å projisere på en ekte vegg\n  • Bruke Overlegg til å la designet ditt sveve over live-kameraet\n  • Bruke Mockup for å forhåndsvise på et veggbilde\n  • Bruke Spor til å tegne av designet ditt på papir</string>
     <string name="lib_project_thumbnail">Prosjektminiatyrbilde</string>
     <string name="lib_project_damaged">Skadet: kan ikke åpnes</string>
     <string name="lib_delete_project_desc">Slett prosjekt %1$s</string>
@@ -425,8 +418,6 @@
     <string name="settings_copyright">GraffitiXR © 2025</string>
 
     <!-- Editor UI -->
-    <string name="layers_title">Lag</string>
-    <string name="brush_size_title">Børstestørrelse</string>
     <string name="save_project_hint">Prosjektnavn</string>
 
     <!-- Target Creation -->
@@ -444,7 +435,6 @@
     <string name="reset_button">Tilbakestill</string>
 
     <string name="poster_title">GENERER PLAKAT</string>
-    <string name="poster_select_layers">Velg lag som skal inkluderes:</string>
     <string name="poster_physical_size">Fysisk størrelse (bredde i mm):</string>
     <string name="poster_generate_pdf">GENERER PDF</string>
 
@@ -469,7 +459,7 @@
     <!-- Overlay Mode help text. -->
     <string name="help_overlay">Overleggsmodus: Skjermdesign over livekamera uten romlig sporing. Instruksjoner: Skaler og flytt designet manuelt for å passe inn i rammen din.</string>
     <!-- Mockup Mode help text. -->
-    <string name="help_mockup">Mockup-modus: Forhåndsvis design på et statisk bilde. Instruksjoner: Bruk \'Vegg\' for å sette et bakgrunnsbilde, og arranger deretter lag på toppen.</string>
+    <string name="help_mockup">Mockup-modus: Forhåndsvis designet på et statisk bilde. Instruksjoner: Bruk \'Vegg\' for å sette et bakgrunnsbilde, og plasser deretter designet oppå.</string>
     <!-- Lightbox Mode help text. -->
     <string name="help_trace">Lysboksmodus: Sporingsoverflate med høy lysstyrke. Instruksjoner: Legg papir over skjermen og spor. Trykk raskt Volum Opp, Ned, Opp, Ned for å avslutte.</string>
     <!-- Target Management help text. -->
@@ -478,21 +468,21 @@
     <string name="help_create">Lag anker: Fotografer et merke på veggen for å låse projeksjonen. Instruksjoner: Pek på en distinkt tekstur og trykk. Appen vil spore dette merket.</string>
     <!-- Layer Management help text. -->
     <!-- Import Image help text. -->
-    <string name="help_add_img">Importer bilde: Legg til en skisse eller referansebilde. Instruksjoner: Velg et bilde fra galleriet ditt. Det vil vises som et nytt designlag.</string>
+    <string name="help_add_img">Importer bilde: Legg til en skisse eller referansebilde. Instruksjoner: Velg et bilde fra galleriet ditt. Det blir designet.</string>
     <!-- New Sketch help text. -->
     <!-- Add Text help text. -->
     <!-- Change Wall help text. -->
     <string name="help_wall">Endre vegg: Angi bakgrunn for Mockup-modus. Instruksjoner: Velg et bilde av den fysiske veggen du planlegger å male på.</string>
     <!-- Project Management help text. -->
-    <string name="help_project_host">Prosjektledelse: Lagre, last inn og eksporter arbeid. Instruksjoner: Trykk for å få tilgang til administrative oppgaver for veggmaleriet ditt.</string>
+    <string name="help_project_host">Prosjektledelse: Lagre, last inn og eksporter arbeid. Instruksjoner: Trykk for å få tilgang til administrative oppgaver for prosjektet ditt.</string>
     <!-- New Project help text. -->
-    <string name="help_new">Nytt prosjekt: Start et nytt veggmaleri. Instruksjoner: Trykk for å tilbakestille. Advarsel: Dette sletter alt gjeldende arbeid. Spar først!</string>
+    <string name="help_new">Nytt prosjekt: Start et nytt verk. Instruksjoner: Trykk for å tilbakestille. Advarsel: Dette sletter alt gjeldende arbeid. Lagre først!</string>
     <!-- Save Project help text. -->
-    <string name="help_save">Lagre prosjekt: Lagre veggmaleri og AR-kart. Instruksjoner: Skriv inn et prosjektnavn og trykk på Lagre for å bevare fremdriften.</string>
+    <string name="help_save">Lagre prosjekt: Lagre verket og AR-kartet. Instruksjoner: Skriv inn et prosjektnavn og trykk på Lagre for å bevare fremdriften.</string>
     <!-- Project Library help text. -->
-    <string name="help_load">Prosjektbibliotek: Få tilgang til lagrede veggmalerier. Instruksjoner: Bla gjennom biblioteket for å fortsette arbeidet eller importere delte prosjektfiler.</string>
+    <string name="help_load">Prosjektbibliotek: Få tilgang til lagrede prosjekter. Instruksjoner: Bla gjennom biblioteket for å fortsette arbeidet eller importere delte prosjektfiler.</string>
     <!-- Export Image help text. -->
-    <string name="help_export">Eksporter bilde: Lagre øyeblikksbilde i høy oppløsning. Instruksjoner: Gjengir alle synlige lag til én enkelt PNG i fotogalleriet ditt.</string>
+    <string name="help_export">Eksporter bilde: Lagre øyeblikksbilde i høy oppløsning. Instruksjoner: Gjengir designet til én enkelt PNG i fotogalleriet ditt.</string>
     <!-- App Settings help text. -->
     <string name="help_settings">Appinnstillinger: Konfigurer preferanser. Instruksjoner: Åpne for å justere håndenhet, enheter og skanneparametere.</string>
     <!-- Flashlight help text. -->
@@ -545,7 +535,6 @@
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
     <string name="settings_scan_mode_voxel_hash">Voxel-hash</string>
     <string name="settings_scan_mode_surface_mesh">Overflatenett</string>
-    <string name="settings_mural_method_label">Veggmaleri-motor</string>
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
@@ -592,8 +581,8 @@
     <string name="settings_reset_tutorials_value">Vis oppstartsveiledningene igjen</string>
     <string-array name="onboarding_trace">
         <item>Dette er Spor-modus.</item>
-        <item>Trykk på «Åpne» for å legge til det første laget ditt. Når det er lagt til, kan du klype og dra på lerretet for å skalere og plassere det.</item>
-        <item>Når de er der og slik du vil ha dem, trykk på Frys-knappen for å gjøre telefonen din til et lysbord for sporing på papir.</item>
+        <item>Trykk på «Åpne» for å legge til designet ditt. Når det er lagt til, kan du klype og dra på lerretet for å skalere og plassere det.</item>
+        <item>Når det er der og slik du vil ha det, trykk på Frys-knappen for å gjøre telefonen din til et lysbord for sporing på papir.</item>
         <item>Vi anbefaler å bruke enten Spor-modus eller Mockup-modus for redigering.</item>
         <item>På den måten er bildene dine klare, og telefonen din kan fokusere på utvidet virkelighet når du trykker på AR-knappen.</item>
     </string-array>
@@ -601,12 +590,12 @@
         <item>AR-projeksjon — projiserer designet ditt på en ekte vegg ved hjelp av telefonens dybdesensor og romlige sporing.</item>
         <item>Pek på veggen og beveg deg sakte fra side til side. Fargede former dukker opp etter hvert som motoren kartlegger overflaten. Vent til hele veggarealet er dekket.</item>
         <item>Bare trykk på skjermen. Appen fotograferer veggen, trekker ut sporingsfunksjoner og låser ankeret umiddelbart.</item>
-        <item>Trykk på «Åpne» for å legge til et designlag — det projiseres på veggen ved hjelp av ankeret du nettopp satte.</item>
+        <item>Trykk på «Åpne» for å legge til designet ditt — det projiseres på veggen ved hjelp av ankeret du nettopp satte.</item>
         <item>Tips — tomme hvite vegger, glatt betong og ensfargede overflater kan ikke spores. Rett ankerpunktet mot graffiti, ru puss eller andre tydelige merker.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Live overlegg — designet ditt svever over live kamerabildet, uten behov for overflateskanning.</item>
-        <item>Trykk på «Åpne» for å legge til et lag — velg et bilde, og det vises her, svevende over live kamerabildet.</item>
+        <item>Trykk på «Åpne» for å legge til designet ditt — velg et bilde, og det vises her, svevende over live kamerabildet.</item>
         <item>Klyp for å skalere, dra for å flytte. Overlegget blir værende festet til skjermen din — gå bakover for å se hvordan det passer på veggen.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
@@ -615,18 +604,15 @@
         <item>Spor, Mockup og Overlegg fungerer som vanlig. Trykk for å lukke.</item>
     </string-array>
     <string-array name="onboarding_mockup">
-        <item>Fotomockup — forhåndsvis designet ditt på et bilde før du i det hele tatt tar frem en pensel.</item>
+        <item>Fotomockup — forhåndsvis designet ditt på et bilde før du i det hele tatt tar frem en sprayboks.</item>
         <item>Trykk på «Vegg» for å velge eller ta et bilde av overflaten din. Gjør dette først!</item>
-        <item>Trykk på «Åpne» for å legge til et lag over veggbildet. Klyp og dra for å skalere og plassere det.</item>
+        <item>Trykk på «Åpne» for å legge designet ditt over veggbildet. Klyp og dra for å skalere og plassere det.</item>
     </string-array>
     <string-array name="onboarding_design">
         <item>Dette er Design — arbeidsområdet ditt. Alt du bygger her følger med til alle andre moduser.</item>
-        <item>Trykk på «Åpne» for å legge til det første laget ditt — velg et bilde fra galleriet, og det havner her som kunstverket ditt.</item>
-        <item>Trykk på et lag for å åpne verktøyene dets — gruppert i mappene Mal, Retusjer, Juster og Effekter. Klyp og dra på lerretet for å skalere og plassere det.</item>
+        <item>Trykk på «Åpne» for å legge til designet ditt — velg et bilde fra galleriet, og det havner her som kunstverket ditt.</item>
+        <item>Bruk Rediger-verktøyene til å justere, invertere, lage omriss av eller isolere det. Klyp og dra på lerretet for å skalere og plassere det.</item>
         <item>Når det ser riktig ut, velg hvordan du vil bruke det: «Spor» for å gjøre telefonen din til et lysbord, «Mockup» for å forhåndsvise på et bilde, eller «AR» for å projisere det på en vegg.</item>
-    </string-array>
-    <string-array name="onboarding_design_layers">
-        <item>Åpne — importerer et bilde fra galleriet ditt; det havner som et nytt lag.</item>
     </string-array>
     <string name="nav_measure">Mål</string>
     <string name="nav_measure_info">Mål den virkelige veggen: trykk på den ene kanten, deretter den andre, på veggen designet står på. Bredden lagres i prosjektet – målt, ikke gjettet.</string>
@@ -727,10 +713,10 @@
     <string name="doodle_cd_detected_marks">Oppdagede merker</string>
     <string name="doodle_cd_confirm">Bekreft</string>
     <string name="doodle_cd_unwarp_base">Fotografert veggbilde med hjørnehåndtak</string>
-    <string name="guidance_open_via_design_overlay">Trykk på «Design» i raden, og deretter «Åpne», for å legge til et lag – velg et bilde, så vises det her, svevende over kameravisningen.</string>
-    <string name="guidance_open_via_design_mockup">Trykk på «Design» i raden, og deretter «Åpne», for å legge til et lag oppå veggbildet. Knip og dra for å justere størrelse og plassering.</string>
-    <string name="guidance_open_via_design_trace">Trykk på «Design» i raden, og deretter «Åpne», for å legge til ditt første lag. Når det er på plass, knip og dra på lerretet for å justere størrelse og plassering.</string>
-    <string name="guidance_open_via_design_ar">Trykk på «Design» i raden, og deretter «Åpne», for å legge til et designlag – det projiseres på veggen med ankeret du nettopp satte.</string>
+    <string name="guidance_open_via_design_overlay">Trykk på «Design» i raden, og deretter «Åpne», for å legge til designet ditt – velg et bilde, så vises det her, svevende over kameravisningen.</string>
+    <string name="guidance_open_via_design_mockup">Trykk på «Design» i raden, og deretter «Åpne», for å legge designet ditt oppå veggbildet. Knip og dra for å justere størrelse og plassering.</string>
+    <string name="guidance_open_via_design_trace">Trykk på «Design» i raden, og deretter «Åpne», for å legge til designet ditt. Når det er på plass, knip og dra på lerretet for å justere størrelse og plassering.</string>
+    <string name="guidance_open_via_design_ar">Trykk på «Design» i raden, og deretter «Åpne», for å legge til designet ditt – det projiseres på veggen med ankeret du nettopp satte.</string>
     <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
     <string name="ar_feedback_guest_edit_dropped">Denne endringen kan ikke deles med verten – den blir værende på denne enheten</string>
     <string name="ar_feedback_backend_resolving">AR-motoren velges fortsatt – prøv å være vert igjen om litt</string>

@@ -11,7 +11,7 @@
     <!-- Label for the Augmented Reality (AR) projection mode. -->
     <string name="nav_ar_mode">AR</string>
     <!-- Instructions for AR mode, explaining how to project artwork onto a wall. -->
-    <string name="nav_ar_mode_info">Proyecta tu obra en una pared real usando realidad aumentada. Escanea la pared primero para colocar el anclaje, luego añade tus capas de diseño.</string>
+    <string name="nav_ar_mode_info">Proyecta tu obra en una pared real usando realidad aumentada. Escanea la pared primero para colocar el anclaje, luego añade tu diseño.</string>
 
     <!-- Label for the camera overlay mode, which doesn\'t use AR tracking. -->
     <string name="nav_overlay">Superposición</string>
@@ -55,19 +55,17 @@
     <string name="nav_refine_info">Ajusta con precisión la posición de un Garabato existente.</string>
 
     <!-- Label for the progress tracking tool. -->
-    <string name="nav_update">Progreso</string>
     <!-- Description of the progress tool, used for marking completed parts of a mural. -->
-    <string name="nav_update_info">Marca las áreas completadas de tu mural para hacer un seguimiento del progreso de la pintura.</string>
 
     <!-- Label for the design and layer management menu. -->
     <string name="nav_design">Diseño</string>
     <!-- Description of the design menu, where layers are added and managed. -->
-    <string name="nav_design_info">Añade y gestiona capas de diseño. Cada capa puede ser una imagen importada o un dibujo a mano alzada.</string>
+    <string name="nav_design_info">Tu espacio de trabajo. El diseño que añades con \'Abrir\' —y editas con las herramientas de abajo— se mantiene en todos los modos.</string>
 
     <!-- Action label to open or import an image. -->
     <string name="nav_open">Abrir</string>
     <!-- Description of the Open action, used to add an image layer from the gallery. -->
-    <string name="nav_open_info">Añade una imagen de tu galería como una nueva capa.</string>
+    <string name="nav_open_info">Añade una imagen de tu galería como diseño.</string>
 
     <!-- Label for the background wall image in Mockup mode. -->
     <string name="nav_wall">Pared</string>
@@ -83,7 +81,7 @@
     <string name="nav_invert">Invertir</string>
     <string name="nav_blend">Fusión</string>
     <!-- Description of the Invert tool, explaining its use for stencil and overlay analysis. -->
-    <string name="nav_invert_info">Crea un negativo de la capa actual. Los negros se vuelven blancos y los colores cambian a sus opuestos — útil para el análisis de plantillas y superposiciones.</string>
+    <string name="nav_invert_info">Crea un negativo del diseño. Los negros se vuelven blancos y los colores cambian a sus opuestos — útil para el análisis de plantillas y superposiciones.</string>
 
     <!-- Label for the outline filter. -->
     <string name="nav_outline">Contorno</string>
@@ -93,18 +91,18 @@
     <!-- Label for image adjustment tools (brightness, contrast, etc.). -->
     <string name="nav_adjust">Ajustar</string>
     <!-- Description of the image adjustment tools. -->
-    <string name="nav_adjust_info">Ajusta el brillo, el contraste, la saturación y el balance de color de esta capa.</string>
+    <string name="nav_adjust_info">Ajusta el brillo, el contraste, la saturación y el balance de color del diseño.</string>
     <string name="nav_edit">Editar</string>
 
     <!-- Label for color balance and tinting tools. -->
     <string name="nav_balance">Color</string>
     <!-- Description of the color balance tool, mentioning RGB sliders. -->
-    <string name="nav_balance_info">Tiñe los colores de la capa usando los controles deslizantes de los canales rojo, verde y azul.</string>
+    <string name="nav_balance_info">Tiñe los colores del diseño usando los controles deslizantes de los canales rojo, verde y azul.</string>
 
     <!-- Label for layer blending mode selection. -->
     <string name="nav_blending">Mezcla</string>
     <!-- Description of blending modes, used to control how layers composite. -->
-    <string name="nav_blending_info">Recorre los modos de mezcla (Normal, Multiplicar, Trama, Superponer…) para controlar cómo se compone esta capa con las capas inferiores.</string>
+    <string name="nav_blending_info">Recorre los modos de mezcla (Normal, Multiplicar, Trama, Superponer…) para controlar cómo se compone el diseño con lo que tiene detrás.</string>
 
     <!-- Label for the application settings menu. -->
     <string name="nav_settings">Ajustes</string>
@@ -134,7 +132,7 @@
     <!-- Action label to export the final image. -->
     <string name="nav_export">Exportar</string>
     <!-- Description of the Export action, explaining it merges layers into one image. -->
-    <string name="nav_export_info">Exporta una imagen combinada plana de todas las capas visibles a tu galería de fotos.</string>
+    <string name="nav_export_info">Exporta el diseño como una imagen plana a tu galería de fotos.</string>
 
     <!-- Label for the interactive help system. -->
     <string name="nav_help">Ayuda</string>
@@ -218,7 +216,6 @@
 
     <string name="generating">GENERANDO...</string>
     <!-- Hint shown when user can add a layer by pressing again. -->
-    <string name="stencil_hint">Presiona de nuevo para añadir una capa.</string>
     <!-- Hint for renaming a layer. -->
     <string name="rename_hint">Renombrar</string>
     <!-- Hint for editing text content. -->
@@ -232,13 +229,9 @@
     <!-- Action to duplicate a layer. -->
     <string name="duplicate">Duplicar</string>
     <!-- Action to unlink a layer from others. -->
-    <string name="unlink_layer">Desvincular Capa</string>
     <!-- Action to link a layer with others. -->
-    <string name="link_layer">Vincular Capa</string>
     <!-- Action to hide a layer. -->
-    <string name="hide_layer">Ocultar Capa</string>
     <!-- Action to show a layer. -->
-    <string name="show_layer">Mostrar Capa</string>
     <!-- Action to flatten all layers. -->
     <string name="flatten_all">Acoplar Todo</string>
     <!-- Action to delete a layer. -->
@@ -350,7 +343,7 @@
     <string name="lib_new_project">Nuevo</string>
     <string name="lib_import_project">Importar</string>
     <string name="lib_no_projects">Aún no hay proyectos</string>
-    <string name="lib_no_projects_hint">Toca Nuevo arriba para comenzar tu primer mural.\n\nSerás llevado al editor donde podrás:\n  \u2022  Añadir arte desde el menú de Diseño\n  \u2022  Cambiar al modo AR para proyectar en una pared real\n  \u2022  Usar Superposición para hacer flotar tu diseño en la cámara en vivo\n  \u2022  Usar Maqueta para previsualizar en una foto de pared\n  \u2022  Usar Mesa de Luz para calcar tu diseño en papel</string>
+    <string name="lib_no_projects_hint">Toca Nuevo abajo para comenzar tu primera obra.\n\nSerás llevado al editor donde podrás:\n  \u2022  Añadir arte desde el menú de Diseño\n  \u2022  Cambiar al modo AR para proyectar en una pared real\n  \u2022  Usar Superposición para hacer flotar tu diseño en la cámara en vivo\n  \u2022  Usar Maqueta para previsualizar en una foto de pared\n  \u2022  Usar Calco para calcar tu diseño en papel</string>
     <string name="lib_project_thumbnail">Miniatura del Proyecto</string>
     <string name="lib_project_damaged">Dañado: no se puede abrir</string>
     <string name="lib_delete_project_desc">Eliminar proyecto %1$s</string>
@@ -425,8 +418,6 @@
     <string name="settings_copyright">GraffitiXR © 2025</string>
 
     <!-- Editor UI -->
-    <string name="layers_title">Capas</string>
-    <string name="brush_size_title">Tamaño del Pincel</string>
     <string name="save_project_hint">Nombre del Proyecto</string>
 
     <!-- Target Creation -->
@@ -444,7 +435,6 @@
     <string name="reset_button">Restablecer</string>
 
     <string name="poster_title">GENERAR PÓSTER</string>
-    <string name="poster_select_layers">Seleccionar capas a incluir:</string>
     <string name="poster_physical_size">Tamaño Físico (Ancho en mm):</string>
     <string name="poster_generate_pdf">GENERAR PDF</string>
 
@@ -469,7 +459,7 @@
     <!-- Overlay Mode help text. -->
     <string name="help_overlay">Modo Superposición: Muestra el diseño sobre la cámara en vivo sin seguimiento espacial. Instrucciones: Escala y mueve manualmente el diseño para ajustarlo a tu marco.</string>
     <!-- Mockup Mode help text. -->
-    <string name="help_mockup">Modo Maqueta: Previsualiza diseño en una foto estática. Instrucciones: Usa \'Pared\' para establecer una imagen de fondo, luego organiza capas encima.</string>
+    <string name="help_mockup">Modo Maqueta: Previsualiza el diseño en una foto estática. Instrucciones: Usa \'Pared\' para establecer una imagen de fondo, luego coloca el diseño encima.</string>
     <!-- Lightbox Mode help text. -->
     <string name="help_trace">Modo Mesa de Luz: Superficie de calco de alto brillo. Instrucciones: Coloca papel sobre la pantalla y calca. Pulsa Subir, Bajar, Subir, Bajar el volumen rápido para salir.</string>
     <!-- Target Management help text. -->
@@ -478,21 +468,21 @@
     <string name="help_create">Crear Anclaje: Fotografía una marca en la pared para bloquear proyección. Instrucciones: Apunta a una textura distinta y toca. La app seguirá esta marca.</string>
     <!-- Layer Management help text. -->
     <!-- Import Image help text. -->
-    <string name="help_add_img">Importar Imagen: Añade un boceto o foto de referencia. Instrucciones: Selecciona una imagen de tu galería. Aparecerá como una nueva capa de diseño.</string>
+    <string name="help_add_img">Importar Imagen: Añade un boceto o foto de referencia. Instrucciones: Selecciona una imagen de tu galería. Se convertirá en el diseño.</string>
     <!-- New Sketch help text. -->
     <!-- Add Text help text. -->
     <!-- Change Wall help text. -->
     <string name="help_wall">Cambiar Pared: Establece fondo para modo Maqueta. Instrucciones: Selecciona una foto de la pared física que planeas pintar.</string>
     <!-- Project Management help text. -->
-    <string name="help_project_host">Gestión de Proyectos: Guarda, carga y exporta trabajos. Instrucciones: Toca para acceder a tareas administrativas de tu mural.</string>
+    <string name="help_project_host">Gestión de Proyectos: Guarda, carga y exporta trabajos. Instrucciones: Toca para acceder a tareas administrativas de tu proyecto.</string>
     <!-- New Project help text. -->
-    <string name="help_new">Nuevo Proyecto: Inicia un mural desde cero. Instrucciones: Toca para restablecer. Advertencia: ¡Esto borra todo el trabajo actual. ¡Guarda primero!</string>
+    <string name="help_new">Nuevo Proyecto: Inicia una obra desde cero. Instrucciones: Toca para restablecer. Advertencia: Esto borra todo el trabajo actual. ¡Guarda primero!</string>
     <!-- Save Project help text. -->
-    <string name="help_save">Guardar Proyecto: Almacena mural y mapa AR. Instrucciones: Ingresa un nombre de proyecto y toca Guardar para conservar tu progreso.</string>
+    <string name="help_save">Guardar Proyecto: Almacena la obra y el mapa AR. Instrucciones: Ingresa un nombre de proyecto y toca Guardar para conservar tu progreso.</string>
     <!-- Project Library help text. -->
-    <string name="help_load">Biblioteca de Proyectos: Accede a murales guardados. Instrucciones: Explora la biblioteca para reanudar trabajos o importar archivos compartidos.</string>
+    <string name="help_load">Biblioteca de Proyectos: Accede a proyectos guardados. Instrucciones: Explora la biblioteca para reanudar trabajos o importar archivos compartidos.</string>
     <!-- Export Image help text. -->
-    <string name="help_export">Exportar Imagen: Guarda instantánea en alta resolución. Instrucciones: Renderiza todas las capas visibles en un solo PNG en tu galería.</string>
+    <string name="help_export">Exportar Imagen: Guarda instantánea en alta resolución. Instrucciones: Renderiza el diseño en un solo PNG en tu galería.</string>
     <!-- App Settings help text. -->
     <string name="help_settings">Ajustes de la App: Configura preferencias. Instrucciones: Abre para ajustar lateralidad, unidades y parámetros de escaneo.</string>
     <!-- Flashlight help text. -->
@@ -545,7 +535,6 @@
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
     <string name="settings_scan_mode_voxel_hash">Hash de vóxeles</string>
     <string name="settings_scan_mode_surface_mesh">Malla de superficie</string>
-    <string name="settings_mural_method_label">Motor de mural</string>
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
@@ -592,8 +581,8 @@
     <string name="settings_reset_tutorials_value">Mostrar de nuevo las guías iniciales</string>
     <string-array name="onboarding_trace">
         <item>Este es el modo Calco.</item>
-        <item>Toca «Abrir» para añadir tu primera capa. Una vez añadida, pellizca y arrastra sobre el lienzo para ajustar su tamaño y posición.</item>
-        <item>Cuando estén donde y como quieras, pulsa el botón Congelar para convertir tu teléfono en una mesa de luz para calcar en papel.</item>
+        <item>Toca «Abrir» para añadir tu diseño. Una vez añadido, pellizca y arrastra sobre el lienzo para ajustar su tamaño y posición.</item>
+        <item>Cuando esté donde y como quieras, pulsa el botón Congelar para convertir tu teléfono en una mesa de luz para calcar en papel.</item>
         <item>Te recomendamos usar el modo Calco o el modo Maqueta para editar.</item>
         <item>Así tus imágenes estarán listas y tu teléfono podrá centrarse en la realidad aumentada al pulsar el botón AR.</item>
     </string-array>
@@ -601,12 +590,12 @@
         <item>Proyección AR — proyecta tu diseño sobre una pared real usando el sensor de profundidad y el seguimiento espacial del teléfono.</item>
         <item>Apunta a la pared y muévete despacio de lado a lado. Aparecerán formas de colores mientras el motor mapea la superficie. Espera hasta que se cubra toda el área de la pared.</item>
         <item>Simplemente toca la pantalla. La app fotografía la pared, extrae puntos de seguimiento y fija el ancla al instante.</item>
-        <item>Toca «Abrir» para añadir una capa de diseño — se proyectará sobre la pared usando el ancla que acabas de fijar.</item>
+        <item>Toca «Abrir» para añadir tu diseño — se proyectará sobre la pared usando el ancla que acabas de fijar.</item>
         <item>Consejo — las paredes blancas lisas, el hormigón liso y las superficies de un solo color no se pueden rastrear. Apunta tu ancla a grafitis, yeso rugoso o cualquier marca distintiva.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Superposición en vivo — tu diseño flota sobre la imagen de la cámara en vivo, sin necesidad de escanear ninguna superficie.</item>
-        <item>Toca «Abrir» para añadir una capa — elige una foto y aparecerá aquí, flotando sobre la imagen de la cámara en vivo.</item>
+        <item>Toca «Abrir» para añadir tu diseño — elige una foto y aparecerá aquí, flotando sobre la imagen de la cámara en vivo.</item>
         <item>Pellizca para escalar, arrastra para reposicionar. La superposición permanece fija en tu pantalla — aléjate para ver cómo encaja en la pared.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
@@ -615,18 +604,15 @@
         <item>Calco, Maqueta y Superposición funcionan con normalidad. Toca para cerrar.</item>
     </string-array>
     <string-array name="onboarding_mockup">
-        <item>Maqueta fotográfica — previsualiza tu diseño sobre una foto antes de siquiera coger un pincel.</item>
+        <item>Maqueta fotográfica — previsualiza tu diseño sobre una foto antes de siquiera coger un bote de spray.</item>
         <item>Toca «Pared» para elegir o tomar una foto de tu superficie. ¡Hazlo primero!</item>
-        <item>Toca «Abrir» para añadir una capa sobre la foto de la pared. Pellizca y arrastra para ajustar su tamaño y posición.</item>
+        <item>Toca «Abrir» para colocar tu diseño sobre la foto de la pared. Pellizca y arrastra para ajustar su tamaño y posición.</item>
     </string-array>
     <string-array name="onboarding_design">
         <item>Esto es Diseño — tu espacio de trabajo. Todo lo que crees aquí se traslada a los demás modos.</item>
-        <item>Toca «Abrir» para añadir tu primera capa — elige una foto de tu galería y aparecerá aquí como tu obra.</item>
-        <item>Toca una capa para abrir sus herramientas — agrupadas en las carpetas Pintar, Retocar, Ajustar y Efectos. Pellizca y arrastra sobre el lienzo para ajustar su tamaño y posición.</item>
+        <item>Toca «Abrir» para añadir tu diseño — elige una foto de tu galería y aparecerá aquí como tu obra.</item>
+        <item>Usa las herramientas de Editar para ajustarlo, invertirlo, extraer su contorno o aislarlo. Pellizca y arrastra sobre el lienzo para ajustar su tamaño y posición.</item>
         <item>Cuando quede como quieres, elige cómo usarlo: «Calco» para convertir tu teléfono en una mesa de luz, «Maqueta» para previsualizarlo sobre una foto, o «AR» para proyectarlo sobre una pared.</item>
-    </string-array>
-    <string-array name="onboarding_design_layers">
-        <item>Abrir — importa una foto de tu galería; se añade como una nueva capa.</item>
     </string-array>
     <string name="nav_measure">Medir</string>
     <string name="nav_measure_info">Mide la pared real: toca un borde y luego el otro, sobre la pared donde está el diseño. El ancho se guarda en el proyecto: medido, no adivinado.</string>
@@ -727,10 +713,10 @@
     <string name="doodle_cd_detected_marks">Marcas detectadas</string>
     <string name="doodle_cd_confirm">Confirmar</string>
     <string name="doodle_cd_unwarp_base">Foto de la pared capturada con tiradores en las esquinas</string>
-    <string name="guidance_open_via_design_overlay">Toca «Diseño» en la barra y luego «Abrir» para añadir una capa: elige una foto y aparecerá aquí, flotando sobre la vista en vivo de la cámara.</string>
-    <string name="guidance_open_via_design_mockup">Toca «Diseño» en la barra y luego «Abrir» para añadir una capa sobre la foto de la pared. Pellizca y arrastra para ajustar su tamaño y posición.</string>
-    <string name="guidance_open_via_design_trace">Toca «Diseño» en la barra y luego «Abrir» para añadir tu primera capa. Una vez dentro, pellizca y arrastra sobre el lienzo para ajustar su tamaño y colocarla.</string>
-    <string name="guidance_open_via_design_ar">Toca «Diseño» en la barra y luego «Abrir» para añadir una capa de diseño: se proyecta sobre la pared usando el ancla que acabas de fijar.</string>
+    <string name="guidance_open_via_design_overlay">Toca «Diseño» en la barra y luego «Abrir» para añadir tu diseño: elige una foto y aparecerá aquí, flotando sobre la vista en vivo de la cámara.</string>
+    <string name="guidance_open_via_design_mockup">Toca «Diseño» en la barra y luego «Abrir» para colocar tu diseño sobre la foto de la pared. Pellizca y arrastra para ajustar su tamaño y posición.</string>
+    <string name="guidance_open_via_design_trace">Toca «Diseño» en la barra y luego «Abrir» para añadir tu diseño. Una vez dentro, pellizca y arrastra sobre el lienzo para ajustar su tamaño y colocarlo.</string>
+    <string name="guidance_open_via_design_ar">Toca «Diseño» en la barra y luego «Abrir» para añadir tu diseño: se proyecta sobre la pared usando el ancla que acabas de fijar.</string>
     <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
     <string name="ar_feedback_guest_edit_dropped">Ese cambio no se puede compartir con el anfitrión: se queda en este dispositivo</string>
     <string name="ar_feedback_backend_resolving">El motor de AR aún se está determinando: vuelve a probar Alojar en un momento</string>

@@ -25,10 +25,10 @@ En dan is er nog een prima reeks relevante ontwerptools voor het voorbereiden va
 *   **AzNavRail UI:** duimgestuurde, eenhandige navigatie, ontworpen voor artiesten met een spuitbus in de hand.
 
 ## Modi
-*   **AR Muurschildering:** Het kerninstrument voor het nauwkeurig verankeren van digitale ontwerpen aan fysieke oppervlakken, getrackt via de hierboven beschreven doodle relocalizer.
-*   **Mockup-modus:** Snelle tools om lagen en overvloeimodi te visualiseren op statische foto's van de muur.
+*   **AR Muurschildering:** Het kerninstrument voor het nauwkeurig verankeren van digitale ontwerpen aan fysieke oppervlakken, getrackt via de hierboven beschreven doodle relocalizer. Op het kleine aantal apparaten zonder ARCore volgt de overlay-afbeelding in plaats daarvan een vorm die je op de muur markeert, met dezelfde OpenCV-pipeline (CameraX + SphereSLAM, alleen vlak).
+*   **Mockup-modus:** Snelle tools om het ontwerp en de overvloeimodus ervan vooraf te bekijken op een statische foto van de muur.
 *   **Trace (lichtbak):** Volledig verlicht oppervlak om op papier over te trekken, met aanraakvergrendeling, automatisch intrekkende rail en fysieke volumeknop-exit (Omhoog, Omlaag, Omhoog, Omlaag).
-*   **Overlay:** Niet-AR-beeldtracering — je referentieafbeelding wordt over de live camera (CameraX) gelegd met instelbare dekking. Op het kleine aantal apparaten zonder ARCore kan deze modus in plaats daarvan een vorm volgen die je op de muur markeert, met dezelfde OpenCV-pipeline, alleen vlak (planair).
+*   **Overlay:** Niet-AR-beeldtracering — je referentieafbeelding wordt over de live camera (CameraX) gelegd met instelbare dekking, vast op het scherm.
 *   **Design:** Plaatsings- en leesbaarheidstools voor de ene ontwerpafbeelding die wordt getraceerd — dekking/helderheid/contrast/verzadiging/kleurbalans, inverteren, contour-extractie en onderwerpisolatie. Er is precies één ontwerpafbeelding; meerdere afbeeldingen tot één geheel samenstellen is de taak van de bijbehorende ontwerp-app, niet van deze app.
 
 ## Licentiëring

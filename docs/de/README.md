@@ -25,10 +25,10 @@ Außerdem gibt es eine ordentliche Suite an relevanten Designwerkzeugen zur Vorb
 *   **AzNavRail-UI:** Daumengesteuerte, einhändige Navigation, entworfen für Künstler, die eine Spraydose in der Hand halten.
 
 ## Modi
-*   **AR-Wandbild:** Das zentrale Präzisionswerkzeug, um digitale Entwürfe an physischen Oberflächen zu verankern, getrackt über den oben beschriebenen Doodle-Relokalisierer.
-*   **Mockup-Modus:** Schnelle Werkzeuge zum Visualisieren von Ebenen und Mischmodi über statischen Wandfotos.
+*   **AR-Wandbild:** Das zentrale Präzisionswerkzeug, um digitale Entwürfe an physischen Oberflächen zu verankern, getrackt über den oben beschriebenen Doodle-Relokalisierer. Auf den wenigen Geräten ohne ARCore folgt das überlagerte Bild stattdessen einer Form, die Sie auf der Wand markieren – mit derselben OpenCV-Pipeline (CameraX + SphereSLAM, rein planar).
+*   **Mockup-Modus:** Schnelle Werkzeuge zur Vorschau des Designs und seines Mischmodus über einem statischen Wandfoto.
 *   **Trace (Leuchtkasten):** Vollhelle Oberfläche zum Abpausen auf Papier, mit Touch-Sperre, automatischem Einklappen der Navigationsleiste und Beenden über die physischen Lautstärketasten (Auf, Ab, Auf, Ab).
-*   **Overlay:** Nicht-AR-Bildüberlagerung – Ihr Referenzbild wird über die Live-Kamera (CameraX) mit einstellbarer Deckkraft gelegt. Auf den wenigen Geräten ohne ARCore kann dieser Modus stattdessen eine auf der Wand markierte Form mit derselben OpenCV-Pipeline tracken, rein planar.
+*   **Overlay:** Nicht-AR-Bildüberlagerung – Ihr Referenzbild wird über die Live-Kamera (CameraX) mit einstellbarer Deckkraft gelegt und bleibt fest auf dem Bildschirm.
 *   **Design:** Platzierungs- und Lesbarkeitswerkzeuge für das eine Design-Bild, das abgepaust wird – Deckkraft/Helligkeit/Kontrast/Sättigung/Farbbalance, Invertieren, Konturextraktion und Motiv-Freistellung. Es gibt genau ein Design-Bild; mehrere Bilder zu einem zusammenzusetzen ist die Aufgabe der begleitenden Design-App, nicht dieser App.
 
 ## Lizenzierung

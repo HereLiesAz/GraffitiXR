@@ -25,10 +25,10 @@ Et puis, il y a une bonne suite d'outils de conception pertinents pour préparer
 *   **Interface AzNavRail :** navigation au pouce, à une main, conçue pour les artistes qui tiennent une bombe de peinture.
 
 ## Modes
-*   **Fresque RA :** L'instrument de précision central pour ancrer des concepts numériques sur des surfaces physiques, suivi grâce au relocalisateur par empreinte décrit ci-dessus.
-*   **Mode Maquette :** Outils rapides pour visualiser des calques et des modes de fusion par-dessus des photos statiques de murs.
+*   **Fresque RA :** L'instrument de précision central pour ancrer des concepts numériques sur des surfaces physiques, suivi grâce au relocalisateur par empreinte décrit ci-dessus. Sur le petit nombre d'appareils sans ARCore, l'image superposée suit à la place une forme que vous marquez sur le mur, en utilisant le même pipeline OpenCV (CameraX + SphereSLAM, en planaire uniquement).
+*   **Mode Maquette :** Outils rapides pour prévisualiser la conception et son mode de fusion par-dessus une photo statique du mur.
 *   **Trace (Table lumineuse) :** Surface pleine luminosité pour décalquer sur papier, avec verrouillage tactile, rétractation automatique du rail, et sortie via les boutons physiques de volume (Haut, Bas, Haut, Bas).
-*   **Superposition :** Décalque d'image hors RA — votre image de référence superposée à la caméra en direct (CameraX) avec une opacité réglable. Sur le petit nombre d'appareils sans ARCore, ce mode peut à la place suivre une forme que vous marquez sur le mur en utilisant le même pipeline OpenCV, en planaire uniquement.
+*   **Superposition :** Décalque d'image hors RA — votre image de référence superposée à la caméra en direct (CameraX) avec une opacité réglable, fixée à l'écran.
 *   **Conception :** Outils de placement et de lisibilité pour l'unique image de conception en cours de décalque — opacité/luminosité/contraste/saturation/balance des couleurs, inversion, extraction de contours et isolement du sujet. Il n'y a qu'une seule image de conception ; composer plusieurs images en une seule, c'est le travail de l'application de conception compagnon, pas de cette application.
 
 ## Licence
