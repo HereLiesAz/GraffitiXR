@@ -369,6 +369,7 @@
   ・  モックアップを使用して壁の写真でプレビュー
   ・  ライトボックスを使用してデザインを紙にトレース</string>
     <string name="lib_project_thumbnail">プロジェクトのサムネイル</string>
+    <string name="lib_project_damaged">破損しています。開けません</string>
     <string name="lib_delete_project_desc">プロジェクト %1$s を削除</string>
 
 
@@ -755,6 +756,7 @@
     <string name="ar_feedback_doodle_not_ready">らくがきの準備がまだできていません — 画面内に保ったまま、もう一度「ホスト」を試してください</string>
     <string name="ar_feedback_package_failed">このプロジェクトを共有用にパッケージできませんでした。先に保存してみてください</string>
     <string name="ar_feedback_host_failed">共有を開始できませんでした：%1$s</string>
+    <string name="ar_feedback_host_too_large">このプロジェクトは大きすぎて Link で共有できません（%1$d MB、上限は %2$d MB）。エクスポートして共有してください。</string>
     <string name="ar_feedback_join_load_failed">ホストのプロジェクトを読み込めませんでした。セッションを終了しました。</string>
     <string name="ar_feedback_join_no_geometry">ホストが ARCore で位置合わせできるジオメトリを提供しませんでした。</string>
     <string name="ar_feedback_join_failed">参加できませんでした：%1$s</string>
@@ -805,6 +807,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">きれいな壁の写真を保存できませんでした。もう一度撮影してください。</string>
+    <string name="ar_feedback_progress_save_failed">壁のマップと塗装の進捗を保存できませんでした。このセッション中は保持されます。空き容量を確保してから、もう一度保存してください。</string>
     <string name="ar_feedback_clean_wall_register_failed">このきれいな壁の写真は、この壁と一致しません。作業する位置あたりから撮り直してください。</string>
 
     <!-- The CV view legend: the name of each way of looking. -->

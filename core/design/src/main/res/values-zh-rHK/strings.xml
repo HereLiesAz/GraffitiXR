@@ -357,6 +357,7 @@
     <string name="lib_no_projects">還沒有項目</string>
     <string name="lib_no_projects_hint">點擊上面的「新建」即可開始創作您的第一幅壁畫。 \n\n您將進入編輯器，您可以在其中執行以下操作：\n \u2022 從「設計」選單中新增圖稿\n \u2022 切換到 AR 模式以投影到真實的牆壁上\n \u2022 使用疊加將您的設計浮動在牆壁上描繪成對圖2022</string>
     <string name="lib_project_thumbnail">項目縮圖</string>
+    <string name="lib_project_damaged">已損壞：開唔到</string>
     <string name="lib_delete_project_desc">刪除項目%1$s</string>
 
 
@@ -743,6 +744,7 @@
     <string name="ar_feedback_doodle_not_ready">隨手畫尚未就緒 — 請讓它保持在畫面中，然後再次嘗試 「主持」</string>
     <string name="ar_feedback_package_failed">無法打包此專案以供分享，請先嘗試儲存</string>
     <string name="ar_feedback_host_failed">無法開始分享：%1$s</string>
+    <string name="ar_feedback_host_too_large">呢個項目太大，冇辦法經 Link 分享（%1$d MB；上限係 %2$d MB）。請匯出再分享。</string>
     <string name="ar_feedback_join_load_failed">無法載入主機的專案，工作階段已結束。</string>
     <string name="ar_feedback_join_no_geometry">主機未提供 ARCore 可用於對齊的幾何資料。</string>
     <string name="ar_feedback_join_failed">無法加入：%1$s</string>
@@ -792,6 +794,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">無法儲存乾淨牆面嘅相片。請重新影過。</string>
+    <string name="ar_feedback_progress_save_failed">無法儲存牆面地圖同繪畫進度。今次工作階段入面仲會保留。請騰出啲空間再儲存。</string>
     <string name="ar_feedback_clean_wall_register_failed">呢張乾淨牆面嘅相片同而家嘅牆面對唔上。請喺大約你會企嘅位置重新影過。</string>
 
     <!-- The CV view legend: the name of each way of looking. -->

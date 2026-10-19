@@ -59,6 +59,23 @@ class PoseFusion {
     private val hybrid = HybridAnchorFusion()
     private var hybridInSync = true
 
+    /** A copy of the standing anchor-local correction, null before the first trusted fix. */
+    fun correctionCopy(): FloatArray? = correction?.copyOf()
+
+    /**
+     * The backbone jumped from [oldBackbone] to [newBackbone] under a correction that was made
+     * against the old one (a relock while ARCore's anchor was frozen at its last good pose): carry
+     * the correction across so the composed pose stays where it was drawn,
+     * `L' = newBackbone⁻¹ · oldBackbone · L`.
+     */
+    fun rebase(oldBackbone: FloatArray, newBackbone: FloatArray) {
+        val l = correction ?: return
+        correction = RigidMath.multiply(
+            RigidMath.multiply(RigidMath.rigidInverse(newBackbone), oldBackbone), l,
+        )
+        hybridInSync = false
+    }
+
     /** Re-arm the cold (hard) snap — call on session resume / tracking loss so the next relock is instant. */
     fun markRelocalizing() {
         coldStart = true

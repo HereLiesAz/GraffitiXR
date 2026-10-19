@@ -94,6 +94,11 @@ missing from an old file just uses its Kotlin default). Notably:
 - `grownDoodle: WallFeatureMap?` is the Doodle's self-grown rows (in the doodle frame), stored the
   same way and restored behind the captured `doodle`. A new capture clears it, as it clears
   `paintMarks` and `paintGrid`.
+- `arCoreCaptureImageUri` names which of `doodleImageUris` is the ARCore doodle's capture photo (the
+  grid's bare-wall colours, with `doodleIntrinsics`). Bound to `doodle`, and never pruned from the
+  list. Older projects without it use the last photo only if no standalone capture appended since.
+- An unreadable `project.json` is listed in the library as damaged (`GraffitiProject.isDamaged`,
+  never serialized): it can be deleted, never opened or written, and its files stay as they are.
 - `paintGrid` is `MobileGS::exportPaintGrid`: int32 cols, rows, k; cols·rows painted bytes; k×4 floats
   (paint colour sum and count per group); then a tail, int32 `0x42524F43`, the design composite's
   int32 width and height, int32 n, n confirmation counts, n promoted flags, int32 set count, and per

@@ -63,6 +63,8 @@ class MainViewModelDoodleSaveTest {
         every { Bitmap.createScaledBitmap(any(), any(), any(), any()) } returns mockk(relaxed = true)
         every { slamManager.setWallDoodle(any(), any(), any(), any(), any(), any(), any(), any()) } returns
             mockk<Doodle>(relaxed = true)
+        // No anchor locked: the depth Doodle stays as built (the session-only branch).
+        coEvery { slamManager.awaitAnchorTransform(any(), any(), any()) } returns null
         viewModel = MainViewModel(projectRepository, slamManager, projectManager, settingsRepository, context)
     }
 
@@ -78,7 +80,7 @@ class MainViewModelDoodleSaveTest {
         every { height } returns 64
     }
 
-    /** The depth-buffer path (no wall plane): no anchor wait, straight to the save. */
+    /** The depth-buffer path (no wall plane); the mocked anchor wait answers at once. */
     private fun confirmDepthCapture() {
         viewModel.onConfirmDoodleCreation(
             bitmap = bitmap(),
@@ -118,7 +120,7 @@ class MainViewModelDoodleSaveTest {
 
     @Test
     fun `an IOException while saving the target is reported instead of crashing`() {
-        coEvery { projectManager.appendDoodleImage(any(), any(), any(), any()) } throws IOException("disk full")
+        coEvery { projectManager.appendDoodleImage(any(), any(), any(), any(), any()) } throws IOException("disk full")
 
         confirmDepthCapture()
         awaitSaveFinished()

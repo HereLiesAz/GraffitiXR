@@ -352,6 +352,7 @@
     <string name="lib_no_projects">Ancora nessun progetto</string>
     <string name="lib_no_projects_hint">Tocca Nuovo in alto per iniziare il tuo primo murale.\n\nVerrai portato nell\'editor dove puoi:\n  •  Aggiungere opere d\'arte dal menu Design\n  •  Passare alla modalità AR per proiettare su un muro reale\n  •  Usare la Sovrapposizione per far fluttuare il tuo design sulla telecamera dal vivo\n  •  Usare Mockup per l\'anteprima su una foto del muro\n  •  Usare Tavolo luminoso per ricalcare il tuo design su carta</string>
     <string name="lib_project_thumbnail">Miniatura del Progetto</string>
+    <string name="lib_project_damaged">Danneggiato: non si può aprire</string>
     <string name="lib_delete_project_desc">Elimina progetto %1$s</string>
 
     <!-- Settings Screen -->
@@ -738,6 +739,7 @@
     <string name="ar_feedback_doodle_not_ready">Lo Scarabocchio non è ancora pronto — tienilo inquadrato e riprova «Ospita»</string>
     <string name="ar_feedback_package_failed">Impossibile preparare questo progetto per la condivisione: prova prima a salvarlo</string>
     <string name="ar_feedback_host_failed">Impossibile avviare la condivisione: %1$s</string>
+    <string name="ar_feedback_host_too_large">Questo progetto è troppo grande per condividerlo via Link (%1$d MB; il limite è %2$d MB). Esportalo per condividerlo.</string>
     <string name="ar_feedback_join_load_failed">Impossibile caricare il progetto dell\'host: la sessione è stata terminata.</string>
     <string name="ar_feedback_join_no_geometry">L\'host non ha fornito una geometria a cui ARCore possa allinearsi.</string>
     <string name="ar_feedback_join_failed">Impossibile partecipare: %1$s</string>
@@ -788,6 +790,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">Impossibile salvare la foto del muro pulito. Scattala di nuovo.</string>
+    <string name="ar_feedback_progress_save_failed">Impossibile salvare la mappa del muro e l’avanzamento della pittura. Restano per questa sessione. Libera spazio e salva di nuovo.</string>
     <string name="ar_feedback_clean_wall_register_failed">Quella foto del muro pulito non coincide con questo muro. Rifalla più o meno da dove starai.</string>
 
     <!-- The CV view legend: the name of each way of looking. -->

@@ -352,6 +352,7 @@
     <string name="lib_no_projects">Nenhum projeto ainda</string>
     <string name="lib_no_projects_hint">Toque em Novo acima para iniciar seu primeiro mural.\n\nVocê será levado ao editor, onde poderá:\n  \u2022  Adicionar arte a partir do menu Design\n  \u2022  Mudar para o modo AR para projetar em uma parede real\n  \u2022  Usar a Sobreposição para flutuar seu design na câmera ao vivo\n  \u2022  Usar a Maquete para visualizar em uma foto de parede\n  \u2022  Usar a Mesa de Luz para traçar seu design no papel</string>
     <string name="lib_project_thumbnail">Miniatura do Projeto</string>
+    <string name="lib_project_damaged">Danificado: não pode ser aberto</string>
     <string name="lib_delete_project_desc">Excluir projeto %1$s</string>
 
     <!-- Settings Screen -->
@@ -738,6 +739,7 @@
     <string name="ar_feedback_doodle_not_ready">O Rabisco ainda não está pronto — mantenha-o à vista e tente Hospedar de novo</string>
     <string name="ar_feedback_package_failed">Não foi possível empacotar este projeto para compartilhar — tente salvá-lo primeiro</string>
     <string name="ar_feedback_host_failed">Não foi possível iniciar o compartilhamento: %1$s</string>
+    <string name="ar_feedback_host_too_large">Este projeto é grande demais para compartilhar pelo Link (%1$d MB; o limite é %2$d MB). Exporte-o para compartilhar.</string>
     <string name="ar_feedback_join_load_failed">Não foi possível carregar o projeto do anfitrião — a sessão foi encerrada.</string>
     <string name="ar_feedback_join_no_geometry">O anfitrião não forneceu geometria à qual o ARCore possa se alinhar.</string>
     <string name="ar_feedback_join_failed">Não foi possível entrar: %1$s</string>
@@ -788,6 +790,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">Não foi possível salvar a foto da parede limpa. Tire-a de novo.</string>
+    <string name="ar_feedback_progress_save_failed">Não foi possível salvar o mapa da parede e o progresso da pintura. Eles ficam guardados nesta sessão. Libere espaço e salve de novo.</string>
     <string name="ar_feedback_clean_wall_register_failed">Essa foto da parede limpa não combina com esta parede. Refaça-a de onde você vai ficar.</string>
 
     <!-- The CV view legend: the name of each way of looking. -->

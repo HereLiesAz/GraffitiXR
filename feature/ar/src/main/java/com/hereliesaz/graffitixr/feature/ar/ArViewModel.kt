@@ -474,6 +474,7 @@ class ArViewModel @Inject constructor(
                     )
                 }
                 hostedCoopSpatialFrame = hostedSpatial
+                arCorePeerDoodle = null
                 _uiState.update {
                     it.copy(
                         coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.HOST,
@@ -496,15 +497,46 @@ class ArViewModel @Inject constructor(
                     )
                 }
                 android.util.Log.e("ArViewModel", "Failed to start hosting", e)
-                _feedback.tryEmit(
-                    com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                        appContext.getString(DesignR.string.ar_feedback_host_failed, e.message ?: appContext.getString(DesignR.string.ar_feedback_unknown_error)), e
+                val tooLarge = generateSequence(e as Throwable) { it.cause }
+                    .filterIsInstance<com.hereliesaz.graffitixr.core.collaboration.session.ProjectTooLargeToHostException>()
+                    .firstOrNull()
+                val message = if (tooLarge != null) {
+                    // Link holds one transfer in memory; export streams and takes twice that. Name
+                    // the limit, and the way out.
+                    appContext.getString(
+                        DesignR.string.ar_feedback_host_too_large,
+                        (tooLarge.bytes + MIB - 1) / MIB,
+                        tooLarge.capBytes / MIB,
                     )
-                )
+                } else {
+                    appContext.getString(DesignR.string.ar_feedback_host_failed, e.message ?: appContext.getString(DesignR.string.ar_feedback_unknown_error))
+                }
+                _feedback.tryEmit(com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(message, e))
                 return@launch
             }
             observeCoopState()
         }
+    }
+
+    /** The ARCore host's doodle this guest joined with, re-installed on every ARCore entry. */
+    @Volatile private var arCorePeerDoodle: ByteArray? = null
+
+    /**
+     * Install the ARCore host's geometry: its doodle (PnP object frame -> host wall frame is explicit;
+     * PoseFusion and return-visit anchoring consume this exact bridge), its paint marks (same doodle
+     * frame; alignToPeer clears them, and a guest at a painted-over wall would otherwise have only the
+     * original marks; the host's grown rows ride in the doodle blob), and its wall normal (earth frame,
+     * so it holds on any device; without one, alignToPeer has already dropped this device's last).
+     */
+    private fun installArCorePeer(
+        doodle: ByteArray,
+        spatialFrame: com.hereliesaz.graffitixr.common.model.CoopSpatialFrame,
+    ) {
+        slamManager.alignToPeer(doodle)
+        val project = projectRepository.currentProject.value
+        project?.paintMarks?.takeIf { it.pointCount > 0 }?.let { slamManager.restorePaintMarks(it) }
+        slamManager.setWallNormalEnu(project?.doodleWallNormalEnu?.takeIf { it.size == 3 }?.toFloatArray())
+        slamManager.captureAnchorCam = spatialFrame.doodleFromWall.toFloatArray()
     }
 
     fun joinFromQr(qr: String) {
@@ -581,18 +613,8 @@ class ArViewModel @Inject constructor(
                                 leaveSession()
                                 return@joinFromQr
                             }
-                            // PnP object frame -> host wall frame is now explicit. Existing ARCore
-                            // PoseFusion/return-visit anchoring consumes this exact bridge.
-                            slamManager.alignToPeer(doodle)
-                            // The host's paint marks are in that same doodle frame: install them too,
-                            // or a guest at a painted-over wall has only the original marks to relock
-                            // on (alignToPeer clears paint marks; the host's grown rows ride in the
-                            // doodle blob itself).
-                            projectRepository.currentProject.value?.paintMarks
-                                ?.takeIf { it.pointCount > 0 }
-                                ?.let { slamManager.restorePaintMarks(it) }
-                            slamManager.captureAnchorCam =
-                                spatialFrame.doodleFromWall.toFloatArray()
+                            arCorePeerDoodle = doodle.copyOf()
+                            installArCorePeer(doodle, spatialFrame)
                             // coopPeerSpatialFrame/role were published before spectator load so the
                             // generic project loader could not race this peer installation.
                         } else {
@@ -615,6 +637,7 @@ class ArViewModel @Inject constructor(
                 val managerTerminal =
                     collaborationManager.state.value as?
                         com.hereliesaz.graffitixr.common.model.CoopSessionState.Ended
+                arCorePeerDoodle = null
                 _uiState.update {
                     it.copy(
                         coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.NONE,
@@ -647,6 +670,7 @@ class ArViewModel @Inject constructor(
             collaborationManager.leaveSession()
             reportedGuestEditDrop = false
             hostedCoopSpatialFrame = null
+            arCorePeerDoodle = null
             _uiState.update {
                 it.copy(
                     coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.NONE,
@@ -2686,7 +2710,21 @@ class ArViewModel @Inject constructor(
             // doodle into it. Force the normal ARCore doodle loader to touch native again
             // on ARCore entry even when the project id/value itself did not change.
             loadedDoodle = null
-            loadDoodleIfExists()
+            val peerFrame = _uiState.value.coopPeerSpatialFrame
+            val peerDoodle = arCorePeerDoodle
+            if (
+                shouldRestoreLocalArCoreDoodle(
+                    isArCoreAvailable = _uiState.value.isArCoreAvailable,
+                    coopRole = _uiState.value.coopRole,
+                    peerSpatialFramePresent = peerFrame != null,
+                )
+            ) {
+                loadDoodleIfExists()
+            } else if (peerFrame != null && peerDoodle != null) {
+                // A guest: the local copy of the host project carries host intrinsics, anchor and
+                // view. Re-install the host's geometry instead (standalone may have replaced it).
+                viewModelScope.launch(Dispatchers.IO) { installArCorePeer(peerDoodle, peerFrame) }
+            }
 
             val now = System.currentTimeMillis()
             arEntryTimestampMs = now
@@ -3899,6 +3937,23 @@ class ArViewModel @Inject constructor(
      * return at once, so teardown closed the session — and a backend switch cleared the native map —
      * before the save had read anything).
      */
+    @Volatile private var lastProgressSaveFailureNoticeMs = 0L
+
+    /**
+     * Tell the artist a wall-map / progress / Doodle write failed. Once a minute at most: an autosave
+     * that keeps failing (a full disk) would otherwise say it on every tick.
+     */
+    private fun reportProgressSaveFailure(e: Exception) {
+        val now = System.currentTimeMillis()
+        if (now - lastProgressSaveFailureNoticeMs < PROGRESS_SAVE_FAILURE_NOTICE_MS) return
+        lastProgressSaveFailureNoticeMs = now
+        _feedback.tryEmit(
+            com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                appContext.getString(DesignR.string.ar_feedback_progress_save_failed), e
+            )
+        )
+    }
+
     private suspend fun saveMapBlocking() {
         val projectId = loadedProjectId ?: return
         // The wall feature map is the only thing here that survives a session meaningfully: it is
@@ -3917,6 +3972,7 @@ class ArViewModel @Inject constructor(
             throw e
         } catch (e: Exception) {
             Timber.e(e, "Wall feature map save failed")
+            reportProgressSaveFailure(e)
             return
         }
 
@@ -4334,7 +4390,17 @@ class ArViewModel @Inject constructor(
             // Persist so the next load starts from the size the artist settled on. Merged through
             // the repository transform rather than a full-object write, for the save-race reason
             // documented on the wall-map save above.
-            projectRepository.updateProject { it.copy(doodle = updated) }
+            // A write error (a full disk) must not take the app down from a viewModelScope launch: native
+            // holds the partition for this session either way.
+            try {
+                projectRepository.updateProject { it.copy(doodle = updated) }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Partitioned Doodle save failed")
+                reportProgressSaveFailure(e)
+                return@launch
+            }
             Timber.i(
                 "Design footprint %.3f x %.3f m; partitioned %d points, backbone %d",
                 design.halfW, design.halfH, updated.points3d.size / 3, backbone,
@@ -4425,6 +4491,24 @@ class ArViewModel @Inject constructor(
      * `return`, so a refused project kept the previous project's map in native and then SAVED it into
      * the refused project's file on teardown.
      */
+    /**
+     * A doodle saved before the capture pose was recorded (pre-Phase-2) has none, so it could never
+     * be corrected or partitioned without a re-capture. Its capture view and anchor are saved with
+     * the project, and the pose is exactly `cv(view) · anchor` (as MetricDoodleBuilder builds it), so
+     * derive it. Only for a doodle in the display frame (not a pre-Phase-0 one) with both saved.
+     */
+    private fun withDerivedCaptureAnchorCam(
+        doodle: com.hereliesaz.graffitixr.common.model.Doodle,
+        project: com.hereliesaz.graffitixr.common.model.GraffitiProject,
+    ): com.hereliesaz.graffitixr.common.model.Doodle {
+        if (doodle.captureAnchorCam.size == 16 || doodle.points3d.isEmpty()) return doodle
+        if (doodle.isLegacyFrame() && project.doodleCaptureRotationDeg < 0) return doodle
+        val view = project.doodleViewMatrix.takeIf { it.size == 16 }?.toFloatArray() ?: return doodle
+        val anchor = project.doodleAnchor.takeIf { it.size == 16 }?.toFloatArray() ?: return doodle
+        val cam = RigidMath.multiply(RigidMath.glViewToCv(view), anchor)
+        return doodle.copy(captureAnchorCam = cam.toList())
+    }
+
     private fun loadDoodleIfExists() {
         viewModelScope.launch(Dispatchers.IO) {
             val project = projectRepository.currentProject.value ?: return@launch
@@ -4454,7 +4538,7 @@ class ArViewModel @Inject constructor(
         reportExit: (NativeStateOwner.LoadExit) -> Unit,
     ) {
         run {
-            val fp = project.doodle
+            val fp = project.doodle?.let { withDerivedCaptureAnchorCam(it, project) }
             val incoming = LoadedDoodle(project.id, fp)
             val current = loadedDoodle
 
@@ -4562,6 +4646,8 @@ class ArViewModel @Inject constructor(
                         // reload relocalizes exactly as it did before the phase landed.
                         regions = fp.regions,
                     )
+                    // That view is in the world it was captured in; a reopened project is another.
+                    slamManager.markDoodleViewStaleUnlessCapturedThisSession()
                     // Retained for the repartition path (2.2), with exactly the values just pushed
                     // so a later re-push cannot drift from what native holds.
                     liveDoodle = LiveDoodle(fp, anchor.toFloatArray(), intr.toFloatArray(), view)
@@ -4640,7 +4726,12 @@ class ArViewModel @Inject constructor(
                     runCatching { java.util.Base64.getDecoder().decode(encoded) }.getOrNull()
                         ?.let { slamManager.restorePaintGrid(it) }
                 }
-                val photo = project.doodleImageUris.lastOrNull()
+                // The ARCore capture's own photo. Older projects predate the field: their last photo
+                // is it only if no standalone capture has appended since.
+                val photo = project.arCoreCaptureImageUri?.takeIf { it in project.doodleImageUris }
+                    ?: project.doodleImageUris.lastOrNull()?.takeIf {
+                        project.arCoreCaptureImageUri == null && project.sphereSlamReferenceUri == null
+                    }
                 val intr = project.doodleIntrinsics
                 if (photo != null && intr.size == 4) {
                     val bmp = runCatching {
@@ -6472,6 +6563,9 @@ class ArViewModel @Inject constructor(
 
         /** A clean-wall photo request counts only for the capture that follows it this closely. */
         private const val CLEAN_WALL_REQUEST_WINDOW_MS = 5_000L
+        private const val MIB = 1024L * 1024L
+        /** A failing wall-map / progress save is reported at most this often. */
+        private const val PROGRESS_SAVE_FAILURE_NOTICE_MS = 60_000L
         /** cos 2°: a learned wall normal is saved again only once it has moved more than this. */
         private const val WALL_NORMAL_RESAVE_COS = 0.99939f
         /** How long a Measure tap waits for the GL thread to resolve it. */

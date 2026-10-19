@@ -339,6 +339,22 @@ class ProjectManagerTest {
         assertEquals(30, doodleFiles())
     }
 
+    @Test
+    fun `appendDoodleImage never prunes the ARCore capture photo`() = runTest {
+        val projectRepositoryProvider = mockk<javax.inject.Provider<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>>(relaxed = true)
+        val pruningManager = ProjectManager(mockContext, uriProvider, projectRepositoryProvider)
+        val bitmap = mockk<Bitmap>(relaxed = true) {
+            every { compress(any(), any(), any()) } returns true
+        }
+        var uris = pruningManager.appendDoodleImage(mockContext, "keep_capture", emptyList(), bitmap)
+        val capture = uris.single()
+        repeat(40) {
+            uris = pruningManager.appendDoodleImage(mockContext, "keep_capture", uris, bitmap, keep = capture)
+        }
+        assertEquals(30, uris.size)
+        assertEquals(capture, uris.first())
+    }
+
 
     // --- Standalone SphereSLAM reference persistence ---
 

@@ -42,6 +42,7 @@
     <string name="lib_no_projects">Aucun projet pour le moment</string>
     <string name="lib_no_projects_hint">Appuyez sur Nouveau ci-dessus pour commencer votre première fresque.\n\nVous serez dirigé vers l\'éditeur où vous pourrez :\n  \u2022  Ajouter des œuvres d\'art depuis le menu Conception\n  \u2022  Passer en mode AR pour projeter sur un vrai mur\n  \u2022  Utiliser Superposition pour faire flotter votre conception sur la caméra en direct\n  \u2022  Utiliser Maquette pour prévisualiser sur une photo de mur\n  \u2022  Utiliser Table lumineuse pour tracer votre conception sur papier</string>
     <string name="lib_project_thumbnail">Vignette du projet</string>
+    <string name="lib_project_damaged">Endommagé : impossible de l’ouvrir</string>
     <string name="lib_delete_project_desc">Supprimer le projet %1$s</string>
 
     <!-- Settings Screen -->
@@ -474,6 +475,7 @@
     <string name="ar_feedback_doodle_not_ready">Le Gribouillis n\'est pas encore prêt — gardez-le dans le champ et relancez « Héberger »</string>
     <string name="ar_feedback_package_failed">Impossible d\'empaqueter ce projet pour le partager : essayez d\'abord de l\'enregistrer</string>
     <string name="ar_feedback_host_failed">Impossible de démarrer le partage : %1$s</string>
+    <string name="ar_feedback_host_too_large">Ce projet est trop volumineux pour être partagé via Link (%1$d Mo ; la limite est de %2$d Mo). Exportez-le pour le partager.</string>
     <string name="ar_feedback_join_load_failed">Impossible de charger le projet de l\'hôte : la session a été terminée.</string>
     <string name="ar_feedback_join_no_geometry">L\'hôte n\'a pas fourni de géométrie sur laquelle ARCore puisse s\'aligner.</string>
     <string name="ar_feedback_join_failed">Impossible de rejoindre : %1$s</string>
@@ -524,6 +526,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">Impossible d’enregistrer la photo du mur propre. Reprenez-la.</string>
+    <string name="ar_feedback_progress_save_failed">Impossible d’enregistrer la carte du mur et la progression de la peinture. Elles sont conservées pour cette session. Libérez de l’espace, puis enregistrez à nouveau.</string>
     <string name="ar_feedback_clean_wall_register_failed">Cette photo du mur propre ne correspond pas à ce mur. Reprenez-la à peu près d’où vous serez.</string>
 
     <!-- The CV view legend: the name of each way of looking. -->

@@ -86,7 +86,7 @@ class MainViewModelStandaloneReplacementTest {
             current.value = firstArg<(GraffitiProject) -> GraffitiProject>()(current.value!!)
         }
         coEvery { projectManager.saveSphereSlamReference(any(), any(), any()) } answers { candidates.removeFirst() }
-        coEvery { projectManager.appendDoodleImage(any(), any(), any(), any()) } returns emptyList()
+        coEvery { projectManager.appendDoodleImage(any(), any(), any(), any(), any()) } returns emptyList()
         coEvery { projectManager.deleteSphereSlamReference(any(), any(), any()) } coAnswers {
             synchronized(deleted) { deleted += thirdArg<Uri?>() }
         }

@@ -293,7 +293,10 @@ object MetricDoodleBuilder {
         }
 
         // ORB fallback — CLAHE-normalize identically to the native reloc path so descriptors match.
-        val gray = toGray(bitmap)
+        // Through native's low-light enhancer first, as every native detect path is.
+        val gray = slam.enhanceIfDark(bitmap).let { src ->
+            try { toGray(src) } finally { if (src !== bitmap) src.recycle() }
+        }
         val orb = ORB.create(1500)
         val clahe = Imgproc.createCLAHE(2.0, org.opencv.core.Size(8.0, 8.0))
         val norm = Mat()
@@ -314,7 +317,7 @@ object MetricDoodleBuilder {
             if (features.closeUps) early.installBase(basePixels, baseDescs, bitmap)
             val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps,
                 onQuickSet = { p, dd -> early.install(p, dd) }, firstStage = 2, stages = 3, stepsBefore = 1) { view, n ->
-                StandaloneFingerprintBuilder.detectOrb(view, null, n)
+                StandaloneFingerprintBuilder.detectOrb(view, null, n, slam)
             }
             if (baseDescs !== d && baseDescs !== mDescs) baseDescs.release()
             try {

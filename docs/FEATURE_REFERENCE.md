@@ -633,6 +633,9 @@ Robust LAN peer-to-peer sync for collaborative painting — **no cloud, no accou
   peers are rejected at the handshake.
   **Known limit:** an incoming op (the echo of the guest's previous gesture, or a host edit)
   arriving mid-gesture overrides the guest's in-progress drag.
+  **Size limit:** one bulk transfer is held in memory on both ends, so Link carries projects up to
+  256 MiB (`Limits.MAX_BULK_BYTES`); export streams and takes up to 512 MiB. Hosting a larger
+  project says so, with both sizes, and points to export.
 
 **Known/deferred (see `BACKLOG.md`):** a mid-bulk stall in `GuestSession` under investigation;
 `LocalLoopTest.kt` real-socket timeouts are a latent CI-gate risk.

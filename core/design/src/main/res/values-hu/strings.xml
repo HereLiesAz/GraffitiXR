@@ -357,6 +357,7 @@
     <string name="lib_no_projects">Még nincsenek projektek</string>
     <string name="lib_no_projects_hint">Koppints az Új gombra fent az első falfestményed megkezdéséhez.\n\nA szerkesztőbe kerülsz, ahol a következőket teheted:\n  \u2022  Műalkotás hozzáadása a Tervezés menüből\n  \u2022  Válts AR módba, hogy valódi falra vetíts\n  \u2022  Használd a Rétegzést, hogy a tervedet az élő kamerán lebegtesd\n  \u2022  Használd a Makettet az előnézethez egy falfotón\n  \u2022  Használd a Világítótáblát a terved papírra rajzolásához</string>
     <string name="lib_project_thumbnail">Projekt miniatűr</string>
+    <string name="lib_project_damaged">Sérült: nem nyitható meg</string>
     <string name="lib_delete_project_desc">%1$s projekt törlése</string>
 
 
@@ -743,6 +744,7 @@
     <string name="ar_feedback_doodle_not_ready">A Firka még nem áll készen — tartsd a képben, és próbáld újra a „Hoszt” indítását</string>
     <string name="ar_feedback_package_failed">Nem sikerült becsomagolni a projektet a megosztáshoz – próbáld előbb elmenteni</string>
     <string name="ar_feedback_host_failed">Nem sikerült elindítani a megosztást: %1$s</string>
+    <string name="ar_feedback_host_too_large">Ez a projekt túl nagy a Linken való megosztáshoz (%1$d MB; a korlát %2$d MB). Exportáld, és úgy oszd meg.</string>
     <string name="ar_feedback_join_load_failed">Nem sikerült betölteni a házigazda projektjét – a munkamenet véget ért.</string>
     <string name="ar_feedback_join_no_geometry">A házigazda nem adott meg olyan geometriát, amelyhez az ARCore igazodni tud.</string>
     <string name="ar_feedback_join_failed">Nem sikerült csatlakozni: %1$s</string>
@@ -793,6 +795,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">Nem sikerült menteni a tiszta fal fotóját. Készítsd el újra.</string>
+    <string name="ar_feedback_progress_save_failed">Nem sikerült menteni a faltérképet és a festés előrehaladását. Ebben a munkamenetben megmaradnak. Szabadíts fel helyet, majd mentsd újra.</string>
     <string name="ar_feedback_clean_wall_register_failed">Ez a tiszta fal fotó nem illik ehhez a falhoz. Készítsd el újra nagyjából onnan, ahol majd állni fogsz.</string>
 
     <!-- The CV view legend: the name of each way of looking. -->

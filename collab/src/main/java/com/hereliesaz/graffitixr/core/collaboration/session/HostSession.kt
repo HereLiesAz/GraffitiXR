@@ -111,9 +111,11 @@ internal class HostSession(
         // the one sent later.
         val probe = snapshotProvider()
         hostedSpatialFrame = probe.spatialFrame
-        require(probe.projectBytes.size <= Limits.MAX_BULK_BYTES && probe.doodleBytes.size <= Limits.MAX_BULK_BYTES) {
-            "project too large to host: ${probe.projectBytes.size}B project / ${probe.doodleBytes.size}B doodle " +
-                "(cap ${Limits.MAX_BULK_BYTES}B)"
+        if (probe.projectBytes.size > Limits.MAX_BULK_BYTES || probe.doodleBytes.size > Limits.MAX_BULK_BYTES) {
+            throw ProjectTooLargeToHostException(
+                maxOf(probe.projectBytes.size, probe.doodleBytes.size).toLong(),
+                Limits.MAX_BULK_BYTES.toLong(),
+            )
         }
     }
 
@@ -870,3 +872,10 @@ internal class HostSession(
         }
     }
 }
+
+/**
+ * The project is bigger than one Link bulk transfer may be ([Limits.MAX_BULK_BYTES], held in memory
+ * on both ends). Export, which streams, takes up to twice that; this says which limit was hit.
+ */
+class ProjectTooLargeToHostException(val bytes: Long, val capBytes: Long) :
+    IllegalArgumentException("project too large to host: ${bytes}B (cap ${capBytes}B)")

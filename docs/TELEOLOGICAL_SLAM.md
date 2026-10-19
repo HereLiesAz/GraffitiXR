@@ -293,6 +293,10 @@ Other behaviour worth knowing:
 - Tone and opacity are how the overlay looks, not what the artwork is: the painting guide is the
   design at full opacity and neutral tone, and a tone edit never re-registers it (only the source
   bitmap, scale or rotation do). Paint marks store the LIVE descriptor that corroborated them.
+- While no ARCore anchor tracks, the backbone holds its last good pose. A relock in that time is a
+  correction against the held pose; when the anchor resumes, that correction is re-based
+  (`PoseFusion.rebase`) so the overlay stays where it was drawn. A correction untouched during the
+  hold carries over as it is.
 - `PoseFusion` believes a diverged, not-high-confidence fix only after three consecutive agreeing
   fixes, and a cold snap needs the inliers spread across the frame (`reloc[35]`, published with the
   pose).

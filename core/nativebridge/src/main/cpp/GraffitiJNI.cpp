@@ -991,6 +991,32 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportPaintMarks(J
     return out;
 }
 
+// The loaded doodle's capture view is from another tracking world (MobileGS::mDoodleViewStale).
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeMarkDoodleViewStale(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (gSlamEngine) gSlamEngine->markDoodleViewStale();
+}
+
+// MobileGS::enhanceIfDark into [out] (an ARGB_8888 bitmap of the same size); false when not enhanced.
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeEnhanceIfDark(JNIEnv* env, jobject thiz, jobject bitmap, jobject out) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return JNI_FALSE;
+    cv::Mat image; bitmapToMat(env, bitmap, image);
+    if (image.empty()) return JNI_FALSE;
+    cv::Mat enhanced;
+    try {
+        if (!gSlamEngine->enhanceIfDark(image, enhanced)) return JNI_FALSE;
+    } catch (const std::exception& e) {
+        LOGE("nativeEnhanceIfDark: exception: %s", e.what());
+        return JNI_FALSE;
+    }
+    if (enhanced.cols != image.cols || enhanced.rows != image.rows) return JNI_FALSE;
+    matToBitmap(env, enhanced, out);
+    return JNI_TRUE;
+}
+
 // Paint inliers of the current (fresh) lock; 0 without one.
 JNIEXPORT jint JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocPaintInliers(JNIEnv* env, jobject thiz) {

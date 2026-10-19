@@ -530,6 +530,24 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         atlasPages.forEach { anticipation.setPage(it.pageNo, it.luma, it.width, it.height) }
     }
 
+    private var lastLightLevelNs = Long.MIN_VALUE
+
+    /**
+     * Standalone has no ARCore light estimate, so native's low-light enhancer would never run here:
+     * the frame's mean luma (0..1, sampled) stands in for it, about five times a second.
+     */
+    private fun publishLightLevel(luma: ByteArray, timestampNs: Long) {
+        val slam = slamManager ?: return
+        if (lastLightLevelNs != Long.MIN_VALUE && timestampNs - lastLightLevelNs < LIGHT_LEVEL_INTERVAL_NS) return
+        lastLightLevelNs = timestampNs
+        if (luma.isEmpty()) return
+        var sum = 0L
+        var n = 0
+        var i = 0
+        while (i < luma.size) { sum += luma[i].toInt() and 0xFF; n++; i += LIGHT_LEVEL_STRIDE }
+        slam.updateLightLevel(sum.toFloat() / (n * 255f))
+    }
+
     @Synchronized
     override fun analyze(image: ImageProxy) {
         var workStartNs = Long.MIN_VALUE
@@ -562,6 +580,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 rotationDegrees = rotationDeg,
             )
             val convertDurationNs = android.os.SystemClock.elapsedRealtimeNanos() - convertStartNs
+            publishLightLevel(rotated.bytes, image.imageInfo.timestamp)
 
             val rawIntrinsics = CameraIntrinsicsEstimator.estimate(
                 context,
@@ -1221,6 +1240,8 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     }
 
     private companion object {
+        private const val LIGHT_LEVEL_INTERVAL_NS = 200_000_000L
+        private const val LIGHT_LEVEL_STRIDE = 97
         /** Typical rear-camera mounting, used only when Camera2 cannot report SENSOR_ORIENTATION. */
         const val DEFAULT_SENSOR_ORIENTATION_DEG = 90
 

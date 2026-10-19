@@ -652,7 +652,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
         wallRegions = mWallRegions;
         wallPatch = mWallPatch.clone();
         memcpy(fpIntrinsics, mDoodleIntrinsics, 4 * sizeof(float));
-        hasFpView = mHasDoodleView;
+        hasFpView = mHasDoodleView && !mDoodleViewStale;
         memcpy(liveIntrinsics, mLiveIntrinsics, 4 * sizeof(float));
         hasWallNormal = mHasWallNormalEnu;
         wallNormal = cv::Vec3d(mWallNormalEnu[0], mWallNormalEnu[1], mWallNormalEnu[2]);
@@ -1306,6 +1306,16 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
                             }
                         }
                         mPnpPaintInliers.store(paintInl, std::memory_order_relaxed);
+                        // A capture view from another tracking world is re-derived from this lock:
+                        // the doodle frame is the capture camera's CV frame, so its GL view in this
+                        // world is C · inv(camFromFp) · C · V_solve.
+                        if (mHasDoodleView && mDoodleViewStale) {
+                            const glm::mat4 Cf(1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0,0,0,1);
+                            const glm::mat4 v = Cf * glm::inverse(pnpMat) * Cf * glm::make_mat4(relocView);
+                            memcpy(mDoodleViewMatrix, glm::value_ptr(v), 16 * sizeof(float));
+                            mDoodleViewStale = false;
+                            mDoodleViewDerived = true;
+                        }
                         published = true;
                     }
                 }
@@ -2479,9 +2489,16 @@ void MobileGS::restoreWallDoodleMetric(const cv::Mat& d, const std::vector<cv::P
         mMapAnchorPending = false;
     }
     if (intrinsics4)    memcpy(mDoodleIntrinsics, intrinsics4, 4 * sizeof(float));
-    if (viewMatrix16) {
+    if (viewMatrix16 && sameDoodle && mDoodleViewDerived) {
+        // A re-push of the same doodle (a repartition) carries the view as captured; the one a lock
+        // re-derived in the current world stays.
+        mHasDoodleView = true;
+    } else if (viewMatrix16) {
         memcpy(mDoodleViewMatrix, viewMatrix16, 16 * sizeof(float));
         mHasDoodleView = true; // enables plane-guided rectification at reloc time
+        // A new doodle's view is taken as current; the loader marks one from another world stale.
+        // A re-push of the same doodle leaves that mark alone.
+        if (!sameDoodle) { mDoodleViewStale = false; mDoodleViewDerived = false; }
     } else {
         // A doodle without a capture view must not inherit the previous one's — the rectifying
         // warp would be computed against the wrong frontal frame and inject bad correspondences.
@@ -2737,6 +2754,9 @@ void MobileGS::alignToDoodle(const uint8_t* data, size_t size) {
         // A peer's doodle is a different frame; local paint marks do not transfer.
         mPaintDescriptors.release();
         mPaintPoints3D.clear();
+        // Nor does this device's last wall's normal: the host's wall is learned from the first locks.
+        mHasWallNormalEnu = false;
+        mWallNormalDisagree = 0;
         mWallDescriptors = descs.clone();
         // A peer's blob has no boundary between captured and grown rows: all of it counts as captured.
         mDoodleBaseCount = (size_t)mWallDescriptors.rows;
@@ -3217,6 +3237,12 @@ void MobileGS::setWallPatch(const cv::Mat& img) {
     mWallPatch = patch.clone(); // raw gray, no CLAHE (the head's SuperPoint was trained on raw gray)
 }
 
+bool MobileGS::enhanceIfDark(const cv::Mat& image, cv::Mat& out) {
+    if (image.empty() || !mEnhancer.isLoaded() ||
+        !(mLightLevel.load(std::memory_order_relaxed) < kLowLightThreshold)) return false;
+    return mEnhancer.enhance(image, out) && !out.empty();
+}
+
 bool MobileGS::getSuperPointFeatures(const cv::Mat& image, std::vector<cv::KeyPoint>& kps, cv::Mat& descs) {
     if (!mSuperPoint.isLoaded() || image.empty()) return false;
     // Same low-light enhance-before-detect step runRelocPass / getDoodleKeypoints /
@@ -3420,6 +3446,8 @@ MobileGS::DoodleData MobileGS::generateDoodle(
         if (viewMat) {
             memcpy(mDoodleViewMatrix, viewMat, 16 * sizeof(float));
             mHasDoodleView = true; // enables plane-guided rectification at reloc time
+            mDoodleViewStale = false;
+            mDoodleViewDerived = false;
         }
     }
 

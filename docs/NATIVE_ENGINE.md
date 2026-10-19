@@ -53,6 +53,23 @@ MobileGS does not consume the hybrid KPM page frame and KPM does not mutate Mobi
 coordinates. The only shared downstream object is PoseFusion's **anchor-local correction**, which is
 frame-invariant under ARCore global world rebases. The correction switch remains off by default.
 
+### 2a'. Frames, worlds and light
+- Every doodle native holds is in the display-oriented capture camera's CV frame, with display
+  intrinsics and a display-oriented view, like every live frame. The depth path builds in the sensor
+  frame (the depth buffer's) and is then re-expressed in the display frame (`p = R_z(+deg) · p_sensor`)
+  with the anchor's capture pose, so it is corrected, re-anchored on reopen and hosted like the plane
+  path. Without an anchor it stays as built, for that session only, and says so.
+- A capture view is in the tracking world it was recorded in. A reopened project, or a new AR session
+  (`SlamManager.clearAnchorEstablished`), is another world: the view is stale
+  (`markDoodleViewStale`) and the rectifying pass waits until a lock re-derives it in the current world
+  (`C · inv(camFromFp) · C · V_solve`). A re-push of the same doodle keeps the derived view.
+- A project saved before the capture pose was recorded gets it derived on load:
+  `captureAnchorCam = cv(doodleViewMatrix) · doodleAnchor`.
+- The low-light enhancer (Zero-DCE, when bundled) runs under `kLowLightThreshold` in every detect
+  path, ORB builds included (`SlamManager.enhanceIfDark`). Standalone has no ARCore light estimate;
+  its analyzer publishes the frame's mean luma as the light level instead.
+- A Link guest drops this device's last wall normal at `alignToDoodle` and takes the host project's.
+
 ### 2b. The sensor turn (lost frames)
 When no tracking pose is current, the pose-based rectifying pass cannot run. The phone's sensors still
 say which way the camera faces (`setCameraAttitude`: earth ← camera from the north-referenced rotation

@@ -979,6 +979,10 @@ class ArRenderer(
     }
     private val mappingViewMatrixScratch = FloatArray(16)
     private val backboneScratch = FloatArray(16)
+    // The frozen backbone, and the correction standing when the hold began (GL thread).
+    private var backboneWasHolding = false
+    private var heldBackbone: FloatArray? = null
+    private var correctionAtHold: FloatArray? = null
     // Scratch for composing the overlay matrix (anchor frame * in-plane transform).
     private val overlayBaseScratch = FloatArray(16)
     private val overlayLocalScratch = FloatArray(16)
@@ -2002,6 +2006,7 @@ class ArRenderer(
                     // lastSeq rewound to 0 it looked brand new on the next frame and cold-snapped
                     // the new anchor onto the old wall.
                     poseFusion.reset(slamManager.getRelocResultInto(relocBuf)[18])
+                    backboneWasHolding = false; heldBackbone = null; correctionAtHold = null
                     correctionArbiter.reset()
                     anchorGeneration++
                     // KPM observations and pose-history samples from before this anchor existed
@@ -2097,6 +2102,25 @@ class ArRenderer(
             val backbone = backboneScratch
             if (anchorEstablished) {
                 anchorOrchestrator.getConsensusMatrix(backbone)
+                // While no anchor tracks, the backbone is frozen at its last good pose, and a relock
+                // then writes its correction against that frozen pose. When ARCore's anchor resumes
+                // the backbone jumps; re-base such a correction so the overlay doesn't jump with it.
+                // A correction untouched during the hold was made against the real anchor, and
+                // carries over as it is.
+                val holdingNow = anchorOrchestrator.isHolding
+                if (holdingNow && !backboneWasHolding) {
+                    heldBackbone = backbone.copyOf()
+                    correctionAtHold = poseFusion.correctionCopy()
+                } else if (!holdingNow && backboneWasHolding) {
+                    val held = heldBackbone
+                    val now = poseFusion.correctionCopy()
+                    if (held != null && now != null && !now.contentEquals(correctionAtHold)) {
+                        poseFusion.rebase(held, backbone)
+                    }
+                    heldBackbone = null
+                    correctionAtHold = null
+                }
+                backboneWasHolding = holdingNow
             } else {
                 // Null only under severe allocation pressure (see SlamManager.getAnchorTransform's
                 // doc) — leave backbone at whatever it already held (previous frame / identity)

@@ -352,6 +352,7 @@
     <string name="lib_no_projects">Noch keine Projekte</string>
     <string name="lib_no_projects_hint">Tippen Sie oben auf Neu, um Ihr erstes Wandbild zu beginnen.\n\nSie werden in den Editor weitergeleitet, wo Sie Folgendes tun können:\n  \u2022  Kunstwerk aus dem Design-Menü hinzufügen\n  \u2022  In den AR-Modus wechseln, um auf eine echte Wand zu projizieren\n  \u2022  Overlay verwenden, um Ihr Design über der Live-Kamera schweben zu lassen\n  \u2022  Mockup verwenden, um eine Vorschau auf einem Wandfoto anzuzeigen\n  \u2022  Leuchtkasten verwenden, um Ihr Design auf Papier zu pausen</string>
     <string name="lib_project_thumbnail">Projekt-Miniaturansicht</string>
+    <string name="lib_project_damaged">Beschädigt: lässt sich nicht öffnen</string>
     <string name="lib_delete_project_desc">Projekt %1$s löschen</string>
 
     <!-- Settings Screen -->
@@ -738,6 +739,7 @@
     <string name="ar_feedback_doodle_not_ready">Die Kritzelei ist noch nicht bereit — halte sie im Bild und versuche es erneut mit „Hosten“</string>
     <string name="ar_feedback_package_failed">Dieses Projekt konnte nicht zum Teilen gepackt werden – speichere es zuerst</string>
     <string name="ar_feedback_host_failed">Das Teilen konnte nicht gestartet werden: %1$s</string>
+    <string name="ar_feedback_host_too_large">Dieses Projekt ist zu groß, um es über Link zu teilen (%1$d MB; Grenze %2$d MB). Exportiere es stattdessen.</string>
     <string name="ar_feedback_join_load_failed">Das Projekt des Hosts konnte nicht geladen werden – die Sitzung wurde beendet.</string>
     <string name="ar_feedback_join_no_geometry">Der Host hat keine Geometrie bereitgestellt, an der ARCore sich ausrichten kann.</string>
     <string name="ar_feedback_join_failed">Beitritt nicht möglich: %1$s</string>
@@ -788,6 +790,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">Das Foto der sauberen Wand konnte nicht gespeichert werden. Nimm es erneut auf.</string>
+    <string name="ar_feedback_progress_save_failed">Wandkarte und Malfortschritt konnten nicht gespeichert werden. Für diese Sitzung bleiben sie erhalten. Mach etwas Speicher frei und speichere erneut.</string>
     <string name="ar_feedback_clean_wall_register_failed">Das Foto der sauberen Wand passt nicht zu dieser Wand. Nimm es ungefähr von dort auf, wo du stehen wirst.</string>
 
     <!-- The CV view legend: the name of each way of looking. -->

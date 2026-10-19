@@ -306,3 +306,20 @@ TEST(MobileGSDoodleState, ARecaptureCarriesPaintMarksThroughAFreshLock) {
     h.carryDoodleFrameState(kIdentity);
     EXPECT_EQ(0, h.getPaintMarkCount());
 }
+
+// F4: a capture view from another tracking world (a reopened project) is stale until a lock
+// re-derives it; a re-push of the same doodle keeps the mark, a new doodle clears it.
+TEST(MobileGSDoodleState, AReloadedCaptureViewIsStaleUntilRelocked) {
+    MobileGS g;
+    seedMetric(g);
+    EXPECT_FALSE(g.doodleViewStale());
+    g.markDoodleViewStale();
+    EXPECT_TRUE(g.doodleViewStale());
+    cv::Mat descs(4, 32, CV_8U, cv::Scalar(7));
+    const std::vector<cv::Point3f> pts = {{0,0,0}, {0.1f,0,0}, {0,0.1f,0}, {0.1f,0.1f,0}};
+    g.restoreWallDoodleMetric(descs, pts, kAnchor, kIntr, kView);   // the same doodle (a repartition)
+    EXPECT_TRUE(g.doodleViewStale());
+    cv::Mat other(4, 32, CV_8U, cv::Scalar(11));
+    g.restoreWallDoodleMetric(other, {{0,0,1}, {0.2f,0,1}, {0,0.2f,1}, {0.2f,0.2f,1}}, kAnchor, kIntr, kView);
+    EXPECT_FALSE(g.doodleViewStale());
+}

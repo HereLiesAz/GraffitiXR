@@ -200,6 +200,20 @@ class SlamManager @Inject constructor(
         hasAnchor = false
         sessionEpoch += 1
         _anchorGeneration.value = _anchorGeneration.value + 1
+        // The next session is another tracking world: the loaded doodle's capture view is not in it.
+        nativeMarkDoodleViewStale()
+    }
+
+    /** The session epoch the loaded doodle was captured in; -1 for one loaded from a project. */
+    @Volatile private var doodleViewEpoch = -1
+
+    /**
+     * A doodle loaded from a project carries a capture view from the tracking world it was captured
+     * in. Unless that is this session (the capture just made, reloaded), rectification waits for a
+     * lock to re-derive the view in this world.
+     */
+    fun markDoodleViewStaleUnlessCapturedThisSession() {
+        if (doodleViewEpoch != sessionEpoch) nativeMarkDoodleViewStale()
     }
 
     /**
@@ -276,6 +290,7 @@ class SlamManager @Inject constructor(
      */
     fun completeDoodleReplacement(newCaptureAnchorCam: FloatArray?) {
         captureAnchorCam = newCaptureAnchorCam
+        doodleViewEpoch = sessionEpoch
         awaitingNewDoodle = false
     }
 
@@ -840,6 +855,16 @@ class SlamManager @Inject constructor(
     /** Which Doodle native holds: changes whenever it is replaced or cleared. */
     fun getDoodleGeneration(): Long = nativeGetDoodleGeneration()
 
+    /**
+     * [bitmap] as native's detectors would see it in low light: enhanced (Zero-DCE, when bundled and
+     * the light level is low), else [bitmap] itself. For the ORB builds that detect in Kotlin.
+     */
+    fun enhanceIfDark(bitmap: android.graphics.Bitmap): android.graphics.Bitmap {
+        if (bitmap.config != android.graphics.Bitmap.Config.ARGB_8888) return bitmap
+        val out = android.graphics.Bitmap.createBitmap(bitmap.width, bitmap.height, android.graphics.Bitmap.Config.ARGB_8888)
+        return if (nativeEnhanceIfDark(bitmap, out)) out else { out.recycle(); bitmap }
+    }
+
     /** Inliers of the current reloc lock that stood on paint; 0 without a fresh lock. */
     fun getRelocPaintInliers(): Int = nativeGetRelocPaintInliers()
 
@@ -1130,6 +1155,8 @@ class SlamManager @Inject constructor(
     private external fun nativeRelocWantsFrame(): Boolean
     private external fun nativeGetDoodleGeneration(): Long
     private external fun nativeGetRelocPaintInliers(): Int
+    private external fun nativeMarkDoodleViewStale()
+    private external fun nativeEnhanceIfDark(bitmap: android.graphics.Bitmap, out: android.graphics.Bitmap): Boolean
     private external fun nativeExportGrownWall(): ByteArray?
     private external fun nativeCarryDoodleFrameState(view: FloatArray?)
     private external fun nativeRestoreGrownWall(desc: ByteArray, rows: Int, cols: Int, type: Int, points: FloatArray)

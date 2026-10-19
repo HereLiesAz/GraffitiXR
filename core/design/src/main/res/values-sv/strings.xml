@@ -357,6 +357,7 @@
     <string name="lib_no_projects">Inga projekt ännu</string>
     <string name="lib_no_projects_hint">Tryck på Ny ovan för att starta din första väggmålning.\n\nDu tas in i redigeraren där du kan:\n  \u2022 Lägg till konstverk från Design-menyn\n  \u2022 Byt till AR-läge för att projicera på en riktig vägg\n  \u2022 Använd Overlay för att flytta din design på livekameran\n  \u2022 Använd Mockup för att förhandsgranska ett väggfoto\n  \u2022 Använd Lightbox för att spåra din design på papper</string>
     <string name="lib_project_thumbnail">Projektets miniatyrbild</string>
+    <string name="lib_project_damaged">Skadad: kan inte öppnas</string>
     <string name="lib_delete_project_desc">Ta bort projekt %1$s</string>
 
 
@@ -743,6 +744,7 @@
     <string name="ar_feedback_doodle_not_ready">Krumeluren är inte klar än — håll den i bild och försök med ”Vara värd” igen</string>
     <string name="ar_feedback_package_failed">Det gick inte att paketera projektet för delning – försök spara det först</string>
     <string name="ar_feedback_host_failed">Det gick inte att starta delningen: %1$s</string>
+    <string name="ar_feedback_host_too_large">Projektet är för stort för att delas via Link (%1$d MB; gränsen är %2$d MB). Exportera det för att dela det.</string>
     <string name="ar_feedback_join_load_failed">Det gick inte att läsa in värdens projekt – sessionen avslutades.</string>
     <string name="ar_feedback_join_no_geometry">Värden angav ingen geometri som ARCore kan justera mot.</string>
     <string name="ar_feedback_join_failed">Det gick inte att ansluta: %1$s</string>
@@ -792,6 +794,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">Det gick inte att spara fotot av den rena väggen. Ta det igen.</string>
+    <string name="ar_feedback_progress_save_failed">Det gick inte att spara väggkartan och målningens framsteg. De finns kvar under den här sessionen. Frigör utrymme och spara igen.</string>
     <string name="ar_feedback_clean_wall_register_failed">Fotot av den rena väggen passar inte den här väggen. Ta det igen ungefär därifrån du kommer att stå.</string>
 
     <!-- The CV view legend: the name of each way of looking. -->

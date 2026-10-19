@@ -369,6 +369,7 @@
   •  使用“效果图”在墙壁照片上预览
   •  使用“透写台”将您的设计描绘到纸上</string>
     <string name="lib_project_thumbnail">项目缩略图</string>
+    <string name="lib_project_damaged">已损坏：无法打开</string>
     <string name="lib_delete_project_desc">删除项目 %1$s</string>
 
 
@@ -755,6 +756,7 @@
     <string name="ar_feedback_doodle_not_ready">随手画尚未就绪 — 请让它保持在画面中，然后再次尝试 “主持”</string>
     <string name="ar_feedback_package_failed">无法打包此项目以供分享，请先尝试保存</string>
     <string name="ar_feedback_host_failed">无法开始分享：%1$s</string>
+    <string name="ar_feedback_host_too_large">此项目太大，无法通过 Link 共享（%1$d MB；上限为 %2$d MB）。请导出后再共享。</string>
     <string name="ar_feedback_join_load_failed">无法加载主机的项目，会话已结束。</string>
     <string name="ar_feedback_join_no_geometry">主机未提供 ARCore 可用于对齐的几何数据。</string>
     <string name="ar_feedback_join_failed">无法加入：%1$s</string>
@@ -804,6 +806,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">无法保存干净墙面的照片。请重新拍摄。</string>
+    <string name="ar_feedback_progress_save_failed">无法保存墙面地图和绘画进度。本次会话中仍会保留。请释放一些空间后再保存。</string>
     <string name="ar_feedback_clean_wall_register_failed">这张干净墙面的照片与当前墙面对不上。请从大致你将要站的位置重新拍摄。</string>
 
     <!-- The CV view legend: the name of each way of looking. -->

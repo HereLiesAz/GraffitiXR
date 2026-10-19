@@ -90,10 +90,20 @@ class MainViewModel @Inject constructor(
      * restores them. In memory only: an app kill in the seconds between confirm and registration keeps
      * the candidate and leaves the previous files orphaned.
      */
+    /** The depth-path Doodle re-expressed in the display frame, with its anchor and capture pose. */
+    private class DepthCoreg(
+        val points: FloatArray,
+        val anchor: FloatArray,
+        val view: FloatArray,
+        val anchorCam: FloatArray,
+    )
+
     private class PendingStandaloneReplacement(
         val projectId: String,
         val candidateUri: android.net.Uri,
         val previous: com.hereliesaz.graffitixr.common.model.GraffitiProject,
+        /** The capture photo the candidate appended to doodleImageUris; dropped with it. */
+        val candidateImageUri: android.net.Uri? = null,
     )
 
     private val replacementLock = Any()
@@ -348,6 +358,8 @@ class MainViewModel @Inject constructor(
                         currentProject.id,
                         baseDoodleUris,
                         bitmap,
+                        keep = projectRepository.currentProject.value?.arCoreCaptureImageUri
+                            ?: currentProject.arCoreCaptureImageUri,
                     )
 
                 var committed = false
@@ -425,7 +437,14 @@ class MainViewModel @Inject constructor(
                     val rollback = (superseded?.previous ?: previous)
                         ?.takeIf { it.sphereSlamReferenceUri != null }
                     pendingStandaloneReplacement =
-                        rollback?.let { PendingStandaloneReplacement(currentProject.id, candidateUri!!, it) }
+                        rollback?.let {
+                            PendingStandaloneReplacement(
+                                currentProject.id,
+                                candidateUri!!,
+                                it,
+                                candidateImageUri = (doodleUris - baseDoodleUris.toSet()).lastOrNull(),
+                            )
+                        }
                     // The old page is the rollback itself only when it was not an unvalidated candidate.
                     rollback != null && superseded == null
                 }
@@ -539,10 +558,13 @@ class MainViewModel @Inject constructor(
                         sphereSlamPaintMarks = p.sphereSlamPaintMarks,
                         sphereSlamPaintGrid = p.sphereSlamPaintGrid,
                         sphereSlamGrownDoodle = p.sphereSlamGrownDoodle,
+                        // The rejected candidate's photo goes with it.
+                        doodleImageUris = current.doodleImageUris - setOfNotNull(rejected.candidateImageUri),
                     )
                 }
             }
             if (!restored) return@launch
+            rejected.candidateImageUri?.let { runCatching { projectManager.deleteDoodleImages(listOf(it)) } }
             runCatching { projectManager.deleteSphereSlamReference(context, rejected.projectId, uri) }
             projectRepository.loadProject(rejected.projectId)
             withContext(Dispatchers.Main) {
@@ -662,14 +684,49 @@ class MainViewModel @Inject constructor(
             // (Teleological artwork base is registered from the live design composite via
             // ArViewModel.updatePaintingGuide — the design-only overlay, not blended with wall texture.)
 
+            // Native built these points in the SENSOR camera frame (the depth buffer's), against the
+            // raw sensor view. Everything else native holds, and every live frame, is display-
+            // oriented: re-express the doodle in the display frame (p = R_z(+deg) · p_sensor, with the
+            // display intrinsics and display-oriented view the plane path stores), and record the
+            // anchor's pose in that capture camera, so it can be corrected, re-anchored on reopen
+            // and hosted. Without an anchor it stays as built, for this session only.
+            val anchor = slamManager.awaitAnchorTransform(slamManager.captureAnchorGenerationBaseline)
+                ?.takeIf { it.size == 16 }
+            val coreg = if (anchor != null && safeIntr.size >= 4 && safeView.size == 16) {
+                val pts = fp.points3d.toFloatArray()
+                for (i in 0 until pts.size / 3) {
+                    val x = pts[3 * i]; val y = pts[3 * i + 1]
+                    when (unrotateDeg) {
+                        90 -> { pts[3 * i] = -y; pts[3 * i + 1] = x }
+                        180 -> { pts[3 * i] = -x; pts[3 * i + 1] = -y }
+                        270 -> { pts[3 * i] = y; pts[3 * i + 1] = -x }
+                    }
+                }
+                val displayView = MetricMarks.glViewDisplayOriented(safeView, unrotateDeg)
+                val anchorCam = com.hereliesaz.sphereslam.math.RigidMath.multiply(
+                    MetricMarks.glViewToCvDisplay(safeView, unrotateDeg), anchor,
+                )
+                slamManager.restoreWallDoodleMetric(
+                    fp.descriptorsData, fp.descriptorsRows, fp.descriptorsCols, fp.descriptorsType,
+                    pts, anchor, safeIntr, viewMatrix = displayView,
+                )
+                DepthCoreg(pts, anchor, displayView, anchorCam)
+            } else {
+                null
+            }
+            // Published only after the doodle it belongs to is installed (null leaves reloc
+            // uncorrected), and this is what lowers the replacement gate the capture raised.
+            slamManager.completeDoodleReplacement(coreg?.anchorCam?.copyOf())
+            // Area progress samples each design cell's bare-wall colour from the capture photo,
+            // which (like the intrinsics) is display-oriented.
+            if (coreg != null) slamManager.setCaptureImage(bitmap, safeIntr)
+
             // Canonical patch (the captured marks) for the distortion head — fed live AND persisted on the
-            // doodle so the head survives reload. Inert unless its model is bundled.
+            // doodle so the head survives reload. Inert unless its model is bundled. After the install
+            // above, which starts a new doodle and drops the previous patch.
             val patch = grayPatchBytes(sensorBmp)
             slamManager.setWallPatchBytes(patch, PATCH_SIZE)
             slamManager.setWallNormalEnu(null) // a new target: its wall normal is learned afresh
-            // This path produces no capture pose. A stale one from an earlier capture this session
-            // would pair these points with the old anchor in PoseFusion.
-            slamManager.captureAnchorCam = null
 
             // Target capture is a writer of the SAME project.json as the editor's design-layer save and
             // AR's wall-feature-map save. A raw whole-object saveProject here (as this used to be) would
@@ -686,23 +743,33 @@ class MainViewModel @Inject constructor(
                 if (current.id != currentProject.id) return@updateProject current
                 committed = true
                 current.copy(
-                    doodle = fp.copy(patchData = patch),
+                    doodle = if (coreg != null) {
+                        fp.copy(
+                            patchData = patch,
+                            points3d = coreg.points.toList(),
+                            captureRotationDeg = unrotateDeg,
+                            captureAnchorCam = coreg.anchorCam.toList(),
+                        )
+                    } else {
+                        fp.copy(patchData = patch)
+                    },
                     // New capture = new doodle frame; paint placed in the old one is invalid,
                     // and so is the wall feature map (its points are in the old frame too). Area
                     // progress is design-relative and stays.
                     paintMarks = null,
                     grownDoodle = null,
                     wallFeatureMap = null,
-                    // This path records no co-registration. Clear any left by an earlier single
-                    // capture: reload would otherwise pair these new points with the old capture's
-                    // anchor, intrinsics and view, and relocalize against geometry that doesn't match.
-                    doodleIntrinsics = emptyList(),
-                    doodleAnchor = emptyList(),
-                    doodleViewMatrix = emptyList(),
-                    doodleCaptureRotationDeg = -1,
+                    // The co-registration just installed, in the display frame like the plane path's.
+                    // Without one, cleared: reload would otherwise pair these new points with an
+                    // earlier capture's anchor, intrinsics and view.
+                    doodleIntrinsics = if (coreg != null) safeIntr.toList() else emptyList(),
+                    doodleAnchor = coreg?.anchor?.toList() ?: emptyList(),
+                    doodleViewMatrix = coreg?.view?.toList() ?: emptyList(),
+                    doodleCaptureRotationDeg = if (coreg != null) unrotateDeg else -1,
                     // A new target may be another wall: its normal is learned afresh.
                     doodleWallNormalEnu = emptyList(),
                     doodleImageUris = updatedDoodleUris,
+                    arCoreCaptureImageUri = updatedDoodleUris.lastOrNull(),
                 )
             }
             if (!committed) {
@@ -717,7 +784,16 @@ class MainViewModel @Inject constructor(
             _uiState.update { it.copy(doodleCapturedThisSession = true) }
 
             withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Doodle Saved & Locked", Toast.LENGTH_SHORT).show()
+                if (coreg != null) {
+                    Toast.makeText(context, "Doodle Saved & Locked", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(
+                        context,
+                        "Doodle saved for this session only: no anchor locked, so it won't re-anchor " +
+                            "when the project is reopened. Create it again holding steady on the wall.",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -926,6 +1002,8 @@ class MainViewModel @Inject constructor(
                     // any later attribution has to work from — and they exist nowhere else.
                     captureEnvironment = captureEnvironment,
                     doodleImageUris = updatedDoodleUris,
+                    // The photo the grid's bare-wall colours come from, with these intrinsics.
+                    arCoreCaptureImageUri = updatedDoodleUris.lastOrNull(),
                 )
             }
             if (!committed) {

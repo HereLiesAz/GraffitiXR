@@ -35,6 +35,12 @@ public:
     // definition for why that half is a logged no-op rather than a real write.
     void updateCamera(float* viewMat, float* projMat);
     void updateLightLevel(float level);
+    /**
+     * The low-light enhancement every native detect path applies (Zero-DCE, when bundled, under
+     * kLowLightThreshold), for detectors that run outside native (the ORB builds), so their
+     * descriptors stay comparable with live reloc frames. False when nothing was done.
+     */
+    bool enhanceIfDark(const cv::Mat& image, cv::Mat& out);
     void updateAnchorTransform(float* transformMat);
     // Deliberately a no-op: neither the angular nor linear velocity this receives is read anywhere
     // in this engine (there is no deblur or motion-compensation consumer). Kept as a callable,
@@ -1116,6 +1122,17 @@ private:
     // restored without a capture view (rectification is then skipped — plain matching still runs).
     float mDoodleViewMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     bool mHasDoodleView = false;
+    // The capture view is in the tracking world it was recorded in. A project reopened, or a new
+    // tracking session, is another world: rectifying then compared poses from two worlds. Stale
+    // until a lock re-derives the capture view in the current world (C·inv(camFromFp)·C·V_solve);
+    // a re-push of the same doodle keeps the derived view. Guarded by mMutex.
+    bool mDoodleViewStale = false;
+    bool mDoodleViewDerived = false;
+public:
+    /** The capture view is from another tracking world (a reload, a new session): see mDoodleViewStale. */
+    void markDoodleViewStale() { std::lock_guard<std::mutex> lock(mMutex); mDoodleViewStale = true; }
+    bool doodleViewStale() const { std::lock_guard<std::mutex> lock(mMutex); return mDoodleViewStale; }
+private:
     // Teleological self-grow: default OFF + the last reloc seq we grew from (only grow on a fresh,
     // confident relock so promoted marks are placed with a current pose, never a stale one).
     //

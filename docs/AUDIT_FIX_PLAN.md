@@ -42,13 +42,13 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
 - [x] **A8. The badge says "locked" before any relock.**
   - Where: `MainActivity.kt:1656-1660` counts HOLDING as locked.
   - Fix: HOLDING after a loss reads as searching until a relock lands.
-- [ ] **A9. The overlay can jump when ARCore's own anchor resumes after a doodle relock.**
+- [x] **A9. The overlay can jump when ARCore's own anchor resumes after a doodle relock.**
   - Where: `AnchorOrchestrator.kt:167-179`. The correction is stored relative to a frozen last-good base.
   - Fix: when the ARCore anchor resumes, re-base the correction so the composed pose is continuous.
 - [x] **A10. A config-change `onDestroy` leaves `isAnchorEstablished` true with no session.**
   - Where: `MainActivity.kt:2218` → `destroyArSession()`.
   - Fix: reset the anchor state there as `exitArMode` does.
-- [ ] **A11. Pre-Phase-2 projects (no capture pose) can never snap back without a re-capture.**
+- [x] **A11. Pre-Phase-2 projects (no capture pose) can never snap back without a re-capture.**
   - Where: `ArRenderer.kt:1729, 2242-2246`.
   - Fix: derive a capture pose from the stored Doodle frame when it is missing.
 
@@ -77,7 +77,7 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
 - [x] **B7. The feature map is weakest when it is needed most.**
   - Where: `MobileGS.cpp:946, 1609-1636`. It needs only `mapPriorSeq > 0`, so it gates with a stale pre-pocket pose; growth adds foreground clutter.
   - Fix: require a recent prior and a minimum map confidence before using it; only grow points that land on the wall plane within tolerance.
-- [ ] **B8. The low-light enhancer is missing or one-sided.**
+- [x] **B8. The low-light enhancer is missing or one-sided.**
   - Where: standalone never sets the light level (`MobileGS.h:1098`). The ORB builds use CLAHE only, with no Zero-DCE (`MetricDoodleBuilder.kt:294-302`, `StandaloneFingerprintBuilder.detectOrb:242-252`), while live reloc enhances (`MobileGS.cpp:752`, `3034-3039`).
   - Fix: a luma-based light level in standalone, and ORB builds through the native enhancer.
 - [x] **B9. Paint marks are matched on the plain pass only.**
@@ -89,7 +89,7 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
 - [x] **B11. Build-time re-installs drop rows grown during the build, and any partition pushed meanwhile.**
   - Where: `MetricDoodleBuilder.kt:547-560`; `MobileGS.cpp:2313-2350`.
   - Fix: install the build result as a prefix and keep the grown tail and partition.
-- [ ] **B12. A depth-path Doodle may rectify with the wrong orientation.**
+- [x] **B12. A depth-path Doodle may rectify with the wrong orientation.**
   - Where: `MobileGS.cpp:3230-3233` with `MainViewModel.kt:641-645`. Sensor-frame points against a display-oriented view.
   - Fix: verify the view convention and apply the same correction `MetricDoodleBuilder` uses.
 - [x] **B13. The distortion head goes blind once only paint carries the lock.**
@@ -184,33 +184,34 @@ The self-grown rows not being saved is B1, and standalone paint marks and grid n
 - [x] **F3. Switching projects, or joining Link, drops the outgoing project's unsaved native state.**
   - Where: `ArViewModel.kt:2001-2013`; `alignToPeer` (`:586`).
   - Fix: run `saveMapBlocking` for the current project before the switch or `alignToPeer`.
-- [ ] **F4. The angled-view rectification compares camera poses from two sessions on a return visit.**
+- [x] **F4. The angled-view rectification compares camera poses from two sessions on a return visit.**
   - Where: `ArViewModel.kt:4517-4525` restores the capture view; `computeRectifyHomography` (`MobileGS.cpp:1330-1380`) assumes a shared VIO world.
   - Fix: rectify only once a lock in the current session gives the capture view in the current world.
-- [ ] **F5. A depth-path capture can never re-anchor on reopen, yet says "Doodle Saved & Locked".**
+- [x] **F5. A depth-path capture can never re-anchor on reopen, yet says "Doodle Saved & Locked".**
   - Where: `MainViewModel.kt:585-595, 664, 690-693, 711`; reload at `ArViewModel.kt:4539-4548`; `ArRenderer.kt:1728-1729, 2242-2247`; hosting refused at `CoopSpatialFrameFactory.kt:58-63`.
   - Fix: record `captureAnchorCam` (and intrinsics and view) from the anchor on the depth path.
 - [x] **F6. A Link guest gets none of the host's paint-derived references.**
   - Where: host sends Doodle rows only (`ArViewModel.kt:462`); `alignToDoodle` clears the guest's paint marks and map (`MobileGS.cpp:2585-2587, 2622-2628`); the archive's `paintMarks` are never installed (`ArViewModel.kt:116-123, 2222-2230`).
   - Fix: after `alignToPeer`, install the host's paint marks (they are in the Doodle frame), and send the grown rows (B1).
-- [ ] **F7. Entering AR as a guest skips the guest guard.**
+- [x] **F7. Entering AR as a guest skips the guest guard.**
   - Where: `ArViewModel.kt:2653-2654` → `loadDoodleIfExists()` bypasses `shouldRestoreLocalArCoreDoodle`, restoring the host's copy with host intrinsics, anchor, view, map and photos (`:4519-4530`).
   - Fix: apply the guard in `setArMode`, and re-run `alignToPeer` for guests.
-- [ ] **F8. The guest keeps its previous wall's normal.**
+- [x] **F8. The guest keeps its previous wall's normal.**
   - Where: `alignToDoodle` doesn't reset `mHasWallNormalEnu` (`MobileGS.cpp:2581-2633`), so `wallOrientationRejects` (`ArRenderer.kt:3576-3603`) rejects the host wall.
   - Fix: clear it at join, or set it from the host project.
-- [ ] **F9. The wrong capture photo can be used for the grid.**
+- [x] **F9. The wrong capture photo can be used for the grid.**
   - Where: `ArViewModel.kt:4602-4608` uses `doodleImageUris.lastOrNull()` with the ARCore intrinsics, but standalone captures append to the same list (`MainViewModel.kt:346, 387`) and a rejected candidate's image stays (`:498-536`).
   - Fix: keep a dedicated ARCore capture-photo reference, and drop rejected candidates' images.
 - [x] **F10. A standalone capture nulls the ARCore paint marks and grid.**
   - Where: `MainViewModel.kt:385-386`.
   - Fix: keep them (they belong to the ARCore frame).
-- [ ] **F11. Silent and lossy failures.**
+- [x] **F11. Silent and lossy failures.**
   - Wall-map and paint save errors only go to logs (`ArViewModel.kt:3901-3908, 3922-3926`).
   - The partition write at `:4303` has no try/catch in a `viewModelScope` launch, so a write error crashes the app.
   - Any decode or `require` failure drops the whole project from the library (`ProjectManager.kt:731-736`).
   - Projects of 256–512 MiB export but can't be hosted (`Limits.kt` vs `ProjectManager`).
   - Fix: surface save failures to the user; catch the partition write; keep an undecodable project listed as damaged with its files intact; align the size limits.
+  - Done. Size limits: Link holds a bulk in memory on both ends, so its 256 MiB cap stays. Hosting a larger project now names both sizes and points to export (512 MiB, streamed).
 
 ## Order of work
 

@@ -357,6 +357,7 @@
     <string name="lib_no_projects">Пока нет проектов</string>
     <string name="lib_no_projects_hint">Нажмите «Создать» выше, чтобы создать свою первую фреску.\n\nВы попадете в редактор, где сможете:\n \u2022 Добавить иллюстрацию из меню «Дизайн».\n \u2022 Переключиться в режим AR для проецирования на настоящую стену.\n \u2022 Используйте «Наложение», чтобы разместить свой дизайн на камере в реальном времени.\n \u2022 Используйте «Мокап», чтобы просмотреть фотографию на стене.\n \u2022 Используйте «Лайтбокс», чтобы перенести свой дизайн на бумагу.</string>
     <string name="lib_project_thumbnail">Миниатюра проекта</string>
+    <string name="lib_project_damaged">Повреждён: не открывается</string>
     <string name="lib_delete_project_desc">Удалить проект %1$s</string>
 
 
@@ -743,6 +744,7 @@
     <string name="ar_feedback_doodle_not_ready">Каракули ещё не готовы — держите их в кадре и снова нажмите «Хост»</string>
     <string name="ar_feedback_package_failed">Не удалось подготовить проект к отправке — сначала попробуйте его сохранить</string>
     <string name="ar_feedback_host_failed">Не удалось начать совместный доступ: %1$s</string>
+    <string name="ar_feedback_host_too_large">Проект слишком велик для передачи через Link (%1$d МБ; предел %2$d МБ). Экспортируйте его, чтобы поделиться.</string>
     <string name="ar_feedback_join_load_failed">Не удалось загрузить проект хоста — сеанс завершён.</string>
     <string name="ar_feedback_join_no_geometry">Хост не передал геометрию, по которой ARCore мог бы выровняться.</string>
     <string name="ar_feedback_join_failed">Не удалось присоединиться: %1$s</string>
@@ -793,6 +795,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">Не удалось сохранить фото чистой стены. Снимите его заново.</string>
+    <string name="ar_feedback_progress_save_failed">Не удалось сохранить карту стены и прогресс росписи. До конца сеанса они сохранятся. Освободите место и сохраните снова.</string>
     <string name="ar_feedback_clean_wall_register_failed">Это фото чистой стены не совпадает с этой стеной. Переснимите примерно с того места, где будете стоять.</string>
 
     <!-- The CV view legend: the name of each way of looking. -->

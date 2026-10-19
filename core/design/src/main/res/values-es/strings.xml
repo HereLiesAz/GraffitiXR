@@ -352,6 +352,7 @@
     <string name="lib_no_projects">Aún no hay proyectos</string>
     <string name="lib_no_projects_hint">Toca Nuevo arriba para comenzar tu primer mural.\n\nSerás llevado al editor donde podrás:\n  \u2022  Añadir arte desde el menú de Diseño\n  \u2022  Cambiar al modo AR para proyectar en una pared real\n  \u2022  Usar Superposición para hacer flotar tu diseño en la cámara en vivo\n  \u2022  Usar Maqueta para previsualizar en una foto de pared\n  \u2022  Usar Mesa de Luz para calcar tu diseño en papel</string>
     <string name="lib_project_thumbnail">Miniatura del Proyecto</string>
+    <string name="lib_project_damaged">Dañado: no se puede abrir</string>
     <string name="lib_delete_project_desc">Eliminar proyecto %1$s</string>
 
     <!-- Settings Screen -->
@@ -738,6 +739,7 @@
     <string name="ar_feedback_doodle_not_ready">El Garabato aún no está listo — mantenlo a la vista y vuelve a probar «Anfitrión»</string>
     <string name="ar_feedback_package_failed">No se pudo empaquetar este proyecto para compartirlo: prueba a guardarlo primero</string>
     <string name="ar_feedback_host_failed">No se pudo iniciar el uso compartido: %1$s</string>
+    <string name="ar_feedback_host_too_large">Este proyecto es demasiado grande para compartirlo por Link (%1$d MB; el límite es %2$d MB). Expórtalo para compartirlo.</string>
     <string name="ar_feedback_join_load_failed">No se pudo cargar el proyecto del anfitrión: se cerró la sesión.</string>
     <string name="ar_feedback_join_no_geometry">El anfitrión no proporcionó geometría con la que ARCore pueda alinearse.</string>
     <string name="ar_feedback_join_failed">No se pudo unir: %1$s</string>
@@ -788,6 +790,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">No se pudo guardar la foto de la pared limpia. Vuelve a tomarla.</string>
+    <string name="ar_feedback_progress_save_failed">No se pudo guardar el mapa de la pared ni el progreso de la pintura. Se conservan durante esta sesión. Libera espacio y vuelve a guardar.</string>
     <string name="ar_feedback_clean_wall_register_failed">Esa foto de la pared limpia no coincide con esta pared. Repítela desde donde vas a estar.</string>
 
     <!-- The CV view legend: the name of each way of looking. -->

@@ -267,7 +267,13 @@ fun ProjectLibraryScreen(
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = lastModifiedFormat.format(Date(project.lastModified)),
+                                            text = if (project.isDamaged) {
+                                                androidx.compose.ui.res.stringResource(
+                                                    com.hereliesaz.graffitixr.design.R.string.lib_project_damaged
+                                                )
+                                            } else {
+                                                lastModifiedFormat.format(Date(project.lastModified))
+                                            },
                                             style = MaterialTheme.typography.bodySmall,
                                             color = Color.White.copy(alpha = 0.85f)
                                         )

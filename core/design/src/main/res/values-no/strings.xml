@@ -352,6 +352,7 @@
     <string name="lib_no_projects">Ingen prosjekter ennå</string>
     <string name="lib_no_projects_hint">Trykk på Ny ovenfor for å starte ditt første veggmaleri.\n\nDu blir tatt inn i redigeringsprogrammet der du kan:\n  \u2022 Legg til kunstverk fra Design-menyen\n  \u2022 Bytt til AR-modus for å projisere på en ekte vegg\n  \u2022 Bruk Overlegg til å flyte designet ditt på live-kameraet\n  \u2022 Bruk Mockup for å forhåndsvise på et veggbilde\n  \u2022 Bruk Lightbox til å spore designet ditt på papir</string>
     <string name="lib_project_thumbnail">Prosjektminiatyrbilde</string>
+    <string name="lib_project_damaged">Skadet: kan ikke åpnes</string>
     <string name="lib_delete_project_desc">Slett prosjekt %1$s</string>
 
     <!-- Settings Screen -->
@@ -738,6 +739,7 @@
     <string name="ar_feedback_doodle_not_ready">Krusedullen er ikke klar ennå — hold den i bildet og prøv Vert igjen</string>
     <string name="ar_feedback_package_failed">Kunne ikke pakke dette prosjektet for deling – prøv å lagre det først</string>
     <string name="ar_feedback_host_failed">Kunne ikke starte deling: %1$s</string>
+    <string name="ar_feedback_host_too_large">Dette prosjektet er for stort til å deles over Link (%1$d MB; grensen er %2$d MB). Eksporter det for å dele det.</string>
     <string name="ar_feedback_join_load_failed">Kunne ikke laste vertens prosjekt – økten ble avsluttet.</string>
     <string name="ar_feedback_join_no_geometry">Verten ga ikke geometri som ARCore kan justere mot.</string>
     <string name="ar_feedback_join_failed">Kunne ikke bli med: %1$s</string>
@@ -788,6 +790,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">Kunne ikke lagre bildet av den rene veggen. Ta det på nytt.</string>
+    <string name="ar_feedback_progress_save_failed">Kunne ikke lagre veggkartet og malefremdriften. De beholdes i denne økten. Frigjør plass og lagre på nytt.</string>
     <string name="ar_feedback_clean_wall_register_failed">Det bildet av den rene veggen passer ikke til denne veggen. Ta det på nytt omtrent der du kommer til å stå.</string>
 
     <!-- The CV view legend: the name of each way of looking. -->

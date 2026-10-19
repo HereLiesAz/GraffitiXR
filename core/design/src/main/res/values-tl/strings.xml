@@ -142,6 +142,7 @@
     <string name="lib_no_projects">Wala pang projects</string>
     <string name="lib_no_projects_hint">I-tap ang Bago sa itaas para simulan ang iyong unang mural.\n\nDadalhin ka sa editor kung saan maaari kang:\n \u2022 Magdagdag ng likhang sining mula sa menu ng Disenyo\n \u2022 Lumipat sa AR mode para i-project sa totoong pader\n \u2022 Gamitin ang Overlay para palutangin ang iyong disenyo sa live na camera\n \u2022 Gamitin ang Mockup para i-preview ang iyong larawan\npapel</string>
     <string name="lib_project_thumbnail">Thumbnail ng Proyekto</string>
+    <string name="lib_project_damaged">Sira: hindi mabuksan</string>
     <string name="lib_delete_project_desc">Tanggalin ang proyekto %1$s</string>
     <string name="settings_title">Mga setting</string>
     <string name="settings_general_section">Pangkalahatan</string>
@@ -453,6 +454,7 @@
     <string name="ar_feedback_doodle_not_ready">Hindi pa handa ang Guhit-guhit — panatilihin ito sa view at subukan muli ang \"I-host\"</string>
     <string name="ar_feedback_package_failed">Hindi ma-package ang proyektong ito para ibahagi — subukan munang i-save ito</string>
     <string name="ar_feedback_host_failed">Hindi masimulan ang pagbabahagi: %1$s</string>
+    <string name="ar_feedback_host_too_large">Masyadong malaki ang proyektong ito para ibahagi sa Link (%1$d MB; ang limitasyon ay %2$d MB). I-export ito para maibahagi.</string>
     <string name="ar_feedback_join_load_failed">Hindi ma-load ang proyekto ng host — natapos ang session.</string>
     <string name="ar_feedback_join_no_geometry">Hindi nagbigay ang host ng geometry na maaaring pagtugmaan ng ARCore.</string>
     <string name="ar_feedback_join_failed">Hindi nakasali: %1$s</string>
@@ -502,6 +504,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">Hindi ma-save ang larawan ng malinis na pader. Kunan ulit.</string>
+    <string name="ar_feedback_progress_save_failed">Hindi ma-save ang mapa ng pader at ang progreso ng pagpinta. Nananatili ang mga ito sa session na ito. Magbakante ng espasyo, saka i-save ulit.</string>
     <string name="ar_feedback_clean_wall_register_failed">Hindi tugma ang larawang iyon ng malinis na pader sa pader na ito. Kunan ulit mula sa lugar na halos kung saan ka tatayo.</string>
 
     <!-- The CV view legend: the name of each way of looking. -->
