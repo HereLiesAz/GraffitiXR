@@ -16,7 +16,7 @@ import kotlin.math.sqrt
  * The fixtures below are built with FORWARD transforms only — pick the answer, push it out through
  * the anchor and then the view — so the test never re-implements the two inverses it is checking.
  */
-class MetricFingerprintBuilderCentroidTest {
+class MetricDoodleBuilderCentroidTest {
 
     private fun identity() = floatArrayOf(1f,0f,0f,0f, 0f,1f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
 
@@ -66,7 +66,7 @@ class MetricFingerprintBuilderCentroidTest {
             pointsCam[i * 3 + 2] = camMean[2] + o[2]
         }
 
-        val got = MetricFingerprintBuilder.marksCentroidLocal(pointsCam, view, anchor)!!
+        val got = MetricDoodleBuilder.marksCentroidLocal(pointsCam, view, anchor)!!
         assertEquals(expectedLocal[0], got[0], 1e-3f)
         assertEquals(expectedLocal[1], got[1], 1e-3f)
         assertEquals(expectedLocal[2], got[2], 1e-3f)
@@ -79,14 +79,14 @@ class MetricFingerprintBuilderCentroidTest {
     @Test fun `identity anchor leaves the world-space mean`() {
         val world = floatArrayOf(-0.8f, 0.25f, 2.3f)
         val cam = apply(view, world)
-        val got = MetricFingerprintBuilder.marksCentroidLocal(cam, view, identity())!!
+        val got = MetricDoodleBuilder.marksCentroidLocal(cam, view, identity())!!
         assertEquals(world[0], got[0], 1e-3f)
         assertEquals(world[1], got[1], 1e-3f)
         assertEquals(world[2], got[2], 1e-3f)
     }
 
     @Test fun `no points yields null`() {
-        assertNull(MetricFingerprintBuilder.marksCentroidLocal(FloatArray(0), view, anchor))
+        assertNull(MetricDoodleBuilder.marksCentroidLocal(FloatArray(0), view, anchor))
     }
 
     /**
@@ -96,18 +96,18 @@ class MetricFingerprintBuilderCentroidTest {
      */
     @Test fun `degenerate pose yields null instead of garbage`() {
         val points = floatArrayOf(0f, 0f, 2f)
-        assertNull(MetricFingerprintBuilder.marksCentroidLocal(points, FloatArray(16), anchor))
-        assertNull(MetricFingerprintBuilder.marksCentroidLocal(points, view, FloatArray(16)))
+        assertNull(MetricDoodleBuilder.marksCentroidLocal(points, FloatArray(16), anchor))
+        assertNull(MetricDoodleBuilder.marksCentroidLocal(points, view, FloatArray(16)))
 
         // A scaled (non-rigid) matrix would come back off by s² from rigidInverse, so it is refused too.
         val scaled = anchor.copyOf().also { for (c in 0 until 3) for (r in 0 until 3) it[c * 4 + r] *= 2f }
-        assertNull(MetricFingerprintBuilder.marksCentroidLocal(points, view, scaled))
+        assertNull(MetricDoodleBuilder.marksCentroidLocal(points, view, scaled))
 
         // A column zeroed by a half-written pose is singular — exactly what invertM used to catch.
         val singular = anchor.copyOf().also { it[8] = 0f; it[9] = 0f; it[10] = 0f }
-        assertNull(MetricFingerprintBuilder.marksCentroidLocal(points, view, singular))
+        assertNull(MetricDoodleBuilder.marksCentroidLocal(points, view, singular))
 
         val notFinite = anchor.copyOf().also { it[12] = Float.NaN }
-        assertNull(MetricFingerprintBuilder.marksCentroidLocal(points, view, notFinite))
+        assertNull(MetricDoodleBuilder.marksCentroidLocal(points, view, notFinite))
     }
 }

@@ -4,6 +4,7 @@ import com.hereliesaz.graffitixr.common.model.CoopSessionState
 import com.hereliesaz.graffitixr.common.model.CoopSpatialFrame
 import com.hereliesaz.graffitixr.common.model.CoopTrackingBackend
 import com.hereliesaz.graffitixr.common.model.Op
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -88,7 +89,8 @@ internal data class HelloRejectedPayload(val reason: RejectReason) {
 internal data class BulkBeginPayload(
     val projectId: String,
     val layerCount: Int,
-    val fingerprintBytes: Int,
+    @SerialName("fingerprintBytes")
+    val doodleBytes: Int,
     val projectBytes: Int,
     val spatialFrame: CoopSpatialFrame,
 )

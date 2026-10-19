@@ -30,8 +30,8 @@ This document lists key files in the repository and their purposes.
 *   `common/model/AnticipationSettings.kt`: Settings → Anticipation — the half-sphere resolution
     (distance, latitude, longitude, roll), aims per half-sphere, the view count, and the battery /
     heat / compute throttle weights.
-*   `common/model/FingerprintFeatures.kt`: Settings → Fingerprint — SuperPoint, Half sphere (ORB plus
-    close-ups) or Both; what the next target's fingerprint is built from.
+*   `common/model/DoodleFeatures.kt`: Settings → Doodle — SuperPoint, Half sphere (ORB plus
+    close-ups) or Both; what the next target's doodle is built from.
 *   `common/util/ImageExt.kt`: target-review helpers — `isolateMarkings` (adaptive threshold, whole
     marks highlighted, specks and marks touching the photo's edge excluded via `highlightWholeMarks`)
     and mark erasing (tap or drag removes a whole mark): `MarkEraser` holds the mask's pixels and flood
@@ -40,7 +40,7 @@ This document lists key files in the repository and their purposes.
 *   `common/util/ImageUtils.kt`: Bitmap loading/decoding helpers used across the editor and AR
     pickers. (There is no `ImageProcessingUtils.kt` — it was replaced by
     `core/nativebridge/.../YuvConverter.kt`, a direct native YUV→RGBA JNI binding, and deleted;
-    `solvePnP`/fingerprinting live in the native `MobileGS` engine, not a Kotlin wrapper.)
+    `solvePnP`/doodling live in the native `MobileGS` engine, not a Kotlin wrapper.)
 
 ### `:core:domain`
 *   `domain/repository/ProjectRepository.kt`: Interface for project data access.
@@ -52,8 +52,8 @@ This document lists key files in the repository and their purposes.
 
 ### `:core:nativebridge`
 *   `nativebridge/SlamManager.kt`: Kotlin JNI bridge. All native calls go through here. Key methods:
-    `updateCamera`, `feedYuvFrame`/`feedColorFrame` (relocalization thread input), `setWallFingerprint`
-    /`restoreWallFingerprintMetric` (target creation / project load), `getAnchorTransform`,
+    `updateCamera`, `feedYuvFrame`/`feedColorFrame` (relocalization thread input), `setWallDoodle`
+    /`restoreWallDoodleMetric` (target creation / project load), `getAnchorTransform`,
     `setRelocEnabled`/`setSelfGrowEnabled`/`setMapRelocEnabled`/`setMapBuildEnabled` (diagnostic-only
     toggles), `loadDistortionHead`. There is no `draw()` and no `importModel3D` — no persistent 3D map
     is rendered by this engine.
@@ -61,7 +61,7 @@ This document lists key files in the repository and their purposes.
     `gEngineMutex` guarding the native `MobileGS` singleton's lifetime.
 *   `src/main/cpp/MobileGS.cpp` / `MobileGS.h`: The relocalization engine. Runs the background
     relocalization thread (`relocThreadFunc` / `runRelocPass`): ORB/SuperPoint detection, Lowe-ratio
-    matching against the stored wall fingerprint, `solvePnPRansac`, plane-guided rectification, and
+    matching against the stored wall doodle, `solvePnPRansac`, plane-guided rectification, and
     (when `distortion_head.onnx` is bundled — the shipped default) the distortion-head crop that
     produces painting-progress and corroboration confidence. No voxel/spatial-hash map — see
     `NATIVE_ENGINE.md`.
@@ -71,7 +71,7 @@ This document lists key files in the repository and their purposes.
 *   `src/main/cpp/DistortionHead.cpp`: ONNX inference wrapper for the distortion-head model —
     `docs/DISTORTION_HEAD.md`.
 *   `src/main/cpp/SuperPointDetector.cpp`: ONNX SuperPoint keypoint/descriptor detector, used as an
-    alternative to ORB in the relocalization and fingerprint-building paths.
+    alternative to ORB in the relocalization and doodle-building paths.
 *   `src/main/assets/superpoint.onnx` + `superpoint.LICENSE.txt`: SuperPoint weights from
     rpautrat/SuperPoint (`superpoint_v6_from_tf.pth`, MIT, © 2018 Paul-Edouard Sarlin & Rémi
     Pautrat) — not Magic Leap's. `src/main/assets/zerodce.onnx`: low-light model trained
@@ -104,7 +104,7 @@ the real (non-stub) tracker is packaged.
     `HybridKpmCorrection`, `HybridPageFrame`, `HybridMetricKpmReference` and PoseFusion's
     hybrid-agreement path); `PhotosphereKeyframeStore` / `PhotosphereFingerprintFrame` /
     `PhotosphereMap.directionOfPixel` (was ArViewModel's keyframe map and placement math and
-    `anchor/StandaloneFingerprintFrame`); `gyro.GyroCompensationMath` (was
+    `anchor/StandaloneDoodleFrame`); `gyro.GyroCompensationMath` (was
     `util/OverlayGyroCompensationMath`); `:overlay` `CoverageGlowRenderer` (was the app's scissor
     wash); `:models` `DepthEstimator` (was `depth/DepthEstimator`); `:reloc` `PoseBlend` for the
     standalone reloc corroboration blend.
@@ -161,7 +161,7 @@ the real (non-stub) tracker is packaged.
     first (views from more than 45° above or below the wall's normal, which a camera at a wall rarely
     takes, last; none dropped), four at a time, into a `PhotosphereTrackingSession` (standalone) or `SphereSlamTracker`
     (ARCore), and tells it which to search.
-*   `anchor/CloseUpFeatures.kt`: the fingerprint's close-ups — square-on crops of the capture photo
+*   `anchor/CloseUpFeatures.kt`: the doodle's close-ups — square-on crops of the capture photo
     at zooms 6×, 3×, 2× over the aim grid, detected with the base detector, mapped back to its pixels.
 *   `RelocAttitude.kt`: the earth ← OpenCV-camera rotation MobileGS turns a lost frame by, from the
     rotation-vector quaternion and the frame's camera ← device rotation.
@@ -169,7 +169,7 @@ the real (non-stub) tracker is packaged.
     CameraX analyzer lifecycle, KPM/reacquisition HUD, GL overlay, target restore, and copyable
     diagnostics.
 *   `StandaloneCameraAttitude.kt`: heading, elevation and an image's roll from one attitude sample;
-    what keyframes and fingerprint placement read (the angles only mean something together near the
+    what keyframes and doodle placement read (the angles only mean something together near the
     poles).
 *   `DeviceStressPolicy.kt`: routes the battery / heat safeties (thermal, power-save, low battery)
     and Adaptive rate to the heavy work — the native relocalizer's back-off, standalone MiDaS cadence,
@@ -180,7 +180,7 @@ the real (non-stub) tracker is packaged.
 *   `SphereSlamStandaloneTrackingAnalyzer.kt`: the CameraX adapter around SphereSLAM `:reloc`
     `PhotosphereTrackingSession`, which runs the synchronous calibrated KPM pose pipeline (quality
     gates, observation-age checks, pose-jump rejection, tracking-state hysteresis, the short
-    rotation-only IMU bridge, base photosphere keyframes, `map_from_fingerprint`, atlas growth).
+    rotation-only IMU bridge, base photosphere keyframes, `map_from_doodle`, atlas growth).
     The adapter supplies pooled display-upright luma (`LumaFrameBufferPool`), intrinsics, the
     host's `CameraAttitudeProvider` attitude (own `GameRotationAttitudeSource` only as a fallback)
     and body→camera `DeviceCameraRotation.cameraFromDevice(SENSOR_ORIENTATION, rotationDegrees)`,
@@ -244,7 +244,7 @@ the real (non-stub) tracker is packaged.
 ### `:feature:editor`
 *   `EditorViewModel.kt`: Placement and legibility for the single design image (there is no
     multi-layer stack — see `FEATURE_REFERENCE.md`), undo/redo, project save/load. Does not own
-    native SLAM state — `:feature:ar`'s `ArViewModel` restores a project's wall fingerprint.
+    native SLAM state — `:feature:ar`'s `ArViewModel` restores a project's wall doodle.
 *   `src/test/.../EditorViewModelTest.kt`: Unit tests for layer ops and bitmap dimensions.
 
 ### `:feature:dashboard`

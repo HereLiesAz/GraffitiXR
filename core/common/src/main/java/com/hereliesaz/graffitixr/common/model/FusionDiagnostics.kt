@@ -8,7 +8,7 @@ package com.hereliesaz.graffitixr.common.model
  * because the failures that have cost the most time here were never wrong numbers: they were stages
  * that silently did not run. Phase 2's partition was inert on every first capture for weeks. The
  * self-grow flag shipped ON while its own comment said OFF. `0.9` added a null check that turns
- * fusion off entirely for a pre-Phase-2 fingerprint — correct, and completely invisible from the
+ * fusion off entirely for a pre-Phase-2 doodle — correct, and completely invisible from the
  * outside, which is exactly the class of thing this exists to end.
  *
  * The artist-visible symptom for most of [FusionState] is identical: the overlay sits on the ARCore
@@ -65,7 +65,7 @@ enum class FusionState {
     NO_ANCHOR,
 
     /**
-     * `IMPLEMENTATION.md` **0.9** — the fingerprint carries no `captureAnchorCam`, so the correction
+     * `IMPLEMENTATION.md` **0.9** — the doodle carries no `captureAnchorCam`, so the correction
      * cannot be composed at all and fusion is skipped.
      *
      * This is a **pre-Phase-2 project**, and it is the state most likely to be mistaken for a bug:
@@ -94,7 +94,7 @@ enum class FusionState {
     HOLDING,
 
     /**
-     * There is no wall fingerprint at all, so there is no capture pose to compose against.
+     * There is no wall doodle at all, so there is no capture pose to compose against.
      *
      * **Out of gate order, and deliberately so.** Every entry above is ordered by how early its gate
      * sits; this one belongs beside [NO_CAPTURE_POSE], because both mean "no capture pose". It is
@@ -106,18 +106,18 @@ enum class FusionState {
      *
      * A device run reported `Reloc: NO TARGET` and `Fusion: OLD TARGET — re-create it` on the same
      * screen. Both came from one condition — `captureAnchorCam == null` — which is true for a
-     * pre-Phase-2 fingerprint AND for no fingerprint whatsoever. The advice differs completely: one
+     * pre-Phase-2 doodle AND for no doodle whatsoever. The advice differs completely: one
      * says re-create a target that exists, the other says create the first one. The overlay
      * contradicted itself, and the aggregated report showed 54% `NO_CAPTURE_POSE` for a session that
-     * never had a fingerprint to begin with.
+     * never had a doodle to begin with.
      */
-    NO_FINGERPRINT,
+    NO_DOODLE,
 
     /**
      * A relocalization reached fusion this tick and was REFUSED by `PoseFusion.MIN_INLIER_RATIO`,
      * while a standing correction from an earlier accepted relock already existed.
      *
-     * **Out of gate order, like [NO_FINGERPRINT], and for the same reason.** Conceptually this
+     * **Out of gate order, like [NO_DOODLE], and for the same reason.** Conceptually this
      * belongs right after [HOLDING] — both describe "a correction stands, nothing new was
      * accepted" — but `EvalSampleLog` persists this enum's **ordinal**, so it is appended instead of
      * inserted.
@@ -139,7 +139,7 @@ enum class FusionState {
      * A hybrid KPM observation passed every quality gate but implies a move beyond the cold-snap
      * thresholds, and is being held until SphereSLAM `HybridAnchorFusion.HYBRID_REQUIRED_AGREEMENT` consistent
      * observations agree. The overlay stays where it is meanwhile. Appended, not inserted, for the
-     * ordinal reason given on [NO_FINGERPRINT].
+     * ordinal reason given on [NO_DOODLE].
      */
     AWAITING_AGREEMENT,
 }

@@ -96,11 +96,11 @@ interface ProjectRepository {
     suspend fun saveArtifact(projectId: String, filename: String, data: ByteArray): String
 
     /**
-     * Updates the target fingerprint path for a project.
+     * Updates the target doodle path for a project.
      * @param projectId The project ID.
      * @param path The file path to the ORB descriptor file.
      */
-    suspend fun updateTargetFingerprint(projectId: String, path: String)
+    suspend fun updateDoodleData(projectId: String, path: String)
 
     /**
      * Imports a project from a .gxr zip file.

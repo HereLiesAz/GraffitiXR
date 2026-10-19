@@ -35,10 +35,10 @@ So: every single finding carries a `file:line` and a concrete failure scenario.
 Inputs, state, and the wrong output that results. "This could be fragile" is not
 a finding. This is:
 
-> `clearWallFingerprint()` releases `mWallDescriptors` and `mWallKeypoints3D` but
+> `clearWallDoodle()` releases `mWallDescriptors` and `mWallKeypoints3D` but
 > not `mArtworkDescriptors`, and no other function in the tree clears those. So a
 > project switch leaves the previous project's artwork validator live:
-> `tryUpdateFingerprint` matches the new project's frames against the old
+> `tryUpdateDoodle` matches the new project's frames against the old
 > project's target and publishes a meaningless painting progress that reaches
 > both the user's readout and `PoseFusion`'s correction strength.
 

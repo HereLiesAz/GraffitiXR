@@ -18,7 +18,7 @@ class ArRailBackendPolicyTest {
             sphereSlamAvailable = false,
         )
         assertFalse(p.backendResolved)
-        assertFalse(p.targetRailEnabled)
+        assertFalse(p.doodleRailEnabled)
         assertFalse(p.coopCalibrationAvailable)
         assertFalse(p.modePreviewExportAvailable)
         assertEquals(DesignR.string.rail_checking_ar_backend, p.exportDisabledReason)
@@ -34,7 +34,7 @@ class ArRailBackendPolicyTest {
         )
         assertTrue(p.backendResolved)
         assertFalse(p.standalone)
-        assertTrue(p.targetRailEnabled)
+        assertTrue(p.doodleRailEnabled)
         assertTrue(p.coopCalibrationAvailable)
         assertTrue(p.modePreviewExportAvailable)
         assertNull(p.exportDisabledReason)
@@ -51,7 +51,7 @@ class ArRailBackendPolicyTest {
         assertTrue(p.backendResolved)
         assertTrue(p.standalone)
         // Target is on the rail in standalone: it opens the shared capture flow.
-        assertTrue(p.targetRailEnabled)
+        assertTrue(p.doodleRailEnabled)
         assertTrue(p.coopCalibrationAvailable)
         assertFalse(p.modePreviewExportAvailable)
         assertEquals(DesignR.string.export_standalone_ar_unavailable, p.exportDisabledReason)

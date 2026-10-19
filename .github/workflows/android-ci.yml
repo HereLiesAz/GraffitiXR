@@ -76,7 +76,7 @@ jobs:
       - name: Native host unit tests
         # core/nativebridge's production C++ (MobileGS, the JNI frame-buffer
         # guards) compiled for the runner against OpenCV 4 + GoogleTest: the known-answer pose and
-        # fingerprint-state tests BACKLOG Phase 7 had no way to run. NDK-side, not Kotlin.
+        # doodle-state tests BACKLOG Phase 7 had no way to run. NDK-side, not Kotlin.
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq cmake g++ libopencv-dev libgtest-dev

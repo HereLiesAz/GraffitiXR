@@ -30,7 +30,7 @@ class EncryptedTransportTest {
         projectId = "p1",
         snapshotProvider = {
             ProjectSnapshot(
-                fingerprintBytes = ByteArray(64) { it.toByte() },
+                doodleBytes = ByteArray(64) { it.toByte() },
                 projectBytes = project,
                 layerCount = 0,
                 spatialFrame = testSpatialFrame(),

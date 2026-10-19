@@ -7,8 +7,8 @@
  * Every JNI entry point that wraps a caller's buffer in a cv::Mat must prove the buffer holds
  * every byte that Mat will read; OpenCV does not know the allocation's real length. These were
  * inline arithmetic at three call sites (nativeFeedYuvFrame, nativeFeedColorFrame,
- * nativeYuvToRgbaBitmap), later joined by the DEPTH16 buffers of nativeSetWallFingerprint and
- * nativeSetArtworkFingerprint; they live here so a host test (src/test/cpp/FrameBufferGuardTest.cpp)
+ * nativeYuvToRgbaBitmap), later joined by the DEPTH16 buffers of nativeSetWallDoodle and
+ * nativeSetArtworkDoodle; they live here so a host test (src/test/cpp/FrameBufferGuardTest.cpp)
  * can pin the arithmetic without a JVM.
  *
  * `capacity <= 0` means GetDirectBufferCapacity could not report one (not a direct buffer, or the

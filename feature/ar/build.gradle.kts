@@ -75,14 +75,14 @@ dependencies {
     // Side-by-side non-ARCore tracker. ARCore remains a separate first-class pose source.
     // SphereSLAM provides the base KPM tracking, world-size retention (AnchoredStandaloneSession /
     // OverlayPlacement), 2-D sweep coverage (SphereCoverage / CameraAttitudeProvider), and the glow
-    // overlay; GraffitiXR's fingerprint (MobileGS) reloc and pose fusion layer on top.
+    // overlay; GraffitiXR's doodle (MobileGS) reloc and pose fusion layer on top.
     // `api`, not `implementation`: feature/ar's public surface exposes SphereSLAM types
     // (e.g. ArViewModel.sphereThinDirections -> SphereCoverage.Direction), so :app must see them.
     api(libs.sphereslam.core)
     implementation(libs.sphereslam.overlay) // drop-in coverage glow (GL)
     // Reloc robustness: the acceptance/stabilizer/state-machine/age policies and the fused
     // RobustTrackingLoop GraffitiXR used to carry locally, now owned by the library. The
-    // proprietary fingerprint build + corroboration fusion layer on top via the loop's
+    // proprietary doodle build + corroboration fusion layer on top via the loop's
     // correctAcceptedPose hook (gate on raw KPM, display the corroborated pose).
     // Public Standalone* typealiases expand to :reloc types, so this must remain on the consumer
     // compile classpath. Keeping those aliases preserves GraffitiXR's existing public vocabulary.

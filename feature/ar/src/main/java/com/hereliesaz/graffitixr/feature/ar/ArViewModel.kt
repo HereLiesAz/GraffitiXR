@@ -21,8 +21,8 @@ import com.google.ar.core.CameraConfig
 import com.google.ar.core.CameraConfigFilter
 import com.hereliesaz.graffitixr.common.DispatcherProvider
 import com.hereliesaz.graffitixr.common.util.imageStats
-import com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
-import com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
+import com.hereliesaz.graffitixr.feature.ar.anchor.DoodlePartition
+import com.hereliesaz.graffitixr.feature.ar.anchor.MetricDoodleBuilder
 import com.hereliesaz.sphereslam.math.RigidMath
 import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder
 import kotlinx.coroutines.Job
@@ -43,7 +43,7 @@ import com.hereliesaz.graffitixr.common.sensor.Vec3
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.common.util.MarkEraser
-import com.hereliesaz.graffitixr.common.util.forTargetReview
+import com.hereliesaz.graffitixr.common.util.forDoodleReview
 import com.hereliesaz.graffitixr.common.wearable.ConnectionState
 import com.hereliesaz.graffitixr.common.wearable.WearableManager
 import com.hereliesaz.graffitixr.feature.ar.coop.calibration.Mat4
@@ -113,7 +113,7 @@ internal fun retryOnLockTimeout(
     return outcome
 }
 
-internal fun shouldRestoreLocalArCoreFingerprint(
+internal fun shouldRestoreLocalArCoreDoodle(
     isArCoreAvailable: Boolean,
     coopRole: com.hereliesaz.graffitixr.common.model.CoopRole,
     peerSpatialFramePresent: Boolean,
@@ -147,9 +147,9 @@ internal fun standaloneTapInFrame(
 }
 
 data class StandaloneFingerprintPlacement(
-    /** Column-major GL map_from_fingerprint transform. */
+    /** Column-major GL map_from_doodle transform. */
     val mapFromFingerprint: FloatArray,
-    /** Width of the captured fingerprint plane in photosphere map units. */
+    /** Width of the captured doodle plane in photosphere map units. */
     val referenceWidthUnits: Float,
     /** True only when the photosphere supplied a physical range rather than normalized radius. */
     val physicallyMetric: Boolean,
@@ -417,7 +417,7 @@ class ArViewModel @Inject constructor(
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
                             if (st.isArCoreAvailable) {
-                                appContext.getString(DesignR.string.ar_feedback_host_need_target_arcore)
+                                appContext.getString(DesignR.string.ar_feedback_host_need_doodle_arcore)
                             } else {
                                 appContext.getString(DesignR.string.ar_feedback_host_need_target_standalone)
                             }
@@ -426,18 +426,18 @@ class ArViewModel @Inject constructor(
                     return@launch
                 }
 
-                val initialFingerprint = slamManager.exportFingerprint() ?: ByteArray(0)
+                val initialDoodle = slamManager.exportDoodle() ?: ByteArray(0)
                 val hostedSpatial = baseSpatial.copy(
-                    fingerprintAvailable = initialFingerprint.isNotEmpty(),
+                    doodleAvailable = initialDoodle.isNotEmpty(),
                 )
                 if (
                     hostedSpatial.hostBackend ==
                         com.hereliesaz.graffitixr.common.model.CoopTrackingBackend.ARCORE &&
-                    !hostedSpatial.fingerprintAvailable
+                    !hostedSpatial.doodleAvailable
                 ) {
                     _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                            appContext.getString(DesignR.string.ar_feedback_fingerprint_not_ready)
+                            appContext.getString(DesignR.string.ar_feedback_doodle_not_ready)
                         )
                     )
                     return@launch
@@ -459,17 +459,17 @@ class ArViewModel @Inject constructor(
                 ) {
                     val current = projectRepository.currentProject.value
                         ?: error("project closed while hosting")
-                    val wireFingerprint = slamManager.exportFingerprint() ?: ByteArray(0)
+                    val wireDoodle = slamManager.exportDoodle() ?: ByteArray(0)
                     val currentSpatial = CoopSpatialFrameFactory.fromProject(current, arCoreHost)
                         ?: error("host wall frame disappeared while hosting")
                     com.hereliesaz.graffitixr.core.collaboration.ProjectSnapshot(
-                        fingerprintBytes = wireFingerprint,
+                        doodleBytes = wireDoodle,
                         projectBytes = kotlinx.coroutines.runBlocking {
                             projectManager.serializeCurrentProject()
                         },
                         layerCount = current.layers.size,
                         spatialFrame = currentSpatial.copy(
-                            fingerprintAvailable = wireFingerprint.isNotEmpty(),
+                            doodleAvailable = wireDoodle.isNotEmpty(),
                         ),
                     )
                 }
@@ -480,7 +480,7 @@ class ArViewModel @Inject constructor(
                         coopSessionState =
                             com.hereliesaz.graffitixr.common.model.CoopSessionState.WaitingForGuest,
                         coopPeerSpatialFrame = null,
-                        coopPeerFingerprint = null,
+                        coopPeerDoodle = null,
                     )
                 }
                 _hostQrPayload.value = qrString
@@ -515,19 +515,19 @@ class ArViewModel @Inject constructor(
                     qr = qr,
                     localDeviceName = android.os.Build.MODEL,
                     localBackend = localBackend,
-                    onBulkReceived = { fingerprint, project, spatialFrame ->
+                    onBulkReceived = { doodle, project, spatialFrame ->
                         // Claim native tracking ownership BEFORE loadAsSpectator publishes the host
                         // project. That publication wakes the generic project collector; if it sees
                         // an ARCore guest without this marker it can asynchronously restore an older
-                        // project.fingerprint over the just-received peer geometry.
+                        // project.doodle over the just-received peer geometry.
                         _uiState.update {
                             it.copy(
                                 coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.GUEST,
                                 coopPeerSpatialFrame = spatialFrame,
-                                coopPeerFingerprint =
+                                coopPeerDoodle =
                                     if (localBackend ==
                                         com.hereliesaz.graffitixr.common.model.CoopTrackingBackend.SPHERESLAM
-                                    ) fingerprint.copyOf() else null,
+                                    ) doodle.copyOf() else null,
                             )
                         }
 
@@ -572,7 +572,7 @@ class ArViewModel @Inject constructor(
 
                         if (localBackend ==
                             com.hereliesaz.graffitixr.common.model.CoopTrackingBackend.ARCORE) {
-                            if (fingerprint.isEmpty()) {
+                            if (doodle.isEmpty()) {
                                 _feedback.tryEmit(
                                     com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
                                         appContext.getString(DesignR.string.ar_feedback_join_no_geometry), null
@@ -583,15 +583,15 @@ class ArViewModel @Inject constructor(
                             }
                             // PnP object frame -> host wall frame is now explicit. Existing ARCore
                             // PoseFusion/return-visit anchoring consumes this exact bridge.
-                            slamManager.alignToPeer(fingerprint)
+                            slamManager.alignToPeer(doodle)
                             slamManager.captureAnchorCam =
-                                spatialFrame.fingerprintFromWall.toFloatArray()
+                                spatialFrame.doodleFromWall.toFloatArray()
                             // coopPeerSpatialFrame/role were published before spectator load so the
                             // generic project loader could not race this peer installation.
                         } else {
                             // Standalone consumes the shared KPM page when the host is SphereSLAM.
-                            // For an ARCore host it instead feeds the peer fingerprint already stored
-                            // above through MobileGS and composes PnP through fingerprintFromWall.
+                            // For an ARCore host it instead feeds the peer doodle already stored
+                            // above through MobileGS and composes PnP through doodleFromWall.
                         }
                     },
                     onOp = { op -> dispatchSpectatorOp(op) },
@@ -612,7 +612,7 @@ class ArViewModel @Inject constructor(
                     it.copy(
                         coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.NONE,
                         coopPeerSpatialFrame = null,
-                        coopPeerFingerprint = null,
+                        coopPeerDoodle = null,
                         // Preserve a deliberate VersionMismatch/SpatialIncompatible decision from
                         // the transport instead of flattening every failed join into NetworkLost.
                         coopSessionState = managerTerminal
@@ -645,7 +645,7 @@ class ArViewModel @Inject constructor(
                     coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.NONE,
                     coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.Idle,
                     coopPeerSpatialFrame = null,
-                    coopPeerFingerprint = null,
+                    coopPeerDoodle = null,
                     guestEditWasDropped = false,
                     tripodView = false,
                     tripodFrame = null,
@@ -703,14 +703,14 @@ class ArViewModel @Inject constructor(
 
     // This class used to keep its OWN `lastCaptureRefusal` field. It was wrong the moment a second
     // capture flow existed: `MainViewModel.handleSingleCapture` — the "tap directly on your painted
-    // marks" review flow, which is the ORDINARY way a target gets created — builds a fingerprint
-    // through the exact same `MetricFingerprintBuilder`, on a failure it never touched this field,
+    // marks" review flow, which is the ORDINARY way a target gets created — builds a doodle
+    // through the exact same `MetricDoodleBuilder`, on a failure it never touched this field,
     // and its refusal reached the artist only as an ephemeral `Toast`. A report built from this
     // class's own field then said "no refusal recorded" for a capture that HAD failed, moments
     // earlier, through the flow the artist actually used — which is indistinguishable, to the field,
     // from nothing having been attempted at all.
     //
-    // `MetricFingerprintBuilder.lastRefusalReason` is the shared answer both flows read and write
+    // `MetricDoodleBuilder.lastRefusalReason` is the shared answer both flows read and write
     // now; see its doc. The report below reads that directly.
 
     private val _captureRequests =
@@ -1047,7 +1047,7 @@ class ArViewModel @Inject constructor(
     /** Same arrangement for self-grow, which had the identical shadowing problem. */
     val evalSelfGrowEnabled: StateFlow<Boolean> = _evalSelfGrowEnabled.asStateFlow()
 
-    /** A/B switch for teleological self-grow (default OFF): promote validated new marks into the fingerprint. */
+    /** A/B switch for teleological self-grow (default OFF): promote validated new marks into the doodle. */
     fun evalSetSelfGrowEnabled(on: Boolean) {
         slamManager.setSelfGrowEnabled(on)
         _evalSelfGrowEnabled.value = on
@@ -1092,11 +1092,11 @@ class ArViewModel @Inject constructor(
     }
 
     /**
-     * Base SphereSLAM photosphere. It exists independently of fingerprints/teleological SLAM.
+     * Base SphereSLAM photosphere. It exists independently of doodles/teleological SLAM.
      *
      * CameraX visual keyframes populate this map from standalone startup. Every tile begins
      * `needsUpdate=true`; keyframes advance each tile's scan progress, and a tile becomes current once
-     * the keyframes' views have covered it (SphereSLAM 0.25.1 `recordView`). The later fingerprint is
+     * the keyframes' views have covered it (SphereSLAM 0.25.1 `recordView`). The later doodle is
      * anchored into this already-running map.
      *
      * The library default since 0.25.1 is the whole sphere — every heading and every elevation to the
@@ -1158,7 +1158,7 @@ class ArViewModel @Inject constructor(
     /**
      * Latest keyframe per photosphere tile (SphereSLAM [com.hereliesaz.sphereslam.PhotosphereKeyframeStore]);
      * feeds [spherePhotosphere], anchors its wall heading on the first keyframe, and supplies the
-     * capture view for fingerprint placement. Guarded by [spherePhotosphereLock] with the map.
+     * capture view for doodle placement. Guarded by [spherePhotosphereLock] with the map.
      */
     private val spherePhotosphereKeyframes =
         com.hereliesaz.sphereslam.PhotosphereKeyframeStore(spherePhotosphere)
@@ -1217,7 +1217,7 @@ class ArViewModel @Inject constructor(
     /**
      * Start compass/elevation sampling for the standalone base photosphere. The analyzer captures a
      * photosphere keyframe only when [latestCameraAttitude] is non-null, so without this the map never
-     * receives a keyframe, `wallHeading` is never set, and every fingerprint capture fails closed.
+     * receives a keyframe, `wallHeading` is never set, and every doodle capture fails closed.
      * Owned by the standalone AR composition (started on entry/resume, stopped on pause/exit).
      */
     fun startStandaloneCameraAttitude() {
@@ -1256,7 +1256,7 @@ class ArViewModel @Inject constructor(
         var firstCaptureForTile = false
         synchronized(spherePhotosphereLock) {
             // The store anchors the map's wall heading on the first keyframe: the photosphere owns
-            // its coordinate frame from startup. That is NOT a fingerprint anchor; it is simply the
+            // its coordinate frame from startup. That is NOT a doodle anchor; it is simply the
             // initial camera-facing bearing for the base map.
             spherePhotosphereKeyframes
                 .record(keyframe, nowMs = android.os.SystemClock.elapsedRealtime())
@@ -1365,7 +1365,7 @@ class ArViewModel @Inject constructor(
             }
             if (committed) {
                 appendDiag(
-                    "SphereSLAM map_from_fingerprint refined from same-frame base+KPM pose " +
+                    "SphereSLAM map_from_doodle refined from same-frame base+KPM pose " +
                         "generation=$anchorGeneration"
                 )
             }
@@ -1510,13 +1510,13 @@ class ArViewModel @Inject constructor(
             // hold them rather than from whatever the eval buttons last asked for.
             "fusion" to (renderer?.fusionEnabled?.toString() ?: "no renderer attached"),
             "syncReloc" to slamManager.evalSyncRelocEveryN().let { if (it > 0) "every $it" else "async" },
-            // The reason an empty-fingerprint run is empty. Without it the report can say the
-            // fingerprint is missing and nothing about why, which is where three device runs stalled.
-            "lastCapture" to (com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
+            // The reason an empty-doodle run is empty. Without it the report can say the
+            // doodle is missing and nothing about why, which is where three device runs stalled.
+            "lastCapture" to (com.hereliesaz.graffitixr.feature.ar.anchor.MetricDoodleBuilder
                 .lastRefusalReason?.let { "REFUSED — $it" } ?: "no refusal recorded"),
             // The single most direct test for "the overlay is receding": is the ARCore anchor's OWN
             // pose moving, independent of fusion, relocalization, or the consensus average. A device
-            // run went 6.2 -> 16.0 ft in four seconds with fusion off and no fingerprint — nothing
+            // run went 6.2 -> 16.0 ft in four seconds with fusion off and no doodle — nothing
             // downstream of the anchor was even running — traced to the primary anchor being attached
             // to a still-forming ARCore Plane trackable rather than a fixed world pose, so ARCore's
             // own plane refinement dragged it along. Fixed by anchoring to a fixed pose instead; this
@@ -1827,7 +1827,7 @@ class ArViewModel @Inject constructor(
     private var loadedProjectId: String? = null
 
     // Whose state native MobileGS holds. `loadedProjectId` flips on emission, but native keeps the
-    // previous project's map until loadFingerprintIfExists finishes swapping it, so saves gate on
+    // previous project's map until loadDoodleIfExists finishes swapping it, so saves gate on
     // THIS token instead (see NativeStateOwner).
     private val nativeStateOwner = NativeStateOwner()
 
@@ -1850,8 +1850,8 @@ class ArViewModel @Inject constructor(
     // viewModelScope's Main.immediate runs the rest synchronously inside the constructor, so code it
     // reaches can execute before any property declared further down the class is initialized. A
     // non-null holder read that early is null: monocularDepthMutex was, and the 1.48.44.1 startup
-    // crash was its NPE in reconcileMonocularDepth. A nullable one declared below would be
-    // overwritten by its own `= null` initializer after init had already set it.
+    // crash was its NPE in reconcileMonocularDepth. (A `= null` initializer is harmless either way:
+    // Kotlin emits none for a default value. A non-default one, like `= -1`, would overwrite.)
 
     // ArAvailabilityChecker's verdict, resolved once per process (a later ARCore install isn't
     // auto-detected). Cached so a "Use ARCore" toggle re-derives the backend without re-running the
@@ -1861,13 +1861,28 @@ class ArViewModel @Inject constructor(
     // Serializes monocular-depth load/unload so rapid toggles can't interleave a self-test and a close.
     private val monocularDepthMutex = Mutex()
 
-    /** Loader runs between their start and their `finally`; see [loadFingerprintIfExists]. */
-    private val fingerprintLoadsInFlight = java.util.concurrent.atomic.AtomicInteger(0)
+    /** Loader runs between their start and their `finally`; see [loadDoodleIfExists]. */
+    private val doodleLoadsInFlight = java.util.concurrent.atomic.AtomicInteger(0)
 
-    // A page frozen this session, waiting for ITS fingerprint to commit. Guards [pendingHybridPage]
+    // A page frozen this session, waiting for ITS doodle to commit. Guards [pendingHybridPage]
     // and its capture keys: written from the GL thread (renderer callbacks) and read from the
     // project collector.
     private val hybridLock = Any()
+
+    // System-throttle monitoring (see startSystemThrottleMonitoring), declared above the init block
+    // that starts it. Declared further down, a recomputeSystemThrottle() during construction read
+    // batteryPct as 0 (a real 0%, so the lowest battery tier) instead of -1 (unknown), and the tier
+    // thresholds as 0, until a later recompute. (The `= null` holders were never at risk: Kotlin
+    // emits no initializer for a default value, so the registration init makes is kept.)
+    private var thermalListener: android.os.PowerManager.OnThermalStatusChangedListener? = null
+    private var powerReceiver: android.content.BroadcastReceiver? = null
+    @Volatile private var thermalHot = false
+    @Volatile private var batteryLow = false
+    /** Live battery level [0..100], or -1 when unknown. Sampled from ACTION_BATTERY_CHANGED. */
+    @Volatile private var batteryPct = -1
+    /** Battery-level thresholds (%) for the medium / low degradation tiers. */
+    private val BATTERY_TIER_MED = 30
+    private val BATTERY_TIER_LOW = 15
 
     init {
         NativeLibLoader.loadAll()
@@ -1898,7 +1913,7 @@ class ArViewModel @Inject constructor(
             // CameraX + SphereSLAM standalone path"). A later install isn't auto-detected mid-process,
             // which is acceptable: standalone AR is fully functional without ARCore.
             // The user can force the standalone path even on an ARCore-capable device (Settings →
-            // "Use ARCore"). Treat an opt-out exactly like unsupported hardware: same fingerprint
+            // "Use ARCore"). Treat an opt-out exactly like unsupported hardware: same doodle
             // cleanup, same standalone routing. The checker result is cached above and the backend is
             // re-derived on every toggle, so a change switches backends immediately — mid-AR too.
             Timber.i("ArCore availability resolved: $result")
@@ -1969,11 +1984,11 @@ class ArViewModel @Inject constructor(
                             project,
                             hosted.hostBackend ==
                                 com.hereliesaz.graffitixr.common.model.CoopTrackingBackend.ARCORE,
-                        )?.copy(fingerprintAvailable = hosted.fingerprintAvailable)
+                        )?.copy(doodleAvailable = hosted.doodleAvailable)
                         if (current != hosted) {
                             _feedback.tryEmit(
                                 com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
-                                    appContext.getString(DesignR.string.ar_feedback_wall_target_changed)
+                                    appContext.getString(DesignR.string.ar_feedback_wall_doodle_changed)
                                 )
                             )
                             leaveSession()
@@ -1991,10 +2006,10 @@ class ArViewModel @Inject constructor(
                     // BEFORE anything can be written: native still holds the previous project's state.
                     nativeStateOwner.beginSwitch(project.id)
                     loadedProjectId = project.id
-                    // Native MobileGS has exactly one active fingerprint frame. Standalone owns it
+                    // Native MobileGS has exactly one active doodle frame. Standalone owns it
                     // on non-ARCore devices; an ARCore co-op GUEST also owns it once protocol-v3 peer
                     // geometry has been installed. Never let a later spectator-project emission run
-                    // the ordinary local loader over that peer fingerprint.
+                    // the ordinary local loader over that peer doodle.
                     restoreLocalArCoreProjectState(project)
                 }
             }
@@ -2132,8 +2147,8 @@ class ArViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            settingsRepository.fingerprintFeatures.collect { features ->
-                _uiState.update { it.copy(fingerprintFeatures = features) }
+            settingsRepository.doodleFeatures.collect { features ->
+                _uiState.update { it.copy(doodleFeatures = features) }
             }
         }
         viewModelScope.launch {
@@ -2147,10 +2162,10 @@ class ArViewModel @Inject constructor(
 
     private var anticipationPersistJob: kotlinx.coroutines.Job? = null
 
-    /** Settings → Fingerprint. Shown at once, persisted; the next target capture builds with it. */
-    fun setFingerprintFeatures(features: com.hereliesaz.graffitixr.common.model.FingerprintFeatures) {
-        _uiState.update { it.copy(fingerprintFeatures = features) }
-        viewModelScope.launch { settingsRepository.setFingerprintFeatures(features) }
+    /** Settings → Doodle. Shown at once, persisted; the next target capture builds with it. */
+    fun setDoodleFeatures(features: com.hereliesaz.graffitixr.common.model.DoodleFeatures) {
+        _uiState.update { it.copy(doodleFeatures = features) }
+        viewModelScope.launch { settingsRepository.setDoodleFeatures(features) }
     }
 
     /**
@@ -2205,7 +2220,7 @@ class ArViewModel @Inject constructor(
         project: com.hereliesaz.graffitixr.common.model.GraffitiProject,
     ) {
         if (
-            !shouldRestoreLocalArCoreFingerprint(
+            !shouldRestoreLocalArCoreDoodle(
                 isArCoreAvailable = _uiState.value.isArCoreAvailable,
                 coopRole = _uiState.value.coopRole,
                 peerSpatialFramePresent = _uiState.value.coopPeerSpatialFrame != null,
@@ -2214,8 +2229,8 @@ class ArViewModel @Inject constructor(
             return
         }
         loadMapIfExists()
-        loadFingerprintIfExists()
-        // A page frozen this session commits once its own fingerprint lands.
+        loadDoodleIfExists()
+        // A page frozen this session commits once its own doodle lands.
         tryCommitPendingHybridPage(project)
         // Once per project page, not per emission: re-arming KPM resets the sidecar.
         // Keyed by URI too, so a page committed after a renderer swap is still offered.
@@ -2241,7 +2256,7 @@ class ArViewModel @Inject constructor(
      * - **standalone → ARCore.** Publishing the state is enough for MainScreen: the standalone branch
      *   leaves composition (its analyzer stops, CameraX unbinds) and the ARCore branch's AR-entry
      *   effect opens the Session behind the camera-availability gate. The project's ARCore-frame
-     *   fingerprint is restored here the way the currentProject collector does.
+     *   doodle is restored here the way the currentProject collector does.
      *
      * Either way a co-op session ends (its spatial frame belongs to the old backend), and SphereSLAM
      * runtime selection and monocular depth are re-evaluated.
@@ -2257,13 +2272,13 @@ class ArViewModel @Inject constructor(
         if (!supported) {
             if (!firstResolution) stopArCoreForStandaloneSwitch()
             // The native MobileGS instance is process-global. Project loading may have installed
-            // an ARCore/capture-camera fingerprint while ARCore capability was still UNKNOWN (or, on a
+            // an ARCore/capture-camera doodle while ARCore capability was still UNKNOWN (or, on a
             // live switch, while ARCore was the backend). Clear that frame BEFORE publishing "ARCore
             // unavailable"; the standalone analyzer starts only after this state update and will then
             // install the centered page-frame fingerprint deterministically.
-            loadedFingerprint = null
+            loadedDoodle = null
             nativeStateOwner.clear()
-            slamManager.clearWallFingerprint()
+            slamManager.clearWallDoodle()
             slamManager.clearWallFeatureMap()
             slamManager.overlayMarkCenterLocal = null
             slamManager.captureAnchorCam = null
@@ -2289,7 +2304,7 @@ class ArViewModel @Inject constructor(
                 leaveSession()
             }
             if (supported) {
-                loadedFingerprint = null
+                loadedDoodle = null
                 projectRepository.currentProject.value?.let { restoreLocalArCoreProjectState(it) }
             }
         }
@@ -2633,10 +2648,10 @@ class ArViewModel @Inject constructor(
         )
         if (enabled) {
             // Standalone SphereSLAM uses the same native MobileGS instance but installs a page-frame
-            // fingerprint into it. Force the normal ARCore fingerprint loader to touch native again
+            // doodle into it. Force the normal ARCore doodle loader to touch native again
             // on ARCore entry even when the project id/value itself did not change.
-            loadedFingerprint = null
-            loadFingerprintIfExists()
+            loadedDoodle = null
+            loadDoodleIfExists()
 
             val now = System.currentTimeMillis()
             arEntryTimestampMs = now
@@ -2689,7 +2704,7 @@ class ArViewModel @Inject constructor(
         // through teardown. `clearAnchorEstablished()` two lines down advances the anchor
         // generation, which the move detector reads as a change, so the renderer would publish a
         // footprint and `onDesignFootprintChanged` would write `latestDesignFootprint` straight back
-        // after the line below nulls it. The next session would then partition its fingerprint
+        // after the line below nulls it. The next session would then partition its doodle
         // against the DEAD session's design pose. Ordering is the whole fix.
         renderer?.isDestroying = true
         lastMappingPausedCmd = null
@@ -3356,15 +3371,15 @@ class ArViewModel @Inject constructor(
             var newUri: android.net.Uri? = null
             var transformApplied = false
             try {
-                // Fingerprinting is part of target creation, not an optional enhancement.
+                // Doodling is part of target creation, not an optional enhancement.
                 // Teleological SLAM consumes this seed for relocalization/progress, so never persist a
-                // standalone reference that cannot also produce its canonical-page fingerprint.
+                // standalone reference that cannot also produce its canonical-page doodle.
                 val standaloneFingerprint =
                     StandaloneFingerprintBuilder.build(
                         slam = slamManager,
                         bitmap = bitmap,
                         referenceWidthMeters = referenceWidthMeters,
-                        features = _uiState.value.fingerprintFeatures,
+                        features = _uiState.value.doodleFeatures,
                     ) ?: error("Standalone target produced no teleological SLAM fingerprint")
 
                 newUri = projectManager.saveSphereSlamReference(appContext, projectId, bitmap)
@@ -3378,7 +3393,7 @@ class ArViewModel @Inject constructor(
                     } else {
                         transformApplied = true
                         lastStandaloneGuideKey = null
-                        // Fingerprint replacement changes only the precision/teleological layer.
+                        // Doodle replacement changes only the precision/teleological layer.
                         // The base SphereSLAM photosphere and its orientation history stay alive.
                         current.copy(
                             sphereSlamReferenceUri = candidateUri,
@@ -3390,11 +3405,11 @@ class ArViewModel @Inject constructor(
                             sphereSlamPlacementAnchorGeneration = 0L,
                             sphereSlamFingerprint = standaloneFingerprint,
                             // A new target may be another wall: its normal is learned afresh.
-                            fingerprintWallNormalEnu = emptyList(),
+                            doodleWallNormalEnu = emptyList(),
                             sphereSlamFingerprintFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                             // Precision target replacement never resets the base photosphere. Attach
-                            // the new fingerprint with the capture-time provisional transform when
+                            // the new doodle with the capture-time provisional transform when
                             // available; otherwise leave it unresolved until the same-frame solver
                             // publishes an exact bridge.
                             sphereSlamMapFromFingerprint =
@@ -3845,7 +3860,7 @@ class ArViewModel @Inject constructor(
     /**
      * Drops the large capture bitmaps and the native depth buffer held in [ArUiState], letting
      * GC reclaim them. We deliberately do NOT call recycle(): on AR-mode teardown a background
-     * fingerprint/save coroutine (onConfirmTargetCreation, updatePaintingGuide)
+     * doodle/save coroutine (onConfirmDoodleCreation, updatePaintingGuide)
      * may still hold these same bitmap instances, and recycling them out from under it would
      * cause a "trying to use a recycled bitmap" crash. Nulling the references is deterministic
      * and safe; the platform reclaims the memory once no coroutine references them.
@@ -3858,8 +3873,8 @@ class ArViewModel @Inject constructor(
             it.copy(
                 tempCaptureBitmap = null,
                 annotatedCaptureBitmap = null,
-                targetRawBitmap = null,
-                targetDepthBuffer = null,
+                doodleRawBitmap = null,
+                doodleDepthBuffer = null,
                 tapMarks = emptyList(),
                 unwarpPoints = emptyList()
             )
@@ -3874,7 +3889,7 @@ class ArViewModel @Inject constructor(
     private suspend fun saveMapBlocking() {
         val projectId = loadedProjectId ?: return
         // The wall feature map is the only thing here that survives a session meaningfully: it is
-        // re-registered on load through the fingerprint + PnP relocalization, so its coordinates are
+        // re-registered on load through the doodle + PnP relocalization, so its coordinates are
         // recoverable.
         //
         // The ARCore point cloud used to be written alongside it and restored on open. That could
@@ -3882,7 +3897,7 @@ class ArViewModel @Inject constructor(
         // wherever the device happened to start, so every restored point landed at an arbitrary
         // rigid offset from the wall it was scanned off — and then appeared to drift as the artist
         // moved, because nothing re-registered it. It is a scan VISUALISATION (relocalization rides
-        // the fingerprint, not the cloud), so the honest fix is not to persist it at all.
+        // the doodle, not the cloud), so the honest fix is not to persist it at all.
         try {
             withContext(dispatchers.io) { saveProjectWallMap() }
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -3933,7 +3948,7 @@ class ArViewModel @Inject constructor(
         // project's, and writing it here would put project A's map into project B. Skip until the
         // loader has claimed ownership; the next autosave tick picks it up. The standalone branch
         // below is installed by the standalone analyzer, not by that loader, and is guarded by its
-        // own reference-URI / map_from_fingerprint checks.
+        // own reference-URI / map_from_doodle checks.
         if (!standaloneBackend && !nativeStateOwner.owns(projectId)) {
             Timber.d("Wall map save skipped: native state is not (yet) project $projectId's")
             return
@@ -3951,7 +3966,7 @@ class ArViewModel @Inject constructor(
             ) {
                 appendDiag(
                     "SphereSLAM explicit precision-map save refused: " +
-                        "native anchor does not match map_from_fingerprint",
+                        "native anchor does not match map_from_doodle",
                 )
                 return
             }
@@ -3982,7 +3997,7 @@ class ArViewModel @Inject constructor(
         }
 
         // ARCore/capture-frame persistence. Never execute this branch for the standalone native
-        // map above: wallFeatureMap/paintMarks belong to the legacy ARCore fingerprint frame.
+        // map above: wallFeatureMap/paintMarks belong to the legacy ARCore doodle frame.
         val paint = slamManager.getPaintMarks()
         val grid = slamManager.exportPaintGrid()
             ?.let { java.util.Base64.getEncoder().encodeToString(it) }
@@ -4012,32 +4027,32 @@ class ArViewModel @Inject constructor(
         currentProject: com.hereliesaz.graffitixr.common.model.GraffitiProject,
     ) {
         val normal = slamManager.getWallNormalEnu() ?: return
-        val saved = currentProject.fingerprintWallNormalEnu
+        val saved = currentProject.doodleWallNormalEnu
         if (saved.size == 3) {
             val dot = saved[0] * normal[0] + saved[1] * normal[1] + saved[2] * normal[2]
             if (dot > WALL_NORMAL_RESAVE_COS) return
         }
         projectRepository.updateProject { project ->
-            if (project.id == projectId) project.copy(fingerprintWallNormalEnu = normal.toList()) else project
+            if (project.id == projectId) project.copy(doodleWallNormalEnu = normal.toList()) else project
         }
     }
 
     /**
-     * The wall fingerprint currently live in native, retained so a design resize can repartition it
+     * The wall doodle currently live in native, retained so a design resize can repartition it
      * (`IMPLEMENTATION.md` 2.2) without a round trip through the project file.
      *
      * Held alongside the intrinsics/anchor/view it was restored with, because a repartition has to
-     * re-push all of them — `restoreWallFingerprintMetric` REPLACES the stored fingerprint, so
+     * re-push all of them — `restoreWallDoodleMetric` REPLACES the stored doodle, so
      * pushing regions alone would drop the co-registration and the rectification view with it.
      */
-    private class LiveFingerprint(
-        val fingerprint: com.hereliesaz.graffitixr.common.model.Fingerprint,
+    private class LiveDoodle(
+        val doodle: com.hereliesaz.graffitixr.common.model.Doodle,
         val anchor: FloatArray,
         val intrinsics: FloatArray,
         val view: FloatArray,
     )
 
-    @Volatile private var liveFingerprint: LiveFingerprint? = null
+    @Volatile private var liveDoodle: LiveDoodle? = null
 
     /**
      * Lets a newer partition request cancel an in-flight older one.
@@ -4046,7 +4061,7 @@ class ArViewModel @Inject constructor(
      * `cancel()` does not join and `Dispatchers.Default` is multi-threaded, so a cancelled job can
      * still finish. There IS an `ensureActive()` between the classify pass and the native push, so
      * the common cancellation lands there — but nothing checks between that call and
-     * `restoreWallFingerprintMetric`, so a cancel arriving in that window still completes its push.
+     * `restoreWallDoodleMetric`, so a cancel arriving in that window still completes its push.
      * What cancellation buys is that the newest design wins the usual case, which matters because a
      * drag fires every frame and each firing costs a repartition, a native replace and a write.
      *
@@ -4055,7 +4070,7 @@ class ArViewModel @Inject constructor(
      */
     // AtomicReference, not @Volatile. This stopped being single-threaded when partition-on-arrival
     // landed: the GL thread reaches it through onDesignFootprintChanged and the IO dispatcher
-    // through partitionLiveFingerprintIfNeeded. @Volatile gives visibility but NOT atomicity, so a
+    // through partitionLiveDoodleIfNeeded. @Volatile gives visibility but NOT atomicity, so a
     // plain `cancel(); assign` still interleaves into "both threads cancel the same job, one
     // assignment is lost, and the orphan runs to completion alongside its replacement" — two jobs
     // pushing into native at once, which is precisely what the swap exists to prevent.
@@ -4065,17 +4080,17 @@ class ArViewModel @Inject constructor(
      * The most recent design footprint the renderer published, or null before the artwork is placed.
      *
      * Kept because the two events that make a partition possible — the artwork being placed, and the
-     * fingerprint becoming live — race, and the losing order was the common one. In a capture
-     * session the fingerprint arrives only after detection, `saveProject` and `loadProject`, long
+     * doodle becoming live — race, and the losing order was the common one. In a capture
+     * session the doodle arrives only after detection, `saveProject` and `loadProject`, long
      * after the single footprint edge that follows confirmation; with only the callback, that
-     * session's fingerprint was never partitioned at all.
+     * session's doodle was never partitioned at all.
      */
-    @Volatile private var latestDesignFootprint: FingerprintPartition.DesignFootprint? = null
+    @Volatile private var latestDesignFootprint: DoodlePartition.DesignFootprint? = null
 
     /**
      * The design pose the live partition was last computed against, or null when none has been.
      *
-     * In memory rather than on the `Fingerprint`: the stored `captureHalfW`/`captureHalfH` already
+     * In memory rather than on the `Doodle`: the stored `captureHalfW`/`captureHalfH` already
      * answer "was this partitioned against a different SIZE", and adding a persisted pose would mean
      * a fourth parallel field to keep consistent for a question that only matters within a session.
      * Null after a reload forces exactly one partition, which is what should happen there regardless.
@@ -4091,11 +4106,11 @@ class ArViewModel @Inject constructor(
      *
      * Edge-triggered so a slow pinch through the threshold does not toast every frame. Saying it at
      * all matters: a `uiState` boolean nothing reads is the same failure as an operator nothing
-     * calls, and its neighbour `legacyFingerprintRefused` shipped exactly that way, with a KDoc
+     * calls, and its neighbour `legacyDoodleRefused` shipped exactly that way, with a KDoc
      * claiming it was "surfaced".
      */
     private fun publishBackboneWarning(backbone: Int) {
-        val tooSmall = backbone in 0 until FingerprintPartition.MIN_BACKBONE
+        val tooSmall = backbone in 0 until DoodlePartition.MIN_BACKBONE
         val wasTooSmall = _uiState.value.backboneTooSmall
         _uiState.update { it.copy(backboneTooSmall = tooSmall) }
         if (tooSmall && !wasTooSmall) {
@@ -4124,67 +4139,67 @@ class ArViewModel @Inject constructor(
     }
 
     /**
-     * Partition the live fingerprint against the last known design footprint, if both exist and the
+     * Partition the live doodle against the last known design footprint, if both exist and the
      * partition is missing or stale.
      *
-     * The pull half of the pair above: called when the FINGERPRINT arrives, where
+     * The pull half of the pair above: called when the DOODLE arrives, where
      * [onDesignFootprintChanged] is called when the FOOTPRINT moves.
      */
-    private fun partitionLiveFingerprintIfNeeded() {
+    private fun partitionLiveDoodleIfNeeded() {
         val design = latestDesignFootprint ?: return
         onDesignFootprintChanged(design)
     }
 
     /**
-     * The artwork was placed or resized: (re)partition the live fingerprint against where it now
+     * The artwork was placed or resized: (re)partition the live doodle against where it now
      * sits (`IMPLEMENTATION.md` 2.2/2.4).
      *
      * **This is where the partition actually happens**, not at capture. Target creation is what
      * establishes the anchor the artwork will sit on, so a capture has no placed design to ask Φ
      * about; the first time the question has an answer is here.
      *
-     * Fires on an unpartitioned fingerprint as well as a stale one. That is the case
-     * `FingerprintPartition.partition` was written for and the one the flow above guarantees:
+     * Fires on an unpartitioned doodle as well as a stale one. That is the case
+     * `DoodlePartition.partition` was written for and the one the flow above guarantees:
      * `isPartitionStale` is defined as false when there is no partition yet, so gating on staleness
-     * alone would mean a fingerprint that starts unpartitioned stays that way forever.
+     * alone would mean a doodle that starts unpartitioned stays that way forever.
      *
      * Called from the GL thread; all work is dispatched off it.
      */
     /**
-     * `IMPLEMENTATION.md` **4.5** — hand the engine the design's pose in the fingerprint's own
+     * `IMPLEMENTATION.md` **4.5** — hand the engine the design's pose in the doodle's own
      * frame, which is what the corroboration match projects design features through.
      *
      * The composition is `captureAnchorCam · rigidModelAnchorLocal`, exactly as
-     * [FingerprintPartition.partition] builds it, and it is built here rather than in C++ for the
+     * [DoodlePartition.partition] builds it, and it is built here rather than in C++ for the
      * same reason Φ's is: neither factor is expressed in a world frame that drift or a session
      * boundary could invalidate, and re-deriving the product on the far side of JNI would be a
      * second chance to get the frame wrong with no test able to see it.
      *
-     * Refuses on the same conditions `partition` refuses on. A fingerprint with no
+     * Refuses on the same conditions `partition` refuses on. A doodle with no
      * `captureAnchorCam` (pre-Phase-2, or the depth path) has no frame to express a placement in,
      * and clearing is not a degradation — it returns corroboration to the global search it did
      * before Phase 4, which is a path that still works.
      */
     private fun pushDesignPlacement(
-        fingerprint: com.hereliesaz.graffitixr.common.model.Fingerprint,
-        design: FingerprintPartition.DesignFootprint,
+        doodle: com.hereliesaz.graffitixr.common.model.Doodle,
+        design: DoodlePartition.DesignFootprint,
     ) {
-        if (!design.isUsable || fingerprint.captureAnchorCam.size != 16) {
+        if (!design.isUsable || doodle.captureAnchorCam.size != 16) {
             slamManager.setDesignPlacement(null, 0f, 0f)
             return
         }
         slamManager.setDesignPlacement(
             RigidMath.multiply(
-                fingerprint.captureAnchorCam.toFloatArray(), design.rigidModelAnchorLocal,
+                doodle.captureAnchorCam.toFloatArray(), design.rigidModelAnchorLocal,
             ),
             design.halfW,
             design.halfH,
         )
     }
 
-    fun onDesignFootprintChanged(design: FingerprintPartition.DesignFootprint) {
+    fun onDesignFootprintChanged(design: DoodlePartition.DesignFootprint) {
         // Retained so the partition can also be driven the OTHER way round — see
-        // [partitionLiveFingerprintIfNeeded]. The footprint edge and the fingerprint's arrival are
+        // [partitionLiveDoodleIfNeeded]. The footprint edge and the doodle's arrival are
         // two independent events and neither reliably comes second, so whichever is later has to be
         // able to start the work. Holding only a callback made this a one-shot that the capture
         // session always lost.
@@ -4195,8 +4210,8 @@ class ArViewModel @Inject constructor(
         if (isDestroying) return
         latestDesignFootprint = design
         tryAutoFit()
-        val live = liveFingerprint ?: return
-        val fp = live.fingerprint
+        val live = liveDoodle ?: return
+        val fp = live.doodle
         // IMPLEMENTATION.md 4.5 — push the placement on EVERY footprint change, not only when a
         // repartition is due. The two have different sensitivities: the partition only has to be
         // redone when the design moves far enough to change WHICH features sit under it, while the
@@ -4209,7 +4224,7 @@ class ArViewModel @Inject constructor(
         // DesignMoveDetector's rate rather than the frame rate.
         pushDesignPlacement(fp, design)
         // Three ways this is worth doing, and the third is the one a size-only check misses.
-        // `Fingerprint.isPartitionStale` compares extents, because extents are what it stores — so
+        // `Doodle.isPartitionStale` compares extents, because extents are what it stores — so
         // a design the artist DRAGGED across the wall is not "stale" by that measure while being
         // completely wrong by Φ's. The pose it was last partitioned against is therefore tracked
         // here, in memory, rather than persisted: after a reload `lastPartitionedPose` is null,
@@ -4224,31 +4239,31 @@ class ArViewModel @Inject constructor(
         // published it, so a job can never be cancelled by a successor that has not yet seen it.
         // Captured at launch, checked before every write. `updateProject` applies to whatever is
         // current WHEN IT RUNS, not when it was queued, so a project switch during the partition
-        // (a classify pass plus a blocking native replace) would write this fingerprint into the
+        // (a classify pass plus a blocking native replace) would write this doodle into the
         // wrong project's file and leave native holding the wrong map.
-        val forProjectId = loadedFingerprint?.projectId
+        val forProjectId = loadedDoodle?.projectId
         val next = viewModelScope.launch(Dispatchers.Default, start = CoroutineStart.LAZY) {
-            val current = liveFingerprint ?: return@launch
-            val updated = FingerprintPartition.partition(current.fingerprint, design)
+            val current = liveDoodle ?: return@launch
+            val updated = DoodlePartition.partition(current.doodle, design)
             // Identity, not equality: `partition` returns the RECEIVER when it refuses (no points, no
-            // captureAnchorCam, no usable extents), and re-pushing an unchanged fingerprint would
+            // captureAnchorCam, no usable extents), and re-pushing an unchanged doodle would
             // reset native's reloc state for nothing.
-            if (updated === current.fingerprint) return@launch
+            if (updated === current.doodle) return@launch
             // The project may have changed while this ran; everything below writes.
-            if (loadedFingerprint?.projectId != forProjectId) return@launch
+            if (loadedDoodle?.projectId != forProjectId) return@launch
             // Idempotence, and it is load-bearing rather than an optimisation.
             //
             // `partition` returns a fresh copy whenever it CAN partition, so the identity check above
-            // only catches refusals. Without this second check, `loadFingerprintIfExists` →
+            // only catches refusals. Without this second check, `loadDoodleIfExists` →
             // partition → `updateProject` → a new `currentProject` emission →
-            // `loadFingerprintIfExists` again is a cycle: every project load paid for two partitions,
-            // two native fingerprint replaces (each resetting reloc state) and two full project
-            // writes. It terminated only because `Fingerprint.equals` compares `regions` by content
+            // `loadDoodleIfExists` again is a cycle: every project load paid for two partitions,
+            // two native doodle replaces (each resetting reloc state) and two full project
+            // writes. It terminated only because `Doodle.equals` compares `regions` by content
             // and `MutableStateFlow` conflates equal values — an accident of an override written for
             // a serialization test, one non-value-equal field away from an unbounded write loop.
-            if (updated.regions.contentEquals(current.fingerprint.regions) &&
-                updated.captureHalfW == current.fingerprint.captureHalfW &&
-                updated.captureHalfH == current.fingerprint.captureHalfH
+            if (updated.regions.contentEquals(current.doodle.regions) &&
+                updated.captureHalfW == current.doodle.captureHalfW &&
+                updated.captureHalfH == current.doodle.captureHalfH
             ) {
                 // Still record the pose: the partition is genuinely up to date for it, and not
                 // recording it would re-enter here on every subsequent frame of a drag.
@@ -4257,24 +4272,24 @@ class ArViewModel @Inject constructor(
                 // all the wall" message on the RELOAD path — a project saved in that state reopened
                 // silently, which is the one case where the artist has no memory of being told.
                 // The partition is unchanged, not absent; its backbone count is just as real.
-                publishBackboneWarning(FingerprintPartition.backboneCount(updated))
+                publishBackboneWarning(DoodlePartition.backboneCount(updated))
                 return@launch
             }
             ensureActive()
 
-            val backbone = FingerprintPartition.backboneCount(updated)
-            slamManager.restoreWallFingerprintMetric(
+            val backbone = DoodlePartition.backboneCount(updated)
+            slamManager.restoreWallDoodleMetric(
                 updated.descriptorsData, updated.descriptorsRows, updated.descriptorsCols,
                 updated.descriptorsType, updated.points3d.toFloatArray(),
                 current.anchor, current.intrinsics,
                 viewMatrix = current.view,
                 regions = updated.regions,
             )
-            liveFingerprint = LiveFingerprint(updated, current.anchor, current.intrinsics, current.view)
+            liveDoodle = LiveDoodle(updated, current.anchor, current.intrinsics, current.view)
             lastPartitionedPose = design.rigidModelAnchorLocal.copyOf()
             // Native now holds exactly this, so the reload our own updateProject is about to trigger
             // must recognise it and not push it again.
-            forProjectId?.let { loadedFingerprint = LoadedFingerprint(it, updated) }
+            forProjectId?.let { loadedDoodle = LoadedDoodle(it, updated) }
 
             // IMPLEMENTATION.md 2.8, relocated. The capture cannot raise this — it has no footprint
             // to measure — so it is raised here, where the artwork's size is what made it true. A
@@ -4285,7 +4300,7 @@ class ArViewModel @Inject constructor(
             // Persist so the next load starts from the size the artist settled on. Merged through
             // the repository transform rather than a full-object write, for the save-race reason
             // documented on the wall-map save above.
-            projectRepository.updateProject { it.copy(fingerprint = updated) }
+            projectRepository.updateProject { it.copy(doodle = updated) }
             Timber.i(
                 "Design footprint %.3f x %.3f m; partitioned %d points, backbone %d",
                 design.halfW, design.halfH, updated.points3d.size / 3, backbone,
@@ -4297,34 +4312,34 @@ class ArViewModel @Inject constructor(
 
 
     /**
-     * Forget the Kotlin-side state describing a partitionable fingerprint.
+     * Forget the Kotlin-side state describing a partitionable doodle.
      *
-     * `liveFingerprint` left set is the dangerous one: a design move partitions the PREVIOUS
+     * `liveDoodle` left set is the dangerous one: a design move partitions the PREVIOUS
      * project's map and `updateProject` writes it into the CURRENT project's file.
      *
      * Call this from any path that leaves no partitionable map loaded, *including* one that leaves a
-     * descriptors-only map in native. [dropLoadedFingerprint] is the stronger form for paths that
+     * descriptors-only map in native. [dropLoadedDoodle] is the stronger form for paths that
      * must also empty native.
      */
     private fun dropPartitionState() {
-        liveFingerprint = null
+        liveDoodle = null
         lastPartitionedPose = null
     }
 
     /**
-     * Leave nothing loaded, in native or in Kotlin: no fingerprint, no marks centre, no partition
+     * Leave nothing loaded, in native or in Kotlin: no doodle, no marks centre, no partition
      * state.
      *
-     * This exists because the alternative kept failing. The branches of `loadFingerprintIfExists`
-     * were fixed one at a time — no-fingerprint first, then the legacy refusal, and each time a
-     * sibling was missed. The refusal branch got the Kotlin half and not `clearWallFingerprint`, so
+     * This exists because the alternative kept failing. The branches of `loadDoodleIfExists`
+     * were fixed one at a time — no-doodle first, then the legacy refusal, and each time a
+     * sibling was missed. The refusal branch got the Kotlin half and not `clearWallDoodle`, so
      * a project whose target was refused went on relocalizing against the PREVIOUS project's wall
      * and centring its overlay on the previous project's marks. Bundling the three operations means
      * a future branch cannot get one and forget the others.
      */
-    private fun dropLoadedFingerprint() {
+    private fun dropLoadedDoodle() {
         nativeStateOwner.clear()
-        slamManager.clearWallFingerprint()
+        slamManager.clearWallDoodle()
         slamManager.overlayMarkCenterLocal = null
         // 0.9 — same lifetime: without it PoseFusion cannot compose a correction at all.
         slamManager.captureAnchorCam = null
@@ -4341,26 +4356,26 @@ class ArViewModel @Inject constructor(
      * state to the project it described, so every new branch was a fresh chance to forget.
      *
      * With the pair stored together, a project switch is a value change rather than a sequence of
-     * assignments somebody has to remember, and the partition job can refuse to write a fingerprint
+     * assignments somebody has to remember, and the partition job can refuse to write a doodle
      * into a project it was not computed for.
      */
-    private data class LoadedFingerprint(
+    private data class LoadedDoodle(
         val projectId: String,
-        val fingerprint: com.hereliesaz.graffitixr.common.model.Fingerprint?,
+        val doodle: com.hereliesaz.graffitixr.common.model.Doodle?,
     )
 
-    @Volatile private var loadedFingerprint: LoadedFingerprint? = null
+    @Volatile private var loadedDoodle: LoadedDoodle? = null
 
-    // fingerprintLoadsInFlight is declared above the init block; see the note there.
+    // doodleLoadsInFlight is declared above the init block; see the note there.
 
     /**
-     * Restore (or clear) the wall fingerprint for the current project.
+     * Restore (or clear) the wall doodle for the current project.
      *
      * **One place decides native-state ownership: the `finally` here.** Every exit path ends in it:
      *
      *  - [NativeStateOwner.LoadExit.LOADED] — [nativeStateOwner] is marked as the loader's last step (only
      *    if the project is still current).
-     *  - [NativeStateOwner.LoadExit.UNCHANGED] — the idempotence early return in [applyProjectFingerprint]. It
+     *  - [NativeStateOwner.LoadExit.UNCHANGED] — the idempotence early return in [applyProjectDoodle]. It
      *    used to skip the marking, so an A -> B -> A switch (the collector had dropped A's ownership
      *    on B's emission, then A came back before B's loader changed anything) left ownership null
      *    while native still held A's state, and [saveProjectWallMap] then refused every ARCore
@@ -4370,69 +4385,69 @@ class ArViewModel @Inject constructor(
      *  - [NativeStateOwner.LoadExit.ABANDONED] after native was possibly touched (a throw, or cancellation
      *    with the view model) — ownership is released, since native may hold a mixture.
      *
-     * Inside [applyProjectFingerprint] the branches of the load decide an OUTCOME and the tail applies
+     * Inside [applyProjectDoodle] the branches of the load decide an OUTCOME and the tail applies
      * it, with a single early return (the idempotence check). That shape is the actual fix for this
      * function's history — the wall-feature-map block used to be skipped by the refusal branch's
      * `return`, so a refused project kept the previous project's map in native and then SAVED it into
      * the refused project's file on teardown.
      */
-    private fun loadFingerprintIfExists() {
+    private fun loadDoodleIfExists() {
         viewModelScope.launch(Dispatchers.IO) {
             val project = projectRepository.currentProject.value ?: return@launch
             var exit = NativeStateOwner.LoadExit.ABANDONED
-            fingerprintLoadsInFlight.incrementAndGet()
+            doodleLoadsInFlight.incrementAndGet()
             try {
-                applyProjectFingerprint(project) { exit = it }
+                applyProjectDoodle(project) { exit = it }
             } finally {
                 nativeStateOwner.finishLoad(
                     project.id,
                     exit,
                     // Read AFTER the loader's work: a load overtaken by a newer project must not claim.
                     stillCurrent = projectRepository.currentProject.value?.id == project.id,
-                    othersInFlight = fingerprintLoadsInFlight.decrementAndGet() > 0,
+                    othersInFlight = doodleLoadsInFlight.decrementAndGet() > 0,
                 )
             }
         }
     }
 
     /**
-     * The body of [loadFingerprintIfExists]. [reportExit] is called BEFORE the exit's last work (the
+     * The body of [loadDoodleIfExists]. [reportExit] is called BEFORE the exit's last work (the
      * unchanged path's partition) so that a throw there still leaves the caller knowing native was
      * not touched; an exception anywhere else leaves the caller at [NativeStateOwner.LoadExit.ABANDONED].
      */
-    private suspend fun applyProjectFingerprint(
+    private suspend fun applyProjectDoodle(
         project: com.hereliesaz.graffitixr.common.model.GraffitiProject,
         reportExit: (NativeStateOwner.LoadExit) -> Unit,
     ) {
         run {
-            val fp = project.fingerprint
-            val incoming = LoadedFingerprint(project.id, fp)
-            val current = loadedFingerprint
+            val fp = project.doodle
+            val incoming = LoadedDoodle(project.id, fp)
+            val current = loadedDoodle
 
             // Nothing about the map changed: re-evaluate the partition (the design may have moved
             // while this emission was in flight) and touch native not at all. This guard is what
-            // keeps `loadFingerprintIfExists` — which runs on EVERY currentProject emission,
+            // keeps `loadDoodleIfExists` — which runs on EVERY currentProject emission,
             // including the ones the partition itself causes — from re-pushing and, on the refusal
             // path, from re-wiping native's artwork registration every time a layer is saved.
             if (current == incoming) {
                 reportExit(NativeStateOwner.LoadExit.UNCHANGED)
-                partitionLiveFingerprintIfNeeded()
+                partitionLiveDoodleIfNeeded()
                 return
             }
             // A different project — and `current != null` is load-bearing, not defensive. On the
             // FIRST load of a session there is no previous project, and the footprint present is the
             // one the renderer just published for the artwork now on screen; nulling it there wipes
             // exactly the value the partition is about to need. (Caught by
-            // `ArViewModelTest.loading an unpartitioned fingerprint partitions it and writes exactly
+            // `ArViewModelTest.loading an unpartitioned doodle partitions it and writes exactly
             // once`, which is why that test exists.)
             if (current != null && current.projectId != project.id) latestDesignFootprint = null
             // Native is about to be rewritten for `project`; until the END of this load it holds a
             // mixture, and no save may attribute it to this project.
             nativeStateOwner.beginSwitch(project.id)
 
-            val intr = project.fingerprintIntrinsics
-            val anchor = project.fingerprintAnchor
-            // IMPLEMENTATION.md 0.7 — refuse a pre-Phase-0 metric fingerprint instead of
+            val intr = project.doodleIntrinsics
+            val anchor = project.doodleAnchor
+            // IMPLEMENTATION.md 0.7 — refuse a pre-Phase-0 metric doodle instead of
             // relocalizing against it.
             //
             // Its 3D points were back-projected with display-rotated pixels and intrinsics but a
@@ -4441,22 +4456,22 @@ class ArViewModel @Inject constructor(
             // exact state Phase 0 exists to end, silently, on a wall the artist has already painted
             // — and the failure would look like poor tracking rather than stale data.
             //
-            // Keys on the PROJECT field, not the Fingerprint's, because a project saved before 0.11
-            // has no rotation on either. Descriptors-only fingerprints are untouched: with no 3D
+            // Keys on the PROJECT field, not the Doodle's, because a project saved before 0.11
+            // has no rotation on either. Descriptors-only doodles are untouched: with no 3D
             // points there is no frame to be wrong about, which is what `isLegacyFrame()` encodes.
             val hasCoRegistration = intr.size >= 4 && anchor.size == 16
             val legacyFrame = fp != null && fp.isLegacyFrame() &&
-                project.fingerprintCaptureRotationDeg < 0 && hasCoRegistration
+                project.doodleCaptureRotationDeg < 0 && hasCoRegistration
 
             // IMPLEMENTATION.md 4.5 — drop the native design placement HERE, before the branches,
             // not inside them.
             //
             // The placement is `captureAnchorCam · rigidModelAnchorLocal`: a design pose expressed
-            // in the frame of the fingerprint it was composed against. The moment a different
-            // fingerprint is loaded, that frame is gone and the matrix describes nowhere. Only one
-            // of the three branches below would have cleared it — `dropLoadedFingerprint` reaches
-            // `clearWallFingerprint`, which does — so switching to a project with a saved metric
-            // fingerprint left the gated corroboration search predicting every design feature at the
+            // in the frame of the doodle it was composed against. The moment a different
+            // doodle is loaded, that frame is gone and the matrix describes nowhere. Only one
+            // of the three branches below would have cleared it — `dropLoadedDoodle` reaches
+            // `clearWallDoodle`, which does — so switching to a project with a saved metric
+            // doodle left the gated corroboration search predicting every design feature at the
             // PREVIOUS project's design location, expressed in this project's frame. It fails
             // silently and in the worst possible direction: a confidently wrong place returns no
             // matches, which reads downstream as "the wall does not corroborate", pinning
@@ -4465,8 +4480,8 @@ class ArViewModel @Inject constructor(
             //
             // Placed before the `when` rather than repeated in each arm because "cleared in one
             // branch and not its sibling" is the exact defect family six audits already found in
-            // this function — the reason `LoadedFingerprint` and the single-exit loader exist. The
-            // metric branch re-pushes through `partitionLiveFingerprintIfNeeded()` at the tail; the
+            // this function — the reason `LoadedDoodle` and the single-exit loader exist. The
+            // metric branch re-pushes through `partitionLiveDoodleIfNeeded()` at the tail; the
             // descriptors-only branch has no frame to place a design in and correctly stays cleared.
             slamManager.setDesignPlacement(null, 0f, 0f)
 
@@ -4474,34 +4489,34 @@ class ArViewModel @Inject constructor(
                 fp == null || legacyFrame -> {
                     if (legacyFrame) {
                         Timber.w(
-                            "Refusing a pre-Phase-0 wall fingerprint: its 3D points are in the " +
+                            "Refusing a pre-Phase-0 wall doodle: its 3D points are in the " +
                                 "sensor frame and the capture rotation was never recorded.",
                         )
-                        _uiState.update { it.copy(legacyFingerprintRefused = true) }
+                        _uiState.update { it.copy(legacyDoodleRefused = true) }
                         // Surfaced, not merely recorded: the flag's own KDoc said it was, and until
                         // recently nothing read it, so the target silently never locked and looked
                         // like bad tracking.
                         _feedback.tryEmit(
                             com.hereliesaz.graffitixr.common.model.FeedbackEvent.Toast(
-                                appContext.getString(DesignR.string.ar_feedback_legacy_target_geometry),
+                                appContext.getString(DesignR.string.ar_feedback_legacy_doodle_geometry),
                             ),
                         )
                     }
                     // Nothing usable for this project, so nothing may be left loaded — in Kotlin or
                     // in native. Reached once per project change, not once per emission, which is
-                    // what the idempotence guard above buys: `clearWallFingerprint` also drops the
+                    // what the idempotence guard above buys: `clearWallDoodle` also drops the
                     // artwork descriptors and painting progress, and running it on every emission
                     // would wipe the registration `updatePaintingGuide` established for the project
                     // currently open.
-                    dropLoadedFingerprint()
+                    dropLoadedDoodle()
                 }
 
                 hasCoRegistration -> {
-                    // Metric fingerprint: replay the true capture intrinsics + anchor so PnP reloc
+                    // Metric doodle: replay the true capture intrinsics + anchor so PnP reloc
                     // matches the live capture instead of using a default-intrinsics guess.
-                    val view = project.fingerprintViewMatrix
+                    val view = project.doodleViewMatrix
                         .takeIf { it.size == 16 }?.toFloatArray() ?: FloatArray(0)
-                    slamManager.restoreWallFingerprintMetric(
+                    slamManager.restoreWallDoodleMetric(
                         fp.descriptorsData, fp.descriptorsRows, fp.descriptorsCols,
                         fp.descriptorsType, fp.points3d.toFloatArray(),
                         anchor.toFloatArray(), intr.toFloatArray(),
@@ -4515,21 +4530,21 @@ class ArViewModel @Inject constructor(
                     )
                     // Retained for the repartition path (2.2), with exactly the values just pushed
                     // so a later re-push cannot drift from what native holds.
-                    liveFingerprint = LiveFingerprint(fp, anchor.toFloatArray(), intr.toFloatArray(), view)
-                    // A different fingerprint from whatever was partitioned before, so the
+                    liveDoodle = LiveDoodle(fp, anchor.toFloatArray(), intr.toFloatArray(), view)
+                    // A different doodle from whatever was partitioned before, so the
                     // remembered pose describes a map that is no longer loaded.
                     lastPartitionedPose = null
                 }
 
                 else -> {
                     // Depth-path or pre-existing project: descriptors-only legacy restore.
-                    slamManager.restoreWallFingerprint(
+                    slamManager.restoreWallDoodle(
                         fp.descriptorsData, fp.descriptorsRows, fp.descriptorsCols,
                         fp.descriptorsType, fp.points3d.toFloatArray(),
                     )
                     // Native holds THIS project's map, so it must not be cleared — but the map has
                     // no co-registration and cannot be partitioned, so every cache describing a
-                    // partitionable fingerprint has to go.
+                    // partitionable doodle has to go.
                     dropPartitionState()
                 }
             }
@@ -4542,22 +4557,22 @@ class ArViewModel @Inject constructor(
                     if (side * side == fp.patchData.size) slamManager.setWallPatchBytes(fp.patchData, side)
                 }
                 // Re-publish the marks centroid (anchor-local) so the overlay re-centers on the
-                // marks after reload, even though the builder doesn't run on a restored fingerprint.
+                // marks after reload, even though the builder doesn't run on a restored doodle.
                 slamManager.overlayMarkCenterLocal =
                     if (fp.markCenterLocal.size >= 3) fp.markCenterLocal.toFloatArray() else null
                 // IMPLEMENTATION.md 0.9 — the third factor of PoseFusion.composeCorrected. A
-                // pre-Phase-2 fingerprint has none, and null there means "do not correct" rather
+                // pre-Phase-2 doodle has none, and null there means "do not correct" rather
                 // than "correct with the world anchor", which is the frame defect 0.9 fixed.
-                // Also lowers the re-capture gate: this project's fingerprint and pose are now both in.
-                slamManager.completeFingerprintReplacement(
+                // Also lowers the re-capture gate: this project's doodle and pose are now both in.
+                slamManager.completeDoodleReplacement(
                     if (fp.captureAnchorCam.size == 16) fp.captureAnchorCam.toFloatArray() else null,
                 )
             }
 
-            loadedFingerprint = incoming
+            loadedDoodle = incoming
             // Only after the state above is consistent, because this can launch a partition that
             // reads it.
-            if (fp != null && !legacyFrame && hasCoRegistration) partitionLiveFingerprintIfNeeded()
+            if (fp != null && !legacyFrame && hasCoRegistration) partitionLiveDoodleIfNeeded()
 
             val map = project.wallFeatureMap
             if (map != null && map.pointCount > 0) {
@@ -4566,8 +4581,8 @@ class ArViewModel @Inject constructor(
                 // No map on this project: clear any map left in native from a previously loaded project.
                 slamManager.clearWallFeatureMap()
             }
-            // Painted-design reference marks live in the fingerprint frame, so they are restored
-            // only beside the fingerprint they were placed in — and cleared otherwise, so another
+            // Painted-design reference marks live in the doodle frame, so they are restored
+            // only beside the doodle they were placed in — and cleared otherwise, so another
             // project's paint never leaks into this one's relocalization.
             val paint = project.paintMarks
             if (fp != null && !legacyFrame && paint != null && paint.pointCount > 0) {
@@ -4578,14 +4593,14 @@ class ArViewModel @Inject constructor(
                 lastSavedPaintCount.set(0)
             }
             // Area progress: its saved state, and the capture photo that supplies bare-wall colours.
-            // Same condition as the paint marks — both are only meaningful in this fingerprint frame.
+            // Same condition as the paint marks — both are only meaningful in this doodle frame.
             if (fp != null && !legacyFrame) {
                 project.paintGrid?.let { encoded ->
                     runCatching { java.util.Base64.getDecoder().decode(encoded) }.getOrNull()
                         ?.let { slamManager.restorePaintGrid(it) }
                 }
-                val photo = project.targetImageUris.lastOrNull()
-                val intr = project.fingerprintIntrinsics
+                val photo = project.doodleImageUris.lastOrNull()
+                val intr = project.doodleIntrinsics
                 if (photo != null && intr.size == 4) {
                     val bmp = runCatching {
                         com.hereliesaz.graffitixr.common.util.ImageUtils.loadBitmapAsync(appContext, photo)
@@ -4601,14 +4616,14 @@ class ArViewModel @Inject constructor(
                 if (clean != null) slamManager.setCleanWallImage(clean) else slamManager.clearCleanWallImage()
                 _uiState.update { it.copy(hasCleanWall = clean != null) }
             } else {
-                // No fingerprint frame to register against: the previous project's clean wall is not this one's.
+                // No doodle frame to register against: the previous project's clean wall is not this one's.
                 slamManager.clearCleanWallImage()
                 _uiState.update { it.copy(hasCleanWall = false) }
             }
             lastSavedProgress = 0f
             // The wall's normal this project learned, for the sensor turn from the first attempt.
             slamManager.setWallNormalEnu(
-                project.fingerprintWallNormalEnu.takeIf { it.size == 3 }?.toFloatArray(),
+                project.doodleWallNormalEnu.takeIf { it.size == 3 }?.toFloatArray(),
             )
         }
         // Last step: native now holds this project's state. The caller's `finally` claims ownership.
@@ -4621,7 +4636,7 @@ class ArViewModel @Inject constructor(
      * This used to restore a saved ARCore point cloud too, which could not be correct — see
      * [saveMapBlocking] — and before that a native `loadModel` that had been a no-op since the
      * voxel/splat map was deleted. The wall feature map itself is restored by the project load path,
-     * which re-registers it through the fingerprint.
+     * which re-registers it through the doodle.
      */
     private fun loadMapIfExists() {
         lastSavedMapPointCount.set(slamManager.getMapPointCount())
@@ -4678,13 +4693,13 @@ class ArViewModel @Inject constructor(
     private fun hybridRestoreKey(project: com.hereliesaz.graffitixr.common.model.GraffitiProject) =
         project.id to project.hybridKpmPageUri
 
-    // A page frozen this session, waiting for ITS fingerprint to commit. Guarded by [hybridLock]
+    // A page frozen this session, waiting for ITS doodle to commit. Guarded by [hybridLock]
     // (declared above the init block; see the note there).
     private var pendingHybridPage: HybridKpmPage? = null
-    // `fingerprint.captureAnchorCam` as it stood when the current capture started. The pending page
-    // commits only once the project's fingerprint has moved off this value — i.e. the capture that
-    // produced the page actually produced a fingerprint. A capture whose fingerprint build fails
-    // never commits its page, so a page can never be paired with a different capture's fingerprint.
+    // `doodle.captureAnchorCam` as it stood when the current capture started. The pending page
+    // commits only once the project's doodle has moved off this value — i.e. the capture that
+    // produced the page actually produced a doodle. A capture whose doodle build fails
+    // never commits its page, so a page can never be paired with a different capture's doodle.
     private var hybridKeyAtCapture: List<Float>? = null
     // Project the capture belongs to; a page never commits into a different project.
     private var hybridCaptureProjectId: String? = null
@@ -4695,7 +4710,7 @@ class ArViewModel @Inject constructor(
             pendingHybridPage = null
             val project = projectRepository.currentProject.value
             hybridCaptureProjectId = project?.id
-            hybridKeyAtCapture = project?.fingerprint?.captureAnchorCam ?: emptyList()
+            hybridKeyAtCapture = project?.doodle?.captureAnchorCam ?: emptyList()
         }
     }
 
@@ -4708,7 +4723,7 @@ class ArViewModel @Inject constructor(
         projectRepository.currentProject.value?.let(::tryCommitPendingHybridPage)
     }
 
-    /** Commit the pending page iff [project] now carries the fingerprint of the capture behind it. */
+    /** Commit the pending page iff [project] now carries the doodle of the capture behind it. */
     private fun tryCommitPendingHybridPage(project: com.hereliesaz.graffitixr.common.model.GraffitiProject) {
         val page: HybridKpmPage
         val key: List<Float>
@@ -4717,9 +4732,9 @@ class ArViewModel @Inject constructor(
             key = HybridKpmPage.commitKeyOrNull(
                 projectId = project.id,
                 captureProjectId = hybridCaptureProjectId,
-                fingerprintKey = project.fingerprint?.captureAnchorCam,
+                doodleKey = project.doodle?.captureAnchorCam,
                 keyAtCapture = hybridKeyAtCapture,
-            ) ?: return // this capture's fingerprint has not landed (or never will)
+            ) ?: return // this capture's doodle has not landed (or never will)
             pendingHybridPage = null
             page = pending
         }
@@ -4730,7 +4745,7 @@ class ArViewModel @Inject constructor(
     private fun pushPersistedHybridPage(project: com.hereliesaz.graffitixr.common.model.GraffitiProject) {
         val uri = project.hybridKpmPageUri ?: return
         val r = renderer ?: return
-        if (!HybridKpmPage.isBoundTo(project.fingerprint?.captureAnchorCam, project.hybridKpmFingerprintKey)) {
+        if (!HybridKpmPage.isBoundTo(project.doodle?.captureAnchorCam, project.hybridKpmDoodleKey)) {
             // Bound to a different (older) target, or the target was never committed: inert.
             Timber.i("ARDIAG hybrid KPM page not restored: bound to a different target")
             return
@@ -4758,9 +4773,9 @@ class ArViewModel @Inject constructor(
     }
 
     /**
-     * Persist a page bound to fingerprint [key]. Same commit discipline as the standalone reference:
+     * Persist a page bound to doodle [key]. Same commit discipline as the standalone reference:
      * write a new versioned file, commit metadata through an exact transform that re-checks the
-     * project id AND that the fingerprint is still [key], then delete the superseded file — or the
+     * project id AND that the doodle is still [key], then delete the superseded file — or the
      * new one if it never became authoritative.
      */
     private fun persistHybridKpmPage(projectId: String, page: HybridKpmPage, key: List<Float>) {
@@ -4771,7 +4786,7 @@ class ArViewModel @Inject constructor(
                 newUri = projectManager.saveHybridKpmPage(appContext, projectId, page.luma)
                 val candidate = newUri
                 projectRepository.updateProject { current ->
-                    if (current.id != projectId || current.fingerprint?.captureAnchorCam != key) {
+                    if (current.id != projectId || current.doodle?.captureAnchorCam != key) {
                         current
                     } else {
                         previousUri = current.hybridKpmPageUri
@@ -4781,7 +4796,7 @@ class ArViewModel @Inject constructor(
                             hybridKpmPageHeightPx = page.height,
                             hybridKpmPageWidthMeters = page.widthMeters,
                             hybridKpmPageFromArtwork = page.pageFromArtwork.toList(),
-                            hybridKpmFingerprintKey = key,
+                            hybridKpmDoodleKey = key,
                         )
                     }
                 }
@@ -4852,7 +4867,7 @@ class ArViewModel @Inject constructor(
         // A fresh renderer has no hybrid page; offer it the persisted one.
         projectRepository.currentProject.value?.let { project ->
             if (
-                shouldRestoreLocalArCoreFingerprint(
+                shouldRestoreLocalArCoreDoodle(
                     isArCoreAvailable = _uiState.value.isArCoreAvailable,
                     coopRole = _uiState.value.coopRole,
                     peerSpatialFramePresent = _uiState.value.coopPeerSpatialFrame != null,
@@ -4999,7 +5014,7 @@ class ArViewModel @Inject constructor(
                 fusionDiagnostics = fusionDiag,
                 hybridKpmDiagnostics = hybridDiag,
                 measureAvailable = renderer?.wallMeasureAvailable == true,
-                wallFingerprintPoints = wallPoints,
+                wallDoodlePoints = wallPoints,
                 scanPhase = newPhase,
                 ambientSectorsCovered = sectorsCovered / 3, // Keep backward compatibility for 30 degree UI units if needed
                 worldMappingProgress = mappingProgress,
@@ -5239,11 +5254,11 @@ class ArViewModel @Inject constructor(
             deferArtworkGuide(bitmap, designKey, standalone = false)
             return
         }
-        val intr = _uiState.value.targetIntrinsics ?: FloatArray(4)
-        val view = _uiState.value.targetCaptureViewMatrix ?: FloatArray(16)
+        val intr = _uiState.value.doodleCaptureIntrinsics ?: FloatArray(4)
+        val view = _uiState.value.doodleCaptureViewMatrix ?: FloatArray(16)
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                slamManager.setArtworkFingerprint(bitmap, null, 0, 0, 0, intr, view)
+                slamManager.setArtworkDoodle(bitmap, null, 0, 0, 0, intr, view)
             } finally {
                 artworkRegInFlight.set(false)
             }
@@ -5261,12 +5276,12 @@ class ArViewModel @Inject constructor(
     /**
      * Register the artwork validator for the ARCore-independent MobileGS path.
      *
-     * This is intentionally descriptors-only: the standalone wall fingerprint already carries
+     * This is intentionally descriptors-only: the standalone wall doodle already carries
      * metric/normalized 3D page points, while the artwork image has no depth map of its own. Native
      * MobileGS explicitly supports this mode for painting progress and falls back to global
      * clean-wall↔artwork matching until standalone design-placement gating is proven.
      *
-     * Do NOT call [tryAutoFit] here. Its pose/frame assumptions are still the ARCore fingerprint
+     * Do NOT call [tryAutoFit] here. Its pose/frame assumptions are still the ARCore doodle
      * contract and are tracked separately in SPHERESLAM_TODO.md.
      */
     fun updateStandalonePaintingGuide(bitmap: Bitmap, designKey: String? = null) {
@@ -5278,7 +5293,7 @@ class ArViewModel @Inject constructor(
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                slamManager.setArtworkFingerprint(
+                slamManager.setArtworkDoodle(
                     bitmap,
                     null,
                     0,
@@ -5316,7 +5331,7 @@ class ArViewModel @Inject constructor(
                     (sphereFingerprintAnchorTile?.let { "${it.sector}:${it.band}" } ?: "unknown")
             )
         } else if (!registered && wasRegistered) {
-            // Removing/replacing the precision fingerprint does not destroy the base SphereSLAM map.
+            // Removing/replacing the precision doodle does not destroy the base SphereSLAM map.
             sphereFingerprintAnchorTile = null
         }
         val state = _uiState.value
@@ -5389,7 +5404,7 @@ class ArViewModel @Inject constructor(
                 featureProgress = featureProgress,
                 relocDiagnostics = reloc,
                 corroborationDiagnostics = corrob,
-                wallFingerprintPoints = wallPoints,
+                wallDoodlePoints = wallPoints,
             )
         }
     }
@@ -5419,7 +5434,7 @@ class ArViewModel @Inject constructor(
                 ) {
                     appendDiag(
                         "SphereSLAM precision-map autosave refused: " +
-                            "native anchor does not match map_from_fingerprint",
+                            "native anchor does not match map_from_doodle",
                     )
                     return@launch
                 }
@@ -5515,9 +5530,9 @@ class ArViewModel @Inject constructor(
         )
 
     /**
-     * CameraX/SphereSLAM counterpart to [onTargetCaptured].
+     * CameraX/SphereSLAM counterpart to [onDoodleCaptured].
      *
-     * Fingerprint capture sits above the pose backend, so standalone feeds the exact same review
+     * Doodle capture sits above the pose backend, so standalone feeds the exact same review
      * state (raw image + removable-mark mask) instead of mounting a second capture workflow.
      * Geometry is supplied later by the standalone fingerprint builder in its canonical page frame.
      */
@@ -5566,7 +5581,7 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.default) {
             val sourceWidth = bitmap.width
             val sourceHeight = bitmap.height
-            val reviewBitmap = bitmap.forTargetReview()
+            val reviewBitmap = bitmap.forDoodleReview()
             try {
                 val markings = reviewBitmap.isolateMarkings()
                 if (reviewBitmap !== bitmap) {
@@ -5577,16 +5592,16 @@ class ArViewModel @Inject constructor(
                 }
                 _uiState.update {
                     it.copy(
-                        targetRawBitmap = reviewBitmap,
-                        targetDepthBuffer = null,
-                        targetDepthWidth = reviewBitmap.width,
-                        targetDepthHeight = reviewBitmap.height,
-                        targetDepthBufferWidth = 0,
-                        targetDepthBufferHeight = 0,
-                        targetDepthStride = 0,
-                        targetIntrinsics = null,
-                        targetCaptureViewMatrix = null,
-                        targetWallPlane = null,
+                        doodleRawBitmap = reviewBitmap,
+                        doodleDepthBuffer = null,
+                        doodleDepthWidth = reviewBitmap.width,
+                        doodleDepthHeight = reviewBitmap.height,
+                        doodleDepthBufferWidth = 0,
+                        doodleDepthBufferHeight = 0,
+                        doodleDepthStride = 0,
+                        doodleCaptureIntrinsics = null,
+                        doodleCaptureViewMatrix = null,
+                        doodleCaptureWallPlane = null,
                         targetPhysicalExtent = null,
                         tempCaptureBitmap = reviewBitmap,
                         annotatedCaptureBitmap = markings,
@@ -5674,7 +5689,7 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    fun onTargetCaptured(
+    fun onDoodleCaptured(
         bitmap: Bitmap,
         depthBuffer: ByteBuffer?,
         colorW: Int,
@@ -5722,12 +5737,12 @@ class ArViewModel @Inject constructor(
             return
         }
         autoFitArmed = true // a fresh photo of the wall may show paint the new design should fit
-        // Doodle demo: a headless capture (no tap, no review) — build the fingerprint from the
+        // Doodle demo: a headless capture (no tap, no review) — build the doodle from the
         // drawing and return before the normal capture/review flow runs. Clear the capture-request
         // flag ourselves (the normal paths below do this) so the renderer isn't re-armed every frame.
-        if (doodlePhaseActive && !doodleFingerprintBuilt) {
+        if (doodlePhaseActive && !doodleBuilt) {
             onCaptureRequestHandled()
-            buildDoodleFingerprint(bitmap, intrinsics, viewMatrix, displayRotation)
+            buildDoodle(bitmap, intrinsics, viewMatrix, displayRotation)
             return
         }
 
@@ -5774,18 +5789,18 @@ class ArViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         tapMarks = it.tapMarks + com.hereliesaz.graffitixr.common.model.TapMark(tapPos.first, tapPos.second, tapDistanceMeters),
-                        targetRawBitmap = bitmap,
-                        targetDisplayRotation = displayRotation,
-                        targetCaptureEnvironment = environment,
-                        targetDepthBuffer = depthBuffer,
-                        targetDepthWidth = colorW,
-                        targetDepthHeight = colorH,
-                        targetDepthBufferWidth = depthBufW,
-                        targetDepthBufferHeight = depthBufH,
-                        targetDepthStride = depthBufStride,
-                        targetIntrinsics = intrinsics,
-                        targetCaptureViewMatrix = viewMatrix,
-                        targetWallPlane = wallPlane,
+                        doodleRawBitmap = bitmap,
+                        doodleDisplayRotation = displayRotation,
+                        doodleCaptureEnvironment = environment,
+                        doodleDepthBuffer = depthBuffer,
+                        doodleDepthWidth = colorW,
+                        doodleDepthHeight = colorH,
+                        doodleDepthBufferWidth = depthBufW,
+                        doodleDepthBufferHeight = depthBufH,
+                        doodleDepthStride = depthBufStride,
+                        doodleCaptureIntrinsics = intrinsics,
+                        doodleCaptureViewMatrix = viewMatrix,
+                        doodleCaptureWallPlane = wallPlane,
                         targetPhysicalExtent = extent,
                         isCaptureRequested = false,
                         tempCaptureBitmap = rotatedBmp,
@@ -5798,18 +5813,18 @@ class ArViewModel @Inject constructor(
                     it.copy(
                         tempCaptureBitmap = rotatedBmp,
                         annotatedCaptureBitmap = markings,
-                        targetRawBitmap = bitmap,
-                        targetDisplayRotation = displayRotation,
-                        targetCaptureEnvironment = environment,
-                        targetDepthBuffer = depthBuffer,
-                        targetDepthWidth = colorW,
-                        targetDepthHeight = colorH,
-                        targetDepthBufferWidth = depthBufW,
-                        targetDepthBufferHeight = depthBufH,
-                        targetDepthStride = depthBufStride,
-                        targetIntrinsics = intrinsics,
-                        targetCaptureViewMatrix = viewMatrix,
-                        targetWallPlane = wallPlane,
+                        doodleRawBitmap = bitmap,
+                        doodleDisplayRotation = displayRotation,
+                        doodleCaptureEnvironment = environment,
+                        doodleDepthBuffer = depthBuffer,
+                        doodleDepthWidth = colorW,
+                        doodleDepthHeight = colorH,
+                        doodleDepthBufferWidth = depthBufW,
+                        doodleDepthBufferHeight = depthBufH,
+                        doodleDepthStride = depthBufStride,
+                        doodleCaptureIntrinsics = intrinsics,
+                        doodleCaptureViewMatrix = viewMatrix,
+                        doodleCaptureWallPlane = wallPlane,
                         targetPhysicalExtent = extent,
                         isCaptureRequested = false
                     )
@@ -5823,7 +5838,7 @@ class ArViewModel @Inject constructor(
     }
 
     /**
-     * A target capture failed (the renderer threw before reaching [onTargetCaptured], or preparing
+     * A target capture failed (the renderer threw before reaching [onDoodleCaptured], or preparing
      * the frame did). Drops the request so the capture button / tap re-arms (a request left up
      * blocks every later tap), logs it, and tells the artist to try again. Safe from any thread.
      */
@@ -5838,7 +5853,7 @@ class ArViewModel @Inject constructor(
         )
     }
 
-    // The in-flight rotate + isolateMarkings of the latest capture (see onTargetCaptured).
+    // The in-flight rotate + isolateMarkings of the latest capture (see onDoodleCaptured).
     private var captureComputeJob: Job? = null
 
     /**
@@ -5863,16 +5878,16 @@ class ArViewModel @Inject constructor(
     }
 
     /**
-     * Remove the ENTIRE mark the user tapped or dragged onto from the fingerprint mask.
+     * Remove the ENTIRE mark the user tapped or dragged onto from the doodle mask.
      * Floods the whole connected highlighted blob to transparent (see [MarkEraser]) — no partial
      * pixel erasing, no per-point dots. A drag calls this per touch sample. Samples are queued and
      * applied in batches to ONE working pixel buffer, publishing one new mask per batch; a touch with
      * no mark in reach erases nothing and publishes nothing (it costs a bounded neighbourhood scan,
-     * not an image copy). The mask's alpha channel is what the native fingerprint masker reads, so
+     * not an image copy). The mask's alpha channel is what the native doodle masker reads, so
      * the mark simply stops contributing.
      *
      * Asynchronous: the mask in [uiState] lags the touches by the queue. Anything that consumes the
-     * mask (Confirm) must go through [awaitLatestTargetCapture], which applies every queued erase first.
+     * mask (Confirm) must go through [awaitLatestDoodleCapture], which applies every queued erase first.
      */
     // Serializes the batches so each starts from the LATEST mask rather than a snapshot taken when the
     // gesture sample fired. Without this, two rapid removals both read the same bitmap and the later
@@ -5926,12 +5941,12 @@ class ArViewModel @Inject constructor(
     }
 
     /**
-     * The capture bitmap and fingerprint mask as they stand NOW, after every mark erase queued so far
+     * The capture bitmap and doodle mask as they stand NOW, after every mark erase queued so far
      * has been applied. Confirm calls this instead of reading the composition's snapshot, which can
      * predate erases still in flight — the artist taps the last mark and Confirm immediately, and the
-     * fingerprint was built with that mark still in it.
+     * doodle was built with that mark still in it.
      */
-    suspend fun awaitLatestTargetCapture(): Pair<Bitmap?, Bitmap?> {
+    suspend fun awaitLatestDoodleCapture(): Pair<Bitmap?, Bitmap?> {
         withContext(dispatchers.default) {
             markRemovalMutex.withLock { applyPendingMarkRemovalsLocked() }
         }
@@ -6091,7 +6106,7 @@ class ArViewModel @Inject constructor(
      * the captured wall plane, and clears the on-image markers.
      */
     fun clearCaptureForRetry() {
-        slamManager.abortFingerprintReplacement()
+        slamManager.abortDoodleReplacement()
         pendingTapPosition = null
         pendingStandaloneFingerprintPlacement = null
         resetCapturePipeline()
@@ -6099,7 +6114,7 @@ class ArViewModel @Inject constructor(
             it.copy(
                 tempCaptureBitmap = null,
                 annotatedCaptureBitmap = null,
-                targetWallPlane = null,
+                doodleCaptureWallPlane = null,
                 tapMarks = emptyList(),
                 unwarpPoints = emptyList()
             )
@@ -6164,13 +6179,13 @@ class ArViewModel @Inject constructor(
         // this anchor first, so the new value always lands after this clear). If the build then fails,
         // fusion reports NO_CAPTURE_POSE instead of correcting in the wrong frame.
         //
-        // Beyond the pose, native still holds the PREVIOUS wall's fingerprint and keeps solving against
+        // Beyond the pose, native still holds the PREVIOUS wall's doodle and keeps solving against
         // it, so its results (seq advancing) are in the old wall's frame too. The replacement gate
         // makes the renderer ignore reloc and the arbiter never pick it until the builder (or a
-        // project load) installs the new fingerprint AND the new pose.
-        slamManager.beginFingerprintReplacement()
+        // project load) installs the new doodle AND the new pose.
+        slamManager.beginDoodleReplacement()
         // Anchor on the wall plane the artist tapped, not wherever the centre hit test happens to land.
-        renderer?.pendingCapturedWallPlane = _uiState.value.targetWallPlane?.copyOf()
+        renderer?.pendingCapturedWallPlane = _uiState.value.doodleCaptureWallPlane?.copyOf()
         renderer?.pendingAnchorEstablishment = true
     }
 
@@ -6257,7 +6272,7 @@ class ArViewModel @Inject constructor(
         _uiState.update { if (it.doodleLocked) it else it.copy(doodleLocked = true) }
     }
 
-    // --- Doodle demo: headless fingerprint build ---
+    // --- Doodle demo: headless doodle build ---
     internal companion object {
         /** Tripod stream (Link): longest edge and JPEG quality of each streamed frame. */
         const val TRIPOD_MAX_EDGE_PX = 960
@@ -6340,9 +6355,9 @@ class ArViewModel @Inject constructor(
         const val LOCK_TIMEOUT_RETRY_DELAY_MS = 200L
     }
     // @Volatile: written on main (setDoodlePhase) / IO (build result) and read on the GL thread
-    // (onTargetCaptured), so the GL thread must observe the latest value.
+    // (onDoodleCaptured), so the GL thread must observe the latest value.
     @Volatile private var doodlePhaseActive = false
-    @Volatile private var doodleFingerprintBuilt = false
+    @Volatile private var doodleBuilt = false
     // Guards against re-entrant builds if captures arrive faster than a build completes.
     @Volatile private var doodleBuildInFlight = false
     private var doodleCaptureJob: Job? = null
@@ -6350,10 +6365,10 @@ class ArViewModel @Inject constructor(
     /**
      * Host tells us the first-run DETECT stage is running — the user has already drawn the scribble on
      * their wall and is now pointing the camera at it. While active we periodically capture the live
-     * frame (no tap) and try to build a wall fingerprint from the marks; the builder returns null
+     * frame (no tap) and try to build a wall doodle from the marks; the builder returns null
      * until there is enough texture, so this self-times to "the drawing is visible enough".
      *
-     * Completion is the fingerprint landing, not the user holding still: a built fingerprint means
+     * Completion is the doodle landing, not the user holding still: a built doodle means
      * the marks were genuinely recognised and relocalization has something to track, which is exactly
      * what "detected, ready to go" should mean. The renderer's stability lock remains as a second
      * trigger, and the timeout below as a last resort.
@@ -6362,7 +6377,7 @@ class ArViewModel @Inject constructor(
         if (doodlePhaseActive == active) return
         doodlePhaseActive = active
         if (active) {
-            doodleFingerprintBuilt = false
+            doodleBuilt = false
             slamManager.overlayMarkCenterLocal = null
         // 0.9 — same lifetime: without it PoseFusion cannot compose a correction at all.
         slamManager.captureAnchorCam = null
@@ -6391,13 +6406,13 @@ class ArViewModel @Inject constructor(
                         break
                     }
                     if (!_uiState.value.isAnchorEstablished || renderer?.doodleWallPlane == null) continue
-                    if (doodleFingerprintBuilt) {
+                    if (doodleBuilt) {
                         // Detected: the drawing was recognised. Done — don't make the user hold the
                         // phone still to satisfy a separate stability gate.
                         onDoodleLocked()
                         break
                     }
-                    requestCapture() // no onScreenTap → no tap; onTargetCaptured builds headlessly
+                    requestCapture() // no onScreenTap → no tap; onDoodleCaptured builds headlessly
                     // Graceful fallback: on a featureless wall relocalization may never converge. Rather
                     // than hang forever, after the budget is spent place the artwork on the plain anchor
                     // so the user still ends up with art stuck to the wall.
@@ -6413,8 +6428,8 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    /** Build a fingerprint from a headless doodle capture; sets doodleFingerprintBuilt on success. */
-    private fun buildDoodleFingerprint(bitmap: Bitmap, intrinsics: FloatArray?, viewMatrix: FloatArray, displayRotation: Int) {
+    /** Build a doodle from a headless doodle capture; sets doodleBuilt on success. */
+    private fun buildDoodle(bitmap: Bitmap, intrinsics: FloatArray?, viewMatrix: FloatArray, displayRotation: Int) {
         // Only one build in flight — captures can arrive faster than a native build completes.
         if (doodleBuildInFlight) return
         val plane = renderer?.doodleWallPlane
@@ -6443,7 +6458,7 @@ class ArViewModel @Inject constructor(
                 intr == null -> "no camera intrinsics for this frame"
                 else -> "native engine could not produce an anchor transform (allocation failure)"
             }
-            com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
+            com.hereliesaz.graffitixr.feature.ar.anchor.MetricDoodleBuilder
                 .recordPreconditionFailure(reason)
             Timber.w("ARDIAG doodle capture skipped: $reason")
             slamManager.setMappingPaused(false)
@@ -6459,38 +6474,38 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 // Capture the wall's colour/luminance so the artwork can be auto-tuned to it on the
-                // swap. Computed every attempt so it's fresh even on the timeout (no-fingerprint) path.
+                // swap. Computed every attempt so it's fresh even on the timeout (no-doodle) path.
                 val wallStats = rotated.imageStats()
                 _uiState.update { it.copy(doodleWallStats = wallStats) }
 
-                val fp = MetricFingerprintBuilder.buildSingle(
+                val fp = MetricDoodleBuilder.buildSingle(
                     slamManager, rotated, viewMatrix, intr, planePoint, planeNormal, anchor,
                     // The same angle `rotated` and `intr` were built with, a dozen lines above.
                     rotationDeg = displayRotation,
-                    features = _uiState.value.fingerprintFeatures,
+                    features = _uiState.value.doodleFeatures,
                 )
                 if (fp != null) {
-                    doodleFingerprintBuilt = true
+                    doodleBuilt = true
                     // No need to clear anything here: `buildSingle` already recorded its own success
-                    // (null) into `MetricFingerprintBuilder.lastRefusalReason` internally.
+                    // (null) into `MetricDoodleBuilder.lastRefusalReason` internally.
                 } else {
                     // `buildSingle` already recorded WHY, from the same counts this used to
-                    // re-derive by hand — see `MetricFingerprintBuilder.lastRefusalReason`. Read it
+                    // re-derive by hand — see `MetricDoodleBuilder.lastRefusalReason`. Read it
                     // back only to log it; the report reads the shared field directly.
                     Timber.w(
                         "ARDIAG target capture refused: " +
-                            "${MetricFingerprintBuilder.lastRefusalReason}",
+                            "${MetricDoodleBuilder.lastRefusalReason}",
                     )
                 }
             } catch (t: Throwable) {
-                android.util.Log.w("ArViewModel", "Doodle fingerprint build failed", t)
+                android.util.Log.w("ArViewModel", "Doodle build failed", t)
                 // A throw is a refusal too, and without this the shared field would otherwise keep
                 // whatever it held before this attempt — success OR failure — and let the report
                 // describe a DIFFERENT capture than the one that just blew up. `buildSingle` has at
                 // least one reachable throw of its own — `glViewToCvDisplay` requires a multiple of
                 // 90 — and reporting a crash as an unrelated result is the failure this whole effort
                 // exists to stop.
-                com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
+                com.hereliesaz.graffitixr.feature.ar.anchor.MetricDoodleBuilder
                     .recordPreconditionFailure("threw ${t.javaClass.simpleName}: ${t.message ?: "no message"}")
             } finally {
                 // Always resume the mapping that requestCapture paused — otherwise a throw would
@@ -6511,8 +6526,8 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    // setArtworkFingerprintFromComposite removed: nothing called it, and it bailed on its first line
-    // (`targetDepthBuffer ?: return`) because the ARCore depth API is disabled, so it could not have
+    // setArtworkDoodleFromComposite removed: nothing called it, and it bailed on its first line
+    // (`doodleDepthBuffer ?: return`) because the ARCore depth API is disabled, so it could not have
     // registered an artwork base even if something had. [updatePaintingGuide] is the live path — it
     // re-registers the design composite whenever the design changes, descriptors-only, which is all
     // the teleological corroboration test needs.
@@ -6552,15 +6567,8 @@ class ArViewModel @Inject constructor(
         get() = appContext.getSystemService(android.os.PowerManager::class.java)
     private val batteryManager: android.os.BatteryManager?
         get() = appContext.getSystemService(android.os.BatteryManager::class.java)
-    private var thermalListener: android.os.PowerManager.OnThermalStatusChangedListener? = null
-    private var powerReceiver: android.content.BroadcastReceiver? = null
-    @Volatile private var thermalHot = false
-    @Volatile private var batteryLow = false
-    /** Live battery level [0..100], or -1 when unknown. Sampled from ACTION_BATTERY_CHANGED. */
-    @Volatile private var batteryPct = -1
-    /** Battery-level thresholds (%) for the medium / low degradation tiers. */
-    private val BATTERY_TIER_MED = 30
-    private val BATTERY_TIER_LOW = 15
+    // The throttle-monitoring state (thermalListener … BATTERY_TIER_LOW) is declared above the init
+    // block that registers it; see the note there.
 
     /**
      * Folds device-stress signals into the AR rate policy. The existing perception floor (30fps via

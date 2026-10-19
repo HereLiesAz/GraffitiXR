@@ -237,7 +237,7 @@ class PlaneMarksObliquityTest {
     // in its CALLER, which handed it display-frame rays and a sensor-frame plane. So asserting
     // `backProject` is now exact under `rzView(90)` would assert nothing: it would still be a
     // deliberately mismatched frame, and it would still be wrong. What has to be exercised is the
-    // path `MetricFingerprintBuilder.buildSingle` actually takes.
+    // path `MetricDoodleBuilder.buildSingle` actually takes.
     // ---------------------------------------------------------------------------------------
 
     /**

@@ -14,22 +14,22 @@ import org.junit.Test
 class CoopPeerWallPoseTest {
     private fun spatial(bridge: FloatArray = identity()) = CoopSpatialFrame(
         hostBackend = CoopTrackingBackend.ARCORE,
-        fingerprintFrameVersion = 1,
+        doodleFrameVersion = 1,
         scale = CoopSpatialScale.METRIC,
-        fingerprintAvailable = true,
+        doodleAvailable = true,
         anchorRevision = 7L,
         referenceWidthUnits = 2f,
-        fingerprintFromWall = bridge.toList(),
+        doodleFromWall = bridge.toList(),
     )
 
     @Test
-    fun `peer PnP composes through fingerprint-from-wall bridge`() {
+    fun `peer PnP composes through doodle-from-wall bridge`() {
         val pnpCv = identity().also {
             it[12] = 0.25f
             it[13] = -0.4f
             it[14] = 2.0f
         }
-        val fingerprintFromWall = identity().also {
+        val doodleFromWall = identity().also {
             it[12] = 1.0f
             it[13] = 0.5f
         }
@@ -39,12 +39,12 @@ class CoopPeerWallPoseTest {
         reloc[17] = 30f
         reloc[18] = 3f
 
-        val maybeSolved = CoopPeerWallPoseSolver.solve(reloc, spatial(fingerprintFromWall))
+        val maybeSolved = CoopPeerWallPoseSolver.solve(reloc, spatial(doodleFromWall))
         assertNotNull(maybeSolved)
         val solved = requireNotNull(maybeSolved)
         val expected = RigidMath.multiply(
             RigidMath.glViewToCv(pnpCv),
-            fingerprintFromWall,
+            doodleFromWall,
         )
         assertArrayEquals(expected, solved.viewMatrix, 1e-6f)
     }
@@ -68,12 +68,12 @@ class CoopPeerWallPoseTest {
     }
 
     @Test
-    fun `ARCore host peer fingerprint selection ignores stale local page state`() {
+    fun `ARCore host peer doodle selection ignores stale local page state`() {
         val frame = spatial()
-        assertTrue(shouldUseCoopPeerFingerprint(frame, byteArrayOf(1, 2, 3)))
-        assertFalse(shouldUseCoopPeerFingerprint(frame, byteArrayOf()))
+        assertTrue(shouldUseCoopPeerDoodle(frame, byteArrayOf(1, 2, 3)))
+        assertFalse(shouldUseCoopPeerDoodle(frame, byteArrayOf()))
         assertFalse(
-            shouldUseCoopPeerFingerprint(
+            shouldUseCoopPeerDoodle(
                 frame.copy(hostBackend = CoopTrackingBackend.SPHERESLAM),
                 byteArrayOf(1),
             )

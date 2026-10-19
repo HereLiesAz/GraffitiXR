@@ -21,7 +21,7 @@ class InterruptedBulkTest {
      * per-attempt window (the guest is then closed to release its socket/coroutine).
      */
     private suspend fun runOnce(): CoopSessionState? {
-        val fingerprint = ByteArray(64 * 1024) { it.toByte() }   // 64KB chunk
+        val doodle = ByteArray(64 * 1024) { it.toByte() }   // 64KB chunk
         val projectBytes = ByteArray(2 * 1024 * 1024) { 0 }       // 2MB -> multiple chunks
 
         val host = HostSession(
@@ -31,7 +31,7 @@ class InterruptedBulkTest {
             projectId = "p1",
             snapshotProvider = {
                 ProjectSnapshot(
-                    fingerprintBytes = fingerprint,
+                    doodleBytes = doodle,
                     projectBytes = projectBytes,
                     layerCount = 0,
                     spatialFrame = testSpatialFrame(),

@@ -114,8 +114,8 @@ KNOWN_UNLOCKED_OK = {
     "mRelocCv",
     # mSuperPoint/mEnhancer/mDistortionHead are NOT write-once: nativeLoadSuperPoint/
     # nativeLoadDistortionHead/nativeLoadLowLightEnhancer can reload them at any time via their
-    # .load() calls, and every other reader here (runRelocPass, tryUpdateFingerprint,
-    # getSuperPointFeatures, getFingerprintKeypoints, generateFingerprint) touches them with no
+    # .load() calls, and every other reader here (runRelocPass, tryUpdateDoodle,
+    # getSuperPointFeatures, getDoodleKeypoints, generateDoodle) touches them with no
     # MobileGS-internal lock. Safety depends on a cross-file invariant this script cannot see:
     # GraffitiJNI.cpp's nativeLoadSuperPoint/nativeLoadDistortionHead/nativeLoadLowLightEnhancer
     # must take gEngineMutex as std::unique_lock (not shared_lock), so a live reload excludes
@@ -270,7 +270,7 @@ def main() -> int:
     all_findings: list[Finding] = []
     for name, _start, body in functions:
         # Convention: a `...Locked` method is only ever called with mMutex already held by its
-        # caller (e.g. buildPaintGridLocked, called inside setArtworkFingerprint's lock scope), so
+        # caller (e.g. buildPaintGridLocked, called inside setArtworkDoodle's lock scope), so
         # its body has no lock of its own to see. Checked by callers, not here.
         if name.endswith("Locked"):
             continue

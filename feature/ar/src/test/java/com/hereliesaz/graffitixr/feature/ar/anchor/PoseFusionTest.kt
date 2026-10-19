@@ -58,7 +58,7 @@ class PoseFusionTest {
         // 90 deg about Z, no translation.
         val rotZ = floatArrayOf(0f,1f,0f,0f, -1f,0f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
         val v = rotZ                       // world -> camera is a pure rotation
-        val pnp = identity()               // camera -> fingerprint world is identity
+        val pnp = identity()               // camera -> doodle world is identity
         val captureAnchorCam = trans(1f, 0f, 0f)  // anchor sits +1 along the capture frame's X
 
         // inverse(V)·[D·pnp]·captureAnchorCam = rotZ⁻¹ · D · trans(1,0,0). D leaves a +X translation

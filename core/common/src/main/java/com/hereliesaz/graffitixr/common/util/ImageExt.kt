@@ -5,9 +5,9 @@ import android.graphics.Bitmap
 
 /**
  * Opaque colour every detected mark is painted with so the user can clearly SEE which marks
- * will feed the wall fingerprint. The marks are dark by definition (that is how they are
+ * will feed the wall doodle. The marks are dark by definition (that is how they are
  * detected), so re-drawing them in their own colour would be near-invisible against a dark
- * wall — they must be highlighted. Only the ALPHA channel matters to the native fingerprint
+ * wall — they must be highlighted. Only the ALPHA channel matters to the native doodle
  * masker (opaque = detect, transparent = skip), so the RGB highlight is purely visual.
  */
 const val MARK_HIGHLIGHT_COLOR: Int = 0xFF00E5FF.toInt() // bright cyan
@@ -59,7 +59,7 @@ internal fun fitWithinPixelBudget(
  * The returned bitmap is the receiver itself when no resize is needed; callers must therefore only
  * recycle the original when the returned instance is different.
  */
-fun Bitmap.forTargetReview(
+fun Bitmap.forDoodleReview(
     maxPixels: Long = TARGET_REVIEW_MAX_PIXELS,
 ): Bitmap {
     val (targetWidth, targetHeight) = fitWithinPixelBudget(width, height, maxPixels)
@@ -314,7 +314,7 @@ internal fun eraseMarkAt(pixels: IntArray, w: Int, h: Int, nx: Float, ny: Float,
  * not once the mask has been replaced by a new capture).
  *
  * Bitmaps are never mutated in place — Compose draws them by reference — and the superseded one is
- * deliberately not recycled here: the UI (and, after Confirm, the fingerprint job) may still hold it,
+ * deliberately not recycled here: the UI (and, after Confirm, the doodle job) may still hold it,
  * and recycling a bitmap that is being drawn crashes the draw. Dropping the reference is the safe
  * release. Not thread-safe; owned by one serialized caller.
  */

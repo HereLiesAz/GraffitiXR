@@ -133,7 +133,7 @@ class ArViewModelLiveSettingsTest {
         assertTrue(vm.uiState.value.isArCoreAvailabilityResolved)
         assertEquals(SphereSlamRuntimeMode.STANDALONE, vm.uiState.value.sphereSlamRuntimeStatus.mode)
         // Same native cleanup the startup path runs for an unsupported device.
-        verify { slamManager.clearWallFingerprint() }
+        verify { slamManager.clearWallDoodle() }
         verify { slamManager.clearWallFeatureMap() }
 
         arCoreEnabled.value = true

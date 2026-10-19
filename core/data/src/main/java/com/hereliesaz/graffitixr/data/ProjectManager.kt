@@ -94,13 +94,13 @@ class ProjectManager @Inject constructor(
 
         /**
          * Cap on how many captured target images a single project keeps, enforced by
-         * [pruneTargetImages]. Nothing previously pruned this list, so repeated re-captures could grow
+         * [pruneDoodleImages]. Nothing previously pruned this list, so repeated re-captures could grow
          * it, and its on-disk PNGs, without bound short of deleting the whole project. No existing
          * precedent in this codebase for the right number, so 30 is chosen as generous headroom for a
          * real capture session while still bounding worst-case storage to a few dozen PNGs.
          *
-         * Note: the live capture flow appends via [appendTargetImage], which does its own pruning and
-         * never routes through [saveProject]'s `targetImages` parameter — this cap/path is exercised by
+         * Note: the live capture flow appends via [appendDoodleImage], which does its own pruning and
+         * never routes through [saveProject]'s `doodleImages` parameter — this cap/path is exercised by
          * tests and direct API use, not production captures.
          */
         private const val MAX_TARGET_IMAGES = 30
@@ -122,12 +122,12 @@ class ProjectManager @Inject constructor(
     suspend fun saveProject(
         context: Context,
         projectData: GraffitiProject,
-        targetImages: List<Bitmap>? = null,
+        doodleImages: List<Bitmap>? = null,
         thumbnail: Bitmap? = null,
     ): GraffitiProject = saveProjectInternal(
         context = context,
         projectData = projectData,
-        targetImages = targetImages,
+        doodleImages = doodleImages,
         thumbnail = thumbnail,
         preserveExistingCaptureState = true,
     )
@@ -148,7 +148,7 @@ class ProjectManager @Inject constructor(
     ): GraffitiProject = saveProjectInternal(
         context = context,
         projectData = projectData,
-        targetImages = null,
+        doodleImages = null,
         thumbnail = null,
         preserveExistingCaptureState = false,
     )
@@ -156,30 +156,30 @@ class ProjectManager @Inject constructor(
     private suspend fun saveProjectInternal(
         context: Context,
         projectData: GraffitiProject,
-        targetImages: List<Bitmap>?,
+        doodleImages: List<Bitmap>?,
         thumbnail: Bitmap?,
         preserveExistingCaptureState: Boolean,
     ): GraffitiProject = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/${projectData.id}")
         if (!root.exists()) root.mkdirs()
 
-        // The target fingerprint must survive EVERY routine save (layer edits, autosave, re-entering
+        // The target doodle must survive EVERY routine save (layer edits, autosave, re-entering
         // AR, etc.) and change only when the user creates a NEW target — which is the one path that
-        // passes a non-null fingerprint. So when the incoming project carries no fingerprint, carry
+        // passes a non-null doodle. So when the incoming project carries no doodle, carry
         // over whatever is already persisted instead of nulling it. This makes it impossible for any
         // other writer (or a stale-snapshot race) to wipe the saved target — the view matrix and
-        // capture rotation are captured alongside the fingerprint itself, so they follow the same
-        // unconditional preserve-from-existing as the fingerprint/intrinsics/anchor; the wall feature
-        // map and cloud anchor id can each legitimately be set on a routine (non-fingerprint) save
+        // capture rotation are captured alongside the doodle itself, so they follow the same
+        // unconditional preserve-from-existing as the doodle/intrinsics/anchor; the wall feature
+        // map and cloud anchor id can each legitimately be set on a routine (non-doodle) save
         // (e.g. the passive wall-map save), so those instead only fall back to the on-disk value when
-        // the incoming project doesn't set one, same as the legacy target-fingerprint references (the
+        // the incoming project doesn't set one, same as the legacy target-doodle references (the
         // learned wall normal and the capture environment follow the same fallback).
         //
-        // An incoming fingerprint does not switch the merge off wholesale. Only a fingerprint that
+        // An incoming doodle does not switch the merge off wholesale. Only a doodle that
         // DIFFERS from the persisted one is a new target, and only the state expressed in the old
         // target's frame (the capture group, legacy refs, wall map, paint marks/grid, cloud anchor,
         // AR placement width) is taken verbatim from it. A stale writer that merely carries the
-        // already-saved fingerprint gets the full merge, and the frame-independent state below
+        // already-saved doodle gets the full merge, and the frame-independent state below
         // (SphereSLAM's own page group, the measured wall width) is preserved either way.
         val mergedCapture = if (preserveExistingCaptureState) {
             val existing = try {
@@ -191,24 +191,24 @@ class ProjectManager @Inject constructor(
                 null
             }
             if (existing != null) {
-                val replacesTarget =
-                    projectData.fingerprint != null && projectData.fingerprint != existing.fingerprint
-                val withTarget = if (replacesTarget) projectData else projectData.copy(
-                    fingerprint = existing.fingerprint,
-                    fingerprintIntrinsics = existing.fingerprintIntrinsics,
-                    fingerprintAnchor = existing.fingerprintAnchor,
-                    fingerprintViewMatrix = existing.fingerprintViewMatrix,
-                    fingerprintCaptureRotationDeg = existing.fingerprintCaptureRotationDeg,
+                val replacesDoodle =
+                    projectData.doodle != null && projectData.doodle != existing.doodle
+                val withTarget = if (replacesDoodle) projectData else projectData.copy(
+                    doodle = existing.doodle,
+                    doodleIntrinsics = existing.doodleIntrinsics,
+                    doodleAnchor = existing.doodleAnchor,
+                    doodleViewMatrix = existing.doodleViewMatrix,
+                    doodleCaptureRotationDeg = existing.doodleCaptureRotationDeg,
                     // Learned by MobileGS at trusted locks (so a routine save may carry a newer one);
                     // an older whole-object writer that never saw it must not clear it.
-                    fingerprintWallNormalEnu =
-                        projectData.fingerprintWallNormalEnu.ifEmpty { existing.fingerprintWallNormalEnu },
-                    // Captured with the fingerprint, in the same frame as the view matrix above.
+                    doodleWallNormalEnu =
+                        projectData.doodleWallNormalEnu.ifEmpty { existing.doodleWallNormalEnu },
+                    // Captured with the doodle, in the same frame as the view matrix above.
                     captureEnvironment = projectData.captureEnvironment ?: existing.captureEnvironment,
-                    // Preserve the legacy target-fingerprint references too, so no save without them
+                    // Preserve the legacy target-doodle references too, so no save without them
                     // can wipe an existing target.
-                    targetFingerprint = projectData.targetFingerprint ?: existing.targetFingerprint,
-                    targetFingerprintPath = projectData.targetFingerprintPath ?: existing.targetFingerprintPath,
+                    doodleData = projectData.doodleData ?: existing.doodleData,
+                    doodleDataPath = projectData.doodleDataPath ?: existing.doodleDataPath,
                     wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
                     paintMarks = projectData.paintMarks ?: existing.paintMarks,
                     paintGrid = projectData.paintGrid ?: existing.paintGrid,
@@ -219,7 +219,7 @@ class ProjectManager @Inject constructor(
                 )
                 withTarget.copy(
                     // Standalone SphereSLAM's canonical wall page is just as persistent as the
-                    // fingerprint: routine/stale saves must not silently erase it.
+                    // doodle: routine/stale saves must not silently erase it.
                     sphereSlamReferenceUri =
                         projectData.sphereSlamReferenceUri ?: existing.sphereSlamReferenceUri,
                     sphereSlamReferenceWidthMeters =
@@ -344,20 +344,20 @@ class ProjectManager @Inject constructor(
         // repeated captures can't grow this list (and its on-disk PNGs) without bound. Filenames are
         // unique (not size-indexed): once the list is pruned to the cap its size stops growing, so an
         // index derived from it would collide with — and silently overwrite — a still-kept file.
-        val savedTargetUris = if (targetImages != null) {
-            val newUris = targetImages.map { bitmap ->
+        val savedDoodleUris = if (doodleImages != null) {
+            val newUris = doodleImages.map { bitmap ->
                 val file = File(root, "target_${UUID.randomUUID()}.png")
                 writePngAtomically(bitmap, file, "target image")
                 uriProvider.getUriForFile(file)
             }
-            pruneTargetImages(incoming.targetImageUris + newUris)
+            pruneDoodleImages(incoming.doodleImageUris + newUris)
         } else {
-            incoming.targetImageUris
+            incoming.doodleImageUris
         }
 
         val updatedGraffitiProject = incoming.copy(
             thumbnailUri = thumbnailUri,
-            targetImageUris = savedTargetUris,
+            doodleImageUris = savedDoodleUris,
             lastModified = System.currentTimeMillis()
         )
 
@@ -423,7 +423,7 @@ class ProjectManager @Inject constructor(
      * Drops the oldest entries once [uris] exceeds [MAX_TARGET_IMAGES], deleting their backing files
      * so a pruned entry doesn't leak a PNG that nothing references any more.
      */
-    private fun pruneTargetImages(uris: List<Uri>): List<Uri> {
+    private fun pruneDoodleImages(uris: List<Uri>): List<Uri> {
         if (uris.size <= MAX_TARGET_IMAGES) return uris
         val overflow = uris.size - MAX_TARGET_IMAGES
         uris.take(overflow).forEach { uri ->
@@ -494,10 +494,10 @@ class ProjectManager @Inject constructor(
     /**
      * The hybrid KPM page's six fields are one unit keyed on its URI, written only by the hybrid
      * persist transform (saveProjectExact, which bypasses this). A stale whole-object writer that
-     * carries no page must not erase it — with OR without a fingerprint in hand: a snapshot taken
-     * after a target's fingerprint saved but before its page committed carries the fingerprint and
-     * would skip the fingerprint-null merge above. Keeping an older page is safe: it restores only
-     * while the project's fingerprint matches its key.
+     * carries no page must not erase it — with OR without a doodle in hand: a snapshot taken
+     * after a target's doodle saved but before its page committed carries the doodle and
+     * would skip the doodle-null merge above. Keeping an older page is safe: it restores only
+     * while the project's doodle matches its key.
      */
     private fun preserveHybridKpmPage(
         root: File,
@@ -520,7 +520,7 @@ class ProjectManager @Inject constructor(
             hybridKpmPageHeightPx = existing.hybridKpmPageHeightPx,
             hybridKpmPageWidthMeters = existing.hybridKpmPageWidthMeters,
             hybridKpmPageFromArtwork = existing.hybridKpmPageFromArtwork,
-            hybridKpmFingerprintKey = existing.hybridKpmFingerprintKey,
+            hybridKpmDoodleKey = existing.hybridKpmDoodleKey,
         )
     }
 
@@ -638,7 +638,7 @@ class ProjectManager @Inject constructor(
      * capture paths, which used to call [saveProject] directly and could silently clobber a concurrent
      * AR wall-map or editor design save).
      */
-    suspend fun appendTargetImage(
+    suspend fun appendDoodleImage(
         context: Context,
         projectId: String,
         existingUris: List<Uri>,
@@ -650,15 +650,15 @@ class ProjectManager @Inject constructor(
         val file = File(root, "target_${UUID.randomUUID()}.png")
         writePngAtomically(bitmap, file, "target image")
         // Only the LIST is pruned here: the dropped files are still referenced by project.json until the
-        // caller commits this list, so the caller deletes them afterwards ([deleteTargetImages]).
+        // caller commits this list, so the caller deletes them afterwards ([deleteDoodleImages]).
         (existingUris + uriProvider.getUriForFile(file)).takeLast(MAX_TARGET_IMAGES)
     }
 
     /**
      * Delete target-image files that the committed project no longer references (the entries
-     * [appendTargetImage] pruned), or a new one whose commit lost the race. Best-effort.
+     * [appendDoodleImage] pruned), or a new one whose commit lost the race. Best-effort.
      */
-    suspend fun deleteTargetImages(uris: Collection<Uri>) = withContext(Dispatchers.IO) {
+    suspend fun deleteDoodleImages(uris: Collection<Uri>) = withContext(Dispatchers.IO) {
         uris.forEach { uri ->
             try {
                 uri.path?.let { File(it).delete() }
@@ -674,7 +674,7 @@ class ProjectManager @Inject constructor(
      * Loads a project's metadata, applying [migrateInMemory] purely in memory.
      *
      * This used to be two functions: this read-only one (used everywhere — dashboard listing, repo
-     * `getProject`/`loadProject`, `updateTargetFingerprint`) plus a `loadProject(): LoadedProject?`
+     * `getProject`/`loadProject`, `updateDoodleData`) plus a `loadProject(): LoadedProject?`
      * that additionally loaded every target-image bitmap and — its one distinguishing behavior —
      * persisted the migration back to project.json. That second function had no caller anywhere in
      * the codebase (nothing ever consumed a `LoadedProject`'s bitmaps either), so the "persist on
@@ -755,13 +755,13 @@ class ProjectManager @Inject constructor(
             overlayImageUri = uri(project.overlayImageUri),
             originalOverlayImageUri = uri(project.originalOverlayImageUri),
             thumbnailUri = uri(project.thumbnailUri),
-            targetImageUris = project.targetImageUris.map { uri(it) },
+            doodleImageUris = project.doodleImageUris.map { uri(it) },
             cleanWallUri = uri(project.cleanWallUri),
             sphereSlamReferenceUri = uri(project.sphereSlamReferenceUri),
             sphereSlamAtlasPages = project.sphereSlamAtlasPages.map { it.copy(referenceUri = uri(it.referenceUri)) },
             evolutionImageUris = project.evolutionImageUris.map { uri(it) },
             hybridKpmPageUri = uri(project.hybridKpmPageUri),
-            targetFingerprintPath = project.targetFingerprintPath?.let { path(it) },
+            doodleDataPath = project.doodleDataPath?.let { path(it) },
         )
     }
 
@@ -1094,14 +1094,14 @@ class ProjectManager @Inject constructor(
                 overlayImageUri = localUri(migrated.overlayImageUri),
                 originalOverlayImageUri = localUri(migrated.originalOverlayImageUri),
                 thumbnailUri = localUri(migrated.thumbnailUri),
-                targetImageUris = migrated.targetImageUris.map { localUri(it)!! },
+                doodleImageUris = migrated.doodleImageUris.map { localUri(it)!! },
                 cleanWallUri = localUri(migrated.cleanWallUri),
                 sphereSlamReferenceUri = localUri(migrated.sphereSlamReferenceUri),
                 sphereSlamAtlasPages = migrated.sphereSlamAtlasPages.map { page ->
                     page.copy(referenceUri = localUri(page.referenceUri)!!)
                 },
                 evolutionImageUris = migrated.evolutionImageUris.map { localUri(it)!! },
-                targetFingerprintPath = migrated.targetFingerprintPath?.let { localPath(it).absolutePath },
+                doodleDataPath = migrated.doodleDataPath?.let { localPath(it).absolutePath },
             ).let { relocated ->
                 // The hybrid page is an optional accelerator, not project content: a sender's
                 // archive that lacks the file drops the page rather than failing the whole import.
@@ -1117,7 +1117,7 @@ class ProjectManager @Inject constructor(
                         hybridKpmPageHeightPx = 0,
                         hybridKpmPageWidthMeters = 0f,
                         hybridKpmPageFromArtwork = emptyList(),
-                        hybridKpmFingerprintKey = emptyList(),
+                        hybridKpmDoodleKey = emptyList(),
                     )
                 }
             }

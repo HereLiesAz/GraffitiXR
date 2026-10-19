@@ -15,7 +15,7 @@ import kotlin.math.hypot
 import kotlin.math.ln
 
 /**
- * Feeds a SphereSLAM tracker the app's anticipated views of its pages (the fingerprint's teleological
+ * Feeds a SphereSLAM tracker the app's anticipated views of its pages (the doodle's teleological
  * layer, in every AR mode): the [HalfSphere] of [AnticipationSettings], throttled by the
  * [AnticipationGovernor]. SphereSLAM learns and searches them; the app decides which, how many and
  * when.

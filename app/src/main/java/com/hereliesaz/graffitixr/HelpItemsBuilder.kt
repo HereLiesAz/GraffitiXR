@@ -29,7 +29,7 @@ internal fun buildHelpItems(strings: AppStrings): Map<String, Any> = mapOf(
     "mode.trace" to strings.help.trace,
 
     // AR tools
-    "target.create" to strings.help.create,
+    "doodle.create" to strings.help.create,
     "mode.ar.light" to strings.help.flashlight,
     "mode.ar.lock" to strings.nav.lockInfo,
     "mode.ar.magic" to strings.adj.magicAlign,

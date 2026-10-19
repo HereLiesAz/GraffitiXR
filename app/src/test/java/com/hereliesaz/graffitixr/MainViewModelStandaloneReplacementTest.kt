@@ -4,7 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import android.widget.Toast
-import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.Doodle
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.common.model.SphereSlamAtlasPage
 import com.hereliesaz.graffitixr.data.ProjectManager
@@ -52,7 +52,7 @@ class MainViewModelStandaloneReplacementTest {
 
     private val oldUri: Uri = mockk(relaxed = true)
     private val oldPage: Uri = mockk(relaxed = true)
-    private val oldFingerprint: Fingerprint = mockk(relaxed = true)
+    private val oldDoodle: Doodle = mockk(relaxed = true)
     private val candidates = ArrayDeque<Uri>()
     private val deleted = mutableListOf<Uri?>()
 
@@ -62,7 +62,7 @@ class MainViewModelStandaloneReplacementTest {
         sphereSlamReferenceWidthMeters = 2f,
         sphereSlamAnchorGeneration = 3L,
         sphereSlamPlacementAnchorGeneration = 3L,
-        sphereSlamFingerprint = oldFingerprint,
+        sphereSlamFingerprint = oldDoodle,
         sphereSlamMapFromFingerprint = List(16) { 1f },
         sphereSlamAtlasPages = listOf(
             SphereSlamAtlasPage(
@@ -86,7 +86,7 @@ class MainViewModelStandaloneReplacementTest {
             current.value = firstArg<(GraffitiProject) -> GraffitiProject>()(current.value!!)
         }
         coEvery { projectManager.saveSphereSlamReference(any(), any(), any()) } answers { candidates.removeFirst() }
-        coEvery { projectManager.appendTargetImage(any(), any(), any(), any()) } returns emptyList()
+        coEvery { projectManager.appendDoodleImage(any(), any(), any(), any()) } returns emptyList()
         coEvery { projectManager.deleteSphereSlamReference(any(), any(), any()) } coAnswers {
             synchronized(deleted) { deleted += thirdArg<Uri?>() }
         }
@@ -118,8 +118,8 @@ class MainViewModelStandaloneReplacementTest {
             placement = StandaloneFingerprintPlacement(FloatArray(16), 1.5f, false, TileId(0, 0)),
         )
         val deadline = System.currentTimeMillis() + 5_000
-        while (viewModel.uiState.value.isConfirmingTarget && System.currentTimeMillis() < deadline) Thread.sleep(10)
-        assertFalse("save never finished", viewModel.uiState.value.isConfirmingTarget)
+        while (viewModel.uiState.value.isConfirmingDoodle && System.currentTimeMillis() < deadline) Thread.sleep(10)
+        assertFalse("save never finished", viewModel.uiState.value.isConfirmingDoodle)
         assertSame(candidate, current.value!!.sphereSlamReferenceUri)
     }
 
@@ -148,7 +148,7 @@ class MainViewModelStandaloneReplacementTest {
         val restored = current.value!!
         assertSame(oldUri, restored.sphereSlamReferenceUri)
         assertEquals(2f, restored.sphereSlamReferenceWidthMeters)
-        assertSame(oldFingerprint, restored.sphereSlamFingerprint)
+        assertSame(oldDoodle, restored.sphereSlamFingerprint)
         assertEquals(previous.sphereSlamMapFromFingerprint, restored.sphereSlamMapFromFingerprint)
         assertEquals(previous.sphereSlamAtlasPages, restored.sphereSlamAtlasPages)
         // A new generation (everything re-solves for the page), still placed.

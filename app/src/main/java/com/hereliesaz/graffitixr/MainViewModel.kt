@@ -10,7 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.sphereslam.camera.CaptureRotation
-import com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
+import com.hereliesaz.graffitixr.feature.ar.anchor.MetricDoodleBuilder
 import com.hereliesaz.sphereslam.reloc.MetricMarks
 import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
@@ -32,35 +32,35 @@ import javax.inject.Inject
 
 data class MainUiState(
     val isTouchLocked: Boolean = false,
-    val isCapturingTarget: Boolean = false,
-    // Whether the current project already has a saved target fingerprint. null = not yet resolved
+    val isCapturingDoodle: Boolean = false,
+    // Whether the current project already has a saved target doodle. null = not yet resolved
     // (project still loading) so AR entry can wait instead of racing; true/false drives whether AR
     // entry auto-selects the Target button (no target yet) or drops straight into layer editing.
-    val hasExistingTarget: Boolean? = null,
-    val hasArCoreTarget: Boolean? = null,
+    val hasExistingDoodle: Boolean? = null,
+    val hasArCoreDoodle: Boolean? = null,
     val hasSphereSlamTarget: Boolean? = null,
     // Compass/attitude saved with the ARCore target (TYPE_ROTATION_VECTOR quaternion [x,y,z,w],
     // body->ENU) and its magnetometer accuracy, for the coarse "which way was it?" search hint.
     // Null when the project has no ARCore target or it was captured without a usable sensor.
-    val savedTargetQuaternion: List<Float>? = null,
-    val savedTargetMagneticAccuracy: Int = -1,
+    val savedDoodleQuaternion: List<Float>? = null,
+    val savedDoodleMagneticAccuracy: Int = -1,
     // Identity of the loaded project, so the search-status timer restarts when it changes.
     val loadedProjectId: String? = null,
     // True once the user has successfully created a target in this app session.
     // Prevents auto-starting target capture on AR re-entry within the same process.
-    val targetCapturedThisSession: Boolean = false,
+    val doodleCapturedThisSession: Boolean = false,
     val captureStep: CaptureStep = CaptureStep.NONE,
     // Phase 4: True while the user is in "tap your painted marks" mode.
     val isWaitingForTap: Boolean = false,
     // True when the current capture was initiated via the tap-to-target path (Phase 4).
     val captureOriginatedFromTap: Boolean = false,
     // True from the moment the artist confirms a target capture until the async
-    // fingerprint-build work (awaitAnchorTransform, ORB/SuperPoint) finishes, success or failure.
-    // resetCaptureUi() unmounts TargetCreationUi (and its own isLoading spinner) immediately on
+    // doodle-build work (awaitAnchorTransform, ORB/SuperPoint) finishes, success or failure.
+    // resetCaptureUi() unmounts DoodleCreationUi (and its own isLoading spinner) immediately on
     // confirm, well before this work is done — up to ~2s of awaitAnchorTransform's timeout alone,
     // plus a full feature build — so without a SEPARATE flag surviving that unmount, the artist
     // saw a plain AR feed with no indication anything was happening.
-    val isConfirmingTarget: Boolean = false,
+    val isConfirmingDoodle: Boolean = false,
     // Overlay ▸ Gyro: hold the drawn design still against tripod vibration (see
     // OverlayGyroStabilizer). Overlay-only; MainScreen turns it off on leaving Overlay.
     val isOverlayGyroActive: Boolean = false,
@@ -80,7 +80,7 @@ class MainViewModel @Inject constructor(
 
     // Tracks the previously-seen project id so the currentProject collector below can tell "the same
     // project reloaded" (e.g. the loadProject() call right after a target capture saves) apart from
-    // "a different project was opened" — only the latter should reset targetCapturedThisSession.
+    // "a different project was opened" — only the latter should reset doodleCapturedThisSession.
     private var lastSeenProjectId: String? = null
 
     /**
@@ -107,34 +107,34 @@ class MainViewModel @Inject constructor(
                 // Only resolve once a real project arrives; leave it null while loading so the UI
                 // doesn't briefly see "no target" and auto-start target capture by mistake.
                 if (project != null) {
-                    val hasArCoreTarget = project.fingerprint != null
+                    val hasArCoreDoodle = project.doodle != null
                     val hasSphereSlamTarget =
                         project.sphereSlamReferenceUri != null && project.sphereSlamFingerprint != null
                     _uiState.update {
                         it.copy(
-                            hasExistingTarget = hasArCoreTarget || hasSphereSlamTarget,
-                            hasArCoreTarget = hasArCoreTarget,
+                            hasExistingDoodle = hasArCoreDoodle || hasSphereSlamTarget,
+                            hasArCoreDoodle = hasArCoreDoodle,
                             hasSphereSlamTarget = hasSphereSlamTarget,
-                            savedTargetQuaternion = if (hasArCoreTarget) {
+                            savedDoodleQuaternion = if (hasArCoreDoodle) {
                                 project.captureEnvironment?.attitude?.rotationVector
                                     ?.takeIf { q -> q.size == 4 }
                             } else null,
-                            savedTargetMagneticAccuracy =
+                            savedDoodleMagneticAccuracy =
                                 project.captureEnvironment?.attitude?.magneticAccuracy ?: -1,
                             loadedProjectId = project.id.toString(),
                         )
                     }
-                    // targetCapturedThisSession is meant to read "has THIS project (in this session)
+                    // doodleCapturedThisSession is meant to read "has THIS project (in this session)
                     // had a target captured", not "has any project, ever, this process" — otherwise
                     // capturing a target in one project silently suppressed the pre-selection prompt
                     // for every other project opened later. Reset it whenever the loaded project
                     // actually changes. Guarded on a non-null previous id so it doesn't fire on the
                     // very first project load, and compares ids (not object identity) so the reload
-                    // onConfirmTargetCreation triggers right after setting the flag true — same
+                    // onConfirmDoodleCreation triggers right after setting the flag true — same
                     // project, same id — does not immediately clobber it.
                     val previousId = lastSeenProjectId
                     if (previousId != null && previousId != project.id) {
-                        _uiState.update { it.copy(targetCapturedThisSession = false) }
+                        _uiState.update { it.copy(doodleCapturedThisSession = false) }
                     }
                     lastSeenProjectId = project.id
                 }
@@ -142,10 +142,10 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    /** Settings → Fingerprint, for the target captures built here. */
-    private val fingerprintFeatures: StateFlow<com.hereliesaz.graffitixr.common.model.FingerprintFeatures> =
-        settingsRepository.fingerprintFeatures.stateIn(
-            viewModelScope, SharingStarted.Eagerly, com.hereliesaz.graffitixr.common.model.FingerprintFeatures.DEFAULT,
+    /** Settings → Doodle, for the target captures built here. */
+    private val doodleFeatures: StateFlow<com.hereliesaz.graffitixr.common.model.DoodleFeatures> =
+        settingsRepository.doodleFeatures.stateIn(
+            viewModelScope, SharingStarted.Eagerly, com.hereliesaz.graffitixr.common.model.DoodleFeatures.DEFAULT,
         )
 
     val completedTutorials: StateFlow<Set<String>> = settingsRepository.completedTutorials
@@ -219,10 +219,10 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun startTargetCapture() {
+    fun startDoodleCapture() {
         _uiState.update {
             it.copy(
-                isCapturingTarget = true,
+                isCapturingDoodle = true,
                 // Phase 4: Skip the auto-capture step — user taps their painted marks instead.
                 captureStep = CaptureStep.NONE,
                 isWaitingForTap = true,
@@ -259,7 +259,7 @@ class MainViewModel @Inject constructor(
     }
 
     /**
-     * Confirm the shared TargetCreationUi capture while SphereSLAM standalone owns pose tracking.
+     * Confirm the shared DoodleCreationUi capture while SphereSLAM standalone owns pose tracking.
      *
      * The artist-facing workflow is intentionally identical to ARCore: tap target, review detected
      * marks, erase any that should not anchor the mural, confirm. Only the geometry stage differs:
@@ -289,13 +289,13 @@ class MainViewModel @Inject constructor(
         }
 
         resetCaptureUi()
-        _uiState.update { it.copy(isConfirmingTarget = true) }
+        _uiState.update { it.copy(isConfirmingDoodle = true) }
         viewModelScope.launch(Dispatchers.IO) {
             var candidateUri: android.net.Uri? = null
             try {
                 val currentProject = projectRepository.currentProject.value
                 if (currentProject == null) {
-                    MetricFingerprintBuilder.recordPreconditionFailure(
+                    MetricDoodleBuilder.recordPreconditionFailure(
                         "no project open to save the standalone target into",
                     )
                     withContext(Dispatchers.Main) {
@@ -308,7 +308,7 @@ class MainViewModel @Inject constructor(
                     return@launch
                 }
 
-                // Fingerprint geometry is authored in the already-running photosphere's units.
+                // Doodle geometry is authored in the already-running photosphere's units.
                 // Without metric range those units are normalized; the explicit map transform still
                 // places the page correctly in the base SphereSLAM frame.
                 val fp = StandaloneFingerprintBuilder.build(
@@ -316,10 +316,10 @@ class MainViewModel @Inject constructor(
                     bitmap = bitmap,
                     referenceWidthMeters = placement.referenceWidthUnits,
                     mask = selectionMask,
-                    features = fingerprintFeatures.value,
+                    features = doodleFeatures.value,
                 )
                 if (fp == null) {
-                    MetricFingerprintBuilder.recordPreconditionFailure(
+                    MetricDoodleBuilder.recordPreconditionFailure(
                         "standalone target produced too few selected SphereSLAM fingerprint features",
                     )
                     withContext(Dispatchers.Main) {
@@ -333,20 +333,20 @@ class MainViewModel @Inject constructor(
                 }
 
                 val patch = grayPatchBytes(bitmap)
-                val fingerprint = fp.copy(patchData = patch)
+                val doodle = fp.copy(patchData = patch)
 
                 val oldReference = currentProject.sphereSlamReferenceUri
                 val oldAtlas = currentProject.sphereSlamAtlasPages
                 candidateUri =
                     projectManager.saveSphereSlamReference(context, currentProject.id, bitmap)
-                val baseTargetUris =
-                    projectRepository.currentProject.value?.targetImageUris
-                        ?: currentProject.targetImageUris
-                val targetUris =
-                    projectManager.appendTargetImage(
+                val baseDoodleUris =
+                    projectRepository.currentProject.value?.doodleImageUris
+                        ?: currentProject.doodleImageUris
+                val doodleUris =
+                    projectManager.appendDoodleImage(
                         context,
                         currentProject.id,
-                        baseTargetUris,
+                        baseDoodleUris,
                         bitmap,
                     )
 
@@ -369,9 +369,9 @@ class MainViewModel @Inject constructor(
                             sphereSlamAnchorFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                             sphereSlamPlacementAnchorGeneration = 0L,
-                            sphereSlamFingerprint = fingerprint,
+                            sphereSlamFingerprint = doodle,
                             // A new target may be another wall: its normal is learned afresh.
-                            fingerprintWallNormalEnu = emptyList(),
+                            doodleWallNormalEnu = emptyList(),
                             sphereSlamFingerprintFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                             sphereSlamMapFromFingerprint = placement.mapFromFingerprint.toList(),
@@ -379,18 +379,18 @@ class MainViewModel @Inject constructor(
                             sphereSlamWallFeatureMapFrameVersion =
                                 com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
                             // Base photosphere history belongs to SphereSLAM and survives precision
-                            // fingerprint creation/recapture. Only the fingerprint-relative KPM atlas
+                            // doodle creation/recapture. Only the doodle-relative KPM atlas
                             // is replaced here.
                             sphereSlamAtlasPages = emptyList(),
                             paintMarks = null,
                             paintGrid = null,
-                            targetImageUris = targetUris,
+                            doodleImageUris = doodleUris,
                         )
                     }
                 }
 
                 if (!committed) {
-                    projectManager.deleteTargetImages(targetUris - baseTargetUris.toSet())
+                    projectManager.deleteDoodleImages(doodleUris - baseDoodleUris.toSet())
                     projectManager.deleteSphereSlamReference(
                         context,
                         currentProject.id,
@@ -408,10 +408,10 @@ class MainViewModel @Inject constructor(
                 // Only a committed target's patch reaches the native wall matcher.
                 slamManager.setWallPatchBytes(patch, PATCH_SIZE)
                 slamManager.setWallNormalEnu(null) // a new target: its wall normal is learned afresh
-                projectManager.deleteTargetImages(baseTargetUris - targetUris.toSet())
+                projectManager.deleteDoodleImages(baseDoodleUris - doodleUris.toSet())
 
                 // The previous target stays on disk until native KPM accepts the candidate: a candidate
-                // that builds a fingerprint can still be too weak to register, and then the previous
+                // that builds a doodle can still be too weak to register, and then the previous
                 // target is restored (onStandaloneReferenceRejected). Replacing a candidate that is
                 // itself still unvalidated keeps the original rollback and drops that candidate.
                 val keepOldForRollback = synchronized(replacementLock) {
@@ -433,7 +433,7 @@ class MainViewModel @Inject constructor(
                 }
 
                 projectRepository.loadProject(currentProject.id)
-                _uiState.update { it.copy(targetCapturedThisSession = true) }
+                _uiState.update { it.copy(doodleCapturedThisSession = true) }
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "Doodle Saved & Locked", Toast.LENGTH_SHORT).show()
                 }
@@ -449,7 +449,7 @@ class MainViewModel @Inject constructor(
                         )
                     }
                 }
-                MetricFingerprintBuilder.recordPreconditionFailure(
+                MetricDoodleBuilder.recordPreconditionFailure(
                     "standalone target save failed: ${e.message ?: e.javaClass.simpleName}",
                 )
                 withContext(Dispatchers.Main) {
@@ -461,8 +461,8 @@ class MainViewModel @Inject constructor(
                 }
             } finally {
                 // A build that failed or was abandoned leaves the replacement gate up; restore the old pair.
-                slamManager.abortFingerprintReplacement()
-                _uiState.update { it.copy(isConfirmingTarget = false) }
+                slamManager.abortDoodleReplacement()
+                _uiState.update { it.copy(isConfirmingDoodle = false) }
             }
         }
     }
@@ -548,7 +548,7 @@ class MainViewModel @Inject constructor(
         return true
     }
 
-    fun onConfirmTargetCreation(
+    fun onConfirmDoodleCreation(
         bitmap: Bitmap? = null,
         selectionMask: Bitmap? = null,
         depthBuffer: ByteBuffer? = null,
@@ -583,7 +583,7 @@ class MainViewModel @Inject constructor(
         val safeView = viewMatrix
 
         if (depthBuffer == null || wallPlane != null) {
-            // Build the wall fingerprint from a SINGLE capture by back-projecting features onto the
+            // Build the wall doodle from a SINGLE capture by back-projecting features onto the
             // ARCore wall plane (whose metric pose ARCore already solved), inside the artist's
             // selection. Preferred even when depth exists: it is the only path that records the full
             // co-registration (intrinsics, anchor, display-oriented view, captureAnchorCam), without
@@ -593,7 +593,7 @@ class MainViewModel @Inject constructor(
             return
         }
         resetCaptureUi()
-        _uiState.update { it.copy(isConfirmingTarget = true) }
+        _uiState.update { it.copy(isConfirmingDoodle = true) }
         val safeDepth = depthBuffer
 
         viewModelScope.launch(Dispatchers.IO) { try {
@@ -602,7 +602,7 @@ class MainViewModel @Inject constructor(
             // artist aimed, tapped, confirmed, and nothing happened.
             val currentProject = projectRepository.currentProject.value
             if (currentProject == null) {
-                MetricFingerprintBuilder.recordPreconditionFailure("no project open to save the target into")
+                MetricDoodleBuilder.recordPreconditionFailure("no project open to save the target into")
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         context,
@@ -614,7 +614,7 @@ class MainViewModel @Inject constructor(
             }
 
             // The confirmed bitmap AND [intrinsics] were both rotated by rotationDeg into display
-            // orientation, but the depth buffer is in the raw sensor frame and generateFingerprint
+            // orientation, but the depth buffer is in the raw sensor frame and generateDoodle
             // indexes it by scaling image pixels, then back-projects with the intrinsics. Undo the
             // SAME recorded rotation on image, mask and intrinsics so all three share the sensor
             // frame. (This used to un-rotate the bitmap by a hardcoded -90 gated on display rotation
@@ -638,7 +638,7 @@ class MainViewModel @Inject constructor(
                 safeIntr // native rejects < 4; nothing to un-rotate
             }
 
-            val fp = slamManager.setWallFingerprint(
+            val fp = slamManager.setWallDoodle(
                 sensorBmp, sensorMask, safeDepth,
                 depthW, depthH, depthStride,
                 sensorIntr, safeView
@@ -655,7 +655,7 @@ class MainViewModel @Inject constructor(
             // ArViewModel.updatePaintingGuide — the design-only overlay, not blended with wall texture.)
 
             // Canonical patch (the captured marks) for the distortion head — fed live AND persisted on the
-            // fingerprint so the head survives reload. Inert unless its model is bundled.
+            // doodle so the head survives reload. Inert unless its model is bundled.
             val patch = grayPatchBytes(sensorBmp)
             slamManager.setWallPatchBytes(patch, PATCH_SIZE)
             slamManager.setWallNormalEnu(null) // a new target: its wall normal is learned afresh
@@ -668,18 +668,18 @@ class MainViewModel @Inject constructor(
             // bypass the repository's atomic transform and could silently clobber whichever of those two
             // ran concurrently (or be clobbered by them) — see docs/AUDIT.md save-race. Route through
             // updateProject { } instead, and only copy the fields target-capture owns onto `current`.
-            val baseTargetUris = projectRepository.currentProject.value?.targetImageUris ?: currentProject.targetImageUris
-            val updatedTargetUris = projectManager.appendTargetImage(context, currentProject.id, baseTargetUris, bitmap)
+            val baseDoodleUris = projectRepository.currentProject.value?.doodleImageUris ?: currentProject.doodleImageUris
+            val updatedDoodleUris = projectManager.appendDoodleImage(context, currentProject.id, baseDoodleUris, bitmap)
             // Guarded on id like the standalone path: this runs on IO well after the tap, and the
             // artist may have opened another project meanwhile — `current` would then be THAT
-            // project, and the old code wrote this wall's fingerprint into it.
+            // project, and the old code wrote this wall's doodle into it.
             var committed = false
             projectRepository.updateProject { current ->
                 if (current.id != currentProject.id) return@updateProject current
                 committed = true
                 current.copy(
-                    fingerprint = fp.copy(patchData = patch),
-                    // New capture = new fingerprint frame; paint placed in the old one is invalid,
+                    doodle = fp.copy(patchData = patch),
+                    // New capture = new doodle frame; paint placed in the old one is invalid,
                     // and so is the wall feature map (its points are in the old frame too).
                     paintMarks = null,
                     paintGrid = null,
@@ -687,25 +687,25 @@ class MainViewModel @Inject constructor(
                     // This path records no co-registration. Clear any left by an earlier single
                     // capture: reload would otherwise pair these new points with the old capture's
                     // anchor, intrinsics and view, and relocalize against geometry that doesn't match.
-                    fingerprintIntrinsics = emptyList(),
-                    fingerprintAnchor = emptyList(),
-                    fingerprintViewMatrix = emptyList(),
-                    fingerprintCaptureRotationDeg = -1,
+                    doodleIntrinsics = emptyList(),
+                    doodleAnchor = emptyList(),
+                    doodleViewMatrix = emptyList(),
+                    doodleCaptureRotationDeg = -1,
                     // A new target may be another wall: its normal is learned afresh.
-                    fingerprintWallNormalEnu = emptyList(),
-                    targetImageUris = updatedTargetUris,
+                    doodleWallNormalEnu = emptyList(),
+                    doodleImageUris = updatedDoodleUris,
                 )
             }
             if (!committed) {
-                projectManager.deleteTargetImages(updatedTargetUris - baseTargetUris.toSet())
+                projectManager.deleteDoodleImages(updatedDoodleUris - baseDoodleUris.toSet())
                 notifyProjectChangedDuringSave()
                 return@launch
             }
             // The pruned entries are no longer referenced now that the list is committed.
-            projectManager.deleteTargetImages(baseTargetUris - updatedTargetUris.toSet())
+            projectManager.deleteDoodleImages(baseDoodleUris - updatedDoodleUris.toSet())
 
             projectRepository.loadProject(currentProject.id)
-            _uiState.update { it.copy(targetCapturedThisSession = true) }
+            _uiState.update { it.copy(doodleCapturedThisSession = true) }
 
             withContext(Dispatchers.Main) {
                 Toast.makeText(context, "Doodle Saved & Locked", Toast.LENGTH_SHORT).show()
@@ -713,20 +713,20 @@ class MainViewModel @Inject constructor(
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            // An IOException from appendTargetImage / the project write (disk full, project dir
+            // An IOException from appendDoodleImage / the project write (disk full, project dir
             // gone) used to escape this viewModelScope coroutine and take the whole app down.
-            onTargetSaveFailed(e)
+            onDoodleSaveFailed(e)
         } finally {
             // A build that failed or was abandoned leaves the replacement gate up; restore the old pair.
-            slamManager.abortFingerprintReplacement()
-            _uiState.update { it.copy(isConfirmingTarget = false) }
+            slamManager.abortDoodleReplacement()
+            _uiState.update { it.copy(isConfirmingDoodle = false) }
         } }
     }
 
     /**
      * The canonical distortion-head patch as a raw [PATCH_SIZE]x[PATCH_SIZE] gray byte buffer (row-major
      * luma). Computed in Kotlin so the exact bytes are both fed to native and persisted on the
-     * Fingerprint — keeping the capture-time and reload-time patch identical.
+     * Doodle — keeping the capture-time and reload-time patch identical.
      */
     private fun grayPatchBytes(bitmap: Bitmap, size: Int = PATCH_SIZE): ByteArray {
         val scaled = Bitmap.createScaledBitmap(bitmap, size, size, true)
@@ -745,7 +745,7 @@ class MainViewModel @Inject constructor(
     private fun resetCaptureUi() {
         _uiState.update {
             it.copy(
-                isCapturingTarget = false,
+                isCapturingDoodle = false,
                 captureStep = CaptureStep.NONE,
                 isWaitingForTap = false,
                 captureOriginatedFromTap = false
@@ -757,7 +757,7 @@ class MainViewModel @Inject constructor(
      * Depth-off, SINGLE-capture target creation. The tap must land on a tracked ARCore wall plane
      * (the plane no longer has to be green — see the hit-test in ArRenderer); ARCore has already
      * solved that plane's metric pose, so we back-project the captured features onto it
-     * ([MetricFingerprintBuilder.buildSingle]) instead of triangulating a second view. No tracked
+     * ([MetricDoodleBuilder.buildSingle]) instead of triangulating a second view. No tracked
      * plane under the tap → refuse and guide the artist to face a wall.
      */
     @OptIn(com.hereliesaz.sphereslam.reloc.ExperimentalSphereSlamRelocApi::class)
@@ -772,16 +772,16 @@ class MainViewModel @Inject constructor(
             // preconditions here and in ArViewModel's doodle path — this call never reaches
             // buildSingle at all, so without this line a diagnostic report would show whatever the
             // PREVIOUS attempt left behind, or nothing, in place of this refusal. See
-            // MetricFingerprintBuilder.lastRefusalReason: this Toast was the only record this
+            // MetricDoodleBuilder.lastRefusalReason: this Toast was the only record this
             // failure ever had, and a Toast a report can't see is not a record.
-            MetricFingerprintBuilder.recordPreconditionFailure(
+            MetricDoodleBuilder.recordPreconditionFailure(
                 "no wall plane under the tap — face the wall more squarely, closer, or with more light",
             )
             Toast.makeText(context, notOnGreenWallMessage, Toast.LENGTH_LONG).show()
             return
         }
         resetCaptureUi()
-        _uiState.update { it.copy(isConfirmingTarget = true) }
+        _uiState.update { it.copy(isConfirmingDoodle = true) }
         val planePoint = floatArrayOf(wallPlane[0], wallPlane[1], wallPlane[2])
         val planeNormal = floatArrayOf(wallPlane[3], wallPlane[4], wallPlane[5])
         // Clear any prior marks-centering override; the builder re-publishes it on a successful build.
@@ -794,7 +794,7 @@ class MainViewModel @Inject constructor(
             // synchronously at the call site — as this did — therefore returned the identity native
             // is constructed with, and the identity is the worst possible wrong answer because it is
             // indistinguishable from a real pose at the world origin. That identity became the
-            // fingerprint's co-registration frame, `markCenterLocal`'s frame, and (since Phase 2)
+            // doodle's co-registration frame, `markCenterLocal`'s frame, and (since Phase 2)
             // `captureAnchorCam`, leaving the partition composed through a stray `A_est⁻¹`.
             // The baseline was taken by setInitialAnchorFromCapture at the instant it raised the
             // request — the only point that does not race the GL thread's establishment. Waiting for
@@ -803,7 +803,7 @@ class MainViewModel @Inject constructor(
             // instantly against the previous anchor's pose.
             val anchor = slamManager.awaitAnchorTransform(slamManager.captureAnchorGenerationBaseline)
             if (anchor == null || anchor.size != 16) {
-                MetricFingerprintBuilder.recordPreconditionFailure(
+                MetricDoodleBuilder.recordPreconditionFailure(
                     "anchor never established for this capture — held steady long enough?",
                 )
                 withContext(Dispatchers.Main) {
@@ -816,12 +816,12 @@ class MainViewModel @Inject constructor(
                 }
                 return@launch
             }
-            // A fingerprint is persisted INTO a project, so without one there is nowhere to put it.
+            // A doodle is persisted INTO a project, so without one there is nowhere to put it.
             // This was a bare `?: return@launch`: the artist aimed, tapped, confirmed, and nothing
             // happened — no target, no error, no clue that the missing piece was a project.
             val currentProject = projectRepository.currentProject.value
             if (currentProject == null) {
-                MetricFingerprintBuilder.recordPreconditionFailure("no project open to save the target into")
+                MetricDoodleBuilder.recordPreconditionFailure("no project open to save the target into")
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         context,
@@ -831,19 +831,19 @@ class MainViewModel @Inject constructor(
                 }
                 return@launch
             }
-            val fp = MetricFingerprintBuilder.buildSingle(
+            val fp = MetricDoodleBuilder.buildSingle(
                 slamManager, bitmap, view, intr, planePoint, planeNormal, anchor,
                 rotationDeg = rotationDeg,
                 mask = selectionMask,
-                features = fingerprintFeatures.value,
+                features = doodleFeatures.value,
             )
             if (fp == null) {
                 // Say WHICH way it fell short. "Not enough texture" was the same message whether the
                 // frame was blank, out of focus, or full of features that simply missed the plane —
                 // three problems with three different fixes, and no way to tell them apart.
-                val detected = MetricFingerprintBuilder.lastDetected
-                val placed = MetricFingerprintBuilder.lastPlaced
-                val need = MetricFingerprintBuilder.lastRequired
+                val detected = MetricDoodleBuilder.lastDetected
+                val placed = MetricDoodleBuilder.lastPlaced
+                val need = MetricDoodleBuilder.lastRequired
                 val message = when {
                     detected < need ->
                         "Only $detected features on this wall (need $need). Too dark, too smooth, " +
@@ -868,8 +868,8 @@ class MainViewModel @Inject constructor(
             // bypass the repository's atomic transform and could silently clobber whichever of those two
             // ran concurrently (or be clobbered by them) — see docs/AUDIT.md save-race. Route through
             // updateProject { } instead, and only copy the fields target-capture owns onto `current`.
-            val baseTargetUris = projectRepository.currentProject.value?.targetImageUris ?: currentProject.targetImageUris
-            val updatedTargetUris = projectManager.appendTargetImage(context, currentProject.id, baseTargetUris, bitmap)
+            val baseDoodleUris = projectRepository.currentProject.value?.doodleImageUris ?: currentProject.doodleImageUris
+            val updatedDoodleUris = projectManager.appendDoodleImage(context, currentProject.id, baseDoodleUris, bitmap)
             // Area progress samples each design cell's bare-wall colour from this photo.
             slamManager.setCaptureImage(bitmap, intr)
             // A clean-wall photo taken earlier registers against this capture photo just now. If it could
@@ -885,62 +885,62 @@ class MainViewModel @Inject constructor(
                 if (current.id != currentProject.id) return@updateProject current
                 committed = true
                 current.copy(
-                    fingerprint = fp.copy(patchData = patch),
-                    // New capture = new fingerprint frame; paint placed in the old one is invalid,
+                    doodle = fp.copy(patchData = patch),
+                    // New capture = new doodle frame; paint placed in the old one is invalid,
                     // and so is the wall feature map (its points are in the old frame too).
                     paintMarks = null,
                     paintGrid = null,
                     wallFeatureMap = null,
                     // Persist the capture's intrinsics + anchor + view — the exact values just fed to
-                    // restoreWallFingerprintMetric — so reload relocalizes with the true intrinsics
+                    // restoreWallDoodleMetric — so reload relocalizes with the true intrinsics
                     // and keeps the plane-guided rectification that the capture session had.
-                    fingerprintIntrinsics = intr.toList(),
-                    fingerprintAnchor = anchor.toList(),
+                    doodleIntrinsics = intr.toList(),
+                    doodleAnchor = anchor.toList(),
                     // DISPLAY-oriented, matching what ingestSingle just handed native (0.10) and the
                     // frame the stored 3D points are in. Persisting the raw sensor-frame view here
                     // would have made 0.10 regress the moment the project was reloaded: the runtime
-                    // fingerprint would be consistent and its saved copy would not.
-                    fingerprintViewMatrix =
+                    // doodle would be consistent and its saved copy would not.
+                    doodleViewMatrix =
                         MetricMarks.glViewDisplayOriented(view, rotationDeg).toList(),
                     // 0.11 — which display frame that was. -1 elsewhere means "genuinely unknown".
-                    fingerprintCaptureRotationDeg = rotationDeg,
+                    doodleCaptureRotationDeg = rotationDeg,
                     // A new target may be another wall: its normal is learned afresh.
-                    fingerprintWallNormalEnu = emptyList(),
+                    doodleWallNormalEnu = emptyList(),
                     // The full record of how and where the device was held at capture. The
-                    // fingerprint's geometry is frozen at that instant, so these are the conditions
+                    // doodle's geometry is frozen at that instant, so these are the conditions
                     // any later attribution has to work from — and they exist nowhere else.
                     captureEnvironment = captureEnvironment,
-                    targetImageUris = updatedTargetUris,
+                    doodleImageUris = updatedDoodleUris,
                 )
             }
             if (!committed) {
-                projectManager.deleteTargetImages(updatedTargetUris - baseTargetUris.toSet())
+                projectManager.deleteDoodleImages(updatedDoodleUris - baseDoodleUris.toSet())
                 notifyProjectChangedDuringSave()
                 return@launch
             }
             // The pruned entries are no longer referenced now that the list is committed.
-            projectManager.deleteTargetImages(baseTargetUris - updatedTargetUris.toSet())
+            projectManager.deleteDoodleImages(baseDoodleUris - updatedDoodleUris.toSet())
             projectRepository.loadProject(currentProject.id)
-            _uiState.update { it.copy(targetCapturedThisSession = true) }
+            _uiState.update { it.copy(doodleCapturedThisSession = true) }
             withContext(Dispatchers.Main) {
                 Toast.makeText(context, "Doodle Saved & Locked", Toast.LENGTH_SHORT).show()
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            // An IOException from appendTargetImage / the project write (disk full, project dir
+            // An IOException from appendDoodleImage / the project write (disk full, project dir
             // gone) used to escape this viewModelScope coroutine and take the whole app down.
-            onTargetSaveFailed(e)
+            onDoodleSaveFailed(e)
         } finally {
             // A build that failed or was abandoned leaves the replacement gate up; restore the old pair.
-            slamManager.abortFingerprintReplacement()
-            _uiState.update { it.copy(isConfirmingTarget = false) }
+            slamManager.abortDoodleReplacement()
+            _uiState.update { it.copy(isConfirmingDoodle = false) }
         } }
     }
 
     /** The project was switched between the target tap and the save; nothing was written. */
     private suspend fun notifyProjectChangedDuringSave() {
-        MetricFingerprintBuilder.recordPreconditionFailure("project changed before the target was saved")
+        MetricDoodleBuilder.recordPreconditionFailure("project changed before the target was saved")
         withContext(Dispatchers.Main) {
             Toast.makeText(
                 context,
@@ -951,9 +951,9 @@ class MainViewModel @Inject constructor(
     }
 
     /** A target save threw (I/O, native); report it instead of crashing the app. */
-    private suspend fun onTargetSaveFailed(e: Exception) {
+    private suspend fun onDoodleSaveFailed(e: Exception) {
         timber.log.Timber.e(e, "Target save failed")
-        MetricFingerprintBuilder.recordPreconditionFailure(
+        MetricDoodleBuilder.recordPreconditionFailure(
             "target save failed: ${e.message ?: e.javaClass.simpleName}",
         )
         withContext(Dispatchers.Main) {
@@ -976,7 +976,7 @@ class MainViewModel @Inject constructor(
      * separately (ArViewModel.clearCaptureForRetry) so they stay in tap mode and can simply
      * re-aim and tap again.
      */
-    fun notifyTargetNotOnWall() {
+    fun notifyDoodleNotOnWall() {
         Toast.makeText(context, notOnGreenWallMessage, Toast.LENGTH_LONG).show()
     }
 

@@ -275,9 +275,9 @@
     <string name="open_settings">Öppna Inställningar</string>
 
 
-    <string name="target_creation_title">KRUMELURRUTNÄT</string>
+    <string name="doodle_creation_title">KRUMELURRUTNÄT</string>
 
-    <string name="target_creation_text">Om du inte har skapat ditt Krumelurrutnät än, ta en bild av väggen genom att trycka på fotoknappen. Tryck annars på Avbryt.</string>
+    <string name="doodle_creation_text">Om du inte har skapat ditt Krumelurrutnät än, ta en bild av väggen genom att trycka på fotoknappen. Tryck annars på Avbryt.</string>
 
     <string name="cancel">Avbryt</string>
 
@@ -370,13 +370,13 @@
     <string name="settings_anticipation_heat">Värme stryper med</string>
     <string name="settings_anticipation_compute">Belastning stryper med</string>
     <string name="settings_anticipation_views">Högst %1$d vyer per sida</string>
-    <string name="settings_fingerprint_features">Krumelur</string>
-    <string name="settings_fingerprint_superpoint">SuperPoint</string>
-    <string name="settings_fingerprint_half_sphere">Halvsfär</string>
-    <string name="settings_fingerprint_both">Båda</string>
-    <string name="settings_fingerprint_superpoint_desc">Bara SuperPoint-drag från tagningen. Tål ljus och slitage; ungefär 1,5 MB per Krumelur. Gäller från nästa Krumelur.</string>
-    <string name="settings_fingerprint_half_sphere_desc">ORB-drag från tagningen och dess 49 närbilder. Starkt på nära håll och litet, under 0,1 MB per Krumelur. Gäller från nästa Krumelur.</string>
-    <string name="settings_fingerprint_both_desc">SuperPoint-drag från tagningen och dess 49 närbilder. Starkast; ungefär 2–3 MB per Krumelur. Gäller från nästa Krumelur.</string>
+    <string name="settings_doodle_features">Krumelur</string>
+    <string name="settings_doodle_superpoint">SuperPoint</string>
+    <string name="settings_doodle_half_sphere">Halvsfär</string>
+    <string name="settings_doodle_both">Båda</string>
+    <string name="settings_doodle_superpoint_desc">Bara SuperPoint-drag från tagningen. Tål ljus och slitage; ungefär 1,5 MB per Krumelur. Gäller från nästa Krumelur.</string>
+    <string name="settings_doodle_half_sphere_desc">ORB-drag från tagningen och dess 49 närbilder. Starkt på nära håll och litet, under 0,1 MB per Krumelur. Gäller från nästa Krumelur.</string>
+    <string name="settings_doodle_both_desc">SuperPoint-drag från tagningen och dess 49 närbilder. Starkast; ungefär 2–3 MB per Krumelur. Gäller från nästa Krumelur.</string>
     <string name="settings_power_section">Ström</string>
     <string name="settings_privacy_section">Integritet</string>
     <string name="settings_developer_section">Utvecklare</string>
@@ -430,17 +430,17 @@
     <string name="save_project_hint">Projektnamn</string>
 
 
-    <string name="target_guide_desc">Justeringsguide för Krumelur</string>
-    <string name="target_captured_desc">Fångad Krumelur</string>
-    <string name="target_review_desc">Granska extraherad Krumelur</string>
-    <string name="target_unwarp_hint">Dra i hörnen för att avvika</string>
-    <string name="target_review_title">KRUMELUR LÅST</string>
-    <string name="fingerprint_closeups_progress">Lär sig väggen: steg %1$d av %2$d · moment %3$d av %4$d</string>
+    <string name="doodle_guide_desc">Justeringsguide för Krumelur</string>
+    <string name="doodle_captured_desc">Fångad Krumelur</string>
+    <string name="doodle_review_desc">Granska extraherad Krumelur</string>
+    <string name="doodle_unwarp_hint">Dra i hörnen för att avvika</string>
+    <string name="doodle_review_title">KRUMELUR LÅST</string>
+    <string name="doodle_closeups_progress">Lär sig väggen: steg %1$d av %2$d · moment %3$d av %4$d</string>
 
-    <string name="target_exclude">Utesluta</string>
-    <string name="target_include">Omfatta</string>
-    <string name="target_erase_marks">Radera märken</string>
-    <string name="target_show_features">Visa funktioner</string>
+    <string name="doodle_exclude">Utesluta</string>
+    <string name="doodle_include">Omfatta</string>
+    <string name="doodle_erase_marks">Radera märken</string>
+    <string name="doodle_show_features">Visa funktioner</string>
     <string name="reset_button">Återställa</string>
 
     <string name="poster_title">GENERERA AFFISCH</string>
@@ -455,7 +455,7 @@
     <string name="scan_hint_build_map">Gå åt vänster och höger för att bygga en karta</string>
     <string name="scan_hint_closer">Flytta dig närmare väggen</string>
     <string name="scan_hint_higher_lower">Skanna högre och lägre</string>
-    <string name="reacquiring_target">Hittar Krumeluren igen…</string>
+    <string name="reacquiring_doodle">Hittar Krumeluren igen…</string>
 
 
     <string name="desc_bg_mockup">Bakgrundsmockup</string>
@@ -718,14 +718,14 @@
     <string name="standalone_photosphere_no_sensor">Den här telefonen saknar rotationssensor, så SphereSLAM kan inte placera ett mål här.</string>
     <string name="standalone_photosphere_compass_not_ready">Kompassen är inte redo än – håll telefonen stilla en sekund och ta om bilden.</string>
     <string name="standalone_photosphere_not_mapped">SphereSLAM har inte kartlagt den här vyn än – håll kameran stilla en sekund mot en upplyst, detaljrik del av ytan och ta sedan om bilden.</string>
-    <string name="target_rectify_title">Räta upp ytan</string>
-    <string name="target_rectify_text">Dra nu i hörnen så att den cyanfärgade ramen ligger längs väggens plana yta.</string>
-    <string name="target_remove_marks_title">Ta bort markeringar</string>
-    <string name="target_erase_hint">Tryck på en markering för att ta bort den, eller dra över flera markeringar.</string>
-    <string name="target_cd_raw_capture">Råbild</string>
-    <string name="target_cd_detected_marks">Upptäckta markeringar</string>
-    <string name="target_cd_confirm">Bekräfta</string>
-    <string name="target_cd_unwarp_base">Fångat väggfoto med hörnhandtag</string>
+    <string name="doodle_rectify_title">Räta upp ytan</string>
+    <string name="doodle_rectify_text">Dra nu i hörnen så att den cyanfärgade ramen ligger längs väggens plana yta.</string>
+    <string name="doodle_remove_marks_title">Ta bort markeringar</string>
+    <string name="doodle_erase_hint">Tryck på en markering för att ta bort den, eller dra över flera markeringar.</string>
+    <string name="doodle_cd_raw_capture">Råbild</string>
+    <string name="doodle_cd_detected_marks">Upptäckta markeringar</string>
+    <string name="doodle_cd_confirm">Bekräfta</string>
+    <string name="doodle_cd_unwarp_base">Fångat väggfoto med hörnhandtag</string>
     <string name="guidance_open_via_design_overlay">Tryck på ”Design” i fältet och sedan på ”Öppna” för att lägga till ett lager – välj ett foto så visas det här, svävande över kameravyn.</string>
     <string name="guidance_open_via_design_mockup">Tryck på ”Design” i fältet och sedan på ”Öppna” för att lägga till ett lager ovanpå väggfotot. Nyp och dra för att ändra storlek och läge.</string>
     <string name="guidance_open_via_design_trace">Tryck på ”Design” i fältet och sedan på ”Öppna” för att lägga till ditt första lager. När det är på plats nyper och drar du på duken för att ändra storlek och placera det.</string>
@@ -734,15 +734,15 @@
     <string name="ar_feedback_guest_edit_dropped">Ändringen kan inte delas med värden – den stannar på den här enheten</string>
     <string name="ar_feedback_backend_resolving">AR-backend fastställs fortfarande – försök vara värd igen om en stund</string>
     <string name="ar_feedback_open_project_first">Öppna ett projekt innan du delar – det finns inget att skicka till en gäst än</string>
-    <string name="ar_feedback_host_need_target_arcore">Fånga och lås en aktuell Krumelur innan du är värd</string>
+    <string name="ar_feedback_host_need_doodle_arcore">Fånga och lås en aktuell Krumelur innan du är värd</string>
     <string name="ar_feedback_host_need_target_standalone">Fånga ett fristående väggmål innan du är värd</string>
-    <string name="ar_feedback_fingerprint_not_ready">Krumeluren är inte klar än — håll den i bild och försök med ”Vara värd” igen</string>
+    <string name="ar_feedback_doodle_not_ready">Krumeluren är inte klar än — håll den i bild och försök med ”Vara värd” igen</string>
     <string name="ar_feedback_package_failed">Det gick inte att paketera projektet för delning – försök spara det först</string>
     <string name="ar_feedback_host_failed">Det gick inte att starta delningen: %1$s</string>
     <string name="ar_feedback_join_load_failed">Det gick inte att läsa in värdens projekt – sessionen avslutades.</string>
     <string name="ar_feedback_join_no_geometry">Värden angav ingen geometri som ARCore kan justera mot.</string>
     <string name="ar_feedback_join_failed">Det gick inte att ansluta: %1$s</string>
-    <string name="ar_feedback_wall_target_changed">Krumeluren ändrades — delningen avslutades. Starta ”Vara värd” igen för den nya väggen.</string>
+    <string name="ar_feedback_wall_doodle_changed">Krumeluren ändrades — delningen avslutades. Starta ”Vara värd” igen för den nya väggen.</string>
     <string name="ar_feedback_backend_changed">Spårningsmotorn ändrades – delningen avslutades. Starta delningen igen.</string>
     <string name="ar_feedback_camera_busy">Kameran är upptagen eller otillgänglig – stäng andra kameraappar och gå sedan in i AR igen</string>
     <string name="ar_feedback_ar_start_failed">Det gick inte att starta AR – kameran kanske används av en annan app</string>
@@ -752,7 +752,7 @@
     <string name="ar_feedback_camera_permission">Kameran är otillgänglig – kontrollera kameratillståndet och gå sedan in i AR igen</string>
     <string name="ar_feedback_camera_not_paused">AR-kameran pausades inte ordentligt – den kan fortsätta köra i bakgrunden</string>
     <string name="ar_feedback_backbone_warning">Konstverket täcker nästan hela väggen i bild — bara %1$d spårade särdrag finns utanför. Gör det mindre eller kliv tillbaka, annars kanske Krumeluren inte låser.</string>
-    <string name="ar_feedback_legacy_target_geometry">Projektets sparade Krumelur skapades av en äldre version och dess 3D-geometri kan inte korrigeras. Skapa Krumeluren igen för att använda den.</string>
+    <string name="ar_feedback_legacy_doodle_geometry">Projektets sparade Krumelur skapades av en äldre version och dess 3D-geometri kan inte korrigeras. Skapa Krumeluren igen för att använda den.</string>
     <string name="ar_feedback_camera_no_frames">Kameran levererar inga bildrutor – lämna AR och försök igen</string>
     <string name="ar_feedback_camera_recovery_timeout">Återställningen av AR-kameran avbröts säkert på grund av tidsgräns – lämna AR och gå in igen</string>
     <string name="ar_feedback_target_prepare_failed">Det gick inte att förbereda det fångade målet. Försök igen.</string>
@@ -778,8 +778,8 @@
 
     <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
     <string name="settings_change_pass">Ändringsdetektering (kräver ett foto av den rena väggen)</string>
-    <string name="target_shutter_cd">Fotografera den bara väggen</string>
-    <string name="target_shutter_retake_cd">Ta om fotot av den bara väggen</string>
+    <string name="doodle_shutter_cd">Fotografera den bara väggen</string>
+    <string name="doodle_shutter_retake_cd">Ta om fotot av den bara väggen</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">CV-vy</string>

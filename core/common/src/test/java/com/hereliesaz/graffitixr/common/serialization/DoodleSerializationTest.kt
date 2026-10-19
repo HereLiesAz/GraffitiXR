@@ -1,6 +1,6 @@
 package com.hereliesaz.graffitixr.common.serialization
 
-import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.Doodle
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -9,13 +9,13 @@ import org.junit.Test
 import org.opencv.core.KeyPoint
 
 /**
- * Round-trip coverage for the relocalization fingerprint — the load-bearing payload of a saved
+ * Round-trip coverage for the relocalization doodle — the load-bearing payload of a saved
  * `.gxr` (descriptors + 3D points + distortion-head patch). This is the data the PnP relocalizer
  * restores on project open, so it must survive serialization byte-for-byte. The reloc *math*
  * (PoseFusion; SphereSLAM MetricMarks) is already covered by their own suites; this fills the
  * remaining gap and guards the format against the upcoming `.gxr` reshape.
  */
-class FingerprintSerializationTest {
+class DoodleSerializationTest {
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -37,8 +37,8 @@ class FingerprintSerializationTest {
     }
 
     @Test
-    fun `Fingerprint survives a full serialization round-trip`() {
-        val original = Fingerprint(
+    fun `Doodle survives a full serialization round-trip`() {
+        val original = Doodle(
             keypoints = listOf(
                 KeyPoint(1f, 2f, 3f, 10f, 0.5f, 0, 1),
                 KeyPoint(4.5f, 6.25f, 8f, 90f, 0.875f, 3, 7),
@@ -52,8 +52,8 @@ class FingerprintSerializationTest {
         )
 
         val decoded = json.decodeFromString(
-            Fingerprint.serializer(),
-            json.encodeToString(Fingerprint.serializer(), original),
+            Doodle.serializer(),
+            json.encodeToString(Doodle.serializer(), original),
         )
 
         // Raw byte payloads — descriptors (for matching) and the distortion-head patch — must be intact.
@@ -79,13 +79,13 @@ class FingerprintSerializationTest {
     }
 
     @Test
-    fun `legacy fingerprint without points3d or patch deserializes with defaults`() {
+    fun `legacy doodle without points3d or patch deserializes with defaults`() {
         // Pre-existing projects predate points3d/patchData. They must still load (defaulted), so the
         // format stays backward-compatible across the `.gxr` reshape. ByteArray encodes as a JSON
         // number array under kotlinx.serialization.
         val legacyJson =
             """{"keypoints":[],"descriptorsData":[1,2,3],"descriptorsRows":1,"descriptorsCols":3,"descriptorsType":0}"""
-        val decoded = json.decodeFromString(Fingerprint.serializer(), legacyJson)
+        val decoded = json.decodeFromString(Doodle.serializer(), legacyJson)
 
         assertEquals(0, decoded.points3d.size)
         assertEquals(0, decoded.patchData.size)
@@ -94,11 +94,11 @@ class FingerprintSerializationTest {
     }
 
     @Test
-    fun `Fingerprint equals and hashCode are value-based across distinct KeyPoint instances`() {
-        // Two fingerprints with separately-constructed but value-identical KeyPoints. OpenCV's
-        // KeyPoint compares by reference, so without the field-wise fix in Fingerprint.equals these
+    fun `Doodle equals and hashCode are value-based across distinct KeyPoint instances`() {
+        // Two doodles with separately-constructed but value-identical KeyPoints. OpenCV's
+        // KeyPoint compares by reference, so without the field-wise fix in Doodle.equals these
         // would be unequal — silently breaking any state-diffing/caching that relies on equality.
-        fun make() = Fingerprint(
+        fun make() = Doodle(
             keypoints = listOf(KeyPoint(1f, 2f, 3f, 10f, 0.5f, 0, 1)),
             points3d = listOf(0.5f, 0.25f, 0.75f),
             descriptorsData = byteArrayOf(9, 8, 7),
@@ -113,11 +113,11 @@ class FingerprintSerializationTest {
     }
 
     @Test
-    fun `Fingerprint rejects a descriptor blob that disagrees with its declared dims`() {
-        // A corrupt/truncated .gxr must not construct a Fingerprint whose byte blob doesn't match its
+    fun `Doodle rejects a descriptor blob that disagrees with its declared dims`() {
+        // A corrupt/truncated .gxr must not construct a Doodle whose byte blob doesn't match its
         // rows — the native restore wraps this in a cv::Mat and would read out of bounds.
         assertThrows(IllegalArgumentException::class.java) {
-            Fingerprint(
+            Doodle(
                 keypoints = emptyList(),
                 points3d = emptyList(),
                 descriptorsData = byteArrayOf(1, 2, 3), // 3 bytes …
@@ -129,9 +129,9 @@ class FingerprintSerializationTest {
     }
 
     @Test
-    fun `Fingerprint rejects a points3d list that is not whole triplets`() {
+    fun `Doodle rejects a points3d list that is not whole triplets`() {
         assertThrows(IllegalArgumentException::class.java) {
-            Fingerprint(
+            Doodle(
                 keypoints = emptyList(),
                 points3d = listOf(0.5f, 0.25f), // 2 floats — not a whole [x,y,z]
                 descriptorsData = ByteArray(0),
@@ -148,9 +148,9 @@ class FingerprintSerializationTest {
      * garbage 3D into solvePnPRansac. The blob-vs-rows guard above did not cover this second array.
      */
     @Test
-    fun `Fingerprint rejects a points3d count that disagrees with the descriptor row count`() {
+    fun `Doodle rejects a points3d count that disagrees with the descriptor row count`() {
         assertThrows(IllegalArgumentException::class.java) {
-            Fingerprint(
+            Doodle(
                 keypoints = emptyList(),
                 points3d = listOf(0.5f, 0.25f, 0.75f), // 1 point …
                 descriptorsData = byteArrayOf(1, 2, 3, 4), // … but 2 rows of 2 declared below
@@ -161,10 +161,10 @@ class FingerprintSerializationTest {
         }
     }
 
-    /** Points-free fingerprints (keypoint-only, older projects) stay legal at any row count. */
+    /** Points-free doodles (keypoint-only, older projects) stay legal at any row count. */
     @Test
-    fun `Fingerprint allows an empty points3d list alongside descriptor rows`() {
-        val fp = Fingerprint(
+    fun `Doodle allows an empty points3d list alongside descriptor rows`() {
+        val fp = Doodle(
             keypoints = emptyList(),
             points3d = emptyList(),
             descriptorsData = byteArrayOf(1, 2, 3, 4),

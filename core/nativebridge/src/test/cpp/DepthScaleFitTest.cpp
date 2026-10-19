@@ -62,7 +62,7 @@ TEST(DepthScaleFit, DegeneracyCheckIsScaleInvariant) {
     EXPECT_FALSE(fitDepthScale(flat, fy).ok);
 }
 
-// Identity camera, K f=500 c=(320,240), wall plane z = 2 + 2x in the fingerprint frame. Wall features
+// Identity camera, K f=500 c=(320,240), wall plane z = 2 + 2x in the doodle frame. Wall features
 // (u <= 400) intersect the plane in front; features at u >= 580 miss it (t < 0) and are placed only
 // from depth. MiDaS reads invd = 3/Z + 0.5, the off-wall surface sits at Z = 3, and 30% of the wall
 // samples are corrupted: a plain least-squares calibration misplaces the off-wall points.

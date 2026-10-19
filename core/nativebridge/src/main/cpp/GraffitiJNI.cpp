@@ -34,7 +34,7 @@ MobileGS* gSlamEngine = nullptr;
 // shared_mutex: nativeInitialize/nativeDestroy (which write the pointer itself) take an exclusive
 // std::unique_lock; every entry point that only dereferences it takes a std::shared_lock and can
 // run concurrently with other readers -- that's the actual fix for heavy OpenCV/SuperPoint work
-// (fingerprint generation, relocalization) blocking the per-frame camera/render path behind one
+// (doodle generation, relocalization) blocking the per-frame camera/render path behind one
 // global lock. Three more entry points also need std::unique_lock despite not touching the
 // pointer: nativeLoadSuperPoint/nativeLoadDistortionHead/nativeLoadLowLightEnhancer mutate
 // mSuperPoint/mDistortionHead/mEnhancer in place via their load() calls.
@@ -42,13 +42,13 @@ MobileGS* gSlamEngine = nullptr;
 // CORRECTION: an earlier version of this comment claimed gEngineMutex was "the only thing"
 // serializing those reloads against an in-flight detect()/enhance()/run() -- false, and dangerous
 // to believe. relocThreadFunc's background worker (MobileGS.cpp) calls runRelocPass/
-// tryUpdateFingerprint, which call into SuperPointDetector/DistortionHead/LowLightEnhancer,
+// tryUpdateDoodle, which call into SuperPointDetector/DistortionHead/LowLightEnhancer,
 // WITHOUT ever taking gEngineMutex -- it's a std::thread, not a JNI entry point. What actually
 // makes a live reload safe against that thread is each of those three classes' own internal
 // std::mutex (SuperPointDetector.h/DistortionHead.h/LowLightEnhancer.h each declare `mMutex`,
 // taken in both load() and the inference call). gEngineMutex's exclusive lock on the three loader
 // entry points is still correct and still necessary -- it's what protects them against the OTHER
-// JNI-entry readers (getSuperPointFeatures, getFingerprintKeypoints, generateFingerprint, all
+// JNI-entry readers (getSuperPointFeatures, getDoodleKeypoints, generateDoodle, all
 // called only via JNI) -- it just isn't sufficient on its own, and the reloc-thread path was never
 // covered by it in the first place.
 //
@@ -388,8 +388,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallPatchBytes(
         JNIEnv* env, jobject thiz, jbyteArray data, jint size) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !data || size <= 0) return;
-    // 64-bit product, like every sibling restore path in this file (nativeRestoreWallFingerprint /
-    // nativeRestoreWallFingerprintMetric / nativeRestoreWallFeatureMap): size*size in 32-bit jint can
+    // 64-bit product, like every sibling restore path in this file (nativeRestoreWallDoodle /
+    // nativeRestoreWallDoodleMetric / nativeRestoreWallFeatureMap): size*size in 32-bit jint can
     // overflow for a hostile/corrupt size and wrap past this check into a too-small buffer.
     if ((jlong)size * (jlong)size > (jlong)env->GetArrayLength(data)) return; // expect a size x size single-channel gray buffer
     jbyte* p = env->GetByteArrayElements(data, nullptr);
@@ -594,10 +594,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     // Relocalization MATCHING still uses the Display-Aligned frame for best user feedback.
     //
     // Ask FIRST whether the reloc worker will take a frame. scheduleRelocCheck drops the frame
-    // outright when relocalization is off, when there is no wall fingerprint to match against yet,
+    // outright when relocalization is off, when there is no wall doodle to match against yet,
     // or when the worker is still busy with the previous one — and building its argument costs a
     // full-frame YUV->RGB conversion plus a full-frame rotate, both on the GL render thread. That
-    // work used to be done unconditionally, so during the entire scanning phase (no fingerprint
+    // work used to be done unconditionally, so during the entire scanning phase (no doodle
     // exists yet, by definition) every single conversion was built and immediately thrown away,
     // several times a second, stalling the render loop for nothing.
     if (frameSnapshot.empty() || !gSlamEngine->relocWantsFrame()) return;
@@ -745,7 +745,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedLumaFrame(
         return;
     }
 
-    // Avoid even the gray->RGB conversion while the reloc worker is busy or no fingerprint exists.
+    // Avoid even the gray->RGB conversion while the reloc worker is busy or no doodle exists.
     if (!gSlamEngine->relocWantsFrame()) return;
 
     try {
@@ -860,7 +860,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadLowLightEnhanc
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerprint(
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallDoodle(
         JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type, jfloatArray ptsArray) {
     // Defensive validation (a malformed/old .gxr must never crash native): non-null refs, a valid
     // OpenCV type (a bogus one makes the cv::Mat ctor throw a cv::Exception → hard process crash,
@@ -880,7 +880,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
     jsize ptsLen = env->GetArrayLength(ptsArray);
     // Point count must match the descriptor row count (mirrors nativeRestorePaintMarks /
     // nativeRestoreWallFeatureMap): a disagreement means a malformed/old blob, so refuse it rather than
-    // store a fingerprint whose keypoints and descriptors have different sizes.
+    // store a doodle whose keypoints and descriptors have different sizes.
     if ((jlong)ptsLen != (jlong)rows * 3) {
         env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
         return;
@@ -891,18 +891,18 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
         points3d.push_back(cv::Point3f(ptsData[i], ptsData[i+1], ptsData[i+2]));
     }
     try {
-        gSlamEngine->restoreWallFingerprint(descriptors, points3d);
+        gSlamEngine->restoreWallDoodle(descriptors, points3d);
     } catch (const std::exception& e) {
-        LOGE("nativeRestoreWallFingerprint: exception: %s", e.what());
+        LOGE("nativeRestoreWallDoodle: exception: %s", e.what());
     } catch (...) {
-        LOGE("nativeRestoreWallFingerprint: unknown exception");
+        LOGE("nativeRestoreWallDoodle: unknown exception");
     }
     env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
     env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerprintMetric(
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallDoodleMetric(
         JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type,
         jfloatArray ptsArray, jfloatArray anchorArray, jfloatArray intrArray, jfloatArray viewArray,
         jbyteArray regionsArray) {
@@ -948,16 +948,16 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
             regions.assign((uint8_t*)regData, (uint8_t*)regData + regLen);
             env->ReleaseByteArrayElements(regionsArray, regData, JNI_ABORT);
         } else if (regLen > 0) {
-            LOGE("restoreWallFingerprintMetric: %d regions for %zu points - dropping partition",
+            LOGE("restoreWallDoodleMetric: %d regions for %zu points - dropping partition",
                  (int)regLen, points3d.size());
         }
     }
     try {
-        gSlamEngine->restoreWallFingerprintMetric(descriptors, points3d, anchor, intr, view, regions);
+        gSlamEngine->restoreWallDoodleMetric(descriptors, points3d, anchor, intr, view, regions);
     } catch (const std::exception& e) {
-        LOGE("nativeRestoreWallFingerprintMetric: exception: %s", e.what());
+        LOGE("nativeRestoreWallDoodleMetric: exception: %s", e.what());
     } catch (...) {
-        LOGE("nativeRestoreWallFingerprintMetric: unknown exception");
+        LOGE("nativeRestoreWallDoodleMetric: unknown exception");
     }
     env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
     env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
@@ -966,7 +966,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
     if (view)   env->ReleaseFloatArrayElements(viewArray, view, JNI_ABORT);
 }
 
-// Persistent wall feature map (Phase 2a: store only). Mirrors the metric-fingerprint restore but
+// Persistent wall feature map (Phase 2a: store only). Mirrors the metric-doodle restore but
 // adds parallel per-point confidence (jfloatArray) + obs (jintArray); anchor/intrinsics are
 // passed through only when correctly sized (16 / 4), else left at their native defaults.
 // Painted-design reference set (MobileGS::kMaxPaintMarks). Blob layout: see exportPaintMarks.
@@ -1035,7 +1035,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFeature
     // can't catch C++ exceptions), a descriptor blob big enough for rows*cols*elemSize computed in
     // 64-bit (a jsize/jint product here would let a hostile rows*cols overflow past the check and
     // wrap a tiny buffer in a huge cv::Mat -> OOB read), and parallel arrays of matching length.
-    // Mirrors nativeRestoreWallFingerprint / nativeRestoreWallFingerprintMetric above.
+    // Mirrors nativeRestoreWallDoodle / nativeRestoreWallDoodleMetric above.
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !descArray || !ptsArray) return;
     if (rows < 0 || cols < 0) return;
@@ -1100,9 +1100,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearWallFeatureMa
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearWallFingerprint(JNIEnv*, jobject) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearWallDoodle(JNIEnv*, jobject) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
-    if (gSlamEngine) gSlamEngine->clearWallFingerprint();
+    if (gSlamEngine) gSlamEngine->clearWallDoodle();
 }
 
 JNIEXPORT jint JNICALL
@@ -1186,7 +1186,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportWallFeatureM
     return arr;
 }
 
-jobject buildFingerprintObject(JNIEnv* env, const MobileGS::FingerprintData& fd) {
+jobject buildDoodleObject(JNIEnv* env, const MobileGS::DoodleData& fd) {
     if (fd.descriptors.empty()) return nullptr;
 
     // Helper: clear any pending JNI exception and bail to nullptr on lookup
@@ -1200,7 +1200,7 @@ jobject buildFingerprintObject(JNIEnv* env, const MobileGS::FingerprintData& fd)
             env->ExceptionClear();
         }
         __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI",
-            "buildFingerprintObject: lookup failed: %s — returning nullptr", what);
+            "buildDoodleObject: lookup failed: %s — returning nullptr", what);
         return nullptr;
     };
 
@@ -1246,42 +1246,42 @@ jobject buildFingerprintObject(JNIEnv* env, const MobileGS::FingerprintData& fd)
     env->SetByteArrayRegion(descArray, 0, descSize, (const jbyte*)fd.descriptors.data);
     if (env->ExceptionCheck()) return bail("descriptor array copy");
 
-    jclass fpClass = env->FindClass("com/hereliesaz/graffitixr/common/model/Fingerprint");
-    if (!fpClass) return bail("Fingerprint class");
-    // FROZEN JNI ABI: construct via the static factory Fingerprint.fromNative, never the raw
+    jclass fpClass = env->FindClass("com/hereliesaz/graffitixr/common/model/Doodle");
+    if (!fpClass) return bail("Doodle class");
+    // FROZEN JNI ABI: construct via the static factory Doodle.fromNative, never the raw
     // constructor. Kotlin default parameters don't emit reduced-arity JVM overloads, so every
     // field added to the data class changed the constructor descriptor and broke this lookup
-    // (twice: patchData, then markCenterLocal), making setWallFingerprint return null on every
-    // capture. The factory signature is frozen — mirrored by Fingerprint.JNI_FACTORY_DESCRIPTOR
-    // and asserted by FingerprintJniContractTest — so new Kotlin fields can't break it again.
+    // (twice: patchData, then markCenterLocal), making setWallDoodle return null on every
+    // capture. The factory signature is frozen — mirrored by Doodle.JNI_FACTORY_DESCRIPTOR
+    // and asserted by DoodleJniContractTest — so new Kotlin fields can't break it again.
     jmethodID fpFactory = env->GetStaticMethodID(
             fpClass, "fromNative",
-            "(Ljava/util/List;Ljava/util/List;[BIII[BLjava/util/List;)Lcom/hereliesaz/graffitixr/common/model/Fingerprint;");
-    if (!fpFactory) return bail("Fingerprint.fromNative factory");
+            "(Ljava/util/List;Ljava/util/List;[BIII[BLjava/util/List;)Lcom/hereliesaz/graffitixr/common/model/Doodle;");
+    if (!fpFactory) return bail("Doodle.fromNative factory");
 
-    // patchData (the distortion-head patch): this native path produces none — FingerprintData has
+    // patchData (the distortion-head patch): this native path produces none — DoodleData has
     // no patch field — so pass an empty array, matching the Kotlin default `patchData = ByteArray(0)`.
     jbyteArray patchArray = env->NewByteArray(0);
     if (!patchArray) return bail("patchArray alloc");
-    // markCenterLocal: FingerprintData carries no marks centroid (it is computed Kotlin-side by
-    // MetricFingerprintBuilder), so pass an empty list, matching the Kotlin default.
+    // markCenterLocal: DoodleData carries no marks centroid (it is computed Kotlin-side by
+    // MetricDoodleBuilder), so pass an empty list, matching the Kotlin default.
     jobject centerList = env->NewObject(listClass, listCtor, (jint)0);
     if (!centerList) return bail("markCenterLocal list alloc");
     jobject fpObj = env->CallStaticObjectMethod(fpClass, fpFactory, kpList, ptsList, descArray,
                                                 fd.descriptors.rows, fd.descriptors.cols, fd.descriptors.type(),
                                                 patchArray, centerList);
-    if (env->ExceptionCheck() || !fpObj) return bail("Fingerprint.fromNative call");
+    if (env->ExceptionCheck() || !fpObj) return bail("Doodle.fromNative call");
 
     return fpObj;
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallFingerprint(
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallDoodle(
         JNIEnv* env, jobject thiz, jobject bitmap, jobject mask, jobject depthBuffer, jint depthW, jint depthH, jint depthStride, jfloatArray intrArray, jfloatArray viewMatArray) {
 
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
-    // generateFingerprint dereferences intr[0..3] and viewMat[0..15] unconditionally (unlike the
+    // generateDoodle dereferences intr[0..3] and viewMat[0..15] unconditionally (unlike the
     // optional-pointer restore paths above), so a null or short array here is an OOB read past
     // whatever GetFloatArrayElements happens to hand back. Not reachable via current Kotlin call
     // sites, but every other array-taking function in this file validates before use.
@@ -1296,13 +1296,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallFingerprint
 
     auto* depthData = static_cast<const uint8_t*>(
             depthBuffer ? env->GetDirectBufferAddress(depthBuffer) : nullptr);
-    // generateFingerprint indexes depthData as depthH rows of depthW uint16 samples, depthStride
+    // generateDoodle indexes depthData as depthH rows of depthW uint16 samples, depthStride
     // bytes apart, trusting the caller's dimensions. Same guard as the Y/U/V/luma planes: a short
-    // buffer is an OOB read. Only checked when generateFingerprint would actually read it.
+    // buffer is an OOB read. Only checked when generateDoodle would actually read it.
     if (depthData && depthW > 0 && depthH > 0 && depthStride > 0) {
         jlong depthCap = env->GetDirectBufferCapacity(depthBuffer);
         if (!graffitixr::plane16Fits(depthCap, depthW, depthH, depthStride)) {
-            LOGE("nativeSetWallFingerprint: depth rejected (cap=%lld, %dx%d stride=%d)",
+            LOGE("nativeSetWallDoodle: depth rejected (cap=%lld, %dx%d stride=%d)",
                  (long long)depthCap, depthW, depthH, depthStride);
             return nullptr;
         }
@@ -1310,25 +1310,25 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallFingerprint
     jfloat* intr = env->GetFloatArrayElements(intrArray, nullptr);
     jfloat* view = env->GetFloatArrayElements(viewMatArray, nullptr);
 
-    MobileGS::FingerprintData fd;
+    MobileGS::DoodleData fd;
     try {
-        fd = gSlamEngine->generateFingerprint(image, maskMat, depthData, depthW, depthH, depthStride, intr, view);
+        fd = gSlamEngine->generateDoodle(image, maskMat, depthData, depthW, depthH, depthStride, intr, view);
     } catch (const std::exception& e) {
-        LOGE("nativeSetWallFingerprint: exception: %s", e.what());
+        LOGE("nativeSetWallDoodle: exception: %s", e.what());
     } catch (...) {
-        LOGE("nativeSetWallFingerprint: unknown exception");
+        LOGE("nativeSetWallDoodle: unknown exception");
     }
 
     env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
     env->ReleaseFloatArrayElements(viewMatArray, view, JNI_ABORT);
 
-    return buildFingerprintObject(env, fd);
+    return buildDoodleObject(env, fd);
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArtworkFingerprint(
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArtworkDoodle(
         JNIEnv* env, jobject thiz, jobject bitmap, jobject depthBuffer, jint depthW, jint depthH, jint depthStride, jfloatArray intrArray, jfloatArray viewMatArray) {
-    // Same OOB hazard as nativeSetWallFingerprint above: setArtworkFingerprint dereferences
+    // Same OOB hazard as nativeSetWallDoodle above: setArtworkDoodle dereferences
     // intr[0..3] / viewMat[0..15] unconditionally. Validate before touching either array.
     if (!intrArray || env->GetArrayLength(intrArray) < 4) return;
     if (!viewMatArray || env->GetArrayLength(viewMatArray) < 16) return;
@@ -1338,13 +1338,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArtworkFingerpr
         bitmapToMat(env, bitmap, composite);
         auto* depthData = static_cast<const uint8_t*>(
                 depthBuffer ? env->GetDirectBufferAddress(depthBuffer) : nullptr);
-        // Same DEPTH16 bounds check as nativeSetWallFingerprint. Depth is optional here
-        // (setArtworkFingerprint stores descriptors-only without it), so a short buffer degrades
+        // Same DEPTH16 bounds check as nativeSetWallDoodle. Depth is optional here
+        // (setArtworkDoodle stores descriptors-only without it), so a short buffer degrades
         // to that path rather than refusing the registration.
         if (depthData && depthW > 0 && depthH > 0 && depthStride > 0) {
             jlong depthCap = env->GetDirectBufferCapacity(depthBuffer);
             if (!graffitixr::plane16Fits(depthCap, depthW, depthH, depthStride)) {
-                LOGE("nativeSetArtworkFingerprint: depth rejected (cap=%lld, %dx%d stride=%d)",
+                LOGE("nativeSetArtworkDoodle: depth rejected (cap=%lld, %dx%d stride=%d)",
                      (long long)depthCap, depthW, depthH, depthStride);
                 depthData = nullptr;
             }
@@ -1352,11 +1352,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArtworkFingerpr
         jfloat* intr = env->GetFloatArrayElements(intrArray, nullptr);
         jfloat* view = env->GetFloatArrayElements(viewMatArray, nullptr);
         try {
-            gSlamEngine->setArtworkFingerprint(composite, depthData, depthW, depthH, depthStride, intr, view);
+            gSlamEngine->setArtworkDoodle(composite, depthData, depthW, depthH, depthStride, intr, view);
         } catch (const std::exception& e) {
-            LOGE("nativeSetArtworkFingerprint: exception: %s", e.what());
+            LOGE("nativeSetArtworkDoodle: exception: %s", e.what());
         } catch (...) {
-            LOGE("nativeSetArtworkFingerprint: unknown exception");
+            LOGE("nativeSetArtworkDoodle: unknown exception");
         }
         env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
         env->ReleaseFloatArrayElements(viewMatArray, view, JNI_ABORT);
@@ -1606,7 +1606,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDetectSuperPoint(
 }
 
 JNIEXPORT jfloatArray JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintKeypoints(
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetDoodleKeypoints(
         JNIEnv* env, jobject thiz, jobject bitmap, jobject mask) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
@@ -1617,13 +1617,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintKeyp
     std::vector<cv::Point2f> pts;
     {
         // Not under mMutex, for the same reason as nativeDetectSuperPoint above:
-        // getFingerprintKeypoints touches only the self-locking mSuperPoint/mEnhancer and atomics.
+        // getDoodleKeypoints touches only the self-locking mSuperPoint/mEnhancer and atomics.
         try {
-            gSlamEngine->getFingerprintKeypoints(image, maskMat, pts);
+            gSlamEngine->getDoodleKeypoints(image, maskMat, pts);
         } catch (const std::exception& e) {
-            LOGE("nativeGetFingerprintKeypoints: exception: %s", e.what());
+            LOGE("nativeGetDoodleKeypoints: exception: %s", e.what());
         } catch (...) {
-            LOGE("nativeGetFingerprintKeypoints: unknown exception");
+            LOGE("nativeGetDoodleKeypoints: unknown exception");
         }
     }
     jfloatArray result = env->NewFloatArray((jsize)(pts.size() * 2));
@@ -1681,7 +1681,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetAnchorTransform
     // Every Kotlin call site (ArRenderer.kt, ArViewModel.kt) treats a null return as "no engine /
     // allocation pressure" and falls back accordingly -- returning a non-null all-zero array here
     // instead silently collapsed the caller's model matrix / fed a garbage pose into
-    // MetricFingerprintBuilder. Match nativeGetFingerprintAnchor's sibling behavior: only allocate
+    // MetricDoodleBuilder. Match nativeGetDoodleAnchor's sibling behavior: only allocate
     // and populate the array once there's an engine to read from.
     if (!gSlamEngine) return nullptr;
     jfloatArray result = env->NewFloatArray(16);
@@ -1872,7 +1872,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocResult(JNI
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintAnchor(JNIEnv* env, jobject, jfloatArray out) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetDoodleAnchor(JNIEnv* env, jobject, jfloatArray out) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     // See nativeGetStageTimings above: leaving `out` untouched here would read as a real all-zero
     // anchor matrix rather than "no engine yet". Write an unambiguous -1.0f sentinel instead (an
@@ -1888,30 +1888,30 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintAnch
     // See nativeGetStageTimings above for why this is validated even though SetFloatArrayRegion
     // itself would already reject a short array.
     if (!out || env->GetArrayLength(out) < 16) {
-        LOGE("nativeGetFingerprintAnchor: out array too short (need 16)");
+        LOGE("nativeGetDoodleAnchor: out array too short (need 16)");
         return;
     }
     float buf[16];
-    gSlamEngine->getFingerprintAnchor(buf);
+    gSlamEngine->getDoodleAnchor(buf);
     env->SetFloatArrayRegion(out, 0, 16, buf);
 }
 
 JNIEXPORT jbyteArray JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportFingerprint(
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportDoodle(
         JNIEnv* env, jobject thiz) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
-    std::vector<uint8_t> fingerprint = gSlamEngine->exportFingerprint();
-    if (fingerprint.empty()) return nullptr;
+    std::vector<uint8_t> doodle = gSlamEngine->exportDoodle();
+    if (doodle.empty()) return nullptr;
 
-    jbyteArray result = env->NewByteArray((jsize)fingerprint.size());
+    jbyteArray result = env->NewByteArray((jsize)doodle.size());
     if (!result) return nullptr;
-    env->SetByteArrayRegion(result, 0, (jsize)fingerprint.size(), (jbyte*)fingerprint.data());
+    env->SetByteArrayRegion(result, 0, (jsize)doodle.size(), (jbyte*)doodle.data());
     return result;
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAlignToFingerprint(
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAlignToDoodle(
         JNIEnv* env, jobject thiz, jbyteArray data) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !data) return;
@@ -1919,11 +1919,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAlignToFingerprint
     jbyte* buffer = env->GetByteArrayElements(data, nullptr);
 
     try {
-        gSlamEngine->alignToFingerprint((uint8_t*)buffer, size);
+        gSlamEngine->alignToDoodle((uint8_t*)buffer, size);
     } catch (const std::exception& e) {
-        LOGE("nativeAlignToFingerprint: exception: %s", e.what());
+        LOGE("nativeAlignToDoodle: exception: %s", e.what());
     } catch (...) {
-        LOGE("nativeAlignToFingerprint: unknown exception");
+        LOGE("nativeAlignToDoodle: unknown exception");
     }
 
     env->ReleaseByteArrayElements(data, buffer, JNI_ABORT);

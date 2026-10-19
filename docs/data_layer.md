@@ -21,8 +21,8 @@ it without depending on `app/`).
   - `layers: List<OverlayLayer>` — read-only migration path for projects saved when this app still
     held a layer list; collapsed into `design` on load (`ProjectManager.migrateInMemory`) and never
     written again.
-  - `targetImageUris`, ARCore `fingerprint`/`wallFeatureMap`/`captureEnvironment`,
-    `fingerprintIntrinsics`/`fingerprintAnchor`/`fingerprintViewMatrix`, plus the separate
+  - `doodleImageUris`, ARCore `doodle`/`wallFeatureMap`/`captureEnvironment`,
+    `doodleIntrinsics`/`doodleAnchor`/`doodleViewMatrix`, plus the separate
     standalone SphereSLAM fields (`sphereSlamReferenceUri`, physical-scale flag/width, anchor
     generation, `sphereSlamFingerprint`, `sphereSlamWallFeatureMap`, and atlas-page metadata) —
     everything durable about either AR backend's wall target. ARCore and standalone target frames
@@ -43,11 +43,11 @@ the two would recreate the backend-frame ambiguity the separate fields prevent):
 - `hybridKpmPageWidthPx` / `HeightPx`, `hybridKpmPageWidthMeters` — DPI and page geometry are
   recomputed from these on restore, never stored;
 - `hybridKpmPageFromArtwork` — the frozen rigid `page_from_artwork` relation;
-- `hybridKpmFingerprintKey` — `fingerprint.captureAnchorCam` of the target the relation belongs to.
+- `hybridKpmDoodleKey` — `doodle.captureAnchorCam` of the target the relation belongs to.
 
-Written once, by an exact transform, after the relation freezes AND that capture's fingerprint has
-landed. Restored only while the project's fingerprint matches the key — an older page is inert, not
-wrong. Preserved against stale whole-object saves (with or without a fingerprint in hand); rebased
+Written once, by an exact transform, after the relation freezes AND that capture's doodle has
+landed. Restored only while the project's doodle matches the key — an older page is inert, not
+wrong. Preserved against stale whole-object saves (with or without a doodle in hand); rebased
 on import (dropped, not fatal, if the archive lacks the file). The dedicated ARCore page anchor and
 timestamp history remain runtime-only: a restore needs neither. Observations from before the
 artwork anchor is (re-)established are ignored.
@@ -58,8 +58,8 @@ artwork anchor is (re-)established are ignored.
   offset), tone adjustments (opacity, brightness, contrast, saturation, color balance), and
   `blendMode`.
 
-### `Fingerprint`
-- **Location:** `Fingerprint.kt`
+### `Doodle`
+- **Location:** `Doodle.kt`
 - **Purpose:** The OpenCV ORB/SuperPoint feature descriptors that identify an AR target's marks
   region. `descriptorsData` (raw byte blob) plus `descriptorsRows`/`descriptorsCols`/
   `descriptorsType` to reconstruct an OpenCV `Mat` on the native side.
@@ -67,7 +67,7 @@ artwork anchor is (re-)established are ignored.
 ### `WallFeatureMap`
 - **Location:** `WallFeatureMap.kt`
 - **Purpose:** The passively-built, confidence-weighted feature map of the wall surrounding the
-  marks fingerprint — the wide-area relocalization backbone (see `docs/RELOC_MAP_DESIGN.md`).
+  marks doodle — the wide-area relocalization backbone (see `docs/RELOC_MAP_DESIGN.md`).
   Stored as primitive arrays (`FloatArray`/`ByteArray`/`IntArray`), not boxed lists, for the same
   reason the native side hands them to JNI without copying. Every array-typed field is bounds- and
   overflow-checked in its `init` block (all size relations computed in `Long`, not `Int`, so a
@@ -139,7 +139,7 @@ project.
   LATEST merged state (not necessarily this call's own locally-computed value) under a mutex, so a
   concurrent transform's disk write can never be overwritten by a staler one. Three writers rely on
   this to coexist safely: the editor's design-layer save, AR's wall-feature-map save, and target
-  capture's fingerprint/environment save — each transform touches only the fields that writer owns.
+  capture's doodle/environment save — each transform touches only the fields that writer owns.
   A writer that instead calls `ProjectManager.saveProject` directly with a whole-object snapshot
   bypasses this entirely and can silently clobber (or be clobbered by) one of the other two.
 

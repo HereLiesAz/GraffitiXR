@@ -10,7 +10,7 @@ import org.junit.Test
  * so the tests below are the reason it was extracted at all.
  *
  * The failure that matters most is the slow drag. A trigger that fires too often wastes work; one
- * that never fires leaves Φ classifying the fingerprint against a design that has physically moved
+ * that never fires leaves Φ classifying the doodle against a design that has physically moved
  * away, and the artist gets a target that will not lock with no indication why.
  */
 class DesignMoveDetectorTest {
@@ -78,7 +78,7 @@ class DesignMoveDetectorTest {
 
     /**
      * The counterpart: genuine stillness must stay quiet. Float noise at a tenth of the threshold
-     * must not fire, or a resting finger repartitions the fingerprint, replaces the native map and
+     * must not fire, or a resting finger repartitions the doodle, replaces the native map and
      * rewrites the project file every frame.
      */
     @Test
@@ -119,7 +119,7 @@ class DesignMoveDetectorTest {
      * input was drift-coupled — and with it the only quantity that moved when the anchor changed.
      * Nothing else in the list does: pan, spin and scale are gestures a capture does not touch, and
      * the extents come from a one-shot fit. `anchorEstablished` is a one-way latch, so `placed` does
-     * not drop either. The trigger simply went quiet, and the NEW fingerprint was partitioned
+     * not drop either. The trigger simply went quiet, and the NEW doodle was partitioned
      * against the DEAD anchor's design frame.
      *
      * No threshold applies: an anchor replacement is discrete, so any change at all must fire.

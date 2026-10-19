@@ -300,19 +300,19 @@ class ProjectManagerTest {
         var project = GraffitiProject(id = "many_targets", name = "Many targets")
         // One capture at a time, as the real capture flow does — 35 captures against a cap of 30.
         repeat(35) {
-            pruningManager.saveProject(mockContext, project, targetImages = listOf(bitmap))
+            pruningManager.saveProject(mockContext, project, doodleImages = listOf(bitmap))
             project = pruningManager.loadProjectMetadata(mockContext, "many_targets")!!
         }
 
-        assertEquals(30, project.targetImageUris.size)
+        assertEquals(30, project.doodleImageUris.size)
         // Nothing beyond the cap remains on disk — pruned entries are deleted, not merely dropped
         // from the list.
-        val targetFiles = File(tempFilesDir, "projects/many_targets").listFiles { f -> f.name.startsWith("target_") }
-        assertEquals(30, targetFiles?.size ?: -1)
+        val doodleFiles = File(tempFilesDir, "projects/many_targets").listFiles { f -> f.name.startsWith("target_") }
+        assertEquals(30, doodleFiles?.size ?: -1)
     }
 
     @Test
-    fun `appendTargetImage prunes the list but leaves the files to the caller's commit`() = runTest {
+    fun `appendDoodleImage prunes the list but leaves the files to the caller's commit`() = runTest {
         val projectRepositoryProvider = mockk<javax.inject.Provider<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>>(relaxed = true)
         val pruningManager = ProjectManager(mockContext, uriProvider, projectRepositoryProvider)
         val bitmap = mockk<Bitmap>(relaxed = true) {
@@ -323,20 +323,20 @@ class ProjectManagerTest {
         var uris = emptyList<Uri>()
         val dropped = mutableListOf<Uri>()
         repeat(35) {
-            val next = pruningManager.appendTargetImage(mockContext, "capture_only", uris, bitmap)
+            val next = pruningManager.appendDoodleImage(mockContext, "capture_only", uris, bitmap)
             dropped += uris - next.toSet()
             uris = next
         }
 
         assertEquals(30, uris.size)
         assertEquals(5, dropped.size)
-        // Pure file IO: appendTargetImage must never create project.json.
+        // Pure file IO: appendDoodleImage must never create project.json.
         assertFalse(File(tempFilesDir, "projects/capture_only/project.json").exists())
-        fun targetFiles() = File(tempFilesDir, "projects/capture_only").listFiles { f -> f.name.startsWith("target_") }?.size
+        fun doodleFiles() = File(tempFilesDir, "projects/capture_only").listFiles { f -> f.name.startsWith("target_") }?.size
         // A dropped file is still referenced until the caller commits the list: nothing deleted yet.
-        assertEquals(35, targetFiles())
-        pruningManager.deleteTargetImages(dropped)
-        assertEquals(30, targetFiles())
+        assertEquals(35, doodleFiles())
+        pruningManager.deleteDoodleImages(dropped)
+        assertEquals(30, doodleFiles())
     }
 
 
@@ -395,23 +395,23 @@ class ProjectManagerTest {
         assertNull(manager.loadProjectMetadata(mockContext, "ww_clear")?.wallWidthMeters)
     }
 
-    private fun fingerprint(rows: Int) = com.hereliesaz.graffitixr.common.model.Fingerprint(
+    private fun doodle(rows: Int) = com.hereliesaz.graffitixr.common.model.Doodle(
         keypoints = emptyList(), points3d = emptyList(), descriptorsData = ByteArray(rows),
         descriptorsRows = rows, descriptorsCols = 1, descriptorsType = 0,
     )
 
     @Test
-    fun `stale save carrying the saved fingerprint still preserves the other fields`() = runTest {
+    fun `stale save carrying the saved doodle still preserves the other fields`() = runTest {
         val reference = Uri.fromFile(File(tempFilesDir, "projects/fp_stale/sphereslam_reference_a.png"))
         manager.saveProjectExact(
             mockContext,
             GraffitiProject(
-                id = "fp_stale", name = "Wall", fingerprint = fingerprint(2),
+                id = "fp_stale", name = "Wall", doodle = doodle(2),
                 wallWidthMeters = 4.2f, cloudAnchorId = "anchor-1", sphereSlamReferenceUri = reference,
             ),
         )
         // A snapshot holding the target but taken before the other fields were written.
-        manager.saveProject(mockContext, GraffitiProject(id = "fp_stale", name = "Renamed", fingerprint = fingerprint(2)))
+        manager.saveProject(mockContext, GraffitiProject(id = "fp_stale", name = "Renamed", doodle = doodle(2)))
         val loaded = manager.loadProjectMetadata(mockContext, "fp_stale")
         assertEquals(4.2f, loaded?.wallWidthMeters ?: 0f, 0f)
         assertEquals("anchor-1", loaded?.cloudAnchorId)
@@ -420,21 +420,21 @@ class ProjectManagerTest {
     }
 
     @Test
-    fun `a new fingerprint replaces the old target's frame state but keeps frame-independent fields`() = runTest {
+    fun `a new doodle replaces the old target's frame state but keeps frame-independent fields`() = runTest {
         val reference = Uri.fromFile(File(tempFilesDir, "projects/fp_new/sphereslam_reference_a.png"))
         manager.saveProjectExact(
             mockContext,
             GraffitiProject(
-                id = "fp_new", name = "Wall", fingerprint = fingerprint(2),
-                fingerprintIntrinsics = listOf(1f, 2f, 3f, 4f),
+                id = "fp_new", name = "Wall", doodle = doodle(2),
+                doodleIntrinsics = listOf(1f, 2f, 3f, 4f),
                 wallWidthMeters = 4.2f, cloudAnchorId = "anchor-1", sphereSlamReferenceUri = reference,
             ),
         )
-        manager.saveProject(mockContext, GraffitiProject(id = "fp_new", name = "Wall", fingerprint = fingerprint(3)))
+        manager.saveProject(mockContext, GraffitiProject(id = "fp_new", name = "Wall", doodle = doodle(3)))
         val loaded = manager.loadProjectMetadata(mockContext, "fp_new")
-        assertEquals(fingerprint(3), loaded?.fingerprint)
+        assertEquals(doodle(3), loaded?.doodle)
         // State expressed in the old target's frame must not be grafted onto the new one.
-        assertTrue(loaded?.fingerprintIntrinsics.isNullOrEmpty())
+        assertTrue(loaded?.doodleIntrinsics.isNullOrEmpty())
         assertNull(loaded?.cloudAnchorId)
         // The wall width and SphereSLAM's own page are not tied to the AR target.
         assertEquals(4.2f, loaded?.wallWidthMeters ?: 0f, 0f)
@@ -497,7 +497,7 @@ class ProjectManagerTest {
     }
 
     @Test
-    fun `stale save carrying a fingerprint still keeps the hybrid KPM page`() = runTest {
+    fun `stale save carrying a doodle still keeps the hybrid KPM page`() = runTest {
         val uri = manager.saveHybridKpmPage(mockContext, "hyb_fp", ByteArray(4))
         manager.saveProjectExact(
             mockContext,
@@ -506,12 +506,12 @@ class ProjectManagerTest {
                 hybridKpmPageWidthPx = 2, hybridKpmPageHeightPx = 2, hybridKpmPageWidthMeters = 1f,
             ),
         )
-        // A snapshot taken after the fingerprint saved but before the page committed.
-        val fp = com.hereliesaz.graffitixr.common.model.Fingerprint(
+        // A snapshot taken after the doodle saved but before the page committed.
+        val fp = com.hereliesaz.graffitixr.common.model.Doodle(
             keypoints = emptyList(), points3d = emptyList(), descriptorsData = ByteArray(0),
             descriptorsRows = 0, descriptorsCols = 0, descriptorsType = 0,
         )
-        manager.saveProject(mockContext, GraffitiProject(id = "hyb_fp", name = "Wall", fingerprint = fp))
+        manager.saveProject(mockContext, GraffitiProject(id = "hyb_fp", name = "Wall", doodle = fp))
         assertEquals(uri, manager.loadProjectMetadata(mockContext, "hyb_fp")?.hybridKpmPageUri)
     }
 
@@ -540,7 +540,7 @@ class ProjectManagerTest {
         assertNotNull(imported)
         assertNull(imported?.hybridKpmPageUri)
         assertEquals(0, imported?.hybridKpmPageWidthPx)
-        assertTrue(imported?.hybridKpmFingerprintKey?.isEmpty() == true)
+        assertTrue(imported?.hybridKpmDoodleKey?.isEmpty() == true)
     }
 
     @Test
@@ -973,13 +973,13 @@ class ProjectManagerTest {
         manager.saveProjectExact(
             mockContext,
             GraffitiProject(
-                id = "env_stale", name = "Wall", fingerprint = fingerprint(2),
-                fingerprintWallNormalEnu = listOf(0f, 1f, 0f), captureEnvironment = env,
+                id = "env_stale", name = "Wall", doodle = doodle(2),
+                doodleWallNormalEnu = listOf(0f, 1f, 0f), captureEnvironment = env,
             ),
         )
         manager.saveProject(mockContext, GraffitiProject(id = "env_stale", name = "Renamed"))
         val loaded = manager.loadProjectMetadata(mockContext, "env_stale")
-        assertEquals(listOf(0f, 1f, 0f), loaded?.fingerprintWallNormalEnu)
+        assertEquals(listOf(0f, 1f, 0f), loaded?.doodleWallNormalEnu)
         assertEquals(1.0, loaded?.captureEnvironment?.location?.latitude ?: 0.0, 0.0)
     }
 
@@ -989,13 +989,13 @@ class ProjectManagerTest {
         val saved = manager.saveProject(
             mockContext,
             GraffitiProject(id = "png_atomic", name = "Wall"),
-            targetImages = listOf(bitmap),
+            doodleImages = listOf(bitmap),
             thumbnail = bitmap,
         )
         val root = File(tempFilesDir, "projects/png_atomic")
         assertTrue(File(root, "thumbnail.png").isFile)
-        assertEquals(1, saved.targetImageUris.size)
-        assertTrue(File(requireNotNull(saved.targetImageUris[0].path)).isFile)
+        assertEquals(1, saved.doodleImageUris.size)
+        assertTrue(File(requireNotNull(saved.doodleImageUris[0].path)).isFile)
         assertTrue(root.listFiles { f -> f.name.endsWith(".tmp") }.isNullOrEmpty())
     }
 

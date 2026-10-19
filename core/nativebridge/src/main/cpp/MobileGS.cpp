@@ -24,7 +24,7 @@
 
 namespace {
 // Normalize illumination so feature matching survives light/color changes: CLAHE on the luma. MUST be
-// applied identically to BOTH fingerprint build and live reloc detection or descriptors stop matching.
+// applied identically to BOTH doodle build and live reloc detection or descriptors stop matching.
 // thread_local so the reloc/map/UI threads each keep their own reusable instance.
 inline void normalizeForFeatures(cv::Mat& gray) {
     if (gray.empty() || gray.type() != CV_8UC1) return;
@@ -73,7 +73,7 @@ struct GatedMatch {
     bool marginFailed = false;      // gatedMatchWithBaseline: true alignment did not beat chance
 };
 
-// The wall exclusion list: features known to be bare wall (the fingerprint as captured, before any
+// The wall exclusion list: features known to be bare wall (the doodle as captured, before any
 // paint), projected into the live frame through the lock's pose.
 struct WallExclusion {
     std::vector<cv::Point2f> uv;    // projected pixel of each bare-wall feature that lands in the frame
@@ -84,7 +84,7 @@ struct WallExclusion {
 // The IMPLEMENTATION.md 4.5 gated match, for any set of design features (the primary artwork's, or a
 // filter's): each design feature is projected through the lock's pose into the live frame, and only
 // live keypoints within [radiusPx] of that prediction may answer for it, by Lowe's ratio. See
-// MobileGS::tryUpdateFingerprint for why each skip and each count is what it is.
+// MobileGS::tryUpdateDoodle for why each skip and each count is what it is.
 void gatedMatchSet(const cv::Mat& artDescs, const std::vector<cv::Point2f>& artPts2d,
                    int artImgW, int artImgH,
                    const std::vector<cv::KeyPoint>& kps, const cv::Mat& descs,
@@ -308,8 +308,8 @@ void MobileGS::initialize(int /*width*/, int /*height*/) {
     // engine ever read (see setViewportSize's definition). Left in the signature so the JNI call
     // site (nativeInitialize) doesn't need to change.
     std::lock_guard<std::mutex> lock(mMutex);
-    // 1500, not 500. This is the QUERY side: the live frame matched against a fingerprint built with
-    // ORB(1500) (MetricFingerprintBuilder) or ORB(1000) (generateFingerprint). Detecting a third as
+    // 1500, not 500. This is the QUERY side: the live frame matched against a doodle built with
+    // ORB(1500) (MetricDoodleBuilder) or ORB(1000) (generateDoodle). Detecting a third as
     // many features on the query as exist in the reference throws away matches before the ratio test
     // even runs — and PnP needs 8 survivors from a frame that may show the marks small, partial or
     // off-centre. ORB is cheap next to the SuperPoint path this falls back from, and it runs on the
@@ -422,7 +422,7 @@ bool MobileGS::wallNormalFromLock(const std::vector<cv::Point3f>& pts, const cv:
     if (!(l1 > 1e-12) || l2 > 0.1 * l1) return false;
     cv::Vec3d n(pca.eigenvectors.at<double>(2, 0), pca.eigenvectors.at<double>(2, 1), pca.eigenvectors.at<double>(2, 2));
     const cv::Vec3d mean(pca.mean.at<double>(0), pca.mean.at<double>(1), pca.mean.at<double>(2));
-    // Toward the camera: its centre in the fingerprint frame is -R^T t.
+    // Toward the camera: its centre in the doodle frame is -R^T t.
     const cv::Vec3d centre = -(camFromFpR.t() * camFromFpT);
     if (n.dot(centre - mean) < 0) n = -n;
     cv::Vec3d enu = earthFromCam * (camFromFpR * n);
@@ -448,7 +448,7 @@ void MobileGS::updateCamera(float* viewMat, float* projMat) {
 
 void MobileGS::updateLightLevel(float level) {
     // Cross-thread scalar (written here on the caller's thread, read unlocked by the reloc worker
-    // thread in runRelocPass / getSuperPointFeatures / getFingerprintKeypoints / generateFingerprint),
+    // thread in runRelocPass / getSuperPointFeatures / getDoodleKeypoints / generateDoodle),
     // so this is atomic like every other piece of cross-thread scalar state in this class rather than
     // mMutex -- no invariant here ties mLightLevel to anything else the mutex protects.
     mLightLevel.store(level, std::memory_order_relaxed);
@@ -534,7 +534,7 @@ std::vector<MobileGS::RelocScalePass> MobileGS::relocScalePasses(int frameW, int
     return out;
 }
 
-bool MobileGS::fingerprintFrameIsCaptureCamera(const std::vector<cv::Point3f>& pts) {
+bool MobileGS::doodleFrameIsCaptureCamera(const std::vector<cv::Point3f>& pts) {
     if (pts.size() < 3) return false;
     cv::Mat data((int)pts.size(), 3, CV_32F);
     for (int i = 0; i < (int)pts.size(); ++i) {
@@ -556,7 +556,7 @@ bool MobileGS::fingerprintFrameIsCaptureCamera(const std::vector<cv::Point3f>& p
 }
 
 /**
- * One relocalization attempt over one frame: snapshot the fingerprint, detect, match, solve, publish.
+ * One relocalization attempt over one frame: snapshot the doodle, detect, match, solve, publish.
  *
  * EVALUATION.md 3.1 — split out of relocThreadFunc so an eval run can call it INLINE instead of
  * handing the frame to a background worker. Thread interleaving is one of the three named sources of
@@ -577,7 +577,7 @@ namespace {
 // Diagnostic only; touches no MobileGS member, so it needs no engine lock.
 struct RelocPerf {
     std::atomic<long long> passUs{0};     // whole runRelocPass
-    std::atomic<long long> matchUs{0};    // the progress matching inside it (tryUpdateFingerprint + updatePaintGrid)
+    std::atomic<long long> matchUs{0};    // the progress matching inside it (tryUpdateDoodle + updatePaintGrid)
     std::atomic<int> passes{0};
     std::atomic<long long> windowStartMs{0};
     // The last pass's progress-matching verdict (MobileGS::CorrobGate ordinal, RelocDiagnostics.kt), how many
@@ -613,14 +613,14 @@ void relocPerfMaybeLog(bool locked, int backoffMs) {
 void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const float* relocAttitude) {
     cv::Mat wallDescs;
     std::vector<cv::Point3f> wallKps3d;
-    // Phase 2: parallel to wallKps3d, or empty for a legacy fingerprint (= all backbone).
+    // Phase 2: parallel to wallKps3d, or empty for a legacy doodle (= all backbone).
     std::vector<uint8_t> wallRegions;
     cv::Mat wallPatch;
     float fpIntrinsics[4];
     float liveIntrinsics[4] = {0,0,0,0};
     bool hasFpView = false;
     // Phase 2b snapshot: the persistent feature map + the last reloc pose, used (when the flag is on)
-    // as the frustum-gate prior. The map is co-registered to the fingerprint anchor, so its points
+    // as the frustum-gate prior. The map is co-registered to the doodle anchor, so its points
     // share wallKps3d's frame and the prior pose (camera_from_fpWorld) projects them directly.
     cv::Mat mapDescs;
     std::vector<cv::Point3f> mapKps3d;
@@ -629,7 +629,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
     // The sensor turn's inputs: the wall's normal (East-North-Up) and this frame's attitude.
     bool hasWallNormal = false;
     cv::Vec3d wallNormal;
-    uint64_t solveFingerprintGeneration = 0;
+    uint64_t solveDoodleGeneration = 0;
     const bool hasAttitude = relocAttitude != nullptr;
     cv::Matx33d earthFromCam = cv::Matx33d::eye();
     if (hasAttitude) for (int i = 0; i < 9; ++i) earthFromCam.val[i] = relocAttitude[i];
@@ -639,8 +639,8 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
         wallKps3d = mWallKeypoints3D;
         wallRegions = mWallRegions;
         wallPatch = mWallPatch.clone();
-        memcpy(fpIntrinsics, mFingerprintIntrinsics, 4 * sizeof(float));
-        hasFpView = mHasFingerprintView;
+        memcpy(fpIntrinsics, mDoodleIntrinsics, 4 * sizeof(float));
+        hasFpView = mHasDoodleView;
         memcpy(liveIntrinsics, mLiveIntrinsics, 4 * sizeof(float));
         hasWallNormal = mHasWallNormalEnu;
         wallNormal = cv::Vec3d(mWallNormalEnu[0], mWallNormalEnu[1], mWallNormalEnu[2]);
@@ -648,14 +648,14 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
         mapKps3d = mMapPoints3D;
         memcpy(mapPriorPose, mPnpCamFromFpWorld, 16 * sizeof(float));
         mapPriorSeq = mPnpResultSeq.load(std::memory_order_relaxed);
-        // Which fingerprint every snapshot above belongs to. Checked again under the same mutex
-        // before this pass publishes: a fingerprint replaced or cleared while the (hundreds of ms)
+        // Which doodle every snapshot above belongs to. Checked again under the same mutex
+        // before this pass publishes: a doodle replaced or cleared while the (hundreds of ms)
         // solve ran must not have its result latched as if it described the NEW wall.
-        solveFingerprintGeneration = mFingerprintGeneration;
+        solveDoodleGeneration = mDoodleGeneration;
     }
 
     // 2.11: reset the backbone counters BEFORE the early-outs below, so an attempt that never
-    // reaches the fingerprint publishes "not measured" instead of the previous attempt's numbers.
+    // reaches the doodle publishes "not measured" instead of the previous attempt's numbers.
     mLastRelocBackboneFeatures.store(-1, std::memory_order_relaxed);
     mLastRelocBackboneMatches.store(-1, std::memory_order_relaxed);
     mLastRelocBackboneInliers.store(-1, std::memory_order_relaxed);
@@ -686,7 +686,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
     mCorrobSearchRadiusPx.store(-1.0f, std::memory_order_relaxed);
     // Same rule again for the five diagnostics below (detected/obliquity/rectified-corr/matches/
     // inliers): they used to only be reset further down, past these early-outs, so a rejected
-    // attempt (e.g. kRelocNoFingerprint) would publish a previous successful attempt's stale
+    // attempt (e.g. kRelocNoDoodle) would publish a previous successful attempt's stale
     // numbers next to its own fresh reject code. Reset to each field's declared "not measured"
     // default (see mLastRelocMatches/mLastRelocInliers/mLastRelocDetected/mLastRelocObliquityDeg/
     // mLastRelocRectifiedCorr initializers in MobileGS.h) before any early-out can return.
@@ -697,10 +697,10 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
     mLastRelocTurnCorr.store(0, std::memory_order_relaxed);
     mLastRelocMatches.store(0, std::memory_order_relaxed);
     mLastRelocInliers.store(0, std::memory_order_relaxed);
-    // ...and the two downstream outcome codes. They are written by tryUpdateFingerprint, which the
-    // early-outs below never reach, so without this a fingerprint-cleared or reloc-disabled tick
+    // ...and the two downstream outcome codes. They are written by tryUpdateDoodle, which the
+    // early-outs below never reach, so without this a doodle-cleared or reloc-disabled tick
     // kept publishing the PREVIOUS attempt's gate/grow verdict (e.g. "gated" / "promoted" beside a
-    // fresh kRelocNoFingerprint). "Not run" is each enum's own name for exactly this state.
+    // fresh kRelocNoDoodle). "Not run" is each enum's own name for exactly this state.
     mCorrobGate.store(kCorrobNotRun, std::memory_order_relaxed);
     mGrowOutcome.store(kGrowNotRun, std::memory_order_relaxed);
 
@@ -709,18 +709,18 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
         return;
     }
     if (wallDescs.empty() || wallKps3d.empty()) {
-        // No fingerprint, or one carrying descriptors but no 3D points (the depth-path result when
+        // No doodle, or one carrying descriptors but no 3D points (the depth-path result when
         // the depth API is off). Either way PnP has nothing to solve against, so the whole thread
         // idles here — silently, before this reject code existed.
-        mLastRelocReject.store(kRelocNoFingerprint, std::memory_order_relaxed);
+        mLastRelocReject.store(kRelocNoDoodle, std::memory_order_relaxed);
         return;
     }
 
     // IMPLEMENTATION.md 2.7 — honour the partition only when it indexes THIS point set. A
     // regions array of the wrong length is treated as absent (all backbone) rather than
-    // subscripted, so a legacy or mismatched fingerprint relocalizes exactly as on main.
+    // subscripted, so a legacy or mismatched doodle relocalizes exactly as on main.
     // Hoisted out of buildCorr so the filter below and the count published here cannot drift
-    // apart: they must agree about which fingerprint is partitioned or the diagnostics describe
+    // apart: they must agree about which doodle is partitioned or the diagnostics describe
     // a different point set from the one PnP saw.
     const bool usePartition = wallRegions.size() == wallKps3d.size();
     // A partition that leaves (almost) nothing outside the artwork cannot localize anything, and
@@ -730,11 +730,11 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
     const int outsideMarks = usePartition
         ? (int)std::count(wallRegions.begin(), wallRegions.end(), kRegionOutside) : 0;
     const bool partitionActive = usePartition && outsideMarks >= kMinBackboneMarks;
-    // 2.11: how many stored points PnP is allowed to draw on. An UNPARTITIONED fingerprint is
+    // 2.11: how many stored points PnP is allowed to draw on. An UNPARTITIONED doodle is
     // 2.7's legacy all-backbone case, so it reports its FULL point count — not zero, and not the
     // -1 sentinel. Zero here is a real measurement meaning F_out is empty (the artwork covers
     // the whole wall), which is the one state reloc cannot recover from; reporting a legacy
-    // fingerprint as zero would raise that alarm on every project saved before Phase 2.
+    // doodle as zero would raise that alarm on every project saved before Phase 2.
     mLastRelocBackboneFeatures.store(
         usePartition
             ? (int)std::count(wallRegions.begin(), wallRegions.end(), kRegionOutside)
@@ -751,20 +751,20 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
     }
     cv::Mat gray;
     cv::cvtColor(workFrame, gray, cv::COLOR_RGB2GRAY);
-    normalizeForFeatures(gray); // illumination-normalize to match the (also-normalized) fingerprint
+    normalizeForFeatures(gray); // illumination-normalize to match the (also-normalized) doodle
 
     // The camera of THIS frame. The PnP below solves with it, so every projection into this image
     // through the resulting (or the previous) pose -- the map frustum gate, corroboration, the
-    // self-grow back-projection -- has to use it as well. The fingerprint's capture intrinsics
-    // describe the fingerprint IMAGE only (the rectification homography's K_fp side).
+    // self-grow back-projection -- has to use it as well. The doodle's capture intrinsics
+    // describe the doodle IMAGE only (the rectification homography's K_fp side).
     double liveK[4];
     const bool liveKReal = relocCameraIntrinsics(liveIntrinsics, fpIntrinsics, gray.cols, gray.rows, liveK);
 
-    // SuperPoint usable when loaded and the wall fingerprint is float-typed (or empty).
+    // SuperPoint usable when loaded and the wall doodle is float-typed (or empty).
     const bool spOk = mSuperPoint.isLoaded() &&
         (wallDescs.empty() || wallDescs.type() == CV_32F);
 
-    // Detect + Lowe-ratio match a gray image against the wall fingerprint. When Hback is non-empty
+    // Detect + Lowe-ratio match a gray image against the wall doodle. When Hback is non-empty
     // the matched keypoints are mapped through it (rectified frame -> current image) before being
     // stored, so the returned 2D points are ALWAYS in the current camera image — exactly what the
     // PnP below expects.
@@ -779,7 +779,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
     }
     mLastRelocDetected.store((int)baseKps.size(), std::memory_order_relaxed);
 
-    // One correspondence per fingerprint point across ALL passes (plain, 0.5x, 2x, rectified). The
+    // One correspondence per doodle point across ALL passes (plain, 0.5x, 2x, rectified). The
     // passes see the same marks, so without this a single wall point matched at three scales counted
     // as three inliers, and PoseFusion's COLD_SNAP_MIN_INLIERS / ratio gates passed on a fraction of
     // the independent evidence they assume. First pass wins (the plain pass runs first).
@@ -830,7 +830,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
                 outObj.push_back(wallKps3d[match[0].trainIdx]);
                 // Everything that survives the filter above is F_out: under a partition because
                 // non-OUTSIDE rows were skipped, and without one because 2.7's zero-length rule
-                // makes the whole fingerprint backbone. Recorded per correspondence rather than
+                // makes the whole doodle backbone. Recorded per correspondence rather than
                 // counted, because the inlier attribution below indexes back through this.
                 outFromBackbone.push_back(
                     (!usePartition || wallRegions[match[0].trainIdx] == kRegionOutside) ? 1 : 0);
@@ -849,7 +849,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
     // UP-scaled, mapping the matched points back to full-res with a scale homography (Hback). These
     // passes share the plain pass's camera geometry, so they only add consistent correspondences
     // across distance; PnP RANSAC discards any that don't fit. Covers both ORB and SuperPoint
-    // fingerprints, beyond ORB's own pyramid range.
+    // doodles, beyond ORB's own pyramid range.
     //
     // SuperPoint caps its input at kMaxInputSide (longest side), so the scales have to be relative
     // to what the PLAIN pass effectively saw, or they collapse onto it: a full-frame 2x upsample of
@@ -876,10 +876,10 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
 
     // Plane-guided rectification (perspective robustness for oblique views). The marks lie on a
     // known plane and the active tracking backend gives a pose, so the oblique-vs-frontal distortion
-    // is a homography we can pre-cancel: warp the live frame into the fingerprint's frontal frame, match, and ADD the
+    // is a homography we can pre-cancel: warp the live frame into the doodle's frontal frame, match, and ADD the
     // correspondences mapped back to the current image (RANSAC filters any that don't fit).
     // Published so the diagnostics can show whether this pass is actually running. It was dead in
-    // practice for a long time (nothing set mHasFingerprintView on the live capture path), so
+    // practice for a long time (nothing set mHasDoodleView on the live capture path), so
     // "did rectification fire, and did it help" is worth being able to read off the device rather
     // than infer. -1 = the pass was not eligible at all this attempt. (Already reset to this same
     // "not eligible" state above, before the early-outs; re-stated here right before the eligibility
@@ -935,15 +935,15 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
     // When the overlay is larger than the marks, the marks leave frame; the map carries features
     // across the whole wall so reloc still locks. Hard constraint: NEVER brute-force the whole map —
     // frustum-gate to the subset the last reloc pose says is in view, then match only those and
-    // APPEND the correspondences (same fingerprint object frame, matched in this live image) so PnP
+    // APPEND the correspondences (same doodle object frame, matched in this live image) so PnP
     // solves over both.
-    // Requires a prior pose (mapPriorSeq>0, i.e. the fingerprint has locked at least once) and a
+    // Requires a prior pose (mapPriorSeq>0, i.e. the doodle has locked at least once) and a
     // matching descriptor type. Default-off, so this is inert until device-validated.
     if (mMapRelocEnabled.load(std::memory_order_relaxed) && !mapDescs.empty() && mapPriorSeq > 0
             && mapDescs.type() == wallDescs.type() && mapKps3d.size() == (size_t)mapDescs.rows) {
         glm::mat4 camFromFp = glm::make_mat4(mapPriorPose);
         // The gate asks "which map points land in THIS frame", so it projects with this frame's
-        // camera -- the same K the prior pose was solved with -- not the fingerprint capture's.
+        // camera -- the same K the prior pose was solved with -- not the doodle capture's.
         const double gfx = liveK[0], gfy = liveK[1], gcx = liveK[2], gcy = liveK[3];
         std::vector<int> visible;
         visible.reserve(mapKps3d.size());
@@ -988,7 +988,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
 
     // Distortion head (optional, docs/DISTORTION_HEAD.md): when the model + canonical patch are
     // present, compare the live view (cropped around the coarse match centroid) against the
-    // fingerprint patch -> matchability (relock confidence) + coverage (= painting-progress). The
+    // doodle patch -> matchability (relock confidence) + coverage (= painting-progress). The
     // corners/H -> IPPE prior is a later increment; here we consume the cheap signals. Inert unless
     // the distortion_head.onnx asset is bundled. Uses RAW gray (the head's SuperPoint expects it).
     if (mDistortionHead.isLoaded() && !wallPatch.empty() && !imgPts.empty()) {
@@ -1020,7 +1020,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
                 // (docs/DISTORTION_HEAD.md) it is the visible fraction of the capture patch — the
                 // original marks — which FALLS as they are painted over: an unpainted wall read
                 // ~100% and progress ran backwards. Progress comes from the corroboration ratio in
-                // tryUpdateFingerprint regardless of whether the head is loaded.
+                // tryUpdateDoodle regardless of whether the head is loaded.
                 (void)clampedCoverage;
                 mCorroborationConfidence.store(clampedMatchability, std::memory_order_relaxed);
             } else {
@@ -1093,7 +1093,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
         std::memory_order_relaxed);
     if (imgPts.size() < 8) {
         // Distinguish "the detector found nothing / the descriptors don't even compare" from
-        // "features were found but too few agreed with the fingerprint" — they call for opposite
+        // "features were found but too few agreed with the doodle" — they call for opposite
         // fixes (light/focus/texture vs. aim at the registered area).
         mLastRelocReject.store(baseDescs.empty() ? kRelocNoFeatures : kRelocFewMatches,
                                std::memory_order_relaxed);
@@ -1104,7 +1104,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
         // Camera matrix of THIS frame (liveK, see relocCameraIntrinsics): the 3D points are
         // camera-independent object coordinates, so K must describe the image the 2D points were
         // detected in, whose orientation and resolution may differ from the capture's. Falls back to
-        // the fingerprint's capture intrinsics only when the live ones were never pushed, and to a
+        // the doodle's capture intrinsics only when the live ones were never pushed, and to a
         // frame-centred default when neither exists.
         const double fx = liveK[0], fy = liveK[1], cx = liveK[2], cy = liveK[3];
         double idata[] = {fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0};
@@ -1146,11 +1146,11 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
                     for (int idx : inliers) { inObj.push_back(objPts[idx]); inImg.push_back(imgPts[idx]); }
                     // IMPLEMENTATION.md 3.2 — how much of the frame the inliers span, published
                     // here because this is the only scope that has them. The self-grow gate runs in
-                    // tryUpdateFingerprint, which sees the inlier COUNT through an atomic and never
+                    // tryUpdateDoodle, which sees the inlier COUNT through an atomic and never
                     // the points, so without this the spread term could not exist at all.
                     //
                     // Measured against the frame the correspondences were found in (`gray`), not the
-                    // fingerprint's capture frame: the box is a statement about this view's geometry.
+                    // doodle's capture frame: the box is a statement about this view's geometry.
                     mLastRelocInlierSpread.store(
                         inlierSpreadOf(inImg, (float)gray.cols, (float)gray.rows),
                         std::memory_order_relaxed);
@@ -1182,7 +1182,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
                 cv::Mat R;
                 cv:: Rodrigues(rvec, R);
 
-                // PnP gives T_camera_from_fingerprintWorld (a view matrix). DO NOT write it to
+                // PnP gives T_camera_from_doodleWorld (a view matrix). DO NOT write it to
                 // mAnchorMatrix (a world-space MODEL matrix) — that caused overlay teleport.
                 // Publish the raw result together with the view of the frame it was solved on;
                 // Kotlin composes inverse(V_solve)*pnp*captureAnchorCam (see PoseFusion). Composing
@@ -1197,17 +1197,17 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
                 bool published = false;
                 {
                     std::lock_guard<std::mutex> lock(mMutex);
-                    // The fingerprint this solve ran against is no longer the stored one (restored,
+                    // The doodle this solve ran against is no longer the stored one (restored,
                     // replaced by a re-capture, or cleared while the solve was in flight). Its pose is
                     // in the OLD wall's frame; latching it would cold-snap the new anchor onto the old
                     // wall. Dropped here, under the lock that publishes, so no ordering of the
                     // replacement and the publish can leak it.
-                    if (solveFingerprintGeneration == mFingerprintGeneration) {
+                    if (solveDoodleGeneration == mDoodleGeneration) {
                         memcpy(mPnpCamFromFpWorld, glm::value_ptr(pnpMat), 16 * sizeof(float));
                         memcpy(mPnpSolveView, relocView, 16 * sizeof(float));
                         // The camera this pose was solved with, published WITH it, so consumers never
                         // pair this pose with another camera. Zeroed for the coarse default, which they
-                        // treat as "no intrinsics" (the old unset-fingerprint-K behaviour).
+                        // treat as "no intrinsics" (the old unset-doodle-K behaviour).
                         for (int i = 0; i < 4; ++i) mPnpIntrinsics[i] = liveKReal ? (float)liveK[i] : 0.0f;
                         // Counts and seq are published in the SAME critical section as the pose.
                         // getRelocResult and the grow/corroboration readers snapshot all of them under
@@ -1222,7 +1222,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
                     }
                 }
                 if (!published) {
-                    LOGI("Relocalization: dropped a PnP solve made against a replaced fingerprint");
+                    LOGI("Relocalization: dropped a PnP solve made against a replaced doodle");
                     // Nothing was published, so the previous attempt's reject code must not stand:
                     // kRelocOk left over here would tell the corroboration gate that
                     // mPnpCamFromFpWorld describes THIS frame.
@@ -1268,9 +1268,9 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
 
     // Teleological gatekeeper: update painting-progress from how much of the artwork base the clean
     // frame now corroborates. No-op until an artwork is registered; read-only on the reloc set.
-    // Hands over this frame's detection so it isn't recomputed (see tryUpdateFingerprint).
+    // Hands over this frame's detection so it isn't recomputed (see tryUpdateDoodle).
     const auto matchStart = std::chrono::steady_clock::now();
-    tryUpdateFingerprint(gray, &baseKps, &baseDescs);
+    tryUpdateDoodle(gray, &baseKps, &baseDescs);
     updatePaintGrid(frame);
     gRelocPerf.matchUs.fetch_add(std::chrono::duration_cast<std::chrono::microseconds>(
         std::chrono::steady_clock::now() - matchStart).count(), std::memory_order_relaxed);
@@ -1331,15 +1331,15 @@ bool MobileGS::computeRectifyHomography(const float* viewCur16, const double* li
     std::vector<cv::Point3f> pts;
     {
         std::lock_guard<std::mutex> lock(mMutex);
-        if (!mHasFingerprintView) return false;
-        viewFp = glm::make_mat4(mFingerprintViewMatrix);
-        fx = mFingerprintIntrinsics[0]; fy = mFingerprintIntrinsics[1];
-        cx = mFingerprintIntrinsics[2]; cy = mFingerprintIntrinsics[3];
+        if (!mHasDoodleView) return false;
+        viewFp = glm::make_mat4(mDoodleViewMatrix);
+        fx = mDoodleIntrinsics[0]; fy = mDoodleIntrinsics[1];
+        cx = mDoodleIntrinsics[2]; cy = mDoodleIntrinsics[3];
         pts = mWallKeypoints3D;
     }
     if (pts.size() < 12 || fx <= 0.0 || fy <= 0.0) return false;
 
-    // Fit a plane to the fingerprint-frame 3D marks: centroid + normal (smallest-variance PCA axis).
+    // Fit a plane to the doodle-frame 3D marks: centroid + normal (smallest-variance PCA axis).
     cv::Mat data((int)pts.size(), 3, CV_32F);
     for (int i = 0; i < (int)pts.size(); ++i) {
         data.at<float>(i,0) = pts[i].x; data.at<float>(i,1) = pts[i].y; data.at<float>(i,2) = pts[i].z;
@@ -1360,7 +1360,7 @@ bool MobileGS::computeRectifyHomography(const float* viewCur16, const double* li
                     T[0][2], T[1][2], T[2][2]);
     cv::Vec3d tgl(T[3][0], T[3][1], T[3][2]);
 
-    // ARCore view matrices are OpenGL convention (camera looks down -z, +y up); the fingerprint 3D
+    // ARCore view matrices are OpenGL convention (camera looks down -z, +y up); the doodle 3D
     // points are OpenCV convention (+z forward, +y down). Convert the pose with C = diag(1,-1,-1)
     // (its own inverse): R_cv = C R_gl C, t_cv = C t_gl. Without this the homography is meaningless.
     const cv::Matx33d C(1,0,0, 0,-1,0, 0,0,-1);
@@ -1372,9 +1372,9 @@ bool MobileGS::computeRectifyHomography(const float* viewCur16, const double* li
     double cosA = std::abs(nCur[2]) / (cv::norm(nCur) + 1e-9);
     obliquityDeg = std::acos(std::min(1.0, cosA)) * 180.0 / CV_PI;
 
-    // Plane-induced homography current-image <- fingerprint-image:  H = K_cur (R + t nᵀ / d) K_fp⁻¹.
+    // Plane-induced homography current-image <- doodle-image:  H = K_cur (R + t nᵀ / d) K_fp⁻¹.
     // With n·X_fp = d:  X_cur = R X_fp + t = R X_fp + t (nᵀX_fp)/d = (R + t nᵀ/d) X_fp.
-    // Two cameras: a fingerprint pixel is un-projected with the CAPTURE camera and re-projected
+    // Two cameras: a doodle pixel is un-projected with the CAPTURE camera and re-projected
     // with the LIVE one. A single K (the capture's, as this used to use) is only right when both
     // frames come from the same camera at the same resolution and rotation.
     const cv::Matx33d Kfp(fx, 0, cx, 0, fy, cy, 0, 0, 1);
@@ -1429,7 +1429,7 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
                                 const cv::Mat& descs, double fx, double fy, double cx, double cy) {
     if (descs.empty() || kps.empty() || (int)kps.size() != descs.rows) return;
     std::lock_guard<std::mutex> lock(mMutex);
-    if (mWallKeypoints3D.size() < 8) return;                                   // need the fingerprint plane
+    if (mWallKeypoints3D.size() < 8) return;                                   // need the doodle plane
     if (!mMapDescriptors.empty() && mMapDescriptors.type() != descs.type()) return;
     if (mMapPoints3D.size() != (size_t)mMapDescriptors.rows) return;  // corrupted map: bail rather than crash
     bool mapMutated = false;
@@ -1501,7 +1501,7 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
         mMapPoints3D.swap(np); mMapConfidence.swap(nc); mMapObs.swap(no); mMapDescriptors = nd;
     }
 
-    // Fit the wall plane (centroid + normal) from the fingerprint's 3D points (in the fingerprint frame).
+    // Fit the wall plane (centroid + normal) from the doodle's 3D points (in the doodle frame).
     cv::Point3f c(0.f, 0.f, 0.f);
     for (const auto& p : mWallKeypoints3D) c += p;
     c *= 1.0f / (float)mWallKeypoints3D.size();
@@ -1621,7 +1621,7 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
             if (t < 0.1f * wallZ || t > 10.f * wallZ) continue;
         }
         glm::vec3 P = camCenter + t * dir;
-        // P is already in the fingerprint object frame. For standalone that is the centred
+        // P is already in the doodle object frame. For standalone that is the centred
         // SphereSLAM page frame; storing it verbatim is the frame-preservation contract.
         mMapPoints3D.push_back(cv::Point3f(P.x, P.y, P.z));
         mMapConfidence.push_back(0.1f);
@@ -1631,16 +1631,16 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
         ++added;
     }
 
-    // Co-register the map to the fingerprint anchor (same object frame as the points above) and
+    // Co-register the map to the doodle anchor (same object frame as the points above) and
     // record the camera these points were back-projected with -- the live camera of this lock, the
-    // one the PnP solved with, not the fingerprint's capture camera.
-    memcpy(mMapAnchorMatrix, mFingerprintAnchorMatrix, 16 * sizeof(float));
+    // one the PnP solved with, not the doodle's capture camera.
+    memcpy(mMapAnchorMatrix, mDoodleAnchorMatrix, 16 * sizeof(float));
     mMapIntrinsics[0]=(float)fx; mMapIntrinsics[1]=(float)fy; mMapIntrinsics[2]=(float)cx; mMapIntrinsics[3]=(float)cy;
     if (mapMutated) mMapRevision.fetch_add(1, std::memory_order_relaxed);
     if (added > 0) LOGI("Map build: +%d pts (map now %zu)", added, mMapPoints3D.size());
 }
 
-void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
+void MobileGS::tryUpdateDoodle(const cv::Mat& grayClean,
                                     const std::vector<cv::KeyPoint>* preKps,
                                     const cv::Mat* preDescs) {
     // Every early return below leaves a reason behind. "Not run" is the default and is distinct
@@ -1663,7 +1663,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     float camFromFp[16];
     // The camera camFromFp was solved with (the live frame's), published with the pose. The gated
     // match projects design features into THIS live frame, so it needs that camera -- the
-    // fingerprint's capture intrinsics describe a different image.
+    // doodle's capture intrinsics describe a different image.
     float pnpFx = 0.0f, pnpFy = 0.0f, pnpCx = 0.0f, pnpCy = 0.0f;
     {
         std::lock_guard<std::mutex> lock(mMutex);
@@ -1750,7 +1750,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     float radiusPx = -1.0f;
 
     if (gated) {
-        // camera_from_design = camera_from_fingerprintWorld * fingerprintWorld_from_design. Both are
+        // camera_from_design = camera_from_doodleWorld * doodleWorld_from_design. Both are
         // column-major, which is glm's layout, so make_mat4 is a reinterpretation and not a
         // transpose. The right-hand factor is the SAME composition Phi is classified with — see
         // setDesignPlacement — deliberately, so the two cannot disagree about where the design is.
@@ -1999,7 +1999,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     }
 
     // --- Teleological self-grow (opt-in) ---------------------------------------------------------
-    // Promote validated NEW marks into the live reloc fingerprint so it self-grows from real painting
+    // Promote validated NEW marks into the live reloc doodle so it self-grows from real painting
     // that matches the target — surviving the original marks being painted over. Depth-free: each new
     // feature is placed on the wall plane via the current relocalized pose. Guarded hard (fresh +
     // confident relock, gatekeeper-validated, capped, deduped) and RANSAC in the reloc PnP is the
@@ -2020,10 +2020,10 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     cv::Matx33d R; cv::Vec3d t; double fx, fy, cx, cy; int inliers; int pnpMatches; long seq;
     float spread = kPromotionNotMeasured; bool trusted = false;
     std::vector<cv::Point3f> wall;
-    uint64_t growFingerprintGeneration = 0;
+    uint64_t growDoodleGeneration = 0;
     {
         std::lock_guard<std::mutex> lock(mMutex);
-        growFingerprintGeneration = mFingerprintGeneration;
+        growDoodleGeneration = mDoodleGeneration;
         seq = mPnpResultSeq.load(std::memory_order_relaxed);
         if (seq == mLastGrowSeq) {                // no fresh relock this tick — pose would be stale
             mGrowOutcome.store(kGrowStaleSeq, std::memory_order_relaxed);
@@ -2031,7 +2031,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         }
         inliers = mPnpInlierCount.load(std::memory_order_relaxed);
         pnpMatches = mPnpMatchCount.load(std::memory_order_relaxed);
-        // camera_from_fingerprint-object, column-major (OpenCV camera frame). No backend/world
+        // camera_from_doodle-object, column-major (OpenCV camera frame). No backend/world
         // conversion happens here. For standalone SphereSLAM, the object frame is exactly the
         // centred KPM page frame, so every ray intersection below is written back in that frame.
         const float* M = mPnpCamFromFpWorld;
@@ -2061,9 +2061,9 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         return;
     }
 
-    // Wall plane (n·X = pdist) in the fingerprint frame, fit to the existing marks.
+    // Wall plane (n·X = pdist) in the doodle frame, fit to the existing marks.
     //
-    // Do NOT require pdist>0. The legacy ARCore fingerprint lives in capture-camera coordinates and
+    // Do NOT require pdist>0. The legacy ARCore doodle lives in capture-camera coordinates and
     // naturally puts a wall in front of the origin, but the standalone SphereSLAM fingerprint is a
     // CENTERED WALL frame by design: all canonical page points lie on z=0, so its valid wall plane
     // passes exactly through the object-frame origin. Ray/plane intersection below only requires
@@ -2086,7 +2086,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         return;
     }
 
-    // fp_from_cam = [R^T | -R^T t]: camera centre and per-pixel ray in the fingerprint frame.
+    // fp_from_cam = [R^T | -R^T t]: camera centre and per-pixel ray in the doodle frame.
     cv::Matx33d Rt = R.t();
     cv::Vec3d C = -(Rt * t);
     double nDotC = n.dot(C);
@@ -2126,10 +2126,10 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     int outsideN = 0, insideN = 0, bandN = 0;
     {
         std::lock_guard<std::mutex> lock(mMutex);
-        // The points above were solved against the fingerprint of growFingerprintGeneration; if it was
+        // The points above were solved against the doodle of growDoodleGeneration; if it was
         // replaced or cleared while this ran they are in the OLD wall's frame and must not be
         // appended to the new one.
-        if (growFingerprintGeneration != mFingerprintGeneration) {
+        if (growDoodleGeneration != mDoodleGeneration) {
             mGrowOutcome.store(kGrowStaleSeq, std::memory_order_relaxed);
             return;
         }
@@ -2165,7 +2165,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
             // undifferentiated.
             if (!mWallRegions.empty()) {
                 const uint8_t region = canClassify
-                    ? classifyInFingerprintFrame(mDesignFpFromDesign, mDesignHalfW, mDesignHalfH,
+                    ? classifyInDoodleFrame(mDesignFpFromDesign, mDesignHalfW, mDesignHalfH,
                                                  newPts[i])
                     : kRegionBand;
                 // 3.5 — an INSIDE promotion is wet paint: it sits under the artwork and is going to
@@ -2186,7 +2186,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
             }
         }
         // Snapshot inside the lock: these feed a log line below, and reading the containers after
-        // the guard released races a concurrent restoreWallFingerprintMetric on the JNI thread.
+        // the guard released races a concurrent restoreWallDoodleMetric on the JNI thread.
         promoted = take;
         wallNow = mWallKeypoints3D.size();
         outsideN = promotedOutside; insideN = promotedInside; bandN = promotedBand;
@@ -2242,70 +2242,70 @@ void MobileGS::setEvalSyncReloc(bool enabled, int everyN) {
     mEvalSyncReloc.store(enabled, std::memory_order_relaxed);
     LOGI("Eval sync-reloc %s (every %d frames)", enabled ? "ON" : "off", std::max(1, everyN));
 }
-// Called with mMutex held by every path that REPLACES or CLEARS the stored wall fingerprint.
+// Called with mMutex held by every path that REPLACES or CLEARS the stored wall doodle.
 //
-// 1. The fingerprint generation advances, so a solve already in flight against the previous
-//    fingerprint (runRelocPass snapshots it at the start and re-checks under this same mutex before
+// 1. The doodle generation advances, so a solve already in flight against the previous
+//    doodle (runRelocPass snapshots it at the start and re-checks under this same mutex before
 //    publishing) is dropped instead of latched as if it described the new wall.
-// 2. The last PnP result was solved against the OLD fingerprint. Left behind, a re-capture would hand
+// 2. The last PnP result was solved against the OLD doodle. Left behind, a re-capture would hand
 //    Kotlin the old wall's pose with a seq it may not have consumed yet (PoseFusion cold-snapping the
 //    new anchor onto the old fix). Back to "no relock": identity pose, zero counts. The seq is
 //    deliberately NOT rewound -- it stays monotonic so a consumer holding the old value can never
 //    mistake a later, genuine result for one it has already seen. Zero inliers/matches also make any
 //    consumer that does treat the stale seq as new reject it (ratio 0 < MIN_INLIER_RATIO).
-// 3. The reject code returns to "no relock against the current fingerprint": a leftover kRelocOk
+// 3. The reject code returns to "no relock against the current doodle": a leftover kRelocOk
 //    would tell the corroboration pass that the (now identity) pose describes the current frame.
 void MobileGS::invalidateRelocResultLocked() {
     static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    ++mFingerprintGeneration;
+    ++mDoodleGeneration;
     memcpy(mPnpCamFromFpWorld, kIdentity16, 16 * sizeof(float));
     memcpy(mPnpSolveView, kIdentity16, 16 * sizeof(float));
     memset(mPnpIntrinsics, 0, 4 * sizeof(float));
     mPnpInlierCount.store(0, std::memory_order_relaxed);
     mPnpMatchCount.store(0, std::memory_order_relaxed);
     mPnpInlierSpread = -1.0f;
-    mLastRelocReject.store(kRelocNoFingerprint, std::memory_order_relaxed);
+    mLastRelocReject.store(kRelocNoDoodle, std::memory_order_relaxed);
 }
 
-void MobileGS::restoreWallFingerprint(const cv::Mat& d, const std::vector<cv::Point3f>& p) {
+void MobileGS::restoreWallDoodle(const cv::Mat& d, const std::vector<cv::Point3f>& p) {
     std::lock_guard<std::mutex> lock(mMutex);
     invalidateRelocResultLocked();
     mWallDescriptors = d.clone();
     mBareWallCount = (size_t)mWallDescriptors.rows;
     mWallKeypoints3D = p;
-    // This path carries no partition, and the previous fingerprint's must not survive onto it: the
+    // This path carries no partition, and the previous doodle's must not survive onto it: the
     // bytes would index a different point set entirely. Empty = all backbone, as before Phase 2.
     mWallRegions.clear();
     // This path also carries no capture-view/anchor/canonical-patch co-registration -- unlike its
-    // metric sibling below, which resets mHasFingerprintView to false when passed a null
+    // metric sibling below, which resets mHasDoodleView to false when passed a null
     // viewMatrix16 for exactly this reason. Without the same reset here, restoring a
-    // descriptors-only fingerprint after a metric one left mHasFingerprintView/
-    // mFingerprintAnchorMatrix/mWallPatch behind: runRelocPass would then rectify THIS wall's
-    // live frames against the PREVIOUS wall's capture view, and getFingerprintAnchor would hand
-    // Kotlin the previous wall's anchor. Match clearWallFingerprint's reset.
+    // descriptors-only doodle after a metric one left mHasDoodleView/
+    // mDoodleAnchorMatrix/mWallPatch behind: runRelocPass would then rectify THIS wall's
+    // live frames against the PREVIOUS wall's capture view, and getDoodleAnchor would hand
+    // Kotlin the previous wall's anchor. Match clearWallDoodle's reset.
     static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    memcpy(mFingerprintAnchorMatrix, kIdentity16, 16 * sizeof(float));
-    memset(mFingerprintIntrinsics, 0, 4 * sizeof(float));
-    mHasFingerprintView = false;
+    memcpy(mDoodleAnchorMatrix, kIdentity16, 16 * sizeof(float));
+    memset(mDoodleIntrinsics, 0, 4 * sizeof(float));
+    mHasDoodleView = false;
     mWallPatch.release();
 }
-void MobileGS::restoreWallFingerprintMetric(const cv::Mat& d, const std::vector<cv::Point3f>& p,
+void MobileGS::restoreWallDoodleMetric(const cv::Mat& d, const std::vector<cv::Point3f>& p,
                                             const float* anchorMatrix16, const float* intrinsics4,
                                             const float* viewMatrix16,
                                             const std::vector<uint8_t>& regions) {
     std::lock_guard<std::mutex> lock(mMutex);
-    // The canonical patch is a picture of THE wall this fingerprint describes. A different
-    // fingerprint must not inherit the previous one's -- the distortion head would compare this
+    // The canonical patch is a picture of THE wall this doodle describes. A different
+    // doodle must not inherit the previous one's -- the distortion head would compare this
     // wall's live frames against another wall's marks and publish its matchability as confidence
-    // -- so it is dropped exactly as restoreWallFingerprint drops it, and the caller re-supplies
+    // -- so it is dropped exactly as restoreWallDoodle drops it, and the caller re-supplies
     // the new one (setWallPatch) after the restore. A RE-PUSH of the identical point set (the
     // Phase-2 repartition path, a standalone session re-seeding the same page) is the same wall,
     // and dropping its patch there would silently switch the head off for the rest of the
     // session; only the content decides, not the call.
     //
-    // The stored set may also be that same fingerprint PLUS marks self-grow has appended since. The
+    // The stored set may also be that same doodle PLUS marks self-grow has appended since. The
     // Kotlin copy a repartition re-pushes is only the base, so it never equals the grown native set;
-    // treat "the base is an exact prefix of what is stored" as the same fingerprint, keep the grown
+    // treat "the base is an exact prefix of what is stored" as the same doodle, keep the grown
     // tail (and the patch), and re-partition only the base. Without this the first design move
     // after any growth wiped the grown marks and silently switched the distortion head off.
     const size_t baseN = p.size();
@@ -2330,40 +2330,40 @@ void MobileGS::restoreWallFingerprintMetric(const cv::Mat& d, const std::vector<
             useRegions.clear();
         }
     }
-    const bool sameFingerprint = growthOfSame || (p == mWallKeypoints3D && d.rows == mWallDescriptors.rows &&
+    const bool sameDoodle = growthOfSame || (p == mWallKeypoints3D && d.rows == mWallDescriptors.rows &&
         d.cols == mWallDescriptors.cols && d.type() == mWallDescriptors.type() &&
         (d.empty() || cv::norm(d, mWallDescriptors, cv::NORM_INF) == 0.0));
-    if (!sameFingerprint) mWallPatch.release();
+    if (!sameDoodle) mWallPatch.release();
     // A re-push of the identical point set (repartition) keeps the standing result: the pose is still
-    // in this fingerprint's frame. Any other content is a different wall -- or a different anchor and
+    // in this doodle's frame. Any other content is a different wall -- or a different anchor and
     // view over the same points -- and the result and any in-flight solve belong to the old one.
-    const bool sameFrame = sameFingerprint &&
-        (!anchorMatrix16 || memcmp(anchorMatrix16, mFingerprintAnchorMatrix, 16 * sizeof(float)) == 0) &&
-        (!intrinsics4 || memcmp(intrinsics4, mFingerprintIntrinsics, 4 * sizeof(float)) == 0);
+    const bool sameFrame = sameDoodle &&
+        (!anchorMatrix16 || memcmp(anchorMatrix16, mDoodleAnchorMatrix, 16 * sizeof(float)) == 0) &&
+        (!intrinsics4 || memcmp(intrinsics4, mDoodleIntrinsics, 4 * sizeof(float)) == 0);
     if (!sameFrame) invalidateRelocResultLocked();
     // The captured (bare) part of the stored set: the base alone when grown marks ride behind it, the
     // standing count when the identical set is re-pushed, otherwise everything.
     mBareWallCount = growthOfSame ? baseN
-        : (sameFingerprint && mBareWallCount > 0 ? std::min(mBareWallCount, (size_t)useD.rows) : (size_t)useD.rows);
+        : (sameDoodle && mBareWallCount > 0 ? std::min(mBareWallCount, (size_t)useD.rows) : (size_t)useD.rows);
     mWallDescriptors = useD.clone();
     mWallKeypoints3D = useP;
     // Belt and braces over the JNI-side length check: a partition that does not index the points it
     // is stored beside is worse than no partition, and this is the last place it can be refused
     // before the reloc thread subscripts it. Empty = all backbone = pre-Phase-2 behaviour.
     mWallRegions = (useRegions.size() == useP.size()) ? useRegions : std::vector<uint8_t>();
-    if (anchorMatrix16) memcpy(mFingerprintAnchorMatrix, anchorMatrix16, 16 * sizeof(float));
-    if (intrinsics4)    memcpy(mFingerprintIntrinsics, intrinsics4, 4 * sizeof(float));
+    if (anchorMatrix16) memcpy(mDoodleAnchorMatrix, anchorMatrix16, 16 * sizeof(float));
+    if (intrinsics4)    memcpy(mDoodleIntrinsics, intrinsics4, 4 * sizeof(float));
     if (viewMatrix16) {
-        memcpy(mFingerprintViewMatrix, viewMatrix16, 16 * sizeof(float));
-        mHasFingerprintView = true; // enables plane-guided rectification at reloc time
+        memcpy(mDoodleViewMatrix, viewMatrix16, 16 * sizeof(float));
+        mHasDoodleView = true; // enables plane-guided rectification at reloc time
     } else {
-        // A fingerprint without a capture view must not inherit the previous one's — the rectifying
+        // A doodle without a capture view must not inherit the previous one's — the rectifying
         // warp would be computed against the wrong frontal frame and inject bad correspondences.
-        mHasFingerprintView = false;
+        mHasDoodleView = false;
     }
 }
 
-void MobileGS::clearWallFingerprint() {
+void MobileGS::clearWallDoodle() {
     std::lock_guard<std::mutex> lock(mMutex);
     mWallDescriptors.release();
     mWallKeypoints3D.clear();
@@ -2371,18 +2371,18 @@ void MobileGS::clearWallFingerprint() {
     mWallRegions.clear();
     // Back to the constructed defaults, so a later project can't inherit this one's co-registration.
     static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    memcpy(mFingerprintAnchorMatrix, kIdentity16, 16 * sizeof(float));
-    memset(mFingerprintIntrinsics, 0, 4 * sizeof(float));
-    mHasFingerprintView = false;
+    memcpy(mDoodleAnchorMatrix, kIdentity16, 16 * sizeof(float));
+    memset(mDoodleIntrinsics, 0, 4 * sizeof(float));
+    mHasDoodleView = false;
     // The wall's normal belongs to this wall; the next project may be another.
     mHasWallNormalEnu = false;
     mWallNormalDisagree = 0;
-    // The last PnP result was solved against THIS fingerprint; see invalidateRelocResultLocked.
+    // The last PnP result was solved against THIS doodle; see invalidateRelocResultLocked.
     invalidateRelocResultLocked();
 
     // The ARTWORK side has to go too. It used to survive, and there is no other path that clears it:
-    // an un-fingerprinted project would then be validated against the PREVIOUS project's artwork by
-    // tryUpdateFingerprint, publishing a meaningless painting progress that reaches the user's
+    // an un-doodled project would then be validated against the PREVIOUS project's artwork by
+    // tryUpdateDoodle, publishing a meaningless painting progress that reaches the user's
     // progress readout AND PoseFusion's correction strength — and, with self-grow enabled, promoting
     // this project's features into its map on the strength of a different project's target.
     mArtworkDescriptors.release();
@@ -2421,8 +2421,8 @@ void MobileGS::clearWallFingerprint() {
     mCorrobMatched.store(-1, std::memory_order_relaxed);
     mCorrobLoneSkips.store(-1, std::memory_order_relaxed);
     mCorrobSearchRadiusPx.store(-1.0f, std::memory_order_relaxed);
-    // The outcome codes describe the cleared project's last attempt. With no fingerprint the reloc
-    // pass returns before tryUpdateFingerprint, so nothing else would ever overwrite them.
+    // The outcome codes describe the cleared project's last attempt. With no doodle the reloc
+    // pass returns before tryUpdateDoodle, so nothing else would ever overwrite them.
     mCorrobGate.store(kCorrobNotRun, std::memory_order_relaxed);
     mGrowOutcome.store(kGrowNotRun, std::memory_order_relaxed);
     memset(mCaptureIntr, 0, 4 * sizeof(float));
@@ -2496,14 +2496,14 @@ void MobileGS::clearWallFeatureMap() {
     mMapRevision.fetch_add(1, std::memory_order_relaxed);
 }
 
-std::vector<uint8_t> MobileGS::exportFingerprint() {
+std::vector<uint8_t> MobileGS::exportDoodle() {
     std::lock_guard<std::mutex> lock(mMutex);
     if (mWallDescriptors.empty() || mWallKeypoints3D.empty()) return {};
 
     // NOTE: the co-op wire format carries no Phase-2 partition, deliberately. It is a fixed,
     // unversioned layout shared with peers that may be running an older build, so appending
     // mWallRegions here would be read as descriptor bytes on the other end. The receiving side
-    // (alignToFingerprint) clears mWallRegions for the same reason, so a shared fingerprint is
+    // (alignToDoodle) clears mWallRegions for the same reason, so a shared doodle is
     // all-backbone on arrival — degraded, but correct, and the peer partitions its own once it
     // places its own artwork. Adding a version field is what would let this change.
     uint32_t numPoints = static_cast<uint32_t>(mWallKeypoints3D.size());
@@ -2529,7 +2529,7 @@ std::vector<uint8_t> MobileGS::exportFingerprint() {
     return buffer;
 }
 
-void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
+void MobileGS::alignToDoodle(const uint8_t* data, size_t size) {
     // Untrusted peer bytes. Validate every length in 64-bit arithmetic (Android ships 32-bit ABIs
     // where numPoints * sizeof(Point3f) would wrap size_t) and BEFORE allocating any cv::Mat from
     // peer-controlled dimensions. Bail on anything inconsistent rather than crash the co-op session.
@@ -2543,7 +2543,7 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
 
     // Cap up front: even though the bounds check below rejects a numPoints larger than the buffer,
     // an explicit ceiling documents the intent and refuses an absurd count before std::vector tries
-    // to reserve it. A real wall fingerprint is a few thousand points.
+    // to reserve it. A real wall doodle is a few thousand points.
     if (numPoints > 100000) return;
 
     // The points block plus the 3 trailing header ints (descRows/descCols/descType) must fit.
@@ -2568,10 +2568,10 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
 
     // Row i of the descriptors IS point i's descriptor; every other restore path refuses a set whose
     // point and descriptor counts differ (the reloc thread indexes one by the other). A peer that
-    // sends a mismatched pair would otherwise install a fingerprint whose matches subscript past
+    // sends a mismatched pair would otherwise install a doodle whose matches subscript past
     // the points.
     if (numPoints != descRows) {
-        LOGE("alignToFingerprint: rejecting peer fingerprint: %u points vs %u descriptor rows",
+        LOGE("alignToDoodle: rejecting peer doodle: %u points vs %u descriptor rows",
              numPoints, descRows);
         return;
     }
@@ -2586,43 +2586,43 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
         std::lock_guard<std::mutex> lock(mMutex);
         invalidateRelocResultLocked();
         mWallKeypoints3D = std::move(points3d);
-        // A peer's fingerprint is a different frame; local paint marks do not transfer.
+        // A peer's doodle is a different frame; local paint marks do not transfer.
         mPaintDescriptors.release();
         mPaintPoints3D.clear();
         mWallDescriptors = descs.clone();
         // A peer's blob is the host's set INCLUDING anything self-grow appended, with no boundary between
         // the captured wall and the grown tail. Treating all of it as bare wall would exclude learned
         // (painted) features from the evidence, so this device has no exclusion list for a peer's
-        // fingerprint: the pass loses its guard here rather than gaining a wrong one.
+        // doodle: the pass loses its guard here rather than gaining a wrong one.
         mBareWallCount = 0;
-        // A peer's fingerprint carries no partition, and the local one indexes a different point
+        // A peer's doodle carries no partition, and the local one indexes a different point
         // set. Empty = all backbone, i.e. pre-Phase-2 behaviour, which is the right default for a
         // map whose design footprint this device never saw.
         mWallRegions.clear();
         // This install carries no accompanying capture view or matching camera intrinsics -- it is a
         // foreign (peer) point set. Solving PnP against it with this device's stale intrinsics, or
         // rectifying against a capture view that belongs to unrelated local geometry, injects bad
-        // correspondences. Reset to the same "no real intrinsics yet" default restoreWallFingerprintMetric
+        // correspondences. Reset to the same "no real intrinsics yet" default restoreWallDoodleMetric
         // uses when it isn't given a capture view, so PnP falls back to the safe default path.
-        memset(mFingerprintIntrinsics, 0, 4 * sizeof(float));
-        mHasFingerprintView = false;
-        // mFingerprintAnchorMatrix must reset too, matching the two resets above -- it wasn't,
-        // which let a peer's install inherit THIS device's previous local fingerprint anchor.
-        // getFingerprintAnchor() would then hand Kotlin that stale anchor to compose against the
+        memset(mDoodleIntrinsics, 0, 4 * sizeof(float));
+        mHasDoodleView = false;
+        // mDoodleAnchorMatrix must reset too, matching the two resets above -- it wasn't,
+        // which let a peer's install inherit THIS device's previous local doodle anchor.
+        // getDoodleAnchor() would then hand Kotlin that stale anchor to compose against the
         // peer's PnP pose, landing the overlay at an arbitrary transform. Same identity default
-        // clearWallFingerprint uses.
+        // clearWallDoodle uses.
         static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-        memcpy(mFingerprintAnchorMatrix, kIdentity16, 16 * sizeof(float));
-        // Everything else that is co-registered to the LOCAL fingerprint frame goes too, matching
-        // clearWallFingerprint. Each would otherwise be read against the peer's frame:
+        memcpy(mDoodleAnchorMatrix, kIdentity16, 16 * sizeof(float));
+        // Everything else that is co-registered to the LOCAL doodle frame goes too, matching
+        // clearWallDoodle. Each would otherwise be read against the peer's frame:
         //  - the canonical patch is a picture of the local wall (distortion-head confidence);
-        //  - the design placement is fingerprint-frame-relative (the gated corroboration would
+        //  - the design placement is doodle-frame-relative (the gated corroboration would
         //    predict the design at the local frame's coordinates in the peer's -- confidently,
         //    precisely in the wrong place -- and self-grow would classify promotions with it);
         //  - the persistent wall feature map is co-registered to the local anchor, and with a
         //    prior pose from the peer frame its frustum gate would append wrong-frame
         //    correspondences to the PnP;
-        //  - the capture photo shot the local fingerprint frame (paint grid / auto-fit).
+        //  - the capture photo shot the local doodle frame (paint grid / auto-fit).
         mWallPatch.release();
         mHasDesignPlacement = false;
         memcpy(mDesignFpFromDesign, kIdentity16, 16 * sizeof(float));
@@ -2648,7 +2648,7 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
         mRelocRequested = true;
     }
     mRelocCv.notify_one();
-    LOGI("Co-op: Received fingerprint with %u points. Relocalization triggered.", numPoints);
+    LOGI("Co-op: Received doodle with %u points. Relocalization triggered.", numPoints);
 }
 bool MobileGS::relocWantsFrame() {
     if (!mRelocEnabled) return false;
@@ -2680,7 +2680,7 @@ void MobileGS::scheduleRelocCheck(const cv::Mat& f) {
     // request is still pending we skip, so we only copy a frame when the worker is ready for the next.
     if (f.empty() || !mRelocEnabled) return;
     {
-        // mWallDescriptors is reassigned under mMutex (generateFingerprint / restore paths /
+        // mWallDescriptors is reassigned under mMutex (generateDoodle / restore paths /
         // self-grow); an unlocked empty() probe races those cv::Mat header writes. Scoped so it
         // never nests with mRelocMutex below.
         std::lock_guard<std::mutex> lock(mMutex);
@@ -2743,9 +2743,9 @@ void MobileGS::scheduleRelocCheck(const cv::Mat& f) {
 bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) { return mSuperPoint.load(onnxBytes); }
 bool MobileGS::loadLowLightEnhancer(const std::vector<uchar>& onnxBytes) { return mEnhancer.load(onnxBytes); }
 // Teleological SLAM, stage 1: store the TARGET artwork as the validator reference. Its features +
-// metric 3D describe "what the wall should become"; tryUpdateFingerprint (stage 2) uses them to decide
-// which new real paint-marks to promote into the live fingerprint as the original marks get covered.
-// Mirrors generateFingerprint's detect + depth back-projection, stored into mArtwork* (no mask: the
+// metric 3D describe "what the wall should become"; tryUpdateDoodle (stage 2) uses them to decide
+// which new real paint-marks to promote into the live doodle as the original marks get covered.
+// Mirrors generateDoodle's detect + depth back-projection, stored into mArtwork* (no mask: the
 // whole target is the reference).
 bool MobileGS::renderCvPreview(cv::Mat& rgba, int maxSide) const {
     std::lock_guard<std::mutex> lock(mMutex);
@@ -2909,11 +2909,11 @@ void MobileGS::startFilterBuild(cv::Mat composite, cv::Mat gray, int descType, l
     });
 }
 
-void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* depthData,
+void MobileGS::setArtworkDoodle(const cv::Mat& composite, const uint8_t* depthData,
                                      int depthW, int depthH, int depthStride,
                                      const float* intr, const float* /*viewMat*/) {
     if (composite.empty()) {
-        LOGE("setArtworkFingerprint: empty composite");
+        LOGE("setArtworkDoodle: empty composite");
         return;
     }
 
@@ -2923,7 +2923,7 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
     else                                gray = composite;
     normalizeForFeatures(gray); // match the live frame's illumination normalization
 
-    // Detect with the SAME descriptor type as the wall fingerprint so the gatekeeper match (clean-vs-
+    // Detect with the SAME descriptor type as the wall doodle so the gatekeeper match (clean-vs-
     // artwork) and self-grow promotion are type-compatible: if the wall is ORB (CV_8U, the depth-off
     // path) use ORB here too; otherwise SuperPoint. Without this, an ORB wall + SuperPoint artwork can't
     // match and painting-progress/self-grow silently do nothing in the depth-off config.
@@ -2939,7 +2939,7 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
         orb->detectAndCompute(gray, cv::noArray(), kps, descs);
     }
     if (kps.empty() || descs.empty()) {
-        LOGE("setArtworkFingerprint: no keypoints detected on target");
+        LOGE("setArtworkDoodle: no keypoints detected on target");
         return;
     }
 
@@ -3018,7 +3018,7 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
     long generation;
     { std::lock_guard<std::mutex> lock(mMutex); generation = mArtworkGeneration; }
     startFilterBuild(composite.clone(), gray.clone(), artworkType, generation);
-    LOGI("setArtworkFingerprint: stored %d validator features (%zu with 3D)", storedRows, storedPts);
+    LOGI("setArtworkDoodle: stored %d validator features (%zu with 3D)", storedRows, storedPts);
 }
 
 void MobileGS::setWallPatch(const cv::Mat& img) {
@@ -3035,10 +3035,10 @@ void MobileGS::setWallPatch(const cv::Mat& img) {
 
 bool MobileGS::getSuperPointFeatures(const cv::Mat& image, std::vector<cv::KeyPoint>& kps, cv::Mat& descs) {
     if (!mSuperPoint.isLoaded() || image.empty()) return false;
-    // Same low-light enhance-before-detect step runRelocPass / getFingerprintKeypoints /
-    // generateFingerprint all take: without it, a target captured in low light (this is the
-    // nativeDetectSuperPoint path MetricFingerprintBuilder uses to build the shipping depth-off
-    // fingerprint) gets descriptors computed on non-enhanced, CLAHE-only pixels while live reloc
+    // Same low-light enhance-before-detect step runRelocPass / getDoodleKeypoints /
+    // generateDoodle all take: without it, a target captured in low light (this is the
+    // nativeDetectSuperPoint path MetricDoodleBuilder uses to build the shipping depth-off
+    // doodle) gets descriptors computed on non-enhanced, CLAHE-only pixels while live reloc
     // frames in the same low light get the full enhance-then-CLAHE treatment -- making the two
     // incomparable.
     cv::Mat workFrame = image;
@@ -3054,12 +3054,12 @@ bool MobileGS::getSuperPointFeatures(const cv::Mat& image, std::vector<cv::KeyPo
     return !kps.empty() && !descs.empty();
 }
 
-void MobileGS::getFingerprintKeypoints(const cv::Mat& image, const cv::Mat& mask,
+void MobileGS::getDoodleKeypoints(const cv::Mat& image, const cv::Mat& mask,
                                        std::vector<cv::Point2f>& out) {
     out.clear();
     if (image.empty()) return;
 
-    // Mirror generateFingerprint's detection so the overlay shows the REAL fingerprint features (not a
+    // Mirror generateDoodle's detection so the overlay shows the REAL doodle features (not a
     // different ORB config): low-light enhance, grayscale, the marks mask, SuperPoint then ORB-1000.
     cv::Mat workFrame = image;
     if (mEnhancer.isLoaded() && mLightLevel.load(std::memory_order_relaxed) < kLowLightThreshold) {
@@ -3069,7 +3069,7 @@ void MobileGS::getFingerprintKeypoints(const cv::Mat& image, const cv::Mat& mask
     if (workFrame.channels() == 4)      cv::cvtColor(workFrame, gray, cv::COLOR_RGBA2GRAY);
     else if (workFrame.channels() == 3) cv::cvtColor(workFrame, gray, cv::COLOR_RGB2GRAY);
     else                                gray = workFrame;
-    normalizeForFeatures(gray); // same normalization as generateFingerprint, so the overlay is truthful
+    normalizeForFeatures(gray); // same normalization as generateDoodle, so the overlay is truthful
 
     cv::Mat orbMask;
     if (!mask.empty()) {
@@ -3090,7 +3090,7 @@ void MobileGS::getFingerprintKeypoints(const cv::Mat& image, const cv::Mat& mask
     for (const auto& k : kps) out.push_back(k.pt);
 }
 
-MobileGS::FingerprintData MobileGS::generateFingerprint(
+MobileGS::DoodleData MobileGS::generateDoodle(
         const cv::Mat& image, const cv::Mat& mask,
         const uint8_t* depthData, int depthW, int depthH, int depthStride,
         const float* intr, const float* viewMat)
@@ -3146,12 +3146,12 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
     }
 
     if (kps.empty() || descs.empty()) {
-        LOGE("generateFingerprint: no keypoints detected");
+        LOGE("generateDoodle: no keypoints detected");
         return {};
     }
 
     if (!depthData || depthW <= 0 || depthH <= 0 || depthStride <= 0) {
-        FingerprintData fd;
+        DoodleData fd;
         fd.keypoints = kps;
         fd.descriptors = descs.clone();
         return fd;
@@ -3192,10 +3192,10 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
         validIdx.push_back(i);
     }
 
-    LOGI("generateFingerprint: %zu/%zu keypoints have valid depth (scaleX=%.4f, scaleY=%.4f, depthW=%d, depthH=%d)",
+    LOGI("generateDoodle: %zu/%zu keypoints have valid depth (scaleX=%.4f, scaleY=%.4f, depthW=%d, depthH=%d)",
          validKps.size(), kps.size(), scaleX, scaleY, depthW, depthH);
     if (validKps.empty()) {
-        LOGE("generateFingerprint: no valid depth. Counts: tooClose=%d, missing=%d (no far-plane check). Total kps=%zu",
+        LOGE("generateDoodle: no valid depth. Counts: tooClose=%d, missing=%d (no far-plane check). Total kps=%zu",
              tooClose, missing, kps.size());
         return {};
     }
@@ -3213,7 +3213,7 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
         pts3dFlat.push_back(p.z);
     }
 
-    FingerprintData fd;
+    DoodleData fd;
     fd.keypoints   = validKps;
     fd.points3d    = std::move(pts3dFlat);
     fd.descriptors = validDescs.clone();
@@ -3222,19 +3222,19 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
         std::lock_guard<std::mutex> lock(mMutex);
         invalidateRelocResultLocked();
         mWallDescriptors  = fd.descriptors.clone();
-        // New capture = new fingerprint frame; paint placed in the old one is meaningless here.
+        // New capture = new doodle frame; paint placed in the old one is meaningless here.
         mPaintDescriptors.release();
         mPaintPoints3D.clear();
         mWallKeypoints3D  = std::move(pts3d);
         mBareWallCount = (size_t)mWallDescriptors.rows;
         // The depth path supplies no partition. Clearing rather than leaving the previous
-        // fingerprint's is not optional: those bytes index a point set that no longer exists.
+        // doodle's is not optional: those bytes index a point set that no longer exists.
         mWallRegions.clear();
-        memcpy(mFingerprintAnchorMatrix, mAnchorMatrix, 16 * sizeof(float));
-        memcpy(mFingerprintIntrinsics, intr, 4 * sizeof(float));
+        memcpy(mDoodleAnchorMatrix, mAnchorMatrix, 16 * sizeof(float));
+        memcpy(mDoodleIntrinsics, intr, 4 * sizeof(float));
         if (viewMat) {
-            memcpy(mFingerprintViewMatrix, viewMat, 16 * sizeof(float));
-            mHasFingerprintView = true; // enables plane-guided rectification at reloc time
+            memcpy(mDoodleViewMatrix, viewMat, 16 * sizeof(float));
+            mHasDoodleView = true; // enables plane-guided rectification at reloc time
         }
     }
 
@@ -3407,21 +3407,21 @@ bool MobileGS::autoFitDesign(float* out5) {
         memcpy(K, mCaptureIntr, sizeof(K)); memcpy(fpFromDesign, mDesignFpFromDesign, sizeof(fpFromDesign));
         halfW = mDesignHalfW; halfH = mDesignHalfH; wall = mWallKeypoints3D;
     }
-    // Everything below casts photo rays from the fingerprint frame's ORIGIN, i.e. assumes the
-    // fingerprint frame is the capture camera's. That holds for ARCore metric/depth fingerprints and
+    // Everything below casts photo rays from the doodle frame's ORIGIN, i.e. assumes the
+    // doodle frame is the capture camera's. That holds for ARCore metric/depth doodles and
     // is false for a standalone SphereSLAM fingerprint (the centred page frame: the wall plane
     // passes through the origin, so every ray/plane intersection is at lambda = 0 and the fit could
     // only ever fail -- after two detector passes). Today no standalone flow calls setCaptureImage,
     // but a project that also carries an ARCore capture photo can leave one loaded under a
     // standalone seed. Refuse up front with a reason instead of failing silently and expensively.
-    if (!fingerprintFrameIsCaptureCamera(wall)) {
+    if (!doodleFrameIsCaptureCamera(wall)) {
         mLastAutoFitResult.store(kAutoFitPageFrame, std::memory_order_relaxed);
-        LOGI("autoFitDesign: fingerprint frame is a centred page frame (standalone), not a capture "
-             "camera -- auto-fit needs a capture-camera fingerprint; skipped");
+        LOGI("autoFitDesign: doodle frame is a centred page frame (standalone), not a capture "
+             "camera -- auto-fit needs a capture-camera doodle; skipped");
         return false;
     }
     mLastAutoFitResult.store(kAutoFitNoFit, std::memory_order_relaxed);
-    // Wall plane in the fingerprint (= capture camera) frame, fit to the marks.
+    // Wall plane in the doodle (= capture camera) frame, fit to the marks.
     cv::Mat data((int)wall.size(), 3, CV_32F);
     for (int i = 0; i < (int)wall.size(); ++i) {
         data.at<float>(i, 0) = wall[i].x; data.at<float>(i, 1) = wall[i].y; data.at<float>(i, 2) = wall[i].z;
@@ -3630,8 +3630,8 @@ void MobileGS::updatePaintGrid(const cv::Mat& colorFrame) {
     };
     auto isDesign = [&](int e) { const int d = designIdx(e); return d >= 0 && g.weight[d] > 0; };
 
-    // 1. Bare-wall colours from the capture photo. For a capture-camera fingerprint (ARCore
-    //    metric/depth) the fingerprint frame IS the capture camera's, so camFromFp at capture is the
+    // 1. Bare-wall colours from the capture photo. For a capture-camera doodle (ARCore
+    //    metric/depth) the doodle frame IS the capture camera's, so camFromFp at capture is the
     //    identity. A standalone fingerprint's frame is the centred PAGE frame instead: projecting
     //    through an identity "camera" there puts every sample at depth 0, so it could never
     //    contribute -- and a capture photo left loaded from an ARCore capture of the same project
@@ -3641,7 +3641,7 @@ void MobileGS::updatePaintGrid(const cv::Mat& colorFrame) {
     //    point still lacks a photo colour -- once every base is latched this block is skipped.)
     if (!mCaptureRgb.empty() && mCaptureIntr[0] > 0 &&
         std::any_of(g.hasBase.begin(), g.hasBase.end(), [](uint8_t b) { return b != 1; }) &&
-        fingerprintFrameIsCaptureCamera(mWallKeypoints3D)) {
+        doodleFrameIsCaptureCamera(mWallKeypoints3D)) {
         std::vector<int> idxs; std::vector<cv::Vec3f> cols;
         for (int e = 0; e < en; ++e) {
             if (g.hasBase[e] == 1) continue;
@@ -3667,7 +3667,7 @@ void MobileGS::updatePaintGrid(const cv::Mat& colorFrame) {
     };
     if (changeOn && mCaptureIntr[0] > 0 &&
         std::any_of(g.hasBaseClean.begin(), g.hasBaseClean.end(), [](uint8_t b) { return b == 0; }) &&
-        fingerprintFrameIsCaptureCamera(mWallKeypoints3D)) {
+        doodleFrameIsCaptureCamera(mWallKeypoints3D)) {
         std::vector<int> idxs; std::vector<cv::Vec3f> cols;
         for (int e = 0; e < en; ++e) {
             if (g.hasBaseClean[e]) continue;
@@ -3957,7 +3957,7 @@ void MobileGS::getRelocResult(float* out, bool withSolveView, bool withSpread) c
     // measured. Written only when the caller's buffer has the slot (withSpread).
     if (withSpread) out[35] = mPnpInlierSpread;
 }
-void MobileGS::getFingerprintAnchor(float* out16) const {
+void MobileGS::getDoodleAnchor(float* out16) const {
     std::lock_guard<std::mutex> lock(mMutex);
-    memcpy(out16, mFingerprintAnchorMatrix, 16 * sizeof(float));
+    memcpy(out16, mDoodleAnchorMatrix, 16 * sizeof(float));
 }

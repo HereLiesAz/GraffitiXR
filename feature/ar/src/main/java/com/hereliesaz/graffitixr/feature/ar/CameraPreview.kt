@@ -31,11 +31,11 @@ fun rememberCameraController(): LifecycleCameraController {
             // shared controller for the non-AR modes AND for AR's standalone SphereSLAM path
             // when ARCore is unavailable. Enabling the use case is not the cost: nothing runs
             // per-frame until a caller actually attaches an analyzer via setImageAnalysisAnalyzer.
-            // Standalone SphereSLAM AR (and its co-op peer-fingerprint variant) is the only
+            // Standalone SphereSLAM AR (and its co-op peer-doodle variant) is the only
             // caller that attaches one.
             setEnabledUseCases(LifecycleCameraController.IMAGE_CAPTURE or LifecycleCameraController.IMAGE_ANALYSIS)
             // Latency over throughput, stated rather than inherited from CameraX's default. The
-            // standalone analyzers (SphereSLAM KPM, co-op peer fingerprint) are synchronous, so with
+            // standalone analyzers (SphereSLAM KPM, co-op peer doodle) are synchronous, so with
             // KEEP_ONLY_LATEST at most one frame waits while one is analysed: a slow KPM match
             // drops stale frames instead of queueing them, and the effective analysis rate adapts
             // to the match cost by itself. STRATEGY_BLOCK_PRODUCER here would queue up to the

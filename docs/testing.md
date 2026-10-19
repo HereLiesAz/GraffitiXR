@@ -31,14 +31,14 @@ rather than ordinary feature behavior:
   Kotlin `external fun` whose parameter count drifts from its native counterpart (does not check types).
 * `SlamManagerAnchorEstablishmentTest` (`:core:nativebridge`) — pins named historical regressions in
   anchor-establishment sequencing.
-* `FingerprintJniContractTest` (`:core:common`) — guards the frozen `Fingerprint.fromNative` JNI
+* `DoodleJniContractTest` (`:core:common`) — guards the frozen `Doodle.fromNative` JNI
   constructor contract.
 
 *Note: The relocalization and confidence/progress logic itself — `MobileGS::runRelocPass`
-(background PnP snap-back), the distortion-head crop, `MobileGS::tryUpdateFingerprint`'s fallback —
+(background PnP snap-back), the distortion-head crop, `MobileGS::tryUpdateDoodle`'s fallback —
 runs entirely in the C++ layer and has no automated coverage of its *algorithmic* correctness. The
 tests above guard the JNI *boundary* (signatures, contracts, sequencing); §2's host-native tests
-cover the fallback tracker's pose math and fingerprint-replacement state, not reloc accuracy.*
+cover the fallback tracker's pose math and doodle-replacement state, not reloc accuracy.*
 
 ### Mock patterns
 
@@ -82,7 +82,7 @@ libgtest-dev`.
 
 | Test | Pins |
 |---|---|
-| `MobileGSFingerprintStateTest` | `restoreWallFingerprint` / `alignToFingerprint` clear the previous fingerprint's capture view, anchor, intrinsics (and, for the restore, the canonical patch); malformed peer bytes change nothing. Private state via the `MobileGSTestPeer` friend. Mutation-checked. |
+| `MobileGSDoodleStateTest` | `restoreWallDoodle` / `alignToDoodle` clear the previous doodle's capture view, anchor, intrinsics (and, for the restore, the canonical patch); malformed peer bytes change nothing. Private state via the `MobileGSTestPeer` friend. Mutation-checked. |
 | `DepthScaleFitTest` | `include/DepthScaleFit.h` (ports SphereSLAM's `DepthScaleFitTest`), and `growMapFromReloc` placing off-wall features at their calibrated depth with a third of the wall depth samples corrupted. Mutation-checked against plain least squares. |
 | `FrameBufferGuardTest` | `include/FrameBufferGuard.h`, the bounds arithmetic of `nativeFeedYuvFrame`, `nativeFeedColorFrame`, `nativeYuvToRgbaBitmap`, incl. 32-bit wrap. |
 

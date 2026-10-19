@@ -77,7 +77,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val COVERAGE_GLOW_COLOR = intPreferencesKey("coverage_glow_color")
     private val COVERAGE_GLOW_INTENSITY = floatPreferencesKey("coverage_glow_intensity")
     private val COVERAGE_GLOW_STYLE = stringPreferencesKey("coverage_glow_style")
-    private val FINGERPRINT_FEATURES = stringPreferencesKey("fingerprint_features")
+    private val DOODLE_FEATURES = stringPreferencesKey("fingerprint_features")
     private val ANTICIPATION_DISTANCE = intPreferencesKey("anticipation_distance")
     private val ANTICIPATION_LATITUDE = intPreferencesKey("anticipation_latitude")
     private val ANTICIPATION_LONGITUDE = intPreferencesKey("anticipation_longitude")
@@ -454,14 +454,14 @@ class SettingsRepositoryImpl @Inject constructor(
         context.dataStore.edit { it[COVERAGE_GLOW_STYLE] = style.storageKey }
     }
 
-    override val fingerprintFeatures: Flow<com.hereliesaz.graffitixr.common.model.FingerprintFeatures> =
+    override val doodleFeatures: Flow<com.hereliesaz.graffitixr.common.model.DoodleFeatures> =
         context.dataStore.data
             .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-            .map { com.hereliesaz.graffitixr.common.model.FingerprintFeatures.fromStorageKey(it[FINGERPRINT_FEATURES]) }
+            .map { com.hereliesaz.graffitixr.common.model.DoodleFeatures.fromStorageKey(it[DOODLE_FEATURES]) }
             .distinctUntilChanged()
 
-    override suspend fun setFingerprintFeatures(features: com.hereliesaz.graffitixr.common.model.FingerprintFeatures) {
-        context.dataStore.edit { it[FINGERPRINT_FEATURES] = features.storageKey }
+    override suspend fun setDoodleFeatures(features: com.hereliesaz.graffitixr.common.model.DoodleFeatures) {
+        context.dataStore.edit { it[DOODLE_FEATURES] = features.storageKey }
     }
 
     override val lastOpenProjectId: Flow<String?> = context.dataStore.data

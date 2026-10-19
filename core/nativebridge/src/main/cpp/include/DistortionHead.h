@@ -9,7 +9,7 @@
 
 /**
  * Distortion head (design: docs/DISTORTION_HEAD.md). A small learned head on a frozen SuperPoint
- * backbone, exported self-contained to ONNX: two gray views in (current crop + canonical fingerprint
+ * backbone, exported self-contained to ONNX: two gray views in (current crop + canonical doodle
  * patch), one tensor out:
  *
  *   distortion[13] = [corners(8), pose(3 = tilt°, log2(scale), roll°), matchability(1), coverage(1)]

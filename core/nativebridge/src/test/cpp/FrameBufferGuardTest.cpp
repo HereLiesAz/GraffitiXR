@@ -1,6 +1,6 @@
 // Pins the JNI frame-buffer bounds arithmetic (include/FrameBufferGuard.h) used by
 // nativeFeedYuvFrame, nativeFeedColorFrame and nativeYuvToRgbaBitmap, plus the DEPTH16 check in
-// nativeSetWallFingerprint / nativeSetArtworkFingerprint. Expected byte counts are
+// nativeSetWallDoodle / nativeSetArtworkDoodle. Expected byte counts are
 // written out by hand, not recomputed with the guard's own formula.
 #include <gtest/gtest.h>
 #include "FrameBufferGuard.h"

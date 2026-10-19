@@ -111,8 +111,8 @@ internal class HostSession(
         // the one sent later.
         val probe = snapshotProvider()
         hostedSpatialFrame = probe.spatialFrame
-        require(probe.projectBytes.size <= Limits.MAX_BULK_BYTES && probe.fingerprintBytes.size <= Limits.MAX_BULK_BYTES) {
-            "project too large to host: ${probe.projectBytes.size}B project / ${probe.fingerprintBytes.size}B fingerprint " +
+        require(probe.projectBytes.size <= Limits.MAX_BULK_BYTES && probe.doodleBytes.size <= Limits.MAX_BULK_BYTES) {
+            "project too large to host: ${probe.projectBytes.size}B project / ${probe.doodleBytes.size}B doodle " +
                 "(cap ${Limits.MAX_BULK_BYTES}B)"
         }
     }
@@ -554,10 +554,10 @@ internal class HostSession(
         }
         require(
             snapshot.projectBytes.size <= Limits.MAX_BULK_BYTES &&
-                snapshot.fingerprintBytes.size <= Limits.MAX_BULK_BYTES,
+                snapshot.doodleBytes.size <= Limits.MAX_BULK_BYTES,
         ) {
             "project too large to host: ${snapshot.projectBytes.size}B project / " +
-                "${snapshot.fingerprintBytes.size}B fingerprint (cap ${Limits.MAX_BULK_BYTES}B)"
+                "${snapshot.doodleBytes.size}B doodle (cap ${Limits.MAX_BULK_BYTES}B)"
         }
         // The snapshot just captured already contains every op enqueued up to seqCutoff (see
         // above), so any of those ops still sitting in outQueue — left over from a previous
@@ -574,14 +574,14 @@ internal class HostSession(
                 BulkBeginPayload(
                     projectId = projectId,
                     layerCount = snapshot.layerCount,
-                    fingerprintBytes = snapshot.fingerprintBytes.size,
+                    doodleBytes = snapshot.doodleBytes.size,
                     projectBytes = snapshot.projectBytes.size,
                     spatialFrame = snapshot.spatialFrame,
                 )
             ),
         )
         // Chunk payload into 64KB frames.
-        chunkAndWrite(output, crypto, FrameType.BULK_FINGERPRINT, snapshot.fingerprintBytes)
+        chunkAndWrite(output, crypto, FrameType.BULK_DOODLE, snapshot.doodleBytes)
         chunkAndWrite(output, crypto, FrameType.BULK_PROJECT, snapshot.projectBytes)
         writeSecure(output, crypto, FrameType.BULK_END, ByteArray(0))
     }

@@ -291,7 +291,7 @@
                 </h2>
 
                 <p class="text-xl md:text-2xl text-slate-300 mb-12 bg-[#07070a]/80 p-6 border-l-4 border-pink-500 rounded-r-lg backdrop-blur-md shadow-[0_10px_30px_rgba(0,0,0,0.8)] max-w-2xl font-mono leading-relaxed">
-                    The offline-first AR toolkit built specifically for street artists. Keep references fingerprinted and anchored to the wall, and knock out mockups on the fly.
+                    The offline-first AR toolkit built specifically for street artists. Keep references doodled and anchored to the wall, and knock out mockups on the fly.
                 </p>
 
                 <div class="flex flex-col sm:flex-row gap-6 w-full max-w-xl">
@@ -331,7 +331,7 @@
 
     <div class="marquee-container">
         <div class="marquee">
-            // OFFLINE AR TOOLKIT // ZERO TRACKING // NATIVE C++ ENGINE // FINGERPRINT RELOCALIZATION // CO-OP MODE // TRACE LIGHTBOX // OPENCV // OFFLINE AR TOOLKIT // ZERO TRACKING // NATIVE C++ ENGINE // FINGERPRINT RELOCALIZATION // CO-OP MODE // TRACE LIGHTBOX // OPENCV //
+            // OFFLINE AR TOOLKIT // ZERO TRACKING // NATIVE C++ ENGINE // DOODLE RELOCALIZATION // CO-OP MODE // TRACE LIGHTBOX // OPENCV // OFFLINE AR TOOLKIT // ZERO TRACKING // NATIVE C++ ENGINE // DOODLE RELOCALIZATION // CO-OP MODE // TRACE LIGHTBOX // OPENCV //
         </div>
     </div>
 
@@ -487,7 +487,7 @@
                     <td class="p-3 text-slate-300">Survives screen-off / phone in a pocket</td>
                     <td class="p-3 text-center bg-cyan-500/5 border-x border-cyan-500/20">
                         <span class="text-amber-400 text-lg font-bold">~</span>
-                        <div class="text-[0.7rem] text-slate-400 mt-1">Fingerprint snap-back &mdash; opt-in, unvalidated on real hardware</div>
+                        <div class="text-[0.7rem] text-slate-400 mt-1">Doodle snap-back &mdash; opt-in, unvalidated on real hardware</div>
                     </td>
                     <td class="p-3 text-center"><span class="text-pink-500/50 text-lg font-bold">&#10007;</span></td>
                     <td class="p-3 text-center"><span class="text-pink-500/50 text-lg font-bold">&#10007;</span></td>
@@ -531,7 +531,7 @@
 
             <!-- Honesty footnote -->
             <p class="mt-10 text-slate-500 text-sm md:text-base font-mono leading-relaxed max-w-4xl border-l-2 border-purple-500/50 pl-5">
-                <span class="text-purple-400">// note:</span> Every app here builds on the same platform AR &mdash; ARCore on Android, ARKit on iOS. None of them read your actual artwork. Da Vinci Eye tracks a printed marker you tape up (its mural app, Mural Maker, is iOS-only and needs two devices); SketchAR and Cupixel lock onto the drawing surface; the AR Drawing clones &mdash; 10M+ downloads apiece &mdash; mostly just ask you to prop the phone up and hold still. All of them depend on something <span class="text-slate-400">outside your work</span> staying put and in frame. GraffitiXR fingerprints <span class="text-cyan-400">your actual marks</span> and regrows the fingerprint as you paint &mdash; so nothing has to be reserved, kept pristine, or kept in view. That's the part no one else does.
+                <span class="text-purple-400">// note:</span> Every app here builds on the same platform AR &mdash; ARCore on Android, ARKit on iOS. None of them read your actual artwork. Da Vinci Eye tracks a printed marker you tape up (its mural app, Mural Maker, is iOS-only and needs two devices); SketchAR and Cupixel lock onto the drawing surface; the AR Drawing clones &mdash; 10M+ downloads apiece &mdash; mostly just ask you to prop the phone up and hold still. All of them depend on something <span class="text-slate-400">outside your work</span> staying put and in frame. GraffitiXR doodles <span class="text-cyan-400">your actual marks</span> and regrows the doodle as you paint &mdash; so nothing has to be reserved, kept pristine, or kept in view. That's the part no one else does.
             </p>
 
             <!-- Punchline -->
@@ -572,11 +572,11 @@
                     <ul class="space-y-6 text-slate-400 font-mono text-lg">
                         <li class="flex items-start bg-[#0a0a0e] p-5 border border-slate-800 hover:border-cyan-500 transition-colors shadow-lg hover:-translate-y-1 transform duration-300">
                             <span class="text-cyan-500 text-2xl mr-4 mt-1 font-bold">>></span>
-                            <span><strong class="text-white font-display text-2xl tracking-wide block mb-1">Fingerprint Relocalization:</strong> A confidence-weighted ORB/SuperPoint feature map snaps your reference back onto the wall via offline PnP — surviving pocketing, lighting shifts, and painting over the marks.</span>
+                            <span><strong class="text-white font-display text-2xl tracking-wide block mb-1">Doodle Relocalization:</strong> A confidence-weighted ORB/SuperPoint feature map snaps your reference back onto the wall via offline PnP — surviving pocketing, lighting shifts, and painting over the marks.</span>
                         </li>
                         <li class="flex items-start bg-[#0a0a0e] p-5 border border-slate-800 hover:border-pink-500 transition-colors shadow-lg hover:-translate-y-1 transform duration-300">
                             <span class="text-pink-500 text-2xl mr-4 mt-1 font-bold">>></span>
-                            <span><strong class="text-white font-display text-2xl tracking-wide block mb-1">Teleological Correction:</strong> Auto map-to-world alignment via OpenCV fingerprinting.</span>
+                            <span><strong class="text-white font-display text-2xl tracking-wide block mb-1">Teleological Correction:</strong> Auto map-to-world alignment via OpenCV doodling.</span>
                         </li>
                         <li class="flex items-start bg-[#0a0a0e] p-5 border border-slate-800 hover:border-orange-500 transition-colors shadow-lg hover:-translate-y-1 transform duration-300">
                             <span class="text-orange-500 text-2xl mr-4 mt-1 font-bold">>></span>
@@ -731,7 +731,7 @@
 > ARCore: Session Bound [DEPTH16 Supported]
 > Loading OpenCV Module... v5.0.0 loaded
 > Initializing DualAnalyzer...
-> Fingerprint relocalizer initialized.
+> Doodle relocalizer initialized.
 > Plane back-projection matrix standing by.
 > Teleological correction active.
 > Status: READY

@@ -56,13 +56,13 @@
     <string name="settings_anticipation_heat">La chaleur réduit de</string>
     <string name="settings_anticipation_compute">La charge réduit de</string>
     <string name="settings_anticipation_views">%1$d vues par page au plus</string>
-    <string name="settings_fingerprint_features">Gribouillis</string>
-    <string name="settings_fingerprint_superpoint">SuperPoint</string>
-    <string name="settings_fingerprint_half_sphere">Demi-sphère</string>
-    <string name="settings_fingerprint_both">Les deux</string>
-    <string name="settings_fingerprint_superpoint_desc">Seulement les points SuperPoint de la capture. Tient à la lumière et à l\'usure ; environ 1,5 Mo par Gribouillis. S\'applique au prochain Gribouillis.</string>
-    <string name="settings_fingerprint_half_sphere_desc">Points ORB de la capture et de ses 49 gros plans. Solide de près et léger, moins de 0,1 Mo par Gribouillis. S\'applique au prochain Gribouillis.</string>
-    <string name="settings_fingerprint_both_desc">Points SuperPoint de la capture et de ses 49 gros plans. Le plus solide ; environ 2–3 Mo par Gribouillis. S\'applique au prochain Gribouillis.</string>
+    <string name="settings_doodle_features">Gribouillis</string>
+    <string name="settings_doodle_superpoint">SuperPoint</string>
+    <string name="settings_doodle_half_sphere">Demi-sphère</string>
+    <string name="settings_doodle_both">Les deux</string>
+    <string name="settings_doodle_superpoint_desc">Seulement les points SuperPoint de la capture. Tient à la lumière et à l\'usure ; environ 1,5 Mo par Gribouillis. S\'applique au prochain Gribouillis.</string>
+    <string name="settings_doodle_half_sphere_desc">Points ORB de la capture et de ses 49 gros plans. Solide de près et léger, moins de 0,1 Mo par Gribouillis. S\'applique au prochain Gribouillis.</string>
+    <string name="settings_doodle_both_desc">Points SuperPoint de la capture et de ses 49 gros plans. Le plus solide ; environ 2–3 Mo par Gribouillis. S\'applique au prochain Gribouillis.</string>
     <string name="settings_power_section">Énergie</string>
     <string name="settings_privacy_section">Confidentialité</string>
     <string name="settings_developer_section">Développeur</string>
@@ -116,17 +116,17 @@
     <string name="save_project_hint">Nom du projet</string>
 
     <!-- Target Creation -->
-    <string name="target_guide_desc">Guide d\'alignement du Gribouillis</string>
-    <string name="target_captured_desc">Gribouillis capturé</string>
-    <string name="target_review_desc">Examiner le Gribouillis extrait</string>
-    <string name="target_unwarp_hint">Faites glisser les coins pour déformer</string>
-    <string name="target_review_title">GRIBOUILLIS VERROUILLÉ</string>
-    <string name="fingerprint_closeups_progress">Apprentissage du mur : étape %1$d sur %2$d · %3$d sur %4$d</string>
+    <string name="doodle_guide_desc">Guide d\'alignement du Gribouillis</string>
+    <string name="doodle_captured_desc">Gribouillis capturé</string>
+    <string name="doodle_review_desc">Examiner le Gribouillis extrait</string>
+    <string name="doodle_unwarp_hint">Faites glisser les coins pour déformer</string>
+    <string name="doodle_review_title">GRIBOUILLIS VERROUILLÉ</string>
+    <string name="doodle_closeups_progress">Apprentissage du mur : étape %1$d sur %2$d · %3$d sur %4$d</string>
 
-    <string name="target_exclude">Exclure</string>
-    <string name="target_include">Inclure</string>
-    <string name="target_erase_marks">Effacer les marques</string>
-    <string name="target_show_features">Afficher les caractéristiques</string>
+    <string name="doodle_exclude">Exclure</string>
+    <string name="doodle_include">Inclure</string>
+    <string name="doodle_erase_marks">Effacer les marques</string>
+    <string name="doodle_show_features">Afficher les caractéristiques</string>
     <string name="reset_button">Réinitialiser</string>
 
     <string name="poster_title">GÉNÉRER AFFICHE</string>
@@ -141,7 +141,7 @@
     <string name="scan_hint_build_map">Marchez à gauche et à droite pour construire la carte</string>
     <string name="scan_hint_closer">Rapprochez-vous du mur</string>
     <string name="scan_hint_higher_lower">Scannez plus haut et plus bas</string>
-    <string name="reacquiring_target">Recherche du Gribouillis…</string>
+    <string name="reacquiring_doodle">Recherche du Gribouillis…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Maquette d\'arrière-plan</string>
@@ -242,8 +242,8 @@
     <string name="install_arcore">Installer ARCore</string>
     <string name="camera_permission_required">La permission de la caméra est requise pour le mode AR.</string>
     <string name="open_settings">Ouvrir Paramètres</string>
-    <string name="target_creation_title">GRILLE DU GRIBOUILLIS</string>
-    <string name="target_creation_text">Si vous n\'avez pas encore créé la grille de votre Gribouillis, prenez une photo du mur en appuyant sur le bouton de capture. Sinon, appuyez sur Annuler.</string>
+    <string name="doodle_creation_title">GRILLE DU GRIBOUILLIS</string>
+    <string name="doodle_creation_text">Si vous n\'avez pas encore créé la grille de votre Gribouillis, prenez une photo du mur en appuyant sur le bouton de capture. Sinon, appuyez sur Annuler.</string>
     <string name="cancel">Annuler</string>
     <string name="diag_copied">COPIÉ ✓</string>
     <string name="diag_title">DIAG PROFONDEUR (appuyer pour copier)</string>
@@ -449,14 +449,14 @@
     <string name="standalone_photosphere_no_sensor">Ce téléphone n\'a pas de capteur de rotation, SphereSLAM ne peut donc pas y placer de cible.</string>
     <string name="standalone_photosphere_compass_not_ready">La boussole n\'est pas encore prête : tenez le téléphone immobile une seconde, puis reprenez.</string>
     <string name="standalone_photosphere_not_mapped">SphereSLAM n\'a pas encore cartographié cette vue : tenez l\'appareil photo immobile sur une zone éclairée et détaillée de la surface pendant une seconde, puis reprenez.</string>
-    <string name="target_rectify_title">Rectifier la surface</string>
-    <string name="target_rectify_text">Faites maintenant glisser les coins pour aligner le cadre cyan sur la surface plane de votre mur.</string>
-    <string name="target_remove_marks_title">Supprimer les marques</string>
-    <string name="target_erase_hint">Appuyez sur une marque pour la supprimer, ou glissez sur plusieurs marques pour les supprimer.</string>
-    <string name="target_cd_raw_capture">Capture brute</string>
-    <string name="target_cd_detected_marks">Marques détectées</string>
-    <string name="target_cd_confirm">Confirmer</string>
-    <string name="target_cd_unwarp_base">Photo du mur capturée avec poignées de coin</string>
+    <string name="doodle_rectify_title">Rectifier la surface</string>
+    <string name="doodle_rectify_text">Faites maintenant glisser les coins pour aligner le cadre cyan sur la surface plane de votre mur.</string>
+    <string name="doodle_remove_marks_title">Supprimer les marques</string>
+    <string name="doodle_erase_hint">Appuyez sur une marque pour la supprimer, ou glissez sur plusieurs marques pour les supprimer.</string>
+    <string name="doodle_cd_raw_capture">Capture brute</string>
+    <string name="doodle_cd_detected_marks">Marques détectées</string>
+    <string name="doodle_cd_confirm">Confirmer</string>
+    <string name="doodle_cd_unwarp_base">Photo du mur capturée avec poignées de coin</string>
     <string name="guidance_open_via_design_overlay">Appuyez sur « Conception » dans la barre, puis sur « Ouvrir », pour ajouter un calque : choisissez une photo et elle apparaît ici, flottant sur la vue caméra en direct.</string>
     <string name="guidance_open_via_design_mockup">Appuyez sur « Conception » dans la barre, puis sur « Ouvrir », pour ajouter un calque sur la photo du mur. Pincez et faites glisser pour le dimensionner et le positionner.</string>
     <string name="guidance_open_via_design_trace">Appuyez sur « Conception » dans la barre, puis sur « Ouvrir », pour ajouter votre premier calque. Une fois en place, pincez et faites glisser sur le canevas pour le dimensionner et le placer.</string>
@@ -465,15 +465,15 @@
     <string name="ar_feedback_guest_edit_dropped">Ce changement ne peut pas être partagé avec l\'hôte : il reste sur cet appareil</string>
     <string name="ar_feedback_backend_resolving">Le moteur AR est encore en cours de sélection : réessayez d\'héberger dans un instant</string>
     <string name="ar_feedback_open_project_first">Ouvrez un projet avant de partager : il n\'y a encore rien à envoyer à un invité</string>
-    <string name="ar_feedback_host_need_target_arcore">Capturez et verrouillez un Gribouillis à jour avant de lancer « Héberger »</string>
+    <string name="ar_feedback_host_need_doodle_arcore">Capturez et verrouillez un Gribouillis à jour avant de lancer « Héberger »</string>
     <string name="ar_feedback_host_need_target_standalone">Capturez une cible murale autonome avant d\'héberger</string>
-    <string name="ar_feedback_fingerprint_not_ready">Le Gribouillis n\'est pas encore prêt — gardez-le dans le champ et relancez « Héberger »</string>
+    <string name="ar_feedback_doodle_not_ready">Le Gribouillis n\'est pas encore prêt — gardez-le dans le champ et relancez « Héberger »</string>
     <string name="ar_feedback_package_failed">Impossible d\'empaqueter ce projet pour le partager : essayez d\'abord de l\'enregistrer</string>
     <string name="ar_feedback_host_failed">Impossible de démarrer le partage : %1$s</string>
     <string name="ar_feedback_join_load_failed">Impossible de charger le projet de l\'hôte : la session a été terminée.</string>
     <string name="ar_feedback_join_no_geometry">L\'hôte n\'a pas fourni de géométrie sur laquelle ARCore puisse s\'aligner.</string>
     <string name="ar_feedback_join_failed">Impossible de rejoindre : %1$s</string>
-    <string name="ar_feedback_wall_target_changed">Le Gribouillis a changé — le partage est terminé. Relancez « Héberger » pour le nouveau mur.</string>
+    <string name="ar_feedback_wall_doodle_changed">Le Gribouillis a changé — le partage est terminé. Relancez « Héberger » pour le nouveau mur.</string>
     <string name="ar_feedback_backend_changed">Le moteur de suivi a changé : le partage est terminé. Relancez le partage.</string>
     <string name="ar_feedback_camera_busy">La caméra est occupée ou indisponible : fermez les autres applications de caméra, puis rouvrez l\'AR</string>
     <string name="ar_feedback_ar_start_failed">Impossible de démarrer l\'AR : votre caméra est peut-être utilisée par une autre application</string>
@@ -483,7 +483,7 @@
     <string name="ar_feedback_camera_permission">Caméra indisponible : vérifiez l\'autorisation de la caméra, puis rouvrez l\'AR</string>
     <string name="ar_feedback_camera_not_paused">La caméra AR ne s\'est pas mise en pause proprement : elle peut continuer à tourner en arrière-plan</string>
     <string name="ar_feedback_backbone_warning">L\'œuvre couvre presque tout le mur visible — seuls %1$d points suivis se trouvent en dehors. Réduisez-la ou reculez, sinon le Gribouillis risque de ne pas se verrouiller.</string>
-    <string name="ar_feedback_legacy_target_geometry">Le Gribouillis enregistré de ce projet a été créé par une version plus ancienne et sa géométrie 3D ne peut pas être corrigée. Recréez le Gribouillis pour l\'utiliser.</string>
+    <string name="ar_feedback_legacy_doodle_geometry">Le Gribouillis enregistré de ce projet a été créé par une version plus ancienne et sa géométrie 3D ne peut pas être corrigée. Recréez le Gribouillis pour l\'utiliser.</string>
     <string name="ar_feedback_camera_no_frames">La caméra ne fournit aucune image : quittez l\'AR et réessayez</string>
     <string name="ar_feedback_camera_recovery_timeout">La récupération de la caméra AR a expiré sans risque : quittez l\'AR puis rouvrez-la</string>
     <string name="ar_feedback_target_prepare_failed">Impossible de préparer la cible capturée. Réessayez.</string>
@@ -510,8 +510,8 @@
     <!-- Pass B: the Settings switch. -->
     <string name="settings_change_pass">Détection des changements (nécessite une photo du mur propre)</string>
     <!-- Spoken labels for the round shutter on the Doodle grid screen, which photographs the bare wall. -->
-    <string name="target_shutter_cd">Photographier le mur nu</string>
-    <string name="target_shutter_retake_cd">Reprendre la photo du mur nu</string>
+    <string name="doodle_shutter_cd">Photographier le mur nu</string>
+    <string name="doodle_shutter_retake_cd">Reprendre la photo du mur nu</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">Vue CV</string>

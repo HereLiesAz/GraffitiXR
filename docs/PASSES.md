@@ -28,7 +28,7 @@ collects each pass's verdict per opaque design cell and combines them; the conse
 
 | id | name | looks for |
 |---|---|---|
-| 0 | `features` | design features confirmed on the wall: descriptors from the design composite matched near their predicted position (`tryUpdateFingerprint`, gated by the lock's pose) |
+| 0 | `features` | design features confirmed on the wall: descriptors from the design composite matched near their predicted position (`tryUpdateDoodle`, gated by the lock's pose) |
 | 1 | `colour` | a cell that has left the bare wall and matches the paint its design colour was painted with. Hue-free: purple in the design may be yellow on the wall. The bare wall comes from the capture photo, or the first AR sighting |
 
 | 2 to 10 | `sketch`, `mosaic`, `posterize2`, `posterize4`, `cartoon`, `blobs`, `invert`, `warm-luma`, `stencil3` | design features at places the matching design filter points to (below) |
@@ -63,7 +63,7 @@ reloc marks: they judge progress only.
 
 ## Guards on every set
 
-- **Wall exclusion list**: the wall as captured (the bare fingerprint, before any paint or self-grow)
+- **Wall exclusion list**: the wall as captured (the bare doodle, before any paint or self-grow)
   is projected into the live frame through the lock's pose. A design feature's live match is not
   counted when a bare-wall feature near it describes that live keypoint at least as well as the
   design does: that is the wall's own texture. The row stays observed, so its confirmation count
@@ -89,7 +89,7 @@ region has the shape of the design. Colour plays no part in the second question.
 - **The switch** is in **Settings** (not the diagnostics overlay), **off by default**, and nothing
   but the user turns it on (`SettingsRepository.changePassEnabled`). Even on, the pass judges
   nothing without a registered clean-wall photo.
-- **Where it can run**: it needs the capture photo and a fingerprint whose frame is the capture
+- **Where it can run**: it needs the capture photo and a doodle whose frame is the capture
   camera's (an ARCore target made by the metric/plane path, or a project reloaded with its capture
   photo). A standalone SphereSLAM target, or an ARCore target made by a path that never installs the
   capture photo, has neither, so the pass judges nothing there; the clean-wall photo is still kept.

@@ -12,7 +12,7 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
-import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.Doodle
 import com.hereliesaz.graffitixr.common.model.WallFeatureMap
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion
@@ -84,8 +84,8 @@ enum class SphereSlamStandalonePoseSource {
     HELD,
     /** Placed from the photosphere: wall out of view, camera located from recognised tiles. */
     PHOTOSPHERE,
-    /** MobileGS PnP against a protocol-v3 co-op peer fingerprint. */
-    PEER_FINGERPRINT,
+    /** MobileGS PnP against a protocol-v3 co-op peer doodle. */
+    PEER_DOODLE,
 }
 
 data class SphereSlamStandaloneFrame(
@@ -133,7 +133,7 @@ internal data class StandaloneAtlasGrowthCandidate(
  *
  * The tracking runtime is SphereSLAM's [PhotosphereTrackingSession] (ported from this class): the
  * rotation-only base photosphere map and its keyframes, the planar KPM precision layer gated by
- * `RobustTrackingLoop`, the same-frame `map_from_fingerprint` solve, the <= [maxBridgeMs] gyro
+ * `RobustTrackingLoop`, the same-frame `map_from_doodle` solve, the <= [maxBridgeMs] gyro
  * bridge, multi-page atlas growth and the failure taxonomy. This class is the Android/app adapter
  * around it: CameraX frames (full Y plane, packed and rotated to display orientation), Camera2
  * characteristics (intrinsics, sensor orientation, timestamp source), the device attitude
@@ -172,10 +172,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     @Volatile private var referenceImage: SphereSlamStandaloneReferenceImage?,
     atlasReferenceImages: List<SphereSlamStandaloneAtlasReferenceImage> = emptyList(),
     private val slamManager: SlamManager? = null,
-    @Volatile private var mobileGsFingerprint: Fingerprint? = null,
-    @Volatile private var mobileGsFingerprintFrameVersion: Int =
+    @Volatile private var mobileGsDoodle: Doodle? = null,
+    @Volatile private var mobileGsDoodleFrameVersion: Int =
         com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
-    @Volatile private var mobileGsMapFromFingerprint: FloatArray? = null,
+    @Volatile private var mobileGsMapFromDoodle: FloatArray? = null,
     @Volatile private var mobileGsWallFeatureMap: WallFeatureMap? = null,
     @Volatile private var mobileGsWallFeatureMapFrameVersion: Int =
         com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
@@ -183,7 +183,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     /**
      * Heading, elevation and the tracked image's roll for a given body->camera rotation, from ONE
      * attitude sample ([StandaloneCameraAttitude]), or null when unknown. Stamped on each keyframe so
-     * a later fingerprint placement can rotate pixel rays correctly in any device orientation and at
+     * a later doodle placement can rotate pixel rays correctly in any device orientation and at
      * the poles.
      */
     private val cameraAttitude: (cameraFromDevice: FloatArray) -> StandaloneCameraAttitude? = { null },
@@ -194,7 +194,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private val onPhotosphereKeyframe: (PhotosphereKeyframe) -> Unit = {},
     /**
      * Solved on a frame where both base-map pose and KPM precision pose are known:
-     * map_from_fingerprint = inverse(camera_from_map) * camera_from_fingerprint.
+     * map_from_doodle = inverse(camera_from_map) * camera_from_doodle.
      */
     private val onMapFromFingerprintSolved: (FloatArray) -> Unit = {},
     private val onReferenceReady: (PhotosphereTrackingSession.RegisteredPage) -> Unit = {},
@@ -304,7 +304,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     private val relocBuf = FloatArray(com.hereliesaz.graffitixr.nativebridge.SlamManager.RELOC_RESULT_SIZE)
 
     /**
-     * Treat the reloc result native holds RIGHT NOW as already consumed. Called when the fingerprint
+     * Treat the reloc result native holds RIGHT NOW as already consumed. Called when the doodle
      * or map the reloc is solved against changes: native keeps the last PnP result latched (same
      * seq) until a new solve finishes, and that result was solved against the OLD reference.
      * Rewinding [lastRelocSeq] to 0 made it count as new again on the next frame, so a stale fix
@@ -338,7 +338,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
 
     // The library session keys its precision-layer rebuild on reference identity, so each app
     // reference is converted once and the converted object reused while it stays current.
-    // The app's anticipated views (the fingerprint's teleological layer), fed to the session.
+    // The app's anticipated views (the doodle's teleological layer), fed to the session.
     private val anticipation: AnticipationFeeder = AnticipationFeeder(
         sink = object : AnticipationFeeder.Sink {
             override fun addViews(pageNo: Int, views: List<AnticipatedView>) = session.addAnticipatedViews(pageNo, views)
@@ -401,7 +401,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             onMapFromFingerprintSolved = { mapFromFingerprint ->
                 // Keep the MobileGS seed's bridge current at once, so a planar-session rebuild
                 // seeds MobileGS before the asynchronous project write/reload completes.
-                mobileGsMapFromFingerprint = mapFromFingerprint.copyOf()
+                mobileGsMapFromDoodle = mapFromFingerprint.copyOf()
                 onMapFromFingerprintSolved(mapFromFingerprint)
             },
             onReferenceReady = { registered ->
@@ -461,7 +461,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         session.updatePrecisionLayer(
             reference = libraryReference(referenceImage),
             atlasPages = atlasReferenceImages.map(::libraryAtlasPage),
-            mapFromFingerprint = mobileGsMapFromFingerprint.validTransformOrNull(),
+            mapFromFingerprint = mobileGsMapFromDoodle.validTransformOrNull(),
         )
         anticipatePages(referenceImage, atlasReferenceImages)
         constructed = true
@@ -475,7 +475,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     }
 
     /**
-     * Hot-swap only the fingerprint/teleological enrichment layer.
+     * Hot-swap only the doodle/teleological enrichment layer.
      *
      * The CameraX analyzer, gyro sampling, and base photosphere remain alive. Rebuilding the planar
      * KPM sub-session here is allowed because it is an enrichment consumer of the base map, not the
@@ -485,8 +485,8 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     fun updatePrecisionLayer(
         reference: SphereSlamStandaloneReferenceImage?,
         atlasPages: List<SphereSlamStandaloneAtlasReferenceImage>,
-        fingerprint: Fingerprint?,
-        fingerprintFrameVersion: Int,
+        doodle: Doodle?,
+        doodleFrameVersion: Int,
         mapFromFingerprint: FloatArray?,
         wallFeatureMap: WallFeatureMap?,
         wallFeatureMapFrameVersion: Int,
@@ -495,19 +495,19 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
 
         // The MobileGS seed is part of the precision layer: a change to it rebuilds the planar
         // session too, so the next build re-seeds MobileGS (configureMobileGs).
-        val fingerprintChanged = mobileGsFingerprint !== fingerprint ||
-            mobileGsFingerprintFrameVersion != fingerprintFrameVersion ||
-            !sameTransform(mobileGsMapFromFingerprint, mapFromFingerprint)
+        val doodleChanged = mobileGsDoodle !== doodle ||
+            mobileGsDoodleFrameVersion != doodleFrameVersion ||
+            !sameTransform(mobileGsMapFromDoodle, mapFromFingerprint)
         val mapChanged = mobileGsWallFeatureMap !== wallFeatureMap ||
             mobileGsWallFeatureMapFrameVersion != wallFeatureMapFrameVersion
 
         referenceImage = reference
-        mobileGsFingerprint = fingerprint
-        mobileGsFingerprintFrameVersion = fingerprintFrameVersion
-        mobileGsMapFromFingerprint = mapFromFingerprint?.copyOf()
+        mobileGsDoodle = doodle
+        mobileGsDoodleFrameVersion = doodleFrameVersion
+        mobileGsMapFromDoodle = mapFromFingerprint?.copyOf()
         mobileGsWallFeatureMap = wallFeatureMap
         mobileGsWallFeatureMapFrameVersion = wallFeatureMapFrameVersion
-        if (fingerprintChanged || mapChanged) adoptCurrentRelocSeq()
+        if (doodleChanged || mapChanged) adoptCurrentRelocSeq()
 
         // Deliberately does not touch the base photosphere (map orientation, keyframe cadence and
         // attitude reference survive inside the session).
@@ -517,7 +517,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             reference = libraryReference(reference),
             atlasPages = atlasPages.map(::libraryAtlasPage),
             mapFromFingerprint = mapFromFingerprint.validTransformOrNull(),
-            forceRebuild = fingerprintChanged || mapChanged,
+            forceRebuild = doodleChanged || mapChanged,
         )
         // The session drops views with the reference they were rendered from: render the new one's.
         if (referenceChanged || previous != atlasPages.map { it.pageNo }) anticipatePages(reference, atlasPages)
@@ -681,9 +681,9 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
                 result.visualAccepted && acceptedCameraFromFingerprint == null ->
                     onFrameTracked(result.pose?.let { standaloneFrame(it) })
                 result.visualAccepted -> {
-                    // KPM and MobileGS are precision/enrichment estimators in fingerprint-local space;
+                    // KPM and MobileGS are precision/enrichment estimators in doodle-local space;
                     // MobileGS is handed the accepted pose already rebased into the base SphereSLAM
-                    // map. The fingerprint never becomes the world.
+                    // map. The doodle never becomes the world.
                     feedMobileGsFrame(rotated, timestampNs, result.projection, result.acceptedCameraFromMap, relocAttitude)
                     maybePushDepth(rotated)
                     onFrameTracked(result.pose?.let { standaloneFrame(it) })
@@ -925,17 +925,17 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         slam.setTrackingPoseValid(false)
         slam.setLiveIntrinsics(intrinsics.fx, intrinsics.fy, intrinsics.cx, intrinsics.cy)
 
-        val fp = mobileGsFingerprint
+        val fp = mobileGsDoodle
         val expectedFrameVersion =
             com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION
-        if (fp != null && mobileGsFingerprintFrameVersion != expectedFrameVersion) {
-            slam.clearWallFingerprint()
+        if (fp != null && mobileGsDoodleFrameVersion != expectedFrameVersion) {
+            slam.clearWallDoodle()
             slam.clearWallFeatureMap()
             slam.overlayMarkCenterLocal = null
             slam.captureAnchorCam = null
             onDiagnostic(
                 "SphereSLAM MobileGS seed refused backend=standalone-kpm " +
-                    "frame=centered-page version=" + mobileGsFingerprintFrameVersion +
+                    "frame=centered-page version=" + mobileGsDoodleFrameVersion +
                     " expected=" + expectedFrameVersion,
             )
             return
@@ -943,30 +943,30 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         if (fp == null || fp.descriptorsRows <= 0 || fp.points3d.size != fp.descriptorsRows * 3) {
             // Native MobileGS is process-global. A standalone project with no seed must explicitly
             // clear a prior project's precision layer without touching the base photosphere.
-            slam.clearWallFingerprint()
+            slam.clearWallDoodle()
             slam.clearWallFeatureMap()
             slam.overlayMarkCenterLocal = null
             slam.captureAnchorCam = null
             return
         }
 
-        val mapFromFingerprint = mobileGsMapFromFingerprint
+        val mapFromFingerprint = mobileGsMapFromDoodle
         if (
             mapFromFingerprint == null ||
             mapFromFingerprint.size != 16 ||
             mapFromFingerprint.any { !it.isFinite() }
         ) {
-            slam.clearWallFingerprint()
+            slam.clearWallDoodle()
             slam.clearWallFeatureMap()
             slam.overlayMarkCenterLocal = null
             slam.captureAnchorCam = null
             onDiagnostic(
-                "SphereSLAM MobileGS seed refused: missing finite photosphere map_from_fingerprint"
+                "SphereSLAM MobileGS seed refused: missing finite photosphere map_from_doodle"
             )
             return
         }
 
-        slam.restoreWallFingerprintMetric(
+        slam.restoreWallDoodleMetric(
             descriptorsData = fp.descriptorsData,
             rows = fp.descriptorsRows,
             cols = fp.descriptorsCols,
@@ -979,8 +979,8 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             viewMatrix = FloatArray(0),
             regions = ByteArray(0),
         )
-        // Native drops the distortion-head patch when the fingerprint CHANGES (a patch belongs to
-        // the wall it pictured), so the seed re-supplies this fingerprint's own -- which also makes
+        // Native drops the distortion-head patch when the doodle CHANGES (a patch belongs to
+        // the wall it pictured), so the seed re-supplies this doodle's own -- which also makes
         // the head work after a standalone reload, not only in the capture session.
         fp.patchData.takeIf { it.isNotEmpty() }?.let { patch ->
             val side = kotlin.math.sqrt(patch.size.toDouble()).toInt()
@@ -1019,7 +1019,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         }
         onDiagnostic(
             "SphereSLAM MobileGS seed backend=standalone-kpm frame=photosphere-map " +
-                "version=" + mobileGsFingerprintFrameVersion +
+                "version=" + mobileGsDoodleFrameVersion +
                 " rows=" + fp.descriptorsRows + " type=" + fp.descriptorsType,
         )
     }
@@ -1037,7 +1037,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         // frame's pixels enter MobileGS, otherwise rectification or future pose-dependent helpers
         // can silently pair a stale pose with a new image.
         slam.setTrackingPoseValid(acceptedView != null)
-        if (mobileGsFingerprint == null) return
+        if (mobileGsDoodle == null) return
 
         // PnP does not need a pose prior. Publish a view only when KPM accepted THIS frame; on a
         // visual miss, feeding the pixels without a new camera pose is safer than labelling stale
@@ -1054,17 +1054,17 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
      * that estimate corroborates KPM — i.e. already agrees within [PoseFusion.diverged]'s thresholds.
      * This is the standalone drift corrector: a wide-baseline reloc that concurs with the drifting
      * planar KPM pose gently tightens it; a reloc that disagrees (stale during motion, a bad solve,
-     * or — were the fingerprint/canonical-frame assumption ever to break — systematically off) is
+     * or — were the doodle/canonical-frame assumption ever to break — systematically off) is
      * ignored. So the loop can reduce accumulated drift but can never yank the overlay to a bad pose,
      * and it only ever blends, never snaps.
      *
-     * Both inputs here intentionally remain in the precision fingerprint frame:
-     * `reloc[0..15]` is CV `camera_from_fingerprint`, while [kpmView] is GL
-     * `camera_from_fingerprint`. [RigidMath.cvViewToGl] converts the former into the latter so
+     * Both inputs here intentionally remain in the precision doodle frame:
+     * `reloc[0..15]` is CV `camera_from_doodle`, while [kpmView] is GL
+     * `camera_from_doodle`. [RigidMath.cvViewToGl] converts the former into the latter so
      * they can corroborate each other. Only AFTER this local precision fusion is the result rebased
-     * through explicit `map_from_fingerprint` into the base SphereSLAM map.
+     * through explicit `map_from_doodle` into the base SphereSLAM map.
      *
-     * Both are camera-from-fingerprint VIEW matrices, so agreement and blending use SphereSLAM's
+     * Both are camera-from-doodle VIEW matrices, so agreement and blending use SphereSLAM's
      * [PoseBlend], which compares and interpolates camera centres (`-Rᵀt`). (PoseFusion's
      * model-matrix helpers compared/lerped the translation column, which for a view mixes position
      * with orientation and swung the blended camera centre off the straight path.)
@@ -1086,7 +1086,7 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         // `kpmView` is the camera now. Comparing them directly would read every bit of hand motion
         // in that gap as drift (and reject the fix, or blend the pose back toward where the camera
         // was). The solve view (reloc[19..34]) is the KPM view of that same frame, so what the
-        // reloc actually says is the fingerprint-local difference
+        // reloc actually says is the doodle-local difference
         //     C = solveView^-1 . relocView        (relocView == solveView . C)
         // and the estimate for NOW is kpmView . C: the live camera carrying that correction, with
         // the latency motion cancelled. Same algebra as PoseFusion's anchor-local correction.

@@ -39,7 +39,7 @@ documented in [`UI_UX.md`](../UI_UX.md); this table is only the mode list itself
 
 | Mode | Purpose |
 |---|---|
-| AR | Live scan + project image on real surface, tracked via the fingerprint relocalizer |
+| AR | Live scan + project image on real surface, tracked via the doodle relocalizer |
 | Overlay | Project image over live camera, no relocalization tracking |
 | Mockup | Compose on a static reference photo |
 | Trace | Lightbox — image at full brightness for physical tracing |

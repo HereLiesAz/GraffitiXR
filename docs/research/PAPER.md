@@ -62,16 +62,16 @@ surface across a working session of hours, through the device being pocketed, th
 artist stepping back and returning, and changing light.
 
 The pose backbone is ARCore's VIO. VIO drifts. The standard correction is visual
-relocalization: fingerprint the surface once, then periodically re-detect it and
+relocalization: doodle the surface once, then periodically re-detect it and
 solve a PnP correction. GraffitiXR does this — `MobileGS::relocThreadFunc` matches
-live features against a stored wall fingerprint and publishes a
-camera-from-fingerprint pose, which `PoseFusion` folds into the rendered anchor as
+live features against a stored wall doodle and publishes a
+camera-from-doodle pose, which `PoseFusion` folds into the rendered anchor as
 a persistent drift correction.
 
 ### 1.2 The reference-decay problem
 
-The assumption underneath all of this is that the fingerprinted surface persists.
-For a muralist it does not. The fingerprint is built from the wall's appearance —
+The assumption underneath all of this is that the doodled surface persists.
+For a muralist it does not. The doodle is built from the wall's appearance —
 its grain, its stains, its existing marks — and the artist covers that appearance
 with paint. Every stroke deletes reference features.
 
@@ -138,7 +138,7 @@ Definitions used throughout.
 | $W$ | ARCore world frame |
 | $V_t$ | camera view (world→camera) at time $t$ |
 | $\Pi$ | the wall plane, in $W$ |
-| $F = \{(\mathbf{x}_i, \mathbf{d}_i)\}$ | wall fingerprint: 3D points on $\Pi$ with descriptors |
+| $F = \{(\mathbf{x}_i, \mathbf{d}_i)\}$ | wall doodle: 3D points on $\Pi$ with descriptors |
 | $A = \{(\mathbf{u}_j, \mathbf{a}_j)\}$ | artwork base: design-image pixels with descriptors |
 | $T$ | anchor pose of the artwork on $\Pi$ |
 | $p$ | painting progress $\in [0,1]$ |
@@ -174,7 +174,7 @@ $$
 
 with $\mathbf{f}_i$ the live descriptors. $p$ then (a) drives the confidence term
 $c$ in the fusion rate, and (b) gates *self-grow*: a live feature matching $A$ is
-promoted into $F$, replenishing the fingerprint from real paint.
+promoted into $F$, replenishing the doodle from real paint.
 
 The design is coherent. Each stage is implementable. It is the natural first
 formulation of the teleological observation.
@@ -187,8 +187,8 @@ seconds:
 | Stage | Defect | Evidence |
 |---|---|---|
 | Confidence weighting | `confGlobal` passed as literal `1f` | one line in `ArRenderer.kt`; $p$ reached the HUD and nothing else, so fusion behaved identically at 0% and 100% painted |
-| Oblique robustness | `mHasFingerprintView` assigned in exactly one function — `generateFingerprint`, on the ARCore-depth path, which is disabled | the rectification pass could not run on any fingerprint the app builds |
-| Artwork registration | `setArtworkFingerprintFromComposite` had zero callers and returned on its first line (`targetDepthBuffer ?: return`, always null) | dead |
+| Oblique robustness | `mHasDoodleView` assigned in exactly one function — `generateDoodle`, on the ARCore-depth path, which is disabled | the rectification pass could not run on any doodle the app builds |
+| Artwork registration | `setArtworkDoodleFromComposite` had zero callers and returned on its first line (`doodleDepthBuffer ?: return`, always null) | dead |
 | Self-grow | required `inliers >= 20` | a half-covered wall rarely reaches 20 raw inliers, so $F$ could only grow when already strong — exactly when it needed to least |
 
 Compounding this, every failure was silent. `mPnpMatchCount` and
@@ -222,7 +222,7 @@ into $F$, corrupting the authoritative reference set. RANSAC in the reloc PnP is
 the only backstop.
 
 **(c) It cannot bootstrap.** $p$ is zero until paint exists, so the mechanism
-contributes nothing at the start — which is when the fingerprint is strongest and
+contributes nothing at the start — which is when the doodle is strongest and
 help is least needed — and would contribute most at the end, if the corruption in
 (b) has not accumulated.
 
@@ -397,8 +397,8 @@ CAPTURE (once, when the target is created)
   1  detect features on the capture frame
   2  back-project onto Π                                   → F
   3  partition by Φ with margin μ                           → F_out, F_in
-  4  weight F_out up, F_in down when building the fingerprint
-  5  store Φ (M, h_w, h_h) alongside the fingerprint
+  4  weight F_out up, F_in down when building the doodle
+  5  store Φ (M, h_w, h_h) alongside the doodle
 
 RELOCALIZE (background thread, ~16 Hz hunting / 5 Hz locked)
   6  detect on the live frame
@@ -440,7 +440,7 @@ so the mapping is given here rather than left to be reconstructed.
   this fails, the search-space argument is wrong.)*
 - **P3** *(→ E6)*. Corroboration false-positive rate under the local test is at least
   an order of magnitude below the global test at matched recall.
-- **P4** *(→ E5)*. Geometric promotion (§5.4) yields a lower fingerprint-corruption
+- **P4** *(→ E5)*. Geometric promotion (§5.4) yields a lower doodle-corruption
   rate than appearance promotion, measured as PnP inlier ratio over session time.
 - **P5** *(→ E13)*. The rigid-offset fit (§5.6) correlates with measured overlay error
   (`errMm`) at $r > 0.7$ once coverage exceeds ~30%.
@@ -656,10 +656,10 @@ interchangeable with the one that was written here.
 ### 8.2b A second frame inconsistency, on the path §8 does not describe
 
 Everything above concerns the no-depth capture path, the one that reaches
-`PlaneMarks.backProject`. `MainViewModel.onConfirmTargetCreation` branches on
+`PlaneMarks.backProject`. `MainViewModel.onConfirmDoodleCreation` branches on
 whether a depth buffer was captured, and the depth branch does not call
 `backProject` at all — it hands the bitmap, the depth image and the intrinsics to
-native `generateFingerprint`, which unprojects keypoints with the supplied
+native `generateDoodle`, which unprojects keypoints with the supplied
 intrinsics and indexes the depth image by linear scaling. All three must
 therefore share a frame. They do not: the depth buffer is ARCore's raw
 sensor-frame image, the intrinsics are the display-rotated `intrArr` in every

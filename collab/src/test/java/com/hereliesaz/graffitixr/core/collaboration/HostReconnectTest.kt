@@ -63,7 +63,7 @@ class HostReconnectTest {
     }
 
     private fun snapshot() = ProjectSnapshot(
-        fingerprintBytes = ByteArray(128) { it.toByte() },
+        doodleBytes = ByteArray(128) { it.toByte() },
         projectBytes = ByteArray(256) { (it * 3).toByte() },
         layerCount = 0,
         spatialFrame = testSpatialFrame(),

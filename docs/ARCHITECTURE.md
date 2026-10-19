@@ -47,8 +47,8 @@ not where the domain models themselves live.
 
 `:feature:editor` does **not** depend on `:core:nativebridge` — it owns image placement and
 legibility only, and has no reason to touch the native SLAM engine. `:feature:ar` is the sole owner
-of the native `SlamManager` singleton, including restoring a saved project's wall fingerprint on
-load (`ArViewModel.loadFingerprintIfExists`).
+of the native `SlamManager` singleton, including restoring a saved project's wall doodle on
+load (`ArViewModel.loadDoodleIfExists`).
 
 ## Module Definitions
 
@@ -65,10 +65,10 @@ and `StencilTones`, is in `:core:common` beside `SketchProcessor`). Authoring (m
 painting, warp/Liquify) does not live here — see [`FEATURE_REFERENCE.md`](FEATURE_REFERENCE.md) for what was removed and why.
 
 ### `:core:nativebridge`
-C++17 `MobileGS` engine and JNI boundary (`GraffitiJNI.cpp`). Handles fingerprint-based
+C++17 `MobileGS` engine and JNI boundary (`GraffitiJNI.cpp`). Handles doodle-based
 relocalization (ORB/SuperPoint descriptors, Lowe-ratio matching, `solvePnPRansac`), the
 distortion-head model for painting-progress/confidence (`docs/DISTORTION_HEAD.md`), and — opt-in,
-off by default — drift correction and self-growing fingerprint (`docs/TELEOLOGICAL_SLAM.md`). OpenCV
+off by default — drift correction and self-growing doodle (`docs/TELEOLOGICAL_SLAM.md`). OpenCV
 is a Maven Central dependency (`org.opencv:opencv`), not a vendored/embedded copy.
 
 ### `:sphereslam`
@@ -92,7 +92,7 @@ Since SphereSLAM 0.24.0 the generic pieces of both roles are library code consum
 `:feature:ar`: the sidecar gates/pairing/agreement fusion (`sidecar.HybridKpmCorrection`,
 `HybridPoseHistory`, `HybridAnchorFusion`, `MetricPageRectification`), the attitude bridge
 (`attitude.*`), camera geometry (`camera.*`), rigid/rotation math (`math.*`), photosphere keyframes
-and fingerprint placement, the embedded coverage wash (`:overlay`) and MiDaS depth (`:models`).
+and doodle placement, the embedded coverage wash (`:overlay`) and MiDaS depth (`:models`).
 Since 0.24.1 the standalone photosphere runtime itself is the library's
 `reloc.PhotosphereTrackingSession` (the app's analyzer is its CameraX/MobileGS/UI adapter), the
 Overlay planar tracker is `reloc.PlanarTracker`, and the `FILL_CENTER` display math and mark
@@ -140,8 +140,8 @@ frame.acquireCameraImage() [raw YUV] ──────────┼► Mobile
 `updateCamera` pose belongs to the current camera frame. ARCore drives it from
 `camera.trackingState`; standalone drives it from same-frame accepted KPM observations. It is not a
 backend identity flag. The plane-guided capture-view rectifier additionally requires a stored
-fingerprint capture view, so it remains intentionally unavailable to centered-page standalone
-fingerprints.
+doodle capture view, so it remains intentionally unavailable to centered-page standalone
+doodles.
 
 **Tracking backend selection:** on ARCore-capable devices, `ArCorePoseSource` supplies the live
 renderer pose while SphereSLAM runs asynchronously beside it. On ARCore-unavailable devices,
@@ -182,7 +182,7 @@ switch:
    gated for metric frame, age (≤500 ms), inliers (≥12), and reprojection error (≤4 px).
    `HybridKpmCorrection` converts it into a corrected artwork anchor at the observation timestamp;
    `PoseFusion` stores only the resulting anchor-local correction.
-2. **MobileGS** — the existing fingerprint background thread (`relocThreadFunc`) continuously
+2. **MobileGS** — the existing doodle background thread (`relocThreadFunc`) continuously
    matches ORB/SuperPoint descriptors and solves PnP. Its existing `captureAnchorCam` correction
    path remains the fallback when no fresh accepted KPM observation exists.
 
@@ -198,7 +198,7 @@ and [`TELEOLOGICAL_SLAM.md`](TELEOLOGICAL_SLAM.md) for MobileGS corroboration/se
 reopened and no anchor exists yet, the renderer turns two consecutive agreeing high-confidence
 reloc solves (`PoseFusion.COLD_SNAP_*` gates, `PoseFusion.diverged` agreement) into the primary
 ARCore anchor (`ArRenderer.pendingRelocAnchor`). This runs regardless of the drift-correction
-toggle and without re-capturing, so the saved target is preserved. Pre-Phase-2 fingerprints
+toggle and without re-capturing, so the saved target is preserved. Pre-Phase-2 doodles
 (no capture pose) cannot use it. Not yet validated on device.
 
 ---
@@ -216,13 +216,13 @@ ARCore/SphereSLAM world origin. The wire descriptor is
 
 - `hostBackend` says whether the host wall came from ARCore or standalone SphereSLAM.
 - `scale` says whether translations are metric metres or normalized page units.
-- `fingerprintFromWall` is the durable transform from host wall-local coordinates into the
-  MobileGS fingerprint object frame.
+- `doodleFromWall` is the durable transform from host wall-local coordinates into the
+  MobileGS doodle object frame.
 - `anchorRevision` identifies the exact host target. A recapture is a new coordinate object and
   ends the running co-op session; reconnect never silently rebases it.
 
-For an ARCore host, `fingerprintFromWall` is the persisted
-`Fingerprint.captureAnchorCam = V_cv(capture) * anchorModel`. For a standalone host it is identity,
+For an ARCore host, `doodleFromWall` is the persisted
+`Doodle.captureAnchorCam = V_cv(capture) * anchorModel`. For a standalone host it is identity,
 because standalone fingerprint points already live directly in the centered canonical KPM wall
 frame.
 
@@ -230,11 +230,11 @@ A peer MobileGS solve is therefore backend-neutral:
 
 ```
 cameraGL_from_hostWall =
-    CV_TO_GL * pnpCV_camera_from_fingerprint * fingerprintFromWall
+    CV_TO_GL * pnpCV_camera_from_doodle * doodleFromWall
 ```
 
 That same equation drives ARCore guest anchoring and the CameraX-only
-`CoopPeerFingerprintAnalyzer` used by an ARCore-host -> standalone-guest session. A standalone
+`CoopPeerDoodleAnalyzer` used by an ARCore-host -> standalone-guest session. A standalone
 host -> standalone guest normally uses the shared KPM page/atlas directly; its project ZIP already
 contains page 0, atlas images, scale metadata, and canonical page transforms.
 

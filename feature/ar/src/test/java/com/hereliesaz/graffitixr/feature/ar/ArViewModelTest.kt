@@ -16,7 +16,7 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
-import com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
+import com.hereliesaz.graffitixr.feature.ar.anchor.DoodlePartition
 import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder
 import com.hereliesaz.sphereslam.SphereSlam
 import io.mockk.coEvery
@@ -81,7 +81,7 @@ class ArViewModelTest {
         mockkObject(SphereSlam)
         every { SphereSlam.isOperational() } returns true
         // Reference-persistence tests exercise the atomic URI/metadata transaction, not feature
-        // extraction. Supply a valid fingerprint so the mandatory teleological-SLAM precondition is
+        // extraction. Supply a valid doodle so the mandatory teleological-SLAM precondition is
         // satisfied without making those tests depend on OpenCV/native descriptor extraction.
         mockkObject(StandaloneFingerprintBuilder)
         every {
@@ -199,9 +199,9 @@ class ArViewModelTest {
 
     // ==================== Capture Workflow Tests ====================
 
-    /** Drives a (non-tap) capture through onTargetCaptured and lets its off-thread preparation land. */
+    /** Drives a (non-tap) capture through onDoodleCaptured and lets its off-thread preparation land. */
     private fun captureBitmap(bitmap: Bitmap) {
-        viewModel.onTargetCaptured(
+        viewModel.onDoodleCaptured(
             bitmap = bitmap, depthBuffer = null,
             colorW = 100, colorH = 100,
             depthBufW = 0, depthBufH = 0, depthBufStride = 0,
@@ -211,7 +211,7 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `onTargetCaptured stores the prepared capture in state`() = runTest {
+    fun `onDoodleCaptured stores the prepared capture in state`() = runTest {
         val mockBitmap = mockk<Bitmap>(relaxed = true)
 
         assertNull(viewModel.uiState.value.tempCaptureBitmap)
@@ -222,11 +222,11 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `awaitLatestTargetCapture returns the staged capture and mask`() = runTest {
+    fun `awaitLatestDoodleCapture returns the staged capture and mask`() = runTest {
         val mockBitmap = mockk<Bitmap>(relaxed = true)
         captureBitmap(mockBitmap)
 
-        val (raw, mask) = viewModel.awaitLatestTargetCapture()
+        val (raw, mask) = viewModel.awaitLatestDoodleCapture()
 
         assertEquals(mockBitmap, raw)
         assertEquals(viewModel.uiState.value.annotatedCaptureBitmap, mask)
@@ -244,7 +244,7 @@ class ArViewModelTest {
 
     @Test
     fun `onCaptureConsumed clears the capture bitmap without recycling it`() = runTest {
-        // Deliberately does NOT recycle: a background fingerprint/save coroutine may still hold
+        // Deliberately does NOT recycle: a background doodle/save coroutine may still hold
         // the same instance. The reference is dropped (GC reclaims); recycle() must not be called.
         val mockBitmap = mockk<Bitmap>(relaxed = true)
         every { mockBitmap.isRecycled } returns false
@@ -297,7 +297,7 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `onScreenTap triggers capture request and onTargetCaptured clears it`() = runTest {
+    fun `onScreenTap triggers capture request and onDoodleCaptured clears it`() = runTest {
         assertFalse(viewModel.uiState.value.isCaptureRequested)
 
         viewModel.onScreenTap(0.5f, 0.5f)
@@ -305,7 +305,7 @@ class ArViewModelTest {
 
         // Simulate frame arrival for a tap (non-null depth buffer to trigger logic)
         val bmp = mockk<Bitmap>(relaxed = true).also { every { it.width } returns 100; every { it.height } returns 100 }
-        viewModel.onTargetCaptured(
+        viewModel.onDoodleCaptured(
             bitmap = bmp,
             depthBuffer = java.nio.ByteBuffer.allocate(10),
             colorW = 100, colorH = 100,
@@ -640,11 +640,11 @@ class ArViewModelTest {
     // ==================== ORB Annotation Tests ====================
 
     @Test
-    fun `onTargetCaptured normal path annotates keypoints asynchronously`() = runTest {
+    fun `onDoodleCaptured normal path annotates keypoints asynchronously`() = runTest {
         val rawBmp = mockk<Bitmap>(relaxed = true)
         every { slamManager.getKeypoints(any()) } returns emptyList()
 
-        viewModel.onTargetCaptured(
+        viewModel.onDoodleCaptured(
             bitmap = rawBmp, depthBuffer = null,
             colorW = 100, colorH = 100,
             depthBufW = 0, depthBufH = 0, depthBufStride = 0,
@@ -772,12 +772,12 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `onTargetCaptured tap path sets annotatedCaptureBitmap to isolated markings and populates unwarpPoints`() = runTest {
+    fun `onDoodleCaptured tap path sets annotatedCaptureBitmap to isolated markings and populates unwarpPoints`() = runTest {
         val rawBmp = mockk<Bitmap>(relaxed = true)
         viewModel.onScreenTap(0.5f, 0.5f)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        viewModel.onTargetCaptured(
+        viewModel.onDoodleCaptured(
             bitmap = rawBmp, depthBuffer = null,
             colorW = 100, colorH = 100,
             depthBufW = 0, depthBufH = 0, depthBufStride = 0,
@@ -836,10 +836,10 @@ class ArViewModelTest {
         assertFalse(viewModel.uiState.value.doodleLocked)
     }
 
-    // ==================== Fingerprint load / partition cascade ====================
+    // ==================== Doodle load / partition cascade ====================
 
     /**
-     * A fingerprint whose points straddle a 0.5 x 0.5 m design placed at the anchor: three under it,
+     * A doodle whose points straddle a 0.5 x 0.5 m design placed at the anchor: three under it,
      * three well outside. The absolute positions only have to survive Φ's classification; what the
      * tests below care about is that the partition is non-trivial, so an "already partitioned"
      * fixture cannot be confused with an empty one.
@@ -849,14 +849,14 @@ class ArViewModelTest {
         1.0f, 0f, 0f, 0f, -1.2f, 0f, -0.9f, 0.8f, 0f,
     )
 
-    private val fixtureFootprint = FingerprintPartition.DesignFootprint(
+    private val fixtureFootprint = DoodlePartition.DesignFootprint(
         rigidModelAnchorLocal = identityMatrix(),
         halfW = 0.5f,
         halfH = 0.5f,
     )
 
     /** Unpartitioned: `regions` empty, extents unknown. The state a fresh capture is saved in. */
-    private fun unpartitionedFingerprint() = com.hereliesaz.graffitixr.common.model.Fingerprint(
+    private fun unpartitionedDoodle() = com.hereliesaz.graffitixr.common.model.Doodle(
         keypoints = emptyList(),
         points3d = fixturePoints,
         descriptorsData = ByteArray(fixturePoints.size / 3 * 32),
@@ -869,15 +869,15 @@ class ArViewModelTest {
         captureAnchorCam = identityMatrix().toList(),
     )
 
-    private fun projectWith(fp: com.hereliesaz.graffitixr.common.model.Fingerprint) =
+    private fun projectWith(fp: com.hereliesaz.graffitixr.common.model.Doodle) =
         com.hereliesaz.graffitixr.common.model.GraffitiProject(
             id = "partition-fixture",
-            fingerprint = fp,
+            doodle = fp,
             // The metric restore is gated on both being present; without them the load takes the
             // descriptors-only legacy branch and never reaches the partition at all.
-            fingerprintIntrinsics = listOf(500f, 500f, 320f, 240f),
-            fingerprintAnchor = identityMatrix().toList(),
-            fingerprintCaptureRotationDeg = 0,
+            doodleIntrinsics = listOf(500f, 500f, 320f, 240f),
+            doodleAnchor = identityMatrix().toList(),
+            doodleCaptureRotationDeg = 0,
         )
 
     private fun identityMatrix() = floatArrayOf(
@@ -885,7 +885,7 @@ class ArViewModelTest {
     )
 
     /**
-     * `loadFingerprintIfExists` and the partition both run off the test dispatcher — IO and Default
+     * `loadDoodleIfExists` and the partition both run off the test dispatcher — IO and Default
      * respectively — so the sequence load → partition → (possible) write only completes on real
      * threads. Interleave scheduler drains with real pauses until it has.
      */
@@ -906,31 +906,31 @@ class ArViewModelTest {
     }
 
     /**
-     * Loading an already-correctly-partitioned fingerprint must push it to native once and write
+     * Loading an already-correctly-partitioned doodle must push it to native once and write
      * nothing.
      *
-     * `loadFingerprintIfExists` runs on EVERY `currentProject` emission and the partition itself
+     * `loadDoodleIfExists` runs on EVERY `currentProject` emission and the partition itself
      * calls `updateProject`, so a partition that writes on load is a cycle: load → partition →
      * write → emission → load. Before the idempotence check in `onDesignFootprintChanged` that is
-     * exactly what happened — two partitions, two `restoreWallFingerprintMetric` calls (each
+     * exactly what happened — two partitions, two `restoreWallDoodleMetric` calls (each
      * resetting native's reloc state) and two full project writes per load. It terminated only
-     * because `Fingerprint.equals` compares `regions` by content and `MutableStateFlow` conflates
+     * because `Doodle.equals` compares `regions` by content and `MutableStateFlow` conflates
      * equal values, which is an accident of an override written for a serialization test: one
-     * non-value-equal field added to `Fingerprint` turns it into an unbounded write loop.
+     * non-value-equal field added to `Doodle` turns it into an unbounded write loop.
      *
-     * The stored regions come from `FingerprintPartition.partition` itself rather than a literal, so
+     * The stored regions come from `DoodlePartition.partition` itself rather than a literal, so
      * the fixture cannot drift away from what the implementation would compute.
      */
     @Test
-    fun `loading an already-partitioned fingerprint pushes once and writes nothing`() = runTest {
-        val stored = FingerprintPartition.partition(unpartitionedFingerprint(), fixtureFootprint)
+    fun `loading an already-partitioned doodle pushes once and writes nothing`() = runTest {
+        val stored = DoodlePartition.partition(unpartitionedDoodle(), fixtureFootprint)
         assertNotEquals(
             "fixture must actually be partitioned, or this test proves nothing",
             0, stored.regions.size,
         )
         val projects = MutableStateFlow<com.hereliesaz.graffitixr.common.model.GraffitiProject?>(null)
         val vm = viewModelOn(projects)
-        // The footprint edge fires before the fingerprint arrives — the ordering a project load
+        // The footprint edge fires before the doodle arrives — the ordering a project load
         // always has, since the artwork is placed from the saved project.
         vm.onDesignFootprintChanged(fixtureFootprint)
 
@@ -938,7 +938,7 @@ class ArViewModelTest {
         settle()
 
         verify(exactly = 1) {
-            slamManager.restoreWallFingerprintMetric(
+            slamManager.restoreWallDoodleMetric(
                 any(), any(), any(), any(), any(), any(), any(), any(), any(),
             )
         }
@@ -950,15 +950,15 @@ class ArViewModelTest {
 
     /**
      * The other half, without which the test above would also pass if partitioning were broken
-     * outright: an UNpartitioned fingerprint must be partitioned and persisted — once.
+     * outright: an UNpartitioned doodle must be partitioned and persisted — once.
      */
     @Test
-    fun `loading an unpartitioned fingerprint partitions it and writes exactly once`() = runTest {
+    fun `loading an unpartitioned doodle partitions it and writes exactly once`() = runTest {
         val projects = MutableStateFlow<com.hereliesaz.graffitixr.common.model.GraffitiProject?>(null)
         val vm = viewModelOn(projects)
         vm.onDesignFootprintChanged(fixtureFootprint)
 
-        projects.value = projectWith(unpartitionedFingerprint())
+        projects.value = projectWith(unpartitionedDoodle())
         settle()
 
         coVerify(exactly = 1) {
@@ -966,7 +966,7 @@ class ArViewModelTest {
         }
         // The restore on load, plus the one that hands native the freshly partitioned regions.
         verify(exactly = 2) {
-            slamManager.restoreWallFingerprintMetric(
+            slamManager.restoreWallDoodleMetric(
                 any(), any(), any(), any(), any(), any(), any(), any(), any(),
             )
         }
@@ -1048,7 +1048,7 @@ class ArViewModelTest {
         // an empty array there and the resulting exception would surface in a LATER test
         // (UncaughtExceptionsBeforeTest), so say plainly that there is no fit.
         every { slamManager.autoFitDesign() } returns null
-        every { slamManager.setArtworkFingerprint(a, any(), any(), any(), any(), any(), any()) } answers {
+        every { slamManager.setArtworkDoodle(a, any(), any(), any(), any(), any(), any()) } answers {
             started.countDown()
             release.await(5, java.util.concurrent.TimeUnit.SECONDS)
             Unit
@@ -1061,7 +1061,7 @@ class ArViewModelTest {
 
         // A, then the deferred B (a copy of it, since the caller may recycle its bitmap).
         verify(exactly = 2, timeout = 5_000) {
-            slamManager.setArtworkFingerprint(any(), any(), any(), any(), any(), any(), any())
+            slamManager.setArtworkDoodle(any(), any(), any(), any(), any(), any(), any())
         }
     }
 

@@ -6,7 +6,7 @@
 
 /**
  * Transliteration of SphereSLAM's `reloc/DepthScaleFit.kt` (the reference; its tests and KDoc carry
- * the rationale). Calibrates MiDaS relative inverse depth to the fingerprint's metric scale so
+ * the rationale). Calibrates MiDaS relative inverse depth to the doodle's metric scale so
  * MobileGS::growMapFromReloc can place off-wall features radially (the library's
  * `RadialDepthPlacement`).
  *

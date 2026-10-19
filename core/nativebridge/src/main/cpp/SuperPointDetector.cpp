@@ -129,7 +129,7 @@ bool SuperPointDetector::detect(const cv::Mat& gray,
 
         kps.clear();
         // extractKeypoints sorts by score and truncates to its maxKps argument BEFORE any mask is
-        // applied below. When a mask is present (generateFingerprint's isolated-marks path,
+        // applied below. When a mask is present (generateDoodle's isolated-marks path,
         // typically a few percent of the frame), requesting the caller's maxKps here means the
         // top-K is chosen from the WHOLE FRAME, and the mask then keeps only whichever of those
         // survive intersecting a small region -- often a handful, sometimes zero, silently

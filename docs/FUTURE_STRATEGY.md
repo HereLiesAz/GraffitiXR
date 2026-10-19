@@ -9,7 +9,7 @@ sits, what it lacks, what it can earn, and what to build next.*
 
 GraffitiXR is the best-in-class solution to the single problem the category leader is worst at:
 **anchor stability.** SketchAR (5M+ users) is most often criticized for the overlay drifting off the
-surface and failing to realign; GraffitiXR's offline fingerprint relocalizer and teleological SLAM exist
+surface and failing to realign; GraffitiXR's offline doodle relocalizer and teleological SLAM exist
 precisely to make the overlay snap back after tracking loss and *tighten* as you paint. That is a real,
 defensible wedge.
 

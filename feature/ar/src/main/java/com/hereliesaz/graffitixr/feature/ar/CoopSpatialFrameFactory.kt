@@ -3,7 +3,7 @@ package com.hereliesaz.graffitixr.feature.ar
 import com.hereliesaz.graffitixr.common.model.CoopSpatialFrame
 import com.hereliesaz.graffitixr.common.model.CoopSpatialScale
 import com.hereliesaz.graffitixr.common.model.CoopTrackingBackend
-import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.Doodle
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION
 
@@ -11,11 +11,11 @@ import com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERS
  * Builds the durable host wall-frame descriptor used by co-op protocol v3.
  *
  * Nothing here consumes a device world origin. ARCore contributes the capture-camera-from-anchor
- * bridge already persisted on [Fingerprint.captureAnchorCam]; standalone contributes identity
- * because its fingerprint object points already live in the centered KPM wall frame.
+ * bridge already persisted on [Doodle.captureAnchorCam]; standalone contributes identity
+ * because its doodle object points already live in the centered KPM wall frame.
  */
 internal object CoopSpatialFrameFactory {
-    private const val ARCORE_FINGERPRINT_FRAME_VERSION = 1
+    private const val ARCORE_DOODLE_FRAME_VERSION = 1
 
     fun localBackend(arCoreAvailable: Boolean): CoopTrackingBackend =
         if (arCoreAvailable) CoopTrackingBackend.ARCORE else CoopTrackingBackend.SPHERESLAM
@@ -32,7 +32,7 @@ internal object CoopSpatialFrameFactory {
         ) return null
 
         val fp = project.sphereSlamFingerprint
-        val fingerprintAvailable =
+        val doodleAvailable =
             fp != null &&
                 project.sphereSlamFingerprintFrameVersion == SPHERE_SLAM_FINGERPRINT_FRAME_VERSION &&
                 fp.descriptorsRows > 0 &&
@@ -40,21 +40,21 @@ internal object CoopSpatialFrameFactory {
 
         return CoopSpatialFrame(
             hostBackend = CoopTrackingBackend.SPHERESLAM,
-            fingerprintFrameVersion = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+            doodleFrameVersion = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
             scale = if (project.sphereSlamReferencePhysicallyMetric) {
                 CoopSpatialScale.METRIC
             } else {
                 CoopSpatialScale.NORMALIZED_PAGE
             },
-            fingerprintAvailable = fingerprintAvailable,
+            doodleAvailable = doodleAvailable,
             anchorRevision = project.sphereSlamAnchorGeneration,
             referenceWidthUnits = project.sphereSlamReferenceWidthMeters,
-            fingerprintFromWall = identity(),
+            doodleFromWall = identity(),
         )
     }
 
     private fun fromArCoreProject(project: GraffitiProject): CoopSpatialFrame? {
-        val fp = project.fingerprint ?: return null
+        val fp = project.doodle ?: return null
         if (
             fp.descriptorsRows <= 0 ||
             fp.points3d.size != fp.descriptorsRows * 3 ||
@@ -77,21 +77,21 @@ internal object CoopSpatialFrameFactory {
 
         return CoopSpatialFrame(
             hostBackend = CoopTrackingBackend.ARCORE,
-            fingerprintFrameVersion = ARCORE_FINGERPRINT_FRAME_VERSION,
+            doodleFrameVersion = ARCORE_DOODLE_FRAME_VERSION,
             scale = CoopSpatialScale.METRIC,
-            fingerprintAvailable = true,
-            anchorRevision = fingerprintRevision(fp),
+            doodleAvailable = true,
+            anchorRevision = doodleRevision(fp),
             referenceWidthUnits = referenceWidth,
-            fingerprintFromWall = fp.captureAnchorCam,
+            doodleFromWall = fp.captureAnchorCam,
         )
     }
 
     /**
-     * Stable content revision for ARCore fingerprints, which predate the explicit standalone-style
+     * Stable content revision for ARCore doodles, which predate the explicit standalone-style
      * anchor generation. It deliberately hashes only geometry/descriptor/frame identity, not design
      * edits or lastModified, so painting/editing does not tear down a healthy co-op session.
      */
-    internal fun fingerprintRevision(fp: Fingerprint): Long {
+    internal fun doodleRevision(fp: Doodle): Long {
         var h = -3750763034362895579L // 64-bit FNV offset, represented as signed Long.
         fun byte(v: Int) {
             h = h xor (v and 0xff).toLong()

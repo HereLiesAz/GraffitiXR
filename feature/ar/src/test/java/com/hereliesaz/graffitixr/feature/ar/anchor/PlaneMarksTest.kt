@@ -118,7 +118,7 @@ class PlaneMarksTest {
      * which (0,0,0) passes, and handed it here.
      *
      * `nDotD = n·d` is then exactly 0 for every pixel, so every ray trips the parallel test and not
-     * one feature is placed. The fingerprint build fails on every capture, for any wall, in any
+     * one feature is placed. The doodle build fails on every capture, for any wall, in any
      * lighting, with no error anywhere. A device run detected a full mark set and reported
      * `wallPoints 0` across 953 samples.
      *

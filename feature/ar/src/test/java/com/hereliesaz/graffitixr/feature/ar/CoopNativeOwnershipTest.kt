@@ -7,9 +7,9 @@ import org.junit.Test
 
 class CoopNativeOwnershipTest {
     @Test
-    fun `ARCore guest peer geometry suppresses ordinary project fingerprint restore`() {
+    fun `ARCore guest peer geometry suppresses ordinary project doodle restore`() {
         assertFalse(
-            shouldRestoreLocalArCoreFingerprint(
+            shouldRestoreLocalArCoreDoodle(
                 isArCoreAvailable = true,
                 coopRole = CoopRole.GUEST,
                 peerSpatialFramePresent = true,
@@ -18,23 +18,23 @@ class CoopNativeOwnershipTest {
     }
 
     @Test
-    fun `local fingerprint restore remains enabled outside peer-owned guest session`() {
+    fun `local doodle restore remains enabled outside peer-owned guest session`() {
         assertTrue(
-            shouldRestoreLocalArCoreFingerprint(
+            shouldRestoreLocalArCoreDoodle(
                 isArCoreAvailable = true,
                 coopRole = CoopRole.NONE,
                 peerSpatialFramePresent = false,
             )
         )
         assertTrue(
-            shouldRestoreLocalArCoreFingerprint(
+            shouldRestoreLocalArCoreDoodle(
                 isArCoreAvailable = true,
                 coopRole = CoopRole.HOST,
                 peerSpatialFramePresent = false,
             )
         )
         assertFalse(
-            shouldRestoreLocalArCoreFingerprint(
+            shouldRestoreLocalArCoreDoodle(
                 isArCoreAvailable = false,
                 coopRole = CoopRole.NONE,
                 peerSpatialFramePresent = false,

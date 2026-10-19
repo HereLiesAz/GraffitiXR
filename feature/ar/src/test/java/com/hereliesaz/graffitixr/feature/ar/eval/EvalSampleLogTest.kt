@@ -222,13 +222,13 @@ class EvalSampleLogTest {
     /**
      * The defect this pair of columns was split to fix, pinned as a test.
      *
-     * `MetricMarks.backProjectToPlane` (SphereSLAM) runs once per target inside `MetricFingerprintBuilder.build`, so
-     * §8's frame mismatch is baked into the fingerprint's 3D points **at capture**. E0b's
+     * `MetricMarks.backProjectToPlane` (SphereSLAM) runs once per target inside `MetricDoodleBuilder.build`, so
+     * §8's frame mismatch is baked into the doodle's 3D points **at capture**. E0b's
      * independent variable is therefore the capture rotation, and the live rotation is a different
      * quantity that can legitimately differ from it on the very same row.
      *
      * The scenario below is the one a single column got wrong: captured in portrait (skewed
-     * fingerprint), relocalized in landscape. Collapsing these two into one value files this row
+     * doodle), relocalized in landscape. Collapsing these two into one value files this row
      * under 0 — E0b's *control* condition — and a genuine effect averages toward nothing, which is
      * indistinguishable from the falsification E0b is supposed to be able to report.
      */
@@ -239,7 +239,7 @@ class EvalSampleLogTest {
         )
         val capture = fields[EvalSampleLog.COLUMNS.indexOf("captureRotationNeededDeg")]
         val live = fields[EvalSampleLog.COLUMNS.indexOf("liveRotationNeededDeg")]
-        assertEquals("the fingerprint was built under the mismatch", "90", capture)
+        assertEquals("the doodle was built under the mismatch", "90", capture)
         assertEquals("the device is held square right now", "0", live)
         assertTrue(
             "grouping E0b by the live rotation would file this defect-bearing row as the control",
@@ -322,11 +322,11 @@ class EvalSampleLogTest {
     }
 
     /**
-     * A legacy fingerprint carries no partition and is therefore all backbone, so its count is the
+     * A legacy doodle carries no partition and is therefore all backbone, so its count is the
      * whole point set. It must not arrive as 0 (which would say the opposite) nor as -1.
      */
     @Test
-    fun `a legacy all-backbone fingerprint logs its full point count`() {
+    fun `a legacy all-backbone doodle logs its full point count`() {
         val legacy = RelocDiagnostics(
             RelocReject.OK, matches = 40, inliers = 24, detected = 1400,
             backboneFeatures = 512, backboneMatches = 40, backboneInliers = 24,

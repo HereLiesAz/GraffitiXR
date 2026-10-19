@@ -177,7 +177,7 @@ class CorroborationTranslitTest {
     /**
      * `IMPLEMENTATION.md` **3.1 / 3.2** — the promotion gate exists twice too, and its stakes are
      * higher than the search radius': it guards the only mechanism that permanently mutates the
-     * reloc fingerprint. A constant edited on one side and not the other silently changes what gets
+     * reloc doodle. A constant edited on one side and not the other silently changes what gets
      * written into the map forever.
      */
     @Test
@@ -228,7 +228,7 @@ class CorroborationTranslitTest {
         val src = source("core/nativebridge/src/main/cpp/MobileGS.cpp").readText()
         assertTrue(
             "the promotion append must run the footprint operator on each candidate",
-            src.contains("classifyInFingerprintFrame(mDesignFpFromDesign, mDesignHalfW, mDesignHalfH,"),
+            src.contains("classifyInDoodleFrame(mDesignFpFromDesign, mDesignHalfW, mDesignHalfH,"),
         )
         assertTrue(
             "no placement must fall back to BAND, never to OUTSIDE",

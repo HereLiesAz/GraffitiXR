@@ -1,9 +1,9 @@
 # Teleological SLAM (Painting-Progress Correction)
 
 Conventional relocalization treats the wall as a fixed target: capture a
-fingerprint once, then match against it forever. That assumption breaks for a
+doodle once, then match against it forever. That assumption breaks for a
 muralist, because **the wall changes as you paint it** — the very marks the
-fingerprint relies on get covered by the artwork, so matching gets *worse* the
+doodle relies on get covered by the artwork, so matching gets *worse* the
 further along you are.
 
 GraffitiXR turns that around. Because the app already knows what the finished
@@ -17,9 +17,9 @@ has, and the more tightly the overlay locks to the wall.
 The work happens entirely in the native engine (`core/nativebridge`), layered
 on top of the OpenCV relocalizer:
 
-1. **Baseline fingerprint.** When the artist registers the wall, the engine
+1. **Baseline doodle.** When the artist registers the wall, the engine
    stores ORB/feature descriptors of the clean surface (the relocalization
-   fingerprint used by `relocThreadFunc` for snap-back).
+   doodle used by `relocThreadFunc` for snap-back).
 2. **Progress measurement.** Two producers exist, and only one runs in a
    shipped build:
    - `core/nativebridge/src/main/assets/distortion_head.onnx` is bundled and
@@ -32,13 +32,13 @@ on top of the OpenCV relocalizer:
      corroboration confidence, gated at `matchability > 0.5f`. Its `coverage`
      output is discarded (`(void)clampedCoverage`): it is the visible fraction
      of the ORIGINAL marks, which falls as they are painted over, so it is not
-     progress. Progress always comes from `tryUpdateFingerprint`. Because
+     progress. Progress always comes from `tryUpdateDoodle`. Because
      matchability is measured against those same original marks, it too falls
-     as they are covered; `tryUpdateFingerprint` therefore also computes the
+     as they are covered; `tryUpdateDoodle` therefore also computes the
      design-based descriptor ratio (matched / predicted-visible) on a gated
      attempt, and the published confidence is the stronger of the two. See
      `docs/DISTORTION_HEAD.md`.
-   - `MobileGS::tryUpdateFingerprint`'s descriptor-similarity test (below,
+   - `MobileGS::tryUpdateDoodle`'s descriptor-similarity test (below,
      "What matching the image does and does not mean") is the fallback: it
      only runs — and only then, via the `!mDistortionHead.isLoaded()` guard
      around the whole publication block — in a build with the ONNX asset
@@ -64,13 +64,13 @@ on top of the OpenCV relocalizer:
    nothing else and correction strength was identical at 0% and 100% painted.)
 
 4. **Self-grow.** Live features that pass the same corroboration test are
-   promoted into the reloc fingerprint (`mSelfGrowEnabled`: the engine starts with it off and
+   promoted into the reloc doodle (`mSelfGrowEnabled`: the engine starts with it off and
    the app pushes the persisted setting, default **on**, switchable from the diagnostic overlay).
    Promoted marks are placed where they were SEEN and tagged OUTSIDE, so the reloc filter uses
    them, and relocalization survives the original marks being painted over. The promotion
    gate is `MobileGS::growTrusted` — a strong inlier ratio qualifies at a lower
    absolute count, because a half-covered wall rarely reaches a large raw inlier
-   count and the old flat `inliers >= 20` meant the fingerprint could only grow
+   count and the old flat `inliers >= 20` meant the doodle could only grow
    when it was already strong.
 
 This is the inverse of the failure mode other tracing apps hit, where accuracy
@@ -79,12 +79,12 @@ degrades as the original reference marks disappear under paint.
 ## What "matching the image" does and does not mean
 
 This section describes the **fallback** descriptor path
-(`MobileGS::tryUpdateFingerprint`), which only runs in a build without
+(`MobileGS::tryUpdateDoodle`), which only runs in a build without
 `distortion_head.onnx` — not the shipped default; see the mechanism section
 above. In that fallback, the corroboration test is **descriptor similarity,
 not geometric accuracy**. A live feature corroborates the artwork when its
 nearest neighbour among the design composite's descriptors passes a Lowe
-ratio of 0.85 (`kCorrobLoweRatio`, `MobileGS::tryUpdateFingerprint`) — a
+ratio of 0.85 (`kCorrobLoweRatio`, `MobileGS::tryUpdateDoodle`) — a
 looser test than relocalization's own 0.75 (`kRelocLoweRatio`), and, per
 `PARAMETERS.md`, one that has not itself been validated against real
 painted-wall photos. There is no positional tolerance, no scale or colour
@@ -109,7 +109,7 @@ attempt missed:
 
 | State | Meaning |
 |---|---|
-| `NO_FINGERPRINT` | no target created, or one with no 3D points — nothing to match |
+| `NO_DOODLE` | no target created, or one with no 3D points — nothing to match |
 | `NO_FEATURES` | live frame had no usable texture (light, focus, blur) |
 | `FEW_MATCHES` | fewer than 8 correspondences survived the ratio test |
 | `PNP_FAILED` | matches found, none geometrically consistent |
@@ -137,20 +137,20 @@ estimators frame by frame (they differ in latency and bias). A re-capture resets
 window is unmeasured; it belongs to the same eval sweep as the other fusion constants.
 
 On a re-capture `PoseFusion.reset(seq)` also adopts the native reloc seq current at that instant as
-already consumed, and every fingerprint replacement zeroes the latched result's counts, so the
+already consumed, and every doodle replacement zeroes the latched result's counts, so the
 pre-capture fix cannot cold-snap the new anchor.
 
-That alone left a window: between the anchor being re-established and the NEW fingerprint being
-installed, native keeps solving against the OLD fingerprint (the seq advances) while Kotlin holds the
+That alone left a window: between the anchor being re-established and the NEW doodle being
+installed, native keeps solving against the OLD doodle (the seq advances) while Kotlin holds the
 old (or no) capture pose, so a later seq would cold-snap the new anchor onto the old wall. An explicit
-**awaiting-new-fingerprint gate** closes it. `ArViewModel.setInitialAnchorFromCapture` raises it
-(`SlamManager.beginFingerprintReplacement`, which also drops `captureAnchorCam`); it is lowered only by
-`completeFingerprintReplacement`, which `MetricFingerprintBuilder` calls after the new fingerprint is
+**awaiting-new-doodle gate** closes it. `ArViewModel.setInitialAnchorFromCapture` raises it
+(`SlamManager.beginDoodleReplacement`, which also drops `captureAnchorCam`); it is lowered only by
+`completeDoodleReplacement`, which `MetricDoodleBuilder` calls after the new doodle is
 installed natively and the new `captureAnchorCam` is computed (or a project load does after restoring
-both), or by `clearWallFingerprint`. While it is up `ArRenderer` ignores reloc results, the arbiter
-never returns `RELOC` (`relocGated`), and fusion reports `NO_FINGERPRINT`. Native independently drops
-any solve that was in flight when the fingerprint changed (fingerprint generation, see
-NATIVE_ENGINE.md), so a result computed against the old fingerprint can never be published after the
+both), or by `clearWallDoodle`. While it is up `ArRenderer` ignores reloc results, the arbiter
+never returns `RELOC` (`relocGated`), and fusion reports `NO_DOODLE`. Native independently drops
+any solve that was in flight when the doodle changed (doodle generation, see
+NATIVE_ENGINE.md), so a result computed against the old doodle can never be published after the
 swap.
 
 The overlay also shows how many features the live frame yielded *before* matching.
@@ -178,7 +178,7 @@ unrotated view. Working the algebra for a 90° turn: a pixel's ray in the rotate
 frame is `d' = (-d_y, d_x, 1)`, i.e. `d' = R·d` with `R = [[0,-1,0],[1,0,0],[0,0,1]]`.
 So the rays live in a frame rotated about the optical axis relative to the plane
 they are being intersected with, and the resulting depths are skewed — the
-fingerprint's 3D structure is not the real wall, and no consistent PnP pose
+doodle's 3D structure is not the real wall, and no consistent PnP pose
 exists over it.
 
 Two details make this fit the observed "never locks" behaviour:
@@ -186,13 +186,13 @@ Two details make this fit the observed "never locks" behaviour:
 - The error **vanishes for a head-on wall** — a plane normal of `(0,0,±1)` is
   invariant under rotation about Z — and grows with obliquity. That matches a
   failure that feels intermittent rather than absolute.
-- The onboarding doodle path (`buildDoodleFingerprint`) uses the identical
+- The onboarding doodle path (`buildDoodle`) uses the identical
   convention, so it would fail the same way.
 
 **RESOLVED — Phase 0 (PR #1797).** The description above is of the pre-fix code;
 the algebra in it is correct and matches the fix's independently-derived direction
 (`d' = R_z(+90)·d`). `MetricMarks.glViewToCvDisplay` now rotates the capture view
-to match the pixels and intrinsics, and `MetricFingerprintBuilder.buildSingle`
+to match the pixels and intrinsics, and `MetricDoodleBuilder.buildSingle`
 routes through it.
 
 The reason given here for not simply fixing it was wrong on its central point.
@@ -212,14 +212,14 @@ feature count point at capture problems instead, which are covered above.
 
 ## Anticipation: the wall as it will be seen
 
-The fingerprint's KPM page is matched not only as captured but as the artist will see it: the
+The doodle's KPM page is matched not only as captured but as the artist will see it: the
 app renders the page from a half-sphere of viewpoints (Settings → Anticipation) and SphereSLAM learns
 each as another image of the page, in every AR mode. Close-ups get the most: nearer half-spheres
 repeat over a grid of aim points across the wall, since the artist is up close most of the time and
 always when it matters, and throttling for battery, heat and load takes the far views first and the
 close-ups last. See `feature/ar/.../anticipation/` and [SPHERESLAM_TODO.md](SPHERESLAM_TODO.md).
 
-The ORB/SuperPoint fingerprint meets the view from the other side: a lost frame is turned by the
+The ORB/SuperPoint doodle meets the view from the other side: a lost frame is turned by the
 phone's sensors square-on to the wall before it is matched (the sensor turn, NATIVE_ENGINE.md §2b),
 using the wall's normal learned at earlier locks and saved with the project.
 
@@ -241,8 +241,8 @@ using the wall's normal learned at earlier locks and saved with the project.
 ## The reference marks and the design (current flow)
 
 The artist taps their painted reference marks and the capture is masked to them, as before. Those
-tapped marks are recorded per point as `Fingerprint.pinned`. When the design is placed,
-`FingerprintPartition` forces the pinned marks OUTSIDE (the backbone the relocalizer matches against)
+tapped marks are recorded per point as `Doodle.pinned`. When the design is placed,
+`DoodlePartition` forces the pinned marks OUTSIDE (the backbone the relocalizer matches against)
 wherever the design falls, instead of classifying them INSIDE just because the design is laid over
 them. Any point that is not pinned is classified by where the design falls. If the backbone is still
 tiny (fewer than `kMinBackboneMarks` OUTSIDE marks) native ignores the partition for matching rather
@@ -251,7 +251,7 @@ than sitting at FEW_MATCHES forever.
 Other behaviour worth knowing:
 - A repartition (design nudged) keeps marks self-grow appended and the distortion head's patch: the
   Kotlin copy it re-pushes is only the base, and native treats "base is a prefix of what I hold" as
-  the same fingerprint.
+  the same doodle.
 - Corroboration needs `kCorrobConfirmations` CONSECUTIVE hits for a feature predicted in view;
   an observed miss resets an unconfirmed feature. Moving the design resets corroboration; paint marks
   already on the wall are kept. Paint marks store the LIVE descriptor that corroborated them.

@@ -1,7 +1,7 @@
 # Relocalization Robustness — Persistent Spatial Map (Design for Review)
 
 > Status: **direction confirmed — lean feature map (Option A/D), co-registered to the
-> fingerprint** (see §4a). Options A–D are retained for context. **Phases 1–2 of §6 below have
+> doodle** (see §4a). Options A–D are retained for context. **Phases 1–2 of §6 below have
 > shipped**: `WallFeatureMap` persists in the `.gxr` project record, and native map storage +
 > reloc matching are wired behind a persisted **Feature map** settings toggle
 > (`SlamManager.setMapBuildEnabled`/`setMapRelocEnabled`, both called from `ArViewModel`), off by
@@ -10,15 +10,15 @@
 > treat the sequencing below as still accurate for what remains open.
 >
 > **Backend frame note (2026-10-01):** ARCore and standalone do not share one persisted
-> `WallFeatureMap` slot. ARCore keeps `wallFeatureMap` in its fingerprint-anchor frame; standalone
+> `WallFeatureMap` slot. ARCore keeps `wallFeatureMap` in its doodle-anchor frame; standalone
 > keeps `sphereSlamWallFeatureMap` in the canonical centered KPM page frame with an identity
-> fingerprint anchor. Hybrid KPM correction does not mutate either map: it contributes only an
+> doodle anchor. Hybrid KPM correction does not mutate either map: it contributes only an
 > anchor-local `PoseFusion` correction on the ARCore path.
 
 ## 1. The goal (your concern, restated)
 Relocalization that is **thorough and smooth over a whole mural** — locks back on from
 many viewpoints, survives tracking loss / pocket / repaint. Your intuition: the marks
-**fingerprint alone isn't enough**, and we should persist a **point cloud with a
+**doodle alone isn't enough**, and we should persist a **point cloud with a
 confidence system** to back it up.
 
 You're right about the limitation. This doc is about *what* to persist and *how it
@@ -27,7 +27,7 @@ feeds reloc*, because that detail decides everything.
 ## 2. What exists today (after the right-size)
 | Thing | State | Feeds reloc? |
 |------|-------|--------------|
-| **Marks fingerprint** (descriptors + 3D points + PnP) | active — *the* relocalizer | ✅ yes |
+| **Marks doodle** (descriptors + 3D points + PnP) | active — *the* relocalizer | ✅ yes |
 | **ARCore point cloud** `(x,y,z,confidence)`, persisted to `cloudPointsPath` | **intact** (never removed) | ❌ no — only *drawn* |
 | ARCore VIO pose (live tracking between relocks) | active | indirectly |
 | Voxel/splat/mesh dense map | **deleted** | ❌ never did |
@@ -39,7 +39,7 @@ sees* (feature descriptors) → known 3D points → solve pose (PnP). Bare xyz+c
 can't do that; it can only do ICP-style geometric alignment, which needs a good pose
 prior and is fragile.
 
-So: the marks fingerprint locks **precisely but only when the marks are in frame**. Look
+So: the marks doodle locks **precisely but only when the marks are in frame**. Look
 away to a far corner and there's nothing to lock onto. That's the gap.
 
 ## 3. Options
@@ -63,20 +63,20 @@ a pose correction, gated by confidence.
   sensitive to ARCore point noise/drift/density; materially less robust than feature matching.
 - Effort **Medium** · Risk **Medium**.
 
-### Option C — Multi-region fingerprints (B2 as first scoped)
-Capture several discrete mark-fingerprints across the wall; reloc tries each.
-- **Pros:** smaller; reuses fingerprint machinery; user-controlled.
+### Option C — Multi-region doodles (B2 as first scoped)
+Capture several discrete mark-doodles across the wall; reloc tries each.
+- **Pros:** smaller; reuses doodle machinery; user-controlled.
 - **Cons:** only covers *where you placed marks*; gaps between regions; manual capture.
 - Effort **Medium** · Risk **Medium**.
 
-### Option D — Hybrid: marks fingerprint (precision) + feature map (coverage)
-Keep the marks fingerprint as the high-precision anchor; add Option A for coverage; fuse
-(fingerprint wins when visible, map fills the gaps).
+### Option D — Hybrid: marks doodle (precision) + feature map (coverage)
+Keep the marks doodle as the high-precision anchor; add Option A for coverage; fuse
+(doodle wins when visible, map fills the gaps).
 - **Best quality, most work.** In practice A should be built *to keep* the marks
-  fingerprint, so A naturally becomes D.
+  doodle, so A naturally becomes D.
 
 ## 4. Recommendation
-**Option A, built to keep the marks fingerprint as the precision anchor (→ effectively D).**
+**Option A, built to keep the marks doodle as the precision anchor (→ effectively D).**
 Confidence persistence + automatic (passive) map-building + wide-area reloc — exactly your
 intuition, delivered leanly (sparse features, *not* the dense splat/mesh we removed).
 
@@ -84,22 +84,22 @@ This is **not a reversal** of the right-size: we deleted the dense map that carr
 descriptors and never fed reloc (dead weight). This adds the **lean feature map that
 actually serves reloc**. The cleanup cleared the deck; this builds the correct thing on it.
 
-## 4a. Confirmed direction — keep the map (lean) and make it *anticipate* the fingerprint
+## 4a. Confirmed direction — keep the map (lean) and make it *anticipate* the doodle
 
 **Decision:** keep a map, but a **lean feature map** (Option A/D). The driving case:
-**the overlaid artwork is larger than the fingerprint**, so while painting the far reaches
-of the mural the marks are out of frame and the fingerprint alone can't hold the lock there.
+**the overlaid artwork is larger than the doodle**, so while painting the far reaches
+of the mural the marks are out of frame and the doodle alone can't hold the lock there.
 
 How the lean map helps reloc *best* in that case:
 
-1. **One coordinate frame.** Map features are stored **relative to the fingerprint anchor**,
-   so relocalizing against *any* wall patch yields the fingerprint/overlay pose directly —
-   the map is the bridge from "what the camera sees" to "where the fingerprint is."
+1. **One coordinate frame.** Map features are stored **relative to the doodle anchor**,
+   so relocalizing against *any* wall patch yields the doodle/overlay pose directly —
+   the map is the bridge from "what the camera sees" to "where the doodle is."
 2. **Coarse-to-fine.** Map = **wide-area coverage** (holds the lock anywhere on the mural);
-   marks fingerprint = **precision snap** when visible. Fuse by inlier count / confidence.
-3. **Anticipate the fingerprint.** Map + VIO keep a live pose with the marks off-screen, so
-   the app **projects the fingerprint anchor into the current frustum**; when it's about to
-   enter view → *"fingerprint imminent"* → **prime the matcher with the fingerprint
+   marks doodle = **precision snap** when visible. Fuse by inlier count / confidence.
+3. **Anticipate the doodle.** Map + VIO keep a live pose with the marks off-screen, so
+   the app **projects the doodle anchor into the current frustum**; when it's about to
+   enter view → *"doodle imminent"* → **prime the matcher with the doodle
    descriptors + raise reloc cadence** so the precision snap is instant. Panning away, the
    map holds the lock so the far mural doesn't drift.
 4. **Stays lean via confidence.** Points earn confidence by repeated consistent observation;
@@ -110,7 +110,7 @@ Design *requirements*, not options, so leanness stays enforceable:
 
 1. **Frustum-gated matching (mandatory).** Never brute-force the whole map. Use the VIO
    pose to cull to the map points in the current frustum (~hundreds) and match only those,
-   so per-reloc cost stays ≈ today's fingerprint reloc. (Brute-forcing 20k SuperPoint
+   so per-reloc cost stays ≈ today's doodle reloc. (Brute-forcing 20k SuperPoint
    descriptors is ~5 B ops/check — explicitly forbidden.)
 2. **ORB by default** (`CV_8U`, 32 B, Hamming) → ~1 MB at the cap. **SuperPoint is an
    opt-in quality upgrade** (int8-quantizable); the data model stores the descriptor
@@ -129,7 +129,7 @@ default; the SuperPoint path (≤ ~5 MB quantized) is gated behind an explicit s
 
 ## 5. Architecture sketch (Option A)
 - **Data:** `WallFeatureMap { points3d[N], descriptors[N×D], confidence[N], obsCount[N] }`,
-  in a fingerprint-relative frame with a fixed anchor + intrinsics (like the fingerprint).
+  in a doodle-relative frame with a fixed anchor + intrinsics (like the doodle).
 - **Build (passive — no explicit scan):** opportunistically, from normal-use keyframes →
   ORB/SuperPoint detect → triangulate via VIO baseline (or depth when available) → associate
   to existing map points (descriptor + reprojection); bump `confidence`/`obsCount`, or add new.
@@ -139,7 +139,7 @@ default; the SuperPoint path (≤ ~5 MB quantized) is gated behind an explicit s
 - **Native:** `mWallMap` (cv::Mat descriptors + `vector<Point3f>` + conf); **ORB default**,
   cap configurable (default 5k, max 20k) by confidence. `relocThreadFunc` **frustum-gates**
   the map to the VIO-visible subset, then merges those correspondences into the PnP set (or
-  runs map-PnP + fingerprint-PnP and takes the higher inlier count).
+  runs map-PnP + doodle-PnP and takes the higher inlier count).
 - **No scan UX:** the map builds silently in the background. Separately, **remove the
   vestigial `AMBIENT`/`WALL` scan phases** + the dead `splatCount >= 30000` gate so
   pre-placement is just camera → capture marks → place. An optional subtle coverage hint is
@@ -148,14 +148,14 @@ default; the SuperPoint path (≤ ~5 MB quantized) is gated behind an explicit s
 
 ## 6. Sequencing (each phase device-gated, behind an A/B flag)
 1. Data model + `.gxr` persistence + **round-trip test** (no reloc risk).
-2. Native map storage + reloc matching **behind a flag** (compare vs fingerprint-only).
+2. Native map storage + reloc matching **behind a flag** (compare vs doodle-only).
 3. **Passive** map build from normal-use keyframes (no scan UX); remove the vestigial
    AMBIENT/WALL scan phases + dead `splatCount` gate.
 4. Confidence/pruning + matcher tuning **on device**.
 
 ## 7. Decisions & remaining open question
-**Decided:** direction = lean feature map (A/D), co-registered to the fingerprint (§4a) ·
-keep the marks fingerprint as the precision anchor · **ORB default**, SuperPoint opt-in ·
+**Decided:** direction = lean feature map (A/D), co-registered to the doodle (§4a) ·
+keep the marks doodle as the precision anchor · **ORB default**, SuperPoint opt-in ·
 budget bounded by the configurable cap + frustum gating (§4b).
 
 **Still open (tuning only — does not block Phases 1–2):**

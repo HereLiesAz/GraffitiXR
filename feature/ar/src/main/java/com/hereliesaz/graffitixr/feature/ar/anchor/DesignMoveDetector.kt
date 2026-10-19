@@ -4,7 +4,7 @@ import kotlin.math.abs
 
 /**
  * Decides when the artist has moved or resized the artwork enough to be worth repartitioning the
- * fingerprint (`IMPLEMENTATION.md` 2.2).
+ * doodle (`IMPLEMENTATION.md` 2.2).
  *
  * Extracted from `ArRenderer` for one reason: this logic has now been wrong twice, in two different
  * ways, and both times it was unreachable from a test because it lived inside a `GLSurfaceView`
@@ -33,7 +33,7 @@ import kotlin.math.abs
  *
  * **And it must react to the anchor being REPLACED.** Removing the marks offset removed the only
  * input that moved when a re-capture established a new anchor — so the trigger went quiet on
- * exactly the path that most needs it, and the new fingerprint got partitioned against the previous
+ * exactly the path that most needs it, and the new doodle got partitioned against the previous
  * anchor's design pose. [anchorGeneration] restores that as a discrete counter, carrying the signal
  * with none of the drift. Note it also advances on session TEARDOWN, not only on establishment — so
  * the renderer must be stopped before teardown clears the partition state, or this fires on the way
@@ -96,7 +96,7 @@ class DesignMoveDetector(
     companion object {
         /**
          * A millimetre of pan or extent, and a tenth of a degree of spin. Below these a "change" is
-         * float noise in the compose chain, and firing on it repartitions the fingerprint, replaces
+         * float noise in the compose chain, and firing on it repartitions the doodle, replaces
          * the native map and rewrites the project file every frame the artist rests a finger on the
          * screen. Guesses with stated reasoning, recorded in `PARAMETERS.md` §6; no experiment sets
          * them, so if repartition cost or missed repartitions ever show up in a run, start here.

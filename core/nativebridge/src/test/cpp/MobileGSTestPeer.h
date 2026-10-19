@@ -6,10 +6,10 @@
 #include "MobileGS.h"
 
 struct MobileGSTestPeer {
-    static bool hasView(MobileGS& g) { return g.mHasFingerprintView; }
+    static bool hasView(MobileGS& g) { return g.mHasDoodleView; }
     static bool hasPatch(MobileGS& g) { return !g.mWallPatch.empty(); }
-    static const float* anchor(MobileGS& g) { return g.mFingerprintAnchorMatrix; }
-    static const float* intrinsics(MobileGS& g) { return g.mFingerprintIntrinsics; }
+    static const float* anchor(MobileGS& g) { return g.mDoodleAnchorMatrix; }
+    static const float* intrinsics(MobileGS& g) { return g.mDoodleIntrinsics; }
     static const float* pnpIntrinsics(MobileGS& g) { return g.mPnpIntrinsics; }
     static bool hasDesignPlacement(MobileGS& g) { return g.mHasDesignPlacement; }
     static float designHalfW(MobileGS& g) { return g.mDesignHalfW; }
@@ -27,9 +27,9 @@ struct MobileGSTestPeer {
     static void setBeforeRelocPublishHook(MobileGS& g, std::function<void()> f) {
         g.mBeforeRelocPublishHook = std::move(f);
     }
-    static uint64_t fingerprintGeneration(MobileGS& g) {
+    static uint64_t doodleGeneration(MobileGS& g) {
         std::lock_guard<std::mutex> lock(g.mMutex);
-        return g.mFingerprintGeneration;
+        return g.mDoodleGeneration;
     }
     // Share of the registered clean-wall image that has real pixels behind it (-1 = none registered).
     static float cleanWallSupportedFraction(MobileGS& g) {

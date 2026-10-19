@@ -19,7 +19,7 @@ fun EditorUi(
     uiState: EditorUiState,
     isTouchLocked: Boolean,
     strings: AppStrings,
-    isCapturingTarget: Boolean = false
+    isCapturingDoodle: Boolean = false
 ) {
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
@@ -71,7 +71,7 @@ fun EditorUi(
                     redoCount = uiState.redoCount,
                     isResetActive = uiState.transformStash != null,
                     isRightHanded = uiState.isRightHanded,
-                    isCapturingTarget = isCapturingTarget,
+                    isCapturingDoodle = isCapturingDoodle,
                     activeLayer = overlayLayer,
                     showUndoRedo = true,
                     canvasBackground = uiState.canvasBackground,
@@ -79,7 +79,7 @@ fun EditorUi(
                 // In a Mode the adjust knobs are the off-rail tools (opacity/saturation/…); in Design
                 // they're rail-triggered via the Adjust panel. Hidden while capturing a target so they
                 // don't overlap the target-creation dialog.
-                showKnobs = !isCapturingTarget &&
+                showKnobs = !isCapturingDoodle &&
                     (uiState.activePanel == EditorPanel.ADJUST || (inMode && uiState.design != null)),
                 showColorBalance = uiState.activePanel == EditorPanel.COLOR,
                 isLandscape = isLandscape,

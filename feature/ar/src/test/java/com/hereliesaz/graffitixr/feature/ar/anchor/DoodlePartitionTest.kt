@@ -1,6 +1,6 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
-import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.Doodle
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -20,7 +20,7 @@ import com.hereliesaz.sphereslam.math.RigidMath
  * way round, and a test that computed its expectation with the same inverse would pass under
  * exactly that bug.
  */
-class FingerprintPartitionTest {
+class DoodlePartitionTest {
 
     private companion object {
         const val HALF_W = 1.0f
@@ -49,9 +49,9 @@ class FingerprintPartitionTest {
         hw: Float = -1f,
         hh: Float = -1f,
         anchorCam: List<Float> = IDENTITY_16,
-    ): Fingerprint {
+    ): Doodle {
         val rows = points.size / 3
-        return Fingerprint(
+        return Doodle(
             keypoints = List(rows) { KeyPoint(1f, 1f, 7f) },
             points3d = points,
             descriptorsData = ByteArray(rows * 32),
@@ -67,13 +67,13 @@ class FingerprintPartitionTest {
 
     @Test
     fun `a point at the design centre is inside`() {
-        val r = FingerprintPartition.classify(floatArrayOf(0f, 0f, 0f), identity(), HALF_W, HALF_H)
+        val r = DoodlePartition.classify(floatArrayOf(0f, 0f, 0f), identity(), HALF_W, HALF_H)
         assertEquals(INSIDE, r[0])
     }
 
     @Test
     fun `a point far beyond the design is outside`() {
-        val r = FingerprintPartition.classify(floatArrayOf(5f, 0f, 0f), identity(), HALF_W, HALF_H)
+        val r = DoodlePartition.classify(floatArrayOf(5f, 0f, 0f), identity(), HALF_W, HALF_H)
         assertEquals(OUTSIDE, r[0])
     }
 
@@ -84,7 +84,7 @@ class FingerprintPartitionTest {
      */
     @Test
     fun `a point on the design edge lands in the band, not the backbone`() {
-        val r = FingerprintPartition.classify(floatArrayOf(HALF_W, 0f, 0f), identity(), HALF_W, HALF_H)
+        val r = DoodlePartition.classify(floatArrayOf(HALF_W, 0f, 0f), identity(), HALF_W, HALF_H)
         assertEquals("edge point must not be backbone", BAND, r[0])
         assertNotEquals(OUTSIDE, r[0])
     }
@@ -96,10 +96,10 @@ class FingerprintPartitionTest {
     @Test
     fun `non-square extents are normalized per axis`() {
         // x = 0.5 is well inside (half-width 1.0); y = 1.5 is well outside (half-height 0.5).
-        val r = FingerprintPartition.classify(floatArrayOf(0.5f, 1.5f, 0f), identity(), HALF_W, HALF_H)
+        val r = DoodlePartition.classify(floatArrayOf(0.5f, 1.5f, 0f), identity(), HALF_W, HALF_H)
         assertEquals(OUTSIDE, r[0])
         // ...and the transpose is inside, which it would not be if the axes were swapped.
-        val r2 = FingerprintPartition.classify(floatArrayOf(0.5f, 0.1f, 0f), identity(), HALF_W, HALF_H)
+        val r2 = DoodlePartition.classify(floatArrayOf(0.5f, 0.1f, 0f), identity(), HALF_W, HALF_H)
         assertEquals(INSIDE, r2[0])
     }
 
@@ -113,10 +113,10 @@ class FingerprintPartitionTest {
     @Test
     fun `a composed scale widens the footprint`() {
         val p = floatArrayOf(1.5f, 0f, 0f)
-        val composed = FingerprintPartition.classify(p, scaled(2f), HALF_W, HALF_H, composed = true)
+        val composed = DoodlePartition.classify(p, scaled(2f), HALF_W, HALF_H, composed = true)
         assertEquals("2x scale must swallow x=1.5", INSIDE, composed[0])
 
-        val asRigid = FingerprintPartition.classify(p, identity(), HALF_W, HALF_H, composed = false)
+        val asRigid = DoodlePartition.classify(p, identity(), HALF_W, HALF_H, composed = false)
         assertEquals("unscaled design must not reach x=1.5", OUTSIDE, asRigid[0])
         assertNotEquals(
             "the two conventions must be distinguishable, or the flag is decorative",
@@ -131,14 +131,14 @@ class FingerprintPartitionTest {
             5f, 0f, 0f,     // outside
             0.1f, 0f, 0f,   // inside
         )
-        val r = FingerprintPartition.classify(pts, identity(), HALF_W, HALF_H)
+        val r = DoodlePartition.classify(pts, identity(), HALF_W, HALF_H)
         assertEquals(3, r.size)
         assertEquals(INSIDE, r[0]); assertEquals(OUTSIDE, r[1]); assertEquals(INSIDE, r[2])
     }
 
     @Test
     fun `an empty point set yields an empty partition`() {
-        assertEquals(0, FingerprintPartition.classify(FloatArray(0), identity(), HALF_W, HALF_H).size)
+        assertEquals(0, DoodlePartition.classify(FloatArray(0), identity(), HALF_W, HALF_H).size)
     }
 
     // -------------------------------------------------------------------------------------
@@ -217,9 +217,9 @@ class FingerprintPartitionTest {
             pts.add(inCam[0]); pts.add(inCam[1]); pts.add(inCam[2])
         }
 
-        val out = FingerprintPartition.partition(
+        val out = DoodlePartition.partition(
             fp(pts, anchorCam = anchorCam.toList()),
-            FingerprintPartition.DesignFootprint(design, HALF_W, HALF_H),
+            DoodlePartition.DesignFootprint(design, HALF_W, HALF_H),
         )
         assertEquals(INSIDE, out.regions[0])
         assertEquals(BAND, out.regions[1])
@@ -239,10 +239,10 @@ class FingerprintPartitionTest {
         val anchorCam = rigid30()
         val design = designPose()
         val pts = floatArrayOf(0f, 0f, 0f, 1.5f, 0.2f, 0f, 3f, 0f, 0f)
-        val right = FingerprintPartition.classify(
+        val right = DoodlePartition.classify(
             pts, RigidMath.multiply(anchorCam, design), HALF_W, HALF_H,
         )
-        val wrong = FingerprintPartition.classify(
+        val wrong = DoodlePartition.classify(
             pts, RigidMath.multiply(design, anchorCam), HALF_W, HALF_H,
         )
         assertFalse(
@@ -260,13 +260,13 @@ class FingerprintPartitionTest {
         val inCam = apply(anchorCam, inAnchor[0], inAnchor[1], inAnchor[2])
         val base = fp(inCam.toList(), anchorCam = anchorCam.toList())
 
-        val small = FingerprintPartition.partition(
-            base, FingerprintPartition.DesignFootprint(design, HALF_W, HALF_H),
+        val small = DoodlePartition.partition(
+            base, DoodlePartition.DesignFootprint(design, HALF_W, HALF_H),
         )
         assertEquals(OUTSIDE, small.regions[0])
 
-        val big = FingerprintPartition.partition(
-            small, FingerprintPartition.DesignFootprint(design, 2f, 1f),
+        val big = DoodlePartition.partition(
+            small, DoodlePartition.DesignFootprint(design, 2f, 1f),
         )
         assertEquals("a wider design must swallow the point", INSIDE, big.regions[0])
         assertEquals(2f, big.captureHalfW, 1e-6f)
@@ -280,30 +280,30 @@ class FingerprintPartitionTest {
      */
     @Test
     fun `partition refuses rather than guesses`() {
-        val design = FingerprintPartition.DesignFootprint(designPose(), HALF_W, HALF_H)
+        val design = DoodlePartition.DesignFootprint(designPose(), HALF_W, HALF_H)
 
         val noAnchorCam = fp(listOf(0f, 0f, 0f), anchorCam = emptyList())
         assertSame("no captureAnchorCam: no frame to compose through",
-            noAnchorCam, FingerprintPartition.partition(noAnchorCam, design))
+            noAnchorCam, DoodlePartition.partition(noAnchorCam, design))
 
         val noPoints = fp(emptyList())
         assertSame("no points: nothing to classify",
-            noPoints, FingerprintPartition.partition(noPoints, design))
+            noPoints, DoodlePartition.partition(noPoints, design))
 
         val ok = fp(listOf(0f, 0f, 0f))
         assertSame("degenerate extents: Φ is undefined",
-            ok, FingerprintPartition.partition(
-                ok, FingerprintPartition.DesignFootprint(designPose(), 0f, 1f)))
+            ok, DoodlePartition.partition(
+                ok, DoodlePartition.DesignFootprint(designPose(), 0f, 1f)))
     }
 
     /**
-     * The case that must work and did not in the first cut of this phase: a fingerprint captured
+     * The case that must work and did not in the first cut of this phase: a doodle captured
      * before any artwork was placed. Target creation is what establishes the anchor the artwork sits
      * on, so EVERY first capture is unpartitioned — and if `partition` refused those, the feature
      * would be inert on the only target the artist actually paints against.
      */
     @Test
-    fun `an unpartitioned fingerprint is exactly what partition is for`() {
+    fun `an unpartitioned doodle is exactly what partition is for`() {
         val anchorCam = rigid30()
         val design = designPose()
         val inAnchor = apply(design, 0f, 0f, 0f)
@@ -313,8 +313,8 @@ class FingerprintPartitionTest {
         assertTrue("a fresh capture carries no partition", fresh.isUnpartitioned())
         assertFalse("...and is therefore never 'stale'", fresh.isPartitionStale(HALF_W, HALF_H))
 
-        val out = FingerprintPartition.partition(
-            fresh, FingerprintPartition.DesignFootprint(design, HALF_W, HALF_H),
+        val out = DoodlePartition.partition(
+            fresh, DoodlePartition.DesignFootprint(design, HALF_W, HALF_H),
         )
         assertFalse("partition must not gate on staleness", out.isUnpartitioned())
         assertEquals(INSIDE, out.regions[0])
@@ -322,9 +322,9 @@ class FingerprintPartitionTest {
 
     @Test
     fun `staleness tracks the recorded extents`() {
-        val f = FingerprintPartition.partition(
+        val f = DoodlePartition.partition(
             fp(listOf(0f, 0f, 0f)),
-            FingerprintPartition.DesignFootprint(designPose(), HALF_W, HALF_H),
+            DoodlePartition.DesignFootprint(designPose(), HALF_W, HALF_H),
         )
         assertFalse("same size is not stale", f.isPartitionStale(HALF_W, HALF_H))
         assertTrue("a resize is stale", f.isPartitionStale(HALF_W * 1.5f, HALF_H))
@@ -336,9 +336,9 @@ class FingerprintPartitionTest {
      * target would simply never lock — a total failure that looks like bad tracking.
      */
     @Test
-    fun `an unpartitioned fingerprint counts as all backbone`() {
+    fun `an unpartitioned doodle counts as all backbone`() {
         val legacy = fp(listOf(0f, 0f, 0f, 5f, 0f, 0f, 9f, 9f, 0f))
-        assertEquals(3, FingerprintPartition.backboneCount(legacy))
+        assertEquals(3, DoodlePartition.backboneCount(legacy))
     }
 
     @Test
@@ -351,12 +351,12 @@ class FingerprintPartitionTest {
             val c = apply(anchorCam, a[0], a[1], a[2])
             pts.add(c[0]); pts.add(c[1]); pts.add(c[2])
         }
-        val f = FingerprintPartition.partition(
+        val f = DoodlePartition.partition(
             fp(pts, anchorCam = anchorCam.toList()),
-            FingerprintPartition.DesignFootprint(design, HALF_W, HALF_H),
+            DoodlePartition.DesignFootprint(design, HALF_W, HALF_H),
         )
         // inside, outside, band -> exactly one backbone point.
-        assertEquals(1, FingerprintPartition.backboneCount(f))
+        assertEquals(1, DoodlePartition.backboneCount(f))
     }
 
     /**
@@ -366,18 +366,18 @@ class FingerprintPartitionTest {
      */
     @Test
     fun `the raw backbone count excludes the band as well as the inside`() {
-        assertEquals(1, FingerprintPartition.backboneCount(byteArrayOf(INSIDE, BAND, OUTSIDE)))
-        assertEquals(0, FingerprintPartition.backboneCount(byteArrayOf(INSIDE, BAND, BAND)))
-        assertEquals(3, FingerprintPartition.backboneCount(byteArrayOf(OUTSIDE, OUTSIDE, OUTSIDE)))
-        assertEquals("no regions is no backbone at this level", 0, FingerprintPartition.backboneCount(ByteArray(0)))
+        assertEquals(1, DoodlePartition.backboneCount(byteArrayOf(INSIDE, BAND, OUTSIDE)))
+        assertEquals(0, DoodlePartition.backboneCount(byteArrayOf(INSIDE, BAND, BAND)))
+        assertEquals(3, DoodlePartition.backboneCount(byteArrayOf(OUTSIDE, OUTSIDE, OUTSIDE)))
+        assertEquals("no regions is no backbone at this level", 0, DoodlePartition.backboneCount(ByteArray(0)))
     }
 
     @Test
     fun `a design with no extents is not usable`() {
-        assertFalse(FingerprintPartition.DesignFootprint(identity(), 0f, 1f).isUsable)
-        assertFalse(FingerprintPartition.DesignFootprint(identity(), 1f, -1f).isUsable)
-        assertFalse(FingerprintPartition.DesignFootprint(FloatArray(4), 1f, 1f).isUsable)
-        assertTrue(FingerprintPartition.DesignFootprint(identity(), 1f, 1f).isUsable)
+        assertFalse(DoodlePartition.DesignFootprint(identity(), 0f, 1f).isUsable)
+        assertFalse(DoodlePartition.DesignFootprint(identity(), 1f, -1f).isUsable)
+        assertFalse(DoodlePartition.DesignFootprint(FloatArray(4), 1f, 1f).isUsable)
+        assertTrue(DoodlePartition.DesignFootprint(identity(), 1f, 1f).isUsable)
     }
 
     /** The 1:1 invariant is enforced by the model, so a mismatched partition cannot be constructed. */

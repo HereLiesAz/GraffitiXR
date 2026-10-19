@@ -22,7 +22,7 @@ internal class GuestSession(
     private val localDeviceName: String,
     private val localBackend: CoopTrackingBackend,
     private val onBulkReceived: suspend (
-        fingerprint: ByteArray,
+        doodle: ByteArray,
         project: ByteArray,
         spatialFrame: CoopSpatialFrame,
     ) -> Unit,
@@ -334,7 +334,7 @@ internal class GuestSession(
         }
         hostBackend = beginPayload.spatialFrame.hostBackend
 
-        val fingerprint = receiveChunked(input, crypto, FrameType.BULK_FINGERPRINT, beginPayload.fingerprintBytes)
+        val doodle = receiveChunked(input, crypto, FrameType.BULK_DOODLE, beginPayload.doodleBytes)
         val project = receiveChunked(input, crypto, FrameType.BULK_PROJECT, beginPayload.projectBytes)
 
         val end = readSecure(input, crypto) ?: error("EOF before BULK_END")
@@ -350,7 +350,7 @@ internal class GuestSession(
 
         writeSecure(output, crypto, FrameType.BULK_ACK, OpCodec.encode(BulkAckPayload(0L)))
 
-        onBulkReceived(fingerprint, project, beginPayload.spatialFrame)
+        onBulkReceived(doodle, project, beginPayload.spatialFrame)
     }
 
     private fun receiveChunked(input: InputStream, crypto: SessionCrypto, expectedType: FrameType, totalBytes: Int): ByteArray {

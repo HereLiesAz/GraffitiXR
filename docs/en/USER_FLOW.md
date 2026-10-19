@@ -30,7 +30,7 @@ per-mode placement/adjustments are shared across AR/Overlay/Mockup/Trace/Design.
 ## 2. RELOCALIZATION (The Spatial Memory)
 **Definition:** The system that keeps the design anchored to the physical wall, including recovery
 after tracking loss or a screen-off event.
-**Components:** `MobileGS` (native C++17 relocalization engine), the wall fingerprint (ORB/SuperPoint
+**Components:** `MobileGS` (native C++17 relocalization engine), the wall doodle (ORB/SuperPoint
 descriptors + a handful of triangulated 3D points — not a dense map), `relocThreadFunc` (background
 relocalization thread).
 
@@ -41,22 +41,23 @@ engine" and is a no-op). There is no `VoxelMap`, `ConfidenceMap`, `PersistentVox
 `getSplatCount` in the current code — `getSplatCount` was removed entirely, not just stubbed.
 
 ### A. The Dependency Chain
-1.  **Baseline fingerprint:** when the artist registers the wall, the engine stores ORB/SuperPoint
+1.  **Baseline doodle:** when the artist registers the wall, the engine stores ORB/SuperPoint
     descriptors of the clean surface plus triangulated 3D points (from stereo depth when available,
     or the artist's natural step-in/step-back baseline otherwise).
 2.  **Relocalization (`relocThreadFunc`):** a background thread continuously matches the live camera
-    against that fingerprint and solves the pose via `solvePnPRansac`.
+    against that doodle and solves the pose via `solvePnPRansac`.
 3.  **Snap-back:** on a high-confidence match, the corrected pose can realign the overlay to the wall
     after tracking loss or a screen-off event. This drift-correction consumer, and the related
-    self-growing-fingerprint mechanism, ship opt-in and off by default — see
+    self-growing-doodle mechanism, ship opt-in and off by default — see
     [`TELEOLOGICAL_SLAM.md`](../TELEOLOGICAL_SLAM.md).
 
 ---
 
 ## 3. THE DOODLE GRID (The Grid Ritual)
 **Definition:** The workflow to establish the initial wall anchor. **Doodle** is the user's name for
-the painted reference marks and what the app captures from them (formerly "target" /
-"fingerprint"); SphereSLAM's own wall reference keeps the name **target**.
+the painted reference marks and what GraffitiXR's engine captures from them (formerly "target" /
+"fingerprint"). SphereSLAM keeps its own **target** and **fingerprint**, which differ; see
+[SphereSLAM terminology](../SPHERESLAM_ARCORE_SIDECAR.md#terminology).
 
 ### A. The Workflow Logic
 0.  **Instructions:** the **DOODLE GRID** card: if the grid isn't painted yet, photograph the bare
@@ -71,7 +72,7 @@ the painted reference marks and what the app captures from them (formerly "targe
       manual 4-corner drag.
 3.  **Feature Extraction Phase:**
     * ORB/SuperPoint descriptors are extracted from the rectified region and become the wall
-      fingerprint.
+      doodle.
 4.  **Anchor Established:**
     * The engine treats this position as the world anchor going forward.
 
@@ -85,14 +86,14 @@ below is a purpose summary, not a literal hierarchy diagram:
 
 | Group | Item | Action / Logic |
 | :--- | :--- | :--- |
-| **Modes** | `AR` | Switch to the AR viewport, tracked via the fingerprint relocalizer. Dual-lens hardware depth is used when the device exposes it, but is **not mandatory** — devices without it get metric scale from step-in/step-back triangulation, not a lesser fallback. |
+| **Modes** | `AR` | Switch to the AR viewport, tracked via the doodle relocalizer. Dual-lens hardware depth is used when the device exposes it, but is **not mandatory** — devices without it get metric scale from step-in/step-back triangulation, not a lesser fallback. |
 | | `Overlay` | Switch to non-AR image tracing over the live camera (CameraX, or a planar homography tracker on the small number of devices without ARCore). |
 | | `Mockup` | Switch to compositing over a static reference photo. |
 | | `Trace` | Switch to lightbox mode (full brightness, touch-locked). |
 | **Modes ▸ AR** | `Doodle` | Arms tap-to-place for Doodle (wall anchor) capture. |
 | **Adjust** | — | Whole-design toggles: Adjust, Balance, Invert, Outline, Isolate — not general layer tools (there is only one design). |
 | **Open** | — | Picks the design image. Stages a replace-confirmation if a design is already placed. |
-| **Project** | `Save/Load` | Project manifest (JSON) plus the persisted wall fingerprint — no voxel/map binary. |
+| **Project** | `Save/Load` | Project manifest (JSON) plus the persisted wall doodle — no voxel/map binary. |
 
 ---
 

@@ -9,7 +9,7 @@ import org.junit.Test
  * `IMPLEMENTATION.md` **3.1 / 3.2** — the promotion gate, tested where it can be tested.
  *
  * This predicate guards the only mechanism in the engine that permanently mutates the reloc
- * fingerprint. A bad promotion is not a dropped frame; it is written into the map and compounds. So
+ * doodle. A bad promotion is not a dropped frame; it is written into the map and compounds. So
  * the tests here are not about coverage — they are the reason the predicate was moved to Kotlin at
  * all, and `CorroborationTranslitTest`'s sibling assertions hold the C++ to the same decisions.
  */
@@ -27,7 +27,7 @@ class PromotionGateTest {
     /**
      * The bootstrap case, and the reason the flat `inliers >= 20` was replaced. A wall whose marks
      * are half painted over is exactly when self-grow is needed and exactly when 20 raw inliers is
-     * out of reach; a strong ratio has to qualify at a lower count or the fingerprint can only grow
+     * out of reach; a strong ratio has to qualify at a lower count or the doodle can only grow
      * when it least needs to.
      */
     @Test

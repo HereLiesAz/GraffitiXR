@@ -13,9 +13,9 @@ import java.io.File
  * argument register. That is a use of uninitialised memory that presents as intermittent corruption
  * far from its cause.
  *
- * This project has already paid once for trusting a name-based binding — `Fingerprint.fromNative`,
- * where adding a field to the data class silently broke the lookup twice and `setWallFingerprint`
- * returned null on every capture. That one is now pinned by `FingerprintJniContractTest`; the
+ * This project has already paid once for trusting a name-based binding — `Doodle.fromNative`,
+ * where adding a field to the data class silently broke the lookup twice and `setWallDoodle`
+ * returned null on every capture. That one is now pinned by `DoodleJniContractTest`; the
  * `native*` methods were not pinned by anything.
  *
  * So: parameter counts, both sides, from source. A count is not a full descriptor check, but it
@@ -89,17 +89,17 @@ class NativeMethodAritySignatureTest {
      * side fails with a message about the partition rather than an anonymous arity mismatch.
      */
     @Test
-    fun `the metric fingerprint restore carries the Phase 2 regions array`() {
+    fun `the metric doodle restore carries the Phase 2 regions array`() {
         val kotlin = File(repoRoot(), SLAM_MANAGER_SRC).readText()
         val cpp = File(repoRoot(), CPP_SRC).readText()
         assertTrue(
-            "Kotlin's nativeRestoreWallFingerprintMetric no longer declares `regions`",
-            Regex("""external fun nativeRestoreWallFingerprintMetric\s*\([^)]*regions:\s*ByteArray""",
+            "Kotlin's nativeRestoreWallDoodleMetric no longer declares `regions`",
+            Regex("""external fun nativeRestoreWallDoodleMetric\s*\([^)]*regions:\s*ByteArray""",
                 RegexOption.DOT_MATCHES_ALL).containsMatchIn(kotlin),
         )
         assertTrue(
-            "GraffitiJNI.cpp's nativeRestoreWallFingerprintMetric no longer takes regionsArray",
-            Regex("""Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerprintMetric\s*\([^)]*jbyteArray regionsArray""",
+            "GraffitiJNI.cpp's nativeRestoreWallDoodleMetric no longer takes regionsArray",
+            Regex("""Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallDoodleMetric\s*\([^)]*jbyteArray regionsArray""",
                 RegexOption.DOT_MATCHES_ALL).containsMatchIn(cpp),
         )
     }

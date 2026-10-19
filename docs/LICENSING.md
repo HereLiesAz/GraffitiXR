@@ -33,19 +33,19 @@ The engine is **not** contained in one module; the protective boundary must cove
 - `core/nativebridge/**` — the native C++ engine (`MobileGS`, `SuperPointDetector`,
   `DistortionHead`, `GraffitiJNI`, …), the JNI bridge, and the Kotlin engine side
   (`SlamManager`, depth providers). Carries its own `core/nativebridge/LICENSE`.
-- `feature/ar/anchor/**` — `MetricFingerprintBuilder`, `MetricMarks`, `PlaneMarks`, `PoseFusion`
-  (fingerprint construction + pose solving — core teleological logic).
+- `feature/ar/anchor/**` — `MetricDoodleBuilder`, `MetricMarks`, `PlaneMarks`, `PoseFusion`
+  (doodle construction + pose solving — core teleological logic).
 - `feature/ar/eval/**` — `DriftCostProbe`, `EvalMetrics`, `EvalSampleLog` (painting-progress / drift
   measurement — the "teleological" half).
-- `core/common/.../model/Fingerprint.kt`, `WallFeatureMap.kt`, and the fingerprint serializers
-  (`FingerprintSerializer`, `KeyPointSerializer`, `MatSerializer`, `RefinementPathSerializer`).
-- The method docs: `TELEOLOGICAL_SLAM.md`, `RELOC_MAP_DESIGN.md`, `SELF_GROWING_FINGERPRINT.md`,
+- `core/common/.../model/Doodle.kt`, `WallFeatureMap.kt`, and the doodle serializers
+  (`DoodleSerializer`, `KeyPointSerializer`, `MatSerializer`, `RefinementPathSerializer`).
+- The method docs: `TELEOLOGICAL_SLAM.md`, `RELOC_MAP_DESIGN.md`, `SELF_GROWING_DOODLE.md`,
   `NATIVE_ENGINE.md`, `DISTORTION_HEAD.md`, `SLAM_SETUP.md`.
 - Everything else in the app not explicitly MIT below.
 
 **Borderline glue left under PolyForm by default** (pull into a stricter posture only if you want maximal
 lockdown): `feature/ar/rendering/ArRenderer.kt`, `feature/ar/ArViewModel.kt`,
-`feature/ar/TargetCreationFlow.kt`. These *use* the engine but don't contain the novel method.
+`feature/ar/DoodleCreationFlow.kt`. These *use* the engine but don't contain the novel method.
 
 ## MIT — the open extension layer *(declared ahead of implementation)*
 

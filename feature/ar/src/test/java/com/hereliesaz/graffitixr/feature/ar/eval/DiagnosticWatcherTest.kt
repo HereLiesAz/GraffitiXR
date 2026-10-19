@@ -26,7 +26,7 @@ import org.junit.Test
 class DiagnosticWatcherTest {
 
     private fun reloc(
-        reject: RelocReject = RelocReject.NO_FINGERPRINT,
+        reject: RelocReject = RelocReject.NO_DOODLE,
         gate: CorrobGate = CorrobGate.NOT_RUN,
         grow: GrowOutcome = GrowOutcome.NOT_RUN,
     ) = RelocDiagnostics(reject = reject, corrobGate = gate, growOutcome = grow)
@@ -40,7 +40,7 @@ class DiagnosticWatcherTest {
 
     private fun DiagnosticWatcher.tick(
         t: Long,
-        reject: RelocReject = RelocReject.NO_FINGERPRINT,
+        reject: RelocReject = RelocReject.NO_DOODLE,
         gate: CorrobGate = CorrobGate.NOT_RUN,
         grow: GrowOutcome = GrowOutcome.NOT_RUN,
         state: FusionState = FusionState.NO_ANCHOR,
@@ -50,7 +50,7 @@ class DiagnosticWatcherTest {
     /**
      * The very first tick must produce nothing, whatever it holds.
      *
-     * Entering AR with a fingerprint already loaded arrives at `OK` on sample one. Treating that as
+     * Entering AR with a doodle already loaded arrives at `OK` on sample one. Treating that as
      * an acquisition edge would photograph the launch screen of every session and burn a slot of a
      * 16-capture budget on it.
      */
@@ -63,7 +63,7 @@ class DiagnosticWatcherTest {
     /**
      * `PROMOTED` is an edge like every other trigger, and it was written as a level test.
      *
-     * The native `mGrowOutcome` is sticky — `MobileGS::tryUpdateFingerprint` returns early without
+     * The native `mGrowOutcome` is sticky — `MobileGS::tryUpdateDoodle` returns early without
      * touching it when no design is registered — so one promotion followed by clearing the design
      * leaves `PROMOTED` standing on every subsequent tick forever. As a level test it re-fired every
      * `REPEAT_COOLDOWN_MS`, spending the whole 16-capture budget on about four minutes of

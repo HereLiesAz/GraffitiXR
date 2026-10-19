@@ -4,7 +4,7 @@ Offline, self-supervised training for the viewpoint/partial-aware relocalization
 Design + integration plan: [`docs/DISTORTION_HEAD.md`](../../docs/DISTORTION_HEAD.md).
 
 The head sits on top of the **frozen** SuperPoint already shipped in the app. It takes two
-views — the live frame crop and the canonical fingerprint patch — and outputs the planar
+views — the live frame crop and the canonical doodle patch — and outputs the planar
 distortion between them plus a confidence and a coverage (= painting-progress) signal.
 
 ## What it predicts

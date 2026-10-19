@@ -26,16 +26,16 @@ import com.hereliesaz.sphereslam.math.RigidMath
  * The one input that encodes a belief is `pnpMat` — what `solvePnP` would return under zero drift.
  * Rather than assert my own convention, it is built from the repo's OWN shipped bridge:
  *
- *  - `RigidMath.glViewToCv` is how every fingerprint's capture view is converted, and
- *  - `MetricFingerprintBuilder` back-projects the fingerprint's 3D points through exactly that CV
+ *  - `RigidMath.glViewToCv` is how every doodle's capture view is converted, and
+ *  - `MetricDoodleBuilder` back-projects the doodle's 3D points through exactly that CV
  *    view, storing `captureAnchorCam = cvView · anchorModel`.
  *
- * So the fingerprint frame IS the display-oriented CV camera frame at capture — not by assumption
- * but by construction, in code that ships and whose fingerprints demonstrably relocalize. Under zero
+ * So the doodle frame IS the display-oriented CV camera frame at capture — not by assumption
+ * but by construction, in code that ships and whose doodles demonstrably relocalize. Under zero
  * drift a point's live CV camera coordinates are therefore
- * `V_cv(t) · V_cv(capture)⁻¹` applied to its fingerprint coordinates, which is the `pnpMat` below.
+ * `V_cv(t) · V_cv(capture)⁻¹` applied to its doodle coordinates, which is the `pnpMat` below.
  *
- * The honest limit: this validates `composeCorrected` **against the fingerprint builder**. It cannot
+ * The honest limit: this validates `composeCorrected` **against the doodle builder**. It cannot
  * catch an error the two share. An inconsistency between them is precisely what 0.6's audit alleged,
  * so it is aimed at the right target — but it is not a device.
  */
@@ -76,7 +76,7 @@ class ComposeCorrectedFrameTest {
 
     /**
      * `pnpMat` as the relocalizer would produce it with no drift: the transform taking a point from
-     * the fingerprint frame (= the capture CV camera frame) to the live CV camera frame.
+     * the doodle frame (= the capture CV camera frame) to the live CV camera frame.
      *
      * Built through `RigidMath.glViewToCv`, the repo's own converter, rather than by writing
      * `diag(1,-1,-1)` here — so the test inherits the shipped convention instead of asserting one.
@@ -113,7 +113,7 @@ class ComposeCorrectedFrameTest {
      * substitution plus one conversion:
      *
      *  - `pnpMat` is CV-convention, so it needs the `D = diag(1,-1,-1)` axis conversion;
-     *  - its domain is the FINGERPRINT frame — the capture CV camera — while `fpAnchor` is a
+     *  - its domain is the DOODLE frame — the capture CV camera — while `fpAnchor` is a
      *    world-space model matrix, so a capture-view factor is needed between them.
      *
      * Since `captureAnchorCam = V_cv(capture) · anchorModel = D · V_gl(capture) · anchorModel`, the

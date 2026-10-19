@@ -5,7 +5,7 @@ internal enum class FrameType(val code: Byte) {
     HELLO_OK(0x11),
     HELLO_REJECTED(0x12),
     BULK_BEGIN(0x20),
-    BULK_FINGERPRINT(0x21),
+    BULK_DOODLE(0x21),
     BULK_PROJECT(0x22),
     BULK_END(0x23),
     BULK_ACK(0x24),

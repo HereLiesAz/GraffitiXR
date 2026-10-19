@@ -56,7 +56,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.viewinterop.AndroidView
 import com.hereliesaz.graffitixr.common.model.CoverageGlowAppearance
 import com.hereliesaz.graffitixr.common.model.CoverageGlowStyle
-import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.Doodle
 import com.hereliesaz.graffitixr.common.model.WallFeatureMap
 import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.common.model.SphereSlamAtlasPage
@@ -226,14 +226,14 @@ internal fun shouldStartStandaloneAnalyzer(
 ): Boolean =
     cameraIdPresent && atlasLoaded
 
-internal fun shouldUseCoopPeerFingerprint(
+internal fun shouldUseCoopPeerDoodle(
     spatialFrame: com.hereliesaz.graffitixr.common.model.CoopSpatialFrame?,
-    peerFingerprint: ByteArray?,
+    peerDoodle: ByteArray?,
 ): Boolean =
     spatialFrame?.hostBackend ==
         com.hereliesaz.graffitixr.common.model.CoopTrackingBackend.ARCORE &&
-        spatialFrame.fingerprintAvailable &&
-        peerFingerprint?.isNotEmpty() == true
+        spatialFrame.doodleAvailable &&
+        peerDoodle?.isNotEmpty() == true
 
 /**
  * First functional no-ARCore AR path.
@@ -255,11 +255,11 @@ fun SphereSlamStandaloneOverlay(
     cameraController: LifecycleCameraController,
     designBitmap: Bitmap?,
     slamManager: SlamManager,
-    mobileGsFingerprint: Fingerprint? = null,
-    mobileGsFingerprintFrameVersion: Int =
+    mobileGsDoodle: Doodle? = null,
+    mobileGsDoodleFrameVersion: Int =
         com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
-    /** Explicit GL map_from_fingerprint bridge into the base SphereSLAM photosphere. */
-    mobileGsMapFromFingerprint: List<Float> = emptyList(),
+    /** Explicit GL map_from_doodle bridge into the base SphereSLAM photosphere. */
+    mobileGsMapFromDoodle: List<Float> = emptyList(),
     mobileGsWallFeatureMap: WallFeatureMap? = null,
     mobileGsWallFeatureMapFrameVersion: Int =
         com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
@@ -269,13 +269,13 @@ fun SphereSlamStandaloneOverlay(
     persistedAtlasPages: List<SphereSlamAtlasPage> = emptyList(),
     /** Protocol-v3 host wall frame when this device is a standalone co-op guest. */
     coopPeerSpatialFrame: com.hereliesaz.graffitixr.common.model.CoopSpatialFrame? = null,
-    /** Host MobileGS fingerprint; required for ARCore-host -> standalone-guest alignment. */
-    coopPeerFingerprint: ByteArray? = null,
+    /** Host MobileGS doodle; required for ARCore-host -> standalone-guest alignment. */
+    coopPeerDoodle: ByteArray? = null,
     onReferenceCaptured: (Bitmap, Float, Boolean) -> Unit = { _, _, _ -> },
-    /** Normal app path: TargetCreationUi above both AR backends owns capture/review/fingerprint UX. */
+    /** Normal app path: DoodleCreationUi above both AR backends owns capture/review/doodle UX. */
     sharedTargetCapture: Boolean = false,
     /**
-     * With [sharedTargetCapture]: New Target / Recapture open the host's TargetCreationUi through
+     * With [sharedTargetCapture]: New Target / Recapture open the host's DoodleCreationUi through
      * this. The current target keeps tracking until the replacement is persisted (a cancelled capture
      * changes nothing). Null hides those buttons (e.g. a co-op guest, who must not re-anchor).
      * Without [sharedTargetCapture] the buttons use this overlay's own capture flow.
@@ -310,8 +310,8 @@ fun SphereSlamStandaloneOverlay(
      */
     onKeyframeOrientation: (Long, FloatArray) -> Unit = { _, _ -> },
     /**
-     * Base SphereSLAM photosphere keyframes. These begin before any fingerprint exists and continue
-     * independently of the fingerprint/teleological layer.
+     * Base SphereSLAM photosphere keyframes. These begin before any doodle exists and continue
+     * independently of the doodle/teleological layer.
      */
     onPhotosphereKeyframe: (PhotosphereKeyframe) -> Unit = {},
     /** Same-frame base-map to precision-target transform, solved only after a real KPM lock. */
@@ -527,7 +527,7 @@ fun SphereSlamStandaloneOverlay(
             // If this commit introduced a MobileGS seed, the analyzer must first restart with that
             // NEW seed and only its onReferenceReady callback may unlock Host. If no seed exists,
             // KPM-only standalone sharing is valid and the page registration already succeeded.
-            if (mobileGsFingerprint == null) {
+            if (mobileGsDoodle == null) {
                 onReferenceRegistrationChanged(true)
             }
         }
@@ -587,7 +587,7 @@ fun SphereSlamStandaloneOverlay(
     // would align the guest to the wrong wall. Peer geometry therefore wins solely from the live
     // protocol-v3 session contract; local/persisted page state is irrelevant while it is active.
     val peerOnlyTracking =
-        shouldUseCoopPeerFingerprint(coopPeerSpatialFrame, coopPeerFingerprint)
+        shouldUseCoopPeerDoodle(coopPeerSpatialFrame, coopPeerDoodle)
     if (reference == null && !peerOnlyTracking && !sharedTargetCapture) {
         val pending = pendingReferenceBitmap
         if (pending != null) {
@@ -765,8 +765,8 @@ fun SphereSlamStandaloneOverlay(
     val swapPending = sharedTargetCapture && reference != null &&
         persistedReferenceUri != null && persistedReferenceUri != loadedReferenceUri
     val candidateUncommitted = referenceNeedsPersistence || awaitingReferencePersistence || swapPending
-    val runtimeMobileGsFingerprint =
-        if (candidateUncommitted) null else mobileGsFingerprint
+    val runtimeMobileGsDoodle =
+        if (candidateUncommitted) null else mobileGsDoodle
     // Snapshot persisted native state once per canonical page. Autosaves/grown-page commits publish
     // new project objects while THIS analyzer already owns the fresher live state; keying ordinary
     // autosaves into the effect would tear down tracking every few seconds.
@@ -835,7 +835,7 @@ fun SphereSlamStandaloneOverlay(
         glRenderer,
         peerOnlyTracking,
         coopPeerSpatialFrame,
-        mobileGsMapFromFingerprint,
+        mobileGsMapFromDoodle,
     ) {
         val mapAnchor =
             if (peerOnlyTracking && coopPeerSpatialFrame != null) {
@@ -847,11 +847,11 @@ fun SphereSlamStandaloneOverlay(
                     0f, 0f, 0f, 1f,
                 )
             } else {
-                mobileGsMapFromFingerprint
+                mobileGsMapFromDoodle
                     .takeIf { it.size == 16 && it.all(Float::isFinite) }
                     ?.toFloatArray()
             }
-        glRenderer.setMapFromFingerprint(mapAnchor)
+        glRenderer.setMapFromDoodle(mapAnchor)
     }
     // Full-view freshness mask: glow everywhere, then punch out only current photosphere tiles.
     // Seeded immediately from the map as it stands (all stale on a fresh map, so the whole view glows
@@ -984,10 +984,10 @@ fun SphereSlamStandaloneOverlay(
 
     // Push the SAME wall-local rigid placement/extents used by the standalone renderer into
     // MobileGS. This turns corroboration from global descriptor search into the spatially gated
-    // path and gives self-grow an unambiguous fingerprint-frame Φ when that experiment is enabled.
+    // path and gives self-grow an unambiguous doodle-frame Φ when that experiment is enabled.
     LaunchedEffect(
         slamManager,
-        runtimeMobileGsFingerprint,
+        runtimeMobileGsDoodle,
         designBitmap,
         designBaseHalfExtents,
         adjustment?.offsetX,
@@ -995,7 +995,7 @@ fun SphereSlamStandaloneOverlay(
         adjustment?.scale,
         adjustment?.rotation,
     ) {
-        val placement = if (runtimeMobileGsFingerprint == null || designBitmap == null) {
+        val placement = if (runtimeMobileGsDoodle == null || designBitmap == null) {
             null
         } else {
             standaloneDesignPlacement(
@@ -1007,7 +1007,7 @@ fun SphereSlamStandaloneOverlay(
             )
         }
         slamManager.setDesignPlacement(
-            placement?.fingerprintFromDesign,
+            placement?.doodleFromDesign,
             placement?.halfWidth ?: 0f,
             placement?.halfHeight ?: 0f,
         )
@@ -1205,7 +1205,7 @@ fun SphereSlamStandaloneOverlay(
         atlasLoaded,
         peerOnlyTracking,
         coopPeerSpatialFrame,
-        coopPeerFingerprint,
+        coopPeerDoodle,
         analyzerRestartGeneration,
     ) {
         // Re-arm the UI-post gate: a prior disposal set this true, and this fresh analyzer's posts
@@ -1218,7 +1218,7 @@ fun SphereSlamStandaloneOverlay(
         val restoredAtlas = atlasReferenceImages
         val standaloneReference = referenceImage
         // SphereSLAM is the base runtime. Start its analyzer as soon as CameraX + atlas state exist,
-        // even before any fingerprint/reference page has been created.
+        // even before any doodle/reference page has been created.
         if (
             !shouldStartStandaloneAnalyzer(
                 cameraIdPresent = id != null,
@@ -1238,16 +1238,16 @@ fun SphereSlamStandaloneOverlay(
             }
             if (peerOnlyTracking) {
                 val peerSpatial = coopPeerSpatialFrame
-                val peerFingerprint = coopPeerFingerprint
-                if (peerSpatial == null || peerFingerprint == null || peerFingerprint.isEmpty()) {
+                val peerDoodle = coopPeerDoodle
+                if (peerSpatial == null || peerDoodle == null || peerDoodle.isEmpty()) {
                     executor.shutdown()
                     onDispose {}
                 } else {
-                    val analyzer = CoopPeerFingerprintAnalyzer(
+                    val analyzer = CoopPeerDoodleAnalyzer(
                         context = context,
                         cameraId = activeCameraId,
                         slam = slamManager,
-                        peerFingerprint = peerFingerprint,
+                        peerDoodle = peerDoodle,
                         spatialFrame = peerSpatial,
                         onFrameTracked = ::consumeTrackedFrame,
                         onDiagnostic = { text -> postUi { onDiagnostic(text) } },
@@ -1271,10 +1271,10 @@ fun SphereSlamStandaloneOverlay(
                 referenceImage = standaloneReference,
                 atlasReferenceImages = activeAtlas,
                 slamManager = slamManager,
-                mobileGsFingerprint = runtimeMobileGsFingerprint,
-                mobileGsFingerprintFrameVersion = mobileGsFingerprintFrameVersion,
-                mobileGsMapFromFingerprint =
-                    mobileGsMapFromFingerprint.takeIf { it.size == 16 }?.toFloatArray(),
+                mobileGsDoodle = runtimeMobileGsDoodle,
+                mobileGsDoodleFrameVersion = mobileGsDoodleFrameVersion,
+                mobileGsMapFromDoodle =
+                    mobileGsMapFromDoodle.takeIf { it.size == 16 }?.toFloatArray(),
                 mobileGsWallFeatureMap = initialMobileGsWallFeatureMap,
                 mobileGsWallFeatureMapFrameVersion = initialMobileGsWallFeatureMapFrameVersion,
                 onReferenceReady = { registered: PhotosphereTrackingSession.RegisteredPage ->
@@ -1368,7 +1368,7 @@ fun SphereSlamStandaloneOverlay(
                 onMapFromFingerprintSolved = onMapFromFingerprintSolved,
                 onPhotosphereKeyframe = { keyframe ->
                     // Base-map update first so the current-tile read below observes the newly captured
-                    // tile. This path works before a fingerprint/KPM pose exists.
+                    // tile. This path works before a doodle/KPM pose exists.
                     onPhotosphereKeyframe(keyframe)
                     val k = keyframe.intrinsics
                     val keyframeIntrinsics = CameraIntrinsics(
@@ -1434,7 +1434,7 @@ fun SphereSlamStandaloneOverlay(
                                 // the analyzer so it tracks the restored page. The base photosphere
                                 // tiles/keyframes live in the view model (heading/elevation keyed),
                                 // so they survive; the new session re-seeds its rotation-only map
-                                // frame from its first attitude and re-solves map_from_fingerprint
+                                // frame from its first attitude and re-solves map_from_doodle
                                 // on its first lock — exactly as on any pause/resume restart.
                                 analyzerFatal = false
                                 analyzerRestartGeneration++
@@ -1485,9 +1485,9 @@ fun SphereSlamStandaloneOverlay(
 
     LaunchedEffect(
         referenceImage,
-        runtimeMobileGsFingerprint,
-        mobileGsFingerprintFrameVersion,
-        mobileGsMapFromFingerprint,
+        runtimeMobileGsDoodle,
+        mobileGsDoodleFrameVersion,
+        mobileGsMapFromDoodle,
         atlasReferenceImages,
         initialMobileGsWallFeatureMap,
         initialMobileGsWallFeatureMapFrameVersion,
@@ -1498,10 +1498,10 @@ fun SphereSlamStandaloneOverlay(
             standaloneAnalyzerRef.get()?.updatePrecisionLayer(
                 reference = referenceImage,
                 atlasPages = withGrownAtlasPages(loadedAtlas, grownAtlasPages),
-                fingerprint = runtimeMobileGsFingerprint,
-                fingerprintFrameVersion = mobileGsFingerprintFrameVersion,
+                doodle = runtimeMobileGsDoodle,
+                doodleFrameVersion = mobileGsDoodleFrameVersion,
                 mapFromFingerprint =
-                    mobileGsMapFromFingerprint.takeIf { it.size == 16 }?.toFloatArray(),
+                    mobileGsMapFromDoodle.takeIf { it.size == 16 }?.toFloatArray(),
                 wallFeatureMap = initialMobileGsWallFeatureMap,
                 wallFeatureMapFrameVersion = initialMobileGsWallFeatureMapFrameVersion,
             )
@@ -1583,7 +1583,7 @@ fun SphereSlamStandaloneOverlay(
                             ?: if (trackingState == StandaloneTrackingState.LOST) {
                                 stringResource(DesignR.string.standalone_wall_target_lost)
                             } else {
-                                strings.ar.reacquiringTarget
+                                strings.ar.reacquiringDoodle
                             },
                         color = Color.White,
                         modifier = Modifier

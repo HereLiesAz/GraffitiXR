@@ -53,10 +53,10 @@
 # native code calls them but R8 doesn't see those calls, so it removes them and
 # `GetMethodID`/`GetStaticMethodID` returns null at runtime, crashing with
 # `JNI DETECTED ERROR IN APPLICATION: mid == null`.
-# GraffitiJNI.cpp builds Fingerprints via the frozen static factory
-# Fingerprint.fromNative (see Fingerprint.JNI_FACTORY_DESCRIPTOR).
--keep class com.hereliesaz.graffitixr.common.model.Fingerprint { *; }
--keepclassmembers class com.hereliesaz.graffitixr.common.model.Fingerprint {
+# GraffitiJNI.cpp builds Doodles via the frozen static factory
+# Doodle.fromNative (see Doodle.JNI_FACTORY_DESCRIPTOR).
+-keep class com.hereliesaz.graffitixr.common.model.Doodle { *; }
+-keepclassmembers class com.hereliesaz.graffitixr.common.model.Doodle {
     <init>(...);
     public static ** fromNative(...);
 }

@@ -89,5 +89,5 @@ real camera and motion sensors. Confirm:
   race `Anchor.detach()` against the render thread.
 - Reopening a project without a live hybrid page still uses the durable MobileGS return-visit path;
   hybrid KPM correction resumes only after a new metric hybrid page is captured.
-- Existing anchor, target capture, scan/fingerprint, depth/plane, MobileGS relocalization, and
+- Existing anchor, target capture, scan/doodle, depth/plane, MobileGS relocalization, and
   teardown flows behave normally.

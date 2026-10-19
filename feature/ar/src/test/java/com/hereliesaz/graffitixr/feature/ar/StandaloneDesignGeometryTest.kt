@@ -63,12 +63,12 @@ class StandaloneDesignGeometryTest {
         )
 
         // Stored +90 CW becomes -90 in the right-handed wall frame.
-        assertEquals(0f, placement.fingerprintFromDesign[0], 0.0001f)
-        assertEquals(-1f, placement.fingerprintFromDesign[1], 0.0001f)
-        assertEquals(1f, placement.fingerprintFromDesign[4], 0.0001f)
-        assertEquals(0f, placement.fingerprintFromDesign[5], 0.0001f)
-        assertEquals(0.25f, placement.fingerprintFromDesign[12], 0.0001f)
-        assertEquals(-0.4f, placement.fingerprintFromDesign[13], 0.0001f)
+        assertEquals(0f, placement.doodleFromDesign[0], 0.0001f)
+        assertEquals(-1f, placement.doodleFromDesign[1], 0.0001f)
+        assertEquals(1f, placement.doodleFromDesign[4], 0.0001f)
+        assertEquals(0f, placement.doodleFromDesign[5], 0.0001f)
+        assertEquals(0.25f, placement.doodleFromDesign[12], 0.0001f)
+        assertEquals(-0.4f, placement.doodleFromDesign[13], 0.0001f)
         // Scale belongs only in the extents.
         assertEquals(2f, placement.halfWidth, 0.0001f)
         assertEquals(1f, placement.halfHeight, 0.0001f)

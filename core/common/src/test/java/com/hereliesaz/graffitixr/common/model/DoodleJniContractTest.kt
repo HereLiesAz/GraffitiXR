@@ -10,47 +10,47 @@ import org.junit.Test
 import org.opencv.core.KeyPoint
 
 /**
- * Guards the frozen JNI ABI between GraffitiJNI.cpp and [Fingerprint.fromNative].
+ * Guards the frozen JNI ABI between GraffitiJNI.cpp and [Doodle.fromNative].
  *
- * `buildFingerprintObject` (C++) looks the factory up by the exact name/descriptor in
- * [Fingerprint.JNI_FACTORY_NAME]/[Fingerprint.JNI_FACTORY_DESCRIPTOR]. Editing the factory's
+ * `buildDoodleObject` (C++) looks the factory up by the exact name/descriptor in
+ * [Doodle.JNI_FACTORY_NAME]/[Doodle.JNI_FACTORY_DESCRIPTOR]. Editing the factory's
  * signature — or reverting native code to the raw constructor, whose descriptor changes whenever
- * a defaulted field is added to the data class — silently breaks wall-fingerprint capture: the
- * native lookup returns null and setWallFingerprint yields null on every call. That exact failure
+ * a defaulted field is added to the data class — silently breaks wall-doodle capture: the
+ * native lookup returns null and setWallDoodle yields null on every call. That exact failure
  * has shipped twice (patchData, then markCenterLocal). If this test fails, fix the factory back
  * to the frozen signature or add a NEW factory for the new shape and update GraffitiJNI.cpp in
  * the same change.
  */
-class FingerprintJniContractTest {
+class DoodleJniContractTest {
 
     @Test
     fun `fromNative exists, is static, and matches the frozen JNI descriptor`() {
-        val method = Fingerprint::class.java.methods.singleOrNull {
-            it.name == Fingerprint.JNI_FACTORY_NAME && Modifier.isStatic(it.modifiers)
+        val method = Doodle::class.java.methods.singleOrNull {
+            it.name == Doodle.JNI_FACTORY_NAME && Modifier.isStatic(it.modifiers)
         }
         assertNotNull(
-            "Fingerprint must expose exactly one static ${Fingerprint.JNI_FACTORY_NAME} — " +
+            "Doodle must expose exactly one static ${Doodle.JNI_FACTORY_NAME} — " +
                 "GraffitiJNI.cpp resolves it with GetStaticMethodID",
             method,
         )
-        assertEquals(Fingerprint.JNI_FACTORY_DESCRIPTOR, jniDescriptorOf(method!!))
+        assertEquals(Doodle.JNI_FACTORY_DESCRIPTOR, jniDescriptorOf(method!!))
     }
 
     @Test
     fun `fromNative passes every field through unchanged`() {
         val keypoints = listOf(KeyPoint(1f, 2f, 3f, 4f, 5f, 6, 7))
         // TWO points for the two declared descriptor rows. The counts used to be arbitrary here —
-        // this test is about ABI pass-through, not geometry — but Fingerprint's init now requires
+        // this test is about ABI pass-through, not geometry — but Doodle's init now requires
         // points3d and descriptorsRows to be 1:1, because the reloc path subscripts the point list
         // by descriptor row. A mismatched fixture would throw inside the factory, which is also
-        // what a mismatched NATIVE payload now does (buildFingerprintObject's ExceptionCheck bails
-        // to nullptr instead of handing back a fingerprint that reads out of bounds).
+        // what a mismatched NATIVE payload now does (buildDoodleObject's ExceptionCheck bails
+        // to nullptr instead of handing back a doodle that reads out of bounds).
         val points3d = listOf(0.5f, -1.5f, 2f, 3.5f, 4f, -6.25f)
         val descriptors = byteArrayOf(1, 2, 3, 4)
         val patch = byteArrayOf(9, 8)
         val center = listOf(0.1f, 0.2f, 0.3f)
 
-        val fp = Fingerprint.fromNative(keypoints, points3d, descriptors, 2, 2, 0, patch, center)
+        val fp = Doodle.fromNative(keypoints, points3d, descriptors, 2, 2, 0, patch, center)
 
         assertEquals(keypoints, fp.keypoints)
         assertEquals(points3d, fp.points3d)
@@ -68,10 +68,10 @@ class FingerprintJniContractTest {
         // signature, this literal still fails the build until GraffitiJNI.cpp is reconciled.
         assertEquals(
             "(Ljava/util/List;Ljava/util/List;[BIII[BLjava/util/List;)" +
-                "Lcom/hereliesaz/graffitixr/common/model/Fingerprint;",
-            Fingerprint.JNI_FACTORY_DESCRIPTOR,
+                "Lcom/hereliesaz/graffitixr/common/model/Doodle;",
+            Doodle.JNI_FACTORY_DESCRIPTOR,
         )
-        assertEquals("fromNative", Fingerprint.JNI_FACTORY_NAME)
+        assertEquals("fromNative", Doodle.JNI_FACTORY_NAME)
     }
 
     /** Builds the JNI method descriptor for [method] from its erased parameter/return types. */

@@ -123,9 +123,9 @@ fun SettingsScreen(
     onCoverageGlowStyleChanged: (CoverageGlowStyle) -> Unit,
     anticipation: AnticipationSettings = AnticipationSettings.DEFAULT,
     onAnticipationChanged: (AnticipationSettings) -> Unit = {},
-    fingerprintFeatures: com.hereliesaz.graffitixr.common.model.FingerprintFeatures =
-        com.hereliesaz.graffitixr.common.model.FingerprintFeatures.DEFAULT,
-    onFingerprintFeaturesChanged: (com.hereliesaz.graffitixr.common.model.FingerprintFeatures) -> Unit = {},
+    doodleFeatures: com.hereliesaz.graffitixr.common.model.DoodleFeatures =
+        com.hereliesaz.graffitixr.common.model.DoodleFeatures.DEFAULT,
+    onDoodleFeaturesChanged: (com.hereliesaz.graffitixr.common.model.DoodleFeatures) -> Unit = {},
     onOpenReleasesPage: () -> Unit,
     onResetTutorials: () -> Unit,
     onClose: () -> Unit,
@@ -389,18 +389,18 @@ fun SettingsScreen(
                         item {
                             SettingsSectionTitle(strings.settings.anticipationSection)
                             AnticipationSettingsControls(anticipation, onAnticipationChanged, strings)
-                            // What the next target's fingerprint is made of: tap to cycle.
+                            // What the next target's doodle is made of: tap to cycle.
                             SettingsItem(
-                                label = strings.settings.fingerprintFeatures,
-                                value = fingerprintFeaturesLabel(fingerprintFeatures, strings),
+                                label = strings.settings.doodleFeatures,
+                                value = doodleFeaturesLabel(doodleFeatures, strings),
                                 modifier = Modifier.clickable {
-                                    onFingerprintFeaturesChanged(
-                                        com.hereliesaz.graffitixr.common.model.FingerprintFeatures.next(fingerprintFeatures),
+                                    onDoodleFeaturesChanged(
+                                        com.hereliesaz.graffitixr.common.model.DoodleFeatures.next(doodleFeatures),
                                     )
                                 },
                             )
                             Text(
-                                text = fingerprintFeaturesDescription(fingerprintFeatures, strings),
+                                text = doodleFeaturesDescription(doodleFeatures, strings),
                                 color = Color.Gray,
                                 fontSize = 12.sp,
                             )
@@ -674,23 +674,23 @@ private fun glowColorLabel(color: CoverageGlowColor, strings: AppStrings): Strin
     CoverageGlowColor.CYAN -> strings.settings.glowColorCyan
 }
 
-// Exhaustive on purpose: a new FingerprintFeatures entry won't compile until it has a label here.
-private fun fingerprintFeaturesLabel(
-    features: com.hereliesaz.graffitixr.common.model.FingerprintFeatures,
+// Exhaustive on purpose: a new DoodleFeatures entry won't compile until it has a label here.
+private fun doodleFeaturesLabel(
+    features: com.hereliesaz.graffitixr.common.model.DoodleFeatures,
     strings: AppStrings,
 ): String = when (features) {
-    com.hereliesaz.graffitixr.common.model.FingerprintFeatures.SUPERPOINT -> strings.settings.fingerprintSuperPoint
-    com.hereliesaz.graffitixr.common.model.FingerprintFeatures.HALF_SPHERE -> strings.settings.fingerprintHalfSphere
-    com.hereliesaz.graffitixr.common.model.FingerprintFeatures.BOTH -> strings.settings.fingerprintBoth
+    com.hereliesaz.graffitixr.common.model.DoodleFeatures.SUPERPOINT -> strings.settings.doodleSuperPoint
+    com.hereliesaz.graffitixr.common.model.DoodleFeatures.HALF_SPHERE -> strings.settings.doodleHalfSphere
+    com.hereliesaz.graffitixr.common.model.DoodleFeatures.BOTH -> strings.settings.doodleBoth
 }
 
-private fun fingerprintFeaturesDescription(
-    features: com.hereliesaz.graffitixr.common.model.FingerprintFeatures,
+private fun doodleFeaturesDescription(
+    features: com.hereliesaz.graffitixr.common.model.DoodleFeatures,
     strings: AppStrings,
 ): String = when (features) {
-    com.hereliesaz.graffitixr.common.model.FingerprintFeatures.SUPERPOINT -> strings.settings.fingerprintSuperPointDesc
-    com.hereliesaz.graffitixr.common.model.FingerprintFeatures.HALF_SPHERE -> strings.settings.fingerprintHalfSphereDesc
-    com.hereliesaz.graffitixr.common.model.FingerprintFeatures.BOTH -> strings.settings.fingerprintBothDesc
+    com.hereliesaz.graffitixr.common.model.DoodleFeatures.SUPERPOINT -> strings.settings.doodleSuperPointDesc
+    com.hereliesaz.graffitixr.common.model.DoodleFeatures.HALF_SPHERE -> strings.settings.doodleHalfSphereDesc
+    com.hereliesaz.graffitixr.common.model.DoodleFeatures.BOTH -> strings.settings.doodleBothDesc
 }
 
 // Exhaustive on purpose: a new CoverageGlowStyle entry won't compile until it has a label here.

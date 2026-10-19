@@ -11,7 +11,7 @@ We are building a tool that respects the "flow" of painting. It must be:
 
 ## Core Pillars
 
-### 1. Fingerprint Relocalization (not a persistent 3D map)
+### 1. Doodle Relocalization (not a persistent 3D map)
 
 An earlier design pivot considered a dense, always-on voxel/surfel map of the wall (a "Persistent
 Voxel Memory," rejecting Gaussian Splatting in favour of opaque surfels with hardware Z-buffering).
@@ -21,11 +21,11 @@ splat layer, no scene reconstruction, and no `draw()`." What shipped instead:
 
 * **Goal:** Recognize the wall instantly after tracking loss or a screen-off event, without a room
   pre-scan and without the cloud.
-* **Architecture:** A C++17 engine (`MobileGS`) fingerprints the marks the artist draws on the wall —
+* **Architecture:** A C++17 engine (`MobileGS`) doodles the marks the artist draws on the wall —
   ORB/SuperPoint descriptors plus a handful of triangulated 3D points — rather than densely mapping
   the whole surface.
 * **Relocalization:** A background thread continuously matches the live camera against that
-  fingerprint and solves the pose with `solvePnPRansac`.
+  doodle and solves the pose with `solvePnPRansac`.
 * **Dual-lens hardware depth is used when available, not mandatory** — it improves the metric scale
   prior on devices that expose stereo depth; devices without it get metric scale from the artist's
   natural step-in/step-back baseline (two-keyframe triangulation), not a lower-confidence fallback of
@@ -39,10 +39,10 @@ splat layer, no scene reconstruction, and no `draw()`." What shipped instead:
 
 ### 3. The Time Capsule (Persistence)
 * **Goal:** A digital sketch should remain on the wall for weeks.
-* **Tech:** Local feature descriptors (ORB/SuperPoint) matched against the saved wall fingerprint via
+* **Tech:** Local feature descriptors (ORB/SuperPoint) matched against the saved wall doodle via
   PnP — not a voxel map (see Pillar 1).
 * **UX:** When the artist returns, the app recognizes the wall texture and "snaps" the mural back
-  into place. Two mechanisms that extend this — drift correction and a self-growing fingerprint —
+  into place. Two mechanisms that extend this — drift correction and a self-growing doodle —
   ship opt-in and off by default; see [`TELEOLOGICAL_SLAM.md`](TELEOLOGICAL_SLAM.md).
 
 ## Anti-Goals (What we are NOT building)
@@ -52,7 +52,7 @@ splat layer, no scene reconstruction, and no `draw()`." What shipped instead:
 
 ---
 *Documentation updated on 2026-09-04: replaced the "Persistent Voxel Memory" pillar — never built,
-and explicitly documented as absent in `NATIVE_ENGINE.md` — with the fingerprint-relocalization
+and explicitly documented as absent in `NATIVE_ENGINE.md` — with the doodle-relocalization
 architecture that actually shipped; corrected the "dual-lens mandatory" claim; pointed Pillar 3 at
-the wall fingerprint instead of the nonexistent voxel map. Prior update: 2026-06-22, SLAM right-size
+the wall doodle instead of the nonexistent voxel map. Prior update: 2026-06-22, SLAM right-size
 and documentation-accuracy pass.*

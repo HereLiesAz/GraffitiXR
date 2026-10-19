@@ -103,7 +103,7 @@ class DriftCostProbe(
      *   describe the same tick rather than two samples taken at different times.
      * @param captureRotationNeededDeg `rotationNeeded` at the moment the ACTIVE TARGET was
      *   captured, or -1 if unknown. **E0b's independent variable** — the frame mismatch is baked
-     *   into the fingerprint at capture, so this and not [liveRotationNeededDeg] is what results
+     *   into the doodle at capture, so this and not [liveRotationNeededDeg] is what results
      *   must be grouped by. See [EvalSample.captureRotationNeededDeg].
      * @param liveRotationNeededDeg `rotationNeeded` for this tick — how the device is held right
      *   now. Secondary; see [EvalSample.liveRotationNeededDeg].

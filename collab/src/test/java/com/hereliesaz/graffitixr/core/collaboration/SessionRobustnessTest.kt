@@ -29,7 +29,7 @@ import org.junit.Test
 class SessionRobustnessTest {
 
     private fun newHost(
-        fingerprint: ByteArray = ByteArray(128) { it.toByte() },
+        doodle: ByteArray = ByteArray(128) { it.toByte() },
         project: ByteArray = ByteArray(256) { (it * 3).toByte() },
     ) = HostSession(
         token = "tok",
@@ -37,7 +37,7 @@ class SessionRobustnessTest {
         localDeviceName = "host",
         projectId = "p1",
         snapshotProvider = { ProjectSnapshot(
-            fingerprintBytes = fingerprint,
+            doodleBytes = doodle,
             projectBytes = project,
             layerCount = 0,
             spatialFrame = testSpatialFrame(),

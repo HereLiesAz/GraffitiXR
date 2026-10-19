@@ -161,16 +161,16 @@ class DiagnosticRecorder(
         // Root cause first, when there is one.
         //
         // A device run produced four "never happened" bullets — no lock, no correction, no gated
-        // corroboration, no promotion — which read as four faults and were one: the fingerprint was
+        // corroboration, no promotion — which read as four faults and were one: the doodle was
         // empty, so nothing downstream could run. Listing consequences beside their cause, in no
         // particular order, makes the reader diagnose the report before they can diagnose the app.
         //
         // This is the opposite failure from the one the section was written for, and just as costly:
         // not too few findings, too many.
-        val noFingerprint = ring.all { it.reloc.reject == RelocReject.NO_FINGERPRINT }
-        if (noFingerprint) {
+        val noDoodle = ring.all { it.reloc.reject == RelocReject.NO_DOODLE }
+        if (noDoodle) {
             sb.appendLine(
-                "**Root cause: there was no wall fingerprint for the entire window.** The target " +
+                "**Root cause: there was no wall doodle for the entire window.** The target " +
                     "was never created, or its capture produced no usable points. Relocalization " +
                     "returns before it even runs its detector in this state, so every finding " +
                     "below follows from this one and is not a separate fault.",
@@ -199,11 +199,11 @@ class DiagnosticRecorder(
                 // constant is not a finding, and the first reader to chase it wastes the trip.
                 if (ring.all { it.fusion.state == FusionState.DISABLED }) {
                     add("fusion was OFF for the whole run (expected — it ships default-off)")
-                } else if (ring.any { it.fusion.state == FusionState.NO_FINGERPRINT }) {
-                    add("fusion had no fingerprint to compose against — a consequence, not a fault")
+                } else if (ring.any { it.fusion.state == FusionState.NO_DOODLE }) {
+                    add("fusion had no doodle to compose against — a consequence, not a fault")
                 } else if (ring.any { it.fusion.state == FusionState.NO_CAPTURE_POSE }) {
                     add(
-                        "fusion was skipped because the fingerprint carries no capture pose " +
+                        "fusion was skipped because the doodle carries no capture pose " +
                             "(pre-Phase-2 target — re-create it)",
                     )
                 } else {

@@ -36,31 +36,31 @@ class HybridKpmPage(
         const val MAX_DIMENSION_PX = 4096
 
         /**
-         * The fingerprint key a page frozen during a capture may commit under, or null if it may not
+         * The doodle key a page frozen during a capture may commit under, or null if it may not
          * commit yet (or ever). Commits only into the capture's own project, and only once that
-         * project's fingerprint differs from the value it held when the capture started — whether
-         * that change landed before or after the page froze (the fingerprint build and the page
+         * project's doodle differs from the value it held when the capture started — whether
+         * that change landed before or after the page froze (the doodle build and the page
          * anchor's first TRACKING frame race).
          *
-         * Residual, accepted: if a new capture is started while an EARLIER capture's fingerprint
-         * build is still running, that earlier fingerprint landing can bind this page. When this
-         * capture's own fingerprint then lands, the key mismatch makes the page inert (not wrong);
+         * Residual, accepted: if a new capture is started while an EARLIER capture's doodle
+         * build is still running, that earlier doodle landing can bind this page. When this
+         * capture's own doodle then lands, the key mismatch makes the page inert (not wrong);
          * it is wrong only if this capture's build also fails.
          */
         fun commitKeyOrNull(
             projectId: String,
             captureProjectId: String?,
-            fingerprintKey: List<Float>?,
+            doodleKey: List<Float>?,
             keyAtCapture: List<Float>?,
         ): List<Float>? {
             if (keyAtCapture == null || projectId != captureProjectId) return null
-            val key = fingerprintKey?.takeIf { it.size == 16 } ?: return null
+            val key = doodleKey?.takeIf { it.size == 16 } ?: return null
             return key.takeIf { it != keyAtCapture }
         }
 
-        /** True when a persisted page bound to [boundKey] belongs to the fingerprint [fingerprintKey]. */
-        fun isBoundTo(fingerprintKey: List<Float>?, boundKey: List<Float>): Boolean =
-            fingerprintKey != null && fingerprintKey.size == 16 && fingerprintKey == boundKey
+        /** True when a persisted page bound to [boundKey] belongs to the doodle [doodleKey]. */
+        fun isBoundTo(doodleKey: List<Float>?, boundKey: List<Float>): Boolean =
+            doodleKey != null && doodleKey.size == 16 && doodleKey == boundKey
 
         /** Rebuild from persisted project fields; null when they are absent or inconsistent. */
         fun fromPersisted(

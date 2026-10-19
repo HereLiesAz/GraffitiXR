@@ -53,15 +53,15 @@ class MainViewModelTest {
     fun `initial state is correct`() = runTest {
         val state = viewModel.uiState.value
         assertEquals(false, state.isTouchLocked)
-        assertEquals(false, state.isCapturingTarget)
+        assertEquals(false, state.isCapturingDoodle)
     }
 
     @Test
-    fun `startTargetCapture updates state`() = runTest {
-        viewModel.startTargetCapture()
+    fun `startDoodleCapture updates state`() = runTest {
+        viewModel.startDoodleCapture()
 
         val state = viewModel.uiState.value
-        assertEquals(true, state.isCapturingTarget)
+        assertEquals(true, state.isCapturingDoodle)
         assertEquals(true, state.isWaitingForTap)
         assertEquals(CaptureStep.NONE, state.captureStep)
     }

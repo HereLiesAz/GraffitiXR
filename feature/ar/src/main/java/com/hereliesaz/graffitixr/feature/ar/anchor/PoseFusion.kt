@@ -69,14 +69,14 @@ class PoseFusion {
      * Clears the persistent local correction back to its initial (no-correction) state and re-arms
      * the cold-start snap, as if this PoseFusion had just been constructed.
      *
-     * Call this when a NEW anchor/fingerprint is established inside an already-running session (the
+     * Call this when a NEW anchor/doodle is established inside an already-running session (the
      * artist re-captures a target). [markRelocalizing] alone does not clear `correction` — by design,
      * a plain tracking loss keeps the standing anchor-local correction so a returning lock resumes
      * where it left off. A re-capture is different: the anchor-local frame itself changed, so a
      * correction expressed in the OLD anchor frame is now meaningless and must be cleared.
      *
      * @param consumedRelocSeq the native reloc result seq (`reloc[18]`) as of this reset. The result
-     *   it names was solved against the OLD fingerprint/anchor, so it is adopted as already
+     *   it names was solved against the OLD doodle/anchor, so it is adopted as already
      *   consumed: only a seq that DIFFERS from it (a solve that finished after the re-capture) can
      *   correct. Resetting `lastSeq` to 0 instead made the still-latched pre-capture result look
      *   brand new on the next frame, and — correction being null and the cold flag re-armed — it
@@ -179,13 +179,13 @@ class PoseFusion {
          *
          *  - `pnpMat` comes out of `solvePnP` in the **CV** convention (+Y down, +Z forward) and was
          *    being chained straight onto a **GL** view inverse, so Y and Z were flipped;
-         *  - its domain is the **fingerprint** frame — the display-oriented CV camera at capture —
+         *  - its domain is the **doodle** frame — the display-oriented CV camera at capture —
          *    while `fpAnchor` was a world-space model matrix, so the capture view was missing
          *    entirely.
          *
          * [captureAnchorCam] repairs the second and half of the first at once. It is
          * `V_cv(capture) · anchorModel`, which Phase 2 already builds, persists on the
-         * `Fingerprint`, and partitions the footprint with — so this needs no new geometry, only a
+         * `Doodle`, and partitions the footprint with — so this needs no new geometry, only a
          * quantity the project already computes for another reason.
          *
          * **`D` here is the fixed CV↔GL axis-conversion matrix, not PoseFusion's persistent
@@ -199,8 +199,8 @@ class PoseFusion {
          * Verified by a zero-drift invariant rather than by inspection: with no drift the correction
          * must be the identity, so this must return `anchorModel` unchanged. It does, to 4.8e-7.
          *
-         * @param captureAnchorCam `Fingerprint.captureAnchorCam` — NOT the live anchor pose and NOT
-         *   `getFingerprintAnchor()`. Passing a world-frame anchor here is the defect being fixed.
+         * @param captureAnchorCam `Doodle.captureAnchorCam` — NOT the live anchor pose and NOT
+         *   `getDoodleAnchor()`. Passing a world-frame anchor here is the defect being fixed.
          */
         fun composeCorrected(
             vCurrent: FloatArray,
@@ -223,9 +223,9 @@ class PoseFusion {
         /**
          * A reloc fix expressed for the camera NOW rather than the camera at solve time.
          *
-         * All three are `camera_from_fingerprint` GL views: [liveView] now, [solveView] the same
+         * All three are `camera_from_doodle` GL views: [liveView] now, [solveView] the same
          * quantity at the frame the reloc was solved on, and [relocView] what the reloc says it was
-         * at that frame. The fingerprint-local difference `C = solveView⁻¹ ∘ relocView` is the
+         * at that frame. The doodle-local difference `C = solveView⁻¹ ∘ relocView` is the
          * reloc's actual claim about the reference (it contains none of the hand motion between solve
          * and now); the estimate for the live camera is `liveView ∘ C`. With no drift
          * (`relocView == solveView`) this is exactly [liveView].
@@ -259,7 +259,7 @@ class PoseFusion {
      *   [16]=inlierCount, [17]=matchCount, [18]=seq, [19..34]=view matrix of the solve frame (see
      *   [solveViewOf]). A legacy 19-float result is still accepted. Read-only here and never
      *   retained, so the caller may pass a reused buffer (`SlamManager.getRelocResultInto`).
-     * @param captureAnchorCam `Fingerprint.captureAnchorCam` — the anchor's pose in the CAPTURE
+     * @param captureAnchorCam `Doodle.captureAnchorCam` — the anchor's pose in the CAPTURE
      *   camera's CV frame, `V_cv(capture) · anchorModel`. Renamed from `fpAnchor` as part of 0.9:
      *   the old name and the old value were both a world-frame model matrix, which is the frame
      *   error that item fixes. See [composeCorrected].

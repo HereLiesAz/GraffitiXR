@@ -33,18 +33,18 @@ cv::Mat makeWall(int w, int h, uint64_t seed = 0x9a11) {
     return img;
 }
 
-// A metric fingerprint of [img] as a frontal wall at Z = 1 m in the capture camera's (OpenCV) frame,
-// built by the production generateFingerprint path from a constant 1000 mm depth map.
-void fingerprintFrontalWall(MobileGS& g, const cv::Mat& img, const float K[4]) {
+// A metric doodle of [img] as a frontal wall at Z = 1 m in the capture camera's (OpenCV) frame,
+// built by the production generateDoodle path from a constant 1000 mm depth map.
+void doodleFrontalWall(MobileGS& g, const cv::Mat& img, const float K[4]) {
     const int dw = img.cols / 4, dh = img.rows / 4;
     std::vector<uint16_t> depth((size_t)dw * dh, 1000);
     const float view[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    auto fd = g.generateFingerprint(img, cv::Mat(), reinterpret_cast<const uint8_t*>(depth.data()),
+    auto fd = g.generateDoodle(img, cv::Mat(), reinterpret_cast<const uint8_t*>(depth.data()),
                                     dw, dh, dw * (int)sizeof(uint16_t), K, view);
     ASSERT_GE(g.getWallKeypointCount(), 50) << "synthetic wall too featureless for the test";
 }
 
-// fingerprint_from_design for a design composite that IS the captured image, laid on the Z = 1 wall:
+// doodle_from_design for a design composite that IS the captured image, laid on the Z = 1 wall:
 // design-local (lx, ly) = image (u, v) mapped through the capture camera. OverlayRenderer's V flip
 // means design +y is image -y, hence the -1 on Y (and Z, to keep it a proper rotation).
 void placeDesignOnImage(MobileGS& g, int w, int h, const float K[4], float out[16], float& hw, float& hh) {
@@ -78,7 +78,7 @@ TEST(MobileGSEvalSync, RunsExactlyOnePassEveryNFramesAndResetsPhaseOnToggle) {
     g.initialize(0, 0);
     const cv::Mat wall = makeWall(320, 240);
     const float K[4] = {300.f, 300.f, 160.f, 120.f};
-    fingerprintFrontalWall(g, wall, K);
+    doodleFrontalWall(g, wall, K);
 
     // A pass always overwrites the reject code, so a sentinel tells which frames ran one.
     auto countPasses = [&](int frames) {
@@ -105,12 +105,12 @@ TEST(MobileGSEvalSync, RunsExactlyOnePassEveryNFramesAndResetsPhaseOnToggle) {
 
 // ---- Reloc pass behaviour ------------------------------------------------------------------------
 
-TEST(MobileGSReloc, LocksOnTheFingerprintedWallAndPublishesTheLiveCamera) {
+TEST(MobileGSReloc, LocksOnTheDoodledWallAndPublishesTheLiveCamera) {
     MobileGS g;
     g.initialize(0, 0);
     const cv::Mat full = makeWall(800, 600);
     const float Kfp[4] = {700.f, 700.f, 400.f, 300.f};
-    fingerprintFrontalWall(g, full, Kfp);
+    doodleFrontalWall(g, full, Kfp);
 
     // The live frame is a CROP of the capture: same focal, shifted principal point. Correct
     // geometry is only recovered if the solve and every consumer use the LIVE camera.
@@ -124,7 +124,7 @@ TEST(MobileGSReloc, LocksOnTheFingerprintedWallAndPublishesTheLiveCamera) {
     ASSERT_EQ(MobileGS::kRelocOk, g.lastRelocReject());
     float out[35];
     g.getRelocResult(out, false);
-    // camera_from_fingerprint: the live camera is the capture camera, so ~identity.
+    // camera_from_doodle: the live camera is the capture camera, so ~identity.
     EXPECT_NEAR(0.f, out[12], 0.02f);
     EXPECT_NEAR(0.f, out[13], 0.02f);
     EXPECT_NEAR(0.f, out[14], 0.02f);
@@ -137,9 +137,9 @@ TEST(MobileGSReloc, LocksOnTheFingerprintedWallAndPublishesTheLiveCamera) {
     g.destroy();
 }
 
-// The standalone (SphereSLAM) fingerprint frame: points on the centred page plane z = 0, Y up, an
-// identity fingerprint anchor — no capture camera. A live camera square-on to the page must lock
-// and report camera_from_fingerprint in that frame: page x → image right, page y (up) → image down,
+// The standalone (SphereSLAM) doodle frame: points on the centred page plane z = 0, Y up, an
+// identity doodle anchor — no capture camera. A live camera square-on to the page must lock
+// and report camera_from_doodle in that frame: page x → image right, page y (up) → image down,
 // so R = diag(1, −1, −1) and the page lies `distance` ahead.
 TEST(MobileGSReloc, LocksOnAStandalonePageFrameFingerprint) {
     MobileGS g;
@@ -160,7 +160,7 @@ TEST(MobileGSReloc, LocksOnAStandalonePageFrameFingerprint) {
     const float identity[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     // A camera `distance` from the page with f = distance / unitsPerPx sees the page 1:1.
     const float K[4] = {distance / unitsPerPx, distance / unitsPerPx, cx, cy};
-    g.restoreWallFingerprintMetric(descs, points, identity, K);
+    g.restoreWallDoodleMetric(descs, points, identity, K);
     EXPECT_FALSE(MobileGSTestPeer::hasView(g)) << "a page frame has no capture-camera view";
 
     g.setLiveIntrinsics(K);
@@ -170,7 +170,7 @@ TEST(MobileGSReloc, LocksOnAStandalonePageFrameFingerprint) {
     ASSERT_EQ(MobileGS::kRelocOk, g.lastRelocReject());
     float out[35];
     g.getRelocResult(out, false);
-    // Column-major camera_from_fingerprint.
+    // Column-major camera_from_doodle.
     EXPECT_NEAR(1.f, out[0], 0.02f);
     EXPECT_NEAR(-1.f, out[5], 0.02f);
     EXPECT_NEAR(-1.f, out[10], 0.02f);
@@ -186,7 +186,7 @@ TEST(MobileGSReloc, PaintMarkCorrespondencesCountInThePublishedMatchTotal) {
     g.initialize(0, 0);
     const cv::Mat wall = makeWall(640, 480);
     const float K[4] = {600.f, 600.f, 320.f, 240.f};
-    fingerprintFrontalWall(g, wall, K);
+    doodleFrontalWall(g, wall, K);
     g.setLiveIntrinsics(K);
     g.setEvalSyncReloc(true, 1);
     g.scheduleRelocCheck(wall);
@@ -219,9 +219,9 @@ TEST(MobileGSReloc, GatedCorroborationProjectsWithTheLiveCamera) {
     g.initialize(0, 0);
     const cv::Mat full = makeWall(800, 600, 0x51de);
     const float Kfp[4] = {700.f, 700.f, 400.f, 300.f};
-    fingerprintFrontalWall(g, full, Kfp);
+    doodleFrontalWall(g, full, Kfp);
     // The design composite is the captured image itself, placed exactly where it was captured.
-    g.setArtworkFingerprint(full, nullptr, 0, 0, 0, nullptr, nullptr);
+    g.setArtworkDoodle(full, nullptr, 0, 0, 0, nullptr, nullptr);
     float fpFromDesign[16]; float hw, hh;
     placeDesignOnImage(g, full.cols, full.rows, Kfp, fpFromDesign, hw, hh);
 
@@ -251,10 +251,10 @@ TEST(MobileGSReloc, EarlyOutAttemptsDoNotKeepThePreviousOutcomeCodes) {
     g.initialize(0, 0);
     const cv::Mat wall = makeWall(320, 240);
     const float K[4] = {300.f, 300.f, 160.f, 120.f};
-    fingerprintFrontalWall(g, wall, K);
+    doodleFrontalWall(g, wall, K);
     g.setEvalSyncReloc(true, 1);
 
-    // No artwork registered: the pass reaches tryUpdateFingerprint, which returns before the
+    // No artwork registered: the pass reaches tryUpdateDoodle, which returns before the
     // promotion block -- and must not leave the previous attempt's grow verdict standing.
     MobileGSTestPeer::setCorrobGate(g, MobileGS::kCorrobGated);
     MobileGSTestPeer::setGrowOutcome(g, MobileGS::kGrowPromoted);
@@ -262,24 +262,24 @@ TEST(MobileGSReloc, EarlyOutAttemptsDoNotKeepThePreviousOutcomeCodes) {
     EXPECT_EQ(MobileGS::kCorrobNoArtwork, g.corrobGateReason());
     EXPECT_EQ(MobileGS::kGrowNotRun, g.growOutcome());
 
-    // Fingerprint replaced by one with no 3D points: the pass returns before tryUpdateFingerprint.
+    // Doodle replaced by one with no 3D points: the pass returns before tryUpdateDoodle.
     MobileGSTestPeer::setCorrobGate(g, MobileGS::kCorrobGated);
     MobileGSTestPeer::setGrowOutcome(g, MobileGS::kGrowPromoted);
-    g.restoreWallFingerprint(cv::Mat(3, 32, CV_8U, cv::Scalar(1)), {});
+    g.restoreWallDoodle(cv::Mat(3, 32, CV_8U, cv::Scalar(1)), {});
     g.scheduleRelocCheck(wall);
-    EXPECT_EQ(MobileGS::kRelocNoFingerprint, g.lastRelocReject());
+    EXPECT_EQ(MobileGS::kRelocNoDoodle, g.lastRelocReject());
     EXPECT_EQ(MobileGS::kCorrobNotRun, g.corrobGateReason());
     EXPECT_EQ(MobileGS::kGrowNotRun, g.growOutcome());
     g.setEvalSyncReloc(false, 1);
     g.destroy();
 }
 
-TEST(MobileGSReloc, ASolveInFlightWhenTheFingerprintIsReplacedNeverPublishes) {
+TEST(MobileGSReloc, ASolveInFlightWhenTheDoodleIsReplacedNeverPublishes) {
     MobileGS g;
     g.initialize(0, 0);
     const cv::Mat wall = makeWall(640, 480);
     const float K[4] = {600.f, 600.f, 320.f, 240.f};
-    fingerprintFrontalWall(g, wall, K);
+    doodleFrontalWall(g, wall, K);
     g.setEvalSyncReloc(true, 1);
 
     // Control: with nothing replaced the same frame locks, so the assertions below are about the
@@ -288,17 +288,17 @@ TEST(MobileGSReloc, ASolveInFlightWhenTheFingerprintIsReplacedNeverPublishes) {
     ASSERT_EQ(MobileGS::kRelocOk, g.lastRelocReject());
     const long seqBefore = MobileGSTestPeer::pnpSeq(g);
 
-    // Replace the fingerprint (a re-capture's restore) at the instant the solve is about to publish.
+    // Replace the doodle (a re-capture's restore) at the instant the solve is about to publish.
     MobileGSTestPeer::setBeforeRelocPublishHook(g, [&g] {
-        g.restoreWallFingerprint(cv::Mat(3, 32, CV_8U, cv::Scalar(5)), {{0,0,1}, {1,0,1}, {0,1,1}});
+        g.restoreWallDoodle(cv::Mat(3, 32, CV_8U, cv::Scalar(5)), {{0,0,1}, {1,0,1}, {0,1,1}});
     });
     g.scheduleRelocCheck(wall);
     MobileGSTestPeer::setBeforeRelocPublishHook(g, nullptr);
 
-    EXPECT_EQ(seqBefore, MobileGSTestPeer::pnpSeq(g)) << "a solve against the replaced fingerprint advanced the seq";
+    EXPECT_EQ(seqBefore, MobileGSTestPeer::pnpSeq(g)) << "a solve against the replaced doodle advanced the seq";
     float out[35];
     g.getRelocResult(out, true);
-    EXPECT_FLOAT_EQ(0.f, out[16]) << "the old wall's inliers were latched onto the new fingerprint";
+    EXPECT_FLOAT_EQ(0.f, out[16]) << "the old wall's inliers were latched onto the new doodle";
     EXPECT_FLOAT_EQ(0.f, out[17]);
     for (int i = 0; i < 16; ++i) EXPECT_FLOAT_EQ(i % 5 == 0 ? 1.f : 0.f, out[i]) << "pose[" << i << "]";
     EXPECT_NE(MobileGS::kRelocOk, g.lastRelocReject());
@@ -306,15 +306,15 @@ TEST(MobileGSReloc, ASolveInFlightWhenTheFingerprintIsReplacedNeverPublishes) {
     g.destroy();
 }
 
-TEST(MobileGSReloc, ASolveInFlightWhenTheFingerprintIsClearedNeverPublishes) {
+TEST(MobileGSReloc, ASolveInFlightWhenTheDoodleIsClearedNeverPublishes) {
     MobileGS g;
     g.initialize(0, 0);
     const cv::Mat wall = makeWall(640, 480);
     const float K[4] = {600.f, 600.f, 320.f, 240.f};
-    fingerprintFrontalWall(g, wall, K);
+    doodleFrontalWall(g, wall, K);
     g.setEvalSyncReloc(true, 1);
     const long seqBefore = MobileGSTestPeer::pnpSeq(g);
-    MobileGSTestPeer::setBeforeRelocPublishHook(g, [&g] { g.clearWallFingerprint(); });
+    MobileGSTestPeer::setBeforeRelocPublishHook(g, [&g] { g.clearWallDoodle(); });
     g.scheduleRelocCheck(wall);
     MobileGSTestPeer::setBeforeRelocPublishHook(g, nullptr);
     EXPECT_EQ(seqBefore, MobileGSTestPeer::pnpSeq(g));
@@ -325,7 +325,7 @@ TEST(MobileGSReloc, ASolveInFlightWhenTheFingerprintIsClearedNeverPublishes) {
 
 // ---- Pure helpers --------------------------------------------------------------------------------
 
-TEST(MobileGSIntrinsics, LiveWinsThenFingerprintThenAFrameCentredDefault) {
+TEST(MobileGSIntrinsics, LiveWinsThenDoodleThenAFrameCentredDefault) {
     const float live[4] = {500, 510, 300, 200}, fp[4] = {900, 910, 960, 540}, none[4] = {0, 0, 0, 0};
     double k[4];
     EXPECT_TRUE(MobileGS::relocCameraIntrinsics(live, fp, 640, 480, k));
@@ -338,7 +338,7 @@ TEST(MobileGSIntrinsics, LiveWinsThenFingerprintThenAFrameCentredDefault) {
 }
 
 TEST(MobileGSIntrinsics, RectifyHomographyUsesBothCameras) {
-    // Same pose, different cameras (the live frame is the capture at half resolution): a fingerprint
+    // Same pose, different cameras (the live frame is the capture at half resolution): a doodle
     // pixel must map to the live pixel of the same ray, i.e. H = K_cur * K_fp^-1.
     const cv::Matx33d Kfp(1000, 0, 960, 0, 1000, 540, 0, 0, 1);
     const cv::Matx33d Kcur(500, 0, 480, 0, 500, 270, 0, 0, 1);
@@ -366,22 +366,22 @@ TEST(MobileGSFrames, PageFrameIsNotACaptureCamera) {
         page.emplace_back(x, y, 0.0f);                 // centred SphereSLAM page frame
         camera.emplace_back(x, y, 2.0f + 0.001f * x);  // capture camera, wall 2 m ahead
     }
-    EXPECT_FALSE(MobileGS::fingerprintFrameIsCaptureCamera(page));
-    EXPECT_TRUE(MobileGS::fingerprintFrameIsCaptureCamera(camera));
+    EXPECT_FALSE(MobileGS::doodleFrameIsCaptureCamera(page));
+    EXPECT_TRUE(MobileGS::doodleFrameIsCaptureCamera(camera));
     // Scale-free: normalised (non-metric) page units read the same.
     for (auto& p : page) p *= 0.01f;
-    EXPECT_FALSE(MobileGS::fingerprintFrameIsCaptureCamera(page));
+    EXPECT_FALSE(MobileGS::doodleFrameIsCaptureCamera(page));
 }
 
-TEST(MobileGSFrames, AutoFitRefusesAPageFrameFingerprintWithAReason) {
+TEST(MobileGSFrames, AutoFitRefusesAPageFrameDoodleWithAReason) {
     MobileGS g;
     std::vector<cv::Point3f> page;
     for (int i = 0; i < 20; ++i) page.emplace_back(-0.5f + 0.05f * i, (i % 5) * 0.1f - 0.2f, 0.0f);
     const float anchor[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     const float K[4] = {500.f, 500.f, 160.f, 120.f};
-    g.restoreWallFingerprintMetric(cv::Mat(20, 32, CV_8U, cv::Scalar(4)), page, anchor, K);
+    g.restoreWallDoodleMetric(cv::Mat(20, 32, CV_8U, cv::Scalar(4)), page, anchor, K);
     const cv::Mat wall = makeWall(320, 240);
-    g.setArtworkFingerprint(wall, nullptr, 0, 0, 0, nullptr, nullptr);
+    g.setArtworkDoodle(wall, nullptr, 0, 0, 0, nullptr, nullptr);
     g.setCaptureImage(wall, K);
     const float fpFromDesign[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     g.setDesignPlacement(fpFromDesign, 0.5f, 0.4f);
@@ -505,7 +505,7 @@ TEST(MobileGSSensorTurn, NothingToTurnOrNothingToSee) {
 }
 
 TEST(MobileGSSensorTurn, LearnsTheWallNormalInTheEarthFromALock) {
-    // Fingerprint points on the plane z = 1 m of the capture camera; the live camera IS the capture
+    // Doodle points on the plane z = 1 m of the capture camera; the live camera IS the capture
     // camera (identity pose), looking north: the wall faces south, toward it.
     std::vector<cv::Point3f> pts;
     for (int i = 0; i < 40; ++i) pts.emplace_back((float)(i % 8) * 0.1f - 0.35f, (float)(i / 8) * 0.1f - 0.2f, 1.0f);
@@ -530,7 +530,7 @@ TEST(MobileGSSensorTurn, ALostLookUpRelocksThroughTheTurnAndTheLockTeachesTheNor
     // A wide lens (about +-40 deg vertically), so a steep look up still keeps the wall in view.
     const cv::Mat full = makeWall(800, 600);
     const float Kf[4] = {350.f, 350.f, 400.f, 300.f};
-    fingerprintFrontalWall(g, full, Kf);
+    doodleFrontalWall(g, full, Kf);
     g.setLiveIntrinsics(Kf);
     g.setEvalSyncReloc(true, 1);
     g.setTrackingPoseValid(false); // lost: no pose to rectify against
@@ -561,7 +561,7 @@ TEST(MobileGSSensorTurn, ALostLookUpRelocksThroughTheTurnAndTheLockTeachesTheNor
     EXPECT_GE(g.lastRelocTurnDeg(), 35);
     EXPECT_GT(g.lastRelocTurnCorr(), 0) << "the turned frame matched";
     ASSERT_EQ(MobileGS::kRelocOk, g.lastRelocReject());
-    // camera_from_fingerprint: the live camera at the capture's centre, turned.
+    // camera_from_doodle: the live camera at the capture's centre, turned.
     float out[35];
     g.getRelocResult(out, false);
     EXPECT_NEAR(0.f, out[12], 0.03f);
@@ -572,8 +572,8 @@ TEST(MobileGSSensorTurn, ALostLookUpRelocksThroughTheTurnAndTheLockTeachesTheNor
     g.setCameraAttitude(nullptr);
     g.scheduleRelocCheck(live);
     EXPECT_EQ(-1, g.lastRelocTurnDeg());
-    // A cleared fingerprint forgets the wall's normal.
-    g.clearWallFingerprint();
+    // A cleared doodle forgets the wall's normal.
+    g.clearWallDoodle();
     EXPECT_FALSE(g.getWallNormalEnu(n));
     g.setEvalSyncReloc(false, 1);
     g.destroy();

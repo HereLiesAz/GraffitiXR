@@ -22,7 +22,7 @@ class LocalLoopTest {
 
     @Test
     fun `host-to-guest 50 deltas survive bulk and arrive in order`() = runBlocking {
-        val fingerprint = ByteArray(1024) { it.toByte() }
+        val doodle = ByteArray(1024) { it.toByte() }
         val projectBytes = ByteArray(2048) { (it * 7).toByte() }
 
         val host = HostSession(
@@ -32,7 +32,7 @@ class LocalLoopTest {
             projectId = "p1",
             snapshotProvider = {
                 ProjectSnapshot(
-                    fingerprintBytes = fingerprint,
+                    doodleBytes = doodle,
                     projectBytes = projectBytes,
                     layerCount = 0,
                     spatialFrame = testSpatialFrame(),
@@ -56,14 +56,14 @@ class LocalLoopTest {
             localDeviceName = "guest",
             localBackend = CoopTrackingBackend.ARCORE,
             onBulkReceived = { fp, pb, _ ->
-                bulkMatches.complete(fp.contentEquals(fingerprint) && pb.contentEquals(projectBytes))
+                bulkMatches.complete(fp.contentEquals(doodle) && pb.contentEquals(projectBytes))
             },
             onOp = { op -> ops.trySend(op) },
         )
         guest.connect()
 
         // Wait for bulk handshake to land.
-        assertTrue("bulk fingerprint/project mismatch", withTimeout(15_000) { bulkMatches.await() })
+        assertTrue("bulk doodle/project mismatch", withTimeout(15_000) { bulkMatches.await() })
 
         // Emit 50 DISTINCT deltas. The op type matters: DeltaBuffer.supersede deliberately coalesces
         // design-scoped ops (an Op.DesignReplace subsumes every earlier design op), so bursting 50 of

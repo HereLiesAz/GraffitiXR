@@ -15,12 +15,12 @@ import org.opencv.core.KeyPoint
  *
  * The partition is only useful if it comes back off disk attached to the *same* points it was
  * computed against. A `regions` array that silently failed to serialize would not throw: the
- * fingerprint would deserialize as unpartitioned, which every consumer reads as all-backbone, so
+ * doodle would deserialize as unpartitioned, which every consumer reads as all-backbone, so
  * the app would keep working and would quietly have Phase 2 switched off. That is the failure this
  * file exists to catch, and it is why the first thing asserted below is that the round trip
- * *distinguishes* a partitioned fingerprint from an unpartitioned one at all.
+ * *distinguishes* a partitioned doodle from an unpartitioned one at all.
  */
-class FingerprintPartitionPersistenceTest {
+class DoodlePartitionPersistenceTest {
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
@@ -30,12 +30,12 @@ class FingerprintPartitionPersistenceTest {
         const val OUTSIDE: Byte = 2
     }
 
-    private fun fingerprint(
+    private fun doodle(
         regions: ByteArray = ByteArray(0),
         halfW: Float = -1f,
         halfH: Float = -1f,
         anchorCam: List<Float> = emptyList(),
-    ) = Fingerprint(
+    ) = Doodle(
         keypoints = List(3) { KeyPoint(it.toFloat(), 2f, 7f) },
         points3d = listOf(0f, 0f, 0f, 1f, 0f, 0f, 2f, 0f, 0f),
         descriptorsData = ByteArray(3 * 32) { (it % 251).toByte() },
@@ -60,9 +60,9 @@ class FingerprintPartitionPersistenceTest {
     @Test
     fun `equality notices each new field on its own`() {
         // One field at a time. A single assertNotEquals between a bare and a fully-populated
-        // fingerprint differs in four places at once, so it would still pass with three of the four
+        // doodle differs in four places at once, so it would still pass with three of the four
         // missing from `equals` — and every round-trip assertion below leans on `equals`.
-        val partitioned = fingerprint(byteArrayOf(INSIDE, BAND, OUTSIDE), 1f, 0.5f, identity16)
+        val partitioned = doodle(byteArrayOf(INSIDE, BAND, OUTSIDE), 1f, 0.5f, identity16)
         assertNotEquals(
             "regions: the partition itself",
             partitioned, partitioned.copy(regions = byteArrayOf(OUTSIDE, OUTSIDE, OUTSIDE)),
@@ -86,9 +86,9 @@ class FingerprintPartitionPersistenceTest {
     }
 
     @Test
-    fun `a partitioned fingerprint survives a round trip intact`() {
-        val original = fingerprint(byteArrayOf(INSIDE, BAND, OUTSIDE), 1.25f, 0.75f, identity16)
-        val decoded = json.decodeFromString<Fingerprint>(json.encodeToString(original))
+    fun `a partitioned doodle survives a round trip intact`() {
+        val original = doodle(byteArrayOf(INSIDE, BAND, OUTSIDE), 1.25f, 0.75f, identity16)
+        val decoded = json.decodeFromString<Doodle>(json.encodeToString(original))
 
         assertEquals(original, decoded)
         assertArrayEquals(byteArrayOf(INSIDE, BAND, OUTSIDE), decoded.regions)
@@ -115,7 +115,7 @@ class FingerprintPartitionPersistenceTest {
               "descriptorsType": 0
             }
         """.trimIndent()
-        val decoded = json.decodeFromString<Fingerprint>(legacy)
+        val decoded = json.decodeFromString<Doodle>(legacy)
 
         assertTrue("no regions key must mean no partition", decoded.isUnpartitioned())
         assertEquals(0, decoded.regions.size)
@@ -126,35 +126,35 @@ class FingerprintPartitionPersistenceTest {
     }
 
     /**
-     * A truncated or hand-edited file must not construct a fingerprint whose partition indexes past
+     * A truncated or hand-edited file must not construct a doodle whose partition indexes past
      * its points. Native subscripts `mWallRegions` by point index while building reloc
      * correspondences, so this is an out-of-bounds read, not a cosmetic inconsistency.
      */
     @Test(expected = IllegalArgumentException::class)
     fun `a regions array that disagrees with the point count is refused at construction`() {
-        fingerprint(byteArrayOf(INSIDE))
+        doodle(byteArrayOf(INSIDE))
     }
 
     /** Same argument for the stored matrix: 16 floats or nothing, never a short prefix. */
     @Test(expected = IllegalArgumentException::class)
     fun `an anchor-cam matrix that is not a 4x4 is refused at construction`() {
-        fingerprint(anchorCam = listOf(1f, 0f, 0f))
+        doodle(anchorCam = listOf(1f, 0f, 0f))
     }
 
     /**
      * `GraffitiProject` is what actually reaches disk, so the round trip is asserted through it too
      * rather than only through the nested type. A field that serializes standalone can still be
      * dropped by the enclosing document — for instance if the project ever stopped carrying the
-     * whole `Fingerprint` and started projecting selected columns out of it.
+     * whole `Doodle` and started projecting selected columns out of it.
      */
     @Test
     fun `the partition survives a round trip through the enclosing project`() {
-        val fp = fingerprint(byteArrayOf(OUTSIDE, OUTSIDE, INSIDE), 2f, 1f, identity16)
-        val project = GraffitiProject(id = "p1", name = "wall", fingerprint = fp)
+        val fp = doodle(byteArrayOf(OUTSIDE, OUTSIDE, INSIDE), 2f, 1f, identity16)
+        val project = GraffitiProject(id = "p1", name = "wall", doodle = fp)
         val decoded = json.decodeFromString<GraffitiProject>(json.encodeToString(project))
 
-        assertArrayEquals(byteArrayOf(OUTSIDE, OUTSIDE, INSIDE), decoded.fingerprint!!.regions)
-        assertEquals(2f, decoded.fingerprint!!.captureHalfW, 0f)
-        assertEquals(identity16, decoded.fingerprint!!.captureAnchorCam)
+        assertArrayEquals(byteArrayOf(OUTSIDE, OUTSIDE, INSIDE), decoded.doodle!!.regions)
+        assertEquals(2f, decoded.doodle!!.captureHalfW, 0f)
+        assertEquals(identity16, decoded.doodle!!.captureAnchorCam)
     }
 }

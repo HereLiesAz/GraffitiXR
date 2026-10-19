@@ -27,8 +27,8 @@ Three chosen, composing components for learned, viewpoint-aware, *self-growing* 
   value is (i) **coverage → painting progress**, (ii) a fast pre-gate, and (iii) a **viewpoint
   prior** to pre-rectify the patch so LightGlue survives extreme tilt. A and B overlap on
   *matchability* — B's is the cheap filter, A's is the precise one.
-- **D — self-growing fingerprint (`SELF_GROWING_FINGERPRINT.md`).** Each *verified* relock contributes a
-  new viewpoint to a multi-view fingerprint bank; the teleological reference validates and promotes
+- **D — self-growing doodle (`SELF_GROWING_DOODLE.md`).** Each *verified* relock contributes a
+  new viewpoint to a multi-view doodle bank; the teleological reference validates and promotes
   new painted marks. B + A are what produce and gate the verified data D grows from.
 
 **Division of labor:** head (B) gates + viewpoint prior + progress → LightGlue (A) precise
@@ -52,12 +52,12 @@ The current relocalizer (`MobileGS::relocThreadFunc`) is viewpoint-blind:
 2. `knnMatch` + Lowe ratio (fixed `0.75`) against **one** stored descriptor set.
 3. `solvePnPRansac` (generic iterative), fixed gates: `≥15` matches, `≥12` inliers, `8px` reproj.
 
-Nothing measures *how* the current view is distorted relative to the captured fingerprint, and
+Nothing measures *how* the current view is distorted relative to the captured doodle, and
 nothing reports it back. Partials ("I see half the mark") and distortions ("I see the whole mark
 but sheared 50°") are indistinguishable to the system — both just fall below threshold and the
 attempt is silently dropped.
 
-The fingerprint lives on a **wall = a plane**, so the relationship between the capture view and any
+The doodle lives on a **wall = a plane**, so the relationship between the capture view and any
 current view is *exactly* a homography `H`. The distortion head learns to estimate that `H` (plus a
 confidence and a coverage fraction) from SuperPoint features, giving the system an explicit,
 numeric perception of the viewpoint — which it can then *act on*.
@@ -65,7 +65,7 @@ numeric perception of the viewpoint — which it can then *act on*.
 > **Decision (recorded):** keep the already-validated SuperPoint, **freeze it**, and bolt on a
 > small trainable head — additive, cannot regress the current matcher, trains in hours on one GPU.
 > This head is component **B** of three chosen for learned relocalization; see §0 for how it composes
-> with the LightGlue matcher (**A**) and the self-growing fingerprint (**D**).
+> with the LightGlue matcher (**A**) and the self-growing doodle (**D**).
 
 ---
 
@@ -97,7 +97,7 @@ SuperPoint already produces a dense, L2-normalized descriptor map `desc [1,256,H
 - `desc_cur` — features of a crop of the current frame, centered on the coarse match centroid (we
   already compute candidate matches in `relocThreadFunc`), resized to a canonical `256×256`
   (→ `32×32×256`).
-- `desc_fp` — features of the stored canonical fingerprint patch, same `256×256` (→ `32×32×256`).
+- `desc_fp` — features of the stored canonical doodle patch, same `256×256` (→ `32×32×256`).
 
 SuperPoint stays **frozen**; only the head trains. The existing keypoint/descriptor/PnP path is
 byte-identical — the head is purely additive.
@@ -168,7 +168,7 @@ Insert between SuperPoint detection (`MobileGS.cpp:299`) and PnP (`:306+`):
 
 ### Why this is load-bearing, not decoration
 
-With ML depth off, `generateFingerprint` returns **descriptors only, no `points3d`**
+With ML depth off, `generateDoodle` returns **descriptors only, no `points3d`**
 (`MobileGS.cpp:540–545`), so `solvePnPRansac` has no object points and **cannot run** — depth-off
 currently means no PnP relock at all. The head's `corners`/`H` enable **2D-only planar relock**
 (decompose `H` with intrinsics → pose, no per-point depth). Until the triangulation core restores
@@ -180,9 +180,9 @@ only path.
 
 ## 6. Prerequisites / schema changes (device side, later)
 
-- `Fingerprint` (`core/common/.../model/Fingerprint.kt`) must carry the **canonical patch** (small
+- `Doodle` (`core/common/.../model/Doodle.kt`) must carry the **canonical patch** (small
   grayscale crop, already produced by `isolateMarkings`) so its features can be recomputed on load.
-  Touches the model, `FingerprintSerializer`, and the JNI ctor keep-rule (`GraffitiJNI.cpp:541`).
+  Touches the model, `DoodleSerializer`, and the JNI ctor keep-rule (`GraffitiJNI.cpp:541`).
 - Real PnP intrinsics — the hardcoded `intr` at `MobileGS.cpp:322` must be fed real ARCore
   intrinsics, else "wrong calibration" and "distortion" are indistinguishable to the solver. This is
   a prerequisite for adaptive thresholds, not a deferred cleanup.

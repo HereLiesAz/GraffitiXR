@@ -275,9 +275,9 @@
     <string name="open_settings">Instellingen openen</string>
 
 
-    <string name="target_creation_title">KRABBELRASTER</string>
+    <string name="doodle_creation_title">KRABBELRASTER</string>
 
-    <string name="target_creation_text">Als je je Krabbelraster nog niet hebt gemaakt, maak dan een foto van de muur door op de opnameknop te drukken. Druk anders op Annuleren.</string>
+    <string name="doodle_creation_text">Als je je Krabbelraster nog niet hebt gemaakt, maak dan een foto van de muur door op de opnameknop te drukken. Druk anders op Annuleren.</string>
 
     <string name="cancel">Annuleren</string>
 
@@ -370,13 +370,13 @@
     <string name="settings_anticipation_heat">Warmte beperkt met</string>
     <string name="settings_anticipation_compute">Belasting beperkt met</string>
     <string name="settings_anticipation_views">Hoogstens %1$d aanzichten per pagina</string>
-    <string name="settings_fingerprint_features">Krabbel</string>
-    <string name="settings_fingerprint_superpoint">SuperPoint</string>
-    <string name="settings_fingerprint_half_sphere">Halve bol</string>
-    <string name="settings_fingerprint_both">Beide</string>
-    <string name="settings_fingerprint_superpoint_desc">Alleen SuperPoint-kenmerken van de opname. Bestand tegen licht en slijtage; ongeveer 1,5 MB per Krabbel. Geldt vanaf de volgende Krabbel.</string>
-    <string name="settings_fingerprint_half_sphere_desc">ORB-kenmerken van de opname en haar 49 close-ups. Sterk van dichtbij en klein, onder 0,1 MB per Krabbel. Geldt vanaf de volgende Krabbel.</string>
-    <string name="settings_fingerprint_both_desc">SuperPoint-kenmerken van de opname en haar 49 close-ups. Het sterkst; ongeveer 2–3 MB per Krabbel. Geldt vanaf de volgende Krabbel.</string>
+    <string name="settings_doodle_features">Krabbel</string>
+    <string name="settings_doodle_superpoint">SuperPoint</string>
+    <string name="settings_doodle_half_sphere">Halve bol</string>
+    <string name="settings_doodle_both">Beide</string>
+    <string name="settings_doodle_superpoint_desc">Alleen SuperPoint-kenmerken van de opname. Bestand tegen licht en slijtage; ongeveer 1,5 MB per Krabbel. Geldt vanaf de volgende Krabbel.</string>
+    <string name="settings_doodle_half_sphere_desc">ORB-kenmerken van de opname en haar 49 close-ups. Sterk van dichtbij en klein, onder 0,1 MB per Krabbel. Geldt vanaf de volgende Krabbel.</string>
+    <string name="settings_doodle_both_desc">SuperPoint-kenmerken van de opname en haar 49 close-ups. Het sterkst; ongeveer 2–3 MB per Krabbel. Geldt vanaf de volgende Krabbel.</string>
     <string name="settings_power_section">Energie</string>
     <string name="settings_privacy_section">Privacy</string>
     <string name="settings_developer_section">Ontwikkelaar</string>
@@ -430,17 +430,17 @@
     <string name="save_project_hint">Projectnaam</string>
 
 
-    <string name="target_guide_desc">Uitlijningsgids voor Krabbel</string>
-    <string name="target_captured_desc">Vastgelegde Krabbel</string>
-    <string name="target_review_desc">Geëxtraheerde Krabbel bekijken</string>
-    <string name="target_unwarp_hint">Versleep hoeken om de vervorming te herstellen</string>
-    <string name="target_review_title">KRABBEL VERGRENDELD</string>
-    <string name="fingerprint_closeups_progress">De muur leren: fase %1$d van %2$d · stap %3$d van %4$d</string>
+    <string name="doodle_guide_desc">Uitlijningsgids voor Krabbel</string>
+    <string name="doodle_captured_desc">Vastgelegde Krabbel</string>
+    <string name="doodle_review_desc">Geëxtraheerde Krabbel bekijken</string>
+    <string name="doodle_unwarp_hint">Versleep hoeken om de vervorming te herstellen</string>
+    <string name="doodle_review_title">KRABBEL VERGRENDELD</string>
+    <string name="doodle_closeups_progress">De muur leren: fase %1$d van %2$d · stap %3$d van %4$d</string>
 
-    <string name="target_exclude">Uitsluiten</string>
-    <string name="target_include">Erbij betrekken</string>
-    <string name="target_erase_marks">Wis markeringen</string>
-    <string name="target_show_features">Kenmerken tonen</string>
+    <string name="doodle_exclude">Uitsluiten</string>
+    <string name="doodle_include">Erbij betrekken</string>
+    <string name="doodle_erase_marks">Wis markeringen</string>
+    <string name="doodle_show_features">Kenmerken tonen</string>
     <string name="reset_button">Opnieuw instellen</string>
 
     <string name="poster_title">GENEREER POSTER</string>
@@ -455,7 +455,7 @@
     <string name="scan_hint_build_map">Loop naar links en rechts om een ​​kaart te bouwen</string>
     <string name="scan_hint_closer">Ga dichter bij de muur staan</string>
     <string name="scan_hint_higher_lower">Scan hoger en lager</string>
-    <string name="reacquiring_target">Krabbel opnieuw zoeken…</string>
+    <string name="reacquiring_doodle">Krabbel opnieuw zoeken…</string>
 
 
     <string name="desc_bg_mockup">Achtergrondmodel</string>
@@ -718,14 +718,14 @@
     <string name="standalone_photosphere_no_sensor">Deze telefoon heeft geen rotatiesensor, dus SphereSLAM kan hier geen doel plaatsen.</string>
     <string name="standalone_photosphere_compass_not_ready">Het kompas is nog niet klaar – houd de telefoon een seconde stil en neem dan opnieuw op.</string>
     <string name="standalone_photosphere_not_mapped">SphereSLAM heeft deze weergave nog niet in kaart gebracht – houd de camera een seconde stil op een verlicht, gedetailleerd deel van het oppervlak en neem dan opnieuw op.</string>
-    <string name="target_rectify_title">Oppervlak rechtzetten</string>
-    <string name="target_rectify_text">Sleep nu de hoeken om het cyaan kader uit te lijnen met het vlakke oppervlak van je muur.</string>
-    <string name="target_remove_marks_title">Markeringen verwijderen</string>
-    <string name="target_erase_hint">Tik op een markering om die te verwijderen, of sleep over meerdere markeringen.</string>
-    <string name="target_cd_raw_capture">Ruwe opname</string>
-    <string name="target_cd_detected_marks">Gedetecteerde markeringen</string>
-    <string name="target_cd_confirm">Bevestigen</string>
-    <string name="target_cd_unwarp_base">Opgenomen muurfoto met hoekgrepen</string>
+    <string name="doodle_rectify_title">Oppervlak rechtzetten</string>
+    <string name="doodle_rectify_text">Sleep nu de hoeken om het cyaan kader uit te lijnen met het vlakke oppervlak van je muur.</string>
+    <string name="doodle_remove_marks_title">Markeringen verwijderen</string>
+    <string name="doodle_erase_hint">Tik op een markering om die te verwijderen, of sleep over meerdere markeringen.</string>
+    <string name="doodle_cd_raw_capture">Ruwe opname</string>
+    <string name="doodle_cd_detected_marks">Gedetecteerde markeringen</string>
+    <string name="doodle_cd_confirm">Bevestigen</string>
+    <string name="doodle_cd_unwarp_base">Opgenomen muurfoto met hoekgrepen</string>
     <string name="guidance_open_via_design_overlay">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om een laag toe te voegen – kies een foto en die verschijnt hier, zwevend boven de live camerabeeld.</string>
     <string name="guidance_open_via_design_mockup">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om een laag boven de muurfoto toe te voegen. Knijp en sleep om de grootte en positie aan te passen.</string>
     <string name="guidance_open_via_design_trace">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om je eerste laag toe te voegen. Zodra die erin staat, knijp en sleep je op het canvas om de grootte en plaats te bepalen.</string>
@@ -734,15 +734,15 @@
     <string name="ar_feedback_guest_edit_dropped">Die wijziging kan niet met de host worden gedeeld – ze blijft op dit apparaat</string>
     <string name="ar_feedback_backend_resolving">De AR-backend wordt nog bepaald – probeer over een moment opnieuw te hosten</string>
     <string name="ar_feedback_open_project_first">Open een project voordat je deelt – er is nog niets om naar een gast te sturen</string>
-    <string name="ar_feedback_host_need_target_arcore">Leg een actuele Krabbel vast en vergrendel die voordat je host</string>
+    <string name="ar_feedback_host_need_doodle_arcore">Leg een actuele Krabbel vast en vergrendel die voordat je host</string>
     <string name="ar_feedback_host_need_target_standalone">Leg een zelfstandig muurdoel vast voordat je host</string>
-    <string name="ar_feedback_fingerprint_not_ready">Krabbel is nog niet klaar — houd hem in beeld en probeer Hosten opnieuw</string>
+    <string name="ar_feedback_doodle_not_ready">Krabbel is nog niet klaar — houd hem in beeld en probeer Hosten opnieuw</string>
     <string name="ar_feedback_package_failed">Dit project kon niet worden ingepakt om te delen – sla het eerst op</string>
     <string name="ar_feedback_host_failed">Delen starten is mislukt: %1$s</string>
     <string name="ar_feedback_join_load_failed">Het project van de host kon niet worden geladen – de sessie is beëindigd.</string>
     <string name="ar_feedback_join_no_geometry">De host heeft geen geometrie geleverd waarop ARCore zich kan uitlijnen.</string>
     <string name="ar_feedback_join_failed">Deelnemen is mislukt: %1$s</string>
-    <string name="ar_feedback_wall_target_changed">Krabbel gewijzigd — delen beëindigd. Start Hosten opnieuw voor de nieuwe muur.</string>
+    <string name="ar_feedback_wall_doodle_changed">Krabbel gewijzigd — delen beëindigd. Start Hosten opnieuw voor de nieuwe muur.</string>
     <string name="ar_feedback_backend_changed">De tracking-backend is gewijzigd – het delen is beëindigd. Start het delen opnieuw.</string>
     <string name="ar_feedback_camera_busy">De camera is bezet of niet beschikbaar – sluit andere camera-apps en ga daarna opnieuw naar AR</string>
     <string name="ar_feedback_ar_start_failed">AR starten is mislukt – je camera wordt mogelijk door een andere app gebruikt</string>
@@ -752,7 +752,7 @@
     <string name="ar_feedback_camera_permission">Camera niet beschikbaar – controleer de cameratoestemming en ga daarna opnieuw naar AR</string>
     <string name="ar_feedback_camera_not_paused">De AR-camera is niet netjes gepauzeerd – ze blijft mogelijk op de achtergrond actief</string>
     <string name="ar_feedback_backbone_warning">Het kunstwerk bedekt bijna de hele zichtbare muur — slechts %1$d gevolgde kenmerken liggen erbuiten. Maak het kleiner of stap achteruit, anders vergrendelt de Krabbel mogelijk niet.</string>
-    <string name="ar_feedback_legacy_target_geometry">De opgeslagen Krabbel van dit project is gemaakt met een oudere versie en de 3D-geometrie ervan kan niet worden gecorrigeerd. Maak de Krabbel opnieuw aan om hem te gebruiken.</string>
+    <string name="ar_feedback_legacy_doodle_geometry">De opgeslagen Krabbel van dit project is gemaakt met een oudere versie en de 3D-geometrie ervan kan niet worden gecorrigeerd. Maak de Krabbel opnieuw aan om hem te gebruiken.</string>
     <string name="ar_feedback_camera_no_frames">De camera levert geen beelden – verlaat AR en probeer het opnieuw</string>
     <string name="ar_feedback_camera_recovery_timeout">Het herstel van de AR-camera is veilig verlopen – verlaat AR en ga opnieuw naar AR</string>
     <string name="ar_feedback_target_prepare_failed">Het vastgelegde doel kon niet worden voorbereid. Probeer het opnieuw.</string>
@@ -779,8 +779,8 @@
     <!-- Pass B: the Settings switch, and the clean-wall step of the target instructions. -->
     <string name="settings_change_pass">Wijzigingsdetectie (heeft een foto van de schone muur nodig)</string>
     <!-- Spoken labels for the round shutter on the Doodle grid screen, which photographs the bare wall. -->
-    <string name="target_shutter_cd">Fotografeer de kale muur</string>
-    <string name="target_shutter_retake_cd">Foto van de kale muur opnieuw maken</string>
+    <string name="doodle_shutter_cd">Fotografeer de kale muur</string>
+    <string name="doodle_shutter_retake_cd">Foto van de kale muur opnieuw maken</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">CV-weergave</string>

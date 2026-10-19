@@ -1,8 +1,8 @@
-# Self-growing fingerprint (component D)
+# Self-growing doodle (component D)
 
 **Status:** design (unbuilt). Depends on component **B** (`DISTORTION_HEAD.md`) and **A**
 (SuperPoint + LightGlue). Fills the "stages 2–4" of the relocalization-first build — the
-goal-directed ("teleological") part where the target validates and grows its own fingerprint.
+goal-directed ("teleological") part where the target validates and grows its own doodle.
 
 > The target doubles as a **validator**: we *know* what the finished mural is supposed to look like
 > (the reference design), so the further along the painting is, the more the wall *becomes* the
@@ -13,12 +13,12 @@ goal-directed ("teleological") part where the target validates and grows its own
 
 ## 1. The problem D solves
 
-The fingerprint today is **single-viewpoint and frozen**: one descriptor set + one set of 3D points,
-captured once (`MobileGS::generateFingerprint`). A close/oblique view must match descriptors computed
-from the original capture, and as paint covers the reference marks the fingerprint goes stale. So
+The doodle today is **single-viewpoint and frozen**: one descriptor set + one set of 3D points,
+captured once (`MobileGS::generateDoodle`). A close/oblique view must match descriptors computed
+from the original capture, and as paint covers the reference marks the doodle goes stale. So
 relock gets *harder* over a session, exactly backwards.
 
-D makes the fingerprint **multi-view and self-growing**: it accumulates verified viewpoints and
+D makes the doodle **multi-view and self-growing**: it accumulates verified viewpoints and
 promotes newly-painted marks (validated against the reference design) into the representation.
 
 ---
@@ -37,13 +37,13 @@ self-poisoning:
 - pose agrees with the VIO-propagated prior (temporal consistency — rejects one-frame flukes).
 
 Only triples passing all four are harvested. Everything else is used for relock but never grows the
-fingerprint.
+doodle.
 
 ### 2.2 What grows — multi-view bank first, adapter later
 
 - **(a) Non-parametric multi-view bank (build first).** Append the verified view's SuperPoint
   keypoints + descriptors, **tagged with its viewpoint** (decomposed `H`: tilt/roll/scale) and a
-  timestamp, to a fingerprint *bank*. Relock then matches against the nearest stored view (by B's
+  timestamp, to a doodle *bank*. Relock then matches against the nearest stored view (by B's
   predicted viewpoint) instead of one canonical view — so a close side-view matches a previously
   stored close side-view rather than fighting the frontal capture. Near-zero risk, no on-device
   backprop. Cap by diversity + LRU (reuse the existing `VoxelHash` LRU / `MAX_SPLATS` discipline);
@@ -71,10 +71,10 @@ with the reference design** (the validator):
 
 ## 3. Metric grounding (wire the triangulation core)
 
-Promoted marks need 3D to restore PnP when ML depth is off (`generateFingerprint` currently returns
+Promoted marks need 3D to restore PnP when ML depth is off (`generateDoodle` currently returns
 no `points3d` without depth → PnP can't run). The **two-view triangulation core** (built, tested,
 unwired) supplies metric 3D for each promoted mark from two verified relock views with known relative
-pose. This is the "wire triangulation → metric marks into the fingerprint" item; D is where it
+pose. This is the "wire triangulation → metric marks into the doodle" item; D is where it
 connects.
 
 ---
@@ -84,7 +84,7 @@ connects.
 - Immutable seed: the original capture view is never evicted or overwritten.
 - Strict promotion gate (§2.1) — verified-only growth.
 - Bounded divergence: adapter (2.2b) regularized to the frozen prior; bank capped by diversity.
-- Reference design as validator: nothing enters the fingerprint that the goal doesn't endorse.
+- Reference design as validator: nothing enters the doodle that the goal doesn't endorse.
 - Temporal consistency: single-frame matches never promote.
 
 ---

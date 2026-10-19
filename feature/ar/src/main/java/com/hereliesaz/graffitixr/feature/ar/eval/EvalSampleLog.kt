@@ -134,26 +134,26 @@ data class EvalSample(
      *
      * **This is the independent variable of `EVALUATION.md` E0b**, and the distinction from
      * [liveRotationNeededDeg] is the whole point of having two columns. `MetricMarks.backProjectToPlane` (SphereSLAM)
-     * runs exactly once per target, inside `MetricFingerprintBuilder.buildSingle`, so whatever frame
-     * relationship holds at capture is **baked into the fingerprint's 3D points** and cannot change
+     * runs exactly once per target, inside `MetricDoodleBuilder.buildSingle`, so whatever frame
+     * relationship holds at capture is **baked into the doodle's 3D points** and cannot change
      * afterwards, however the device is subsequently held. That is why the capture rotation, not the
      * live one, is the variable to group by.
      *
      * Note the §8 mismatch this column was built to measure is **fixed as of Phase 0** — the capture
      * view is now rotated to match the intrinsics. The column is still the right one: it records the
-     * condition a fingerprint was built under, which is what any before/after comparison needs.
+     * condition a doodle was built under, which is what any before/after comparison needs.
      *
      * A first version of this column logged the live per-tick rotation instead, which is a
-     * different quantity and mislabels the experiment: capture in portrait (skewed fingerprint),
+     * different quantity and mislabels the experiment: capture in portrait (skewed doodle),
      * then relocalize in landscape, and every defect-bearing row is filed under 0 — the *control*
      * condition — so a real §8 effect averages toward nothing and reads as a falsification. The
      * justification given for per-tick sampling was that `screenOrientation="fullUser"` lets the
      * user rotate mid-run and flip the condition; rotating mid-run does not flip the condition,
-     * because the fingerprint was already built. That is precisely the case it labels wrongly.
+     * because the doodle was already built. That is precisely the case it labels wrongly.
      *
      * Known gap: the renderer only observes a capture it performed, so a target restored from a
      * saved project reads -1 rather than its original rotation. -1 is honest there; a 0 would not
-     * be. Persisting this on `Fingerprint` is `IMPLEMENTATION.md` todo 0.7.
+     * be. Persisting this on `Doodle` is `IMPLEMENTATION.md` todo 0.7.
      */
     val captureRotationNeededDeg: Int = -1,
     /**

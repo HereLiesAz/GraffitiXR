@@ -1,15 +1,15 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
-import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.Doodle
 import com.hereliesaz.sphereslam.math.RigidMath
 
 /**
- * `IMPLEMENTATION.md` **Phase 2** — tag every fingerprint point with its region relative to the
+ * `IMPLEMENTATION.md` **Phase 2** — tag every doodle point with its region relative to the
  * design's projected footprint.
  *
- * This is the join between Φ ([Footprint], Phase 1) and the stored map ([Fingerprint], `core/common`).
- * It lives in `feature/ar` and not on `Fingerprint` itself because the module graph runs
- * `feature/ar → core/common`: the data model cannot see [Footprint]. So `Fingerprint` carries the
+ * This is the join between Φ ([Footprint], Phase 1) and the stored map ([Doodle], `core/common`).
+ * It lives in `feature/ar` and not on `Doodle` itself because the module graph runs
+ * `feature/ar → core/common`: the data model cannot see [Footprint]. So `Doodle` carries the
  * bytes and the invariants, and the geometry that produces them lives here.
  *
  * **What the partition is for**, from `PAPER.md` §5: the backbone `F_out` sits outside the design
@@ -24,7 +24,7 @@ import com.hereliesaz.sphereslam.math.RigidMath
  * worse than a discarded one — a doomed feature admitted to the backbone corrupts the thing the
  * backbone exists to be.
  */
-object FingerprintPartition {
+object DoodlePartition {
 
     /**
      * Default margins, as fractions of the design's half-extent, in normalized design coordinates.
@@ -40,7 +40,7 @@ object FingerprintPartition {
     const val DEFAULT_OUTER_MARGIN = 0.10f
 
     /**
-     * Minimum backbone size for a partitioned fingerprint to be able to relocalize at all
+     * Minimum backbone size for a partitioned doodle to be able to relocalize at all
      * (`IMPLEMENTATION.md` 2.8).
      *
      * `F_out` is what the reloc PnP solves from with no prior. If the artwork covers the whole
@@ -60,19 +60,19 @@ object FingerprintPartition {
     const val MIN_BACKBONE = 40
 
     /**
-     * Where the artwork sits, expressed **relative to the fingerprint anchor** — `A⁻¹ · M_design` —
+     * Where the artwork sits, expressed **relative to the doodle anchor** — `A⁻¹ · M_design` —
      * together with its effective, scale-included half-extents in metres.
      *
      * **Anchor-relative, not world.** The obvious choice is the design's world pose, and it is
      * wrong: ARCore's world origin does not survive a session, and within one it drifts and is
      * corrected by relocalization, so a world pose recorded at one moment does not describe the same
      * physical place at another. The anchor does survive both — it is the frame
-     * [Fingerprint.markCenterLocal] already uses for exactly this reason — so pairing it with
-     * [Fingerprint.captureAnchorCam] gives a composition with no world frame in it at all.
+     * [Doodle.markCenterLocal] already uses for exactly this reason — so pairing it with
+     * [Doodle.captureAnchorCam] gives a composition with no world frame in it at all.
      *
      * One object rather than three loose parameters because the three are only meaningful together,
      * and because "no design placed" then reads as a deliberate `null` at the call site instead of
-     * three numbers somebody forgot. Absent is safe: an unpartitioned fingerprint is the legacy
+     * three numbers somebody forgot. Absent is safe: an unpartitioned doodle is the legacy
      * all-backbone case, which is exactly the behaviour before Phase 2.
      *
      * @param rigidModelAnchorLocal the design's pose relative to the anchor, **without** the overlay
@@ -104,7 +104,7 @@ object FingerprintPartition {
      *   **unscaled** half-extents; otherwise pass the **scaled** ones. Getting this pair wrong is
      *   the highest-probability bug here — both combinations compile and both produce plausible
      *   numbers — which is why `Footprint` exposes them as two named entry points rather than a
-     *   boolean, and why `FingerprintPartitionTest` covers a scaled anchor explicitly.
+     *   boolean, and why `DoodlePartitionTest` covers a scaled anchor explicitly.
      */
     fun classify(
         points: FloatArray,
@@ -115,7 +115,7 @@ object FingerprintPartition {
         innerMargin: Float = DEFAULT_INNER_MARGIN,
         outerMargin: Float = DEFAULT_OUTER_MARGIN,
         /**
-         * Per point, nonzero for a reference mark the artist tapped ([Fingerprint.pinned]): forced
+         * Per point, nonzero for a reference mark the artist tapped ([Doodle.pinned]): forced
          * OUTSIDE wherever the design falls. Ignored unless 1:1 with the points.
          */
         pinned: ByteArray = ByteArray(0),
@@ -140,14 +140,14 @@ object FingerprintPartition {
     }
 
     /**
-     * Partition (or repartition) [fingerprint] against where the artwork currently sits, returning
+     * Partition (or repartition) [doodle] against where the artwork currently sits, returning
      * an updated copy.
      *
      * This is the only entry point production should use, and it takes no matrix in the points'
      * frame — so no caller can supply one in the wrong frame. It composes the two durable factors:
      *
      * ```
-     * design_in_points_frame  =  fingerprint.captureAnchorCam · design.rigidModelAnchorLocal
+     * design_in_points_frame  =  doodle.captureAnchorCam · design.rigidModelAnchorLocal
      * ```
      *
      * the first frozen at capture, the second read live off the renderer, and neither expressed in
@@ -160,28 +160,28 @@ object FingerprintPartition {
      * question Φ asks ("is this feature under the artwork?") has an answer.
      *
      * Returns the **receiver itself** — identity-comparable, so a caller can cheaply skip a
-     * re-push — when it cannot honestly partition: no 3D points, no [Fingerprint.captureAnchorCam]
-     * (a pre-Phase-2 or depth-path fingerprint), or a design with no usable extents. Each is a
+     * re-push — when it cannot honestly partition: no 3D points, no [Doodle.captureAnchorCam]
+     * (a pre-Phase-2 or depth-path doodle), or a design with no usable extents. Each is a
      * refusal rather than a guess: partitioning against an assumed frame produces a complete,
      * plausible, wrong answer, whereas leaving it unpartitioned reproduces `main` exactly.
      */
     fun partition(
-        fingerprint: Fingerprint,
+        doodle: Doodle,
         design: DesignFootprint,
         innerMargin: Float = DEFAULT_INNER_MARGIN,
         outerMargin: Float = DEFAULT_OUTER_MARGIN,
-    ): Fingerprint {
-        if (fingerprint.points3d.isEmpty()) return fingerprint
-        if (fingerprint.captureAnchorCam.size != 16) return fingerprint
-        if (!design.isUsable) return fingerprint
+    ): Doodle {
+        if (doodle.points3d.isEmpty()) return doodle
+        if (doodle.captureAnchorCam.size != 16) return doodle
+        if (!design.isUsable) return doodle
         val designInPointFrame = RigidMath.multiply(
-            fingerprint.captureAnchorCam.toFloatArray(), design.rigidModelAnchorLocal,
+            doodle.captureAnchorCam.toFloatArray(), design.rigidModelAnchorLocal,
         )
-        return fingerprint.copy(
+        return doodle.copy(
             regions = classify(
-                fingerprint.points3d.toFloatArray(), designInPointFrame, design.halfW, design.halfH,
+                doodle.points3d.toFloatArray(), designInPointFrame, design.halfW, design.halfH,
                 composed = false, innerMargin = innerMargin, outerMargin = outerMargin,
-                pinned = fingerprint.pinned,
+                pinned = doodle.pinned,
             ),
             captureHalfW = design.halfW,
             captureHalfH = design.halfH,
@@ -191,18 +191,18 @@ object FingerprintPartition {
     /**
      * How many points fall in the backbone set `F_out`.
      *
-     * An **unpartitioned** fingerprint counts as all-backbone, matching the legacy reading in
-     * [Fingerprint.regions] — a pre-Phase-2 map must keep relocalizing, not be excluded wholesale.
+     * An **unpartitioned** doodle counts as all-backbone, matching the legacy reading in
+     * [Doodle.regions] — a pre-Phase-2 map must keep relocalizing, not be excluded wholesale.
      */
-    fun backboneCount(fingerprint: Fingerprint): Int {
-        if (fingerprint.regions.isEmpty()) return fingerprint.points3d.size / 3
-        return backboneCount(fingerprint.regions)
+    fun backboneCount(doodle: Doodle): Int {
+        if (doodle.regions.isEmpty()) return doodle.points3d.size / 3
+        return backboneCount(doodle.regions)
     }
 
     /**
      * How many of [regions] are backbone. Note this is the *raw* count and has no legacy reading —
      * an empty array is 0 here, not "all of them", because there is no point list in scope to say
-     * how many "all" would be. Callers holding a fingerprint should use the overload above.
+     * how many "all" would be. Callers holding a doodle should use the overload above.
      *
      * Split out so the capture-time `F_out` floor and the diagnostic count are literally the same
      * arithmetic. `count { it != INSIDE }` and `count { it == OUTSIDE }` differ precisely on the

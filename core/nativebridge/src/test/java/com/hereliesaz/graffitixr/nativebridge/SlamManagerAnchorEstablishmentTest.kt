@@ -33,7 +33,7 @@ import org.junit.Test
  * The second used a boolean latch. Every target confirmation RE-establishes the anchor, so after the
  * first capture the latch is permanently true and every later capture resolves instantly — against
  * the previous anchor's pose, one GL frame before the new one is written. Re-capture is not exotic;
- * the app's own legacy-fingerprint message tells the artist to create the target again. Hence a
+ * the app's own legacy-doodle message tells the artist to create the target again. Hence a
  * generation counter, and hence the last test here.
  *
  * **On the exceptions.** `libgraffitixr.so` is not on a JVM unit-test classpath, so every `external
@@ -177,7 +177,7 @@ class SlamManagerAnchorEstablishmentTest {
      * A second capture snapshots the generation AFTER the first capture established an anchor, so
      * "has an anchor ever been established" is already true and tells it nothing. It must keep
      * waiting until the count advances past its own snapshot — otherwise it reads the pose of the
-     * anchor it is about to replace, and the fingerprint is co-registered to a dead frame.
+     * anchor it is about to replace, and the doodle is co-registered to a dead frame.
      */
     @Test
     fun `a second capture waits for an establishment newer than its own snapshot`() = runTest {
