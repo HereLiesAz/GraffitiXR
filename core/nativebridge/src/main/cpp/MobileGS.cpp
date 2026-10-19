@@ -3401,6 +3401,9 @@ bool MobileGS::autoFitDesign(float* out5) {
     // version of the design (a stencil, a posterized fill, a sketch) is found by that filter's set.
     struct FitSet { std::vector<cv::Point2f> pts; cv::Mat descs; };
     std::vector<FitSet> sets;
+    // What the fit was computed from, to check nothing was replaced while matching. photoRef shares
+    // the capture photo's buffer, so that buffer cannot be freed and reused under the same address.
+    cv::Mat photoRef; long artworkGen = 0;
     // A design registered just now is still having its filter sets built; the slow filters (sketch,
     // stencil) finish last and may be the only ones that find the paint. Wait for that build.
     joinFilterBuild();
@@ -3412,6 +3415,7 @@ bool MobileGS::autoFitDesign(float* out5) {
             return false;
         }
         photoRgb = mCaptureRgb.clone(); designGray = mArtworkGray.clone();
+        photoRef = mCaptureRgb; artworkGen = mArtworkGeneration;
         memcpy(K, mCaptureIntr, sizeof(K)); memcpy(fpFromDesign, mDesignFpFromDesign, sizeof(fpFromDesign));
         halfW = mDesignHalfW; halfH = mDesignHalfH; wall = mWallKeypoints3D;
         if (!mArtworkDescriptors.empty() && mArtworkKeypoints2D.size() == (size_t)mArtworkDescriptors.rows)
@@ -3498,13 +3502,15 @@ bool MobileGS::autoFitDesign(float* out5) {
         if (n >= 15 && n * 4 >= (int)src.size() && n > bestInl) { bestInl = n; bestM = M; }
     }
     if (bestM.empty()) return false;
-    // The fit is relative to the placement snapshotted above. A placement moved while matching would
-    // have it applied to the wrong transform.
+    // The fit is relative to the placement, design, Doodle and photo snapshotted above. Any of them
+    // replaced while matching would have it applied to the wrong thing.
     {
         std::lock_guard<std::mutex> lock(mMutex);
         if (!mHasDesignPlacement || mDesignHalfW != halfW || mDesignHalfH != halfH ||
-            memcmp(mDesignFpFromDesign, fpFromDesign, sizeof(fpFromDesign)) != 0) {
-            LOGI("autoFitDesign: the placement moved while matching; fit dropped");
+            memcmp(mDesignFpFromDesign, fpFromDesign, sizeof(fpFromDesign)) != 0 ||
+            mArtworkGeneration != artworkGen || mCaptureRgb.data != photoRef.data ||
+            memcmp(mCaptureIntr, K, sizeof(K)) != 0 || mWallKeypoints3D != wall) {
+            LOGI("autoFitDesign: placement, design, Doodle or photo changed while matching; fit dropped");
             return false;
         }
     }
