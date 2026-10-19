@@ -93,7 +93,7 @@ fun ProjectLibraryScreen(
     }
 
     // Deletion is destructive and unrecoverable (it wipes the project's AR wall
-    // fingerprint along with its design artifacts), so the trash icon on a card
+    // doodle along with its design artifacts), so the trash icon on a card
     // never deletes directly — it only stages a project here, and the actual
     // onDeleteProject call happens solely from the confirm button of the
     // AlertDialog rendered below.

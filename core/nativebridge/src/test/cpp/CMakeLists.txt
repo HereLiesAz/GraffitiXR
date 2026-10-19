@@ -25,7 +25,7 @@ set(SRC ${CMAKE_CURRENT_SOURCE_DIR}/../../main/cpp)
 set(GLM_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../libs/glm)
 
 add_executable(native_host_tests
-    MobileGSFingerprintStateTest.cpp
+    MobileGSDoodleStateTest.cpp
     MobileGSRelocTest.cpp
     MobileGSTeleologicalTest.cpp
     SuperPointDetectorTest.cpp

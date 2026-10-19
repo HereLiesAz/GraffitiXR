@@ -8,10 +8,10 @@ import java.io.File
 /**
  * [Footprint.Region] is a **wire format**, not an internal enum.
  *
- * `Fingerprint.regions` stores `Region.ordinal` as one byte per point. Kotlin writes those bytes;
+ * `Doodle.regions` stores `Region.ordinal` as one byte per point. Kotlin writes those bytes;
  * `MobileGS.cpp` reads them and decides which points the reloc PnP is allowed to see. Nothing in
  * either toolchain checks that the two agree — no shared header, no generated binding, no JNI
- * descriptor. Reorder the enum and every fingerprint in the field silently inverts: the backbone
+ * descriptor. Reorder the enum and every doodle in the field silently inverts: the backbone
  * becomes the painted-over set and the target stops locking, with no error anywhere.
  *
  * So the agreement is pinned here, from both directions:

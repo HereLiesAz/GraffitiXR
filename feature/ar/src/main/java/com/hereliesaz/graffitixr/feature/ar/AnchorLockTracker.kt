@@ -13,7 +13,7 @@ import kotlin.math.sqrt
  *
  * [locked] latches: once true it stays true until [reset], so a single post-lock jitter frame can't
  * un-fire the swap mid-transition. Pure/deterministic and Android-free for unit testing; the choice
- * of a pragmatic jitter gate (vs. bootstrapping a fingerprint and gating on PnP pose stability) is
+ * of a pragmatic jitter gate (vs. bootstrapping a doodle and gating on PnP pose stability) is
  * deliberate — see PR notes.
  */
 class AnchorLockTracker(

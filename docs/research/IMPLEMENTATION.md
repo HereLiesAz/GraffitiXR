@@ -28,7 +28,7 @@ Do that before claiming a native change compiles. Where it is NOT available, CI 
 both the Kotlin/JVM unit tests *and* the NDK build. Those are two independent
 gates and one can pass while the other fails — that has already happened once in
 this project's history (`int matches` shadowed a `std::vector<...> matches` in
-`tryUpdateFingerprint`; the Kotlin tests were green on the same commit). **Do not
+`tryUpdateDoodle`; the Kotlin tests were green on the same commit). **Do not
 report a native change as verified on the strength of a green unit-test run.**
 
 **Pure math goes in Kotlin objects with no Android imports.** That is the
@@ -38,9 +38,9 @@ the Android-dependent callers. Every new formula in this plan follows it. If a
 piece of math cannot be unit-tested, it is in the wrong file.
 
 **One behavioural change per commit, each behind a readable flag where it can
-be.** The relocalizer is a feedback loop: a change to the fingerprint contents
+be.** The relocalizer is a feedback loop: a change to the doodle contents
 changes the match count, which changes the inlier ratio, which changes whether
-`PoseFusion` snaps, which changes the pose the next fingerprint update is built
+`PoseFusion` snaps, which changes the pose the next doodle update is built
 from. Landing two changes together makes the eval uninterpretable.
 
 **Do not touch `PoseFusion.currentAnchor`'s composition and
@@ -57,7 +57,7 @@ or 6a.**
 
 ### The defect
 
-`MetricFingerprintBuilder` and the capture path rotate the captured bitmap *and*
+`MetricDoodleBuilder` and the capture path rotate the captured bitmap *and*
 the intrinsics into display orientation, then hand `PlaneMarks.backProject` a
 view matrix that has **not** been rotated. So the rays are built in a frame
 rotated about the optical axis by `R_z` relative to the plane they are
@@ -95,8 +95,8 @@ the wrong place, and a low corroboration rate would be read as the mechanism
 failing rather than the frame convention.
 
 **Phase 3 (promotion), worst.** Promotion writes new observations into the
-fingerprint using the current relocalized pose (`mPnpCamFromFpWorld` in
-`tryUpdateFingerprint`). If the pose carries a rotation error, promotion *writes
+doodle using the current relocalized pose (`mPnpCamFromFpWorld` in
+`tryUpdateDoodle`). If the pose carries a rotation error, promotion *writes
 that error into the map* and it compounds — a static bias becomes a divergent one.
 
 The general form, which is §8 of the paper's point: any failure measured on top
@@ -141,14 +141,14 @@ bug, and the same test becomes the regression guard.
 |---|---|
 | `feature/ar/.../anchor/PlaneMarks.kt` | Delete the CAUTION block once resolved; document the chosen convention as a contract on `backProject`. |
 | `feature/ar/.../anchor/MetricMarks.kt` | Add `glViewToCvDisplay(glView, rotationDeg)` — `glViewToCv` then a `R_z` pre-multiply. Keep `glViewToCv` untouched so the triangulation path is unaffected. |
-| `feature/ar/.../anchor/MetricFingerprintBuilder.kt` | Route capture views through the new converter; store the rotation used alongside the fingerprint. |
+| `feature/ar/.../anchor/MetricDoodleBuilder.kt` | Route capture views through the new converter; store the rotation used alongside the doodle. |
 | `feature/ar/.../ArViewModel.kt` | Pass `displayRotation` (already available via `DisplayRotationHelper`) to the capture path. |
-| `core/common/.../model/Fingerprint.kt` | Add `captureRotationDeg: Int` so a fingerprint persisted under one convention is not silently reloaded under another. Default `-1` = legacy/unknown → refuse to reload, force recapture. |
+| `core/common/.../model/Doodle.kt` | Add `captureRotationDeg: Int` so a doodle persisted under one convention is not silently reloaded under another. Default `-1` = legacy/unknown → refuse to reload, force recapture. |
 
 ### Exit criteria
 
 - `PlaneMarksObliquityTest` passes at 0/20/40/60° with <1 mm error.
-- A fingerprint persisted before this change is rejected on load with a
+- A doodle persisted before this change is rejected on load with a
   user-visible "re-capture your target" message rather than silently misused.
 - On device: the reloc inlier *ratio* at 40° obliquity improves. Ratio, not
   count — count moves with texture, ratio moves with geometry.
@@ -279,14 +279,14 @@ reads are stale; see Phase 2's note on capture-time snapshotting.
 
 ---
 
-## Phase 2 — Partition the fingerprint at capture
+## Phase 2 — Partition the doodle at capture
 
 **Depends on: Phase 1.**
 
 ### What changes
 
-Today `MetricFingerprintBuilder.build` produces one undifferentiated
-`Fingerprint`: descriptors plus 3D points, all treated identically by the reloc
+Today `MetricDoodleBuilder.build` produces one undifferentiated
+`Doodle`: descriptors plus 3D points, all treated identically by the reloc
 PnP. After this phase it produces the same points, each **tagged** with its
 region.
 
@@ -307,13 +307,13 @@ the inside features usable at all despite being cross-modal and decaying.
 
 ### Signature changes
 
-`core/common/.../model/Fingerprint.kt` — add a parallel `regions: ByteArray`
+`core/common/.../model/Doodle.kt` — add a parallel `regions: ByteArray`
 (one byte per 3D point, values from `Footprint.Region.ordinal`). A parallel array
 rather than a struct-of-arrays rewrite: the descriptors are already an
 opaque row-major `Mat` blob and the points a flat `FloatArray`, and adding a
 third parallel array is consistent with that and cheap to serialize.
 
-`MetricFingerprintBuilder`:
+`MetricDoodleBuilder`:
 
 ```kotlin
 fun build(
@@ -323,14 +323,14 @@ fun build(
     overlayHalfW: Float, overlayHalfH: Float,   // NEW
     minPoints: Int = 20,
     ratio: Float = 0.75f,
-): Fingerprint?
+): Doodle?
 ```
 
 and the same two parameters on the single-view `PlaneMarks` path.
 
 **Snapshot the effective footprint at capture — and watch the right variable.**
 The regions are only meaningful against the design's size at the moment they were
-computed, so store that size in the `Fingerprint`. But be precise about what
+computed, so store that size in the `Doodle`. But be precise about what
 actually changes when the user resizes the design:
 
 `OverlayRenderer.setExtent` has exactly two call sites — `ArRenderer.kt:499` (a
@@ -350,23 +350,23 @@ pinching the design is a normal thing to do mid-session.
 
 ### Native side
 
-`SlamManager.restoreWallFingerprintMetric` gains a `regions: ByteArray`
+`SlamManager.restoreWallDoodleMetric` gains a `regions: ByteArray`
 parameter; `MobileGS` stores it as `std::vector<uint8_t> mWallRegions` alongside
 `mWallKeypoints3D` and filters the reloc correspondence build to
 `INSIDE`-excluded rows.
 
-Guard the arity: a legacy persisted fingerprint has no regions. Treat a
+Guard the arity: a legacy persisted doodle has no regions. Treat a
 zero-length `regions` as "all backbone", which reproduces today's behaviour
 exactly. That makes Phase 2 a no-op for old data instead of a crash.
 
 ### Tests
 
-- `FingerprintPartitionTest`: given a synthetic point set straddling the design
+- `DoodlePartitionTest`: given a synthetic point set straddling the design
   edge and a known anchor, the partition assigns the expected counts.
 - `RelocDiagnosticsTest` extension: `matches` must now be reported against the
   backbone-only correspondence count, not the total. Add an assertion that the
   two are separately readable — the same shortfall means different things.
-- A round-trip serialization test: persist and reload a partitioned fingerprint,
+- A round-trip serialization test: persist and reload a partitioned doodle,
   assert regions survive and the legacy-empty path is honoured.
 
 ### Risk
@@ -380,7 +380,7 @@ and the implementation must make it *legible* rather than mysterious:
 - If `F_out` is below a floor at capture time, refuse the capture with a specific
   message: "step back — the target needs some wall around it to lock onto."
   Compare `MainViewModel`'s existing use of
-  `MetricFingerprintBuilder.lastDetected/lastPlaced/lastRequired` for the pattern.
+  `MetricDoodleBuilder.lastDetected/lastPlaced/lastRequired` for the pattern.
 
 ### Rollback
 
@@ -389,9 +389,9 @@ returns to `main` exactly.
 
 ### Exit criteria
 
-- Legacy fingerprints load and relocalize identically (byte-identical inlier
+- Legacy doodles load and relocalize identically (byte-identical inlier
   counts on a replayed recording).
-- A newly captured fingerprint reports non-zero `F_out` and `F_in` counts.
+- A newly captured doodle reports non-zero `F_out` and `F_in` counts.
 - Capture on a wall-filling design is refused with the specific message.
 
 ---
@@ -402,9 +402,9 @@ returns to `main` exactly.
 
 ### What changes
 
-`MobileGS::tryUpdateFingerprint` already contains a self-grow path, gated off by
+`MobileGS::tryUpdateDoodle` already contains a self-grow path, gated off by
 `mSelfGrowEnabled`. It promotes new clean-frame features into the live
-fingerprint by placing them on the wall plane via the current relocalized pose.
+doodle by placing them on the wall plane via the current relocalized pose.
 The gate `growTrusted(inliers, matches)` is:
 
 ```cpp
@@ -434,7 +434,7 @@ inliers land in one textured corner.
 
 ### Files
 
-- `core/nativebridge/src/main/cpp/MobileGS.cpp` — `tryUpdateFingerprint`;
+- `core/nativebridge/src/main/cpp/MobileGS.cpp` — `tryUpdateDoodle`;
   `growTrusted` gains an `inlierSpread` argument.
 - `core/nativebridge/src/main/cpp/include/MobileGS.h` — `mWallRegions`.
 - New native unit coverage is awkward; instead expose `growTrusted`'s decision
@@ -483,7 +483,7 @@ sides of it (E6/E7).
 
 ### Files
 
-- `core/nativebridge/src/main/cpp/MobileGS.cpp` — `tryUpdateFingerprint`'s
+- `core/nativebridge/src/main/cpp/MobileGS.cpp` — `tryUpdateDoodle`'s
   `knnMatch` becomes a gated match. Simplest correct implementation: bucket the
   frame's keypoints into a uniform grid sized to `r`, then for each `F_in` point
   gather the 9 neighbouring cells. No new dependency, `O(n)` build, and it beats a
@@ -529,7 +529,7 @@ confGlobal = slamManager.getPaintingProgress(),
 ```
 
 and `PoseFusion` uses it to scale correction strength above `CONF_FLOOR`. But
-`getPaintingProgress()` is doing two jobs at once. In `tryUpdateFingerprint` it is
+`getPaintingProgress()` is doing two jobs at once. In `tryUpdateDoodle` it is
 `matched / artDescs.rows` — the fraction of the *design's* features the wall
 answers for. That number goes **up** as the artist paints, which is the intended
 "the further along, the tighter it locks" behaviour. It also decays by `×0.9`
@@ -700,7 +700,7 @@ order.** Work top to bottom.
 ### Phase 5a — split progress from confidence (no new dependencies)
 
 - [x] **5a.1** Add `mCorroborationConfidence` atomic to `MobileGS.h`. **[N]**
-- [x] **5a.2** In `tryUpdateFingerprint`, compute and publish corroboration
+- [x] **5a.2** In `tryUpdateDoodle`, compute and publish corroboration
       confidence separately from `mPaintingProgress`. Keep today's
       `artDescs.rows` denominator for now — 5b changes it. **[N]**
 - [x] **5a.3** Remove the `×0.9` decay from the painting-progress channel; leave
@@ -841,9 +841,9 @@ order.** Work top to bottom.
       `rotationDeg` with **no default** — a default would let a caller silently reinstate the
       defect. Plumbed from `MainActivity` → `MainViewModel` and from the doodle path.
 - [x] **0.5** Audit *every* consumer of the capture view matrix for the same
-      convention — `MetricFingerprintBuilder`, `PlaneMarks` callers,
-      `targetCaptureViewMatrix` in `ArViewModel`, `fingerprintViewMatrix` in
-      `MainViewModel`, and `restoreWallFingerprintMetric`'s `viewMatrix16`.
+      convention — `MetricDoodleBuilder`, `PlaneMarks` callers,
+      `targetCaptureViewMatrix` in `ArViewModel`, `doodleViewMatrix` in
+      `MainViewModel`, and `restoreWallDoodleMetric`'s `viewMatrix16`.
       List each site in the commit message with its verdict.
 - [x] **0.6** Confirm `PoseFusion.composeCorrected` is consistent under the chosen
       convention. `PoseFusionTest` now pins the factor order with non-commuting
@@ -874,18 +874,18 @@ order.** Work top to bottom.
       change with its own experiment gating it and is untouched. The test pins the
       three-factor form as it stands, so 0.9 has to change it deliberately rather
       than by accident.)*
-- [x] **0.7** Add `captureRotationDeg` to `Fingerprint`; default `-1`; refuse to
-      reload a legacy fingerprint and prompt for re-capture. **[T]**
-      *(DONE. Safe to add to `Fingerprint` after all: JNI constructs through the FROZEN
+- [x] **0.7** Add `captureRotationDeg` to `Doodle`; default `-1`; refuse to
+      reload a legacy doodle and prompt for re-capture. **[T]**
+      *(DONE. Safe to add to `Doodle` after all: JNI constructs through the FROZEN
       `fromNative` static factory, not the primary constructor, precisely so defaulted
       fields cannot break the descriptor lookup — the model comment claiming a "fixed
       constructor signature" is superseded by that factory, and was checked against
       `JNI_FACTORY_DESCRIPTOR` before the field was added. The refusal keys on
       `isLegacyFrame()` = metric points present AND no recorded rotation, so a
-      descriptors-only fingerprint — no 3D, nothing to be in the wrong frame — is never
+      descriptors-only doodle — no 3D, nothing to be in the wrong frame — is never
       refused. `< 0` and not `<= 0`: landscape capture is `rotationNeeded == 0` and is
       valid. Mutation-tested; `<= 0` fails 2 tests.)*
-      *(STILL OPEN — the one Phase 0 item not landed. A fingerprint saved before this
+      *(STILL OPEN — the one Phase 0 item not landed. A doodle saved before this
       change stores sensor-frame points; it is no **worse** than it was, because the live
       side was already display-frame and the pair never agreed, but it is not fixed either
       and nothing tells the user. Separable from the geometry: it is persistence and
@@ -909,7 +909,7 @@ order.** Work top to bottom.
       - `objPts` = `mWallKeypoints3D` = `PlaneMarks.backProject`'s `pointsCam`, which
         are in the **capture camera's** frame, not a world frame — despite the native
         field being named `mPnpCamFromFpWorld`.
-      - `fpAnchor` = `mFingerprintAnchorMatrix` = `getAnchorTransform()`, which
+      - `fpAnchor` = `mDoodleAnchorMatrix` = `getAnchorTransform()`, which
         `MobileGS.cpp:525`'s own comment calls "a world-space MODEL matrix".
 
       So world coordinates are fed into a map whose domain is capture-camera
@@ -935,11 +935,11 @@ order.** Work top to bottom.
       **2.92**: not a rounding artefact, a wholly different pose.*
       ***Why it is not circular.** The one belief-carrying input is what `solvePnP`
       returns under zero drift, and that is built from the repo's OWN shipped bridge —
-      `MetricMarks.glViewToCv`, and `MetricFingerprintBuilder`'s
-      `captureAnchorCam = cvView · anchorModel`. The fingerprint frame IS the
-      display-oriented CV capture camera by construction, in code whose fingerprints
+      `MetricMarks.glViewToCv`, and `MetricDoodleBuilder`'s
+      `captureAnchorCam = cvView · anchorModel`. The doodle frame IS the
+      display-oriented CV capture camera by construction, in code whose doodles
       demonstrably relocalize. Limit, stated: this validates `composeCorrected` against
-      the fingerprint builder and cannot catch an error the two share.*
+      the doodle builder and cannot catch an error the two share.*
       ***The fix.** `corrected = inv(vCurrent) · [D · pnpMat] · captureAnchorCam`.
       `captureAnchorCam` is a quantity Phase 2 already builds, persists and partitions
       with, so no new geometry was needed — only a factor the project already had and
@@ -949,18 +949,18 @@ order.** Work top to bottom.
       is wrong here because `captureAnchorCam` carries its own `D`; the trailing factor
       applies it twice and lands **4.29** from the anchor — worse than the 2.92 defect it
       was meant to fix. §8.3's warning arriving in person. Both mistakes are pinned.*
-      ***Behaviour change worth knowing:** a pre-Phase-2 fingerprint has no
+      ***Behaviour change worth knowing:** a pre-Phase-2 doodle has no
       `captureAnchorCam`, and fusion is now SKIPPED for it rather than fed a world-frame
       anchor. Refusing to correct leaves the overlay on the drifting backbone; correcting
       in mixed frames pulls it somewhere confidently wrong, and §8.3 says the second is
       worse.*
       *Still not device-verified — the invariant proves internal consistency, not that
       the overlay lands on the wall. That remains E-series work.)*
-- [x] **0.10** `MetricFingerprintBuilder.ingestSingle` stores display-frame
+- [x] **0.10** `MetricDoodleBuilder.ingestSingle` stores display-frame
       `res.pointsCam` alongside the **un-rotated** `glView` in the same
-      `restoreWallFingerprintMetric` call. Native pairs them in
+      `restoreWallDoodleMetric` call. Native pairs them in
       `computeRectifyHomography` (`viewFp` at `MobileGS.cpp:571`, `mWallKeypoints3D`
-      at `:576`), so the rectifying homography is off by `R_z` on the fingerprint
+      at `:576`), so the rectifying homography is off by `R_z` on the doodle
       side. This is a **live** gap in the path Phase 0 just fixed, not a legacy-data
       gap — it was mis-filed under 0.7 in PR #1797. In GL convention the matching
       rotation is `R_z(−θ)`, since `D·R_z(θ)·D = R_z(−θ)` for `D = diag(1,−1,−1)`.
@@ -972,16 +972,16 @@ order.** Work top to bottom.
 - [x] **0.11** Persist `captureRotationDeg` in `GraffitiProject` at save time.
       Without it, projects captured *after* Phase 0 — the correct ones — are
       indistinguishable on disk from legacy ones, so 0.7's "refuse to reload a legacy
-      fingerprint" would reject them too.
+      doodle" would reject them too.
       *(DONE, and it caught a second defect: `saveProject` persisted
-      `fingerprintViewMatrix = view.toList()` — the RAW sensor-frame view — so 0.10 was
+      `doodleViewMatrix = view.toList()` — the RAW sensor-frame view — so 0.10 was
       undone the moment a project reloaded. Now persists the display-oriented view,
       matching both the stored points and what native received at capture.)*
 
-### Phase 2 — partition the fingerprint
+### Phase 2 — partition the doodle
 
 - [x] **2.1** Add `regions: ByteArray`, `captureHalfW`, `captureHalfH` to
-      `Fingerprint`; empty `regions` means legacy all-backbone. **[T]**
+      `Doodle`; empty `regions` means legacy all-backbone. **[T]**
       *(Also `captureAnchorCam` — the anchor's pose in the capture camera frame,
       `V_cv · A`. See 2.4 for why the partition cannot be composed without it.
       `equals`/`hashCode` were extended to every new field, without which the 2.9
@@ -989,20 +989,20 @@ order.** Work top to bottom.
 - [x] **2.2** Add the user-rescales-the-design path; pure Kotlin over the stored
       points. Key the staleness check on **`overlayScale`** (or the effective
       scaled half-extents), NOT on `OverlayRenderer`'s extents. **[T]**
-      *(Landed as `FingerprintPartition.partition`, and wired: `ArRenderer` fires
+      *(Landed as `DoodlePartition.partition`, and wired: `ArRenderer` fires
       `onDesignFootprintChanged` when the effective half-extents appear or move
       past 1 mm; `ArViewModel` repartitions, re-pushes to native, and persists.
       The handler cancels any in-flight job rather than queueing — a live pinch
       fires per frame, and an older partition completing last would leave native
       and disk describing a size the artist has already left behind.*
-      *It fires on an **unpartitioned** fingerprint as well as a stale one.
+      *It fires on an **unpartitioned** doodle as well as a stale one.
       `isPartitionStale` is defined as false when there is no partition, so
-      gating on staleness alone would mean a fingerprint that starts
+      gating on staleness alone would mean a doodle that starts
       unpartitioned stays that way forever — which, per 2.4, is every one.)*
 - [x] **2.3** Thread the design's placement into the partition.
       *(As one `DesignFootprint` — anchor-relative rigid pose plus effective
       half-extents — rather than loose floats, so "no design placed" reads as a
-      deliberate `null`. NOT threaded into `MetricFingerprintBuilder`, which the
+      deliberate `null`. NOT threaded into `MetricDoodleBuilder`, which the
       original text called for: see 2.4. The two-keyframe `build` overload has no
       production caller and was left alone rather than given a parameter nothing
       would pass.)*
@@ -1028,14 +1028,14 @@ order.** Work top to bottom.
       leaves matrices **all zeros without throwing** (verified by probe, not
       assumed), so the framework version would have been untestable and would
       have classified everything INSIDE.)*
-- [x] **2.5** Add `FingerprintPartitionTest` — synthetic straddling point set,
+- [x] **2.5** Add `DoodlePartitionTest` — synthetic straddling point set,
       expected counts per region. **[T]**
       *(The fixtures use a rotated+translated design pose, not the identity. With
       an identity design the two factors commute, so the likeliest defect —
       writing the multiply the other way round — is invisible; the first version
       of this file used the identity and an audit passed it with the operands
       swapped. Mutation-verified: the swap now fails four tests.)*
-- [x] **2.6** Add `regions` to `SlamManager.restoreWallFingerprintMetric`'s
+- [x] **2.6** Add `regions` to `SlamManager.restoreWallDoodleMetric`'s
       signature and JNI binding.
       *(JNI binds by SHORT NAME and does not check the descriptor, so an arity
       change on one side alone links, runs, and reads a garbage register.
@@ -1052,7 +1052,7 @@ order.** Work top to bottom.
       exactly on the BAND, the region that must be trusted by neither side.
       `mWallRegions` is cleared at every other site that replaces
       `mWallKeypoints3D` (plain restore, co-op receive, depth-path
-      `generateFingerprint`, `clearWallFingerprint`), because a partition left
+      `generateDoodle`, `clearWallDoodle`), because a partition left
       behind indexes a point set that no longer exists. Self-grow appends `BAND`
       per promoted mark so the 1:1 invariant survives without admitting an
       unclassified feature to the backbone; 3.4 classifies them properly. The
@@ -1070,14 +1070,14 @@ order.** Work top to bottom.
       is knowable the target already exists, and the honest advice is "make the
       artwork smaller or step back", not "that never worked".)*
 - [x] **2.9** Add a persistence round-trip test including the legacy-empty path. **[T]**
-      *(Asserted through `GraffitiProject` as well as `Fingerprint`. Equality is
+      *(Asserted through `GraffitiProject` as well as `Doodle`. Equality is
       checked one field at a time: a single comparison between a bare and a fully
-      populated fingerprint differs in five places at once and would still pass
+      populated doodle differs in five places at once and would still pass
       with four of the five missing from `equals`.)*
-- [ ] **2.10** Verify on a replayed recording that a legacy fingerprint produces
+- [ ] **2.10** Verify on a replayed recording that a legacy doodle produces
       byte-identical inlier counts to `main`.
       *(Blocked on hardware — needs a replayed recording this environment cannot
-      produce. The static argument is that a legacy fingerprint has empty
+      produce. The static argument is that a legacy doodle has empty
       `regions`, `usePartition` is therefore false, and the correspondence loop is
       byte-identical. That is an argument, not the measurement the item asks for,
       and it is not a substitute.)*
@@ -1085,12 +1085,12 @@ order.** Work top to bottom.
       to `RelocDiagnostics`, the CSV, and the overlay. Defaults encode "not
       measured", not zero — follow the `obliquityDeg = -1` precedent. **[T][N]**
       *(All three default to -1 and are reset to -1 at the TOP of each reloc
-      iteration, before the disabled/no-fingerprint early-outs, so a stalled
+      iteration, before the disabled/no-doodle early-outs, so a stalled
       attempt never shows the previous one's numbers. `backboneFeatures` reports
-      the FULL point count on an unpartitioned fingerprint rather than 0 —
+      the FULL point count on an unpartitioned doodle rather than 0 —
       reporting 0 there would fire the empty-`F_out` alarm on every pre-Phase-2
       project. `usePartition` was hoisted out of `buildCorr` so the filter and
-      the count cannot disagree about which fingerprint is partitioned. Matches
+      the count cannot disagree about which doodle is partitioned. Matches
       and inliers travel on a `corrFromBackbone` array parallel to the
       correspondences; the Phase-2b map path pushes 0, because those points were
       never classified by Φ. `backboneInliers` stays -1 on `PNP_FAILED`: there is
@@ -1132,14 +1132,14 @@ order.** Work top to bottom.
       `knnMatch` against `artDescs` with the gated match. **[N]**
       *(Landed as `include/KeypointGrid.h` + `include/SearchRadius.h`, one C++ file
       per Kotlin reference so a reviewer can diff them side by side, plus the gated
-      branch in `tryUpdateFingerprint`. NDK build verified for both ABIs.*
+      branch in `tryUpdateDoodle`. NDK build verified for both ABIs.*
       ***The plan's premise did not survive contact with the code.** 4.5 says to
       project each `F_in` 3D point through the current pose, but the corroboration
       match compares the frame against `mArtworkDescriptors` — the DESIGN's
-      features — and those have no position in the fingerprint frame.
+      features — and those have no position in the doodle frame.
       `mArtworkKeypoints3D` is empty on the shipping path (the design composite
       carries no depth) and, when depth exists, is expressed in the artwork
-      capture camera's frame, which has no relation to the fingerprint's. So the
+      capture camera's frame, which has no relation to the doodle's. So the
       prediction goes through the design's PLACEMENT instead: a new
       `setDesignPlacement` carries `captureAnchorCam · rigidModelAnchorLocal` —
       the exact composition Φ is classified with, passed rather than re-derived so
@@ -1169,7 +1169,7 @@ order.** Work top to bottom.
       *Six defects found by the adversarial audit of this commit and fixed in the
       follow-up: (1) the native design placement was cleared on one of three
       project-switch branches, so opening a second project with a saved metric
-      fingerprint left the gated search predicting at the PREVIOUS project's design
+      doodle left the gated search predicting at the PREVIOUS project's design
       location — the seventh instance of the "cleared in one branch, not its
       sibling" family, now fixed structurally by clearing before the `when` rather
       than inside it; (2) painting progress ratcheted with no false-positive bound
@@ -1332,7 +1332,7 @@ order.** Work top to bottom.
       firing, and E5 has to separate those to say whether the term is too strict.)*
 - [x] **3.4** Classify each promotion candidate via Φ at promotion time; only
       `OUTSIDE` enters the reloc set. **[N]**
-      *(Φ transliterated as `classifyInFingerprintFrame`, using the design placement
+      *(Φ transliterated as `classifyInDoodleFrame`, using the design placement
       Phase 4 already pushes for the corroboration search — the same matrix, so the
       two cannot disagree about where the design is. Written out as two dot products
       rather than a matrix inverse because only the X and Y rows are needed; Z is the
@@ -1341,7 +1341,7 @@ order.** Work top to bottom.
       but meant self-grow could never enlarge `F_out` — most of what self-grow is
       for. **No placement still means BAND**, and that is the same refusal rather
       than an accidental fallback: "we could not ask" is not evidence of "outside".*
-      *Margins copied from `FingerprintPartition`'s shipped 0.04/0.10, NOT the
+      *Margins copied from `DoodlePartition`'s shipped 0.04/0.10, NOT the
       pre-registered 0.05/0.15 — §4 of PARAMETERS records that discrepancy. Two Φs
       disagreeing about the edge would be worse than either margin being wrong.)*
 - [x] **3.5** Route `INSIDE` promotions into `F_in` with a bounded lifetime, or
@@ -1371,7 +1371,7 @@ order.** Work top to bottom.
       that have cost the most time were never wrong numbers — they were stages that
       silently did not run. Phase 2's partition was inert on every first capture for
       weeks; self-grow shipped ON while its own comment said OFF; and **0.9 added a
-      null check that turns fusion off entirely for a pre-Phase-2 fingerprint**,
+      null check that turns fusion off entirely for a pre-Phase-2 doodle**,
       which is correct and was completely invisible from outside.*
       *Six states produce the identical artist-visible symptom — the overlay sits on
       the backbone and drifts. `DISABLED`, `NO_ANCHOR`, `NO_CAPTURE_POSE`,

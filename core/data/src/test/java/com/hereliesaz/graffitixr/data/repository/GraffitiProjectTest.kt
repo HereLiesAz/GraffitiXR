@@ -50,7 +50,7 @@ class GraffitiProjectTest {
                     isImageLocked = true
                 )
             ),
-            targetFingerprintPath = "/path/to/fingerprint"
+            targetDoodlePath = "/path/to/doodle"
         )
 
         assertEquals("test-id", project.id)
@@ -59,9 +59,9 @@ class GraffitiProjectTest {
 
         // Full round-trip equality — the test name promised "preserves all fields" but only ever
         // checked 4 of the class's ~30, so a regression in any OTHER field (there is no shortage:
-        // drawingPaths, gpsData, fingerprintIntrinsics, railExpansion, ...) went uncaught. GraffitiProject
+        // drawingPaths, gpsData, doodleIntrinsics, railExpansion, ...) went uncaught. GraffitiProject
         // is a data class, so assertEquals against the whole object exercises every field at once;
-        // WallFeatureMap/Fingerprint (left at their null defaults here) have their own dedicated
+        // WallFeatureMap/Doodle (left at their null defaults here) have their own dedicated
         // array-aware equals() overrides, covered separately by the tests below.
         val decoded = json.decodeFromString<GraffitiProject>(json.encodeToString(project))
         assertEquals(project, decoded)
@@ -70,7 +70,7 @@ class GraffitiProjectTest {
     @Test
     fun `serialization preserves the wall feature map`() {
         // The persistent feature map rides in project.json (and thus the .gxr), parallel to the
-        // fingerprint. Verify it survives the project round-trip intact (descriptor blob included).
+        // doodle. Verify it survives the project round-trip intact (descriptor blob included).
         val map = WallFeatureMap(
             points3d = floatArrayOf(0f, 0f, 1f, 0.1f, 0.2f, 1.1f),
             descriptorsData = ByteArray(64) { (it % 251).toByte() },
@@ -112,14 +112,14 @@ class GraffitiProjectTest {
             id = "standalone-map",
             sphereSlamWallFeatureMap = map,
             sphereSlamWallFeatureMapFrameVersion =
-                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
         )
 
         val decoded = json.decodeFromString<GraffitiProject>(json.encodeToString(project))
 
         assertEquals(map, decoded.sphereSlamWallFeatureMap)
         assertEquals(
-            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
             decoded.sphereSlamWallFeatureMapFrameVersion,
         )
     }
@@ -157,7 +157,7 @@ class GraffitiProjectTest {
             id = "standalone-anchor",
             sphereSlamAnchorGeneration = 9L,
             sphereSlamAnchorFrameVersion =
-                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+                com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
             sphereSlamPlacementAnchorGeneration = 8L,
             sphereSlamModeAdjustment = com.hereliesaz.graffitixr.common.model.ModeAdjustment(
                 offsetX = 0.6f,
@@ -172,7 +172,7 @@ class GraffitiProjectTest {
 
         assertEquals(9L, decoded.sphereSlamAnchorGeneration)
         assertEquals(
-            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+            com.hereliesaz.graffitixr.common.model.SPHERE_SLAM_DOODLE_FRAME_VERSION,
             decoded.sphereSlamAnchorFrameVersion,
         )
         assertEquals(8L, decoded.sphereSlamPlacementAnchorGeneration)

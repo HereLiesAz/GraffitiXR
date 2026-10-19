@@ -11,7 +11,7 @@ The relocalizer's real constants live in `core/nativebridge/src/main/cpp/include
 | `kRelocLoweRatio` | `0.75` | Lowe's-ratio threshold for a relocalization descriptor match. |
 | `kCorrobLoweRatio` | `0.85` | Same test, for the teleological corroboration path (see `TELEOLOGICAL_SLAM.md`). |
 | `kBigLockInliers` | `20` | Inlier count above which a PnP solve is accepted outright. |
-| `kMaxWallMarks` | `5000` | Cap on fingerprint points, including any self-grow additions. |
+| `kMaxWallMarks` | `5000` | Cap on doodle points, including any self-grow additions. |
 | RANSAC | `100` iterations, `8px` reprojection threshold, `0.99` confidence | `cv::solvePnPRansac`'s own parameters for the reloc solve. |
 
 ## Sensor input pipeline
@@ -20,10 +20,10 @@ The relocalizer's real constants live in `core/nativebridge/src/main/cpp/include
 
 #### Color frame (`feedYuvFrame` / `feedColorFrame`)
 The ARCore camera feed is offloaded to `relocThreadFunc` for background ORB/SuperPoint matching
-against the stored fingerprint and a `solvePnPRansac` pose solve.
+against the stored doodle and a `solvePnPRansac` pose solve.
 
 #### Depth (hardware stereo where available)
-Depth is used for triangulating the fingerprint's 3D points at capture time on devices with real
+Depth is used for triangulating the doodle's 3D points at capture time on devices with real
 hardware stereo; there is no separate mapping/fusion pipeline that consumes it afterward.
 
 ### Standalone CameraX + SphereSLAM/KPM path
@@ -65,18 +65,18 @@ persisted page images on reopen/import/co-op project transfer.
 
 #### MobileGS boundary — connected through the centered page frame
 
-Standalone MobileGS no longer reuses the ARCore `fingerprint` slot. It has its own
-`sphereSlamFingerprint` and `sphereSlamWallFeatureMap`, both versioned against the canonical
+Standalone MobileGS no longer reuses the ARCore `doodle` slot. It has its own
+`sphereSlamDoodle` and `sphereSlamWallFeatureMap`, both versioned against the canonical
 centered KPM page frame. For standalone:
 
-- KPM page 0, renderer wall coordinates, MobileGS fingerprint object coordinates, and persisted
+- KPM page 0, renderer wall coordinates, MobileGS doodle object coordinates, and persisted
   standalone wall-map coordinates are the same centered page frame;
 - accepted same-frame KPM view/projection feed `SlamManager.updateCamera`;
 - CameraX display-oriented luma/intrinsics feed MobileGS only under that explicit frame contract;
-- self-grow and wall-feature-map intersections are stored directly in fingerprint/page coordinates;
-- an ARCore-frame `fingerprint` is never silently restored into standalone MobileGS.
+- self-grow and wall-feature-map intersections are stored directly in doodle/page coordinates;
+- an ARCore-frame `doodle` is never silently restored into standalone MobileGS.
 
-The two persisted fingerprint/map slots remain separate precisely so no implicit ARCore-world
+The two persisted doodle/map slots remain separate precisely so no implicit ARCore-world
 conversion can creep back in.
 
 ### ARCore + metric hybrid KPM correction
@@ -102,20 +102,20 @@ Correction priority while the off-by-default drift-correction switch is enabled 
 
 KPM never writes renderer view/projection matrices and is not used as surrogate continuous tracking
 while ARCore is paused. The hybrid rectified page/page↔artwork relation is currently runtime-only;
-project reopen falls back to the durable MobileGS fingerprint until a new metric hybrid page is
+project reopen falls back to the durable MobileGS doodle until a new metric hybrid page is
 captured.
 
 ## Tuning guide
 
 **"The tracking doesn't snap back after pocketing"**
-Cause: no wall fingerprint was captured, or relocalization is failing its RANSAC/inlier gates against the live frame (a near-featureless or highly repetitive surface — smooth stucco, running-bond brick — starves the correspondence set the solver needs).
-Fix: confirm a target was actually captured and locked; for a low-texture wall, capture the fingerprint over a patch with more visible variation (an edge, a stain, a fixture) rather than the flattest part of the surface.
+Cause: no wall doodle was captured, or relocalization is failing its RANSAC/inlier gates against the live frame (a near-featureless or highly repetitive surface — smooth stucco, running-bond brick — starves the correspondence set the solver needs).
+Fix: confirm a target was actually captured and locked; for a low-texture wall, capture the doodle over a patch with more visible variation (an edge, a stain, a fixture) rather than the flattest part of the surface.
 
 **"The overlay is placed correctly at capture but drifts off over a session"**
 Cause: drift correction (`driftCorrectionEnabled`) can be switched off — see `docs/TELEOLOGICAL_SLAM.md` for how to enable it from the diagnostic overlay, and its own caveats before doing so.
 
 **"The geometry looks skewed after rotating the phone"**
-Cause: the fingerprint's stored intrinsics were captured at one display rotation and the live frame is being matched at another — see `MobileGS.cpp`'s `restoreWallFingerprintMetric`/reloc PnP path and `ArRenderer`'s `cvRotateCode` handling.
+Cause: the doodle's stored intrinsics were captured at one display rotation and the live frame is being matched at another — see `MobileGS.cpp`'s `restoreWallDoodleMetric`/reloc PnP path and `ArRenderer`'s `cvRotateCode` handling.
 Fix: re-capture the target at the orientation painting will actually happen in, or file this as the open bug it currently is if it reproduces.
 
 ---

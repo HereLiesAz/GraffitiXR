@@ -24,7 +24,7 @@ continuing to defer verification to some future session. `compileDebugKotlin`,
 
 - **Task 17 — Co-op Implementation.** Real project serialization and spectator load implemented in `ProjectManager`. Wired `StrokeComplete` Op in `EditorViewModel` using bitmap-space mapping. Verified host-guest drawing sync logic.
 - **Co-op — Transport security & robustness.** Encrypted the peer-to-peer transport (protocol v2: token-derived AES-256-GCM per frame, nonce/proof handshake, no token on the wire) and hardened the sessions: accept-loop survives bad handshakes, ops are lossless across reconnects (seq/encode/buffer at enqueue), 15s socket read timeouts, guest re-syncs on host `sessionId` change, bounded pre-handler spectator-op buffering. Import/spectator load hardened against Zip-Slip. See `collab/` and `core/data/ProjectManager.kt`.
-- **Relocalization — Fingerprint JNI ABI.** Fixed `nativeSetWallFingerprint` silently returning null (native looked up a stale `Fingerprint` constructor descriptor after a field was added). Native now builds through a frozen `Fingerprint.fromNative` factory guarded by `FingerprintJniContractTest`.
+- **Relocalization — Doodle JNI ABI.** Fixed `nativeSetWallDoodle` silently returning null (native looked up a stale `Doodle` constructor descriptor after a field was added). Native now builds through a frozen `Doodle.fromNative` factory guarded by `DoodleJniContractTest`.
 - **Task 15 — QR Scanner.** Integrated ZXing-based QR scanner into `MainActivity`. Search button now triggers live scanner to join sessions.
 - **Voxel Memory — Frustum Culling.** Implemented true NDC-based visible splat confidence calculation in `VoxelHash`.
 - **Relocalization — Thread Safety.** Added mutex locking to `mWallDescriptors` and `mWallKeypoints3D` in `MobileGS` to prevent races between JNI updates and the background PnP thread.
@@ -36,9 +36,9 @@ architecture/engineering, docs cross-consistency). Full findings are in that ses
 fixed this pass:
 
 - **`EditorViewModel` had a second, dumber project-load path racing `ArViewModel`'s.**
-  `restoreWorld`/`internal val slamManager` skipped fingerprint-region partitioning, the
+  `restoreWorld`/`internal val slamManager` skipped doodle-region partitioning, the
   legacy-frame refusal, and clearing stale design placement — silently corrupting reloc state on a
-  project switch. Deleted the whole path; `ArViewModel.loadFingerprintIfExists` is now the only
+  project switch. Deleted the whole path; `ArViewModel.loadDoodleIfExists` is now the only
   loader. Also dropped `:feature:editor`'s `:core:nativebridge` dependency, which existed only for
   this.
 - **"Open" replaced the design outright with no confirmation**, contradicted by four
@@ -64,12 +64,12 @@ fixed this pass:
   hand. Added `consumerProguardFiles("consumer-rules.pro")` and moved the real rules there.
   `:core:common` had the mirror-image bug: its `build.gradle.kts` referenced a `proguard-rules.pro`
   that doesn't exist (removed the dangling reference) while its actual `consumer-rules.pro` — the
-  file that *is* wired — carried zero real rules despite owning `Fingerprint`, which is constructed
-  from native via a frozen JNI factory. Added the `Fingerprint` keep rules there so they travel with
+  file that *is* wired — carried zero real rules despite owning `Doodle`, which is constructed
+  from native via a frozen JNI factory. Added the `Doodle` keep rules there so they travel with
   the class that needs them, rather than living only in the app's copy.
-- **Removed confirmed-zero-caller dead code found during this pass:** the `mobilegs::exportFingerprint`
-  /`alignToFingerprint` free-function wrappers in `MobileGS.cpp` (unlocked reads of `gSlamEngine` —
-  the real, correctly-locked callers are `MobileGS::exportFingerprint`/`alignToFingerprint`, called
+- **Removed confirmed-zero-caller dead code found during this pass:** the `mobilegs::exportDoodle`
+  /`alignToDoodle` free-function wrappers in `MobileGS.cpp` (unlocked reads of `gSlamEngine` —
+  the real, correctly-locked callers are `MobileGS::exportDoodle`/`alignToDoodle`, called
   directly under `gEngineMutex` from `GraffitiJNI.cpp`; the wrapper namespace had no callers and no
   header declaration anywhere); the eight inert `core/nativebridge/libs/litert_npu_runtime_libraries/`
   Gradle modules (never `include()`d in `settings.gradle.kts`, one of them declaring a
@@ -150,7 +150,7 @@ hosts) share Measure results.
 
 - [ ] SphereSLAM 0.24.0 consolidation (2026-10-10) needs on-device verification — see
   `docs/SPHERESLAM_TODO.md` ("Device verification still owed for this move"): the gyro-bridge /
-  photosphere device→camera rotation fix in portrait and both landscapes, roll-aware fingerprint
+  photosphere device→camera rotation fix in portrait and both landscapes, roll-aware doodle
   placement, the embedded coverage wash (camera visible, wash beneath the artwork), hybrid KPM
   agreement in mixed MobileGS + KPM sessions, and MiDaS loading from the `:models` asset.
 - [ ] Overlay ▸ Gyro (tripod stabilisation, 2026-10-09) needs on-device verification: the design
@@ -252,7 +252,7 @@ Conceptual, needs a product decision rather than a code fix:
   and has been deleted, see above.)
 - **No way anywhere in the app to enter real wall dimensions** — scale comes from a depth guess
   adjusted by pinch, for a target user (commissioned muralist) who prices per square foot.
-- **The "no cloud" anti-goal blocks encrypted crew fingerprint-sharing** (Co-op stays host→guest
+- **The "no cloud" anti-goal blocks encrypted crew doodle-sharing** (Co-op stays host→guest
   only) without changing the risk profile it's meant to protect (an E2E relay holding no identity
   would serve the stated illegal-graffiti threat model equally well).
 - Five "modes" (AR/Overlay/Mockup/Trace/Design) are one renderer with three boolean axes
@@ -276,18 +276,18 @@ than after.
 - [x] `GraffitiJNI.cpp` `nativeFeedColorFrame` — wraps the caller's `DirectByteBuffer` in a
   `cv::Mat` with no capacity or dimension check (its sibling `nativeFeedYuvFrame` has exactly
   this guard). Add the same `GetDirectBufferCapacity` bounds check before constructing the Mat.
-- [x] `MobileGS::restoreWallFingerprint` (the descriptors-only restore path) — doesn't reset
-  `mHasFingerprintView`/`mFingerprintAnchorMatrix`/`mWallPatch` from a previously-loaded metric
-  fingerprint, so switching to a descriptors-only project can silently co-register against the
-  old project's capture pose. Mirror the guard `restoreWallFingerprintMetric` and
-  `alignToFingerprint` already have.
-- [x] `MobileGS::alignToFingerprint` — resets `mFingerprintIntrinsics`/`mHasFingerprintView` but
-  not `mFingerprintAnchorMatrix`; a co-op peer's fingerprint can inherit this device's stale
-  local anchor. Reset it alongside the other two (match `clearWallFingerprint`'s identity reset).
+- [x] `MobileGS::restoreWallDoodle` (the descriptors-only restore path) — doesn't reset
+  `mHasDoodleView`/`mDoodleAnchorMatrix`/`mWallPatch` from a previously-loaded metric
+  doodle, so switching to a descriptors-only project can silently co-register against the
+  old project's capture pose. Mirror the guard `restoreWallDoodleMetric` and
+  `alignToDoodle` already have.
+- [x] `MobileGS::alignToDoodle` — resets `mDoodleIntrinsics`/`mHasDoodleView` but
+  not `mDoodleAnchorMatrix`; a co-op peer's doodle can inherit this device's stale
+  local anchor. Reset it alongside the other two (match `clearWallDoodle`'s identity reset).
 - [x] `nativeGetAnchorTransform` — returns a non-null all-zero `FloatArray(16)` when
   `gSlamEngine` is null, contradicting the null-on-failure contract every Kotlin call site
   (`ArRenderer.kt`, `ArViewModel.kt`) explicitly documents and relies on. Return `nullptr`
-  instead, matching `nativeGetFingerprintAnchor`'s sibling behavior.
+  instead, matching `nativeGetDoodleAnchor`'s sibling behavior.
 - [x] `SuperPointDetector.cpp` `extractKeypoints` — the `cv::resize` call for a degenerate
   (near-zero-width) input sits outside the function's `try` block; an escaped exception on the
   reloc worker thread (no `try` at that specific call site) kills relocalization for the session
@@ -313,13 +313,13 @@ than after.
   `inliers.size() >= 8`, `ratio >= 0.35`) have no spatial-conditioning check; a tight cluster of
   matches (e.g. all inside one logo) passes every gate and produces a high-confidence garbage
   pose. Add a bounding-box-area or condition-number check on `objPts` before the PnP solve.
-- [x] `SuperPointDetector.cpp:108-120` — masked detection (`generateFingerprint`'s isolated-marks
+- [x] `SuperPointDetector.cpp:108-120` — masked detection (`generateDoodle`'s isolated-marks
   path) truncates to `maxKps` *before* applying the mask, so a small mask can yield zero
   survivors and silently fall back to ORB, permanently downgrading that project's wall
-  fingerprint to binary descriptors. Apply the mask before the top-K truncation, or detect with a
+  doodle to binary descriptors. Apply the mask before the top-K truncation, or detect with a
   higher provisional cap when a mask is present.
 - [x] `LowLightEnhancer` — silently a no-op on all three bitmap-sourced call sites
-  (`getSuperPointFeatures`, `getFingerprintKeypoints`, `generateFingerprint`): they hand it
+  (`getSuperPointFeatures`, `getDoodleKeypoints`, `generateDoodle`): they hand it
   `CV_8UC4` (from `bitmapToMat`), the model wants 3-channel, OpenCV throws, the catch swallows
   it. Only the reloc live-frame path (which converts to RGB first) actually works. Convert
   RGBA→RGB before the three broken calls, or make `LowLightEnhancer::enhance` accept and convert
@@ -477,8 +477,8 @@ device, no ARCore) and a half-built AR interaction is worse than a documented pl
   "Matched X%" wording was a separate issue — **since fixed**: `matched_percent` reads
   "%1$d%% painted" (and its translation) in all 15 locale `strings.xml` files (re-verified
   2026-10-08).
-- [x] **The tracked "no-cloud blocks crew fingerprint-sharing" tension is factually resolved, not
-  open**: `.gxr` project export already round-trips the wall fingerprint and is byte-identical to
+- [x] **The tracked "no-cloud blocks crew doodle-sharing" tension is factually resolved, not
+  open**: `.gxr` project export already round-trips the wall doodle and is byte-identical to
   Co-op's own bulk-sync payload. The real gap was affordance: it was buried inside "Save", landing
   silently in Downloads with no hand-off. Added `EditorViewModel.shareProject()` — same export,
   routed through cache + `FileProvider` + `ACTION_SEND` — and a "Share Wall" rail item next to
@@ -586,9 +586,9 @@ inferred:
   `@RunWith(RobolectricTestRunner)` anywhere under its `src/test`). Adding Robolectric is a real
   infra decision (new dependency, config across every module with native/Android-framework
   seams) — out of scope for a test-backfill pass, flagged here rather than added silently.
-- [x] `restoreWallFingerprint`/`alignToFingerprint`: stale co-registration state is cleared —
-  `MobileGSFingerprintStateTest` (host-native), mutation-checked. Finding while writing it:
-  `alignToFingerprint` resets the view/anchor/intrinsics but NOT `mWallPatch`, so a peer's wall
+- [x] `restoreWallDoodle`/`alignToDoodle`: stale co-registration state is cleared —
+  `MobileGSDoodleStateTest` (host-native), mutation-checked. Finding while writing it:
+  `alignToDoodle` resets the view/anchor/intrinsics but NOT `mWallPatch`, so a peer's wall
   is corroborated against this device's own canonical patch. Not in Phase 1's scope; flagged,
   not changed. Was **blocked**: same as the `HomographyTracker` item — native C++ methods
   on `MobileGS`, no gtest/native test binary in the repo, no `androidTest` to exercise the real

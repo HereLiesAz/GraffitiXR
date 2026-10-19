@@ -5,7 +5,7 @@ package com.hereliesaz.graffitixr.common.model
  *
  * Every one of these failures used to be silent. The only published counters updated on SUCCESS, so a
  * relocalizer that had never locked once was indistinguishable from an idle one — all zeros, forever,
- * with no way to tell whether the fingerprint was missing, the frame had no texture, or PnP was
+ * with no way to tell whether the doodle was missing, the frame had no texture, or PnP was
  * solving and falling one inlier short.
  *
  * Lives in `core:common` rather than next to `SlamManager` so both the AR UI state and the native
@@ -26,16 +26,16 @@ data class RelocDiagnostics(
     /**
      * Obliquity (degrees between the wall normal and the optical axis) measured by the plane-guided
      * rectification pass, or -1 when that pass wasn't eligible — no capture view stored, ARCore not
-     * tracking, or too few fingerprint points. The pass only warps above 25°.
+     * tracking, or too few doodle points. The pass only warps above 25°.
      */
     val obliquityDeg: Int = -1,
     /** Correspondences the rectification pass contributed on top of the plain and scaled passes. */
     val rectifiedCorrespondences: Int = 0,
     /**
-     * Stored fingerprint points in `F_out` — the backbone the reloc PnP is allowed to solve against
+     * Stored doodle points in `F_out` — the backbone the reloc PnP is allowed to solve against
      * (`PAPER.md` §5.3) — or -1 when no attempt has got far enough to look.
      *
-     * An unpartitioned (legacy) fingerprint reports its full point count, because zero-length
+     * An unpartitioned (legacy) doodle reports its full point count, because zero-length
      * regions means all-backbone. **Zero is a real reading**: it says the artwork covers the whole
      * visible wall, so there is nothing left to bootstrap a pose from. That is the limit of the
      * domain of applicability the paper names, and the state `ArUiState.backboneTooSmall` warns
@@ -129,7 +129,7 @@ enum class CorrobGate {
     NO_POSE,
     /** The artwork's 2D positions do not index its descriptors 1:1 — a bug, not a state. */
     BAD_2D,
-    /** The fingerprint carries no intrinsics to project through. */
+    /** The doodle carries no intrinsics to project through. */
     NO_INTRINSICS,
     /** No corroboration attempt reached the decision at all. */
     NOT_RUN,
@@ -200,8 +200,8 @@ data class CorroborationDiagnostics(
 enum class RelocReject {
     /** Published a pose. */
     OK,
-    /** No wall fingerprint yet, or one carrying descriptors but no 3D points. */
-    NO_FINGERPRINT,
+    /** No wall doodle yet, or one carrying descriptors but no 3D points. */
+    NO_DOODLE,
     /** Relocalization switched off. */
     DISABLED,
     /** Nothing detected in the live frame, or a descriptor type that can't compare. */

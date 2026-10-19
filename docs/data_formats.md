@@ -23,7 +23,7 @@ Its contents, all produced by `ProjectManager`:
 There is **no separate binary map/voxel/splat file of any kind**. The persistent wall-feature map
 (`WallFeatureMap` — points, ORB/SuperPoint descriptor blob, confidence, anchor, intrinsics) lives
 entirely as fields inside `project.json`, alongside everything else (see §2). Likewise the marks
-`Fingerprint`'s descriptor blob, GPS/sensor data, and `CaptureEnvironment` are all just fields of
+`Doodle`'s descriptor blob, GPS/sensor data, and `CaptureEnvironment` are all just fields of
 the one JSON document — nothing is broken out into its own file format.
 
 Writes are atomic. `project.json` goes through `ProjectManager.atomicWriteText`, which writes a
@@ -86,7 +86,7 @@ missing from an old file just uses its Kotlin default). Notably:
   a stationary user). Without the flag, `Json.encodeToString` throws on a `NaN` field.
 - URIs (`backgroundImageUri`, `targetImageUris`, etc.) are strings via `UriSerializer`
   (`Uri.toString()` / `Uri.parse()`), always local `file://` paths under the project directory.
-- `fingerprint: Fingerprint?` carries the marks-region ORB/SuperPoint descriptor blob as a
+- `doodle: Doodle?` carries the marks-region ORB/SuperPoint descriptor blob as a
   base64-ish byte array field (kotlinx.serialization's default `ByteArray` encoding), plus
   `descriptorsRows`/`descriptorsCols`/`descriptorsType` to reconstruct an OpenCV `Mat`.
 - `wallFeatureMap: WallFeatureMap?` carries the passively-built wide-area feature map the same
@@ -105,13 +105,13 @@ missing from an old file just uses its Kotlin default). Notably:
   KPM page, dedicated ARCore page anchor, timestamp history, and frozen `page_from_artwork`
   relation are live-renderer/session state only. Do not confuse that page with
   `sphereSlamReferenceUri`, which is the durable canonical wall object for the standalone backend.
-  After process death/reopen the ARCore path uses the persisted MobileGS fingerprint/capture pose
+  After process death/reopen the ARCore path uses the persisted MobileGS doodle/capture pose
   until a new hybrid KPM page is captured.
 
 ## History
 
 An earlier version of this document (and of `docs/data_layer.md`) described a `.gxr` archive
-containing a `meta.json`/`model.map`/`target.fingerprint`/`reference.png` split, with `model.map`
+containing a `meta.json`/`model.map`/`target.doodle`/`reference.png` split, with `model.map`
 specified as a custom binary "Persistent Voxel Memory" surfel dump behind a magic header — the two
 documents even disagreed with each other on what that magic number was (`"GXR1"` vs. `"GXRM"`).
 No code in this repository has ever written that format; the actual, and only, persistence format

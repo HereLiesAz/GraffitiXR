@@ -2,14 +2,14 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
 
 import android.graphics.Bitmap
 import com.hereliesaz.graffitixr.common.model.AnticipationSettings
-import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder.DetectedFeatures
+import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneDoodleBuilder.DetectedFeatures
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * The fingerprint's close-ups: features of the capture photo as the camera will see them up close,
- * added to the fingerprint beside the capture's own.
+ * The doodle's close-ups: features of the capture photo as the camera will see them up close,
+ * added to the doodle beside the capture's own.
  *
  * A capture spreads its ~1500 features over the whole wall, so a close-up of one corner meets only
  * the few that fell there, and at a size the capture never saw them at (SuperPoint has no scale
@@ -18,7 +18,7 @@ import kotlin.math.roundToInt
  * zoom `distance / i` on half-sphere i, over a grid of `ceil(distance / i)` aims per side
  * ([AnticipationSettings.aimsPerSide]), square-on (the relocalizer turns a live frame square-on by
  * the sensors). Each close-up is a crop of the photo enlarged to about a live frame's size, run through
- * the base fingerprint's own detector; its features map back to the photo's pixels, so the builder
+ * the base doodle's own detector; its features map back to the photo's pixels, so the builder
  * places them on the wall exactly like its own. Zooms under [MIN_ZOOM] are left to the matcher's own
  * scale passes.
  */
@@ -125,8 +125,8 @@ internal object CloseUpFeatures {
     }
 
     /**
-     * The close-up features of [photo] for a fingerprint of [baseRows] features, found by [detect]
-     * (the base fingerprint's own detector, asked for at most the given count), positions in the
+     * The close-up features of [photo] for a doodle of [baseRows] features, found by [detect]
+     * (the base doodle's own detector, asked for at most the given count), positions in the
      * photo's pixels. Null when none was found.
      */
     fun detect(
@@ -156,8 +156,8 @@ internal object CloseUpFeatures {
             val inQuick = i < quickCount || quickCount == views.size
             val stageTotal = if (inQuick) quickCount else views.size - quickCount
             val stageDone = if (inQuick) i else i - quickCount
-            FingerprintBuildProgress.set(
-                FingerprintBuildProgress.Step(
+            DoodleBuildProgress.set(
+                DoodleBuildProgress.Step(
                     stage = if (inQuick) firstStage else firstStage + 1, stages = stages,
                     stageDone = stageDone, stageTotal = stageTotal,
                     done = stepsBefore + i, total = total,
@@ -179,8 +179,8 @@ internal object CloseUpFeatures {
                 if (i + 1 == quickCount && i + 1 < views.size) onQuickSet?.invoke(concat(parts))
                 // After the quick set's hand-off, so the pill moves to stage 2/3 as its crops start.
                 if (i + 1 < views.size) report(i + 1)
-                else FingerprintBuildProgress.set(
-                    FingerprintBuildProgress.Step(
+                else DoodleBuildProgress.set(
+                    DoodleBuildProgress.Step(
                         stage = if (quickCount == views.size) firstStage else firstStage + 1, stages = stages,
                         stageDone = if (quickCount == views.size) views.size else views.size - quickCount,
                         stageTotal = if (quickCount == views.size) views.size else views.size - quickCount,
@@ -189,7 +189,7 @@ internal object CloseUpFeatures {
                 )
             }
         } finally {
-            FingerprintBuildProgress.set(null)
+            DoodleBuildProgress.set(null)
         }
         return concat(parts)
     }

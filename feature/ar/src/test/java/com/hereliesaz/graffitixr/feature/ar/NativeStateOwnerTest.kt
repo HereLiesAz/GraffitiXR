@@ -57,7 +57,7 @@ class NativeStateOwnerTest {
         // B becomes current: the collector drops ownership before B's loader touches native.
         o.beginSwitch("B")
         assertFalse(o.owns("A"))
-        // A comes back before B's loader changed anything, so A's loader finds loadedFingerprint == A
+        // A comes back before B's loader changed anything, so A's loader finds loadedDoodle == A
         // and returns early. Native still holds A's state; ownership must come back or ARCore
         // wall-map autosave (which requires owns(A)) is disabled for the rest of the session.
         o.beginSwitch("A")

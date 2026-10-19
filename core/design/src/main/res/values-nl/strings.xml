@@ -370,13 +370,13 @@
     <string name="settings_anticipation_heat">Warmte beperkt met</string>
     <string name="settings_anticipation_compute">Belasting beperkt met</string>
     <string name="settings_anticipation_views">Hoogstens %1$d aanzichten per pagina</string>
-    <string name="settings_fingerprint_features">Krabbel</string>
-    <string name="settings_fingerprint_superpoint">SuperPoint</string>
-    <string name="settings_fingerprint_half_sphere">Halve bol</string>
-    <string name="settings_fingerprint_both">Beide</string>
-    <string name="settings_fingerprint_superpoint_desc">Alleen SuperPoint-kenmerken van de opname. Bestand tegen licht en slijtage; ongeveer 1,5 MB per Krabbel. Geldt vanaf de volgende Krabbel.</string>
-    <string name="settings_fingerprint_half_sphere_desc">ORB-kenmerken van de opname en haar 49 close-ups. Sterk van dichtbij en klein, onder 0,1 MB per Krabbel. Geldt vanaf de volgende Krabbel.</string>
-    <string name="settings_fingerprint_both_desc">SuperPoint-kenmerken van de opname en haar 49 close-ups. Het sterkst; ongeveer 2–3 MB per Krabbel. Geldt vanaf de volgende Krabbel.</string>
+    <string name="settings_doodle_features">Krabbel</string>
+    <string name="settings_doodle_superpoint">SuperPoint</string>
+    <string name="settings_doodle_half_sphere">Halve bol</string>
+    <string name="settings_doodle_both">Beide</string>
+    <string name="settings_doodle_superpoint_desc">Alleen SuperPoint-kenmerken van de opname. Bestand tegen licht en slijtage; ongeveer 1,5 MB per Krabbel. Geldt vanaf de volgende Krabbel.</string>
+    <string name="settings_doodle_half_sphere_desc">ORB-kenmerken van de opname en haar 49 close-ups. Sterk van dichtbij en klein, onder 0,1 MB per Krabbel. Geldt vanaf de volgende Krabbel.</string>
+    <string name="settings_doodle_both_desc">SuperPoint-kenmerken van de opname en haar 49 close-ups. Het sterkst; ongeveer 2–3 MB per Krabbel. Geldt vanaf de volgende Krabbel.</string>
     <string name="settings_power_section">Energie</string>
     <string name="settings_privacy_section">Privacy</string>
     <string name="settings_developer_section">Ontwikkelaar</string>
@@ -435,7 +435,7 @@
     <string name="target_review_desc">Geëxtraheerde Krabbel bekijken</string>
     <string name="target_unwarp_hint">Versleep hoeken om de vervorming te herstellen</string>
     <string name="target_review_title">KRABBEL VERGRENDELD</string>
-    <string name="fingerprint_closeups_progress">De muur leren: fase %1$d van %2$d · stap %3$d van %4$d</string>
+    <string name="doodle_closeups_progress">De muur leren: fase %1$d van %2$d · stap %3$d van %4$d</string>
 
     <string name="target_exclude">Uitsluiten</string>
     <string name="target_include">Erbij betrekken</string>
@@ -736,7 +736,7 @@
     <string name="ar_feedback_open_project_first">Open een project voordat je deelt – er is nog niets om naar een gast te sturen</string>
     <string name="ar_feedback_host_need_target_arcore">Leg een actuele Krabbel vast en vergrendel die voordat je host</string>
     <string name="ar_feedback_host_need_target_standalone">Leg een zelfstandig muurdoel vast voordat je host</string>
-    <string name="ar_feedback_fingerprint_not_ready">Krabbel is nog niet klaar — houd hem in beeld en probeer Hosten opnieuw</string>
+    <string name="ar_feedback_doodle_not_ready">Krabbel is nog niet klaar — houd hem in beeld en probeer Hosten opnieuw</string>
     <string name="ar_feedback_package_failed">Dit project kon niet worden ingepakt om te delen – sla het eerst op</string>
     <string name="ar_feedback_host_failed">Delen starten is mislukt: %1$s</string>
     <string name="ar_feedback_join_load_failed">Het project van de host kon niet worden geladen – de sessie is beëindigd.</string>

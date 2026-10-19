@@ -1,28 +1,28 @@
 # Native Engine (MobileGS) Documentation
 
 ## Overview
-`MobileGS` (`core/nativebridge/src/main/cpp/MobileGS.cpp` / `include/MobileGS.h`) is a C++17 relocalizer: it fingerprints a wall the artist has marked, then matches that fingerprint against the live camera feed to snap the mural's anchor back into place after tracking loss or a pocketed phone. It is **not** a mapping engine — there is no persistent-voxel or splat layer, no scene reconstruction, and no `draw()`. Earlier drafts of this document described one; that layer was deleted from the codebase, and `MobileGS.cpp`'s own code says so at the two call sites that used to feed it (`setMappingPaused`, `getSplatCount` — both log "no gaussian-splat mapper in this engine" and return inert values).
+`MobileGS` (`core/nativebridge/src/main/cpp/MobileGS.cpp` / `include/MobileGS.h`) is a C++17 relocalizer: it doodles a wall the artist has marked, then matches that doodle against the live camera feed to snap the mural's anchor back into place after tracking loss or a pocketed phone. It is **not** a mapping engine — there is no persistent-voxel or splat layer, no scene reconstruction, and no `draw()`. Earlier drafts of this document described one; that layer was deleted from the codebase, and `MobileGS.cpp`'s own code says so at the two call sites that used to feed it (`setMappingPaused`, `getSplatCount` — both log "no gaussian-splat mapper in this engine" and return inert values).
 
 ## Key Components
 
-### 1. The wall fingerprint
-A fingerprint is ORB (`cv::ORB::create(1500)`) or SuperPoint descriptors paired with the triangulated 3D positions of the marks the artist drew, captured once when the target is confirmed (`restoreWallFingerprintMetric`). It optionally carries a per-point region tag (`Footprint::Region` — INSIDE/BAND/OUTSIDE) so relocalization can exclude points that sit under the artwork itself and will be painted over.
+### 1. The wall doodle
+A doodle is ORB (`cv::ORB::create(1500)`) or SuperPoint descriptors paired with the triangulated 3D positions of the marks the artist drew, captured once when the target is confirmed (`restoreWallDoodleMetric`). It optionally carries a per-point region tag (`Footprint::Region` — INSIDE/BAND/OUTSIDE) so relocalization can exclude points that sit under the artwork itself and will be painted over.
 
-Both app builders (`MetricFingerprintBuilder`, `StandaloneFingerprintBuilder`) add the capture
+Both app builders (`MetricDoodleBuilder`, `StandaloneDoodleBuilder`) add the capture
 photo's **close-ups** (`CloseUpFeatures`): crops at zooms 6×, 3× and 2× (the anticipation
 half-spheres, square-on), each tiled by its grid of aim points, enlarged to about a live frame's size
-and run through the base fingerprint's own detector. Their features map back to the photo's pixels
+and run through the base doodle's own detector. Their features map back to the photo's pixels
 and onto the wall like the capture's own, so a close-up of any corner meets dense features at the
 size it sees them. At most as many as the capture's own (≤ 2000), shared across the 49 crops.
-Settings → Fingerprint chooses what a new target's fingerprint is made of (`FingerprintFeatures`):
+Settings → Doodle chooses what a new target's doodle is made of (`DoodleFeatures`):
 **SuperPoint** (SuperPoint features of the capture only, ~1.5 MB), **Half sphere** (ORB features of
 the capture and its close-ups, < 0.1 MB) or **Both** (SuperPoint and the close-ups, ~2–3 MB; the
-default). It applies to the next capture; relocalization matches whichever descriptors a fingerprint
-holds. While they build, a progress bar counts the crops down (`FingerprintBuildProgress`, shown by
+default). It applies to the next capture; relocalization matches whichever descriptors a doodle
+holds. While they build, a progress bar counts the crops down (`DoodleBuildProgress`, shown by
 `MainScreen` in any mode).
 
 ### 2. Relocalization ("snap-back")
-A background thread (`relocThreadFunc`) continuously matches the live camera frame's descriptors against the stored fingerprint (Lowe ratio test, `kRelocLoweRatio = 0.75`) and solves the resulting 2D↔3D correspondences with `cv::solvePnPRansac` (100 iterations, 8px reprojection threshold, 0.99 confidence). Every solve that clears PnP's own floors (at least 6 inliers, `FEW_INLIERS` otherwise) is published (pose, inlier/match counts, and a monotonically increasing `seq` — all under `mMutex` in one critical section, so a reader never sees a torn result); native applies no further accept/reject policy to the *anchor*. `kBigLockInliers = 20` only gates `growTrusted` — whether a relock is trusted enough to promote new marks into the fingerprint (a big lock still has to pass the inlier-spread gate); it does not accept a lock "outright". The anchor correction itself is **Kotlin-side**: `PoseFusion` reads the published result (`getRelocResult`), applies its inlier-ratio gate (`MIN_INLIER_RATIO = 0.5`) and cold-snap / blend policy, and keeps the standing anchor-local correction. Every path that **replaces or clears** the stored fingerprint (`restoreWallFingerprint`, `restoreWallFingerprintMetric` with different content or a different anchor/intrinsics, `alignToFingerprint`, `generateFingerprint`, `clearWallFingerprint`) calls `invalidateRelocResultLocked()` under `mMutex`: it resets the published result's pose and counts to "no relock" and the reject code to `NO_FINGERPRINT`, never rewinds the seq (so a consumer holding an old seq can't mistake a later result for one it has seen), and advances a **fingerprint generation** counter (`mFingerprintGeneration`). `runRelocPass` snapshots the generation together with the fingerprint at the start of a pass and re-checks it in the same critical section that publishes: a solve that was in flight while the fingerprint was replaced or cleared is **dropped**, never latched into the new wall's result. A re-push of the identical frame (the repartition path) neither advances the generation nor drops the standing result. The worker waits between attempts (`mRelocLockedBackoffMs`, default 200 ms once locked; `mRelocHuntBackoffMs`, default 60 ms while hunting; both clamped to 10–2000 ms and raised under thermal / power-save / low-battery pressure via `setRelocBackoffMs`). This — not a mapping/rendering layer — is the actual mechanism behind the "Pocket-Ready" pitch: it needs no persistent map, just the one fingerprint.
+A background thread (`relocThreadFunc`) continuously matches the live camera frame's descriptors against the stored doodle (Lowe ratio test, `kRelocLoweRatio = 0.75`) and solves the resulting 2D↔3D correspondences with `cv::solvePnPRansac` (100 iterations, 8px reprojection threshold, 0.99 confidence). Every solve that clears PnP's own floors (at least 6 inliers, `FEW_INLIERS` otherwise) is published (pose, inlier/match counts, and a monotonically increasing `seq` — all under `mMutex` in one critical section, so a reader never sees a torn result); native applies no further accept/reject policy to the *anchor*. `kBigLockInliers = 20` only gates `growTrusted` — whether a relock is trusted enough to promote new marks into the doodle (a big lock still has to pass the inlier-spread gate); it does not accept a lock "outright". The anchor correction itself is **Kotlin-side**: `PoseFusion` reads the published result (`getRelocResult`), applies its inlier-ratio gate (`MIN_INLIER_RATIO = 0.5`) and cold-snap / blend policy, and keeps the standing anchor-local correction. Every path that **replaces or clears** the stored doodle (`restoreWallDoodle`, `restoreWallDoodleMetric` with different content or a different anchor/intrinsics, `alignToDoodle`, `generateDoodle`, `clearWallDoodle`) calls `invalidateRelocResultLocked()` under `mMutex`: it resets the published result's pose and counts to "no relock" and the reject code to `NO_DOODLE`, never rewinds the seq (so a consumer holding an old seq can't mistake a later result for one it has seen), and advances a **doodle generation** counter (`mDoodleGeneration`). `runRelocPass` snapshots the generation together with the doodle at the start of a pass and re-checks it in the same critical section that publishes: a solve that was in flight while the doodle was replaced or cleared is **dropped**, never latched into the new wall's result. A re-push of the identical frame (the repartition path) neither advances the generation nor drops the standing result. The worker waits between attempts (`mRelocLockedBackoffMs`, default 200 ms once locked; `mRelocHuntBackoffMs`, default 60 ms while hunting; both clamped to 10–2000 ms and raised under thermal / power-save / low-battery pressure via `setRelocBackoffMs`). This — not a mapping/rendering layer — is the actual mechanism behind the "Pocket-Ready" pitch: it needs no persistent map, just the one doodle.
 
 ### 2a. Relationship to hybrid SphereSLAM/KPM
 
@@ -42,12 +42,12 @@ The ownership boundary is strict:
   consulted, so the two estimators never alternate frame by frame;
 - the MobileGS PnP correction drives only before KPM has first accepted, or once KPM has been silent
   for the whole window (and a capture pose exists, and no re-capture is awaiting its new
-  fingerprint — `SlamManager.awaitingNewFingerprint`). Unloading the KPM page does not end the
+  doodle — `SlamManager.awaitingNewDoodle`). Unloading the KPM page does not end the
   window early: the correction is held until it elapses;
 - if neither source is available, PoseFusion only re-applies its standing anchor-local correction.
 See `TELEOLOGICAL_SLAM.md` ("Correction sources").
 
-MobileGS does not consume the hybrid KPM page frame and KPM does not mutate MobileGS fingerprint
+MobileGS does not consume the hybrid KPM page frame and KPM does not mutate MobileGS doodle
 coordinates. The only shared downstream object is PoseFusion's **anchor-local correction**, which is
 frame-invariant under ARCore global world rebases. The correction switch remains off by default.
 
@@ -59,29 +59,29 @@ The live frame is then turned about its own centre into a camera square-on to th
 (`sensorTurnHomography`: focal × cos(obliquity), principal point where the frame's centre lands),
 matched there, and the matches mapped back for the one PnP. A pure turn needs no position, so this
 works from the first lost frame. The normal is learned at every well-supported lock
-(`wallNormalFromLock`: the fingerprint's plane through the PnP pose and that frame's attitude),
-averaged in, saved with the project (`fingerprintWallNormalEnu`) and restored on load, so it is
+(`wallNormalFromLock`: the doodle's plane through the PnP pose and that frame's attitude),
+averaged in, saved with the project (`doodleWallNormalEnu`) and restored on load, so it is
 there for the first relocalization of the next session; a new target forgets it. Diagnostics:
 `lastRelocTurnDeg`, `lastRelocTurnCorr`.
 
 ### 3. Teleological corroboration and self-grow (both off by default)
 Two optional, separately-gated mechanisms sit on top of relocalization:
 - **Corroboration**: compares descriptors from the design composite against the live wall to produce a confidence signal (Lowe ratio `kCorrobLoweRatio = 0.85`) — see `docs/TELEOLOGICAL_SLAM.md` for what it does and does not measure.
-- **Self-grow** (`mSelfGrowEnabled`, default **off**, `setSelfGrowEnabled`): lets validated new marks extend the fingerprint as the artist paints, so relocalization can survive the original reference being covered. Capped at `kMaxWallMarks = 5000` points. Two further, independent 5000 caps exist: `kMaxPaintMarks = 5000` (painted-design reference marks) and `kMapCap = 5000` (the persistent feature map, which confidence-prunes when full).
+- **Self-grow** (`mSelfGrowEnabled`, default **off**, `setSelfGrowEnabled`): lets validated new marks extend the doodle as the artist paints, so relocalization can survive the original reference being covered. Capped at `kMaxWallMarks = 5000` points. Two further, independent 5000 caps exist: `kMaxPaintMarks = 5000` (painted-design reference marks) and `kMapCap = 5000` (the persistent feature map, which confidence-prunes when full).
 
 Both are reachable only from the diagnostic overlay (Settings > diagnostic overlay), not the artist-facing UI — see that doc for why, and for the open questions around self-grow's promotion gate.
 
 ### 4. Optional persistent wall feature map
-`WallFeatureMap` (`setMapRelocEnabled`/`setMapBuildEnabled`, `IMPLEMENTATION.md` phases 2b/3) is a second, longer-lived relocalization source that can be built and matched against across sessions. Off by default like the two mechanisms above. The **map path** of the reloc pass is additive and prior-gated: it needs a previous published pose (`mapPriorSeq > 0`, i.e. the fingerprint has locked at least once), frustum-gates the map to the points that pose says are in view (never a brute-force match of the whole map), and appends those correspondences to the fingerprint's before the single PnP solve.
+`WallFeatureMap` (`setMapRelocEnabled`/`setMapBuildEnabled`, `IMPLEMENTATION.md` phases 2b/3) is a second, longer-lived relocalization source that can be built and matched against across sessions. Off by default like the two mechanisms above. The **map path** of the reloc pass is additive and prior-gated: it needs a previous published pose (`mapPriorSeq > 0`, i.e. the doodle has locked at least once), frustum-gates the map to the points that pose says are in view (never a brute-force match of the whole map), and appends those correspondences to the doodle's before the single PnP solve.
 
-For standalone SphereSLAM, both self-grown fingerprint points and feature-map growth are written
-directly in the centered KPM-page fingerprint frame (+X right, +Y up, +Z wall normal). The
+For standalone SphereSLAM, both self-grown doodle points and feature-map growth are written
+directly in the centered KPM-page doodle frame (+X right, +Y up, +Z wall normal). The
 standalone map is persisted separately from the ARCore-frame map and must carry an identity
-fingerprint-anchor transform on save and restore; incompatible anchors are refused rather than
+doodle-anchor transform on save and restore; incompatible anchors are refused rather than
 implicitly converted.
 
 ## Memory Management
-- The fingerprint itself is small (a few thousand descriptor+point pairs at most); there is no fixed-size point-cloud or voxel budget to speak of beyond `kMaxWallMarks`.
+- The doodle itself is small (a few thousand descriptor+point pairs at most); there is no fixed-size point-cloud or voxel budget to speak of beyond `kMaxWallMarks`.
 
 ## JNI Interface (`GraffitiJNI.cpp` → `SlamManager.kt`)
 
@@ -89,7 +89,7 @@ A representative subset of the real, currently-exported surface (see `SlamManage
 
 | Kotlin method | Description |
 |---|---|
-| `restoreWallFingerprintMetric(...)` | Ingests a captured fingerprint (descriptors + 3D points + capture pose/intrinsics). |
+| `restoreWallDoodleMetric(...)` | Ingests a captured doodle (descriptors + 3D points + capture pose/intrinsics). |
 | `updateAnchorTransform(mat)` | Hands the engine the current ARCore anchor pose. (The relocalization correction itself is computed Kotlin-side by `PoseFusion` from `getRelocResult`.) |
 | `getRelocDiagnostics()` | Structured relocalization state (inliers, reprojection error, reject reason). |
 | `getCorroborationConfidence()` | Teleological corroboration's confidence signal (see `TELEOLOGICAL_SLAM.md`). |
@@ -97,6 +97,6 @@ A representative subset of the real, currently-exported surface (see `SlamManage
 | `feedYuvFrame(...)` | Per-frame camera feed into the reloc thread. |
 | `setCameraAttitude(earthFromCamera)` | The frame's north-referenced camera attitude, for the sensor turn. |
 | `getWallNormalEnu()` / `setWallNormalEnu(n)` | The wall's normal learned at locks; saved with and restored from the project. |
-| `clearWallFingerprint()` | Drops the current fingerprint (new project / re-target). |
+| `clearWallDoodle()` | Drops the current doodle (new project / re-target). |
 
 

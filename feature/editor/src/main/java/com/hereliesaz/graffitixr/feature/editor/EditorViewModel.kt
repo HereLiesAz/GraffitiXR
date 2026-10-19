@@ -408,7 +408,7 @@ class EditorViewModel @Inject constructor(
             }
         }
 
-        // Wall-fingerprint restore is ArViewModel's job (loadFingerprintIfExists) — it owns the
+        // Wall-doodle restore is ArViewModel's job (loadDoodleIfExists) — it owns the
         // SlamManager singleton and does the partition/legacy-frame/design-placement handling that
         // this class does not replicate. A second loader here used to race it: same currentProject
         // flow, same native engine, undefined order, and this one skipped every one of those steps.
@@ -1046,7 +1046,7 @@ class EditorViewModel @Inject constructor(
     }
 
     /**
-     * Shares an editable `.gxr` archive, including the wall fingerprint, through ACTION_SEND.
+     * Shares an editable `.gxr` archive, including the wall doodle, through ACTION_SEND.
      * ProjectManager and Co-op use the same ZIP format so another painter can reopen the wall.
      *
      * Written to cacheDir (not Downloads/MediaStore) since this copy is a share intermediate, not

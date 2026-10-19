@@ -1,7 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
 import android.graphics.Bitmap
-import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.Doodle
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import org.opencv.android.Utils
 import org.opencv.core.KeyPoint
@@ -15,19 +15,19 @@ import com.hereliesaz.sphereslam.math.RigidMath
 import com.hereliesaz.sphereslam.reloc.MetricMarks
 
 /**
- * Builds a wall fingerprint from two camera keyframes by triangulation — the depth-off path. Detects
+ * Builds a wall doodle from two camera keyframes by triangulation — the depth-off path. Detects
  * ORB on both views, matches with a Lowe ratio test, triangulates the matches into metric 3D via
  * SphereSLAM's [MetricMarks.triangulateTwoView], and hands the result to the native
- * engine through [SlamManager.restoreWallFingerprintMetric].
+ * engine through [SlamManager.restoreWallDoodleMetric].
  *
  * The artist's natural step-in / step-back supplies the baseline; no second lens, no ML depth. Points
  * land in keyframe-0's CV camera frame with the anchor pose attached, so they relocalize through the
- * same PnP/PoseFusion path as a depth-built fingerprint.
+ * same PnP/PoseFusion path as a depth-built doodle.
  *
  * ORB (CV_8U) descriptors are used deliberately: the native reloc thread only takes the SuperPoint
  * path when the stored descriptors are CV_32F, so CV_8U keeps both ends on ORB and consistent.
  */
-object MetricFingerprintBuilder {
+object MetricDoodleBuilder {
 
     /** A detected feature pixel (u, v) in the captured image. */
     private data class Pixel(val u: Float, val v: Float)
@@ -50,7 +50,7 @@ object MetricFingerprintBuilder {
     )
 
     /**
-     * Detect, match, triangulate, and ingest. Returns a persistable [Fingerprint] (descriptors +
+     * Detect, match, triangulate, and ingest. Returns a persistable [Doodle] (descriptors +
      * keyframe-0-frame 3D points), or null if the geometry was too weak — too few matches survived
      * triangulation/reprojection filtering. The result is also committed to the live native engine.
      *
@@ -63,18 +63,18 @@ object MetricFingerprintBuilder {
         anchorModel: FloatArray,
         minPoints: Int = 20,
         ratio: Float = 0.75f,
-    ): Fingerprint? {
+    ): Doodle? {
         val matched = detectAndMatch(kf0.gray, kf1.gray, ratio) ?: return null
         return assemble(slam, matched, kf0.glView, kf1.glView,
             floatArrayOf(kf0.fx, kf0.fy, kf0.cx, kf0.cy), anchorModel, minPoints)
     }
 
-    /** Triangulate a Matched set into metric 3D, ingest it, and return the persistable Fingerprint. */
+    /** Triangulate a Matched set into metric 3D, ingest it, and return the persistable Doodle. */
     private fun assemble(
         slam: SlamManager, matched: Matched,
         glView0: FloatArray, glView1: FloatArray, intr0: FloatArray,
         anchorModel: FloatArray, minPoints: Int,
-    ): Fingerprint? {
+    ): Doodle? {
         try {
             val cv0 = RigidMath.glViewToCv(glView0)
             val cv1 = RigidMath.glViewToCv(glView1)
@@ -108,12 +108,12 @@ object MetricFingerprintBuilder {
             }
             keptDesc.release()
 
-            slam.clearPaintMarks() // new capture = new fingerprint frame
+            slam.clearPaintMarks() // new capture = new doodle frame
             slam.clearWallFeatureMap() // its points are in the old frame too
-            slam.restoreWallFingerprintMetric(
+            slam.restoreWallDoodleMetric(
                 bytes, rows, cols, type, tri.points, anchorModel, intr0,
             )
-            return Fingerprint(
+            return Doodle(
                 keypoints, tri.points.toList(), bytes, rows, cols, type,
                 markCenterLocal = markCenterLocal?.toList() ?: emptyList(),
             )
@@ -133,9 +133,9 @@ object MetricFingerprintBuilder {
         bitmap1: Bitmap, glView1: FloatArray, intr1: FloatArray,
         anchorModel: FloatArray,
         minPoints: Int = 20,
-    ): Fingerprint? {
+    ): Doodle? {
         // Prefer SuperPoint (learned, far more robust to viewpoint/illumination) so the depth-off
-        // fingerprint is CV_32F and the reloc thread runs its SuperPoint path. Falls back to ORB if the
+        // doodle is CV_32F and the reloc thread runs its SuperPoint path. Falls back to ORB if the
         // model isn't loaded or the SuperPoint match/triangulation is too weak — strictly never-worse.
         val sp = matchSuperPoint(slam, bitmap0, bitmap1, 0.75f)
         if (sp != null) {
@@ -155,7 +155,7 @@ object MetricFingerprintBuilder {
     }
 
     /**
-     * Single-capture path: build the wall fingerprint from ONE view by back-projecting detected
+     * Single-capture path: build the wall doodle from ONE view by back-projecting detected
      * features onto a known wall plane (the green ARCore plane, whose metric pose ARCore has already
      * solved). No triangulation, no second view. Detects SuperPoint first (CV_32F → reloc runs its
      * SuperPoint path), falls back to ORB. Returns null if too few features hit the plane.
@@ -188,7 +188,7 @@ object MetricFingerprintBuilder {
      *
      * It has to live here, on the shared object, rather than on either caller: there are at least
      * two independent capture flows that reach this class — the doodle demo
-     * (`ArViewModel.buildDoodleFingerprint`) and the "tap directly on your painted marks" review flow
+     * (`ArViewModel.buildDoodle`) and the "tap directly on your painted marks" review flow
      * (`MainViewModel.handleSingleCapture`) — and each built its own version of this message from the
      * same three counts. A refusal-reporting fix landed on the doodle path while `handleSingleCapture`
      * kept reporting failures through an ephemeral `Toast` with no record anywhere a diagnostic report
@@ -233,8 +233,8 @@ object MetricFingerprintBuilder {
      *
      * Note this does **not** take the design's placement. Target creation is what establishes the
      * anchor the artwork will sit on, so at capture there is no placed design to partition against —
-     * see `FingerprintPartition.partition`, which runs when the artwork lands. What is recorded here
-     * is [Fingerprint.captureAnchorCam], the capture-time half of that later composition.
+     * see `DoodlePartition.partition`, which runs when the artwork lands. What is recorded here
+     * is [Doodle.captureAnchorCam], the capture-time half of that later composition.
      */
     fun buildSingle(
         slam: SlamManager,
@@ -246,13 +246,13 @@ object MetricFingerprintBuilder {
         /**
          * The artist's selected marks region, same orientation as [bitmap] (scaled if its size
          * differs). A feature is kept only where the mask's alpha is non-zero — the same rule native
-         * `getFingerprintKeypoints` / `generateFingerprint` apply to an ARGB mask. Null keeps all.
+         * `getDoodleKeypoints` / `generateDoodle` apply to an ARGB mask. Null keeps all.
          */
         mask: Bitmap? = null,
-        /** SuperPoint or ORB, with or without the close-ups (Settings → Fingerprint). */
-        features: com.hereliesaz.graffitixr.common.model.FingerprintFeatures =
-            com.hereliesaz.graffitixr.common.model.FingerprintFeatures.DEFAULT,
-    ): Fingerprint? {
+        /** SuperPoint or ORB, with or without the close-ups (Settings → Doodle). */
+        features: com.hereliesaz.graffitixr.common.model.DoodleFeatures =
+            com.hereliesaz.graffitixr.common.model.DoodleFeatures.DEFAULT,
+    ): Doodle? {
         lastDetected = 0; lastPlaced = 0; lastRequired = minPoints
         // Convention B: the bitmap and intrinsics arrived in display orientation, so the view goes
         // there too. This is the fix for PAPER.md §8 — previously `glViewToCv(glView)`, which left
@@ -274,7 +274,7 @@ object MetricFingerprintBuilder {
                 if (features.closeUps) early.installBase(basePixels, baseDescs, bitmap)
                 val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps,
                     onQuickSet = { p, d -> early.install(p, d) }, firstStage = 2, stages = 3, stepsBefore = 1) { view, _ ->
-                    StandaloneFingerprintBuilder.detectSuperPoint(slam, view)
+                    StandaloneDoodleBuilder.detectSuperPoint(slam, view)
                 }
                 if (baseDescs !== descs && baseDescs !== mDescs) baseDescs.release()
                 val fp = try {
@@ -313,7 +313,7 @@ object MetricFingerprintBuilder {
             if (features.closeUps) early.installBase(basePixels, baseDescs, bitmap)
             val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps,
                 onQuickSet = { p, dd -> early.install(p, dd) }, firstStage = 2, stages = 3, stepsBefore = 1) { view, n ->
-                StandaloneFingerprintBuilder.detectOrb(view, null, n)
+                StandaloneDoodleBuilder.detectOrb(view, null, n)
             }
             if (baseDescs !== d && baseDescs !== mDescs) baseDescs.release()
             try {
@@ -330,7 +330,7 @@ object MetricFingerprintBuilder {
     }
 
     /**
-     * Installs a partial fingerprint during the build so relocalization can start before the slow
+     * Installs a partial doodle during the build so relocalization can start before the slow
      * close-ups finish. Each [install] replaces the last; the final [ingestSingle] replaces them all
      * and keeps the overlay centre the first one set, so the artwork does not shift when the finer
      * views land. A failed install (too few points yet) is ignored: the final one is authoritative.
@@ -349,9 +349,9 @@ object MetricFingerprintBuilder {
         /** Stage 1 of 3: the photo's own features. Reports itself, since the close-ups report the rest. */
         fun installBase(pixels: List<Pixel>, descs: Mat, photo: Bitmap) {
             val total = 1 + CloseUpFeatures.views(photo.width, photo.height).size
-            FingerprintBuildProgress.set(FingerprintBuildProgress.Step(1, 3, 0, 1, 0, total))
+            DoodleBuildProgress.set(DoodleBuildProgress.Step(1, 3, 0, 1, 0, total))
             install(pixels, descs)
-            FingerprintBuildProgress.set(FingerprintBuildProgress.Step(1, 3, 1, 1, 1, total))
+            DoodleBuildProgress.set(DoodleBuildProgress.Step(1, 3, 1, 1, 1, total))
         }
 
         fun install(pixels: List<Pixel>, descs: Mat) {
@@ -378,10 +378,10 @@ object MetricFingerprintBuilder {
          */
         onQuickSet: ((List<Pixel>, Mat) -> Unit)? = null,
         firstStage: Int = 1, stages: Int = 2, stepsBefore: Int = 0,
-        detect: (Bitmap, Int) -> StandaloneFingerprintBuilder.DetectedFeatures?,
+        detect: (Bitmap, Int) -> StandaloneDoodleBuilder.DetectedFeatures?,
     ): Pair<List<Pixel>, Mat> {
         if (!enabled || pixels.isEmpty() || descs.empty()) return pixels to descs
-        val quick: ((StandaloneFingerprintBuilder.DetectedFeatures?) -> Unit)? = onQuickSet?.let { cb ->
+        val quick: ((StandaloneDoodleBuilder.DetectedFeatures?) -> Unit)? = onQuickSet?.let { cb ->
             { partial ->
                 mergeCloseUps(bitmap, mask, pixels, descs, partial)?.let { (p, d) ->
                     try { cb(p, d) } finally { d.release() }
@@ -395,10 +395,10 @@ object MetricFingerprintBuilder {
     /** [pixels]/[descs] plus [extra] (kept to [mask]); null when [extra] adds nothing usable. */
     private fun mergeCloseUps(
         bitmap: Bitmap, mask: Bitmap?, pixels: List<Pixel>, descs: Mat,
-        extra0: StandaloneFingerprintBuilder.DetectedFeatures?,
+        extra0: StandaloneDoodleBuilder.DetectedFeatures?,
     ): Pair<List<Pixel>, Mat>? {
         val extra = extra0
-            ?.let { StandaloneFingerprintBuilder.filterByMask(it, mask, bitmap.width, bitmap.height) }
+            ?.let { StandaloneDoodleBuilder.filterByMask(it, mask, bitmap.width, bitmap.height) }
             ?.takeIf { it.rows > 0 && it.cols == descs.cols() && it.type == descs.type() }
             ?: return null
         val extraDescs = Mat(extra.rows, extra.cols, extra.type)
@@ -470,11 +470,11 @@ object MetricFingerprintBuilder {
         rotationDeg: Int = 0,
         /** Overlay centre from an earlier partial install of this same capture; reused, not recomputed. */
         markCenterOverride: FloatArray? = null,
-        /** The artist's tapped marks, in the capture photo's pixels; recorded as [Fingerprint.pinned]. */
+        /** The artist's tapped marks, in the capture photo's pixels; recorded as [Doodle.pinned]. */
         pinMask: Bitmap? = null,
         photoW: Int = 0,
         photoH: Int = 0,
-    ): Fingerprint? {
+    ): Doodle? {
         val res = MetricMarks.backProjectToPlane(
             pixelArray(pixels), cvView, planePointWorld, planeNormalWorld,
             intr[0], intr[1], intr[2], intr[3],
@@ -487,7 +487,7 @@ object MetricFingerprintBuilder {
             recordAttemptOutcome(succeeded = false)
             return null
         }
-        // Reaching here means this pass will return a Fingerprint below. Set eagerly rather than at
+        // Reaching here means this pass will return a Doodle below. Set eagerly rather than at
         // the final `return` so every path through the rest of this function — there is only one —
         // does not need its own copy of this line.
         recordAttemptOutcome(succeeded = true)
@@ -495,7 +495,7 @@ object MetricFingerprintBuilder {
         // IMPLEMENTATION.md 2.4's capture-time half: the anchor's pose in THIS frame, so the
         // partition can be composed later without a world frame. `res.points` is in the capture
         // CV camera frame and the design's pose will be known relative to the anchor, so
-        // `cvView · anchorModel` is the bridge between them — see Fingerprint.captureAnchorCam.
+        // `cvView · anchorModel` is the bridge between them — see Doodle.captureAnchorCam.
         // Recorded unconditionally, including on a capture that establishes the anchor and therefore
         // has no design to partition against yet.
         val anchorCam = RigidMath.multiply(cvView, anchorModel)
@@ -544,9 +544,9 @@ object MetricFingerprintBuilder {
         // Native pairs the two in computeRectifyHomography (viewFp / mWallKeypoints3D) against a
         // display-oriented viewCur, so handing it the raw sensor-frame view leaves the rectifying
         // homography rotated by R_z. Note the GL sign is NEGATED — see glViewDisplayOriented.
-        slam.clearPaintMarks() // new capture = new fingerprint frame
+        slam.clearPaintMarks() // new capture = new doodle frame
         slam.clearWallFeatureMap() // its points are in the old frame too
-        slam.restoreWallFingerprintMetric(
+        slam.restoreWallDoodleMetric(
             bytes, rows, cols, type, res.points, anchorModel, intr,
             viewMatrix = glView?.let { MetricMarks.glViewDisplayOriented(it, rotationDeg) }
                 ?: FloatArray(0),
@@ -555,24 +555,24 @@ object MetricFingerprintBuilder {
             // did before Phase 2 rather than losing its whole map.
             // IMPLEMENTATION.md 2.6 — no partition exists yet at capture (see above), so native
             // gets a zero-length array and reads it as all-backbone, exactly as before Phase 2.
-            // FingerprintPartition.partition re-pushes with real regions once the artwork lands.
+            // DoodlePartition.partition re-pushes with real regions once the artwork lands.
             regions = ByteArray(0),
         )
         // IMPLEMENTATION.md 0.9 — published at capture as well as on reload, or the session that
         // CREATED the target would relocalize without a correction until the project was reopened.
-        // AFTER the fingerprint is installed, never before: the new pose paired with the previous
-        // fingerprint is the same wrong-frame composition the replacement gate exists to prevent.
-        // This is also what lowers `awaitingNewFingerprint` -- the new fingerprint AND the new pose
+        // AFTER the doodle is installed, never before: the new pose paired with the previous
+        // doodle is the same wrong-frame composition the replacement gate exists to prevent.
+        // This is also what lowers `awaitingNewDoodle` -- the new doodle AND the new pose
         // are both in place only here.
-        slam.completeFingerprintReplacement(anchorCam.copyOf())
-        return Fingerprint(
+        slam.completeDoodleReplacement(anchorCam.copyOf())
+        return Doodle(
             keypoints, res.points.toList(), bytes, rows, cols, type,
             markCenterLocal = markCenterLocal?.toList() ?: emptyList(),
             // IMPLEMENTATION.md 0.7 — record the frame these points were built in, so a reload can
-            // tell a Phase-0 fingerprint from a pre-Phase-0 one instead of guessing.
+            // tell a Phase-0 doodle from a pre-Phase-0 one instead of guessing.
             captureRotationDeg = rotationDeg,
             // IMPLEMENTATION.md 2.4 — the durable bridge from these points to wherever the artwork
-            // ends up. Without it this fingerprint could never be partitioned at all.
+            // ends up. Without it this doodle could never be partitioned at all.
             captureAnchorCam = anchorCam.toList(),
             pinned = if (pinnedKept.any { it.toInt() != 0 }) pinnedKept else ByteArray(0),
         )
@@ -620,7 +620,7 @@ object MetricFingerprintBuilder {
     }
 
     /**
-     * Centroid [x,y,z] of the kept 3D marks expressed in the FINGERPRINT ANCHOR's local frame, used
+     * Centroid [x,y,z] of the kept 3D marks expressed in the DOODLE ANCHOR's local frame, used
      * to center the AR overlay on the marks rather than the screen-center anchor. [pointsCam] are in
      * the capture's CV camera frame (flat [x,y,z,...]): invert the CV world→camera view to get their
      * mean in world space, then invert [anchorModel] (the anchor's world pose) to express it in the
@@ -688,7 +688,7 @@ object MetricFingerprintBuilder {
     private fun detectAndMatch(gray0: Mat, gray1: Mat, ratio: Float): Matched? {
         val orb = ORB.create(1500)
         // Illumination-normalize identically to the native reloc path (CLAHE 2.0 / 8x8) so this
-        // triangulated fingerprint's descriptors match the live frame's under light/color changes.
+        // triangulated doodle's descriptors match the live frame's under light/color changes.
         // CLAHE doesn't move pixels, so keypoint positions (used for triangulation) are unaffected.
         val clahe = Imgproc.createCLAHE(2.0, org.opencv.core.Size(8.0, 8.0))
         val n0 = Mat(); val n1 = Mat()

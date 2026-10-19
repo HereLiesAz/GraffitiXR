@@ -1,20 +1,20 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 /**
- * Pure capture-time seam between a standalone fingerprint capture and the base SphereSLAM
+ * Pure capture-time seam between a standalone doodle capture and the base SphereSLAM
  * photosphere (docs/SPHERESLAM_SPHERE_MAP.md §5.3).
  *
- * A fingerprint is bound to the photosphere through the camera view it was captured from: the
+ * A doodle is bound to the photosphere through the camera view it was captured from: the
  * pointing direction (compass heading/elevation/roll from `CameraAttitudeProvider`) plus pinhole
  * intrinsics. SphereSLAM picks that view (`PhotosphereKeyframeStore.view`) and places the
- * fingerprint (`PhotosphereFingerprintFrame.placement`); this object names the reason when it
+ * doodle (`PhotosphereFingerprintFrame.placement`); this object names the reason when it
  * cannot, so the artist gets an actionable message instead of a silent fail-closed confirmation.
  *
  * It never invents a direction: no attitude means no placement.
  */
 internal object StandalonePhotosphereCapture {
 
-    /** Why a standalone fingerprint capture cannot be bound to the photosphere. */
+    /** Why a standalone doodle capture cannot be bound to the photosphere. */
     enum class Blocker {
         /** The device has no magnetometer-fused rotation-vector sensor. Not recoverable. */
         ATTITUDE_SENSOR_MISSING,

@@ -9,7 +9,7 @@ invariants that are easy to accidentally regress during UI/renderer refactors:
 3. Hybrid SphereSLAM may correct the artwork only through the explicit metric/timestamp/PoseFusion
    seam; it must never replace the primary ARCore view/projection matrices.
 4. MobileGS tracking validity is backend-neutral, and standalone self-grow/map points remain in the
-   centred SphereSLAM fingerprint frame rather than passing through an ARCore-world conversion.
+   centred SphereSLAM doodle frame rather than passing through an ARCore-world conversion.
 5. The standalone runtime never reaches ARCore-only hit-test/depth/anchor/perception APIs and exposes
    an explicit canonical-wall hit-test seam instead.
 6. Co-op never installs peer geometry without a protocol-v3 backend/scale/wall-frame contract.
@@ -58,7 +58,7 @@ standalone_wall_hit = read(
     "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/StandaloneWallHitTest.kt"
 )
 coop_peer_analyzer = read(
-    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/CoopPeerFingerprintAnalyzer.kt"
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/CoopPeerDoodleAnalyzer.kt"
 )
 coop_spatial_frame = read(
     "core/common/src/main/java/com/hereliesaz/graffitixr/common/model/CoopSpatialFrame.kt"
@@ -88,7 +88,7 @@ else:
 standalone_paths = [
     "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/SphereSlamStandaloneOverlay.kt",
     "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/SphereSlamStandaloneTrackingAnalyzer.kt",
-    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/CoopPeerFingerprintAnalyzer.kt",
+    "feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/CoopPeerDoodleAnalyzer.kt",
 ]
 for path in standalone_paths:
     text = read(path)
@@ -210,12 +210,12 @@ if "setTrackingPoseValid(acceptedView != null)" not in standalone_analyzer:
     )
 if "mWallKeypoints3D.push_back(newPts[i]);" not in mobile_gs_cpp:
     fail(
-        "MobileGS self-grow no longer appends back-projected points directly in fingerprint space; "
+        "MobileGS self-grow no longer appends back-projected points directly in doodle space; "
         "review standalone centred-page frame preservation."
     )
 if "mMapPoints3D.push_back(cv::Point3f(P.x, P.y, P.z));" not in mobile_gs_cpp:
     fail(
-        "MobileGS feature-map growth no longer stores the fingerprint-frame intersection directly; "
+        "MobileGS feature-map growth no longer stores the doodle-frame intersection directly; "
         "review standalone centred-page frame preservation."
     )
 
@@ -257,14 +257,14 @@ if _coop_version is None or int(_coop_version.group(1)) < 3:
 for token in ("localBackend: CoopTrackingBackend", "spatialFrame: CoopSpatialFrame"):
     if token not in coop_handshake:
         fail(f"Co-op handshake/bulk payload lost required spatial token {token!r}.")
-for token in ("fingerprintFromWall", "supportsGuest", "NORMALIZED_PAGE"):
+for token in ("doodleFromWall", "supportsGuest", "NORMALIZED_PAGE"):
     if token not in coop_spatial_frame:
         fail(f"CoopSpatialFrame lost required frame/scale contract token {token!r}.")
 if "slam.alignToPeer(peerBytes)" not in coop_peer_analyzer:
-    fail("Standalone peer-fingerprint tracker no longer installs the validated co-op fingerprint.")
+    fail("Standalone peer-doodle tracker no longer installs the validated co-op doodle.")
 if "CoopPeerWallPoseSolver" not in coop_peer_analyzer:
-    fail("Standalone peer-fingerprint tracker no longer composes PnP into the host wall frame.")
-if "localBackend = localBackend" not in ar_view_model or "spatialFrame.fingerprintFromWall" not in ar_view_model:
+    fail("Standalone peer-doodle tracker no longer composes PnP into the host wall frame.")
+if "localBackend = localBackend" not in ar_view_model or "spatialFrame.doodleFromWall" not in ar_view_model:
     fail("ArViewModel no longer routes validated co-op backend/frame metadata to peer alignment.")
 for required in (
     "isDepthApiSupported = false",

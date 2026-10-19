@@ -4,14 +4,14 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import android.widget.Toast
-import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.Doodle
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.common.model.SphereSlamAtlasPage
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
-import com.hereliesaz.graffitixr.feature.ar.StandaloneFingerprintPlacement
-import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder
+import com.hereliesaz.graffitixr.feature.ar.StandaloneDoodlePlacement
+import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneDoodleBuilder
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.sphereslam.TileId
 import io.mockk.coEvery
@@ -52,7 +52,7 @@ class MainViewModelStandaloneReplacementTest {
 
     private val oldUri: Uri = mockk(relaxed = true)
     private val oldPage: Uri = mockk(relaxed = true)
-    private val oldFingerprint: Fingerprint = mockk(relaxed = true)
+    private val oldDoodle: Doodle = mockk(relaxed = true)
     private val candidates = ArrayDeque<Uri>()
     private val deleted = mutableListOf<Uri?>()
 
@@ -62,8 +62,8 @@ class MainViewModelStandaloneReplacementTest {
         sphereSlamReferenceWidthMeters = 2f,
         sphereSlamAnchorGeneration = 3L,
         sphereSlamPlacementAnchorGeneration = 3L,
-        sphereSlamFingerprint = oldFingerprint,
-        sphereSlamMapFromFingerprint = List(16) { 1f },
+        sphereSlamDoodle = oldDoodle,
+        sphereSlamMapFromDoodle = List(16) { 1f },
         sphereSlamAtlasPages = listOf(
             SphereSlamAtlasPage(
                 pageNo = 1,
@@ -97,14 +97,14 @@ class MainViewModelStandaloneReplacementTest {
         every { Toast.makeText(any(), any<CharSequence>(), any()) } returns mockk(relaxed = true)
         mockkStatic(Bitmap::class)
         every { Bitmap.createScaledBitmap(any(), any(), any(), any()) } returns mockk(relaxed = true)
-        mockkObject(StandaloneFingerprintBuilder)
-        every { StandaloneFingerprintBuilder.build(any(), any(), any(), any(), any()) } returns mockk(relaxed = true)
+        mockkObject(StandaloneDoodleBuilder)
+        every { StandaloneDoodleBuilder.build(any(), any(), any(), any(), any()) } returns mockk(relaxed = true)
         viewModel = MainViewModel(projectRepository, slamManager, projectManager, settingsRepository, context)
     }
 
     @After
     fun tearDown() {
-        unmockkObject(StandaloneFingerprintBuilder)
+        unmockkObject(StandaloneDoodleBuilder)
         unmockkStatic(Toast::class)
         unmockkStatic(Bitmap::class)
         Dispatchers.resetMain()
@@ -115,7 +115,7 @@ class MainViewModelStandaloneReplacementTest {
         viewModel.onConfirmStandaloneTargetCreation(
             bitmap = mockk(relaxed = true),
             selectionMask = null,
-            placement = StandaloneFingerprintPlacement(FloatArray(16), 1.5f, false, TileId(0, 0)),
+            placement = StandaloneDoodlePlacement(FloatArray(16), 1.5f, false, TileId(0, 0)),
         )
         val deadline = System.currentTimeMillis() + 5_000
         while (viewModel.uiState.value.isConfirmingTarget && System.currentTimeMillis() < deadline) Thread.sleep(10)
@@ -148,8 +148,8 @@ class MainViewModelStandaloneReplacementTest {
         val restored = current.value!!
         assertSame(oldUri, restored.sphereSlamReferenceUri)
         assertEquals(2f, restored.sphereSlamReferenceWidthMeters)
-        assertSame(oldFingerprint, restored.sphereSlamFingerprint)
-        assertEquals(previous.sphereSlamMapFromFingerprint, restored.sphereSlamMapFromFingerprint)
+        assertSame(oldDoodle, restored.sphereSlamDoodle)
+        assertEquals(previous.sphereSlamMapFromDoodle, restored.sphereSlamMapFromDoodle)
         assertEquals(previous.sphereSlamAtlasPages, restored.sphereSlamAtlasPages)
         // A new generation (everything re-solves for the page), still placed.
         assertEquals(5L, restored.sphereSlamAnchorGeneration)

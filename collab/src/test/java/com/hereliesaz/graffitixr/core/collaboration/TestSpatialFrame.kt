@@ -7,16 +7,16 @@ import com.hereliesaz.graffitixr.common.model.CoopTrackingBackend
 internal fun testSpatialFrame(
     backend: CoopTrackingBackend = CoopTrackingBackend.ARCORE,
     scale: CoopSpatialScale = CoopSpatialScale.METRIC,
-    fingerprintAvailable: Boolean = true,
+    doodleAvailable: Boolean = true,
     revision: Long = 1L,
 ): CoopSpatialFrame = CoopSpatialFrame(
     hostBackend = backend,
-    fingerprintFrameVersion = 1,
+    doodleFrameVersion = 1,
     scale = scale,
-    fingerprintAvailable = fingerprintAvailable,
+    doodleAvailable = doodleAvailable,
     anchorRevision = revision,
     referenceWidthUnits = 1f,
-    fingerprintFromWall = listOf(
+    doodleFromWall = listOf(
         1f, 0f, 0f, 0f,
         0f, 1f, 0f, 0f,
         0f, 0f, 1f, 0f,

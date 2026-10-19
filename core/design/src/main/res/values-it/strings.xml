@@ -365,13 +365,13 @@
     <string name="settings_anticipation_heat">Il calore riduce di</string>
     <string name="settings_anticipation_compute">Il carico riduce di</string>
     <string name="settings_anticipation_views">Al massimo %1$d viste per pagina</string>
-    <string name="settings_fingerprint_features">Scarabocchio</string>
-    <string name="settings_fingerprint_superpoint">SuperPoint</string>
-    <string name="settings_fingerprint_half_sphere">Semisfera</string>
-    <string name="settings_fingerprint_both">Entrambi</string>
-    <string name="settings_fingerprint_superpoint_desc">Solo i tratti SuperPoint della cattura. Regge a luce e usura; circa 1,5 MB per Scarabocchio. Vale dal prossimo Scarabocchio.</string>
-    <string name="settings_fingerprint_half_sphere_desc">Tratti ORB della cattura e dei suoi 49 primi piani. Forte da vicino e leggero, meno di 0,1 MB per Scarabocchio. Vale dal prossimo Scarabocchio.</string>
-    <string name="settings_fingerprint_both_desc">Tratti SuperPoint della cattura e dei suoi 49 primi piani. Il più forte; circa 2–3 MB per Scarabocchio. Vale dal prossimo Scarabocchio.</string>
+    <string name="settings_doodle_features">Scarabocchio</string>
+    <string name="settings_doodle_superpoint">SuperPoint</string>
+    <string name="settings_doodle_half_sphere">Semisfera</string>
+    <string name="settings_doodle_both">Entrambi</string>
+    <string name="settings_doodle_superpoint_desc">Solo i tratti SuperPoint della cattura. Regge a luce e usura; circa 1,5 MB per Scarabocchio. Vale dal prossimo Scarabocchio.</string>
+    <string name="settings_doodle_half_sphere_desc">Tratti ORB della cattura e dei suoi 49 primi piani. Forte da vicino e leggero, meno di 0,1 MB per Scarabocchio. Vale dal prossimo Scarabocchio.</string>
+    <string name="settings_doodle_both_desc">Tratti SuperPoint della cattura e dei suoi 49 primi piani. Il più forte; circa 2–3 MB per Scarabocchio. Vale dal prossimo Scarabocchio.</string>
     <string name="settings_power_section">Energia</string>
     <string name="settings_privacy_section">Privacy</string>
     <string name="settings_developer_section">Sviluppatore</string>
@@ -430,7 +430,7 @@
     <string name="target_review_desc">Rivedi Scarabocchio Estratto</string>
     <string name="target_unwarp_hint">Trascina gli angoli per distorcere</string>
     <string name="target_review_title">SCARABOCCHIO BLOCCATO</string>
-    <string name="fingerprint_closeups_progress">Studio del muro: fase %1$d di %2$d · passo %3$d di %4$d</string>
+    <string name="doodle_closeups_progress">Studio del muro: fase %1$d di %2$d · passo %3$d di %4$d</string>
 
     <string name="target_exclude">Escludi</string>
     <string name="target_include">Includi</string>
@@ -731,7 +731,7 @@
     <string name="ar_feedback_open_project_first">Apri un progetto prima di condividere: non c\'è ancora nulla da inviare a un ospite</string>
     <string name="ar_feedback_host_need_target_arcore">Acquisisci e blocca uno Scarabocchio aggiornato prima di avviare «Ospita»</string>
     <string name="ar_feedback_host_need_target_standalone">Acquisisci un target parete standalone prima di fare da host</string>
-    <string name="ar_feedback_fingerprint_not_ready">Lo Scarabocchio non è ancora pronto — tienilo inquadrato e riprova «Ospita»</string>
+    <string name="ar_feedback_doodle_not_ready">Lo Scarabocchio non è ancora pronto — tienilo inquadrato e riprova «Ospita»</string>
     <string name="ar_feedback_package_failed">Impossibile preparare questo progetto per la condivisione: prova prima a salvarlo</string>
     <string name="ar_feedback_host_failed">Impossibile avviare la condivisione: %1$s</string>
     <string name="ar_feedback_join_load_failed">Impossibile caricare il progetto dell\'host: la sessione è stata terminata.</string>

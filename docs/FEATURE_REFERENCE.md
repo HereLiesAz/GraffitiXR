@@ -2,7 +2,7 @@
 
 > The exhaustive reference for every mode, tool, setting, and option in GraffitiXR.
 > Companion to the conceptual docs (`ARCHITECTURE.md`, `NATIVE_ENGINE.md`, `TELEOLOGICAL_SLAM.md`,
-> `RELOC_MAP_DESIGN.md`, `SELF_GROWING_FINGERPRINT.md`, `STENCILS.md`). Those explain *how*;
+> `RELOC_MAP_DESIGN.md`, `SELF_GROWING_DOODLE.md`, `STENCILS.md`). Those explain *how*;
 > this explains *what every control does*.
 
 Defaults, value ranges, and identity states below are drawn from the source models
@@ -19,7 +19,7 @@ removed; the design is still represented by the `Layer` type for its per-image p
 editor holds at most one) chosen/replaced in **Design**; every other mode is a *lens* onto that same
 design, carrying its own **mode adjustment** (position/tone applied to the whole design for that
 lens only). AR mode has two backends: ARCore-supported devices keep the existing ARCore +
-MobileGS/fingerprint path; ARCore-unavailable devices use CameraX + SphereSLAM/KPM to register the
+MobileGS/doodle path; ARCore-unavailable devices use CameraX + SphereSLAM/KPM to register the
 design to a captured wall page. The standalone path uses the same centered KPM wall frame for
 MobileGS, self-grow, the persistent feature map, and a bounded multi-page atlas; ARCore-only
 depth/planes/anchors are replaced or explicitly unavailable rather than emulated.
@@ -38,7 +38,7 @@ adjustment/anchoring lens is active.
 
 | Mode | Purpose | Anchoring | Primary output |
 |---|---|---|---|
-| **AR** | Anchor the design to a real wall for painting at scale | ARCore: continuous ARCore anchor + MobileGS fingerprint, with optional metric KPM→PoseFusion correction; standalone: SphereSLAM/KPM canonical wall page/atlas + short IMU bridge | On-wall overlay; ARCore supports composited `glReadPixels` export, standalone preview export is currently disabled |
+| **AR** | Anchor the design to a real wall for painting at scale | ARCore: continuous ARCore anchor + MobileGS doodle, with optional metric KPM→PoseFusion correction; standalone: SphereSLAM/KPM canonical wall page/atlas + short IMU bridge | On-wall overlay; ARCore supports composited `glReadPixels` export, standalone preview export is currently disabled |
 | **MOCKUP** | Compose the design onto a static wall photo | None (static image) | Flattened preview image |
 | **OVERLAY** | Classic non-AR tracing — reference over live camera | None (screen-space) | Sensor still + composited layers (CameraX) |
 | **TRACE** | Phone-as-lightbox for copying onto paper | Locked screen-space | Transparent-background PNG |
@@ -52,14 +52,14 @@ adjustment/anchoring lens is active.
 | Camera view | full screen: ARCore's background quad is centre-cropped to the view by `Frame.transformCoordinates2d`, and its projection/hit tests share that display geometry | full screen: `PreviewView` `FILL_CENTER` (as in Overlay); the artwork projection, target-capture taps and coverage-glow lens apply the same centre crop (SphereSLAM `camera.CameraFillCenter`), while tracking keeps the full analysis frame |
 | Continuous pose | ARCore | calibrated SphereSLAM/KPM page match |
 | Short visual miss | ARCore tracking/fusion | rotation-only IMU bridge, max 400 ms |
-| Persisted wall target | ARCore target/fingerprint data | versioned rectified SphereSLAM reference PNG + width/metric metadata |
-| MobileGS fingerprint / self-grow | existing path | centered-page fingerprint + self-grow + separately persisted wall map |
+| Persisted wall target | ARCore target/doodle data | versioned rectified SphereSLAM reference PNG + width/metric metadata |
+| MobileGS doodle / self-grow | existing path | centered-page doodle + self-grow + separately persisted wall map |
 | Wall extent | ARCore planes / hit tests / depth where available | canonical KPM page/atlas; screen hits use calibrated ray→z=0 wall intersection |
 | Depth / distance | ARCore depth / proved hardware stereo / triangulated depth | unavailable; normalized KPM scale is never presented as depth |
 | Anchor object | local ARCore `Anchor` + fusion | canonical centered wall frame + persisted generation/version |
 | Perception debug | ARCore planes, feature points, accumulated scan cloud | KPM page/inliers/reprojection error/age/match-time/tracking-state diagnostics |
 | Target rail action | ARCore tap-to-target flow | disabled; use the on-screen **Wall Target** capture |
-| Co-op Host/Join | protocol-v3 host wall frame + peer fingerprint | protocol-v3 host wall frame; standalone↔standalone may use normalized page units, cross-backend requires metric scale + peer fingerprint |
+| Co-op Host/Join | protocol-v3 host wall frame + peer doodle | protocol-v3 host wall frame; standalone↔standalone may use normalized page units, cross-backend requires metric scale + peer doodle |
 | Drift correction | PoseFusion (on by default): accepted metric KPM observation first, MobileGS fallback, otherwise hold standing anchor-local correction | KPM is the primary wall pose while visible; MobileGS corroboration/self-grow use the same centered page frame, not ARCore PoseFusion |
 | AR preview export | composited GL framebuffer | disabled until CameraX + transparent GL can be composited correctly |
 | Pan/scale/rotation/tone/lock | `modeAdjustments[AR]` | `sphereSlamModeAdjustment`; the same controls/undo UI swap to the active backend's persisted adjustment, and standalone spatial placement is generation-bound to its canonical wall |
@@ -389,20 +389,20 @@ design document).
 ## 6. Relocalization & Teleological SLAM (ARCore/MobileGS path)
 
 This section describes relocalization/corroboration around the wall target. On ARCore-capable
-devices, MobileGS remains the durable fingerprint/return-visit path and optional PoseFusion fallback,
+devices, MobileGS remains the durable doodle/return-visit path and optional PoseFusion fallback,
 while a physically metric rectified KPM page can provide a timestamp-aligned correction through
 `HybridKpmCorrection → PoseFusion`. On standalone devices, KPM supplies the canonical wall pose and
-MobileGS fingerprint/self-grow/feature-map data live directly in that same centered page frame.
-Detailed math in `RELOC_MAP_DESIGN.md`, `SELF_GROWING_FINGERPRINT.md`,
+MobileGS doodle/self-grow/feature-map data live directly in that same centered page frame.
+Detailed math in `RELOC_MAP_DESIGN.md`, `SELF_GROWING_DOODLE.md`,
 `TELEOLOGICAL_SLAM.md`, `NATIVE_ENGINE.md`, and `SPHERESLAM_ARCORE_SIDECAR.md`.
 
-- **Fingerprint capture.** When you lock onto a wall, the native engine (`MobileGS`, C++17) captures an
-  OpenCV feature **fingerprint** of your marks: ORB/SuperPoint descriptors plus a handful of
-  triangulated 3D points (`WallFeatureMap` / `Fingerprint`). No cloud, no room pre-scan.
+- **Doodle capture.** When you lock onto a wall, the native engine (`MobileGS`, C++17) captures an
+  OpenCV feature **doodle** of your marks: ORB/SuperPoint descriptors plus a handful of
+  triangulated 3D points (`WallFeatureMap` / `Doodle`). No cloud, no room pre-scan.
 - **Snap-back.** After tracking loss or a screen-off (pocket) event, the engine matches the live camera
-  against the fingerprint and solves the pose via **PnP/RANSAC** to realign the overlay in milliseconds.
+  against the doodle and solves the pose via **PnP/RANSAC** to realign the overlay in milliseconds.
 - **Teleological self-grow.** Because the intended result is known, OpenCV can watch your progress and
-  **extend the fingerprint from validated new marks** as you paint — so snap-back survives the original
+  **extend the doodle from validated new marks** as you paint — so snap-back survives the original
   reference marks being painted over, tightening the lock instead of degrading it.
 - **These are A/B switches.** `ArViewModel.evalSetFusionEnabled`
   (drift correction, default **on**) and `evalSetSelfGrowEnabled` (teleological self-grow, default
@@ -425,19 +425,19 @@ Detailed math in `RELOC_MAP_DESIGN.md`, `SELF_GROWING_FINGERPRINT.md`,
   triangulated from disparity rather than inferred; it proves the configuration works. The probe
   runs after the camera-free gate, and a probe that cannot open the camera persists nothing and
   retries on the next AR entry. Monocular (MiDaS) depth is never used on the ARCore path. Metric
-  scale for the fingerprint comes from `MetricFingerprintBuilder`'s two-keyframe triangulation.
+  scale for the doodle comes from `MetricDoodleBuilder`'s two-keyframe triangulation.
 - **Thread safety.** `mWallDescriptors` / `mWallKeypoints3D` are mutex-guarded against races between JNI
-  updates and the background PnP thread. The JNI ABI is frozen via `Fingerprint.fromNative` and locked by
-  `FingerprintJniContractTest`.
+  updates and the background PnP thread. The JNI ABI is frozen via `Doodle.fromNative` and locked by
+  `DoodleJniContractTest`.
 
-**JNI contract note (maintainers):** adding fields to `Fingerprint` without updating the frozen factory
-descriptor will silently return null from `nativeSetWallFingerprint`. The contract test exists to catch this.
+**JNI contract note (maintainers):** adding fields to `Doodle` without updating the frozen factory
+descriptor will silently return null from `nativeSetWallDoodle`. The contract test exists to catch this.
 
 ---
 
 ### Saved-target search status and direction hint
 
-When the project already has a saved ARCore target (`project.fingerprint != null`) but the live view is
+When the project already has a saved ARCore target (`project.doodle != null`) but the live view is
 not matched yet (anchor established, `paintingProgress == 0`), the top-right pill reads **"Looking for
 your target..."** instead of the generic "Scanning...". Once the target locks it becomes "Matched n%".
 
@@ -506,7 +506,7 @@ Settings screen:
 | Setting | Key | Default | Effect |
 |---|---|---|---|
 | Drift correction | `drift_correction_enabled` | on | "Fusion" — pulls the overlay back onto each accepted relocalization instead of riding the raw ARCore anchor |
-| Self-grow | `self_grow_enabled` | on | Promotes newly validated marks into the reloc fingerprint as you paint; writes the map, so is colour-coded amber rather than green |
+| Self-grow | `self_grow_enabled` | on | Promotes newly validated marks into the reloc doodle as you paint; writes the map, so is colour-coded amber rather than green |
 | Feature map | `feature_map_enabled` | on | Builds and matches against the persistent wall feature map (`WallFeatureMap`); also writes, also amber |
 
 ### 7.3 Interface / locale / canvas
@@ -553,8 +553,8 @@ ARDIAG perf anticipation: frames=1760 avgWorkMs=11.4 searchable=246 builtThisMin
   the back-off in use. `corrobGate`, `predicted`, `matched` and `relocReject` are the last pass's answer to "why is
   there no painting progress": `corrobGate` 0 = the gated match ran (then `predicted` design features were in view
   and `matched` of them were found), 1 = no design registered, 2 = no design placement pushed, 3 = relocalization did
-  not lock, 4 = design 2D positions do not index the descriptors, 5 = the fingerprint has no intrinsics, 6 = no
-  attempt reached the decision. `relocReject` 0 = a pose was published, 1 = no fingerprint yet, 2 = relocalization
+  not lock, 4 = design 2D positions do not index the descriptors, 5 = the doodle has no intrinsics, 6 = no
+  attempt reached the decision. `relocReject` 0 = a pose was published, 1 = no doodle yet, 2 = relocalization
   off, 3 = nothing detected in the live frame, 4 = under 8 matches, 5 = PnP found no pose, 6 = under 6 inliers.
 - `anticipation` (Kotlin, the tracking thread): `frames` seen, `avgWorkMs` the tracking work per frame, `searchable`
   the anticipated views the tracker is searching, `builtThisMinute` and `renderMs` the views rendered this minute and

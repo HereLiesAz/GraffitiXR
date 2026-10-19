@@ -30,7 +30,7 @@ import javax.inject.Singleton
  * it stands at send time, not as it stood when hosting started minutes or hours earlier.
  */
 data class ProjectSnapshot(
-    val fingerprintBytes: ByteArray,
+    val doodleBytes: ByteArray,
     val projectBytes: ByteArray,
     val layerCount: Int,
     val spatialFrame: CoopSpatialFrame,
@@ -38,14 +38,14 @@ data class ProjectSnapshot(
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is ProjectSnapshot) return false
-        return fingerprintBytes.contentEquals(other.fingerprintBytes) &&
+        return doodleBytes.contentEquals(other.doodleBytes) &&
             projectBytes.contentEquals(other.projectBytes) &&
             layerCount == other.layerCount &&
             spatialFrame == other.spatialFrame
     }
 
     override fun hashCode(): Int {
-        var result = fingerprintBytes.contentHashCode()
+        var result = doodleBytes.contentHashCode()
         result = 31 * result + projectBytes.contentHashCode()
         result = 31 * result + layerCount
         result = 31 * result + spatialFrame.hashCode()
@@ -124,7 +124,7 @@ class CollaborationManager @Inject constructor() {
         localDeviceName: String,
         localBackend: CoopTrackingBackend,
         onBulkReceived: suspend (
-            fingerprint: ByteArray,
+            doodle: ByteArray,
             project: ByteArray,
             spatialFrame: CoopSpatialFrame,
         ) -> Unit,

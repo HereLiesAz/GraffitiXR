@@ -21,7 +21,7 @@ const float kIntr[4]    = {500.f, 500.f, 320.f, 240.f};
 void seedMetric(MobileGS& g, const std::vector<uint8_t>& regions) {
     cv::Mat descs(4, 32, CV_8U, cv::Scalar(7));
     std::vector<cv::Point3f> pts = {{0,0,0}, {0.1f,0,0}, {0,0.1f,0}, {0.1f,0.1f,0}};
-    g.restoreWallFingerprintMetric(descs, pts, kAnchor, kIntr, kView, regions);
+    g.restoreWallDoodleMetric(descs, pts, kAnchor, kIntr, kView, regions);
     g.setWallPatch(cv::Mat(64, 64, CV_8UC1, cv::Scalar(200)));
 }
 
@@ -46,11 +46,11 @@ cv::Mat makeWall(int w, int h, uint64_t seed = 0x9a11) {
     return img;
 }
 
-void fingerprintFrontalWall(MobileGS& g, const cv::Mat& img, const float K[4]) {
+void doodleFrontalWall(MobileGS& g, const cv::Mat& img, const float K[4]) {
     const int dw = img.cols / 4, dh = img.rows / 4;
     std::vector<uint16_t> depth((size_t)dw * dh, 1000);
     const float view[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    g.generateFingerprint(img, cv::Mat(), reinterpret_cast<const uint8_t*>(depth.data()),
+    g.generateDoodle(img, cv::Mat(), reinterpret_cast<const uint8_t*>(depth.data()),
                           dw, dh, dw * (int)sizeof(uint16_t), K, view);
     ASSERT_GE(g.getWallKeypointCount(), 50) << "synthetic wall too featureless for the test";
 }
@@ -66,7 +66,7 @@ TEST(MobileGSTeleological, AnAllInsidePartitionStillRelocalizes) {
     g.initialize(0, 0);
     const cv::Mat wall = makeWall(800, 600);
     const float K[4] = {700.f, 700.f, 400.f, 300.f};
-    fingerprintFrontalWall(g, wall, K);
+    doodleFrontalWall(g, wall, K);
     const int n = g.getWallKeypointCount();
     MobileGSTestPeer::setWallRegions(g, std::vector<uint8_t>((size_t)n, 0));   // all INSIDE
     g.setLiveIntrinsics(K);
@@ -84,7 +84,7 @@ TEST(MobileGSTeleological, ARealBackboneStillExcludesTheInsideMarks) {
     g.initialize(0, 0);
     const cv::Mat wall = makeWall(800, 600);
     const float K[4] = {700.f, 700.f, 400.f, 300.f};
-    fingerprintFrontalWall(g, wall, K);
+    doodleFrontalWall(g, wall, K);
     const int n = g.getWallKeypointCount();
     std::vector<uint8_t> regions((size_t)n, 0);                                // all INSIDE ...
     for (int i = 0; i < n; i += 4) regions[(size_t)i] = 2;                    // ... but a quarter OUTSIDE
@@ -100,7 +100,7 @@ TEST(MobileGSTeleological, ARealBackboneStillExcludesTheInsideMarks) {
 }
 
 // A repartition re-pushes only the BASE points, but the native set can be the base plus marks
-// self-grow appended. That used to be read as a different fingerprint: the grown marks and the
+// self-grow appended. That used to be read as a different doodle: the grown marks and the
 // distortion head's patch were thrown away by the first design move.
 TEST(MobileGSTeleological, RepartitionAfterGrowthKeepsTheGrownMarksAndThePatch) {
     MobileGS g;
@@ -111,20 +111,20 @@ TEST(MobileGSTeleological, RepartitionAfterGrowthKeepsTheGrownMarksAndThePatch) 
 
     cv::Mat descs(4, 32, CV_8U, cv::Scalar(7));
     std::vector<cv::Point3f> base = {{0,0,0}, {0.1f,0,0}, {0,0.1f,0}, {0.1f,0.1f,0}};
-    g.restoreWallFingerprintMetric(descs, base, kAnchor, kIntr, kView, {2, 2, 0, 1});
+    g.restoreWallDoodleMetric(descs, base, kAnchor, kIntr, kView, {2, 2, 0, 1});
 
     EXPECT_EQ(6u, MobileGSTestPeer::wallPointCount(g)) << "the grown marks were wiped by the repartition";
     EXPECT_EQ(6u, MobileGSTestPeer::wallRegionCount(g)) << "partition must stay 1:1 with the points";
     EXPECT_TRUE(MobileGSTestPeer::hasPatch(g)) << "the distortion head's patch was dropped";
 }
 
-TEST(MobileGSTeleological, AnActuallyDifferentFingerprintStillReplacesEverything) {
+TEST(MobileGSTeleological, AnActuallyDifferentDoodleStillReplacesEverything) {
     MobileGS g;
     seedMetric(g, {0, 1, 2, 0});
     MobileGSTestPeer::appendGrown(g, {{0.3f, 0, 0}}, cv::Mat(1, 32, CV_8U, cv::Scalar(9)), 2);
     cv::Mat descs(4, 32, CV_8U, cv::Scalar(8));            // different content
     std::vector<cv::Point3f> pts = {{0,0,1}, {0.2f,0,1}, {0,0.2f,1}, {0.2f,0.2f,1}};
-    g.restoreWallFingerprintMetric(descs, pts, kAnchor, kIntr, kView);
+    g.restoreWallDoodleMetric(descs, pts, kAnchor, kIntr, kView);
     EXPECT_EQ(4u, MobileGSTestPeer::wallPointCount(g));
     EXPECT_FALSE(MobileGSTestPeer::hasPatch(g));
 }
@@ -142,9 +142,9 @@ TEST(MobileGSTeleological, TheInlierSpreadRidesWithThePose) {
     out[35] = -5.f;
     g.getRelocResult(out, true, false);
     EXPECT_FLOAT_EQ(-5.f, out[35]);
-    g.clearWallFingerprint();
+    g.clearWallDoodle();
     g.getRelocResult(out, true, true);
-    EXPECT_LT(out[35], 0.f) << "a cleared fingerprint's spread must read as not measured";
+    EXPECT_LT(out[35], 0.f) << "a cleared doodle's spread must read as not measured";
 }
 
 // Moving the design invalidates what was confirmed under the old placement; re-pushing the same
@@ -242,8 +242,8 @@ int paintMarksAfterThreeLocks(bool selfGrow) {
     g.initialize(0, 0);
     const cv::Mat full = makeWall(800, 600, 0x51de);
     const float K[4] = {700.f, 700.f, 400.f, 300.f};
-    fingerprintFrontalWall(g, full, K);
-    g.setArtworkFingerprint(full, nullptr, 0, 0, 0, nullptr, nullptr);
+    doodleFrontalWall(g, full, K);
+    g.setArtworkDoodle(full, nullptr, 0, 0, 0, nullptr, nullptr);
     g.awaitFilterTargets();   // the filters' targets are built on a worker
     const float hw = (float)full.cols / (2.0f * K[0]);
     const float hh = (float)full.rows / (2.0f * K[1]);
@@ -365,14 +365,14 @@ TEST(MobileGSTeleological, FilterTargetsAreBuiltOffTheCallingThreadAndSuperseded
     g.initialize(0, 0);
     const float K[4] = {700.f, 700.f, 400.f, 300.f};
     const cv::Mat wall = makeWall(800, 600, 0x51de);
-    fingerprintFrontalWall(g, wall, K);
+    doodleFrontalWall(g, wall, K);
     // Two designs in a row: the first build must stand down for the second, never install its places.
-    g.setArtworkFingerprint(makeWall(800, 600, 0x1111), nullptr, 0, 0, 0, nullptr, nullptr);
-    g.setArtworkFingerprint(makeWall(800, 600, 0x2222), nullptr, 0, 0, 0, nullptr, nullptr);
+    g.setArtworkDoodle(makeWall(800, 600, 0x1111), nullptr, 0, 0, 0, nullptr, nullptr);
+    g.setArtworkDoodle(makeWall(800, 600, 0x2222), nullptr, 0, 0, 0, nullptr, nullptr);
     g.awaitFilterTargets();
     EXPECT_GE(g.readyFilterTargets(), 4);
     // Clearing the wall drops the targets with the design.
-    g.clearWallFingerprint();
+    g.clearWallDoodle();
     g.awaitFilterTargets();
     EXPECT_EQ(0, g.readyFilterTargets());
     g.destroy();
@@ -408,8 +408,8 @@ TEST(MobileGSTeleological, ThePassStatsCountWhatEachPassJudged) {
     g.initialize(0, 0);
     const cv::Mat full = makeWall(800, 600, 0x51de);
     const float K[4] = {700.f, 700.f, 400.f, 300.f};
-    fingerprintFrontalWall(g, full, K);
-    g.setArtworkFingerprint(full, nullptr, 0, 0, 0, nullptr, nullptr);
+    doodleFrontalWall(g, full, K);
+    g.setArtworkDoodle(full, nullptr, 0, 0, 0, nullptr, nullptr);
     const float hw = (float)full.cols / (2.0f * K[0]);
     const float hh = (float)full.rows / (2.0f * K[1]);
     const float place[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0,
@@ -459,8 +459,8 @@ struct PaintedRig {
         g.initialize(0, 0);
         bare = makeWall(800, 600, 0x51de);
         design = makeWall(800, 600, 0xbeef);
-        fingerprintFrontalWall(g, bare, K);
-        g.setArtworkFingerprint(design, nullptr, 0, 0, 0, nullptr, nullptr);
+        doodleFrontalWall(g, bare, K);
+        g.setArtworkDoodle(design, nullptr, 0, 0, 0, nullptr, nullptr);
         const float hw = (float)bare.cols / (2.0f * K[0]);
         const float hh = (float)bare.rows / (2.0f * K[1]);
         const float place[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0,
@@ -507,8 +507,8 @@ TEST(MobileGSTeleological, ARepeatingDesignFailsTheBaselineMargin) {
         const cv::Rect r(x, y, std::min(120, 800 - x), std::min(90, 600 - y));
         tile(cv::Rect(0, 0, r.width, r.height)).copyTo(design(r));
     }
-    fingerprintFrontalWall(g, bare, K);
-    g.setArtworkFingerprint(design, nullptr, 0, 0, 0, nullptr, nullptr);
+    doodleFrontalWall(g, bare, K);
+    g.setArtworkDoodle(design, nullptr, 0, 0, 0, nullptr, nullptr);
     const float hw = 800.f / (2.0f * K[0]), hh = 600.f / (2.0f * K[1]);
     const float place[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0.0f, 0.0f, 1.0f, 1};
     g.setDesignPlacement(place, hw, hh);
@@ -635,9 +635,9 @@ struct ChangeRig {
             const int x = rng.uniform(10, 770), y = rng.uniform(10, 570);
             cv::rectangle(design, cv::Rect(x, y, 9, 9), (i % 2) ? cv::Scalar(20, 20, 20) : cv::Scalar(235, 235, 235), cv::FILLED);
         }
-        fingerprintFrontalWall(g, bare, K);
+        doodleFrontalWall(g, bare, K);
         g.setCaptureImage(bare, K);
-        g.setArtworkFingerprint(design, nullptr, 0, 0, 0, nullptr, nullptr);
+        g.setArtworkDoodle(design, nullptr, 0, 0, 0, nullptr, nullptr);
         g.awaitFilterTargets();
         const float hw = 800.f / (2.0f * K[0]), hh = 600.f / (2.0f * K[1]);
         const float place[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0.0f, 0.0f, 1.0f, 1};
@@ -731,8 +731,8 @@ TEST(MobileGSTeleological, TheCvPreviewDrawsEveryPassesTargetsInTheDesignsOwnPix
 
     const cv::Mat full = makeWall(800, 600, 0x51de);
     const float K[4] = {700.f, 700.f, 400.f, 300.f};
-    fingerprintFrontalWall(g, full, K);
-    g.setArtworkFingerprint(full, nullptr, 0, 0, 0, nullptr, nullptr);
+    doodleFrontalWall(g, full, K);
+    g.setArtworkDoodle(full, nullptr, 0, 0, 0, nullptr, nullptr);
     g.awaitFilterTargets();
 
     cv::Mat rgba;

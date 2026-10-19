@@ -24,14 +24,14 @@
 
 ## 2. AR VILÁG PERZISZTENCIA (A Valóság Horgonya)
 **Definíció:** A rendszer, amely a terv pozícióját a fizikai valósághoz rögzíti, még követésvesztés után is.
-**Komponensek:** `MobileGS` (natív C++17 relokalizáló motor), `Fingerprint` (a fal ujjlenyomata).
+**Komponensek:** `MobileGS` (natív C++17 relokalizáló motor), `Doodle` (a fal ujjlenyomata).
 
 **Fontos korrekció:** `MobileGS` **nem** térképező motor — nincs perzisztens voxel- vagy splat-réteg, nincs jelenetrekonstrukció, és nincs `draw()` metódus. A `MobileGS.cpp` saját kódkommentje is ezt mondja azon a hívási ponton, amely korábban egy ilyen réteget táplált (`setMappingPaused`, amely "no gaussian-splat mapper in this engine" üzenetet naplóz, és no-op). Nincs `VoxelMap`, `ConfidenceMap`, `PersistentVoxelMemory` vagy `getSplatCount` a jelenlegi kódban — a `getSplatCount`-ot teljesen eltávolították, nem csak csonkolták.
 
 ### A. A Tényleges Mechanizmus
-1.  **A Fal Ujjlenyomata (Fingerprint):**
+1.  **A Fal Ujjlenyomata (Doodle):**
     * **Adat:** ORB (`cv::ORB::create(1500)`) vagy SuperPoint leírók, párosítva a felhasználó által a falra rajzolt jelek háromszögelt 3D pozícióival.
-    * **Rögzítés:** A célpont megerősítésekor (`restoreWallFingerprintMetric`) egyszer jön létre.
+    * **Rögzítés:** A célpont megerősítésekor (`restoreWallDoodleMetric`) egyszer jön létre.
 2.  **Relokalizáció ("Snap-Back"):**
     * **Folyamat:** Egy háttérszál (`relocThreadFunc`) folyamatosan összeveti az élő kamerakép leíróit a tárolt ujjlenyomattal (Lowe-arány teszt), majd a 2D↔3D megfeleltetéseket `cv::solvePnPRansac`-kal oldja meg.
     * **Eredmény:** Követésvesztés vagy zsebre tétel után ez igazítja vissza a globális horgony-transzformációt — nincs szükség térképhez, csak az egy ujjlenyomathoz.
@@ -40,8 +40,8 @@
     * **Önnövelés (self-grow):** a validált új jeleket hozzáadja az ujjlenyomathoz, hogy a snap-back túlélje az eredeti referencia lefestését (max. 5000 pont).
 
 ### B. Implementációs Irányelv
-* **Mentés:** A `Project.save()` a projektfájlban a `Fingerprint`-et szerializálja (`GraffitiProject.fingerprint`), nem egy voxeltérképet.
-* **Betöltés:** Az AR módba belépéskor a mentett `Fingerprint` betöltődik a `MobileGS`-be, amely megkísérli a relokalizációt a tárolt ujjlenyomat alapján.
+* **Mentés:** A `Project.save()` a projektfájlban a `Doodle`-et szerializálja (`GraffitiProject.doodle`), nem egy voxeltérképet.
+* **Betöltés:** Az AR módba belépéskor a mentett `Doodle` betöltődik a `MobileGS`-be, amely megkísérli a relokalizációt a tárolt ujjlenyomat alapján.
 
 ---
 
@@ -63,9 +63,9 @@
 3.  **Funkció Kinyerési Fázis:**
     * **Folyamat:** Passzold a `flatTarget`-et az `OrbFeatureDetector`-nak.
     * **Érvényesítés:** `HA (FunkcióSzám < 50) -> Elutasítás "Túl alacsony textúra"`.
-    * **Eredmény:** A `Fingerprint` létrejött.
+    * **Eredmény:** A `Doodle` létrejött.
 4.  **Befecskendezési Fázis:**
-    * **Akció:** `MobileGS.setAnchor(Fingerprint)`.
+    * **Akció:** `MobileGS.setAnchor(Doodle)`.
     * **Eredmény:** A motor mostantól ezt a képpozíciót (0,0,0)-ként kezeli a Világ Térben.
 
 ---
@@ -88,7 +88,7 @@
 | | `Invert` | A `Layer.isInverted` kapcsoló váltása. |
 | | `Outline` | A `Layer.isSketch` (körvonal-kinyerés, OpenCV Canny) kapcsoló váltása. |
 | | `Isolate` | A `Layer.isSubjectIsolated` (MLKit alany-elkülönítés) kapcsoló váltása. |
-| **PROJECT** | `New` / `Save` / `Load` / `Export` / `Settings` | Új projekt, mentés, betöltés, exportálás, beállítások. A projektfájl a `Fingerprint`-et szerializálja, nem egy voxeltérképet (lásd 2. szakasz). |
+| **PROJECT** | `New` / `Save` / `Load` / `Export` / `Settings` | Új projekt, mentés, betöltés, exportálás, beállítások. A projektfájl a `Doodle`-et szerializálja, nem egy voxeltérképet (lásd 2. szakasz). |
 | *(önálló elem)* | `Open` | Kép (vagy szövegréteg) kiválasztása; mellékhatásként átvált Design módba. Nincs "Design" harmonika-hoszt. |
 | *(önálló elem)* | `Help` | Az AzNavRail beépített súgó-overlayjét nyitja meg. |
 

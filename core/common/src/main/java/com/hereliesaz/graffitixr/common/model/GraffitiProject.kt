@@ -13,12 +13,12 @@ import kotlinx.serialization.Serializable
 import java.util.UUID
 
 /**
- * Persisted frame contract for [GraffitiProject.sphereSlamFingerprint].
+ * Persisted frame contract for [GraffitiProject.sphereSlamDoodle].
  *
  * v1 = centered rectified KPM page: +X image-right, +Y image-up, +Z wall normal, with the exact
  * artoolkitX half-pixel page mapping. Bump this BEFORE changing point semantics.
  */
-const val SPHERE_SLAM_FINGERPRINT_FRAME_VERSION: Int = 1
+const val SPHERE_SLAM_DOODLE_FRAME_VERSION: Int = 1
 
 /**
  * One additional standalone KPM page registered into the canonical centered-wall frame.
@@ -35,7 +35,7 @@ data class SphereSlamAtlasPage(
     val referenceWidthMeters: Float,
     val physicallyMetric: Boolean,
     val canonicalFromPage: List<Float>,
-    val frameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+    val frameVersion: Int = SPHERE_SLAM_DOODLE_FRAME_VERSION,
 ) {
     init {
         require(pageNo > 0) { "grown SphereSLAM atlas pages use positive page IDs" }
@@ -159,7 +159,7 @@ data class GraffitiProject(
      * deterministically. [sphereSlamAnchorFrameVersion] declares the coordinate semantics.
      */
     val sphereSlamAnchorGeneration: Long = 0L,
-    val sphereSlamAnchorFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+    val sphereSlamAnchorFrameVersion: Int = SPHERE_SLAM_DOODLE_FRAME_VERSION,
     /**
      * Anchor generation the persisted AR-mode design adjustment was authored against.
      * A mismatch means the adjustment belongs to an older standalone wall frame and must not render.
@@ -178,36 +178,36 @@ data class GraffitiProject(
     /**
      * MobileGS reloc seed built from the SAME rectified page as [sphereSlamReferenceUri].
      *
-     * Kept separate from [fingerprint]: the legacy/ARCore fingerprint stores object points in a
+     * Kept separate from [doodle]: the legacy/ARCore doodle stores object points in a
      * capture-camera CV frame, while this seed stores points in the centered durable SphereSLAM wall
      * frame. Mixing those two fields would make an ARCore loader interpret valid page points using
      * the wrong frame semantics.
      */
     @SerialName("sphereSlamFingerprint")
-    val sphereSlamFingerprint: Fingerprint? = null,
+    val sphereSlamDoodle: Doodle? = null,
     @SerialName("sphereSlamFingerprintFrameVersion")
-    val sphereSlamFingerprintFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+    val sphereSlamDoodleFrameVersion: Int = SPHERE_SLAM_DOODLE_FRAME_VERSION,
 
     /**
-     * Column-major GL 4x4 `map_from_fingerprint` transform for standalone SphereSLAM.
+     * Column-major GL 4x4 `map_from_doodle` transform for standalone SphereSLAM.
      *
-     * The photosphere/map is the base tracking frame and exists before the fingerprint. The later
-     * fingerprint is therefore NOT the map origin; this transform places its local page coordinates
+     * The photosphere/map is the base tracking frame and exists before the doodle. The later
+     * doodle is therefore NOT the map origin; this transform places its local page coordinates
      * into the already-running SphereSLAM map. Empty means legacy/unknown and must fail closed rather
      * than being silently treated as identity.
      */
     @SerialName("sphereSlamMapFromFingerprint")
-    val sphereSlamMapFromFingerprint: List<Float> = emptyList(),
+    val sphereSlamMapFromDoodle: List<Float> = emptyList(),
 
     /**
      * Wide-area MobileGS feature map for the standalone SphereSLAM backend.
      *
-     * Kept separate from [wallFeatureMap], whose points are in the legacy ARCore fingerprint frame.
-     * These points are in the exact same centred KPM-page frame as [sphereSlamFingerprint]. A new
+     * Kept separate from [wallFeatureMap], whose points are in the legacy ARCore doodle frame.
+     * These points are in the exact same centred KPM-page frame as [sphereSlamDoodle]. A new
      * standalone reference therefore invalidates both together.
      */
     val sphereSlamWallFeatureMap: WallFeatureMap? = null,
-    val sphereSlamWallFeatureMapFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+    val sphereSlamWallFeatureMapFrameVersion: Int = SPHERE_SLAM_DOODLE_FRAME_VERSION,
 
     /**
      * Per-keyframe device orientation samples recorded during standalone tracking — the angular glue
@@ -244,12 +244,12 @@ data class GraffitiProject(
      */
     val hybridKpmPageFromArtwork: List<Float> = emptyList(),
     /**
-     * `fingerprint.captureAnchorCam` of the ARCore target this page's relation was frozen against.
-     * The page is restored only while [fingerprint] still carries this exact value: a later target,
-     * or a capture whose fingerprint never committed, leaves the page inert rather than wrong.
+     * `doodle.captureAnchorCam` of the ARCore target this page's relation was frozen against.
+     * The page is restored only while [doodle] still carries this exact value: a later target,
+     * or a capture whose doodle never committed, leaves the page inert rather than wrong.
      */
     @SerialName("hybridKpmFingerprintKey")
-    val hybridKpmFingerprintKey: List<Float> = emptyList(),
+    val hybridKpmDoodleKey: List<Float> = emptyList(),
 
     val refinementPaths: List<RefinementPath> = emptyList(),
 
@@ -258,11 +258,11 @@ data class GraffitiProject(
 
     @SerialName("fingerprint")
 
-    val fingerprint: Fingerprint? = null,
+    val doodle: Doodle? = null,
 
-    // Teleological Fingerprinting
+    // Teleological Doodling
     @SerialName("targetFingerprintPath")
-    val targetFingerprintPath: String? = null,
+    val targetDoodlePath: String? = null,
 
     val drawingPaths: List<List<Pair<Float, Float>>> = emptyList(),
 
@@ -291,34 +291,34 @@ data class GraffitiProject(
 
     @SerialName("targetFingerprint")
 
-    val targetFingerprint: String? = null,
+    val targetDoodle: String? = null,
     // Per-mode whole-design adjustments, keyed by EditorMode.name. Defaulted for back-compat with
     // projects saved before this field existed.
     val modeAdjustments: Map<String, ModeAdjustment> = emptyMap(),
 
     // Camera intrinsics (fx,fy,cx,cy) and the anchor pose (column-major 4x4, 16 floats) captured
-    // alongside a metric fingerprint. Persisted so relocalization on reload replays the TRUE capture
-    // intrinsics + anchor through SlamManager.restoreWallFingerprintMetric instead of falling back to
-    // a default guess. Kept here rather than on Fingerprint because Fingerprint is constructed in
+    // alongside a metric doodle. Persisted so relocalization on reload replays the TRUE capture
+    // intrinsics + anchor through SlamManager.restoreWallDoodleMetric instead of falling back to
+    // a default guess. Kept here rather than on Doodle because Doodle is constructed in
     // native JNI with a fixed constructor signature (changing it would break depth-path capture).
     // Both empty on depth-path or pre-existing projects, which keep the legacy descriptors-only restore.
     @SerialName("fingerprintIntrinsics")
-    val fingerprintIntrinsics: List<Float> = emptyList(),
+    val doodleIntrinsics: List<Float> = emptyList(),
     @SerialName("fingerprintAnchor")
-    val fingerprintAnchor: List<Float> = emptyList(),
+    val doodleAnchor: List<Float> = emptyList(),
 
-    // The camera view (column-major 4x4, GL convention world→camera) at fingerprint capture. This is
+    // The camera view (column-major 4x4, GL convention world→camera) at doodle capture. This is
     // what lets the reloc thread pre-cancel oblique-vs-frontal distortion: the marks lie on a known
     // plane, so with the capture view and the live view it can warp the live frame into the
-    // fingerprint's frontal frame, match there, and map the correspondences back.
+    // doodle's frontal frame, match there, and map the correspondences back.
     // Without it MobileGS::computeRectifyHomography returns false and that whole pass is skipped —
-    // which is what happened to every metric fingerprint, since only the (dead, depth-API) capture
+    // which is what happened to every metric doodle, since only the (dead, depth-API) capture
     // path ever set it. An artist working a wall at arm's length is oblique most of the time, so this
     // is exactly the case it exists for. Empty on projects saved before this field.
     @SerialName("fingerprintViewMatrix")
-    val fingerprintViewMatrix: List<Float> = emptyList(),
+    val doodleViewMatrix: List<Float> = emptyList(),
 
-    // rotationNeeded at fingerprint capture (0/90/180/270), or -1 when unknown — IMPLEMENTATION.md
+    // rotationNeeded at doodle capture (0/90/180/270), or -1 when unknown — IMPLEMENTATION.md
     // 0.11. Persisted alongside the view matrix because the two only mean anything together: the
     // stored points, the stored view and the intrinsics are all in the DISPLAY frame as of Phase 0,
     // and this records which display frame that was.
@@ -328,14 +328,14 @@ data class GraffitiProject(
     // mean "genuinely unknown" and not "not written yet", which is why it is defaulted rather than
     // inferred at load time.
     @SerialName("fingerprintCaptureRotationDeg")
-    val fingerprintCaptureRotationDeg: Int = -1,
+    val doodleCaptureRotationDeg: Int = -1,
 
     // The wall's normal in East-North-Up (out of the wall), learned by MobileGS at trusted locks in
     // either AR mode. With the phone's north-referenced attitude it lets relocalization turn a lost
     // frame square-on to the wall, from the first attempt of a session. Empty until learned; cleared
     // with a new target, which may be another wall.
     @SerialName("fingerprintWallNormalEnu")
-    val fingerprintWallNormalEnu: List<Float> = emptyList(),
+    val doodleWallNormalEnu: List<Float> = emptyList(),
 
     // The AR design quad's half-width in metres, fixed at its first placement in this project. The
     // first placement fits the quad to the screen at the anchor's distance; persisting the result
@@ -356,17 +356,17 @@ data class GraffitiProject(
     // optional.
     val captureEnvironment: CaptureEnvironment? = null,
 
-    // Persistent confidence-weighted feature map of the wall around the marks fingerprint — the
+    // Persistent confidence-weighted feature map of the wall around the marks doodle — the
     // lean spatial backbone for wide-area relocalization (see docs/RELOC_MAP_DESIGN.md). Null on
     // projects without one; built passively during normal use. Defaulted for back-compat.
     val wallFeatureMap: WallFeatureMap? = null,
     // Teleological reference set: design features the wall has confirmed as painted, in the
-    // fingerprint frame (points + descriptors only). Relocalization matches these alongside the
+    // doodle frame (points + descriptors only). Relocalization matches these alongside the
     // original marks, so a return visit locks onto the paint once the marks are painted over.
-    // Valid only with the fingerprint it was built against; a new target capture clears it.
+    // Valid only with the doodle it was built against; a new target capture clears it.
     val paintMarks: WallFeatureMap? = null,
     // Area-progress state (painted grid cells + learned paint colours), Base64 of the native blob.
-    // Tied to the fingerprint like paintMarks: a new target capture clears it.
+    // Tied to the doodle like paintMarks: a new target capture clears it.
     val paintGrid: String? = null,
 
     // Per-host AzNavRail expansion state (host id -> expanded), so the rail restores exactly as the

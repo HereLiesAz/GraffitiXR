@@ -28,11 +28,11 @@ public:
      * Why 0.015 for that knob. Measured on a synthetic sparse "spray marks" frame (this app's case):
      * 0.005 -> 369 maxima, 0.01 -> 320, 0.015 -> 154, 0.02 -> 123, 0.05 -> 115. Below ~0.015 the
      * count doubles with responses an order of magnitude weaker than the corners above it -- the
-     * population that repeats worst across viewpoint, i.e. that matches a stored fingerprint least
+     * population that repeats worst across viewpoint, i.e. that matches a stored doodle least
      * (rpautrat's own default, 0.005, is tuned for a top-K evaluation that discards them anyway).
      * Above it the yield on sparse walls drops ~20% by 0.02 for no gain in a dense scene, where
      * maxKps' top-K already bounds the set. 0.015 sits at that knee, and it is also the value every
-     * fingerprint saved so far was detected with, so keeping it keeps live detection consistent with
+     * doodle saved so far was detected with, so keeping it keeps live detection consistent with
      * the stored reference sets. (It happens to equal MagicLeap's demo default; that is not the
      * reason, these are not MagicLeap's weights.)
      */

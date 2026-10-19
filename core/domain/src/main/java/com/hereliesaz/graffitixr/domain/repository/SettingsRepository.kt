@@ -75,7 +75,7 @@ interface SettingsRepository {
     suspend fun setDriftCorrectionEnabled(on: Boolean)
 
     /**
-     * Whether self-grow may promote validated new marks into the reloc fingerprint.
+     * Whether self-grow may promote validated new marks into the reloc doodle.
      *
      * On by default: it is the stage that keeps the lock alive as the original marks are painted
      * over, and promotion is gated (`MobileGS::growTrusted`). Persisted so an explicit choice survives.
@@ -253,9 +253,9 @@ interface SettingsRepository {
     val coverageGlowStyle: Flow<CoverageGlowStyle>
     suspend fun setCoverageGlowStyle(style: CoverageGlowStyle)
 
-    /** Settings → Fingerprint: what a new target's fingerprint is made of; default [FingerprintFeatures.DEFAULT]. */
-    val fingerprintFeatures: Flow<com.hereliesaz.graffitixr.common.model.FingerprintFeatures>
-    suspend fun setFingerprintFeatures(features: com.hereliesaz.graffitixr.common.model.FingerprintFeatures)
+    /** Settings → Doodle: what a new target's doodle is made of; default [DoodleFeatures.DEFAULT]. */
+    val doodleFeatures: Flow<com.hereliesaz.graffitixr.common.model.DoodleFeatures>
+    suspend fun setDoodleFeatures(features: com.hereliesaz.graffitixr.common.model.DoodleFeatures)
 
     /**
      * Anticipation: the half-sphere of views of the target the trackers relock from (distance,

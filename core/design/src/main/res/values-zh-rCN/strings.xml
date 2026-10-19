@@ -382,13 +382,13 @@
     <string name="settings_anticipation_heat">发热限制幅度</string>
     <string name="settings_anticipation_compute">负载限制幅度</string>
     <string name="settings_anticipation_views">每页最多 %1$d 个视图</string>
-    <string name="settings_fingerprint_features">随手画</string>
-    <string name="settings_fingerprint_superpoint">SuperPoint</string>
-    <string name="settings_fingerprint_half_sphere">半球</string>
-    <string name="settings_fingerprint_both">两者</string>
-    <string name="settings_fingerprint_superpoint_desc">仅采集图像的 SuperPoint 特征。耐光照与磨损；每个随手画约 1.5 MB。从下一个随手画起生效。</string>
-    <string name="settings_fingerprint_half_sphere_desc">采集图像及其 49 个特写的 ORB 特征。近距离强且小，每个随手画不到 0.1 MB。从下一个随手画起生效。</string>
-    <string name="settings_fingerprint_both_desc">采集图像及其 49 个特写的 SuperPoint 特征。最强；每个随手画约 2–3 MB。从下一个随手画起生效。</string>
+    <string name="settings_doodle_features">随手画</string>
+    <string name="settings_doodle_superpoint">SuperPoint</string>
+    <string name="settings_doodle_half_sphere">半球</string>
+    <string name="settings_doodle_both">两者</string>
+    <string name="settings_doodle_superpoint_desc">仅采集图像的 SuperPoint 特征。耐光照与磨损；每个随手画约 1.5 MB。从下一个随手画起生效。</string>
+    <string name="settings_doodle_half_sphere_desc">采集图像及其 49 个特写的 ORB 特征。近距离强且小，每个随手画不到 0.1 MB。从下一个随手画起生效。</string>
+    <string name="settings_doodle_both_desc">采集图像及其 49 个特写的 SuperPoint 特征。最强；每个随手画约 2–3 MB。从下一个随手画起生效。</string>
     <string name="settings_power_section">电源</string>
     <string name="settings_privacy_section">隐私</string>
     <string name="settings_developer_section">开发者</string>
@@ -447,7 +447,7 @@
     <string name="target_review_desc">查看提取的随手画</string>
     <string name="target_unwarp_hint">拖动角以取消扭曲</string>
     <string name="target_review_title">随手画已锁定</string>
-    <string name="fingerprint_closeups_progress">正在学习墙面：第 %1$d / %2$d 阶段 · 第 %3$d / %4$d 步</string>
+    <string name="doodle_closeups_progress">正在学习墙面：第 %1$d / %2$d 阶段 · 第 %3$d / %4$d 步</string>
 
     <string name="target_exclude">排除</string>
     <string name="target_include">包含</string>
@@ -748,7 +748,7 @@
     <string name="ar_feedback_open_project_first">分享前请先打开一个项目，目前没有可发送给访客的内容</string>
     <string name="ar_feedback_host_need_target_arcore">托管前请先捕获并锁定当前的随手画</string>
     <string name="ar_feedback_host_need_target_standalone">托管前请先捕获独立的墙面目标</string>
-    <string name="ar_feedback_fingerprint_not_ready">随手画尚未就绪 — 请让它保持在画面中，然后再次尝试 “主持”</string>
+    <string name="ar_feedback_doodle_not_ready">随手画尚未就绪 — 请让它保持在画面中，然后再次尝试 “主持”</string>
     <string name="ar_feedback_package_failed">无法打包此项目以供分享，请先尝试保存</string>
     <string name="ar_feedback_host_failed">无法开始分享：%1$s</string>
     <string name="ar_feedback_join_load_failed">无法加载主机的项目，会话已结束。</string>

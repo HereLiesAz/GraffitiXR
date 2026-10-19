@@ -2,12 +2,12 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
 
 /**
  * `IMPLEMENTATION.md` **Phase 3** — whether a relock is trusted enough to promote new marks into the
- * authoritative reloc fingerprint.
+ * authoritative reloc doodle.
  *
  * This is the pure-Kotlin **reference**. `MobileGS::growTrusted` transliterates it, and
  * `PromotionGateTest` pins the decisions the transliteration has to reproduce. The arrangement
  * exists because this predicate guards the one mechanism in the engine that **permanently mutates**
- * the map: a bad promotion is not a transient error, it is written into the fingerprint and
+ * the map: a bad promotion is not a transient error, it is written into the doodle and
  * compounds. Phase 3's risk section calls it the only phase that can make the system worse forever
  * rather than for a frame, which is why the predicate is tested somewhere it can actually be tested
  * and the C++ is held to it by source-text assertion.
@@ -58,7 +58,7 @@ object PromotionGate {
      * The bootstrap reasoning behind the ratio branch is worth keeping visible: this used to be a
      * flat `inliers >= 20`, which could not bootstrap. Self-grow is the mechanism that keeps
      * relocalization alive as the original marks get painted over, so a wall whose marks are already
-     * half-covered — precisely when growth is needed — rarely reaches 20 raw inliers. The fingerprint
+     * half-covered — precisely when growth is needed — rarely reaches 20 raw inliers. The doodle
      * could only grow when it was already strong.
      */
     fun matchTrusted(inliers: Int, matches: Int): Boolean {

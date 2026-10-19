@@ -365,13 +365,13 @@
     <string name="settings_anticipation_heat">El calor reduce en</string>
     <string name="settings_anticipation_compute">La carga reduce en</string>
     <string name="settings_anticipation_views">Como máximo %1$d vistas por página</string>
-    <string name="settings_fingerprint_features">Garabato</string>
-    <string name="settings_fingerprint_superpoint">SuperPoint</string>
-    <string name="settings_fingerprint_half_sphere">Media esfera</string>
-    <string name="settings_fingerprint_both">Ambos</string>
-    <string name="settings_fingerprint_superpoint_desc">Solo rasgos SuperPoint de la captura. Resiste luz y desgaste; unos 1,5 MB por Garabato. Se aplica al próximo Garabato.</string>
-    <string name="settings_fingerprint_half_sphere_desc">Rasgos ORB de la captura y de sus 49 primeros planos. Fuerte de cerca y pequeño, menos de 0,1 MB por Garabato. Se aplica al próximo Garabato.</string>
-    <string name="settings_fingerprint_both_desc">Rasgos SuperPoint de la captura y de sus 49 primeros planos. El más fuerte; unos 2–3 MB por Garabato. Se aplica al próximo Garabato.</string>
+    <string name="settings_doodle_features">Garabato</string>
+    <string name="settings_doodle_superpoint">SuperPoint</string>
+    <string name="settings_doodle_half_sphere">Media esfera</string>
+    <string name="settings_doodle_both">Ambos</string>
+    <string name="settings_doodle_superpoint_desc">Solo rasgos SuperPoint de la captura. Resiste luz y desgaste; unos 1,5 MB por Garabato. Se aplica al próximo Garabato.</string>
+    <string name="settings_doodle_half_sphere_desc">Rasgos ORB de la captura y de sus 49 primeros planos. Fuerte de cerca y pequeño, menos de 0,1 MB por Garabato. Se aplica al próximo Garabato.</string>
+    <string name="settings_doodle_both_desc">Rasgos SuperPoint de la captura y de sus 49 primeros planos. El más fuerte; unos 2–3 MB por Garabato. Se aplica al próximo Garabato.</string>
     <string name="settings_power_section">Energía</string>
     <string name="settings_privacy_section">Privacidad</string>
     <string name="settings_developer_section">Desarrollador</string>
@@ -430,7 +430,7 @@
     <string name="target_review_desc">Revisar Garabato Extraído</string>
     <string name="target_unwarp_hint">Arrastra las esquinas para eliminar la deformación</string>
     <string name="target_review_title">GARABATO FIJADO</string>
-    <string name="fingerprint_closeups_progress">Aprendiendo el muro: etapa %1$d de %2$d · paso %3$d de %4$d</string>
+    <string name="doodle_closeups_progress">Aprendiendo el muro: etapa %1$d de %2$d · paso %3$d de %4$d</string>
 
     <string name="target_exclude">Excluir</string>
     <string name="target_include">Incluir</string>
@@ -731,7 +731,7 @@
     <string name="ar_feedback_open_project_first">Abre un proyecto antes de compartir: todavía no hay nada que enviar a un invitado</string>
     <string name="ar_feedback_host_need_target_arcore">Captura y fija un Garabato actual antes de usar «Anfitrión»</string>
     <string name="ar_feedback_host_need_target_standalone">Captura un objetivo de pared independiente antes de alojar</string>
-    <string name="ar_feedback_fingerprint_not_ready">El Garabato aún no está listo — mantenlo a la vista y vuelve a probar «Anfitrión»</string>
+    <string name="ar_feedback_doodle_not_ready">El Garabato aún no está listo — mantenlo a la vista y vuelve a probar «Anfitrión»</string>
     <string name="ar_feedback_package_failed">No se pudo empaquetar este proyecto para compartirlo: prueba a guardarlo primero</string>
     <string name="ar_feedback_host_failed">No se pudo iniciar el uso compartido: %1$s</string>
     <string name="ar_feedback_join_load_failed">No se pudo cargar el proyecto del anfitrión: se cerró la sesión.</string>

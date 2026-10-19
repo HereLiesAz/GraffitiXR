@@ -46,30 +46,30 @@ public:
     // True means the pose belongs to THIS camera frame and is safe for pose-dependent helpers;
     // false means updateCamera may still contain the last accepted pose and must not be treated live.
     void setTrackingPoseValid(bool isValid);
-    void restoreWallFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
-    // Ingest a fingerprint built from triangulated metric marks (no depth source): also fixes the
-    // fingerprint anchor pose and the intrinsics the reloc PnP should use.
+    void restoreWallDoodle(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
+    // Ingest a doodle built from triangulated metric marks (no depth source): also fixes the
+    // doodle anchor pose and the intrinsics the reloc PnP should use.
     //
     // viewMatrix16 (optional, GL-convention world->camera at capture) enables the plane-guided
     // rectification pass in relocThreadFunc. Without it computeRectifyHomography bails and oblique
-    // views get no correction — which was the case for EVERY fingerprint built this way, since only
-    // generateFingerprint (the depth path, disabled) ever set it.
+    // views get no correction — which was the case for EVERY doodle built this way, since only
+    // generateDoodle (the depth path, disabled) ever set it.
     //
     // regions (optional, IMPLEMENTATION.md Phase 2) is one Footprint::Region ordinal per 3D point.
     // The reloc correspondence build excludes INSIDE points — they sit under the artwork and decay
     // as it is painted, so matching against them is what makes accuracy degrade with task progress.
-    // EMPTY MEANS ALL BACKBONE, reproducing pre-Phase-2 behaviour exactly for legacy fingerprints.
-    void restoreWallFingerprintMetric(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d,
+    // EMPTY MEANS ALL BACKBONE, reproducing pre-Phase-2 behaviour exactly for legacy doodles.
+    void restoreWallDoodleMetric(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d,
                                       const float* anchorMatrix16, const float* intrinsics4,
                                       const float* viewMatrix16 = nullptr,
                                       const std::vector<uint8_t>& regions = {});
-    // Drop the stored wall fingerprint (marks + co-registration). Needed because a fingerprint is
+    // Drop the stored wall doodle (marks + co-registration). Needed because a doodle is
     // otherwise process-lifetime state: the restore calls above only ever REPLACE it, so a project
-    // with no fingerprint of its own would keep relocalizing against whatever wall was fingerprinted
-    // earlier in the session. Reloc already treats an empty fingerprint as "nothing to match".
-    void clearWallFingerprint();
+    // with no doodle of its own would keep relocalizing against whatever wall was doodled
+    // earlier in the session. Reloc already treats an empty doodle as "nothing to match".
+    void clearWallDoodle();
     // Persistent wall *feature* map (lean reloc backbone; docs/RELOC_MAP_DESIGN.md), co-registered to
-    // the fingerprint anchor. Restore replaces the stored map (confidence/obs optional). Phase 2a stores
+    // the doodle anchor. Restore replaces the stored map (confidence/obs optional). Phase 2a stores
     // it only; reloc matching against it (Phase 2b) is gated separately.
     void restoreWallFeatureMap(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d,
                                const std::vector<float>& confidence, const std::vector<int>& obs,
@@ -115,7 +115,7 @@ public:
      */
     enum RelocReject {
         kRelocOk = 0,            //!< published a pose
-        kRelocNoFingerprint = 1, //!< no wall fingerprint yet (or it carries no 3D points)
+        kRelocNoDoodle = 1, //!< no wall doodle yet (or it carries no 3D points)
         kRelocDisabled = 2,      //!< relocalization switched off
         kRelocNoFeatures = 3,    //!< nothing detected in the live frame, or descriptor type mismatch
         kRelocFewMatches = 4,    //!< fewer than 8 correspondences survived the Lowe ratio test
@@ -124,11 +124,11 @@ public:
     };
 
     /**
-     * Whether a relock is trusted enough to promote new marks into the authoritative fingerprint.
+     * Whether a relock is trusted enough to promote new marks into the authoritative doodle.
      *
      * This used to be a flat `inliers >= 20`, which could not bootstrap: self-grow is the mechanism
      * that keeps relocalization alive as the original marks get painted over, but a wall whose marks
-     * are already half-covered rarely reaches 20 raw inliers, so the fingerprint could only grow when
+     * are already half-covered rarely reaches 20 raw inliers, so the doodle could only grow when
      * it was already strong — exactly when it needed to least.
      *
      * The ratio is the quality signal (it is what PoseFusion trusts), so a strong ratio now qualifies
@@ -207,21 +207,21 @@ public:
     /**
      * IMPLEMENTATION.md 3.4 — Φ, transliterated from `Footprint.of` + `Footprint.classify`.
      *
-     * Classifies a point already expressed in the FINGERPRINT frame against the design's placement.
+     * Classifies a point already expressed in the DOODLE frame against the design's placement.
      * Returns kRegionOutside / kRegionBand / kRegionInside, matching the wire ordinals exactly.
      *
-     * @param fpFromDesign the design's RIGID model matrix in the fingerprint frame, column-major —
+     * @param fpFromDesign the design's RIGID model matrix in the doodle frame, column-major —
      *   `mDesignFpFromDesign`. Rigid, so the inverse is a transpose plus a rotated translation; the
      *   overlay's scale lives in the half-extents instead, which is `Footprint`'s "scale trap" and
      *   the reason there is no similarity-inverse branch here.
      *
-     * Margins default to `FingerprintPartition.DEFAULT_INNER_MARGIN` / `DEFAULT_OUTER_MARGIN`. Note
+     * Margins default to `DoodlePartition.DEFAULT_INNER_MARGIN` / `DEFAULT_OUTER_MARGIN`. Note
      * those are the values that SHIPPED, which are not the ones PARAMETERS.md pre-registered (0.05 /
      * 0.15) — the discrepancy is recorded in §4 there, and copying the shipped values here keeps
      * promotion classifying against the same footprint the capture partition used. Two Φs that
      * disagree about the edge would be worse than either margin being wrong.
      */
-    static uint8_t classifyInFingerprintFrame(const float* fpFromDesign, float halfW, float halfH,
+    static uint8_t classifyInDoodleFrame(const float* fpFromDesign, float halfW, float halfH,
                                               const cv::Point3f& p,
                                               float innerMargin = 0.04f,
                                               float outerMargin = 0.10f) {
@@ -256,7 +256,7 @@ public:
     static constexpr int kPnpRansacIterations = 300;
     static constexpr double kPnpRansacConfidence = 0.995;
     // Teleological reference set: design features the wall has confirmed (painted), placed in the
-    // fingerprint frame through the design's placement. Matched by the reloc PnP alongside the
+    // doodle frame through the design's placement. Matched by the reloc PnP alongside the
     // backbone, so the more of the mural exists, the more the wall has to lock onto — and snap-back
     // survives the original marks being painted over. Capped like the wall set.
     static constexpr size_t kMaxPaintMarks = 5000;
@@ -275,7 +275,7 @@ public:
         kCorrobNoPlacement = 2,    //!< no design placement pushed — Phase 4 inactive for this project
         kCorrobNoPose = 3,         //!< relocalization did not lock this frame
         kCorrobBad2d = 4,          //!< artwork 2D positions do not index the descriptors 1:1
-        kCorrobNoIntrinsics = 5,   //!< the fingerprint carries no intrinsics to project through
+        kCorrobNoIntrinsics = 5,   //!< the doodle carries no intrinsics to project through
         kCorrobNotRun = 6,         //!< no corroboration attempt reached the decision at all
     };
 
@@ -373,8 +373,8 @@ public:
     /** Extra correspondences the sensor turn contributed to the last attempt. */
     int lastRelocTurnCorr() const { return mLastRelocTurnCorr.load(std::memory_order_relaxed); }
     /**
-     * Stored fingerprint points in F_out — the backbone the reloc PnP is allowed to use — or -1 when
-     * no attempt has got far enough to look. An unpartitioned fingerprint reports its full point
+     * Stored doodle points in F_out — the backbone the reloc PnP is allowed to use — or -1 when
+     * no attempt has got far enough to look. An unpartitioned doodle reports its full point
      * count, not zero, per the zero-length-regions rule.
      */
     int lastRelocBackboneFeatures() const { return mLastRelocBackboneFeatures.load(std::memory_order_relaxed); }
@@ -386,7 +386,7 @@ public:
     // Sphere map Phase 4 (docs/SPHERESLAM_SPHERE_MAP.md): the persistent-map reloc contribution of
     // the last attempt, for the on-device tuning instrument. -1 = not measured (the map path did not
     // run this attempt: flag off, no map, or no prior pose). Lets the artist see the surrounding
-    // sphere carrying the lock — above all when the fingerprint marks are off-frame.
+    // sphere carrying the lock — above all when the doodle marks are off-frame.
     int lastRelocMapVisible() const { return mLastRelocMapVisible.load(std::memory_order_relaxed); }
     int lastRelocMapCorr() const { return mLastRelocMapCorr.load(std::memory_order_relaxed); }
 
@@ -441,8 +441,8 @@ public:
      * IMPLEMENTATION.md 4.5 — where the design sits, so the corroboration match can predict where
      * each of its features should appear.
      *
-     * @param fpFromDesign16 the design's model matrix expressed in the WALL FINGERPRINT frame,
-     *   column-major. This is exactly `FingerprintPartition.partition`'s `designInPointFrame`
+     * @param fpFromDesign16 the design's model matrix expressed in the WALL DOODLE frame,
+     *   column-major. This is exactly `DoodlePartition.partition`'s `designInPointFrame`
      *   (`captureAnchorCam * rigidModelAnchorLocal`) — the same composition Phi is classified with,
      *   deliberately, because a second derivation of the same quantity is a second chance to get the
      *   frame wrong. RIGID: the overlay's scale is folded into the extents, not this matrix.
@@ -456,13 +456,13 @@ public:
     void scheduleRelocCheck(const cv::Mat& colorFrame);
     /**
      * Cheap pre-check for the three conditions under which scheduleRelocCheck() drops the frame:
-     * relocalization disabled, no wall fingerprint to match against yet, or the reloc worker still
+     * relocalization disabled, no wall doodle to match against yet, or the reloc worker still
      * busy with the previous request.
      *
      * Callers convert a raw camera frame to RGB (and rotate it) before they can schedule it, which
      * is the single most expensive thing on the GL render thread. Ask this first so that work is
      * only paid for on frames the worker will actually take — during scanning there is no
-     * fingerprint yet, so every one of those conversions used to be built and thrown away.
+     * doodle yet, so every one of those conversions used to be built and thrown away.
      */
     bool relocWantsFrame();
     void getAnchorTransform(float* outMat16) const;
@@ -477,33 +477,33 @@ public:
     void restorePaintMarks(const cv::Mat& descs, const std::vector<cv::Point3f>& pts);
     void clearPaintMarks();
     int getPaintMarkCount() const;
-    void getFingerprintAnchor(float* out16) const;
-    void setArtworkFingerprint(const cv::Mat& composite, const uint8_t* depthData, int depthW, int depthH, int depthStride, const float* intrinsics4, const float* viewMat16);
-    // Detect the same features generateFingerprint would (SuperPoint/ORB-1000, masked) and return their
-    // 2D positions in image pixels — for a truthful "what anchors the fingerprint" curation overlay.
-    void getFingerprintKeypoints(const cv::Mat& image, const cv::Mat& mask, std::vector<cv::Point2f>& out);
+    void getDoodleAnchor(float* out16) const;
+    void setArtworkDoodle(const cv::Mat& composite, const uint8_t* depthData, int depthW, int depthH, int depthStride, const float* intrinsics4, const float* viewMat16);
+    // Detect the same features generateDoodle would (SuperPoint/ORB-1000, masked) and return their
+    // 2D positions in image pixels — for a truthful "what anchors the doodle" curation overlay.
+    void getDoodleKeypoints(const cv::Mat& image, const cv::Mat& mask, std::vector<cv::Point2f>& out);
     // Teleological self-grow (default OFF): promotes validated new marks into the live reloc
-    // fingerprint so snap-back survives the original reference being painted over. Mutates the
+    // doodle so snap-back survives the original reference being painted over. Mutates the
     // authoritative set but is hard-guarded (fresh+confident relock, gatekeeper-validated, plane-fit,
     // re-projection dedup, per-relock + total caps, RANSAC backstop). Toggleable via the UI.
     void setSelfGrowEnabled(bool e) { mSelfGrowEnabled.store(e, std::memory_order_relaxed); }
-    // Live wall-fingerprint size — diagnostic for relocalization health and watching self-grow.
+    // Live wall-doodle size — diagnostic for relocalization health and watching self-grow.
     int getWallKeypointCount() const { std::lock_guard<std::mutex> lock(mMutex); return (int)mWallKeypoints3D.size(); }
     // SuperPoint detect+describe for one image (gray + CLAHE applied inside, matching the reloc path) so
-    // the depth-off triangulated fingerprint can be built from SuperPoint (CV_32F) instead of ORB. False
+    // the depth-off triangulated doodle can be built from SuperPoint (CV_32F) instead of ORB. False
     // if the model isn't loaded or nothing was found.
     bool getSuperPointFeatures(const cv::Mat& image, std::vector<cv::KeyPoint>& kps, cv::Mat& descs);
 
-    struct FingerprintData {
+    struct DoodleData {
         std::vector<cv::KeyPoint> keypoints;
         std::vector<float> points3d;
         cv::Mat descriptors;
     };
-    FingerprintData generateFingerprint(const cv::Mat& image, const cv::Mat& mask, const uint8_t* depthData, int depthW, int depthH, int depthStride, const float* intrinsics, const float* viewMat);
+    DoodleData generateDoodle(const cv::Mat& image, const cv::Mat& mask, const uint8_t* depthData, int depthW, int depthH, int depthStride, const float* intrinsics, const float* viewMat);
 
     bool loadSuperPoint(const std::vector<uchar>& onnxBytes);
     bool loadDistortionHead(const std::vector<uchar>& onnxBytes) { return mDistortionHead.load(onnxBytes); }
-    // Canonical fingerprint patch (the marks) the distortion head compares the live crop against.
+    // Canonical doodle patch (the marks) the distortion head compares the live crop against.
     // Stored as a raw 256x256 gray (NO CLAHE — the head's frozen SuperPoint was trained on raw gray).
     void setWallPatch(const cv::Mat& img);
     bool loadLowLightEnhancer(const std::vector<uchar>& onnxBytes);
@@ -555,7 +555,7 @@ public:
             ? mEvalSyncEveryN.load(std::memory_order_relaxed) : 0;
     }
     // Deliberately a no-op: there is no gaussian-splat mapper in this engine for this to pause (the
-    // reloc/fingerprint pipeline is not "mapping" and is never gated by this flag). Kept as a
+    // reloc/doodle pipeline is not "mapping" and is never gated by this flag). Kept as a
     // callable, logged no-op (same pattern as setStageEnabled below) rather than deleted so the
     // seven ArViewModel call sites don't need to change; a caller relying on this to actually pause
     // work will see a warning in logcat instead of a silently-ignored request.
@@ -604,8 +604,8 @@ public:
     }
 
     // Collaboration methods
-    std::vector<uint8_t> exportFingerprint();
-    void alignToFingerprint(const uint8_t* data, size_t size);
+    std::vector<uint8_t> exportDoodle();
+    void alignToDoodle(const uint8_t* data, size_t size);
 
     void destroy();
     std::mutex& getMutex() { return mMutex; }
@@ -616,9 +616,9 @@ public:
 
     /**
      * The camera matrix a relocalization attempt on a [frameW]x[frameH] live frame solves with:
-     * the LIVE intrinsics when set (they describe the frame being solved), else the fingerprint's
+     * the LIVE intrinsics when set (they describe the frame being solved), else the doodle's
      * capture intrinsics, else a coarse default centred on the frame. Returns true when out4 came
-     * from real intrinsics (live or fingerprint), false for the default.
+     * from real intrinsics (live or doodle), false for the default.
      *
      * One function so the PnP and every consumer of its pose agree on K by construction; they did
      * not, and the disagreement put every live-image projection off by the ratio between the two
@@ -628,11 +628,11 @@ public:
                                       double out4[4]);
 
     /**
-     * Plane-induced homography current-image <- fingerprint-image for a plane n.X = d in the
-     * fingerprint camera frame and a relative pose X_cur = R X_fp + t (both OpenCV convention):
+     * Plane-induced homography current-image <- doodle-image for a plane n.X = d in the
+     * doodle camera frame and a relative pose X_cur = R X_fp + t (both OpenCV convention):
      *   H = K_cur (R + t n^T / d) K_fp^-1
      * Two cameras, not one: the live frame and the capture can differ in resolution and rotation,
-     * so mapping a fingerprint pixel needs K_fp's inverse and landing it in the live image needs
+     * so mapping a doodle pixel needs K_fp's inverse and landing it in the live image needs
      * K_cur. Normalised so H(2,2) == 1; returns an empty matrix when degenerate. Pure, for tests.
      */
     static cv::Matx33d planeHomography(const cv::Matx33d& Kcur, const cv::Matx33d& Kfp,
@@ -640,15 +640,15 @@ public:
                                        const cv::Vec3d& n, double d, bool* ok = nullptr);
 
     /**
-     * True when the fingerprint's 3D points can be in a CAMERA frame, i.e. the wall plane they fit
+     * True when the doodle's 3D points can be in a CAMERA frame, i.e. the wall plane they fit
      * does not pass through the frame's origin. A capture-camera frame (ARCore metric/depth
-     * fingerprints) has its origin at the camera centre, a wall-distance away from the wall; the
-     * standalone SphereSLAM fingerprint is the CENTRED PAGE frame, whose points all lie on z = 0,
-     * so the plane passes through the origin. Anything that treats the fingerprint frame as the
+     * doodles) has its origin at the camera centre, a wall-distance away from the wall; the
+     * standalone SphereSLAM doodle is the CENTRED PAGE frame, whose points all lie on z = 0,
+     * so the plane passes through the origin. Anything that treats the doodle frame as the
      * capture camera's (autoFitDesign, the paint grid's capture-photo sampling) must refuse the
      * second kind rather than project through a camera that is not there. Pure, for tests.
      */
-    static bool fingerprintFrameIsCaptureCamera(const std::vector<cv::Point3f>& pts);
+    static bool doodleFrameIsCaptureCamera(const std::vector<cv::Point3f>& pts);
 
     /** One extra multi-scale reloc matching pass: crop [roi] of the frame, resize by [scale]. */
     struct RelocScalePass { cv::Rect roi; double scale; };
@@ -675,8 +675,8 @@ public:
                                      double& turnDeg, double& obliquityDeg);
 
     /**
-     * The wall's normal in East-North-Up from a lock: the plane of the fingerprint's points [pts]
-     * (fingerprint frame), turned into the camera by the PnP pose ([camFromFpR], [camFromFpT]) and
+     * The wall's normal in East-North-Up from a lock: the plane of the doodle's points [pts]
+     * (doodle frame), turned into the camera by the PnP pose ([camFromFpR], [camFromFpT]) and
      * into the earth by the frame's attitude ([earthFromCam]), pointing toward the camera. False when
      * the points are too few or not planar enough to have one. Pure.
      */
@@ -688,7 +688,7 @@ public:
     enum AutoFitResult {
         kAutoFitOk = 0,
         kAutoFitNotReady = 1,        //!< no capture photo / design / placement / enough wall points
-        kAutoFitPageFrame = 2,       //!< fingerprint is a centred page frame, not a capture camera
+        kAutoFitPageFrame = 2,       //!< doodle is a centred page frame, not a capture camera
         kAutoFitNoFit = 3,           //!< ran, but no confident similarity was found
     };
     int lastAutoFitResult() const { return mLastAutoFitResult.load(std::memory_order_relaxed); }
@@ -700,12 +700,12 @@ private:
      * background worker or inline from the caller in eval sync mode.
      */
     void runRelocPass(const cv::Mat& frame, const float* relocView, const float* relocAttitude = nullptr);
-    // mMutex held. The stored wall fingerprint is being replaced or cleared: advance
-    // mFingerprintGeneration and drop the latched PnP result that belongs to the old one.
+    // mMutex held. The stored wall doodle is being replaced or cleared: advance
+    // mDoodleGeneration and drop the latched PnP result that belongs to the old one.
     void invalidateRelocResultLocked();
     // Teleological self-grow (gatekeeper stage): measure how much of the registered artwork base is now
     // corroborated by real wall content in the clean camera frame -> mPaintingProgress. Read-only on the
-    // reloc fingerprint; the promotion step (adding validated new marks) is staged separately.
+    // reloc doodle; the promotion step (adding validated new marks) is staged separately.
     /**
      * @param preKps,preDescs features already detected on [grayClean] by the caller. The reloc thread
      *        has just run the detector over this exact frame, and SuperPoint is an ONNX forward pass —
@@ -713,22 +713,22 @@ private:
      *        only when the descriptor type matches the artwork's (a mismatch can't knnMatch anyway,
      *        so it re-detects with the right detector). Pass nullptr to always detect.
      */
-    void tryUpdateFingerprint(const cv::Mat& grayClean,
+    void tryUpdateDoodle(const cv::Mat& grayClean,
                               const std::vector<cv::KeyPoint>* preKps = nullptr,
                               const cv::Mat* preDescs = nullptr);
-    // Area progress (see PaintGrid). Runs after tryUpdateFingerprint on a frame whose reloc succeeded.
+    // Area progress (see PaintGrid). Runs after tryUpdateDoodle on a frame whose reloc succeeded.
     void updatePaintGrid(const cv::Mat& colorFrame);
     // Builds the grid from the registered design composite; caller holds mMutex.
     void buildPaintGridLocked(const cv::Mat& composite, const std::vector<cv::Point2f>& featurePts);
-    // Plane-guided rectification: homography (current-image <-> fingerprint-image) from the wall plane
-    // and the VIO baseline between the current and fingerprint-capture views, plus the viewing
-    // obliquity in degrees. False if no fingerprint view is stored or the geometry is degenerate.
-    // liveK4 = fx,fy,cx,cy of the CURRENT frame; the fingerprint side uses mFingerprintIntrinsics.
+    // Plane-guided rectification: homography (current-image <-> doodle-image) from the wall plane
+    // and the VIO baseline between the current and doodle-capture views, plus the viewing
+    // obliquity in degrees. False if no doodle view is stored or the geometry is degenerate.
+    // liveK4 = fx,fy,cx,cy of the CURRENT frame; the doodle side uses mDoodleIntrinsics.
     bool computeRectifyHomography(const float* viewCur16, const double* liveK4, cv::Mat& Hcur_fp,
                                   cv::Mat& Hfp_cur, double& obliquityDeg);
     // Phase 3 passive builder: on a reloc lock, back-project the frame's features onto the wall plane
-    // (fit from the fingerprint points) to get 3D points in the fingerprint frame, associate to the map
-    // by descriptor (bump confidence) or add new (capped). Co-registers the map to the fingerprint anchor.
+    // (fit from the doodle points) to get 3D points in the doodle frame, associate to the map
+    // by descriptor (bump confidence) or add new (capped). Co-registers the map to the doodle anchor.
     void growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv::KeyPoint>& kps,
                           const cv::Mat& descs, double fx, double fy, double cx, double cy);
 
@@ -748,7 +748,7 @@ private:
     std::vector<cv::Point3f> mWallKeypoints3D;
     // IMPLEMENTATION.md Phase 2 — the footprint partition, parallel to mWallKeypoints3D. One
     // Footprint::Region ordinal per point. EMPTY means "no partition" and is read as all-backbone,
-    // so a pre-Phase-2 fingerprint relocalizes exactly as it does on main. Always either empty or
+    // so a pre-Phase-2 doodle relocalizes exactly as it does on main. Always either empty or
     // the same size as mWallKeypoints3D; the JNI layer drops a mismatched array rather than let a
     // short one be indexed by point index.
     std::vector<uint8_t> mWallRegions;
@@ -762,9 +762,9 @@ private:
     std::vector<cv::Point3f> mArtworkKeypoints3D;
     // IMPLEMENTATION.md 4.5 — the artwork features' 2D positions in the composite the descriptors
     // were detected on, kept 1:1 with mArtworkDescriptors THROUGH the depth-path row filter in
-    // setArtworkFingerprint. mArtworkKeypoints3D is not usable for this: it is empty on the shipping
+    // setArtworkDoodle. mArtworkKeypoints3D is not usable for this: it is empty on the shipping
     // path (the design composite carries no depth) and, when depth does exist, it is expressed in
-    // the artwork CAPTURE camera's frame, which has no relation to the wall fingerprint frame the
+    // the artwork CAPTURE camera's frame, which has no relation to the wall doodle frame the
     // reloc pose is in. Predicting where a design feature should appear goes through the design's
     // placement instead, which is a frame the app actually knows.
     std::vector<cv::Point2f> mArtworkKeypoints2D;
@@ -782,10 +782,10 @@ private:
     // of hours, roughly monotonic. Never decayed." Cleared whenever a new artwork is registered,
     // because every prior reading was against a different target.
     std::vector<uint8_t> mArtworkCorroborated;
-    // See kMaxPaintMarks. Rows of mPaintDescriptors are 1:1 with mPaintPoints3D (fingerprint frame).
+    // See kMaxPaintMarks. Rows of mPaintDescriptors are 1:1 with mPaintPoints3D (doodle frame).
     // Independent of the artwork registration: once confirmed, paint stays a reference even if the
-    // design composite is re-registered. Cleared only when the fingerprint FRAME changes (a new
-    // capture, clearWallFingerprint, a peer alignment) — never by a partition re-restore.
+    // design composite is re-registered. Cleared only when the doodle FRAME changes (a new
+    // capture, clearWallDoodle, a peer alignment) — never by a partition re-restore.
     cv::Mat mPaintDescriptors;
     std::vector<cv::Point3f> mPaintPoints3D;
     // Per artwork row, for the current generation: already promoted into the paint set.
@@ -818,7 +818,7 @@ private:
      * wall exclusion list is these rows. Guarded by mMutex.
      */
     size_t mBareWallCount = 0;
-    // Bumped whenever the artwork is replaced or cleared. tryUpdateFingerprint snapshots the
+    // Bumped whenever the artwork is replaced or cleared. tryUpdateDoodle snapshots the
     // descriptors under the lock, spends milliseconds matching outside it, and then merges its
     // result back in; without this it would merge into whatever artwork is registered by then. The
     // sizes alone are not enough — a design swapped for one with the same feature count would pass a
@@ -859,7 +859,7 @@ private:
     PaintGrid mGrid;
     // Per-pass diagnostics (see PassEvidence.h), guarded by mMutex.
     passes::Stats mPassStats[passes::kPassCount];
-    cv::Mat mCaptureRgb;                           // capture photo (fingerprint frame = its camera)
+    cv::Mat mCaptureRgb;                           // capture photo (doodle frame = its camera)
     cv::Mat mCleanWallRaw;                         // clean-wall photo as given (<= 640 px)
     cv::Mat mCleanWallRgb;                         // ... warped into the capture photo's pixels
     cv::Mat mCleanWallValid;                       // 255 where the warp has real clean-wall pixels behind it
@@ -949,7 +949,7 @@ private:
     }
 
     // --- Persistent wall feature map (lean reloc backbone; docs/RELOC_MAP_DESIGN.md) ---
-    // Co-registered to the fingerprint anchor. Phase 2a stores it; reloc matching (Phase 2b) is gated
+    // Co-registered to the doodle anchor. Phase 2a stores it; reloc matching (Phase 2b) is gated
     // separately, so today this is inert state with no effect on relocalization.
     cv::Mat mMapDescriptors;
     std::vector<cv::Point3f> mMapPoints3D;
@@ -985,29 +985,29 @@ private:
     // fx,fy,cx,cy of the camera mPnpCamFromFpWorld was SOLVED with -- the live frame's intrinsics
     // (see relocCameraIntrinsics). Published with the pose under mMutex, because every consumer
     // that projects into or back-projects out of the live image through that pose (corroboration,
-    // self-grow, map frustum gate) must use the camera the pose describes, not the fingerprint's
+    // self-grow, map frustum gate) must use the camera the pose describes, not the doodle's
     // capture camera. {0,..} = the solve used the coarse default (no real intrinsics known), which
-    // the consumers treat as "no intrinsics" exactly as they used to treat an unset fingerprint K.
+    // the consumers treat as "no intrinsics" exactly as they used to treat an unset doodle K.
     float mPnpIntrinsics[4] = {0,0,0,0};
     std::atomic<int> mPnpInlierCount{0};
     std::atomic<int> mPnpMatchCount{0};
     std::atomic<long> mPnpResultSeq{0};
     // Inlier spread of the published solve; written with the pose under mMutex. Negative = not measured.
     float mPnpInlierSpread = -1.0f;
-    // Identity of the stored wall fingerprint. Advanced (under mMutex) by every path that replaces or
-    // clears it, via invalidateRelocResultLocked(). runRelocPass snapshots it with the fingerprint
+    // Identity of the stored wall doodle. Advanced (under mMutex) by every path that replaces or
+    // clears it, via invalidateRelocResultLocked(). runRelocPass snapshots it with the doodle
     // and re-checks it under the same mutex before publishing, so a solve that was in flight when the
-    // fingerprint changed never latches a pose in the old wall's frame. Guarded by mMutex.
-    uint64_t mFingerprintGeneration = 0;
+    // doodle changed never latches a pose in the old wall's frame. Guarded by mMutex.
+    uint64_t mDoodleGeneration = 0;
     // Test seam, null in production: runs on the solving thread after the solve and before the
-    // publish critical section, so a host test can replace the fingerprint at exactly the moment the
+    // publish critical section, so a host test can replace the doodle at exactly the moment the
     // race window is open. Set only through MobileGSTestPeer.
     std::function<void()> mBeforeRelocPublishHook;
-    float mFingerprintAnchorMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    // fx,fy,cx,cy the wall fingerprint's 3D points were built with; {0,..} => unset (use a default).
-    float mFingerprintIntrinsics[4] = {0,0,0,0};
+    float mDoodleAnchorMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    // fx,fy,cx,cy the wall doodle's 3D points were built with; {0,..} => unset (use a default).
+    float mDoodleIntrinsics[4] = {0,0,0,0};
     float mLiveIntrinsics[4] = {0,0,0,0}; // see setLiveIntrinsics; guarded by mMutex
-    // IMPLEMENTATION.md 4.5 — the design's rigid pose in the FINGERPRINT frame plus its
+    // IMPLEMENTATION.md 4.5 — the design's rigid pose in the DOODLE frame plus its
     // scale-included half-extents. Guarded by mMutex like everything else here, and false until
     // Kotlin has pushed a placement: absent means the corroboration match falls back to the global
     // search, which is Phase 4 turned off rather than Phase 4 guessing.
@@ -1015,11 +1015,11 @@ private:
     float mDesignHalfW = 0.0f;
     float mDesignHalfH = 0.0f;
     bool mHasDesignPlacement = false;
-    // VIO view matrix at fingerprint-capture time + flag; used to rectify oblique live views to the
-    // fingerprint's frontal frame before matching (perspective-robust matching). False for fingerprints
+    // VIO view matrix at doodle-capture time + flag; used to rectify oblique live views to the
+    // doodle's frontal frame before matching (perspective-robust matching). False for doodles
     // restored without a capture view (rectification is then skipped — plain matching still runs).
-    float mFingerprintViewMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    bool mHasFingerprintView = false;
+    float mDoodleViewMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    bool mHasDoodleView = false;
     // Teleological self-grow: default OFF + the last reloc seq we grew from (only grow on a fresh,
     // confident relock so promoted marks are placed with a current pose, never a stale one).
     //
@@ -1070,7 +1070,7 @@ private:
     bool mHasWallNormalEnu = false;
     int mWallNormalDisagree = 0; // (mMutex) consecutive locks that disagree with it
     // Written by updateLightLevel() on the caller's thread, read (unlocked) by the reloc worker
-    // thread in runRelocPass / getSuperPointFeatures / getFingerprintKeypoints / generateFingerprint
+    // thread in runRelocPass / getSuperPointFeatures / getDoodleKeypoints / generateDoodle
     // to decide whether to run the low-light enhancer. Atomic, like every other piece of cross-thread
     // scalar state in this class, rather than mMutex: the reads are on a hot per-frame path and this
     // is a single float with no invariant linking it to anything else the mutex protects.
@@ -1103,8 +1103,8 @@ private:
      */
     // NOT {0}: zero is kRelocOk, so a default-constructed engine would report a successful lock
     // before a single attempt had run and the overlay would read LOCKED on a wall it had never seen.
-    // kRelocNoFingerprint is the truthful starting state — there is no fingerprint until one is built.
-    std::atomic<int>        mLastRelocReject{kRelocNoFingerprint};
+    // kRelocNoDoodle is the truthful starting state — there is no doodle until one is built.
+    std::atomic<int>        mLastRelocReject{kRelocNoDoodle};
     std::atomic<int>        mLastRelocMatches{0};
     std::atomic<int>        mLastRelocInliers{0};
     std::atomic<int>        mLastRelocDetected{0};

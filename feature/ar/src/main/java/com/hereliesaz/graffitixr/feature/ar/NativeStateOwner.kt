@@ -21,12 +21,12 @@ package com.hereliesaz.graffitixr.feature.ar
  * Thread-safe; all methods are cheap.
  */
 internal class NativeStateOwner {
-    /** How a fingerprint loader run ended; see [finishLoad]. */
+    /** How a doodle loader run ended; see [finishLoad]. */
     enum class LoadExit {
         /** The run never reached the state writes, or threw / was cancelled after they may have begun. */
         ABANDONED,
 
-        /** The loaded fingerprint already described this project: native was not touched. */
+        /** The loaded doodle already described this project: native was not touched. */
         UNCHANGED,
 
         /** Native was rewritten for the project and the load reached its last step. */

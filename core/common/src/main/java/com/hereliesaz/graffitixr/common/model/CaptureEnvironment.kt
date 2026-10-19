@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
  * problem in three separate directions:
  *
  *  - **The capture geometry is frozen at capture.** `MetricMarks.backProjectToPlane` (SphereSLAM) runs once per target,
- *    so whatever frame relationship held at that instant is baked into the fingerprint's 3D points
+ *    so whatever frame relationship held at that instant is baked into the doodle's 3D points
  *    forever (`PAPER.md` §8). If a capture later turns out to be wrong, the only way to attribute it
  *    is to know the conditions it was made under — and those conditions were not recorded.
  *  - **`screenOrientation="fullUser"` respects the auto-rotate setting.** With rotation lock on, the

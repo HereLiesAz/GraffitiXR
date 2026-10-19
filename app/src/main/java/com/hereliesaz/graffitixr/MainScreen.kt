@@ -75,7 +75,7 @@ fun MainScreen(
     hasCameraPermission: Boolean,
     cameraController: androidx.camera.view.LifecycleCameraController,
     isExporting: Boolean = false,
-    // First-run DETECT stage: enables the renderer's tap-free auto-anchor so the fingerprint builder
+    // First-run DETECT stage: enables the renderer's tap-free auto-anchor so the doodle builder
     // has a pose to work against while it looks for the marks the user drew. The scribble itself is
     // NOT projected — it was drawn on the wall in the preceding step, so the overlay shows the user's
     // artwork throughout. Defaulted off — no effect on the normal path.
@@ -321,16 +321,16 @@ fun MainScreen(
 
                         // Painting progress is about WHAT is being painted, not display tone. Use
                         // the untoned design composite just like ARCore mode does. The standalone
-                        // fingerprint value is part of the key so a newly accepted wall page
+                        // doodle value is part of the key so a newly accepted wall page
                         // re-registers the same design against the new MobileGS wall frame.
                         LaunchedEffect(
                             standaloneDesign,
-                            arUiState.sphereSlamFingerprint,
+                            arUiState.sphereSlamDoodle,
                             arUiState.sphereSlamReferenceUri,
                         ) {
                             if (
                                 standaloneDesign != null &&
-                                arUiState.sphereSlamFingerprint != null
+                                arUiState.sphereSlamDoodle != null
                             ) {
                                 val guide = withContext(Dispatchers.Default) {
                                     compositeDesignForAr(standaloneDesign)
@@ -349,11 +349,11 @@ fun MainScreen(
                             cameraController = cameraController,
                             designBitmap = standaloneTexture,
                             slamManager = slamManager,
-                            mobileGsFingerprint = arUiState.sphereSlamFingerprint,
-                            mobileGsFingerprintFrameVersion =
-                                arUiState.sphereSlamFingerprintFrameVersion,
-                            mobileGsMapFromFingerprint =
-                                arUiState.sphereSlamMapFromFingerprint,
+                            mobileGsDoodle = arUiState.sphereSlamDoodle,
+                            mobileGsDoodleFrameVersion =
+                                arUiState.sphereSlamDoodleFrameVersion,
+                            mobileGsMapFromDoodle =
+                                arUiState.sphereSlamMapFromDoodle,
                             mobileGsWallFeatureMap = arUiState.sphereSlamWallFeatureMap,
                             mobileGsWallFeatureMapFrameVersion =
                                 arUiState.sphereSlamWallFeatureMapFrameVersion,
@@ -363,7 +363,7 @@ fun MainScreen(
                                 arUiState.sphereSlamReferencePhysicallyMetric,
                             persistedAtlasPages = arUiState.sphereSlamAtlasPages,
                             coopPeerSpatialFrame = arUiState.coopPeerSpatialFrame,
-                            coopPeerFingerprint = arUiState.coopPeerFingerprint,
+                            coopPeerDoodle = arUiState.coopPeerDoodle,
                             sharedTargetCapture = true,
                             // A co-op guest keeps the session's spatial frame: no re-targeting
                             // (ArViewModel.onScreenTap ignores its taps).
@@ -431,7 +431,7 @@ fun MainScreen(
                                 arViewModel.onStandalonePhotosphereKeyframe(keyframe)
                             },
                             onMapFromFingerprintSolved = { mapFromFingerprint ->
-                                arViewModel.onStandaloneMapFromFingerprintSolved(mapFromFingerprint)
+                                arViewModel.onStandaloneMapFromDoodleSolved(mapFromFingerprint)
                             },
                             depthEstimator = arViewModel.standaloneDepthEstimatorOrNull(),
                             sweepCoverage = sweepCoverageValue,

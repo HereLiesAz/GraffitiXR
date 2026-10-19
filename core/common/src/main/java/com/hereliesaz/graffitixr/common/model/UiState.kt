@@ -18,7 +18,7 @@ data class EvalLiveMetrics(
     // array rendered as a measured 0.0 ms reloc cost.
     val stageMs: FloatArray = FloatArray(5) { -1f },
     val batteryMa: Float = 0f,
-    val wallCount: Int = 0, // live wall-fingerprint point count (reloc health / self-grow watch)
+    val wallCount: Int = 0, // live wall-doodle point count (reloc health / self-grow watch)
 )
 
 /** A tapped wall mark: normalized screen coords (0..1) plus the camera→point range in meters
@@ -41,7 +41,7 @@ data class ArUiState(
     val isScanning: Boolean = false,
     val splatCount: Int = 0,
     val isTargetDetected: Boolean = false,
-    // True once a target fingerprint has been saved to the current project.
+    // True once a target doodle has been saved to the current project.
     // Controls whether artwork is rendered in AR space (via OverlayRenderer).
     val isAnchorEstablished: Boolean = false,
     /** AR Measure tool state; see [MeasureUi]. */
@@ -125,17 +125,17 @@ data class ArUiState(
      * How and where the device was held when the active target was captured.
      *
      * Null until a capture happens this session. Persisted onto the project at save, because the
-     * conditions a fingerprint was built under are not recoverable from the fingerprint.
+     * conditions a doodle was built under are not recoverable from the doodle.
      */
     val targetCaptureEnvironment: CaptureEnvironment? = null,
     /**
-     * Set when a saved wall fingerprint was refused at load because it predates Phase 0 and its 3D
+     * Set when a saved wall doodle was refused at load because it predates Phase 0 and its 3D
      * points are in the sensor frame with no recorded capture rotation (IMPLEMENTATION.md 0.7).
      *
      * Surfaced so the artist is told to re-capture rather than left wondering why the overlay never
      * locks onto a target the app appears to have loaded.
      */
-    val legacyFingerprintRefused: Boolean = false,
+    val legacyDoodleRefused: Boolean = false,
     /**
      * Set when the artwork's footprint leaves too little bare wall around it for the reloc PnP to
      * localize against (`IMPLEMENTATION.md` 2.8, `PARAMETERS.md` §4 `MIN_BACKBONE`).
@@ -277,8 +277,8 @@ data class ArUiState(
     val coverageGlow: CoverageGlowAppearance = CoverageGlowAppearance.DEFAULT,
     /** Settings → Anticipation: the half-sphere of views the trackers relock from, and its throttle. */
     val anticipation: AnticipationSettings = AnticipationSettings.DEFAULT,
-    /** Settings → Fingerprint: what the next target's fingerprint is made of. */
-    val fingerprintFeatures: FingerprintFeatures = FingerprintFeatures.DEFAULT,
+    /** Settings → Doodle: what the next target's doodle is made of. */
+    val doodleFeatures: DoodleFeatures = DoodleFeatures.DEFAULT,
 
     // True once ARCore has been confirmed installed and supported on this device and the artist has
     // "Use ARCore" on (re-derived the moment that setting changes).
@@ -312,15 +312,15 @@ data class ArUiState(
      */
     val isSphereSlamReferenceRegistered: Boolean = false,
     val sphereSlamAnchorGeneration: Long = 0L,
-    val sphereSlamAnchorFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+    val sphereSlamAnchorFrameVersion: Int = SPHERE_SLAM_DOODLE_FRAME_VERSION,
     val sphereSlamPlacementAnchorGeneration: Long = 0L,
-    // Separate from the ARCore/capture-camera fingerprint; see GraffitiProject.sphereSlamFingerprint.
-    val sphereSlamFingerprint: Fingerprint? = null,
-    val sphereSlamFingerprintFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
-    /** Column-major GL map_from_fingerprint; empty until the precision target is localized in-map. */
-    val sphereSlamMapFromFingerprint: List<Float> = emptyList(),
+    // Separate from the ARCore/capture-camera doodle; see GraffitiProject.sphereSlamDoodle.
+    val sphereSlamDoodle: Doodle? = null,
+    val sphereSlamDoodleFrameVersion: Int = SPHERE_SLAM_DOODLE_FRAME_VERSION,
+    /** Column-major GL map_from_doodle; empty until the precision target is localized in-map. */
+    val sphereSlamMapFromDoodle: List<Float> = emptyList(),
     val sphereSlamWallFeatureMap: WallFeatureMap? = null,
-    val sphereSlamWallFeatureMapFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
+    val sphereSlamWallFeatureMapFrameVersion: Int = SPHERE_SLAM_DOODLE_FRAME_VERSION,
     val sphereSlamAtlasPages: List<SphereSlamAtlasPage> = emptyList(),
 
     // Mirrors the runtime camera permission state so AR overlays can react without
@@ -343,7 +343,7 @@ data class ArUiState(
      * network session and are cleared on leave.
      */
     val coopPeerSpatialFrame: CoopSpatialFrame? = null,
-    val coopPeerFingerprint: ByteArray? = null,
+    val coopPeerDoodle: ByteArray? = null,
     val showCoopNotFoundDialog: Boolean = false,
 
     // ── Enhanced Diagnostics ──────────────
@@ -398,19 +398,19 @@ data class ArUiState(
      */
     val hybridKpmDiagnostics: HybridKpmDiagnostics = HybridKpmDiagnostics(),
     /**
-     * How many 3D points the live wall fingerprint holds — 0 when there is none.
+     * How many 3D points the live wall doodle holds — 0 when there is none.
      *
      * The direct answer to "did the target actually get built", read straight from the engine
      * rather than inferred from [relocDiagnostics], which is stale until the reloc thread has run at
      * least once and therefore cannot be trusted in the seconds right after a capture.
      *
      * Exists because "TARGET ESTABLISHED" was gated on [isAnchorEstablished] — an ARCore anchor,
-     * which says nothing about the fingerprint. A capture whose back-projection produced no usable
+     * which says nothing about the doodle. A capture whose back-projection produced no usable
      * points still lit the success banner, and the artist was told to go ahead and paint against an
      * overlay that could only ever drift. The failure was fully diagnosable in the engine and the UI
      * asserted the opposite.
      */
-    val wallFingerprintPoints: Int = 0,
+    val wallDoodlePoints: Int = 0,
 )
 
 enum class CoopRole { NONE, HOST, GUEST }
@@ -429,9 +429,9 @@ enum class ScanPhase { AMBIENT, WALL, COMPLETE }
  * Computed in the UI from [ArUiState.isAnchorEstablished] + [ArUiState.paintingProgress].
  */
 enum class RelocState {
-    /** No fingerprint loaded — target not yet confirmed. */
+    /** No doodle loaded — target not yet confirmed. */
     IDLE,
-    /** Fingerprint active, PnP running, but no features matched yet. */
+    /** Doodle active, PnP running, but no features matched yet. */
     SEARCHING,
     /** At least some artwork features are visible and matched. */
     TRACKING

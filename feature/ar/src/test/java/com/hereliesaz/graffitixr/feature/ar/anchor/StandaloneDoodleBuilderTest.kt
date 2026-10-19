@@ -9,7 +9,7 @@ import org.junit.Test
 import org.opencv.core.CvType
 import com.hereliesaz.sphereslam.PhotosphereFingerprintFrame
 
-class StandaloneFingerprintBuilderTest {
+class StandaloneDoodleBuilderTest {
 
     @Test
     fun assemble_placesEveryDescriptorOnCenteredKpmPagePlane() {
@@ -30,8 +30,8 @@ class StandaloneFingerprintBuilderTest {
         )
         val descriptors = ByteArray(rows * 4) { it.toByte() }
 
-        val fp = StandaloneFingerprintBuilder.assemble(
-            detected = StandaloneFingerprintBuilder.DetectedFeatures(
+        val fp = StandaloneDoodleBuilder.assemble(
+            detected = StandaloneDoodleBuilder.DetectedFeatures(
                 positions = positions,
                 descriptorsData = descriptors,
                 rows = rows,
@@ -83,8 +83,8 @@ class StandaloneFingerprintBuilderTest {
         )
         val descriptors = ByteArray(10 * 2) { it.toByte() }
 
-        val fp = StandaloneFingerprintBuilder.assemble(
-            StandaloneFingerprintBuilder.DetectedFeatures(
+        val fp = StandaloneDoodleBuilder.assemble(
+            StandaloneDoodleBuilder.DetectedFeatures(
                 positions, descriptors, 10, 2, CvType.CV_8U,
             ),
             width,
@@ -114,8 +114,8 @@ class StandaloneFingerprintBuilderTest {
     @Test
     fun assemble_refusesTooFewValidRows() {
         val geometry = SphereSlamPoseMath.pageGeometry(10, 10, 100f)
-        val fp = StandaloneFingerprintBuilder.assemble(
-            StandaloneFingerprintBuilder.DetectedFeatures(
+        val fp = StandaloneDoodleBuilder.assemble(
+            StandaloneDoodleBuilder.DetectedFeatures(
                 positions = FloatArray(7 * 2) { 2f },
                 descriptorsData = ByteArray(7 * 4),
                 rows = 7,

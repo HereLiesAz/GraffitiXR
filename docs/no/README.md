@@ -6,7 +6,7 @@ Så jeg lager noe bedre ved å gjenbruke (det de innvidde kaller) rutenettmetode
 
 Så, nå, det er hva disse krotene gjør.
 
-Jeg måtte finne opp en tilpasset **fingerprinted relocalizer** som fungerer på Android uten hjelp fra skyen — fordi graffiti er, som du vet, ulovlig. Når du låser deg til en vegg, fanger appen et OpenCV-feature-**fingeravtrykk** av merkene dine — deskriptorer pluss en håndfull trianguerte 3D-punkter. Selv etter tap av sporing eller at skjermen har vært av, sammenligner motoren live kamerabildet med det fingeravtrykket og løser posisjonen (PnP) for å **klikke tilbake** og rette opp veggmaleriet ditt mot veggen igjen, på millisekunder — ingen sky, og ingen forhåndsskanning av hele rommet.
+Jeg måtte finne opp en tilpasset **doodled relocalizer** som fungerer på Android uten hjelp fra skyen — fordi graffiti er, som du vet, ulovlig. Når du låser deg til en vegg, fanger appen et OpenCV-feature-**fingeravtrykk** av merkene dine — deskriptorer pluss en håndfull trianguerte 3D-punkter. Selv etter tap av sporing eller at skjermen har vært av, sammenligner motoren live kamerabildet med det fingeravtrykket og løser posisjonen (PnP) for å **klikke tilbake** og rette opp veggmaleriet ditt mot veggen igjen, på millisekunder — ingen sky, og ingen forhåndsskanning av hele rommet.
 
 Og jeg fulgte det opp med det jeg kaller **Teleological SLAM** — siden vi vet hvordan resultatet skal se ut, bruker jeg OpenCV til å se etter fremgangen din, noe som betyr at jo lenger du har kommet, desto tettere fester overlegget seg til veggen. Uten dette ville du dekket disse merkene med selve maleriet, noe som gjør appen mindre nøyaktig etter hvert som du går. Det er akkurat der andre lignende apper virkelig svikter.
 
@@ -18,7 +18,7 @@ Og så er det en solid samling relevante designverktøy for å klargjøre det en
 
 ## Nøkkelfunksjoner
 *   **Offline-First:** Ingen skyavhengigheter for noe appen gjør — sporing, rendering og designarbeid er alt lokalt. Det eneste som noensinne forlater enheten, er en krasjrapport, og den er opt-in og av som standard (Innstillinger > Krasjrapporter); se [`docs/en/PRIVACY_POLICY.md`](../en/PRIVACY_POLICY.md).
-*   **Fingerprint Relocalization:** en native C++17 OpenCV-pipeline (ORB/SuperPoint-deskriptorer + PnP/RANSAC) tar et fingeravtrykk av merkene du tegner på veggen, og klikker overlegget tilbake på plass etter tap av sporing — helt offline, ingen forhåndsskanning av rommet.
+*   **Doodle Relocalization:** en native C++17 OpenCV-pipeline (ORB/SuperPoint-deskriptorer + PnP/RANSAC) tar et fingeravtrykk av merkene du tegner på veggen, og klikker overlegget tilbake på plass etter tap av sporing — helt offline, ingen forhåndsskanning av rommet.
 *   **Klar for lomma (eksperimentelt, av som standard):** driftkorreksjon og et selv-utvidende fingeravtrykk (slik at tilbake-klikk kan overleve at den opprinnelige referansen males over) finnes og kan slås på fra Innstillinger > diagnostisk overlegg, men ingen av delene er validert på ekte maskinvare ennå — se [Teleological SLAM](../TELEOLOGICAL_SLAM.md).
 *   **Dual-Lens Aware:** velger automatisk maskinvare-stereodybde på enheter som støtter det; andre enheter sporer via ARCores monokulære posisjonsestimat, uten separat dybdemåling.
 *   **Co-op-modus:** kryptert, QR-parret sesjonsdeling, slik at en medarbeider kan følge vertens live lerret i AR. For øyeblikket bare vert → gjest — en gjests egne redigeringer synkroniseres ikke tilbake ennå.

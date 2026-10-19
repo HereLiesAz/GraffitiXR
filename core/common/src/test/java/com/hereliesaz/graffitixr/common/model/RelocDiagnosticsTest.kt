@@ -13,7 +13,7 @@ class RelocDiagnosticsTest {
     @Test
     fun `reject ordinals match the native contract`() {
         assertEquals(0, RelocReject.OK.ordinal)
-        assertEquals(1, RelocReject.NO_FINGERPRINT.ordinal)
+        assertEquals(1, RelocReject.NO_DOODLE.ordinal)
         assertEquals(2, RelocReject.DISABLED.ordinal)
         assertEquals(3, RelocReject.NO_FEATURES.ordinal)
         assertEquals(4, RelocReject.FEW_MATCHES.ordinal)
@@ -111,7 +111,7 @@ class RelocDiagnosticsTest {
     }
 
     /**
-     * A legacy (unpartitioned) fingerprint is the all-backbone case, so it reports its full point
+     * A legacy (unpartitioned) doodle is the all-backbone case, so it reports its full point
      * count — not zero, and not the sentinel. The native side computes it; this pins the
      * three-way distinction the field has to carry.
      */
@@ -121,7 +121,7 @@ class RelocDiagnosticsTest {
         val empty = RelocDiagnostics(RelocReject.FEW_MATCHES, backboneFeatures = 0)
         val unmeasured = RelocDiagnostics()
         assertEquals(3, setOf(legacy, empty, unmeasured).map { it.backboneFeatures }.toSet().size)
-        assertTrue("a legacy fingerprint is all backbone, not none", legacy.backboneFeatures > 0)
+        assertTrue("a legacy doodle is all backbone, not none", legacy.backboneFeatures > 0)
     }
 
     /**

@@ -22,10 +22,10 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
  *     a hybrid page ready the correction is held ([Source.HOLD]); with neither source the raw
  *     backbone is used ([Source.NONE]).
  *
- * **Reloc gate.** While a re-capture is replacing the wall fingerprint (`relocGated`) the reloc
+ * **Reloc gate.** While a re-capture is replacing the wall doodle (`relocGated`) the reloc
  * result and `captureAnchorCam` describe the PREVIOUS wall. The reloc path is then unusable no matter
  * what else is true — [Source.RELOC] is never returned — so a later solve cannot cold-snap the new
- * anchor onto the old wall. Hybrid still works (its page is independent of the fingerprint).
+ * anchor onto the old wall. Hybrid still works (its page is independent of the doodle).
  *
  * So the handover is one-way and timed: reloc until hybrid first accepts, hybrid while it keeps
  * accepting, reloc again only after hybrid has been unavailable for the full window. No frame-by-frame
@@ -52,8 +52,8 @@ class CorrectionSourceArbiter {
      * @param hybridAccepted a hybrid observation passed its quality gates this frame
      * @param hybridFrameReady a metric KPM page is loaded and could produce observations
      * @param hasRelocCapturePose `captureAnchorCam` exists (the reloc path can compose a correction)
-     * @param relocGated the wall fingerprint is being replaced (a re-capture's anchor exists but its
-     *   new fingerprint and `captureAnchorCam` are not both installed yet): reloc must not drive
+     * @param relocGated the wall doodle is being replaced (a re-capture's anchor exists but its
+     *   new doodle and `captureAnchorCam` are not both installed yet): reloc must not drive
      */
     fun select(
         nowNs: Long,

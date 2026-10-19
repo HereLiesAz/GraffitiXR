@@ -17,5 +17,5 @@
 # reachability edge for that JNI lookup, so without this a minified consumer app that doesn't
 # separately declare this rule would strip the constructor and GetMethodID would return null at
 # runtime ("JNI DETECTED ERROR IN APPLICATION: mid == null") -- same failure mode as the
-# Fingerprint.fromNative binding documented in core/common/consumer-rules.pro.
+# Doodle.fromNative binding documented in core/common/consumer-rules.pro.
 -keep class org.opencv.core.KeyPoint { *; }

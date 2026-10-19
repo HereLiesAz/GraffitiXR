@@ -8,7 +8,7 @@ package com.hereliesaz.graffitixr.feature.ar
  * This file was GraffitiXR's local copy of the lock/reacquire/bridge/lost state machine. The generic
  * logic moved into the published library (`:reloc`) so every SphereSLAM consumer shares it; these
  * aliases keep GraffitiXR's domain vocabulary (`StandaloneTrackingState`, …) while the implementation
- * is the library's. The proprietary fingerprint reloc still layers on top, unchanged.
+ * is the library's. The proprietary doodle reloc still layers on top, unchanged.
  *
  * @see com.hereliesaz.sphereslam.reloc.TrackingStateMachine
  */

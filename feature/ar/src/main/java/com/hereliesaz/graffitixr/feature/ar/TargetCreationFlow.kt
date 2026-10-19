@@ -249,7 +249,7 @@ private fun ShutterButton(saved: Boolean, onClick: () -> Unit, modifier: Modifie
  * Tap a mark to remove it, or drag across marks to remove each one the finger passes over;
  * removeMarkAt() flood-fills the WHOLE touched mark out of annotatedCaptureBitmap. The native
  * engine reads the alpha channel of that bitmap as its detection mask (opaque = detect,
- * transparent = skip), so a removed mark stops contributing to the fingerprint automatically.
+ * transparent = skip), so a removed mark stops contributing to the doodle automatically.
  *
  * On confirm, annotatedCaptureBitmap is passed directly as the selection mask.
  */
@@ -290,7 +290,7 @@ private fun FeatureSelectionReview(
                 .background(Color.Black.copy(alpha = 0.6f))
         )
 
-        // -- Highlighted marks (the whole-mark fingerprint mask), always shown --
+        // -- Highlighted marks (the whole-mark doodle mask), always shown --
         annotatedBitmap?.let { bmp ->
             val image = remember(bmp) { bmp.asImageBitmap() }
             Image(

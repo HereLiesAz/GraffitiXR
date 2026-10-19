@@ -15,8 +15,8 @@ import org.junit.Test
  * first invocation — which is user-visible as a broken target capture. Locking the descriptor
  * here means signature drift fails the JVM test suite instead of only breaking at runtime.
  *
- * Mirrors the guard on `Fingerprint.fromNative` (FingerprintJniContractTest in core:common) — the
- * same class of bug shipped twice for Fingerprint before the frozen ABI was added.
+ * Mirrors the guard on `Doodle.fromNative` (DoodleJniContractTest in core:common) — the
+ * same class of bug shipped twice for Doodle before the frozen ABI was added.
  */
 class YuvConverterContractTest {
 

@@ -116,7 +116,7 @@ class HomographyOverlayRenderer(
         )
     )
 
-    /** Explicit base-map placement of the fingerprint/artwork plane. Null = no truthful anchor yet. */
+    /** Explicit base-map placement of the doodle/artwork plane. Null = no truthful anchor yet. */
     private val mapFromFingerprint =
         java.util.concurrent.atomic.AtomicReference<FloatArray?>(null)
     private val localModel4 = FloatArray(16).also { Matrix.setIdentityM(it, 0) }
@@ -277,12 +277,12 @@ class HomographyOverlayRenderer(
     }
 
     /**
-     * Place the fingerprint-local artwork plane into SphereSLAM's persistent map frame.
+     * Place the doodle-local artwork plane into SphereSLAM's persistent map frame.
      *
      * The renderer fails closed when this is null/invalid; drawing at map origin would silently make
-     * the fingerprint the world frame again.
+     * the doodle the world frame again.
      */
-    fun setMapFromFingerprint(value: FloatArray?) {
+    fun setMapFromDoodle(value: FloatArray?) {
         mapFromFingerprint.set(
             value?.takeIf { it.size == 16 && it.all(Float::isFinite) }?.copyOf()
         )
@@ -353,7 +353,7 @@ class HomographyOverlayRenderer(
         val projection = displayProjectionFor(frame.frameIntrinsics) ?: return
 
         // The camera pose is camera_from_map. The design therefore needs the explicit
-        // map_from_fingerprint model anchor before its artist-controlled local adjustment.
+        // map_from_doodle model anchor before its artist-controlled local adjustment.
         val anchor = mapFromFingerprint.get() ?: return
         val t = transform.get()
         Matrix.setIdentityM(localModel4, 0)

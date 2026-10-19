@@ -86,8 +86,8 @@ The new model is about 5–10% slower because of the 10 unfolded BatchNorm layer
 
 ## Compatibility
 The new descriptors differ from the old ones (mean cosine about −0.17), so SuperPoint data saved with the old model is stale. That means every `descriptorsType == 5` (CV_32F) blob in GraffitiXR `project.json`, in these fields:
-- `fingerprint`
-- `sphereSlamFingerprint`
+- `doodle`
+- `sphereSlamDoodle`
 - `wallFeatureMap`
 - `sphereSlamWallFeatureMap`
 - `paintMarks`

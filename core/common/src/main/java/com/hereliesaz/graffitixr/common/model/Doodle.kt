@@ -8,7 +8,7 @@ import org.opencv.core.KeyPoint
  * Now includes 3D points for Perspective-n-Point (PnP) relocalization.
  */
 @Serializable
-data class Fingerprint(
+data class Doodle(
     val keypoints: List<@Serializable(with = com.hereliesaz.graffitixr.common.serialization.KeyPointSerializer::class) org.opencv.core.KeyPoint>,
     // 3D coordinates relative to the anchor at capture time.
     // Flattened list [x0, y0, z0, x1, y1, z1...] for serialization efficiency.
@@ -20,7 +20,7 @@ data class Fingerprint(
     // Canonical 256x256 raw-gray patch of the marks (row-major) for the distortion head. Empty when
     // the head isn't in use. Defaulted so older saved projects deserialize unchanged.
     val patchData: ByteArray = ByteArray(0),
-    // Marks centroid [x,y,z] in the fingerprint anchor's local frame, so the AR overlay can re-center
+    // Marks centroid [x,y,z] in the doodle anchor's local frame, so the AR overlay can re-center
     // on the marks after a project reload (when the builder doesn't run). Empty when unavailable;
     // defaulted so older saved projects deserialize unchanged.
     val markCenterLocal: List<Float> = emptyList(),
@@ -28,10 +28,10 @@ data class Fingerprint(
      * `rotationNeeded` the capture was taken under — 0/90/180/270 — or **-1 when unknown**
      * (`IMPLEMENTATION.md` 0.7).
      *
-     * `-1` means the fingerprint predates Phase 0, so its 3D points are in the *sensor* camera
+     * `-1` means the doodle predates Phase 0, so its 3D points are in the *sensor* camera
      * frame while everything that consumes them now assumes *display*. That is the `PAPER.md` §8
      * mismatch, frozen into a saved file: the points cannot be repaired after the fact because the
-     * rotation that produced them was never recorded. Such a fingerprint must be re-captured, not
+     * rotation that produced them was never recorded. Such a doodle must be re-captured, not
      * silently reloaded — see [isLegacyFrame].
      *
      * Adding this field is safe for the native path specifically because JNI constructs through the
@@ -44,7 +44,7 @@ data class Fingerprint(
      * `IMPLEMENTATION.md` Phase 2 — one byte per 3D point, holding `Footprint.Region.ordinal`:
      * the point's position relative to the design's projected footprint at capture.
      *
-     * **Empty means legacy "all backbone"**, not "all inside". A fingerprint saved before Phase 2
+     * **Empty means legacy "all backbone"**, not "all inside". A doodle saved before Phase 2
      * has no partition, and the safe reading is that every point is load-bearing — treating them as
      * corroboration-only would exclude the entire map from the reloc PnP and the target would never
      * lock at all. Consumers must branch on `regions.isEmpty()` rather than indexing blindly.
@@ -71,7 +71,7 @@ data class Fingerprint(
     val captureHalfW: Float = -1f,
     val captureHalfH: Float = -1f,
     /**
-     * The fingerprint **anchor's** pose expressed in the capture camera frame — `V_cv · A`, where
+     * The doodle **anchor's** pose expressed in the capture camera frame — `V_cv · A`, where
      * `V_cv` is the capture's CV-convention world→camera view and `A` the anchor's world pose
      * (column-major 4x4, 16 floats). Empty when unknown.
      *
@@ -94,7 +94,7 @@ data class Fingerprint(
      * Stored unconditionally at capture, **including when no design is placed yet**. That case is
      * not an edge case: target creation is what *establishes* the anchor the artwork will sit on, so
      * on a first capture there is no artwork to partition against. Recording this now is what lets
-     * the partition be computed later, the moment the design does land, instead of the fingerprint
+     * the partition be computed later, the moment the design does land, instead of the doodle
      * being permanently unpartitionable.
      */
     val captureAnchorCam: List<Float> = emptyList(),
@@ -111,10 +111,10 @@ data class Fingerprint(
     val pinned: ByteArray = ByteArray(0),
 ) {
     init {
-        // Defensive: a corrupt or truncated project file must never construct a Fingerprint whose
+        // Defensive: a corrupt or truncated project file must never construct a Doodle whose
         // descriptor blob disagrees with its declared dims — the native restore (GraffitiJNI) wraps
         // this blob in a cv::Mat, so a short blob would read out of bounds. Mirrors WallFeatureMap's
-        // guards. Empty optional arrays (older projects, or a keypoint-only fingerprint) are allowed.
+        // guards. Empty optional arrays (older projects, or a keypoint-only doodle) are allowed.
         require(descriptorsRows >= 0 && descriptorsCols >= 0) { "descriptor dims must be non-negative" }
         require(points3d.isEmpty() || points3d.size % 3 == 0) {
             "points3d (${points3d.size}) must be a flat list of [x,y,z] triplets"
@@ -158,7 +158,7 @@ data class Fingerprint(
         }
     }
 
-    /** True when this fingerprint carries no partition — a pre-Phase-2 capture. See [regions]. */
+    /** True when this doodle carries no partition — a pre-Phase-2 capture. See [regions]. */
     fun isUnpartitioned(): Boolean = regions.isEmpty()
 
     /**
@@ -166,7 +166,7 @@ data class Fingerprint(
      *
      * The artist pinching the design mid-session is normal, and the right response is to recompute
      * the regions from the stored 3D points (a cheap pure-Kotlin pass) rather than force a
-     * re-capture. An unpartitioned or extent-less fingerprint is never "stale" — there is nothing to
+     * re-capture. An unpartitioned or extent-less doodle is never "stale" — there is nothing to
      * recompute against.
      */
     fun isPartitionStale(halfW: Float, halfH: Float, eps: Float = 1e-4f): Boolean {
@@ -176,10 +176,10 @@ data class Fingerprint(
     }
 
     /**
-     * True when this fingerprint carries metric 3D points but no record of the rotation they were
+     * True when this doodle carries metric 3D points but no record of the rotation they were
      * built under — i.e. it was saved before Phase 0 and its geometry is skewed by `PAPER.md` §8.
      *
-     * Keyed on [points3d] being non-empty deliberately: a descriptors-only fingerprint has no 3D to
+     * Keyed on [points3d] being non-empty deliberately: a descriptors-only doodle has no 3D to
      * be wrong about, so it is not legacy in this sense and must not be refused.
      */
     fun isLegacyFrame(): Boolean = points3d.isNotEmpty() && captureRotationDeg < 0
@@ -187,9 +187,9 @@ data class Fingerprint(
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
-        other as Fingerprint
+        other as Doodle
         // OpenCV's KeyPoint has no value-based equals(), so a plain List<KeyPoint> comparison is
-        // reference-based and returns false for structurally-identical fingerprints. Compare
+        // reference-based and returns false for structurally-identical doodles. Compare
         // field-wise to honour the value-equality this override already provides for the ByteArrays.
         if (!keypointsValueEqual(keypoints, other.keypoints)) return false
         if (points3d != other.points3d) return false
@@ -201,7 +201,7 @@ data class Fingerprint(
         if (markCenterLocal != other.markCenterLocal) return false
         // The Phase-0/Phase-2 fields belong here for one concrete reason: a persistence round-trip
         // test asserts `decoded == original`, and a field missing from equals makes that assertion
-        // pass whether or not the field survived serialization. Two fingerprints differing only in
+        // pass whether or not the field survived serialization. Two doodles differing only in
         // which frame their points are in, or in how their points are partitioned, are not equal.
         if (captureRotationDeg != other.captureRotationDeg) return false
         if (!regions.contentEquals(other.regions)) return false
@@ -232,20 +232,20 @@ data class Fingerprint(
 
     companion object {
         /**
-         * FROZEN JNI ABI — `buildFingerprintObject` in GraffitiJNI.cpp constructs Fingerprints
+         * FROZEN JNI ABI — `buildDoodleObject` in GraffitiJNI.cpp constructs Doodles
          * through [fromNative] by this exact name/descriptor. The raw constructor must never be
          * used from JNI: Kotlin default parameters don't emit reduced-arity JVM overloads, so
          * every field added to the data class silently broke the native lookup (twice now:
-         * patchData, then markCenterLocal) and setWallFingerprint returned null on every capture.
+         * patchData, then markCenterLocal) and setWallDoodle returned null on every capture.
          *
-         * Never change [fromNative]'s signature. Add new Fingerprint fields with defaults and,
+         * Never change [fromNative]'s signature. Add new Doodle fields with defaults and,
          * if native code must supply them, introduce a NEW factory with its own frozen descriptor.
-         * FingerprintJniContractTest asserts the descriptor below matches the compiled method.
+         * DoodleJniContractTest asserts the descriptor below matches the compiled method.
          */
         const val JNI_FACTORY_NAME = "fromNative"
         const val JNI_FACTORY_DESCRIPTOR =
             "(Ljava/util/List;Ljava/util/List;[BIII[BLjava/util/List;)" +
-                "Lcom/hereliesaz/graffitixr/common/model/Fingerprint;"
+                "Lcom/hereliesaz/graffitixr/common/model/Doodle;"
 
         @JvmStatic
         fun fromNative(
@@ -257,7 +257,7 @@ data class Fingerprint(
             descriptorsType: Int,
             patchData: ByteArray,
             markCenterLocal: List<Float>,
-        ): Fingerprint = Fingerprint(
+        ): Doodle = Doodle(
             keypoints = keypoints,
             points3d = points3d,
             descriptorsData = descriptorsData,

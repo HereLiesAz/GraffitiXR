@@ -19,7 +19,7 @@ matters more than the individual fixes.
 **In the code** — two shipping bugs the documents had asserted were fine:
 `mSelfGrowEnabled` defaulted to `true`, so the only mechanism that permanently
 mutates the reloc map ran unsupervised in every release build while five separate
-places said it defaulted off; and `clearWallFingerprint()` never cleared the
+places said it defaulted off; and `clearWallDoodle()` never cleared the
 artwork validator, so a project switch left the previous project's target driving
 this project's painting progress and correction strength.
 
@@ -75,7 +75,7 @@ What has been settled without one:
   not the geometry, because it evaluates `backProject`'s own expression.
 - E0b's independent variable is now logged per CSV row, as
   `captureRotationNeededDeg`. It previously was not logged at all. Note it is the
-  rotation at **capture** — the mismatch is baked into the fingerprint's 3D points
+  rotation at **capture** — the mismatch is baked into the doodle's 3D points
   there and does not change with how the device is held afterwards. A first
   attempt logged the live per-tick rotation, which files a portrait-captured,
   landscape-relocalized run under the control condition and turns a real effect

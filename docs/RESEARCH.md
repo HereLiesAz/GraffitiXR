@@ -185,8 +185,8 @@ permissiveness is *why* the ecosystem exploded and why other editors run the sam
   different licenses. Precedence, most-specific first: per-file SPDX header > module `LICENSE` >
   `LICENSING.md` > root `LICENSE`.
 - **The moat leaks across module lines.** The teleological engine is not contained in `:core:nativebridge`;
-  significant algorithm code is Kotlin in `feature/ar/anchor/` (`MetricFingerprintBuilder`, `PoseFusion`)
-  and `feature/ar/eval/` (`DriftCostProbe`), plus the `Fingerprint`/`WallFeatureMap` models and serializers
+  significant algorithm code is Kotlin in `feature/ar/anchor/` (`MetricDoodleBuilder`, `PoseFusion`)
+  and `feature/ar/eval/` (`DriftCostProbe`), plus the `Doodle`/`WallFeatureMap` models and serializers
   in `core:common`, plus the method docs. The protective (NC) boundary must cover that whole set, not just
   the C++.
 - **The one rule that keeps the open layer from leaking the moat:** the MIT extension API exposes only

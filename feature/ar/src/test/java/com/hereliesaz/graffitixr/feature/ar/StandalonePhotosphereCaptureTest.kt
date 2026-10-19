@@ -7,7 +7,7 @@ import org.junit.Test
 
 /**
  * The app-owned half of the capture seam: which input is missing and the artist-facing message.
- * Choosing the capture view and placing the fingerprint are SphereSLAM's
+ * Choosing the capture view and placing the doodle are SphereSLAM's
  * (`PhotosphereKeyframeStore.view`, `PhotosphereFingerprintFrame.placement`) and tested there.
  */
 class StandalonePhotosphereCaptureTest {

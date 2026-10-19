@@ -27,7 +27,7 @@ Basis legend:
 | Parameter | Location | Current | Basis | Sweep? | Set by |
 |---|---|---|---|---|---|
 | Reloc Lowe ratio | `MobileGS.cpp:310,403,697,774` | `0.75` | conventional | fixed | — |
-| ORB feature count (query) | `MobileGS.cpp:86` | `1500` | derived — symmetry with the fingerprint side; the comment at `:80` is an argument, not an observation | screen | E4 → E11 |
+| ORB feature count (query) | `MobileGS.cpp:86` | `1500` | derived — symmetry with the doodle side; the comment at `:80` is an argument, not an observation | screen | E4 → E11 |
 | ORB feature count (artwork) | `MobileGS.cpp:1094` | `1500` | derived — must match the query side for the type-compatible match | fixed | — |
 | CLAHE clip limit | `MobileGS.cpp:25` | `2.0` | conventional | screen | E4 |
 | CLAHE tile grid | `MobileGS.cpp:25` | `8×8` | conventional | fixed | — |
@@ -131,9 +131,9 @@ one is still a **prior**, not a measurement: E8 is the experiment that sets them
 
 | Parameter | Location | Current | Prior it shipped as | Basis | Set by |
 |---|---|---|---|---|---|
-| `DEFAULT_INNER_MARGIN` | `FingerprintPartition.kt` | `0.04` | `0.05` | guessed — a few per cent of the design's half-extent, of the order of a brush width at mural scale | E8 |
-| `DEFAULT_OUTER_MARGIN` | `FingerprintPartition.kt` | `0.10` | `0.15` | guessed — wider than inner, because overspray extends past the design and a doomed feature in `F_out` is worse than a discarded one | E8 |
-| `MIN_BACKBONE` | `FingerprintPartition.kt` | `40` | `40` | guessed — 5× the native PnP correspondence floor of 8, leaving room for the match rate | E8 |
+| `DEFAULT_INNER_MARGIN` | `DoodlePartition.kt` | `0.04` | `0.05` | guessed — a few per cent of the design's half-extent, of the order of a brush width at mural scale | E8 |
+| `DEFAULT_OUTER_MARGIN` | `DoodlePartition.kt` | `0.10` | `0.15` | guessed — wider than inner, because overspray extends past the design and a doomed feature in `F_out` is worse than a discarded one | E8 |
+| `MIN_BACKBONE` | `DoodlePartition.kt` | `40` | `40` | guessed — 5× the native PnP correspondence floor of 8, leaving room for the match rate | E8 |
 
 **The margins shipped at values this table did not predict, and the reason is not
 flattering.** They came in at `0.04` / `0.10` against a pre-registered `0.05` /
@@ -153,7 +153,7 @@ It is checked **when the artwork is placed or resized, not at capture**. Target
 creation is what establishes the anchor the artwork sits on, so a capture has no
 footprint to measure and cannot answer the question at all — an earlier cut of
 Phase 2 put the check there and it could never fire. For the same reason it is
-independent of `MetricFingerprintBuilder`'s `minPoints` floor of 20: "did enough
+independent of `MetricDoodleBuilder`'s `minPoints` floor of 20: "did enough
 features land on the wall" and "is enough of what landed outside the artwork" are
 different questions asked at different moments.
 
@@ -275,7 +275,7 @@ fixtures remains the right fix and is not done.
 ## 7. Geometric promotion — landed, gated off
 
 From Phase 3. These govern the only mechanism in the engine that **permanently
-mutates** the reloc fingerprint, so a wrong value here is not a transient error —
+mutates** the reloc doodle, so a wrong value here is not a transient error —
 it is written into the map and compounds. The whole phase ships behind
 `setSelfGrowEnabled`, default **off**, until E5 shows a positive effect on a
 replayed dataset.
@@ -323,7 +323,7 @@ cannot miss that.
 ## 6. Rendering and interaction — set, not swept
 
 Three of these gate the Phase-2 repartition, which costs a classify pass, a
-native fingerprint replace and a project write each time it fires. They are
+native doodle replace and a project write each time it fires. They are
 guesses with stated reasoning, not measurements, and no experiment sets them —
 if repartition cost or missed repartitions ever show up in a run, start here.
 

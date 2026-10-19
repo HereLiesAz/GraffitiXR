@@ -6,7 +6,7 @@ Dus ik maak iets beters door de rastermethode opnieuw te gebruiken (wat de kenne
 
 Dus dat is wat die krabbels doen.
 
-Ik moest een aangepaste **fingerprinted relocalizer** uitvinden die op Android werkt zonder de hulp van de cloud — omdat graffiti, weet je, illegaal is. Zodra je op een muur vergrendelt, legt de app een OpenCV-feature-**vingerafdruk** van je markeringen vast — descriptors plus een handvol getrianguleerde 3D-punten. Zelfs na verlies van tracking of het uitschakelen van het scherm vergelijkt de engine het live camerabeeld met die vingerafdruk en lost de pose op (PnP) om **terug te klikken** en je muurschildering weer op de muur uit te lijnen, binnen milliseconden — geen cloud, en geen voorafgaande scan van de hele ruimte.
+Ik moest een aangepaste **doodled relocalizer** uitvinden die op Android werkt zonder de hulp van de cloud — omdat graffiti, weet je, illegaal is. Zodra je op een muur vergrendelt, legt de app een OpenCV-feature-**vingerafdruk** van je markeringen vast — descriptors plus een handvol getrianguleerde 3D-punten. Zelfs na verlies van tracking of het uitschakelen van het scherm vergelijkt de engine het live camerabeeld met die vingerafdruk en lost de pose op (PnP) om **terug te klikken** en je muurschildering weer op de muur uit te lijnen, binnen milliseconden — geen cloud, en geen voorafgaande scan van de hele ruimte.
 
 En ik heb dat opgevolgd met wat ik een **Teleological SLAM** noem — omdat we weten hoe het resultaat eruit hoort te zien, gebruik ik OpenCV om je voortgang te herkennen, wat betekent dat hoe verder je bent, hoe strakker de overlay aan de muur blijft plakken. Zonder dit zou je die markeringen met de schildering zelf bedekken, waardoor de app gaandeweg minder nauwkeurig wordt. Dat is precies waar andere apps zoals deze echt falen.
 
@@ -18,14 +18,14 @@ En dan is er nog een prima reeks relevante ontwerptools voor het voorbereiden va
 
 ## Belangrijkste kenmerken
 *   **Offline-First:** Geen cloudafhankelijkheden voor wat de app ook doet — tracking, rendering en ontwerpwerk zijn allemaal lokaal. Het enige dat ooit het apparaat verlaat, is een crashrapport, en dat is opt-in en standaard uit (Instellingen > Crashrapporten); zie [`docs/en/PRIVACY_POLICY.md`](../en/PRIVACY_POLICY.md).
-*   **Fingerprint Relocalization:** een native C++17 OpenCV-pipeline (ORB/SuperPoint-descriptors + PnP/RANSAC) legt een vingerafdruk vast van de markeringen die je op de muur tekent en klikt de overlay terug na verlies van tracking — volledig offline, geen voorafgaande scan van de ruimte.
+*   **Doodle Relocalization:** een native C++17 OpenCV-pipeline (ORB/SuperPoint-descriptors + PnP/RANSAC) legt een vingerafdruk vast van de markeringen die je op de muur tekent en klikt de overlay terug na verlies van tracking — volledig offline, geen voorafgaande scan van de ruimte.
 *   **Klaar voor de broekzak (experimenteel, standaard uit):** driftcorrectie en een zelf-uitbreidende vingerafdruk (zodat terug-klikken de originele referentie kan overleven, ook als die overgeschilderd wordt) bestaan en kunnen worden ingeschakeld via Instellingen > diagnostische overlay, maar geen van beide is nog gevalideerd op echte hardware — zie [Teleological SLAM](../TELEOLOGICAL_SLAM.md).
 *   **Dual-Lens Aware:** selecteert automatisch hardware-stereodiepte op apparaten die dit bieden; andere apparaten volgen via de monoculaire pose van ARCore, zonder aparte dieptemeting.
 *   **Co-op-modus:** versleuteld, met QR-code gekoppeld sessies delen, zodat een medewerker het live canvas van de host in AR kan volgen. Momenteel alleen host → gast — de eigen bewerkingen van een gast worden nog niet teruggesynchroniseerd.
 *   **AzNavRail UI:** duimgestuurde, eenhandige navigatie, ontworpen voor artiesten met een spuitbus in de hand.
 
 ## Modi
-*   **AR Muurschildering:** Het kerninstrument voor het nauwkeurig verankeren van digitale ontwerpen aan fysieke oppervlakken, getrackt via de hierboven beschreven fingerprint relocalizer.
+*   **AR Muurschildering:** Het kerninstrument voor het nauwkeurig verankeren van digitale ontwerpen aan fysieke oppervlakken, getrackt via de hierboven beschreven doodle relocalizer.
 *   **Mockup-modus:** Snelle tools om lagen en overvloeimodi te visualiseren op statische foto's van de muur.
 *   **Trace (lichtbak):** Volledig verlicht oppervlak om op papier over te trekken, met aanraakvergrendeling, automatisch intrekkende rail en fysieke volumeknop-exit (Omhoog, Omlaag, Omhoog, Omlaag).
 *   **Overlay:** Niet-AR-beeldtracering — je referentieafbeelding wordt over de live camera (CameraX) gelegd met instelbare dekking. Op het kleine aantal apparaten zonder ARCore kan deze modus in plaats daarvan een vorm volgen die je op de muur markeert, met dezelfde OpenCV-pipeline, alleen vlak (planair).
@@ -57,4 +57,4 @@ Strikt ontkoppelde architectuur met meerdere modules:
 - [Release & Google Play-distributie](../RELEASE.md)
 
 ---
-*Documentatie bijgewerkt op 2026-09-04: afgestemd op de gecorrigeerde Engelse hoofd-README — de vermeende "Persistent Voxel Memory"-engine, de "Single GL Render Path" met `slamManager.draw()`, en het optische-stroom-fallback voor meerdere lenzen bestaan niet in de code en zijn vervangen door de werkelijke fingerprinted relocalizer, Dual-Lens Aware-werking, Co-op-modus, Trace-modus en licentiëringsparagraaf. Kapotte links naar `docs/PIPELINE_3D.md` (bestaat niet) en `docs/screens.md` (verkeerd pad) zijn verwijderd of hersteld. Vorige update: 2026-03-17, tijdens het herontwerp van de website en de integratiefase van de stencilmodus (stencilmodus is inmiddels uit de app verwijderd).*
+*Documentatie bijgewerkt op 2026-09-04: afgestemd op de gecorrigeerde Engelse hoofd-README — de vermeende "Persistent Voxel Memory"-engine, de "Single GL Render Path" met `slamManager.draw()`, en het optische-stroom-fallback voor meerdere lenzen bestaan niet in de code en zijn vervangen door de werkelijke doodled relocalizer, Dual-Lens Aware-werking, Co-op-modus, Trace-modus en licentiëringsparagraaf. Kapotte links naar `docs/PIPELINE_3D.md` (bestaat niet) en `docs/screens.md` (verkeerd pad) zijn verwijderd of hersteld. Vorige update: 2026-03-17, tijdens het herontwerp van de website en de integratiefase van de stencilmodus (stencilmodus is inmiddels uit de app verwijderd).*

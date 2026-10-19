@@ -7,7 +7,7 @@ import android.util.Log
 import com.hereliesaz.graffitixr.common.model.CorrobGate
 import com.hereliesaz.graffitixr.common.model.CorroborationDiagnostics
 import com.hereliesaz.graffitixr.common.model.GrowOutcome
-import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.Doodle
 import com.hereliesaz.graffitixr.common.model.RelocDiagnostics
 import com.hereliesaz.graffitixr.common.model.RelocReject
 import com.hereliesaz.graffitixr.common.model.WallFeatureMap
@@ -203,26 +203,26 @@ class SlamManager @Inject constructor(
     }
 
     /**
-     * Centroid of the matched fingerprint marks, expressed in the FINGERPRINT ANCHOR's local frame
+     * Centroid of the matched doodle marks, expressed in the DOODLE ANCHOR's local frame
      * (the anchor PoseFusion converges the live render anchor toward), or null to fall back to the
      * anchor's own position. Anchor-local (not world) so it survives a project reload into a new
      * ARCore session: the renderer reconstructs the world point from the live anchor each frame. Set
-     * by the AR fingerprint builder on capture and re-published on project load; read by the AR
+     * by the AR doodle builder on capture and re-published on project load; read by the AR
      * renderer to center the artwork overlay on the marks instead of the screen-center anchor. Plain
      * Kotlin state (not native) shared across the view models and the GL thread, hence @Volatile.
      */
     @Volatile var overlayMarkCenterLocal: FloatArray? = null
 
     /**
-     * `IMPLEMENTATION.md` **0.9** — `Fingerprint.captureAnchorCam`, the anchor's pose in the CAPTURE
-     * camera's CV frame (`V_cv(capture) · anchorModel`), or null when the live fingerprint has none.
+     * `IMPLEMENTATION.md` **0.9** — `Doodle.captureAnchorCam`, the anchor's pose in the CAPTURE
+     * camera's CV frame (`V_cv(capture) · anchorModel`), or null when the live doodle has none.
      *
      * Carried here for the same reason [overlayMarkCenterLocal] is: the renderer needs it every
-     * frame and does not hold the `Fingerprint`. It is the third factor of
+     * frame and does not hold the `Doodle`. It is the third factor of
      * `PoseFusion.composeCorrected`, and it replaced a world-frame anchor that put the composition
      * in the wrong frame entirely.
      *
-     * **Null means do not correct.** A pre-Phase-2 fingerprint has no `captureAnchorCam`, and there
+     * **Null means do not correct.** A pre-Phase-2 doodle has no `captureAnchorCam`, and there
      * is no way to compose the correction without it — the world-frame anchor that used to be passed
      * is precisely the defect. Skipping the correction leaves relocalization off for such a project
      * rather than pulling the overlay toward a pose computed in mixed frames, which is the failure
@@ -231,52 +231,52 @@ class SlamManager @Inject constructor(
     @Volatile var captureAnchorCam: FloatArray? = null
 
     /**
-     * True from the moment a (re-)capture replaces the anchor until its NEW wall fingerprint and its
+     * True from the moment a (re-)capture replaces the anchor until its NEW wall doodle and its
      * NEW [captureAnchorCam] are both installed.
      *
-     * In that window the native engine still holds the previous wall's fingerprint (and may solve
+     * In that window the native engine still holds the previous wall's doodle (and may solve
      * against it, bumping the result seq) and the Kotlin side still describes the previous anchor, so
      * any reloc result is in the OLD wall's frame: composed with the new anchor it cold-snaps the
      * overlay onto the old wall. While this is set the renderer ignores reloc results and the
      * correction-source arbiter never selects reloc. Native additionally drops a solve that was in
-     * flight when the fingerprint was replaced (its fingerprint generation).
+     * flight when the doodle was replaced (its doodle generation).
      *
-     * Raise it with [beginFingerprintReplacement]; lower it only through
-     * [completeFingerprintReplacement] (both halves installed), [clearWallFingerprint] (nothing left
-     * to be stale against) or a successful depth-path [setWallFingerprint].
+     * Raise it with [beginDoodleReplacement]; lower it only through
+     * [completeDoodleReplacement] (both halves installed), [clearWallDoodle] (nothing left
+     * to be stale against) or a successful depth-path [setWallDoodle].
      */
-    @Volatile var awaitingNewFingerprint: Boolean = false
+    @Volatile var awaitingNewDoodle: Boolean = false
         private set
 
     /** A re-capture is replacing the anchor: forget the old capture pose and gate reloc. */
-    fun beginFingerprintReplacement() {
+    fun beginDoodleReplacement() {
         previousCaptureAnchorCam = captureAnchorCam
         captureAnchorCam = null
-        awaitingNewFingerprint = true
+        awaitingNewDoodle = true
     }
 
     private var previousCaptureAnchorCam: FloatArray? = null
 
     /**
      * A replacement that never completed (build failed, capture abandoned): native still holds the
-     * previous fingerprint, so restore its pose and lower the gate. A no-op once the gate is down,
+     * previous doodle, so restore its pose and lower the gate. A no-op once the gate is down,
      * so it is safe in every `finally`. Without this a failed re-capture silences relocalization
      * of the still-valid saved target for the rest of the session.
      */
-    fun abortFingerprintReplacement() {
-        if (!awaitingNewFingerprint) return
+    fun abortDoodleReplacement() {
+        if (!awaitingNewDoodle) return
         captureAnchorCam = previousCaptureAnchorCam
-        awaitingNewFingerprint = false
+        awaitingNewDoodle = false
     }
 
     /**
-     * The new fingerprint is already installed natively; publish its [newCaptureAnchorCam] (null for a
-     * fingerprint that has none, which leaves reloc uncorrected) and only THEN lower the gate, so a
+     * The new doodle is already installed natively; publish its [newCaptureAnchorCam] (null for a
+     * doodle that has none, which leaves reloc uncorrected) and only THEN lower the gate, so a
      * frame can never see the gate down beside a stale or missing pose.
      */
-    fun completeFingerprintReplacement(newCaptureAnchorCam: FloatArray?) {
+    fun completeDoodleReplacement(newCaptureAnchorCam: FloatArray?) {
         captureAnchorCam = newCaptureAnchorCam
-        awaitingNewFingerprint = false
+        awaitingNewDoodle = false
     }
 
     /**
@@ -384,8 +384,8 @@ class SlamManager @Inject constructor(
      * IMPLEMENTATION.md 4.5 — tell the engine where the design sits, so the corroboration match can
      * predict where each design feature should appear instead of searching the whole frame.
      *
-     * @param fpFromDesign16 the design's model matrix in the WALL FINGERPRINT frame, column-major.
-     *   This is `FingerprintPartition.partition`'s `designInPointFrame`
+     * @param fpFromDesign16 the design's model matrix in the WALL DOODLE frame, column-major.
+     *   This is `DoodlePartition.partition`'s `designInPointFrame`
      *   (`captureAnchorCam * rigidModelAnchorLocal`) — pass that composition, do not rebuild it. It
      *   is rigid: the overlay's scale belongs in the extents, not in this matrix.
      * @param halfW,halfH the design's effective (scale-included) half-extents in metres.
@@ -403,28 +403,28 @@ class SlamManager @Inject constructor(
      */
     fun getAnchorTransform(): FloatArray? = nativeGetAnchorTransform()
 
-    fun setWallFingerprint(
+    fun setWallDoodle(
         bitmap: Bitmap,
         mask: Bitmap?,
         depthBuffer: ByteBuffer,
         depthW: Int, depthH: Int, depthStride: Int,
         intrinsics: FloatArray,
         viewMatrix: FloatArray
-    ): Fingerprint? {
+    ): Doodle? {
         if (!depthBuffer.isDirect) return null
-        val fp = nativeSetWallFingerprint(bitmap, mask, depthBuffer, depthW, depthH, depthStride, intrinsics, viewMatrix)
-        // A depth-path fingerprint is installed and carries no capture pose: nothing is left to wait for.
-        if (fp != null) awaitingNewFingerprint = false
+        val fp = nativeSetWallDoodle(bitmap, mask, depthBuffer, depthW, depthH, depthStride, intrinsics, viewMatrix)
+        // A depth-path doodle is installed and carries no capture pose: nothing is left to wait for.
+        if (fp != null) awaitingNewDoodle = false
         return fp
     }
 
-    fun restoreWallFingerprint(descriptorsData: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray) {
-        nativeRestoreWallFingerprint(descriptorsData, rows, cols, type, points3d)
+    fun restoreWallDoodle(descriptorsData: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray) {
+        nativeRestoreWallDoodle(descriptorsData, rows, cols, type, points3d)
     }
 
     /**
-     * Ingest a fingerprint built from triangulated metric marks (no depth source). Also fixes the
-     * fingerprint anchor pose (column-major 4x4) and the camera intrinsics (fx,fy,cx,cy) the reloc
+     * Ingest a doodle built from triangulated metric marks (no depth source). Also fixes the
+     * doodle anchor pose (column-major 4x4) and the camera intrinsics (fx,fy,cx,cy) the reloc
      * PnP should use. points3d are in keyframe-0's CV camera frame (see SphereSLAM `reloc.MetricMarks`).
      *
      * [viewMatrix] is the GL-convention world->camera view at capture. Supplying it enables the
@@ -436,33 +436,33 @@ class SlamManager @Inject constructor(
      * [regions] is the Phase-2 partition: one byte per 3D point, holding a `Footprint.Region`
      * ordinal. The reloc correspondence build excludes the points tagged `INSIDE` — they sit under
      * the artwork and decay as it is painted. **An empty array means all-backbone**, which is
-     * exactly the behaviour before Phase 2, so a legacy fingerprint keeps relocalizing against its
+     * exactly the behaviour before Phase 2, so a legacy doodle keeps relocalizing against its
      * whole map rather than losing it. A non-empty array of the wrong length is rejected native-side
      * rather than silently truncating, because the partition is indexed by point.
      */
-    fun restoreWallFingerprintMetric(
+    fun restoreWallDoodleMetric(
         descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,
         points3d: FloatArray, anchorMatrix: FloatArray, intrinsics: FloatArray,
         viewMatrix: FloatArray = FloatArray(0),
         regions: ByteArray = ByteArray(0),
     ) {
-        nativeRestoreWallFingerprintMetric(
+        nativeRestoreWallDoodleMetric(
             descriptorsData, rows, cols, type, points3d, anchorMatrix, intrinsics, viewMatrix,
             regions,
         )
     }
 
     /**
-     * Drop the in-native wall fingerprint. The restore calls above only ever REPLACE the stored
-     * fingerprint, so without this it is process-lifetime state: a project that has no fingerprint of
-     * its own would keep relocalizing against whatever wall was fingerprinted earlier in the session
+     * Drop the in-native wall doodle. The restore calls above only ever REPLACE the stored
+     * doodle, so without this it is process-lifetime state: a project that has no doodle of
+     * its own would keep relocalizing against whatever wall was doodled earlier in the session
      * (notably the marks built during first-run onboarding). Call it when loading a project that has
-     * no saved fingerprint, alongside [clearWallFeatureMap].
+     * no saved doodle, alongside [clearWallFeatureMap].
      */
-    fun clearWallFingerprint() {
-        nativeClearWallFingerprint()
-        // No fingerprint left to be stale against; reloc has nothing to match either way.
-        awaitingNewFingerprint = false
+    fun clearWallDoodle() {
+        nativeClearWallDoodle()
+        // No doodle left to be stale against; reloc has nothing to match either way.
+        awaitingNewDoodle = false
     }
 
     /** Restore the persistent wall feature map into native (Phase 2a: stored; matched in Phase 2b). */
@@ -474,7 +474,7 @@ class SlamManager @Inject constructor(
     }
     /**
      * Teleological reference set: design features the wall has confirmed as painted, in the
-     * fingerprint frame. Matched by relocalization alongside the original marks, so tracking holds
+     * doodle frame. Matched by relocalization alongside the original marks, so tracking holds
      * as they get painted over. Returned as a [WallFeatureMap] (points + descriptors only) for
      * project persistence, or null when empty. Blob: [rows, cols, type][rows*3 floats][descriptors].
      */
@@ -498,12 +498,12 @@ class SlamManager @Inject constructor(
         }
     }
 
-    /** Restore a persisted [getPaintMarks] set. Must follow the fingerprint restore it belongs to. */
+    /** Restore a persisted [getPaintMarks] set. Must follow the doodle restore it belongs to. */
     fun restorePaintMarks(map: WallFeatureMap) = nativeRestorePaintMarks(
         map.descriptorsData, map.descriptorsRows, map.descriptorsCols, map.descriptorsType, map.points3d,
     )
 
-    /** Drop the paint set — required whenever the fingerprint FRAME changes (a new capture). */
+    /** Drop the paint set — required whenever the doodle FRAME changes (a new capture). */
     fun clearPaintMarks() = nativeClearPaintMarks()
 
     fun getPaintMarkCount(): Int = nativeGetPaintMarkCount()
@@ -625,7 +625,7 @@ class SlamManager @Inject constructor(
      * Sphere map Phase 4: the last reloc attempt's persistent-map contribution as
      * `[frustumVisiblePoints, correspondencesAddedToPnP]`; each is -1 when the map path did not run
      * (flag off, no map, or no prior pose). The on-device tuning instrument reads this to show the
-     * surrounding sphere carrying a lock — especially while the fingerprint marks are off-frame.
+     * surrounding sphere carrying a lock — especially while the doodle marks are off-frame.
      */
     fun getMapRelocCounts(): IntArray {
         val o = IntArray(2)
@@ -673,7 +673,7 @@ class SlamManager @Inject constructor(
         }
     }
 
-    fun setArtworkFingerprint(
+    fun setArtworkDoodle(
         bitmap: Bitmap,
         depthBuffer: ByteBuffer?,
         depthW: Int, depthH: Int, depthStride: Int,
@@ -683,7 +683,7 @@ class SlamManager @Inject constructor(
         // Depth is optional: with the ML depth API off there is no capture depth buffer, so the artwork
         // base registers descriptors-only (enough for painting-progress; 3D-dependent promotion waits).
         if (depthBuffer == null || depthBuffer.isDirect) {
-            nativeSetArtworkFingerprint(bitmap, depthBuffer, depthW, depthH, depthStride, intrinsics, viewMatrix)
+            nativeSetArtworkDoodle(bitmap, depthBuffer, depthW, depthH, depthStride, intrinsics, viewMatrix)
         }
     }
 
@@ -692,7 +692,7 @@ class SlamManager @Inject constructor(
     fun setViewportSize(width: Int, height: Int) = nativeSetViewportSize(width, height)
 
     fun setRelocEnabled(enabled: Boolean) = nativeSetRelocEnabled(enabled)
-    /** Teleological self-grow (default OFF): promote validated new marks into the live fingerprint. */
+    /** Teleological self-grow (default OFF): promote validated new marks into the live doodle. */
     fun setSelfGrowEnabled(enabled: Boolean) = nativeSetSelfGrowEnabled(enabled)
 
     /**
@@ -772,12 +772,12 @@ class SlamManager @Inject constructor(
      */
     fun detectSuperPoint(bitmap: Bitmap): FloatArray? = nativeDetectSuperPoint(bitmap)
 
-    /** Live wall-fingerprint point count — diagnostic for reloc health / watching self-grow. */
+    /** Live wall-doodle point count — diagnostic for reloc health / watching self-grow. */
     fun getWallKeypointCount(): Int = nativeGetWallKeypointCount()
 
-    /** Store the canonical fingerprint patch (the captured marks) for the distortion head. */
+    /** Store the canonical doodle patch (the captured marks) for the distortion head. */
     fun setWallPatch(bitmap: Bitmap) = nativeSetWallPatch(bitmap)
-    /** Store the canonical patch from a raw [size]x[size] gray byte buffer (persisted on Fingerprint). */
+    /** Store the canonical patch from a raw [size]x[size] gray byte buffer (persisted on Doodle). */
     fun setWallPatchBytes(data: ByteArray, size: Int) = nativeSetWallPatchBytes(data, size)
 
     /**
@@ -909,14 +909,14 @@ class SlamManager @Inject constructor(
         return out
     }
 
-    /** Pose fusion (B): the anchor model matrix captured in the fingerprint world frame. */
-    fun getFingerprintAnchor(): FloatArray { val o = FloatArray(16); nativeGetFingerprintAnchor(o); return o }
+    /** Pose fusion (B): the anchor model matrix captured in the doodle world frame. */
+    fun getDoodleAnchor(): FloatArray { val o = FloatArray(16); nativeGetDoodleAnchor(o); return o }
 
-    fun exportFingerprint(): ByteArray? = nativeExportFingerprint()
-    fun alignToFingerprint(data: ByteArray) = nativeAlignToFingerprint(data)
+    fun exportDoodle(): ByteArray? = nativeExportDoodle()
+    fun alignToDoodle(data: ByteArray) = nativeAlignToDoodle(data)
 
-    /** Co-op alias: align local SLAM state to the peer's fingerprint bytes. */
-    fun alignToPeer(fingerprint: ByteArray) = alignToFingerprint(fingerprint)
+    /** Co-op alias: align local SLAM state to the peer's doodle bytes. */
+    fun alignToPeer(doodle: ByteArray) = alignToDoodle(doodle)
 
     fun startSensorCollection() {
         collectionJob?.cancel()
@@ -1019,12 +1019,12 @@ class SlamManager @Inject constructor(
     }
 
     /**
-     * The REAL fingerprint feature positions (image pixels) the same detector used by
-     * generateFingerprint would produce on [bitmap], restricted to [mask] when given — for a truthful
+     * The REAL doodle feature positions (image pixels) the same detector used by
+     * generateDoodle would produce on [bitmap], restricted to [mask] when given — for a truthful
      * curation overlay. Unlike getKeypoints (plain ORB-500), this matches what actually anchors.
      */
-    fun getFingerprintKeypoints(bitmap: Bitmap, mask: Bitmap?): List<android.util.Pair<Float, Float>> {
-        val raw = nativeGetFingerprintKeypoints(bitmap, mask) ?: return emptyList()
+    fun getDoodleKeypoints(bitmap: Bitmap, mask: Bitmap?): List<android.util.Pair<Float, Float>> {
+        val raw = nativeGetDoodleKeypoints(bitmap, mask) ?: return emptyList()
         val list = ArrayList<android.util.Pair<Float, Float>>(raw.size / 2)
         for (i in 0 until raw.size / 2) list.add(android.util.Pair(raw[i * 2], raw[i * 2 + 1]))
         return list
@@ -1036,7 +1036,7 @@ class SlamManager @Inject constructor(
 
     // Native methods
     private external fun nativeGetKeypoints(bitmap: Bitmap): FloatArray?
-    private external fun nativeGetFingerprintKeypoints(bitmap: Bitmap, mask: Bitmap?): FloatArray?
+    private external fun nativeGetDoodleKeypoints(bitmap: Bitmap, mask: Bitmap?): FloatArray?
     private external fun nativeInitialize()
 
     private external fun nativeSetViewportSize(width: Int, height: Int)
@@ -1061,19 +1061,19 @@ class SlamManager @Inject constructor(
     private external fun nativeGetStageTimings(out: FloatArray)
     private external fun nativeSetStageEnabled(stage: Int, enabled: Boolean)
     private external fun nativeGetRelocResult(out: FloatArray)
-    private external fun nativeGetFingerprintAnchor(out: FloatArray)
-    private external fun nativeExportFingerprint(): ByteArray?
-    private external fun nativeAlignToFingerprint(data: ByteArray)
-    private external fun nativeSetWallFingerprint(
+    private external fun nativeGetDoodleAnchor(out: FloatArray)
+    private external fun nativeExportDoodle(): ByteArray?
+    private external fun nativeAlignToDoodle(data: ByteArray)
+    private external fun nativeSetWallDoodle(
         bitmap: Bitmap, mask: Bitmap?,
         depthBuffer: ByteBuffer,
         depthW: Int, depthH: Int, depthStride: Int,
         intrinsics: FloatArray, viewMatrix: FloatArray
-    ): Fingerprint?
-    private external fun nativeRestoreWallFingerprint(
+    ): Doodle?
+    private external fun nativeRestoreWallDoodle(
         descriptorsData: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray
     )
-    private external fun nativeRestoreWallFingerprintMetric(
+    private external fun nativeRestoreWallDoodleMetric(
         descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,
         points3d: FloatArray, anchorMatrix: FloatArray, intrinsics: FloatArray,
         viewMatrix: FloatArray, regions: ByteArray
@@ -1102,7 +1102,7 @@ class SlamManager @Inject constructor(
         anchor: FloatArray, intrinsics: FloatArray
     )
     private external fun nativeClearWallFeatureMap()
-    private external fun nativeClearWallFingerprint()
+    private external fun nativeClearWallDoodle()
     private external fun nativeGetMapPointCount(): Int
     private external fun nativeGetWallFeatureMapRevision(): Long
     private external fun nativeSetMapRelocEnabled(enabled: Boolean)
@@ -1112,7 +1112,7 @@ class SlamManager @Inject constructor(
     private external fun nativeSetLatestDepthMap(data: FloatArray?, w: Int, h: Int, frameW: Int, frameH: Int)
     private external fun nativeGetMapRelocCounts(out: IntArray)
     private external fun nativeExportWallFeatureMap(): ByteArray?
-    private external fun nativeSetArtworkFingerprint(
+    private external fun nativeSetArtworkDoodle(
         bitmap: Bitmap, depthBuffer: ByteBuffer?,
         depthW: Int, depthH: Int, depthStride: Int,
         intrinsics: FloatArray, viewMatrix: FloatArray

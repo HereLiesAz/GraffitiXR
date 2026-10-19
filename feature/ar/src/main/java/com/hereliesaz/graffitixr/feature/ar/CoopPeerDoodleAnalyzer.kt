@@ -27,15 +27,15 @@ internal fun shouldHoldCoopPeerPose(
 /**
  * CameraX tracker used when a standalone phone joins an ARCore-hosted co-op session.
  *
- * There is no KPM page in that project. The host's MobileGS fingerprint is therefore the visual
- * reference: PnP solves camera-from-fingerprint and protocol-v3 metadata composes it into the host
+ * There is no KPM page in that project. The host's MobileGS doodle is therefore the visual
+ * reference: PnP solves camera-from-doodle and protocol-v3 metadata composes it into the host
  * wall frame. This analyzer never creates or consumes an ARCore Session.
  */
-internal class CoopPeerFingerprintAnalyzer(
+internal class CoopPeerDoodleAnalyzer(
     private val context: Context,
     private val cameraId: String,
     private val slam: SlamManager,
-    peerFingerprint: ByteArray,
+    peerDoodle: ByteArray,
     private val spatialFrame: CoopSpatialFrame,
     private val onFrameTracked: (SphereSlamStandaloneFrame?) -> Unit,
     private val onDiagnostic: (String) -> Unit = {},
@@ -43,7 +43,7 @@ internal class CoopPeerFingerprintAnalyzer(
     private val frameGate: AnalysisFrameGate = AnalysisFrameGate(),
 ) : ImageAnalysis.Analyzer, AutoCloseable {
 
-    private val peerBytes = peerFingerprint.copyOf()
+    private val peerBytes = peerDoodle.copyOf()
     private var directBuffer: ByteBuffer? = null
     private var lastSeq = 0f
     private var lastGood: SphereSlamStandaloneFrame? = null
@@ -51,14 +51,14 @@ internal class CoopPeerFingerprintAnalyzer(
     @Volatile private var closed = false
 
     init {
-        require(peerBytes.isNotEmpty()) { "peer fingerprint required" }
-        require(spatialFrame.fingerprintAvailable) { "spatial frame says no peer fingerprint" }
+        require(peerBytes.isNotEmpty()) { "peer doodle required" }
+        require(spatialFrame.doodleAvailable) { "spatial frame says no peer doodle" }
         slam.ensureInitialized()
         // MobileGS is process-global. A local standalone map belongs to a different coordinate
         // object and must not survive installation of peer geometry.
         slam.clearWallFeatureMap()
         slam.overlayMarkCenterLocal = null
-        slam.captureAnchorCam = spatialFrame.fingerprintFromWall.toFloatArray()
+        slam.captureAnchorCam = spatialFrame.doodleFromWall.toFloatArray()
         slam.setTrackingPoseValid(false)
         slam.alignToPeer(peerBytes)
         onDiagnostic(
@@ -162,7 +162,7 @@ internal class CoopPeerFingerprintAnalyzer(
                     ),
                     observationAgeMs = null,
                     matchDurationMs = 0f,
-                    source = SphereSlamStandalonePoseSource.PEER_FINGERPRINT,
+                    source = SphereSlamStandalonePoseSource.PEER_DOODLE,
                 )
                 lastGood = tracked
                 lastFreshSolveMs = android.os.SystemClock.elapsedRealtime()
@@ -186,7 +186,7 @@ internal class CoopPeerFingerprintAnalyzer(
             onFrameTracked(held)
         } catch (t: Throwable) {
             if (!closed) {
-                Timber.w(t, "Co-op peer fingerprint analysis failed")
+                Timber.w(t, "Co-op peer doodle analysis failed")
                 onDiagnostic("Co-op peer tracker failure=${t.javaClass.simpleName}")
                 onFrameTracked(null)
             }

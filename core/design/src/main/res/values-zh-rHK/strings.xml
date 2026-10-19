@@ -370,13 +370,13 @@
     <string name="settings_anticipation_heat">發熱限制幅度</string>
     <string name="settings_anticipation_compute">負載限制幅度</string>
     <string name="settings_anticipation_views">每頁最多 %1$d 個視圖</string>
-    <string name="settings_fingerprint_features">隨手畫</string>
-    <string name="settings_fingerprint_superpoint">SuperPoint</string>
-    <string name="settings_fingerprint_half_sphere">半球</string>
-    <string name="settings_fingerprint_both">兩者</string>
-    <string name="settings_fingerprint_superpoint_desc">僅擷取圖像的 SuperPoint 特徵。耐光照與磨損；每個隨手畫約 1.5 MB。由下一個隨手畫起生效。</string>
-    <string name="settings_fingerprint_half_sphere_desc">擷取圖像及其 49 個特寫的 ORB 特徵。近距離強且細小，每個隨手畫少於 0.1 MB。由下一個隨手畫起生效。</string>
-    <string name="settings_fingerprint_both_desc">擷取圖像及其 49 個特寫的 SuperPoint 特徵。最強；每個隨手畫約 2–3 MB。由下一個隨手畫起生效。</string>
+    <string name="settings_doodle_features">隨手畫</string>
+    <string name="settings_doodle_superpoint">SuperPoint</string>
+    <string name="settings_doodle_half_sphere">半球</string>
+    <string name="settings_doodle_both">兩者</string>
+    <string name="settings_doodle_superpoint_desc">僅擷取圖像的 SuperPoint 特徵。耐光照與磨損；每個隨手畫約 1.5 MB。由下一個隨手畫起生效。</string>
+    <string name="settings_doodle_half_sphere_desc">擷取圖像及其 49 個特寫的 ORB 特徵。近距離強且細小，每個隨手畫少於 0.1 MB。由下一個隨手畫起生效。</string>
+    <string name="settings_doodle_both_desc">擷取圖像及其 49 個特寫的 SuperPoint 特徵。最強；每個隨手畫約 2–3 MB。由下一個隨手畫起生效。</string>
     <string name="settings_power_section">電源</string>
     <string name="settings_privacy_section">私隱</string>
     <string name="settings_developer_section">開發人員</string>
@@ -435,7 +435,7 @@
     <string name="target_review_desc">查看擷取出的隨手畫</string>
     <string name="target_unwarp_hint">拖曳角點以恢復扭曲</string>
     <string name="target_review_title">隨手畫已鎖定</string>
-    <string name="fingerprint_closeups_progress">正在學習牆面：第 %1$d / %2$d 階段 · 第 %3$d / %4$d 步</string>
+    <string name="doodle_closeups_progress">正在學習牆面：第 %1$d / %2$d 階段 · 第 %3$d / %4$d 步</string>
 
     <string name="target_exclude">排除</string>
     <string name="target_include">包括</string>
@@ -736,7 +736,7 @@
     <string name="ar_feedback_open_project_first">分享前請先開啟一個專案，目前沒有可傳送給訪客的內容</string>
     <string name="ar_feedback_host_need_target_arcore">主持前請先擷取並鎖定目前的隨手畫</string>
     <string name="ar_feedback_host_need_target_standalone">主持前請先擷取獨立的牆面目標</string>
-    <string name="ar_feedback_fingerprint_not_ready">隨手畫尚未就緒 — 請讓它保持在畫面中，然後再次嘗試 「主持」</string>
+    <string name="ar_feedback_doodle_not_ready">隨手畫尚未就緒 — 請讓它保持在畫面中，然後再次嘗試 「主持」</string>
     <string name="ar_feedback_package_failed">無法打包此專案以供分享，請先嘗試儲存</string>
     <string name="ar_feedback_host_failed">無法開始分享：%1$s</string>
     <string name="ar_feedback_join_load_failed">無法載入主機的專案，工作階段已結束。</string>

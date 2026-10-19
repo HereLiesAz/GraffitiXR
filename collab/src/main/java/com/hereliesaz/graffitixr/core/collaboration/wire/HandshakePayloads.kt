@@ -90,7 +90,7 @@ internal data class BulkBeginPayload(
     val projectId: String,
     val layerCount: Int,
     @SerialName("fingerprintBytes")
-    val fingerprintBytes: Int,
+    val doodleBytes: Int,
     val projectBytes: Int,
     val spatialFrame: CoopSpatialFrame,
 )

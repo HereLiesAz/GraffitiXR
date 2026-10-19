@@ -370,13 +370,13 @@
     <string name="settings_anticipation_heat">Нагрев снижает на</string>
     <string name="settings_anticipation_compute">Нагрузка снижает на</string>
     <string name="settings_anticipation_views">Не более %1$d видов на страницу</string>
-    <string name="settings_fingerprint_features">Каракули</string>
-    <string name="settings_fingerprint_superpoint">SuperPoint</string>
-    <string name="settings_fingerprint_half_sphere">Полусфера</string>
-    <string name="settings_fingerprint_both">Оба</string>
-    <string name="settings_fingerprint_superpoint_desc">Только признаки SuperPoint снимка. Устойчивы к свету и износу; около 1,5 МБ на одни Каракули. Действует для следующих Каракулей.</string>
-    <string name="settings_fingerprint_half_sphere_desc">Признаки ORB снимка и его 49 крупных планов. Надёжны вблизи и компактны: меньше 0,1 МБ на одни Каракули. Действует для следующих Каракулей.</string>
-    <string name="settings_fingerprint_both_desc">Признаки SuperPoint снимка и его 49 крупных планов. Самый надёжный вариант; около 2–3 МБ на одни Каракули. Действует для следующих Каракулей.</string>
+    <string name="settings_doodle_features">Каракули</string>
+    <string name="settings_doodle_superpoint">SuperPoint</string>
+    <string name="settings_doodle_half_sphere">Полусфера</string>
+    <string name="settings_doodle_both">Оба</string>
+    <string name="settings_doodle_superpoint_desc">Только признаки SuperPoint снимка. Устойчивы к свету и износу; около 1,5 МБ на одни Каракули. Действует для следующих Каракулей.</string>
+    <string name="settings_doodle_half_sphere_desc">Признаки ORB снимка и его 49 крупных планов. Надёжны вблизи и компактны: меньше 0,1 МБ на одни Каракули. Действует для следующих Каракулей.</string>
+    <string name="settings_doodle_both_desc">Признаки SuperPoint снимка и его 49 крупных планов. Самый надёжный вариант; около 2–3 МБ на одни Каракули. Действует для следующих Каракулей.</string>
     <string name="settings_power_section">Питание</string>
     <string name="settings_privacy_section">Конфиденциальность</string>
     <string name="settings_developer_section">Для разработчиков</string>
@@ -435,7 +435,7 @@
     <string name="target_review_desc">Просмотр извлечённых Каракулей</string>
     <string name="target_unwarp_hint">Перетащите углы, чтобы развернуть</string>
     <string name="target_review_title">КАРАКУЛИ ЗАФИКСИРОВАНЫ</string>
-    <string name="fingerprint_closeups_progress">Изучение стены: этап %1$d из %2$d · шаг %3$d из %4$d</string>
+    <string name="doodle_closeups_progress">Изучение стены: этап %1$d из %2$d · шаг %3$d из %4$d</string>
 
     <string name="target_exclude">Исключать</string>
     <string name="target_include">Включать</string>
@@ -736,7 +736,7 @@
     <string name="ar_feedback_open_project_first">Откройте проект перед тем, как делиться, — гостю пока нечего отправлять</string>
     <string name="ar_feedback_host_need_target_arcore">Перед запуском хоста снимите и зафиксируйте актуальные Каракули</string>
     <string name="ar_feedback_host_need_target_standalone">Перед запуском хоста снимите автономную цель на стене</string>
-    <string name="ar_feedback_fingerprint_not_ready">Каракули ещё не готовы — держите их в кадре и снова нажмите «Хост»</string>
+    <string name="ar_feedback_doodle_not_ready">Каракули ещё не готовы — держите их в кадре и снова нажмите «Хост»</string>
     <string name="ar_feedback_package_failed">Не удалось подготовить проект к отправке — сначала попробуйте его сохранить</string>
     <string name="ar_feedback_host_failed">Не удалось начать совместный доступ: %1$s</string>
     <string name="ar_feedback_join_load_failed">Не удалось загрузить проект хоста — сеанс завершён.</string>

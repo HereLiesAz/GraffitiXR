@@ -75,7 +75,7 @@ second value, the wall is different.
 
 **Everything is coupled.** The relocalizer is a feedback loop. A parameter that
 changes the match count changes the inlier ratio, which changes whether
-`PoseFusion` hard-snaps, which changes the pose the next fingerprint update is
+`PoseFusion` hard-snaps, which changes the pose the next doodle update is
 built from. One-factor-at-a-time sweeps on the live system measure the loop, not
 the factor.
 
@@ -366,7 +366,7 @@ and lock rate.
 >
 > To run E0b as designed, check out a build from **before** Phase 0 (`main` at
 > `e9de3c5` or earlier, i.e. any commit preceding the `glViewToCvDisplay` routing
-> in `MetricFingerprintBuilder.buildSingle`).
+> in `MetricDoodleBuilder.buildSingle`).
 >
 > This is the cost of landing Phase 0 ahead of its own go/no-go, which was a
 > deliberate call — but it was not recorded when the call was made, and a device
@@ -402,8 +402,8 @@ captured, and the two branches do not share a line of geometry:
 
 | Depth API | Capture path | Reaches `PlaneMarks.backProject`? |
 |---|---|---|
-| **off** | `handleSingleCapture` → `MetricFingerprintBuilder` | **yes — this is §8's path** |
-| on | `SlamManager.setWallFingerprint` → native `generateFingerprint` | no; 3D comes from the depth image |
+| **off** | `handleSingleCapture` → `MetricDoodleBuilder` | **yes — this is §8's path** |
+| on | `SlamManager.setWallDoodle` → native `generateDoodle` | no; 3D comes from the depth image |
 
 `depthApiEnabled` follows the `useArCoreDepthApi` setting (`ArViewModel`), and
 `ArRenderer` only populates the buffer when it is on. So on a depth-capable
@@ -411,7 +411,7 @@ device with the setting left on, **`backProject` never runs during E0b** and a
 result either way says nothing about §8.
 
 Worse, it will not *look* uninformative. The depth path has an orientation
-dependence of its own, and it also singles out landscape. `generateFingerprint`
+dependence of its own, and it also singles out landscape. `generateDoodle`
 (`MobileGS.cpp`) unprojects keypoints with the supplied `intr` and maps them to
 the depth image by linear scaling `depthW/image.cols`, so the bitmap, the depth
 image and the intrinsics must all be in one frame. The depth buffer is ARCore's
@@ -449,8 +449,8 @@ holding the phone, with nothing in the data to check that memory against.
 
 **Group by `captureRotationNeededDeg`, never by `liveRotationNeededDeg`.** The two
 are different quantities and the distinction is the experiment. `backProject` runs
-exactly once per target, inside `MetricFingerprintBuilder.build`, so the frame
-mismatch is baked into the fingerprint's 3D points **at capture** and does not
+exactly once per target, inside `MetricDoodleBuilder.build`, so the frame
+mismatch is baked into the doodle's 3D points **at capture** and does not
 change however the device is held afterwards. A first version of this column
 logged the live per-tick rotation, which mislabels the central case: capture in
 portrait, relocalize in landscape, and every defect-bearing row is filed under
@@ -603,7 +603,7 @@ so a future session does not re-litigate it.
 ### E5 — Promotion gate
 
 **Question.** What values of the promotion gate (`growTrusted`'s inlier floor,
-ratio floor, and the Phase 3b spread term) maximize fingerprint quality over
+ratio floor, and the Phase 3b spread term) maximize doodle quality over
 session time?
 
 **Method.** Synthetic progression with `setSelfGrowEnabled(true)`. Sweep the

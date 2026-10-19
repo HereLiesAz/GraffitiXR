@@ -130,7 +130,7 @@ class DiagnosticWatcher(
      *
      * The view model outlives an AR session — entering and leaving AR is a mode switch inside it —
      * so without this the edge state persists across sessions. Session one ends with the lock `OK`;
-     * ten minutes later session two's first tick reads `NO_FINGERPRINT`, both cooldowns have long
+     * ten minutes later session two's first tick reads `NO_DOODLE`, both cooldowns have long
      * expired, and a `LOCK_LOST` fires captioned "what the camera was pointed at when the lock died"
      * for a loss that happened on a different wall in a different session. The once-only triggers
      * would meanwhile be latched for the life of the process and could never fire again.
@@ -164,7 +164,7 @@ class DiagnosticWatcher(
 
         // An EDGE, like everything else here, and it was written as a level test.
         //
-        // The native `mGrowOutcome` is sticky: `MobileGS::tryUpdateFingerprint` returns early —
+        // The native `mGrowOutcome` is sticky: `MobileGS::tryUpdateDoodle` returns early —
         // without touching it — when no design is registered. So one promotion followed by clearing
         // the design leaves `PROMOTED` standing on every subsequent tick, forever. As a level test
         // that re-fired every `repeatCooldownMs`, spending the entire 16-capture budget on ~4
@@ -263,11 +263,11 @@ enum class CaptureTrigger(
     /** What the reader of the report should look for in the image. */
     val whatToLookFor: String,
 ) {
-    /** Self-grow wrote new marks into the fingerprint. The one irreversible act in the engine. */
+    /** Self-grow wrote new marks into the doodle. The one irreversible act in the engine. */
     PROMOTED(once = false, whatToLookFor = "which part of the wall got promoted into the map"),
 
     /**
-     * Fusion hit `IMPLEMENTATION.md` 0.9 — a pre-Phase-2 fingerprint with no capture pose, so the
+     * Fusion hit `IMPLEMENTATION.md` 0.9 — a pre-Phase-2 doodle with no capture pose, so the
      * overlay is uncorrected and will drift with no other symptom.
      */
     NO_CAPTURE_POSE(once = true, whatToLookFor = "the overlay is on the raw ARCore backbone here"),

@@ -203,39 +203,39 @@ class DiagnosticRecorderTest {
      * Four findings that are one cause must say so, and say it first.
      *
      * A device run produced exactly this: no lock, no correction, no gated corroboration, no
-     * promotion — read as four faults, and all four were the empty fingerprint. Relocalization
+     * promotion — read as four faults, and all four were the empty doodle. Relocalization
      * returns before it runs its detector in that state, so nothing downstream could possibly have
      * happened. Listing consequences beside their cause in no particular order makes the reader
      * diagnose the report before they can diagnose the app: the opposite failure from the one this
      * section was written for, and just as costly.
      */
     @Test
-    fun `an empty fingerprint is reported as the root cause of everything below it`() {
+    fun `an empty doodle is reported as the root cause of everything below it`() {
         val r = recorder()
         repeat(20) {
             r.tick(
-                reject = RelocReject.NO_FINGERPRINT, gate = CorrobGate.NOT_RUN,
-                grow = GrowOutcome.NOT_RUN, state = FusionState.NO_FINGERPRINT,
+                reject = RelocReject.NO_DOODLE, gate = CorrobGate.NOT_RUN,
+                grow = GrowOutcome.NOT_RUN, state = FusionState.NO_DOODLE,
             )
         }
         val out = r.report(emptyMap(), emptyMap(), emptyList())
-        assertTrue(out, out.contains("Root cause: there was no wall fingerprint"))
+        assertTrue(out, out.contains("Root cause: there was no wall doodle"))
         assertTrue(out, out.indexOf("Root cause") < out.indexOf("Never happened"))
         assertTrue(out, out.contains("a consequence, not a fault"))
     }
 
-    /** A run that did have a fingerprint must not be handed a root cause it did not have. */
+    /** A run that did have a doodle must not be handed a root cause it did not have. */
     @Test
-    fun `a run with a fingerprint gets no root-cause claim`() {
+    fun `a run with a doodle gets no root-cause claim`() {
         val r = recorder()
         repeat(10) { r.tick(reject = RelocReject.FEW_INLIERS) }
-        r.tick(reject = RelocReject.NO_FINGERPRINT)
+        r.tick(reject = RelocReject.NO_DOODLE)
         val out = r.report(emptyMap(), emptyMap(), emptyList())
         assertFalse(out, out.contains("Root cause"))
     }
 
     /**
-     * No fingerprint and a pre-Phase-2 fingerprint are opposite instructions.
+     * No doodle and a pre-Phase-2 doodle are opposite instructions.
      *
      * One says create the first target, the other says re-create an existing one. They shared a
      * state until a device screenshot showed the overlay telling an artist to "re-create" a target
@@ -243,14 +243,14 @@ class DiagnosticRecorderTest {
      */
     @Test
     fun `the two no-capture-pose causes give different instructions`() {
-        val noFp = recorder().apply { repeat(5) { tick(state = FusionState.NO_FINGERPRINT) } }
+        val noFp = recorder().apply { repeat(5) { tick(state = FusionState.NO_DOODLE) } }
             .report(emptyMap(), emptyMap(), emptyList())
-        assertTrue(noFp, noFp.contains("no fingerprint to compose against"))
+        assertTrue(noFp, noFp.contains("no doodle to compose against"))
 
         val oldFp = recorder().apply { repeat(5) { tick(state = FusionState.NO_CAPTURE_POSE) } }
             .report(emptyMap(), emptyMap(), emptyList())
         assertTrue(oldFp, oldFp.contains("pre-Phase-2 target — re-create it"))
-        assertFalse(oldFp, oldFp.contains("no fingerprint to compose against"))
+        assertFalse(oldFp, oldFp.contains("no doodle to compose against"))
     }
 
     /**

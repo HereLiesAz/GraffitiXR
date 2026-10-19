@@ -370,13 +370,13 @@
     <string name="settings_anticipation_heat">Värme stryper med</string>
     <string name="settings_anticipation_compute">Belastning stryper med</string>
     <string name="settings_anticipation_views">Högst %1$d vyer per sida</string>
-    <string name="settings_fingerprint_features">Krumelur</string>
-    <string name="settings_fingerprint_superpoint">SuperPoint</string>
-    <string name="settings_fingerprint_half_sphere">Halvsfär</string>
-    <string name="settings_fingerprint_both">Båda</string>
-    <string name="settings_fingerprint_superpoint_desc">Bara SuperPoint-drag från tagningen. Tål ljus och slitage; ungefär 1,5 MB per Krumelur. Gäller från nästa Krumelur.</string>
-    <string name="settings_fingerprint_half_sphere_desc">ORB-drag från tagningen och dess 49 närbilder. Starkt på nära håll och litet, under 0,1 MB per Krumelur. Gäller från nästa Krumelur.</string>
-    <string name="settings_fingerprint_both_desc">SuperPoint-drag från tagningen och dess 49 närbilder. Starkast; ungefär 2–3 MB per Krumelur. Gäller från nästa Krumelur.</string>
+    <string name="settings_doodle_features">Krumelur</string>
+    <string name="settings_doodle_superpoint">SuperPoint</string>
+    <string name="settings_doodle_half_sphere">Halvsfär</string>
+    <string name="settings_doodle_both">Båda</string>
+    <string name="settings_doodle_superpoint_desc">Bara SuperPoint-drag från tagningen. Tål ljus och slitage; ungefär 1,5 MB per Krumelur. Gäller från nästa Krumelur.</string>
+    <string name="settings_doodle_half_sphere_desc">ORB-drag från tagningen och dess 49 närbilder. Starkt på nära håll och litet, under 0,1 MB per Krumelur. Gäller från nästa Krumelur.</string>
+    <string name="settings_doodle_both_desc">SuperPoint-drag från tagningen och dess 49 närbilder. Starkast; ungefär 2–3 MB per Krumelur. Gäller från nästa Krumelur.</string>
     <string name="settings_power_section">Ström</string>
     <string name="settings_privacy_section">Integritet</string>
     <string name="settings_developer_section">Utvecklare</string>
@@ -435,7 +435,7 @@
     <string name="target_review_desc">Granska extraherad Krumelur</string>
     <string name="target_unwarp_hint">Dra i hörnen för att avvika</string>
     <string name="target_review_title">KRUMELUR LÅST</string>
-    <string name="fingerprint_closeups_progress">Lär sig väggen: steg %1$d av %2$d · moment %3$d av %4$d</string>
+    <string name="doodle_closeups_progress">Lär sig väggen: steg %1$d av %2$d · moment %3$d av %4$d</string>
 
     <string name="target_exclude">Utesluta</string>
     <string name="target_include">Omfatta</string>
@@ -736,7 +736,7 @@
     <string name="ar_feedback_open_project_first">Öppna ett projekt innan du delar – det finns inget att skicka till en gäst än</string>
     <string name="ar_feedback_host_need_target_arcore">Fånga och lås en aktuell Krumelur innan du är värd</string>
     <string name="ar_feedback_host_need_target_standalone">Fånga ett fristående väggmål innan du är värd</string>
-    <string name="ar_feedback_fingerprint_not_ready">Krumeluren är inte klar än — håll den i bild och försök med ”Vara värd” igen</string>
+    <string name="ar_feedback_doodle_not_ready">Krumeluren är inte klar än — håll den i bild och försök med ”Vara värd” igen</string>
     <string name="ar_feedback_package_failed">Det gick inte att paketera projektet för delning – försök spara det först</string>
     <string name="ar_feedback_host_failed">Det gick inte att starta delningen: %1$s</string>
     <string name="ar_feedback_join_load_failed">Det gick inte att läsa in värdens projekt – sessionen avslutades.</string>

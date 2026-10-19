@@ -365,13 +365,13 @@
     <string name="settings_anticipation_heat">O calor reduz em</string>
     <string name="settings_anticipation_compute">A carga reduz em</string>
     <string name="settings_anticipation_views">No máximo %1$d vistas por página</string>
-    <string name="settings_fingerprint_features">Rabisco</string>
-    <string name="settings_fingerprint_superpoint">SuperPoint</string>
-    <string name="settings_fingerprint_half_sphere">Meia esfera</string>
-    <string name="settings_fingerprint_both">Ambos</string>
-    <string name="settings_fingerprint_superpoint_desc">Só traços SuperPoint da captura. Resiste a luz e desgaste; cerca de 1,5 MB por Rabisco. Vale a partir do próximo Rabisco.</string>
-    <string name="settings_fingerprint_half_sphere_desc">Traços ORB da captura e dos seus 49 close-ups. Forte de perto e pequeno, menos de 0,1 MB por Rabisco. Vale a partir do próximo Rabisco.</string>
-    <string name="settings_fingerprint_both_desc">Traços SuperPoint da captura e dos seus 49 close-ups. O mais forte; cerca de 2–3 MB por Rabisco. Vale a partir do próximo Rabisco.</string>
+    <string name="settings_doodle_features">Rabisco</string>
+    <string name="settings_doodle_superpoint">SuperPoint</string>
+    <string name="settings_doodle_half_sphere">Meia esfera</string>
+    <string name="settings_doodle_both">Ambos</string>
+    <string name="settings_doodle_superpoint_desc">Só traços SuperPoint da captura. Resiste a luz e desgaste; cerca de 1,5 MB por Rabisco. Vale a partir do próximo Rabisco.</string>
+    <string name="settings_doodle_half_sphere_desc">Traços ORB da captura e dos seus 49 close-ups. Forte de perto e pequeno, menos de 0,1 MB por Rabisco. Vale a partir do próximo Rabisco.</string>
+    <string name="settings_doodle_both_desc">Traços SuperPoint da captura e dos seus 49 close-ups. O mais forte; cerca de 2–3 MB por Rabisco. Vale a partir do próximo Rabisco.</string>
     <string name="settings_power_section">Energia</string>
     <string name="settings_privacy_section">Privacidade</string>
     <string name="settings_developer_section">Desenvolvedor</string>
@@ -430,7 +430,7 @@
     <string name="target_review_desc">Revisar Rabisco Extraído</string>
     <string name="target_unwarp_hint">Arraste os cantos para desfazer distorções</string>
     <string name="target_review_title">RABISCO TRAVADO</string>
-    <string name="fingerprint_closeups_progress">Aprendendo a parede: etapa %1$d de %2$d · passo %3$d de %4$d</string>
+    <string name="doodle_closeups_progress">Aprendendo a parede: etapa %1$d de %2$d · passo %3$d de %4$d</string>
 
     <string name="target_exclude">Excluir</string>
     <string name="target_include">Incluir</string>
@@ -731,7 +731,7 @@
     <string name="ar_feedback_open_project_first">Abra um projeto antes de compartilhar — ainda não há nada para enviar a um convidado</string>
     <string name="ar_feedback_host_need_target_arcore">Capture e trave um Rabisco atual antes de hospedar</string>
     <string name="ar_feedback_host_need_target_standalone">Capture um alvo de parede independente antes de hospedar</string>
-    <string name="ar_feedback_fingerprint_not_ready">O Rabisco ainda não está pronto — mantenha-o à vista e tente Hospedar de novo</string>
+    <string name="ar_feedback_doodle_not_ready">O Rabisco ainda não está pronto — mantenha-o à vista e tente Hospedar de novo</string>
     <string name="ar_feedback_package_failed">Não foi possível empacotar este projeto para compartilhar — tente salvá-lo primeiro</string>
     <string name="ar_feedback_host_failed">Não foi possível iniciar o compartilhamento: %1$s</string>
     <string name="ar_feedback_join_load_failed">Não foi possível carregar o projeto do anfitrião — a sessão foi encerrada.</string>

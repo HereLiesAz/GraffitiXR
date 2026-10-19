@@ -1,6 +1,6 @@
-// BACKLOG Phase 7: stale co-registration state must not survive a fingerprint replacement.
-// Phase 1 fixed restoreWallFingerprint (descriptors-only) and alignToFingerprint (co-op peer) to
-// reset the capture view / anchor / canonical patch a previous metric fingerprint left behind;
+// BACKLOG Phase 7: stale co-registration state must not survive a doodle replacement.
+// Phase 1 fixed restoreWallDoodle (descriptors-only) and alignToDoodle (co-op peer) to
+// reset the capture view / anchor / canonical patch a previous metric doodle left behind;
 // these pin those resets. Private state is read through the MobileGSTestPeer friend.
 #include <gtest/gtest.h>
 #include <opencv2/opencv.hpp>
@@ -21,7 +21,7 @@ const float kIntr[4]      = {500.f, 500.f, 320.f, 240.f};
 void seedMetric(MobileGS& g) {
     cv::Mat descs(4, 32, CV_8U, cv::Scalar(7));
     std::vector<cv::Point3f> pts = {{0,0,0}, {0.1f,0,0}, {0,0.1f,0}, {0.1f,0.1f,0}};
-    g.restoreWallFingerprintMetric(descs, pts, kAnchor, kIntr, kView);
+    g.restoreWallDoodleMetric(descs, pts, kAnchor, kIntr, kView);
     g.setWallPatch(cv::Mat(64, 64, CV_8UC1, cv::Scalar(200)));
     ASSERT_TRUE(MobileGSTestPeer::hasView(g));
     ASSERT_TRUE(MobileGSTestPeer::hasPatch(g));
@@ -30,7 +30,7 @@ void seedMetric(MobileGS& g) {
 
 void expectIdentityAnchor(MobileGS& g) {
     float out[16];
-    g.getFingerprintAnchor(out); // the value Kotlin composes against
+    g.getDoodleAnchor(out); // the value Kotlin composes against
     for (int i = 0; i < 16; ++i) EXPECT_FLOAT_EQ(out[i], kIdentity[i]) << "anchor[" << i << "]";
 }
 
@@ -40,29 +40,29 @@ void expectZeroIntrinsics(MobileGS& g) {
 
 } // namespace
 
-TEST(MobileGSFingerprintState, DescriptorsOnlyRestoreClearsPreviousCoRegistration) {
+TEST(MobileGSDoodleState, DescriptorsOnlyRestoreClearsPreviousCoRegistration) {
     MobileGS g;
     seedMetric(g);
     cv::Mat descs(2, 32, CV_8U, cv::Scalar(9));
-    g.restoreWallFingerprint(descs, {{1,1,1}, {2,2,2}});
+    g.restoreWallDoodle(descs, {{1,1,1}, {2,2,2}});
     EXPECT_FALSE(MobileGSTestPeer::hasView(g));
     EXPECT_FALSE(MobileGSTestPeer::hasPatch(g));
     expectIdentityAnchor(g);
     expectZeroIntrinsics(g);
 }
 
-TEST(MobileGSFingerprintState, PeerFingerprintDoesNotInheritLocalAnchorOrView) {
+TEST(MobileGSDoodleState, PeerDoodleDoesNotInheritLocalAnchorOrView) {
     MobileGS host;
     {
         cv::Mat descs(3, 32, CV_8U, cv::Scalar(3));
-        host.restoreWallFingerprint(descs, {{0,0,0}, {1,0,0}, {0,1,0}});
+        host.restoreWallDoodle(descs, {{0,0,0}, {1,0,0}, {0,1,0}});
     }
-    const std::vector<uint8_t> wire = host.exportFingerprint();
+    const std::vector<uint8_t> wire = host.exportDoodle();
     ASSERT_FALSE(wire.empty());
 
     MobileGS guest;
     seedMetric(guest);
-    // State co-registered to the LOCAL frame that a peer's fingerprint must not inherit.
+    // State co-registered to the LOCAL frame that a peer's doodle must not inherit.
     {
         const float fpFromDesign[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0,0,1.5f,1};
         guest.setDesignPlacement(fpFromDesign, 0.4f, 0.3f);
@@ -77,12 +77,12 @@ TEST(MobileGSFingerprintState, PeerFingerprintDoesNotInheritLocalAnchorOrView) {
     }
     const uint64_t mapRevBefore = guest.getWallFeatureMapRevision();
 
-    guest.alignToFingerprint(wire.data(), wire.size());
+    guest.alignToDoodle(wire.data(), wire.size());
     EXPECT_FALSE(MobileGSTestPeer::hasView(guest));
     expectIdentityAnchor(guest);
     expectZeroIntrinsics(guest);
-    // ...and everything else clearWallFingerprint drops for the same reason.
-    EXPECT_FALSE(MobileGSTestPeer::hasPatch(guest)) << "local canonical patch survived a peer fingerprint";
+    // ...and everything else clearWallDoodle drops for the same reason.
+    EXPECT_FALSE(MobileGSTestPeer::hasPatch(guest)) << "local canonical patch survived a peer doodle";
     EXPECT_FALSE(MobileGSTestPeer::hasDesignPlacement(guest)) << "design placement is local-frame-relative";
     EXPECT_FLOAT_EQ(0.f, MobileGSTestPeer::designHalfW(guest));
     EXPECT_EQ(0, guest.getMapPointCount()) << "wall feature map is co-registered to the local anchor";
@@ -91,49 +91,49 @@ TEST(MobileGSFingerprintState, PeerFingerprintDoesNotInheritLocalAnchorOrView) {
     EXPECT_EQ(3, guest.getWallKeypointCount());
 }
 
-TEST(MobileGSFingerprintState, MetricRestoreOfADifferentFingerprintDropsThePatch) {
+TEST(MobileGSDoodleState, MetricRestoreOfADifferentDoodleDropsThePatch) {
     MobileGS g;
     seedMetric(g);
     cv::Mat descs(4, 32, CV_8U, cv::Scalar(8));   // different content
     std::vector<cv::Point3f> pts = {{0,0,1}, {0.2f,0,1}, {0,0.2f,1}, {0.2f,0.2f,1}};
-    g.restoreWallFingerprintMetric(descs, pts, kAnchor, kIntr, kView);
+    g.restoreWallDoodleMetric(descs, pts, kAnchor, kIntr, kView);
     EXPECT_FALSE(MobileGSTestPeer::hasPatch(g)) << "previous wall's patch survived onto a new wall";
     EXPECT_TRUE(MobileGSTestPeer::hasView(g));
 }
 
-TEST(MobileGSFingerprintState, MetricRePushOfTheSameFingerprintKeepsThePatch) {
+TEST(MobileGSDoodleState, MetricRePushOfTheSameDoodleKeepsThePatch) {
     // The Phase-2 repartition path and a standalone re-seed push the identical point set again
     // (only the partition differs). That is the same wall, so its patch must survive.
     MobileGS g;
     seedMetric(g);
     cv::Mat descs(4, 32, CV_8U, cv::Scalar(7));
     std::vector<cv::Point3f> pts = {{0,0,0}, {0.1f,0,0}, {0,0.1f,0}, {0.1f,0.1f,0}};
-    g.restoreWallFingerprintMetric(descs, pts, kAnchor, kIntr, kView, {0, 1, 2, 0});
+    g.restoreWallDoodleMetric(descs, pts, kAnchor, kIntr, kView, {0, 1, 2, 0});
     EXPECT_TRUE(MobileGSTestPeer::hasPatch(g));
 }
 
-TEST(MobileGSFingerprintState, ClearResetsTheOutcomeCodes) {
+TEST(MobileGSDoodleState, ClearResetsTheOutcomeCodes) {
     MobileGS g;
     seedMetric(g);
     MobileGSTestPeer::setCorrobGate(g, MobileGS::kCorrobGated);
     MobileGSTestPeer::setGrowOutcome(g, MobileGS::kGrowPromoted);
-    g.clearWallFingerprint();
+    g.clearWallDoodle();
     EXPECT_EQ(MobileGS::kCorrobNotRun, g.corrobGateReason());
     EXPECT_EQ(MobileGS::kGrowNotRun, g.growOutcome());
     EXPECT_FALSE(MobileGSTestPeer::hasPatch(g));
 }
 
-TEST(MobileGSFingerprintState, MalformedPeerBytesChangeNothing) {
+TEST(MobileGSDoodleState, MalformedPeerBytesChangeNothing) {
     MobileGS guest;
     seedMetric(guest);
     const uint8_t junk[8] = {0xff, 0xff, 0xff, 0x7f, 0, 0, 0, 0};
-    guest.alignToFingerprint(junk, sizeof junk);
+    guest.alignToDoodle(junk, sizeof junk);
     EXPECT_TRUE(MobileGSTestPeer::hasView(guest));
     EXPECT_EQ(0, std::memcmp(MobileGSTestPeer::anchor(guest), kAnchor, sizeof kAnchor));
 }
 
-TEST(MobileGSFingerprintState, ClearForgetsTheLatchedPnpResultButKeepsTheSeqMonotonic) {
-    // A re-capture hands Kotlin the latched result; it was solved against the OLD fingerprint.
+TEST(MobileGSDoodleState, ClearForgetsTheLatchedPnpResultButKeepsTheSeqMonotonic) {
+    // A re-capture hands Kotlin the latched result; it was solved against the OLD doodle.
     MobileGS g;
     seedMetric(g);
     MobileGSTestPeer::setPnpResult(g, 40, 50, 7);
@@ -142,7 +142,7 @@ TEST(MobileGSFingerprintState, ClearForgetsTheLatchedPnpResultButKeepsTheSeqMono
     ASSERT_FLOAT_EQ(40.f, out[16]);
     ASSERT_FLOAT_EQ(7.f, out[18]);
 
-    g.clearWallFingerprint();
+    g.clearWallDoodle();
     g.getRelocResult(out, true);
     EXPECT_FLOAT_EQ(0.f, out[16]) << "stale inliers survived the clear";
     EXPECT_FLOAT_EQ(0.f, out[17]) << "stale matches survived the clear";
@@ -150,48 +150,48 @@ TEST(MobileGSFingerprintState, ClearForgetsTheLatchedPnpResultButKeepsTheSeqMono
     for (int i = 0; i < 16; ++i) EXPECT_FLOAT_EQ(kIdentity[i], out[i]) << "pose[" << i << "]";
 }
 
-TEST(MobileGSFingerprintState, EveryReplacementAdvancesTheGenerationAndForgetsTheLatchedResult) {
+TEST(MobileGSDoodleState, EveryReplacementAdvancesTheGenerationAndForgetsTheLatchedResult) {
     MobileGS g;
     seedMetric(g);
-    const auto g0 = MobileGSTestPeer::fingerprintGeneration(g);
+    const auto g0 = MobileGSTestPeer::doodleGeneration(g);
 
     // A re-push of the identical frame (repartition) keeps the standing result and the generation.
     MobileGSTestPeer::setPnpResult(g, 40, 50, 7);
     cv::Mat same(4, 32, CV_8U, cv::Scalar(7));
     std::vector<cv::Point3f> samePts = {{0,0,0}, {0.1f,0,0}, {0,0.1f,0}, {0.1f,0.1f,0}};
-    g.restoreWallFingerprintMetric(same, samePts, kAnchor, kIntr, kView, {0, 1, 2, 0});
-    EXPECT_EQ(g0, MobileGSTestPeer::fingerprintGeneration(g));
+    g.restoreWallDoodleMetric(same, samePts, kAnchor, kIntr, kView, {0, 1, 2, 0});
+    EXPECT_EQ(g0, MobileGSTestPeer::doodleGeneration(g));
     float out[35];
     g.getRelocResult(out, true);
     EXPECT_FLOAT_EQ(40.f, out[16]);
 
-    // A different fingerprint (re-capture / project switch) advances it and drops the result, while
+    // A different doodle (re-capture / project switch) advances it and drops the result, while
     // the seq stays monotonic.
     cv::Mat other(4, 32, CV_8U, cv::Scalar(8));
-    g.restoreWallFingerprintMetric(other, {{0,0,1}, {0.2f,0,1}, {0,0.2f,1}, {0.2f,0.2f,1}}, kAnchor, kIntr, kView);
-    const auto g1 = MobileGSTestPeer::fingerprintGeneration(g);
+    g.restoreWallDoodleMetric(other, {{0,0,1}, {0.2f,0,1}, {0,0.2f,1}, {0.2f,0.2f,1}}, kAnchor, kIntr, kView);
+    const auto g1 = MobileGSTestPeer::doodleGeneration(g);
     EXPECT_GT(g1, g0);
     g.getRelocResult(out, true);
     EXPECT_FLOAT_EQ(0.f, out[16]);
     EXPECT_FLOAT_EQ(7.f, out[18]);
 
     // Same points but a different anchor is a different frame.
-    g.restoreWallFingerprintMetric(other, {{0,0,1}, {0.2f,0,1}, {0,0.2f,1}, {0.2f,0.2f,1}}, kIdentity, kIntr, kView);
-    EXPECT_GT(MobileGSTestPeer::fingerprintGeneration(g), g1);
+    g.restoreWallDoodleMetric(other, {{0,0,1}, {0.2f,0,1}, {0,0.2f,1}, {0.2f,0.2f,1}}, kIdentity, kIntr, kView);
+    EXPECT_GT(MobileGSTestPeer::doodleGeneration(g), g1);
 
-    const auto g2 = MobileGSTestPeer::fingerprintGeneration(g);
-    g.restoreWallFingerprint(cv::Mat(3, 32, CV_8U, cv::Scalar(1)), {{0,0,0}, {1,0,0}, {0,1,0}});
-    const auto g3 = MobileGSTestPeer::fingerprintGeneration(g);
+    const auto g2 = MobileGSTestPeer::doodleGeneration(g);
+    g.restoreWallDoodle(cv::Mat(3, 32, CV_8U, cv::Scalar(1)), {{0,0,0}, {1,0,0}, {0,1,0}});
+    const auto g3 = MobileGSTestPeer::doodleGeneration(g);
     EXPECT_GT(g3, g2);
-    g.clearWallFingerprint();
-    EXPECT_GT(MobileGSTestPeer::fingerprintGeneration(g), g3);
+    g.clearWallDoodle();
+    EXPECT_GT(MobileGSTestPeer::doodleGeneration(g), g3);
 }
 
-TEST(MobileGSFingerprintState, PeerFingerprintWithMismatchedPointAndDescriptorCountsIsRejected) {
+TEST(MobileGSDoodleState, PeerDoodleWithMismatchedPointAndDescriptorCountsIsRejected) {
     MobileGS host;
     cv::Mat descs(3, 32, CV_8U, cv::Scalar(3));
-    host.restoreWallFingerprint(descs, {{0,0,0}, {1,0,0}, {0,1,0}});
-    std::vector<uint8_t> wire = host.exportFingerprint();
+    host.restoreWallDoodle(descs, {{0,0,0}, {1,0,0}, {0,1,0}});
+    std::vector<uint8_t> wire = host.exportDoodle();
     ASSERT_FALSE(wire.empty());
     // Wire layout: u32 numPoints, numPoints * Point3f, then u32 descRows... Lower numPoints to 2 and
     // drop one point's bytes so every length check still passes and ONLY the count mismatch remains.
@@ -201,7 +201,7 @@ TEST(MobileGSFingerprintState, PeerFingerprintWithMismatchedPointAndDescriptorCo
 
     MobileGS guest;
     seedMetric(guest);
-    guest.alignToFingerprint(wire.data(), wire.size());
-    EXPECT_EQ(4, guest.getWallKeypointCount()) << "a mismatched peer fingerprint replaced the local one";
+    guest.alignToDoodle(wire.data(), wire.size());
+    EXPECT_EQ(4, guest.getWallKeypointCount()) << "a mismatched peer doodle replaced the local one";
     EXPECT_TRUE(MobileGSTestPeer::hasView(guest));
 }

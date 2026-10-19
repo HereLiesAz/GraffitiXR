@@ -365,13 +365,13 @@
     <string name="settings_anticipation_heat">Wärme drosselt um</string>
     <string name="settings_anticipation_compute">Last drosselt um</string>
     <string name="settings_anticipation_views">Höchstens %1$d Ansichten pro Seite</string>
-    <string name="settings_fingerprint_features">Kritzelei</string>
-    <string name="settings_fingerprint_superpoint">SuperPoint</string>
-    <string name="settings_fingerprint_half_sphere">Halbkugel</string>
-    <string name="settings_fingerprint_both">Beides</string>
-    <string name="settings_fingerprint_superpoint_desc">Nur SuperPoint-Merkmale der Aufnahme. Hält bei Licht und Abnutzung; etwa 1,5 MB pro Kritzelei. Gilt ab der nächsten Kritzelei.</string>
-    <string name="settings_fingerprint_half_sphere_desc">ORB-Merkmale der Aufnahme und ihrer 49 Nahansichten. Stark aus der Nähe und klein, unter 0,1 MB pro Kritzelei. Gilt ab der nächsten Kritzelei.</string>
-    <string name="settings_fingerprint_both_desc">SuperPoint-Merkmale der Aufnahme und ihrer 49 Nahansichten. Am stärksten; etwa 2–3 MB pro Kritzelei. Gilt ab der nächsten Kritzelei.</string>
+    <string name="settings_doodle_features">Kritzelei</string>
+    <string name="settings_doodle_superpoint">SuperPoint</string>
+    <string name="settings_doodle_half_sphere">Halbkugel</string>
+    <string name="settings_doodle_both">Beides</string>
+    <string name="settings_doodle_superpoint_desc">Nur SuperPoint-Merkmale der Aufnahme. Hält bei Licht und Abnutzung; etwa 1,5 MB pro Kritzelei. Gilt ab der nächsten Kritzelei.</string>
+    <string name="settings_doodle_half_sphere_desc">ORB-Merkmale der Aufnahme und ihrer 49 Nahansichten. Stark aus der Nähe und klein, unter 0,1 MB pro Kritzelei. Gilt ab der nächsten Kritzelei.</string>
+    <string name="settings_doodle_both_desc">SuperPoint-Merkmale der Aufnahme und ihrer 49 Nahansichten. Am stärksten; etwa 2–3 MB pro Kritzelei. Gilt ab der nächsten Kritzelei.</string>
     <string name="settings_power_section">Energie</string>
     <string name="settings_privacy_section">Datenschutz</string>
     <string name="settings_developer_section">Entwickler</string>
@@ -430,7 +430,7 @@
     <string name="target_review_desc">Extrahierte Kritzelei überprüfen</string>
     <string name="target_unwarp_hint">Ecken ziehen zum Entzerren</string>
     <string name="target_review_title">KRITZELEI FIXIERT</string>
-    <string name="fingerprint_closeups_progress">Die Wand lernen: Phase %1$d von %2$d · Schritt %3$d von %4$d</string>
+    <string name="doodle_closeups_progress">Die Wand lernen: Phase %1$d von %2$d · Schritt %3$d von %4$d</string>
 
     <string name="target_exclude">Ausschließen</string>
     <string name="target_include">Einschließen</string>
@@ -731,7 +731,7 @@
     <string name="ar_feedback_open_project_first">Öffne ein Projekt, bevor du teilst – es gibt noch nichts, was an einen Gast gesendet werden könnte</string>
     <string name="ar_feedback_host_need_target_arcore">Erfasse und fixiere eine aktuelle Kritzelei, bevor du „Hosten“ startest</string>
     <string name="ar_feedback_host_need_target_standalone">Erfasse vor dem Hosten ein eigenständiges Wandziel</string>
-    <string name="ar_feedback_fingerprint_not_ready">Die Kritzelei ist noch nicht bereit — halte sie im Bild und versuche es erneut mit „Hosten“</string>
+    <string name="ar_feedback_doodle_not_ready">Die Kritzelei ist noch nicht bereit — halte sie im Bild und versuche es erneut mit „Hosten“</string>
     <string name="ar_feedback_package_failed">Dieses Projekt konnte nicht zum Teilen gepackt werden – speichere es zuerst</string>
     <string name="ar_feedback_host_failed">Das Teilen konnte nicht gestartet werden: %1$s</string>
     <string name="ar_feedback_join_load_failed">Das Projekt des Hosts konnte nicht geladen werden – die Sitzung wurde beendet.</string>

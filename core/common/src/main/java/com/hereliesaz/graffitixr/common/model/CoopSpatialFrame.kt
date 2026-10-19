@@ -10,7 +10,7 @@ const val COOP_SPATIAL_FRAME_SCHEMA_VERSION: Int = 1
  * Pose backend that owns the host wall frame advertised to a co-op guest.
  *
  * This is descriptive metadata, not permission to reinterpret one backend's world frame as the
- * other. Every co-op pose crosses through [CoopSpatialFrame.fingerprintFromWall].
+ * other. Every co-op pose crosses through [CoopSpatialFrame.doodleFromWall].
  */
 @Serializable
 enum class CoopTrackingBackend {
@@ -32,54 +32,54 @@ enum class CoopSpatialScale {
 }
 
 /**
- * Explicit bridge from a host's durable wall-local coordinates to the fingerprint object points
+ * Explicit bridge from a host's durable wall-local coordinates to the doodle object points
  * shipped over co-op.
  *
- * The transform is `fingerprint_from_wall`:
- * - ARCore host: `Fingerprint.captureAnchorCam = V_cv(capture) * anchorModel`;
- * - standalone host: identity, because the SphereSLAM fingerprint already stores points directly in
+ * The transform is `doodle_from_wall`:
+ * - ARCore host: `Doodle.captureAnchorCam = V_cv(capture) * anchorModel`;
+ * - standalone host: identity, because the SphereSLAM doodle already stores points directly in
  *   the canonical centered KPM wall frame.
  *
  * A peer PnP solve therefore becomes one backend-neutral wall view:
  *
- * `cameraGL_from_wall = CV_TO_GL * pnpCV_camera_from_fingerprint * fingerprintFromWall`.
+ * `cameraGL_from_wall = CV_TO_GL * pnpCV_camera_from_doodle * doodleFromWall`.
  */
 @Serializable
 data class CoopSpatialFrame(
     val schemaVersion: Int = COOP_SPATIAL_FRAME_SCHEMA_VERSION,
     val hostBackend: CoopTrackingBackend,
     @SerialName("fingerprintFrameVersion")
-    val fingerprintFrameVersion: Int,
+    val doodleFrameVersion: Int,
     val scale: CoopSpatialScale,
     /**
-     * Whether the bulk snapshot carries a PnP fingerprint in this frame. Standalone peers can share
+     * Whether the bulk snapshot carries a PnP doodle in this frame. Standalone peers can share
      * one KPM page without it; every cross-backend pairing needs it as the geometric bridge.
      */
     @SerialName("fingerprintAvailable")
-    val fingerprintAvailable: Boolean,
-    /** Stable for the host wall target; changes when the target/fingerprint is replaced. */
+    val doodleAvailable: Boolean,
+    /** Stable for the host wall target; changes when the target/doodle is replaced. */
     val anchorRevision: Long,
     /** One useful wall-width scale in this frame. Metres for METRIC, page units otherwise. */
     val referenceWidthUnits: Float,
-    /** Column-major rigid 4x4 transform: fingerprint object frame from host wall-local frame. */
+    /** Column-major rigid 4x4 transform: doodle object frame from host wall-local frame. */
     @SerialName("fingerprintFromWall")
-    val fingerprintFromWall: List<Float>,
+    val doodleFromWall: List<Float>,
 ) {
     init {
         require(schemaVersion == COOP_SPATIAL_FRAME_SCHEMA_VERSION) {
             "unsupported co-op spatial frame schema: $schemaVersion"
         }
-        require(fingerprintFrameVersion > 0) { "fingerprint frame version must be positive" }
+        require(doodleFrameVersion > 0) { "doodle frame version must be positive" }
         require(referenceWidthUnits.isFinite() && referenceWidthUnits > 0f) {
             "referenceWidthUnits must be finite and positive"
         }
-        require(fingerprintFromWall.size == 16 && fingerprintFromWall.all { it.isFinite() }) {
-            "fingerprintFromWall must be a finite column-major 4x4"
+        require(doodleFromWall.size == 16 && doodleFromWall.all { it.isFinite() }) {
+            "doodleFromWall must be a finite column-major 4x4"
         }
-        require(kotlin.math.abs(fingerprintFromWall[3]) < 1e-4f)
-        require(kotlin.math.abs(fingerprintFromWall[7]) < 1e-4f)
-        require(kotlin.math.abs(fingerprintFromWall[11]) < 1e-4f)
-        require(kotlin.math.abs(fingerprintFromWall[15] - 1f) < 1e-4f)
+        require(kotlin.math.abs(doodleFromWall[3]) < 1e-4f)
+        require(kotlin.math.abs(doodleFromWall[7]) < 1e-4f)
+        require(kotlin.math.abs(doodleFromWall[11]) < 1e-4f)
+        require(kotlin.math.abs(doodleFromWall[15] - 1f) < 1e-4f)
     }
 
     /**
@@ -88,8 +88,8 @@ data class CoopSpatialFrame(
      * would silently relabel arbitrary page units as metres.
      */
     fun supportsGuest(guestBackend: CoopTrackingBackend): Boolean {
-        if (guestBackend != hostBackend && !fingerprintAvailable) return false
-        if (hostBackend == CoopTrackingBackend.ARCORE && !fingerprintAvailable) return false
+        if (guestBackend != hostBackend && !doodleAvailable) return false
+        if (hostBackend == CoopTrackingBackend.ARCORE && !doodleAvailable) return false
         return scale == CoopSpatialScale.METRIC ||
             (hostBackend == CoopTrackingBackend.SPHERESLAM &&
                 guestBackend == CoopTrackingBackend.SPHERESLAM)

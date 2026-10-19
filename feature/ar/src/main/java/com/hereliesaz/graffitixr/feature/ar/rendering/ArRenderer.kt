@@ -74,7 +74,7 @@ class ArRenderer(
     // light that never came on.
     private val onFlashlightUnavailable: () -> Unit = {},
     // Fired from the GL thread when the artwork's footprint appears or changes size — the artist
-    // placed a design, or pinched one. IMPLEMENTATION.md 2.2/2.4: this is where the fingerprint
+    // placed a design, or pinched one. IMPLEMENTATION.md 2.2/2.4: this is where the doodle
     // actually gets partitioned, because target creation is what establishes the anchor the artwork
     // sits on, so a capture has no footprint to partition against.
     //
@@ -83,7 +83,7 @@ class ArRenderer(
     // saves a listener that would otherwise have to poll. It is a FILTER, not a debounce — a live
     // pinch still fires every frame, and collapsing that is the consumer's job.
     private val onDesignFootprintChanged:
-        (com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.DesignFootprint) -> Unit = {},
+        (com.hereliesaz.graffitixr.feature.ar.anchor.DoodlePartition.DesignFootprint) -> Unit = {},
 ) : GLSurfaceView.Renderer {
 
     /**
@@ -361,7 +361,7 @@ class ArRenderer(
     private val relocBuf = FloatArray(com.hereliesaz.graffitixr.nativebridge.SlamManager.RELOC_RESULT_SIZE)
     // A/B switch for the Sub-project A harness: when false, the overlay is driven purely by the
     // world-locked ARCore anchor (the stable pre/post-anchor behavior). When true, the mark-PnP
-    // relocalization correction is fused on top — which, for a richly-detailed fingerprint (e.g. a
+    // relocalization correction is fused on top — which, for a richly-detailed doodle (e.g. a
     // painting) that relocalizes nearly every frame, can yank the overlay to a camera-relative pose
     // and make it ride the screen. Default ON: without it a saved target never pulls the overlay onto
     // the wall; the artist can switch it off from the diagnostics overlay.
@@ -635,13 +635,13 @@ class ArRenderer(
 
     // First-run doodle demo. doodleLockActive is set by the host while the onboarding overlay is up;
     // when active the renderer auto-establishes a wall anchor, and (once the host has built a
-    // fingerprint from the user's drawing) tracks the fused mark-PnP pose, firing onDoodleLocked when
+    // doodle from the user's drawing) tracks the fused mark-PnP pose, firing onDoodleLocked when
     // it holds steady AND relocalization is confident (DOODLE_MIN_RELOC_INLIERS).
     private val anchorLockTracker = AnchorLockTracker()
     private var doodleLockReported = false
     private var doodleAutoAnchorRequested = false
     // Wall plane the doodle anchor landed on: [px,py,pz, nx,ny,nz] in world space. Written on the GL
-    // thread at anchor establishment, read off-thread by ArViewModel to build the fingerprint from the
+    // thread at anchor establishment, read off-thread by ArViewModel to build the doodle from the
     // user's drawing (no tap). Volatile for safe publication across threads.
     @Volatile
     var doodleWallPlane: FloatArray? = null
@@ -722,11 +722,11 @@ class ArRenderer(
     @Volatile var isCapturingTarget: Boolean = false
     @Volatile var pendingAnchorEstablishment: Boolean = false
     // The wall plane the artist tapped to create this target, [px,py,pz, nx,ny,nz] in world space.
-    // The anchor is placed ON it: that is the surface the fingerprint is back-projected onto, so an
+    // The anchor is placed ON it: that is the surface the doodle is back-projected onto, so an
     // anchor anywhere else (a stray hit-test point, or a free point in the air) is co-registered with
     // a different surface than the marks. Consumed by the next establishment.
     @Volatile var pendingCapturedWallPlane: FloatArray? = null
-    // Return-visit anchoring. A reopened project (or a co-op guest) restores its fingerprint and the
+    // Return-visit anchoring. A reopened project (or a co-op guest) restores its doodle and the
     // native reloc thread solves PnP against it, but nothing used to turn that solve into an anchor:
     // the only anchor sources were a fresh capture (which overwrites the saved target) and the doodle
     // demo. So the mural never came back to the wall. When a saved capture pose exists and no anchor
@@ -793,7 +793,7 @@ class ArRenderer(
     /**
      * One-time rotation correction, computed the instant an anchor is established and never touched
      * again until the next one. ARCore tracks and drift-corrects an anchor's pose continuously, and
-     * once a fingerprint exists PoseFusion refines it further — that rotation is already the
+     * once a doodle exists PoseFusion refines it further — that rotation is already the
      * correctly-tracked orientation ARCore/the consensus system produced; this app's only real job is
      * choosing which way is "up, facing the user" for the artwork, which is a one-time framing
      * decision, not something that needs re-solving every frame.
@@ -858,7 +858,7 @@ class ArRenderer(
     @Volatile var currentMetersPerPixel: Float = 0f
     // In-plane offset (overlay-local meters) that shifts the overlay center from the tracked anchor
     // onto the matched-marks centroid. Recomputed each frame from SlamManager.overlayMarkCenterLocal
-    // (the marks centroid in the fingerprint anchor's frame) against the live anchor, so it tracks
+    // (the marks centroid in the doodle anchor's frame) against the live anchor, so it tracks
     // drift and survives anchor re-establishment and project reload.
     private var markOffsetX: Float = 0f
     private var markOffsetY: Float = 0f
@@ -874,7 +874,7 @@ class ArRenderer(
     // Parallel wall tracker. It observes camera luma beside ARCore; it never replaces poseSource.
     // Its output is reserved for relocalization/drift fusion once metric page scale is established.
     private val sphereSlamTracker = com.hereliesaz.sphereslam.SphereSlamTracker()
-    // The app's anticipated views of the KPM page (the fingerprint's teleological layer): the
+    // The app's anticipated views of the KPM page (the doodle's teleological layer): the
     // half-sphere of Settings → Anticipation, throttled by battery, heat and this renderer's load.
     private val anticipation = com.hereliesaz.graffitixr.feature.ar.anticipation.AnticipationFeeder(
         sink = object : com.hereliesaz.graffitixr.feature.ar.anticipation.AnticipationFeeder.Sink {
@@ -960,9 +960,9 @@ class ArRenderer(
     /**
      * Emitted on the GL thread when a new ARCore target capture begins. The owner must drop any
      * frozen-but-uncommitted page from an earlier capture; it must NOT eagerly delete the persisted
-     * page, because a capture can still be cancelled or fail to produce a fingerprint, and the
-     * persisted page is bound to its fingerprint (see ArViewModel) and simply stops restoring once a
-     * newer fingerprint replaces it.
+     * page, because a capture can still be cancelled or fail to produce a doodle, and the
+     * persisted page is bound to its doodle (see ArViewModel) and simply stops restoring once a
+     * newer doodle replaces it.
      */
     @Volatile var onHybridPageInvalidated: (() -> Unit)? = null
 
@@ -1220,7 +1220,7 @@ class ArRenderer(
         // Re-arm the one-shot screen fit. This call OVERWRITES whatever the fit last set with a 10 m
         // placeholder; without re-arming, the fit never restores a real size, the published design
         // footprint stays that placeholder, and Φ swallows every feature in view — reporting zero
-        // backbone, and repartitioning the live fingerprint into one that can never relocalize.
+        // backbone, and repartitioning the live doodle into one that can never relocalize.
         quadInitialFitApplied = false
     }
 
@@ -1685,7 +1685,7 @@ class ArRenderer(
             // at full brightness/colour only where it has been mapped — so the user literally sees
             // what hasn't been scanned yet (it stays dark).
             // A1 (voxel-map removal): the dense voxel map is being retired — it never fed pose
-            // (relocalization rides the fingerprint + PnP), and was scan-reveal visualization only.
+            // (relocalization rides the doodle + PnP), and was scan-reveal visualization only.
             // Forcing the reveal mask off disables drawCoverage() and the camera dimming. Reversible:
             // restore the !anchorEstablished/VOXEL_HASH predicate to re-enable. Native map processing is
             // untouched here (A3 removes it).
@@ -1712,7 +1712,7 @@ class ArRenderer(
 
             lastStep = "anchorEstablish"
             // First-run doodle demo: once a surface exists and we're tracking, auto-establish the
-            // wall anchor (same path as a capture confirm, minus the fingerprint) so the scribble has
+            // wall anchor (same path as a capture confirm, minus the doodle) so the scribble has
             // somewhere to stick. One-shot per doodle session.
             if (doodleLockActive && !anchorEstablished && !pendingAnchorEstablishment &&
                 !doodleAutoAnchorRequested && planeDetectedReported &&
@@ -1722,7 +1722,7 @@ class ArRenderer(
                 pendingAnchorEstablishment = true
             }
             if (!anchorEstablished && !pendingAnchorEstablishment && !isCapturingTarget &&
-                !slamManager.awaitingNewFingerprint &&
+                !slamManager.awaitingNewDoodle &&
                 frame.camera.trackingState == TrackingState.TRACKING
             ) {
                 val cac = slamManager.captureAnchorCam
@@ -1881,7 +1881,7 @@ class ArRenderer(
                             // shifts its centre by a lot. The anchor rides along.
                             //
                             // A device run showed exactly this: the overlay receding 6.2 -> 16.0 ft in
-                            // four seconds, accelerating, with fusion off and no fingerprint — nothing
+                            // four seconds, accelerating, with fusion off and no doodle — nothing
                             // downstream of the anchor was even running. A screenshot from the same
                             // session showed the plane polygon itself spanning a canvas, a doorway and
                             // the floor as one badly-fit surface — the exact shape of trackable this
@@ -1962,7 +1962,7 @@ class ArRenderer(
                     lastOverlayDiagMs = 0L // log the new anchor's basis on the next frame
                     slamManager.updateAnchorTransform(anchorModelMatrix)
                     // Doodle demo: publish the wall plane (anchor point + surface normal) so the
-                    // ViewModel can build a fingerprint from the drawing and relocalize against it.
+                    // ViewModel can build a doodle from the drawing and relocalize against it.
                     if (doodleLockActive) {
                         // ONLY with a real normal. `anchorSurfaceNormal` is deliberately zeroed on
                         // two branches above — no surface geometry, and a cross product too short to
@@ -1972,7 +1972,7 @@ class ArRenderer(
                         // A zero normal is not a bad plane, it is a plane that rejects everything:
                         // `MetricMarks.backProjectToPlane` (SphereSLAM) computes `nDotD = n·d`, which is exactly 0 for
                         // every pixel, so every ray trips the parallel test and NOT ONE feature is
-                        // ever placed. The fingerprint build then fails on every capture, for any
+                        // ever placed. The doodle build then fails on every capture, for any
                         // wall, in any lighting, silently — a device run detected a full mark set and
                         // logged `wallPoints 0` across 953 samples because of this.
                         val n = anchorSurfaceNormal
@@ -1988,7 +1988,7 @@ class ArRenderer(
                         }
                     }
                     setPrimaryAnchor(checkNotNull(anchor)) // the fallback branch always creates one
-                    // A new anchor/fingerprint reference point exists now. PoseFusion's standing
+                    // A new anchor/doodle reference point exists now. PoseFusion's standing
                     // `correction` was solved against the OLD anchor's drift (if this is a re-capture
                     // within the same session, not the session's first anchor) and is now WRONG, not
                     // merely stale — applying it to the NEW anchor's pose would offset the overlay and
@@ -1998,7 +1998,7 @@ class ArRenderer(
                     // on the session's first anchor, since correction starts null anyway.
                     //
                     // The native PnP result still latched at this instant was solved against the
-                    // OLD fingerprint. Hand its seq to the reset so it counts as consumed: with
+                    // OLD doodle. Hand its seq to the reset so it counts as consumed: with
                     // lastSeq rewound to 0 it looked brand new on the next frame and cold-snapped
                     // the new anchor onto the old wall.
                     poseFusion.reset(slamManager.getRelocResultInto(relocBuf)[18])
@@ -2204,20 +2204,20 @@ class ArRenderer(
             // Fuse in the corrected mark-PnP snap (smoothed) when anchored; the flag lets the eval
             // harness A/B fusion vs the old toggle. Off → exact previous behavior.
             // IMPLEMENTATION.md 0.9 — the correction needs `captureAnchorCam`, the anchor's pose in
-            // the CAPTURE camera's CV frame. `getFingerprintAnchor()` used to be passed here and is a
+            // the CAPTURE camera's CV frame. `getDoodleAnchor()` used to be passed here and is a
             // WORLD-frame model matrix: composing it against a CV-convention PnP result put the
             // correction in mixed frames, which the zero-drift invariant measured at 2.92 off.
             //
-            // Null on a pre-Phase-2 fingerprint, and then fusion is SKIPPED rather than fed a
+            // Null on a pre-Phase-2 doodle, and then fusion is SKIPPED rather than fed a
             // world-frame anchor. Refusing to correct leaves the overlay on the ARCore backbone,
             // which drifts; correcting in the wrong frame pulls it somewhere confidently wrong, and
             // PAPER.md §8.3 is explicit that the second is worse.
             val captureAnchorCam = slamManager.captureAnchorCam
-            // A re-capture's anchor exists but its fingerprint and capture pose are not both installed
+            // A re-capture's anchor exists but its doodle and capture pose are not both installed
             // yet: native may still solve against the previous wall and Kotlin still describes the
             // previous anchor. Reloc is ignored (the arbiter will not pick it, and the skip reason
-            // below says why) until SlamManager.completeFingerprintReplacement lowers the gate.
-            val relocGated = slamManager.awaitingNewFingerprint
+            // below says why) until SlamManager.completeDoodleReplacement lowers the gate.
+            val relocGated = slamManager.awaitingNewDoodle
             // The three reasons fusion can be skipped are known HERE and nowhere else — PoseFusion
             // is never called, so it cannot report them. Without this the overlay simply drifts and
             // every other row on the overlay looks healthy, which is the failure mode this whole
@@ -2232,16 +2232,16 @@ class ArRenderer(
                 !fusionEnabled -> com.hereliesaz.graffitixr.common.model.FusionState.DISABLED
                 !anchorEstablished -> com.hereliesaz.graffitixr.common.model.FusionState.NO_ANCHOR
                 // A metric KPM page is a complete alternate relocalization input and does NOT need
-                // MobileGS captureAnchorCam. Only report the legacy missing-fingerprint gates when
+                // MobileGS captureAnchorCam. Only report the legacy missing-doodle gates when
                 // neither correction source is capable of carrying the standing correction.
                 hybridFrameReady -> null
-                // The new wall's fingerprint is still being built: "no fingerprint yet" is the truth,
+                // The new wall's doodle is still being built: "no doodle yet" is the truth,
                 // not NO_CAPTURE_POSE ("old target - re-create it"), which the previous wall's
                 // still-loaded point count would otherwise produce.
-                relocGated -> com.hereliesaz.graffitixr.common.model.FusionState.NO_FINGERPRINT
+                relocGated -> com.hereliesaz.graffitixr.common.model.FusionState.NO_DOODLE
                 captureAnchorCam == null ->
                     if (slamManager.getWallKeypointCount() <= 0) {
-                        com.hereliesaz.graffitixr.common.model.FusionState.NO_FINGERPRINT
+                        com.hereliesaz.graffitixr.common.model.FusionState.NO_DOODLE
                     } else {
                         com.hereliesaz.graffitixr.common.model.FusionState.NO_CAPTURE_POSE
                     }
@@ -2496,7 +2496,7 @@ class ArRenderer(
             // First-run doodle demo: feed the anchor's world translation to the lock tracker while the
             // overlay holds. Once it has held steady past the min-draw dwell, fire the swap once.
             if (doodleLockActive && anchorEstablished && !doodleLockReported) {
-                // anchorMatrix is the FUSED pose — once a fingerprint has been built from the user's
+                // anchorMatrix is the FUSED pose — once a doodle has been built from the user's
                 // drawing, poseFusion folds the mark-PnP relocalization correction into it, so the
                 // tracker is measuring relocalization stability, not raw ARCore anchor. Gate the swap
                 // on BOTH a still fused pose AND a confident relock (PnP inliers), so the lock only
@@ -2569,7 +2569,7 @@ class ArRenderer(
                         // because it corrected wrongly are indistinguishable without this.
                         fusion = fusionDiagnostics(),
                         // E0b's independent variable is the rotation that was in force AT CAPTURE,
-                        // because that is the one baked into the fingerprint's 3D points. Sampling
+                        // because that is the one baked into the doodle's 3D points. Sampling
                         // the live rotation here instead — which an earlier version of this call
                         // did — files a portrait-captured, landscape-relocalized run under 0, the
                         // control condition, and turns a real effect into a null result.
@@ -2687,7 +2687,7 @@ class ArRenderer(
                 resetHybridReference()
                 // A new target may replace the artwork anchor any hybrid relation is expressed
                 // against. Drop the queued restore and tell the owner; persistence is bound to the
-                // fingerprint, so nothing on disk needs touching here.
+                // doodle, so nothing on disk needs touching here.
                 pendingHybridRestore = null
                 targetCaptureStarted = true
                 onHybridPageInvalidated?.invoke()
@@ -2702,8 +2702,8 @@ class ArRenderer(
                         val displayDegrees = displayRotationHelper.getRotation() * 90
                         val rotationNeeded = (sensorOrientation - displayDegrees + 360) % 360
                         // Recorded HERE, where the capture's geometry is decided, because this is
-                        // the angle that gets baked into the fingerprint: backProject runs once
-                        // per target inside MetricFingerprintBuilder.buildSingle, against these rotated
+                        // the angle that gets baked into the doodle: backProject runs once
+                        // per target inside MetricDoodleBuilder.buildSingle, against these rotated
                         // intrinsics and a view matrix now rotated to match (Phase 0). However the device
                         // is held afterwards, the skew in those 3D points does not change.
                         lastCaptureRotationNeededDeg = rotationNeeded
@@ -2782,7 +2782,7 @@ class ArRenderer(
                         // is exactly as metric. Requiring green meant that on a dim wall, or one taken
                         // at an angle, target creation refused outright with "face a wall", and the
                         // artist had no way to proceed. Now any tracking plane under the tap will do,
-                        // green preferred; the honest quality bar is downstream, where the fingerprint
+                        // green preferred; the honest quality bar is downstream, where the doodle
                         // needs enough features to actually localize.
                         var wallPlane: FloatArray? = null
                         if (tap != null && surfaceWidth > 0) {
@@ -2903,7 +2903,7 @@ class ArRenderer(
                         // Everything knowable about how and where the device was held, sampled at
                         // the instant the geometry is frozen. backProject runs once per target, so
                         // this is the only moment these conditions exist to be recorded — afterwards
-                        // the fingerprint carries their consequences with no record of their cause.
+                        // the doodle carries their consequences with no record of their cause.
                         val captureEnvironment = com.hereliesaz.graffitixr.common.model.CaptureEnvironment(
                             capturedAtEpochMs = System.currentTimeMillis(),
                             elapsedRealtimeNs = android.os.SystemClock.elapsedRealtimeNanos(),
@@ -3218,7 +3218,7 @@ class ArRenderer(
 
             lastStep = "overlayDraw"
             // Base overlay frame: the anchor's LIVE rotation (already tracked/drift-corrected by
-            // ARCore, and once fusion has a fingerprint, further refined by PoseFusion) with the
+            // ARCore, and once fusion has a doodle, further refined by PoseFusion) with the
             // one-time [overlayRotationCorrection] composed on top — see that field's comment. Nothing
             // gets rebuilt from scratch here; ARCore/the consensus system keep doing the tracking.
             // A zero stored normal (no anchor yet) leaves the raw anchor frame, uncorrected.
@@ -3253,7 +3253,7 @@ class ArRenderer(
             drainWallPointQueue(viewMatrix, projMatrix, wallReady = wallReady)
 
             // Center the overlay on the matched-marks centroid instead of the screen-center anchor.
-            // overlayMarkCenterLocal is the centroid in the fingerprint anchor's frame; reconstruct
+            // overlayMarkCenterLocal is the centroid in the doodle anchor's frame; reconstruct
             // its world position from the live (drift-tracked, reloc-fused) anchor, then project the
             // delta from the anchor onto the overlay-local in-plane axes. Recomputed every frame, so
             // it follows drift and recovers automatically after anchor re-establishment / reload.
@@ -3319,9 +3319,9 @@ class ArRenderer(
                 overlayPanX, overlayPanY, overlayRotationDeg, newHalfW, newHalfH,
                 slamManager.anchorGeneration.value,
             )
-            // Anchor-RELATIVE, not world — see FingerprintPartition.DesignFootprint. The live anchor
+            // Anchor-RELATIVE, not world — see DoodlePartition.DesignFootprint. The live anchor
             // drifts and is corrected by reloc, so its world pose at two moments is not the same
-            // physical place, and pairing this with the fingerprint's capture-time anchor pose is
+            // physical place, and pairing this with the doodle's capture-time anchor pose is
             // what makes the two ends comparable at all.
             //
             // It cancels the anchor's TRANSLATION exactly: overlayBaseScratch takes its translation
@@ -3335,7 +3335,7 @@ class ArRenderer(
             // performs cold snaps that are not small — a 3° relock at a one-metre lever arm moves an
             // edge ~5 cm, past DEFAULT_INNER_MARGIN. Nothing bounds that today; E8 is where the
             // margins and this interaction get measured rather than asserted.
-            var footprint: com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.DesignFootprint? = null
+            var footprint: com.hereliesaz.graffitixr.feature.ar.anchor.DoodlePartition.DesignFootprint? = null
             synchronized(designFootprintLock) {
                 val invertible =
                     android.opengl.Matrix.invertM(designAnchorInvScratch, 0, anchorMatrix, 0)
@@ -3346,7 +3346,7 @@ class ArRenderer(
                 }
                 designPlaced = placed && invertible
                 if (designPlaced && designMoved) {
-                    footprint = com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
+                    footprint = com.hereliesaz.graffitixr.feature.ar.anchor.DoodlePartition
                         .DesignFootprint(designRigidModel.copyOf(), newHalfW, newHalfH)
                 }
             }

@@ -163,23 +163,23 @@ class ProjectManager @Inject constructor(
         val root = File(context.filesDir, "projects/${projectData.id}")
         if (!root.exists()) root.mkdirs()
 
-        // The target fingerprint must survive EVERY routine save (layer edits, autosave, re-entering
+        // The target doodle must survive EVERY routine save (layer edits, autosave, re-entering
         // AR, etc.) and change only when the user creates a NEW target — which is the one path that
-        // passes a non-null fingerprint. So when the incoming project carries no fingerprint, carry
+        // passes a non-null doodle. So when the incoming project carries no doodle, carry
         // over whatever is already persisted instead of nulling it. This makes it impossible for any
         // other writer (or a stale-snapshot race) to wipe the saved target — the view matrix and
-        // capture rotation are captured alongside the fingerprint itself, so they follow the same
-        // unconditional preserve-from-existing as the fingerprint/intrinsics/anchor; the wall feature
-        // map and cloud anchor id can each legitimately be set on a routine (non-fingerprint) save
+        // capture rotation are captured alongside the doodle itself, so they follow the same
+        // unconditional preserve-from-existing as the doodle/intrinsics/anchor; the wall feature
+        // map and cloud anchor id can each legitimately be set on a routine (non-doodle) save
         // (e.g. the passive wall-map save), so those instead only fall back to the on-disk value when
-        // the incoming project doesn't set one, same as the legacy target-fingerprint references (the
+        // the incoming project doesn't set one, same as the legacy target-doodle references (the
         // learned wall normal and the capture environment follow the same fallback).
         //
-        // An incoming fingerprint does not switch the merge off wholesale. Only a fingerprint that
+        // An incoming doodle does not switch the merge off wholesale. Only a doodle that
         // DIFFERS from the persisted one is a new target, and only the state expressed in the old
         // target's frame (the capture group, legacy refs, wall map, paint marks/grid, cloud anchor,
         // AR placement width) is taken verbatim from it. A stale writer that merely carries the
-        // already-saved fingerprint gets the full merge, and the frame-independent state below
+        // already-saved doodle gets the full merge, and the frame-independent state below
         // (SphereSLAM's own page group, the measured wall width) is preserved either way.
         val mergedCapture = if (preserveExistingCaptureState) {
             val existing = try {
@@ -192,23 +192,23 @@ class ProjectManager @Inject constructor(
             }
             if (existing != null) {
                 val replacesTarget =
-                    projectData.fingerprint != null && projectData.fingerprint != existing.fingerprint
+                    projectData.doodle != null && projectData.doodle != existing.doodle
                 val withTarget = if (replacesTarget) projectData else projectData.copy(
-                    fingerprint = existing.fingerprint,
-                    fingerprintIntrinsics = existing.fingerprintIntrinsics,
-                    fingerprintAnchor = existing.fingerprintAnchor,
-                    fingerprintViewMatrix = existing.fingerprintViewMatrix,
-                    fingerprintCaptureRotationDeg = existing.fingerprintCaptureRotationDeg,
+                    doodle = existing.doodle,
+                    doodleIntrinsics = existing.doodleIntrinsics,
+                    doodleAnchor = existing.doodleAnchor,
+                    doodleViewMatrix = existing.doodleViewMatrix,
+                    doodleCaptureRotationDeg = existing.doodleCaptureRotationDeg,
                     // Learned by MobileGS at trusted locks (so a routine save may carry a newer one);
                     // an older whole-object writer that never saw it must not clear it.
-                    fingerprintWallNormalEnu =
-                        projectData.fingerprintWallNormalEnu.ifEmpty { existing.fingerprintWallNormalEnu },
-                    // Captured with the fingerprint, in the same frame as the view matrix above.
+                    doodleWallNormalEnu =
+                        projectData.doodleWallNormalEnu.ifEmpty { existing.doodleWallNormalEnu },
+                    // Captured with the doodle, in the same frame as the view matrix above.
                     captureEnvironment = projectData.captureEnvironment ?: existing.captureEnvironment,
-                    // Preserve the legacy target-fingerprint references too, so no save without them
+                    // Preserve the legacy target-doodle references too, so no save without them
                     // can wipe an existing target.
-                    targetFingerprint = projectData.targetFingerprint ?: existing.targetFingerprint,
-                    targetFingerprintPath = projectData.targetFingerprintPath ?: existing.targetFingerprintPath,
+                    targetDoodle = projectData.targetDoodle ?: existing.targetDoodle,
+                    targetDoodlePath = projectData.targetDoodlePath ?: existing.targetDoodlePath,
                     wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
                     paintMarks = projectData.paintMarks ?: existing.paintMarks,
                     paintGrid = projectData.paintGrid ?: existing.paintGrid,
@@ -219,7 +219,7 @@ class ProjectManager @Inject constructor(
                 )
                 withTarget.copy(
                     // Standalone SphereSLAM's canonical wall page is just as persistent as the
-                    // fingerprint: routine/stale saves must not silently erase it.
+                    // doodle: routine/stale saves must not silently erase it.
                     sphereSlamReferenceUri =
                         projectData.sphereSlamReferenceUri ?: existing.sphereSlamReferenceUri,
                     sphereSlamReferenceWidthMeters =
@@ -261,37 +261,37 @@ class ProjectManager @Inject constructor(
                         projectData.sphereSlamModeAdjustment ?: existing.sphereSlamModeAdjustment,
                     // A new canonical page defines a new standalone object frame. Preserve an old
                     // seed only while the canonical reference URI itself is unchanged.
-                    sphereSlamFingerprint =
+                    sphereSlamDoodle =
                         if (
                             projectData.sphereSlamReferenceUri != null &&
                             projectData.sphereSlamReferenceUri != existing.sphereSlamReferenceUri
                         ) {
-                            projectData.sphereSlamFingerprint
+                            projectData.sphereSlamDoodle
                         } else {
-                            projectData.sphereSlamFingerprint ?: existing.sphereSlamFingerprint
+                            projectData.sphereSlamDoodle ?: existing.sphereSlamDoodle
                         },
-                    sphereSlamFingerprintFrameVersion =
+                    sphereSlamDoodleFrameVersion =
                         if (
                             projectData.sphereSlamReferenceUri != null &&
                             projectData.sphereSlamReferenceUri != existing.sphereSlamReferenceUri
                         ) {
-                            projectData.sphereSlamFingerprintFrameVersion
+                            projectData.sphereSlamDoodleFrameVersion
                         } else {
-                            existing.sphereSlamFingerprintFrameVersion
+                            existing.sphereSlamDoodleFrameVersion
                         },
-                    sphereSlamMapFromFingerprint =
+                    sphereSlamMapFromDoodle =
                         if (
                             projectData.sphereSlamReferenceUri != null &&
                             projectData.sphereSlamReferenceUri != existing.sphereSlamReferenceUri
                         ) {
-                            projectData.sphereSlamMapFromFingerprint
-                        } else if (projectData.sphereSlamMapFromFingerprint.size == 16) {
-                            projectData.sphereSlamMapFromFingerprint
+                            projectData.sphereSlamMapFromDoodle
+                        } else if (projectData.sphereSlamMapFromDoodle.size == 16) {
+                            projectData.sphereSlamMapFromDoodle
                         } else {
-                            existing.sphereSlamMapFromFingerprint
+                            existing.sphereSlamMapFromDoodle
                         },
                     // The standalone wide-wall map is expressed in the SAME centred page frame as
-                    // sphereSlamFingerprint. A new canonical page must never inherit the old map.
+                    // sphereSlamDoodle. A new canonical page must never inherit the old map.
                     sphereSlamWallFeatureMap =
                         if (
                             projectData.sphereSlamReferenceUri != null &&
@@ -494,10 +494,10 @@ class ProjectManager @Inject constructor(
     /**
      * The hybrid KPM page's six fields are one unit keyed on its URI, written only by the hybrid
      * persist transform (saveProjectExact, which bypasses this). A stale whole-object writer that
-     * carries no page must not erase it — with OR without a fingerprint in hand: a snapshot taken
-     * after a target's fingerprint saved but before its page committed carries the fingerprint and
-     * would skip the fingerprint-null merge above. Keeping an older page is safe: it restores only
-     * while the project's fingerprint matches its key.
+     * carries no page must not erase it — with OR without a doodle in hand: a snapshot taken
+     * after a target's doodle saved but before its page committed carries the doodle and
+     * would skip the doodle-null merge above. Keeping an older page is safe: it restores only
+     * while the project's doodle matches its key.
      */
     private fun preserveHybridKpmPage(
         root: File,
@@ -520,7 +520,7 @@ class ProjectManager @Inject constructor(
             hybridKpmPageHeightPx = existing.hybridKpmPageHeightPx,
             hybridKpmPageWidthMeters = existing.hybridKpmPageWidthMeters,
             hybridKpmPageFromArtwork = existing.hybridKpmPageFromArtwork,
-            hybridKpmFingerprintKey = existing.hybridKpmFingerprintKey,
+            hybridKpmDoodleKey = existing.hybridKpmDoodleKey,
         )
     }
 
@@ -674,7 +674,7 @@ class ProjectManager @Inject constructor(
      * Loads a project's metadata, applying [migrateInMemory] purely in memory.
      *
      * This used to be two functions: this read-only one (used everywhere — dashboard listing, repo
-     * `getProject`/`loadProject`, `updateTargetFingerprint`) plus a `loadProject(): LoadedProject?`
+     * `getProject`/`loadProject`, `updateTargetDoodle`) plus a `loadProject(): LoadedProject?`
      * that additionally loaded every target-image bitmap and — its one distinguishing behavior —
      * persisted the migration back to project.json. That second function had no caller anywhere in
      * the codebase (nothing ever consumed a `LoadedProject`'s bitmaps either), so the "persist on
@@ -761,7 +761,7 @@ class ProjectManager @Inject constructor(
             sphereSlamAtlasPages = project.sphereSlamAtlasPages.map { it.copy(referenceUri = uri(it.referenceUri)) },
             evolutionImageUris = project.evolutionImageUris.map { uri(it) },
             hybridKpmPageUri = uri(project.hybridKpmPageUri),
-            targetFingerprintPath = project.targetFingerprintPath?.let { path(it) },
+            targetDoodlePath = project.targetDoodlePath?.let { path(it) },
         )
     }
 
@@ -1101,7 +1101,7 @@ class ProjectManager @Inject constructor(
                     page.copy(referenceUri = localUri(page.referenceUri)!!)
                 },
                 evolutionImageUris = migrated.evolutionImageUris.map { localUri(it)!! },
-                targetFingerprintPath = migrated.targetFingerprintPath?.let { localPath(it).absolutePath },
+                targetDoodlePath = migrated.targetDoodlePath?.let { localPath(it).absolutePath },
             ).let { relocated ->
                 // The hybrid page is an optional accelerator, not project content: a sender's
                 // archive that lacks the file drops the page rather than failing the whole import.
@@ -1117,7 +1117,7 @@ class ProjectManager @Inject constructor(
                         hybridKpmPageHeightPx = 0,
                         hybridKpmPageWidthMeters = 0f,
                         hybridKpmPageFromArtwork = emptyList(),
-                        hybridKpmFingerprintKey = emptyList(),
+                        hybridKpmDoodleKey = emptyList(),
                     )
                 }
             }

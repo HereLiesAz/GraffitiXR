@@ -897,7 +897,7 @@ class MainActivity : AppCompatActivity() {
                 //           the user is looking at the phone and marking a wall. Trying to do this in
                 //           AR meant fighting for screen space with a live feed and depending on a
                 //           pose being established before there was anything drawn to anchor to.
-                //   DETECT  now that marks exist, point the camera at them and let the fingerprint
+                //   DETECT  now that marks exist, point the camera at them and let the doodle
                 //           builder latch on. Completion means "detected", not "held still long
                 //           enough".
                 //
@@ -906,7 +906,7 @@ class MainActivity : AppCompatActivity() {
                 // is byte-for-byte unchanged. The key is marked complete on detection landing (the
                 // intended path) and equally on every way out of the flow — the explainer dialog's
                 // dismiss and "Not now", and the DRAW stage's "Skip" — so declining doesn't re-offer
-                // the walkthrough on a later cold launch. It does not mean "the user has a fingerprint."
+                // the walkthrough on a later cold launch. It does not mean "the user has a doodle."
                 val firstRunDoodleKey = "first_run_ar_doodle"
                 val firstRunCompletedTutorials by mainViewModel.completedTutorials.collectAsState()
                 // rememberSaveable so a process/config event mid-flow doesn't reset the stage and
@@ -976,13 +976,13 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                // Detection only runs in DETECT: the AR VM's capture/fingerprint loop needs the camera,
+                // Detection only runs in DETECT: the AR VM's capture/doodle loop needs the camera,
                 // so it must not start while the user is still drawing.
                 LaunchedEffect(firstRunStage) {
                     arViewModel.setDoodlePhase(firstRunStage == FirstRunStage.DETECT)
                 }
 
-                // Detected: the fingerprint latched onto the drawn marks, so the artwork is ready to
+                // Detected: the doodle latched onto the drawn marks, so the artwork is ready to
                 // place. Tune it to the wall we just measured and never show onboarding again.
                 LaunchedEffect(arUiState.doodleLocked) {
                     if (firstRunStage == FirstRunStage.DETECT && arUiState.doodleLocked) {
@@ -1525,7 +1525,7 @@ class MainActivity : AppCompatActivity() {
                             }
 
                             // Confirming a target unmounts TargetCreationUi right away, and the
-                            // fingerprint build (awaitAnchorTransform, the ORB/SuperPoint pass, the
+                            // doodle build (awaitAnchorTransform, the ORB/SuperPoint pass, the
                             // close-ups) carries on in the background. There is deliberately NO spinner
                             // or "Saving target" cover here: the artist can keep using the AR overlay
                             // while the wall is learned, and the only indicator is the close-up progress
@@ -1533,7 +1533,7 @@ class MainActivity : AppCompatActivity() {
                             // a SECOND capture from racing the save (see its uses).
 
                             // isAnchorEstablished means ARCore made an anchor. It says NOTHING about
-                            // whether the wall fingerprint got built, and gating the success banner
+                            // whether the wall doodle got built, and gating the success banner
                             // on it alone told artists a target was ready when back-projection had
                             // produced no usable points — so the overlay could only ever drift, and
                             // the one screen that could have explained it claimed success instead.
@@ -1543,15 +1543,15 @@ class MainActivity : AppCompatActivity() {
                                     && !mainUiState.isCapturingTarget
                                     && editorUiState.editorMode == EditorMode.AR
                                     && !showLibrary && !showSettings
-                            val hasWallFingerprint = arUiState.wallFingerprintPoints > 0
-                            if (basePostTargetVisible && !hasWallFingerprint) {
+                            val hasWallDoodle = arUiState.wallDoodlePoints > 0
+                            if (basePostTargetVisible && !hasWallDoodle) {
                                 TargetIncompleteOverlay(
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
                                         .padding(bottom = 140.dp)
                                 )
                             }
-                            // With a fingerprint there is nothing to add here: the rail's guidance callout
+                            // With a doodle there is nothing to add here: the rail's guidance callout
                             // (gx.hasTarget -> gx.arReady) is the one "now open a design" instruction.
 
                             val showProgress = editorUiState.editorMode == EditorMode.AR
@@ -1594,7 +1594,7 @@ class MainActivity : AppCompatActivity() {
 
                             // Close-up build progress: same row, height and pill style as the distance
                             // chip (TopStart) and the relocalization badge (TopEnd).
-                            val closeUpProgress by com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintBuildProgress.state
+                            val closeUpProgress by com.hereliesaz.graffitixr.feature.ar.anchor.DoodleBuildProgress.state
                                 .collectAsState()
                             closeUpProgress?.let { step ->
                                 if (!showLibrary && !showSettings) {
@@ -1607,7 +1607,7 @@ class MainActivity : AppCompatActivity() {
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                     ) {
                                         Text(
-                                            text = strings.ar.fingerprintCloseUpsProgress(step.stage, step.stages, step.done, step.total),
+                                            text = strings.ar.doodleCloseUpsProgress(step.stage, step.stages, step.done, step.total),
                                             color = Color.White,
                                             fontSize = 12.sp,
                                         )
@@ -1652,7 +1652,7 @@ class MainActivity : AppCompatActivity() {
                             }
 
                             // RelocState.IDLE means "target not yet confirmed" (UiState.kt) — SEARCHING/
-                            // TRACKING both require the fingerprint to be active, i.e. an established
+                            // TRACKING both require the doodle to be active, i.e. an established
                             // anchor. This badge is therefore only meaningful once anchored; gating it on
                             // `!isAnchorEstablished` made every branch but IDLE dead (the badge always
                             // returned immediately, per RelocStatusBadge's own state machine below).
@@ -1769,7 +1769,7 @@ class MainActivity : AppCompatActivity() {
                                     diagnostics = arUiState.relocDiagnostics,
                                     corroboration = arUiState.corroborationDiagnostics,
                                     fusion = arUiState.fusionDiagnostics,
-                                    // `wallFingerprintPoints`, NOT `evalLiveMetrics.wallCount`.
+                                    // `wallDoodlePoints`, NOT `evalLiveMetrics.wallCount`.
                                     //
                                     // evalLiveMetrics is only written while a dev eval log is
                                     // running (`if (evalLogging)` in setTrackingState); in every
@@ -1777,8 +1777,8 @@ class MainActivity : AppCompatActivity() {
                                     // hardcoded 0 forever. It read "FP PTS 0" beside "BACKBONE
                                     // 1500 PTS · 1042 CORR · 1015 IN" on a locked device — and it
                                     // is what made me tell the artist their target had never been
-                                    // created when the fingerprint was right there.
-                                    fingerprintPoints = arUiState.wallFingerprintPoints,
+                                    // created when the doodle was right there.
+                                    doodlePoints = arUiState.wallDoodlePoints,
                                     paintingProgress = arUiState.paintingProgress,
                                     featureProgress = arUiState.featureProgress,
                                     sphereSlamStatus = arUiState.sphereSlamRuntimeStatus,
@@ -1912,7 +1912,7 @@ class MainActivity : AppCompatActivity() {
                                             mainViewModel.onConfirmStandaloneTargetCreation(
                                                 bitmap,
                                                 mask,
-                                                arViewModel.standaloneFingerprintPlacementForConfirm(),
+                                                arViewModel.standaloneDoodlePlacementForConfirm(),
                                             )
                                         } else {
                                             arViewModel.setInitialAnchorFromCapture()
@@ -2089,8 +2089,8 @@ class MainActivity : AppCompatActivity() {
                                     onCoverageGlowStyleChanged = { arViewModel.setCoverageGlowStyle(it) },
                                     anticipation = arUiState.anticipation,
                                     onAnticipationChanged = { arViewModel.setAnticipationSettings(it) },
-                                    fingerprintFeatures = arUiState.fingerprintFeatures,
-                                    onFingerprintFeaturesChanged = { arViewModel.setFingerprintFeatures(it) },
+                                    doodleFeatures = arUiState.doodleFeatures,
+                                    onDoodleFeaturesChanged = { arViewModel.setDoodleFeatures(it) },
                                     onOpenReleasesPage = { dashboardViewModel.openReleasesPage(this@MainActivity) },
                                     onResetTutorials = {
                                         settingsViewModel.resetCompletedTutorials()
@@ -3197,13 +3197,13 @@ private val EVAL_OVERLAY_ENABLED = com.hereliesaz.graffitixr.BuildConfig.DEBUG
 
 /**
  * Live-frame feature count below which a match shortfall is blamed on the capture (dark, blurred,
- * blank wall) rather than on aim. The detector is configured for 1500, and a fingerprint needs 20 to
+ * blank wall) rather than on aim. The detector is configured for 1500, and a doodle needs 20 to
  * exist at all, so a frame yielding under 100 is starved regardless of where it's pointed.
  */
 private const val FEW_FEATURES_IN_FRAME = 100
 
 /**
- * Live relocalization state: whether the wall fingerprint exists, whether PnP is locking, and if not,
+ * Live relocalization state: whether the wall doodle exists, whether PnP is locking, and if not,
  * which gate the last attempt missed and by how much.
  *
  * This is deliberately shipped in release (behind the Diagnostic Overlay setting) because the failure
@@ -3215,7 +3215,7 @@ private fun RelocDiagnosticsOverlay(
     diagnostics: RelocDiagnostics,
     corroboration: com.hereliesaz.graffitixr.common.model.CorroborationDiagnostics,
     fusion: com.hereliesaz.graffitixr.common.model.FusionDiagnostics,
-    fingerprintPoints: Int,
+    doodlePoints: Int,
     paintingProgress: Float,
     featureProgress: Float = -1f,
     sphereSlamStatus: com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeStatus,
@@ -3244,7 +3244,7 @@ private fun RelocDiagnosticsOverlay(
     // What to DO about it, not just what happened.
     val (label, hint) = when (d.reject) {
         RelocReject.OK -> "LOCKED" to "matching the wall"
-        RelocReject.NO_FINGERPRINT ->
+        RelocReject.NO_DOODLE ->
             "NO DOODLE" to "create a Doodle — nothing to match against"
         RelocReject.DISABLED -> "OFF" to "relocalization disabled"
         RelocReject.NO_FEATURES ->
@@ -3326,14 +3326,14 @@ private fun RelocDiagnosticsOverlay(
         )
         // "0 features" is a MEASUREMENT and must not be printed when nothing was measured.
         //
-        // The native relocalizer early-returns on an empty fingerprint BEFORE it runs the detector,
+        // The native relocalizer early-returns on an empty doodle BEFORE it runs the detector,
         // so `detected` keeps its default 0 and the row read "0 FEATURES" on a device — telling an
         // artist their wall had no texture, and sending them to fix the lighting, when the real and
         // only problem was that no target existed to match against. Same for a disabled relocalizer.
         DiagnosticRow(
             "In frame",
             when (d.reject) {
-                RelocReject.NO_FINGERPRINT, RelocReject.DISABLED, RelocReject.UNKNOWN ->
+                RelocReject.NO_DOODLE, RelocReject.DISABLED, RelocReject.UNKNOWN ->
                     "not sampled"
                 else -> "${d.detected} features"
             },
@@ -3348,7 +3348,7 @@ private fun RelocDiagnosticsOverlay(
             androidx.compose.ui.graphics.Color.White,
         )
         // The partition, read off the device (IMPLEMENTATION.md 2.11). "FP pts" is the whole
-        // fingerprint; this row is the part reloc is actually allowed to solve against, plus how
+        // doodle; this row is the part reloc is actually allowed to solve against, plus how
         // much of it survived matching and RANSAC. A backbone of 0 with a healthy FP pts is the
         // wall-filling design — the one failure the totals above describe as ordinary bad luck.
         // "—" means the reloc thread has not got far enough to measure it, which is a different
@@ -3366,7 +3366,7 @@ private fun RelocDiagnosticsOverlay(
                 androidx.compose.ui.graphics.Color.White
             },
         )
-        DiagnosticRow("FP pts", fingerprintPoints.toString(), androidx.compose.ui.graphics.Color.Cyan)
+        DiagnosticRow("FP pts", doodlePoints.toString(), androidx.compose.ui.graphics.Color.Cyan)
 
         // Pose fusion: what is actually happening to the overlay, and when nothing is, WHY.
         //
@@ -3389,7 +3389,7 @@ private fun RelocDiagnosticsOverlay(
                 // Distinct from the line above, which used to cover this case and sent the artist to
                 // "re-create" a target that had never been created — directly contradicting the
                 // Reloc row's own "NO TARGET" three rows up.
-                com.hereliesaz.graffitixr.common.model.FusionState.NO_FINGERPRINT ->
+                com.hereliesaz.graffitixr.common.model.FusionState.NO_DOODLE ->
                     "NO DOODLE — create one"
                 com.hereliesaz.graffitixr.common.model.FusionState.WAITING_FOR_LOCK -> "waiting for lock"
                 com.hereliesaz.graffitixr.common.model.FusionState.COLD_SNAP -> "snapped"
@@ -3407,7 +3407,7 @@ private fun RelocDiagnosticsOverlay(
                 // Red for the states that mean corrections are being computed and thrown away, or
                 // cannot be computed at all. Amber for the transient waits. White for working.
                 com.hereliesaz.graffitixr.common.model.FusionState.NO_CAPTURE_POSE,
-                com.hereliesaz.graffitixr.common.model.FusionState.NO_FINGERPRINT,
+                com.hereliesaz.graffitixr.common.model.FusionState.NO_DOODLE,
                 com.hereliesaz.graffitixr.common.model.FusionState.RELOCK_REFUSED,
                 com.hereliesaz.graffitixr.common.model.FusionState.DISABLED ->
                     androidx.compose.ui.graphics.Color.Red
@@ -3514,7 +3514,7 @@ private fun RelocDiagnosticsOverlay(
         }
         // paintingProgress IS a genuine progress signal, not a confidence readout: the cumulative
         // fraction of the design's features the wall has corroborated (MobileGS
-        // tryUpdateFingerprint). Confidence is the separate mCorroborationConfidence channel,
+        // tryUpdateDoodle). Confidence is the separate mCorroborationConfidence channel,
         // surfaced in the Corrob/Spread/Reproj rows above. A prior pass here
         // mislabeled this "Matched", inheriting RelocStatusBadge's then-mislabeling of the same value
         // (since fixed: the badge's string now reads "painted") — caught by review before merge. "Painted" wasn't wrong about WHAT this is, only imprecise about how
@@ -3538,13 +3538,13 @@ private fun RelocDiagnosticsOverlay(
                 else androidx.compose.ui.graphics.Color.Gray,
             )
         }
-        // Self-grow. Promotes newly validated marks into the reloc fingerprint so relocalization
+        // Self-grow. Promotes newly validated marks into the reloc doodle so relocalization
         // survives the original marks being painted over — the whole point of the teleological
-        // fingerprint, and useless to an artist if it can only be switched on in a debug build.
+        // doodle, and useless to an artist if it can only be switched on in a debug build.
         //
         // Amber rather than green when on: it is the one switch here that WRITES to the map instead
-        // of reading it. A promotion that should not have happened stays in the fingerprint and
-        // compounds, and the remedy is to re-create the target — which replaces the fingerprint
+        // of reading it. A promotion that should not have happened stays in the doodle and
+        // compounds, and the remedy is to re-create the target — which replaces the doodle
         // outright (`mWallDescriptors = d.clone()`) rather than merging into it, so the damage is
         // bounded to one target and is undone by an action the app already asks for when the overlay
         // misbehaves. Recoverable, then, but not free, and the colour should say so.
@@ -3676,12 +3676,12 @@ private fun DiagnosticRow(label: String, value: String, color: Color) {
 }
 
 /**
- * Shown when an ARCore anchor exists but the wall fingerprint does not — the state that used to
+ * Shown when an ARCore anchor exists but the wall doodle does not — the state that used to
  * render as "TARGET ESTABLISHED".
  *
  * This is a real and recoverable failure, not an edge case: back-projection drops any feature whose
  * recovered depth falls outside its 0.1-10 m trust range, so a capture can find well over a thousand
- * features and place none of them on the wall. Without a fingerprint the reloc thread has nothing to
+ * features and place none of them on the wall. Without a doodle the reloc thread has nothing to
  * match against, every diagnostic freezes, and the overlay runs on raw VIO and drifts within
  * seconds. Naming it is the difference between "re-capture, squarer and closer" and "this app
  * doesn't work".

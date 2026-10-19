@@ -54,8 +54,8 @@ internal fun fitStandaloneDesignHalfExtents(
 
 
 internal data class StandaloneDesignPlacement(
-    /** Column-major fingerprint_from_design rigid transform. */
-    val fingerprintFromDesign: FloatArray,
+    /** Column-major doodle_from_design rigid transform. */
+    val doodleFromDesign: FloatArray,
     /** Scale-included effective half-extents; scale is deliberately NOT in the matrix. */
     val halfWidth: Float,
     val halfHeight: Float,
@@ -64,10 +64,10 @@ internal data class StandaloneDesignPlacement(
 /**
  * Build the exact rigid design placement consumed by MobileGS corroboration/self-grow.
  *
- * The standalone fingerprint frame IS the renderer wall frame, so the only rigid transform is the
+ * The standalone doodle frame IS the renderer wall frame, so the only rigid transform is the
  * user's in-plane pan + Z spin. GraffitiXR stores ModeAdjustment.rotation as screen-space CW+ while
  * the wall frame is right-handed CCW+, hence the sign flip. Scale belongs in the extents, matching
- * ArRenderer/FingerprintPartition; putting it into this matrix would corrupt Φ classification.
+ * ArRenderer/DoodlePartition; putting it into this matrix would corrupt Φ classification.
  *
  * rotationX/rotationY are intentionally absent: in GraffitiXR they are texture-content perspective
  * effects, not physical wall-plane pose, and the ARCore placement path likewise keeps them out of Φ.
@@ -103,7 +103,7 @@ internal fun standaloneDesignPlacement(
         panX, panY, 0f, 1f,
     )
     return StandaloneDesignPlacement(
-        fingerprintFromDesign = rigid,
+        doodleFromDesign = rigid,
         halfWidth = fit.halfWidth * safeScale,
         halfHeight = fit.halfHeight * safeScale,
     )

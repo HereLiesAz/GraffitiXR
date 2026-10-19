@@ -1,8 +1,8 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
 import android.graphics.Bitmap
-import com.hereliesaz.graffitixr.common.model.Fingerprint
-import com.hereliesaz.graffitixr.common.model.FingerprintFeatures
+import com.hereliesaz.graffitixr.common.model.Doodle
+import com.hereliesaz.graffitixr.common.model.DoodleFeatures
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.sphereslam.SphereSlamPoseMath
 import java.nio.ByteBuffer
@@ -17,9 +17,9 @@ import org.opencv.imgproc.Imgproc
 import com.hereliesaz.sphereslam.PhotosphereFingerprintFrame
 
 /**
- * Builds the standalone MobileGS fingerprint directly from the rectified SphereSLAM wall page.
+ * Builds the standalone MobileGS doodle directly from the rectified SphereSLAM wall page.
  *
- * Unlike [MetricFingerprintBuilder], no ARCore world/capture-camera frame is involved. Every
+ * Unlike [MetricDoodleBuilder], no ARCore world/capture-camera frame is involved. Every
  * descriptor row is paired with a point on z=0 in [PhotosphereFingerprintFrame], which is the same
  * centered wall frame KPM and the standalone renderer use.
  *
@@ -27,7 +27,7 @@ import com.hereliesaz.sphereslam.PhotosphereFingerprintFrame
  * will then use its CV_32F SuperPoint path. ORB(1500) + CLAHE is the fallback and intentionally
  * matches MobileGS::normalizeForFeatures + mFeatureDetector.
  */
-object StandaloneFingerprintBuilder {
+object StandaloneDoodleBuilder {
     private const val DEFAULT_MIN_POINTS = 16
     private const val ORB_FEATURES = 1500
 
@@ -53,9 +53,9 @@ object StandaloneFingerprintBuilder {
         referenceWidthMeters: Float,
         mask: Bitmap? = null,
         minPoints: Int = DEFAULT_MIN_POINTS,
-        /** SuperPoint or ORB, with or without the close-ups (Settings → Fingerprint). */
-        features: FingerprintFeatures = FingerprintFeatures.DEFAULT,
-    ): Fingerprint? {
+        /** SuperPoint or ORB, with or without the close-ups (Settings → Doodle). */
+        features: DoodleFeatures = DoodleFeatures.DEFAULT,
+    ): Doodle? {
         require(bitmap.width > 0 && bitmap.height > 0)
         require(referenceWidthMeters.isFinite() && referenceWidthMeters > 0f)
         require(minPoints >= 8)
@@ -97,7 +97,7 @@ object StandaloneFingerprintBuilder {
         heightPixels: Int,
         geometry: SphereSlamPoseMath.PageGeometry,
         minPoints: Int = DEFAULT_MIN_POINTS,
-    ): Fingerprint? {
+    ): Doodle? {
         require(widthPixels > 0 && heightPixels > 0)
         require(minPoints >= 8)
         if (detected.rows == 0 || detected.cols == 0) return null
@@ -147,7 +147,7 @@ object StandaloneFingerprintBuilder {
             )
         }
 
-        return Fingerprint(
+        return Doodle(
             keypoints = keypoints,
             points3d = points,
             descriptorsData = descriptors,
@@ -156,7 +156,7 @@ object StandaloneFingerprintBuilder {
             descriptorsType = detected.type,
             markCenterLocal = listOf(sx / keep.size, sy / keep.size, 0f),
             // This is NOT an ARCore display-rotation capture. The value deliberately remains
-            // unknown; this fingerprint lives in the separate sphereSlamFingerprint project field
+            // unknown; this doodle lives in the separate sphereSlamDoodle project field
             // and is never passed through the ARCore legacy-frame loader.
             captureRotationDeg = -1,
         )

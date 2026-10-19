@@ -405,13 +405,13 @@
     <string name="settings_anticipation_heat">Heat throttles by</string>
     <string name="settings_anticipation_compute">Load throttles by</string>
     <string name="settings_anticipation_views">%1$d views per page at most</string>
-    <string name="settings_fingerprint_features">Doodle</string>
-    <string name="settings_fingerprint_superpoint">SuperPoint</string>
-    <string name="settings_fingerprint_half_sphere">Half sphere</string>
-    <string name="settings_fingerprint_both">Both</string>
-    <string name="settings_fingerprint_superpoint_desc">SuperPoint features of the capture only. Holds through light and wear; about 1.5 MB per Doodle. Applies to the next Doodle.</string>
-    <string name="settings_fingerprint_half_sphere_desc">ORB features of the capture and its 49 close-ups. Strong up close and small, under 0.1 MB per Doodle. Applies to the next Doodle.</string>
-    <string name="settings_fingerprint_both_desc">SuperPoint features of the capture and its 49 close-ups. The strongest; about 2–3 MB per Doodle. Applies to the next Doodle.</string>
+    <string name="settings_doodle_features">Doodle</string>
+    <string name="settings_doodle_superpoint">SuperPoint</string>
+    <string name="settings_doodle_half_sphere">Half sphere</string>
+    <string name="settings_doodle_both">Both</string>
+    <string name="settings_doodle_superpoint_desc">SuperPoint features of the capture only. Holds through light and wear; about 1.5 MB per Doodle. Applies to the next Doodle.</string>
+    <string name="settings_doodle_half_sphere_desc">ORB features of the capture and its 49 close-ups. Strong up close and small, under 0.1 MB per Doodle. Applies to the next Doodle.</string>
+    <string name="settings_doodle_both_desc">SuperPoint features of the capture and its 49 close-ups. The strongest; about 2–3 MB per Doodle. Applies to the next Doodle.</string>
     <string name="settings_power_section">Power</string>
     <string name="settings_privacy_section">Privacy</string>
     <string name="settings_developer_section">Developer</string>
@@ -484,7 +484,7 @@
     <string name="target_review_desc">Review Extracted Doodle</string>
     <string name="target_unwarp_hint">Drag corners to unwarp</string>
     <string name="target_review_title">DOODLE LOCKED</string>
-    <string name="fingerprint_closeups_progress">Learning the wall: stage %1$d of %2$d · step %3$d of %4$d</string>
+    <string name="doodle_closeups_progress">Learning the wall: stage %1$d of %2$d · step %3$d of %4$d</string>
 
     <string name="target_exclude">Exclude</string>
     <string name="target_include">Include</string>
@@ -753,7 +753,7 @@
     <string name="ar_feedback_open_project_first">Open a project before sharing — there\'s nothing to send to a guest yet</string>
     <string name="ar_feedback_host_need_target_arcore">Capture and lock a current Doodle before hosting</string>
     <string name="ar_feedback_host_need_target_standalone">Capture a standalone Wall Target before hosting</string>
-    <string name="ar_feedback_fingerprint_not_ready">Doodle is not ready yet — keep it in view and try Host again</string>
+    <string name="ar_feedback_doodle_not_ready">Doodle is not ready yet — keep it in view and try Host again</string>
     <string name="ar_feedback_package_failed">Couldn\'t package this project to share — try saving it first</string>
     <string name="ar_feedback_host_failed">Couldn\'t start sharing: %1$s</string>
     <string name="ar_feedback_join_load_failed">Couldn\'t load the host\'s project — the session was ended.</string>

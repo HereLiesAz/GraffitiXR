@@ -4,12 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * A persistent, confidence-weighted **feature** map of the wall surrounding the marks
- * [Fingerprint] — the lean spatial backbone for wide-area relocalization (see
+ * [Doodle] — the lean spatial backbone for wide-area relocalization (see
  * `docs/RELOC_MAP_DESIGN.md`). Because the overlaid artwork is usually larger than the marks,
- * the fingerprint alone can't hold the lock when you look away from it; this map carries
+ * the doodle alone can't hold the lock when you look away from it; this map carries
  * feature descriptors at 3D points across the whole wall so reloc works from far more
- * viewpoints, all co-registered to the fingerprint anchor (matching any patch yields the
- * fingerprint/overlay pose directly).
+ * viewpoints, all co-registered to the doodle anchor (matching any patch yields the
+ * doodle/overlay pose directly).
  *
  * It is built **passively** from whatever keyframes normal use provides (no explicit scan),
  * and bounded by the "lean" budget: ORB descriptors by default (`CV_8U`, 32 B/point;
@@ -24,7 +24,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class WallFeatureMap(
-    // Flattened 3D points [x0,y0,z0, x1,y1,z1, ...] in the fingerprint-anchor frame; one triplet per point.
+    // Flattened 3D points [x0,y0,z0, x1,y1,z1, ...] in the doodle-anchor frame; one triplet per point.
     val points3d: FloatArray = FloatArray(0),
     // Descriptors as a flat row-major byte blob: [descriptorsRows] rows (one per point), each
     // [descriptorsCols] wide, of OpenCV [descriptorsType] (CV_8U for ORB, CV_32F for SuperPoint).
@@ -36,7 +36,7 @@ data class WallFeatureMap(
     val confidence: FloatArray = FloatArray(0),
     val obsCount: IntArray = IntArray(0),
     // Co-registration: the anchor pose (column-major 4x4, 16 floats) and intrinsics (fx,fy,cx,cy)
-    // the points were built in — the SAME frame as the marks fingerprint's anchor. Empty => unset.
+    // the points were built in — the SAME frame as the marks doodle's anchor. Empty => unset.
     val anchor: FloatArray = FloatArray(0),
     val intrinsics: FloatArray = FloatArray(0),
 ) {

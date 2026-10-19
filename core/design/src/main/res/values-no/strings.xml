@@ -365,13 +365,13 @@
     <string name="settings_anticipation_heat">Varme struper med</string>
     <string name="settings_anticipation_compute">Belastning struper med</string>
     <string name="settings_anticipation_views">Høyst %1$d visninger per side</string>
-    <string name="settings_fingerprint_features">Krusedull</string>
-    <string name="settings_fingerprint_superpoint">SuperPoint</string>
-    <string name="settings_fingerprint_half_sphere">Halvkule</string>
-    <string name="settings_fingerprint_both">Begge</string>
-    <string name="settings_fingerprint_superpoint_desc">Bare SuperPoint-trekk fra opptaket. Tåler lys og slitasje; omtrent 1,5 MB per Krusedull. Gjelder fra neste Krusedull.</string>
-    <string name="settings_fingerprint_half_sphere_desc">ORB-trekk fra opptaket og dets 49 nærbilder. Sterkt på nært hold og lite, under 0,1 MB per Krusedull. Gjelder fra neste Krusedull.</string>
-    <string name="settings_fingerprint_both_desc">SuperPoint-trekk fra opptaket og dets 49 nærbilder. Sterkest; omtrent 2–3 MB per Krusedull. Gjelder fra neste Krusedull.</string>
+    <string name="settings_doodle_features">Krusedull</string>
+    <string name="settings_doodle_superpoint">SuperPoint</string>
+    <string name="settings_doodle_half_sphere">Halvkule</string>
+    <string name="settings_doodle_both">Begge</string>
+    <string name="settings_doodle_superpoint_desc">Bare SuperPoint-trekk fra opptaket. Tåler lys og slitasje; omtrent 1,5 MB per Krusedull. Gjelder fra neste Krusedull.</string>
+    <string name="settings_doodle_half_sphere_desc">ORB-trekk fra opptaket og dets 49 nærbilder. Sterkt på nært hold og lite, under 0,1 MB per Krusedull. Gjelder fra neste Krusedull.</string>
+    <string name="settings_doodle_both_desc">SuperPoint-trekk fra opptaket og dets 49 nærbilder. Sterkest; omtrent 2–3 MB per Krusedull. Gjelder fra neste Krusedull.</string>
     <string name="settings_power_section">Strøm</string>
     <string name="settings_privacy_section">Personvern</string>
     <string name="settings_developer_section">Utvikler</string>
@@ -430,7 +430,7 @@
     <string name="target_review_desc">Gjennomgå uttrukket Krusedull</string>
     <string name="target_unwarp_hint">Dra hjørnene for å løsne</string>
     <string name="target_review_title">KRUSEDULL LÅST</string>
-    <string name="fingerprint_closeups_progress">Lærer veggen: trinn %1$d av %2$d · steg %3$d av %4$d</string>
+    <string name="doodle_closeups_progress">Lærer veggen: trinn %1$d av %2$d · steg %3$d av %4$d</string>
 
     <string name="target_exclude">Utelukke</string>
     <string name="target_include">Inkludere</string>
@@ -731,7 +731,7 @@
     <string name="ar_feedback_open_project_first">Åpne et prosjekt før du deler – det er ikke noe å sende til en gjest ennå</string>
     <string name="ar_feedback_host_need_target_arcore">Ta opp og lås en oppdatert Krusedull før du er vert</string>
     <string name="ar_feedback_host_need_target_standalone">Ta opp et frittstående veggmål før du er vert</string>
-    <string name="ar_feedback_fingerprint_not_ready">Krusedullen er ikke klar ennå — hold den i bildet og prøv Vert igjen</string>
+    <string name="ar_feedback_doodle_not_ready">Krusedullen er ikke klar ennå — hold den i bildet og prøv Vert igjen</string>
     <string name="ar_feedback_package_failed">Kunne ikke pakke dette prosjektet for deling – prøv å lagre det først</string>
     <string name="ar_feedback_host_failed">Kunne ikke starte deling: %1$s</string>
     <string name="ar_feedback_join_load_failed">Kunne ikke laste vertens prosjekt – økten ble avsluttet.</string>

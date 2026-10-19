@@ -172,12 +172,12 @@ class CoopSpectatorProjectNormalizerTest {
         width: Float,
     ) = CoopSpatialFrame(
         hostBackend = host,
-        fingerprintFrameVersion = 1,
+        doodleFrameVersion = 1,
         scale = scale,
-        fingerprintAvailable = true,
+        doodleAvailable = true,
         anchorRevision = 1L,
         referenceWidthUnits = width,
-        fingerprintFromWall = listOf(
+        doodleFromWall = listOf(
             1f, 0f, 0f, 0f,
             0f, 1f, 0f, 0f,
             0f, 0f, 1f, 0f,

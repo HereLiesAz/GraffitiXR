@@ -9,7 +9,7 @@ package com.hereliesaz.graffitixr.core.collaboration.wire
  *
  * v3 makes spatial alignment explicit: HELLO identifies the guest pose backend and BULK_BEGIN
  * carries the host wall-frame bridge/scale contract. A v2 peer is deliberately incompatible
- * because it can only assume peer fingerprint coordinates are interchangeable.
+ * because it can only assume peer doodle coordinates are interchangeable.
  *
  * v4 makes co-op bidirectional: a guest sends its own edits as GUEST_OP frames and the host acks
  * them with GUEST_OP_ACK. A v3 host would silently ignore GUEST_OP (its inbound loop drops unknown

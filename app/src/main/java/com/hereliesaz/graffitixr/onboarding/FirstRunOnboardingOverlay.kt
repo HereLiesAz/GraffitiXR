@@ -44,7 +44,7 @@ import kotlinx.coroutines.delay
  * By the time this is up the user has already copied the scribble onto their wall from
  * [ScribbleDrawScreen], so there is no reference to show here — the reference is on the wall. The
  * job is just to get the camera pointed at it and moving enough for a surface to be found, after
- * which the fingerprint builder latches onto the drawn marks.
+ * which the doodle builder latches onto the drawn marks.
  *
  *  1. [title] ("point your camera at what you drew") appears centred for [TITLE_HOLD_MS].
  *  2. It rises to the top, leaving the camera view unobstructed while detection runs.

@@ -200,7 +200,7 @@ class SyntheticHomographyDataset(Dataset):
         pose = np.array([tilt, log2s, roll], np.float32)
         return {
             "cur": to_tensor(warped),          # [1,P,P]  the live view
-            "fp": to_tensor(canonical),        # [1,P,P]  the canonical fingerprint patch
+            "fp": to_tensor(canonical),        # [1,P,P]  the canonical doodle patch
             "corners": torch.from_numpy(corners),
             "pose": torch.from_numpy(pose),
             "coverage": torch.tensor(coverage, dtype=torch.float32),

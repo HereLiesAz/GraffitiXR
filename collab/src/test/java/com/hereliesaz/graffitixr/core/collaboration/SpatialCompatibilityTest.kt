@@ -19,7 +19,7 @@ class SpatialCompatibilityTest {
         val normalized = testSpatialFrame(
             backend = CoopTrackingBackend.SPHERESLAM,
             scale = CoopSpatialScale.NORMALIZED_PAGE,
-            fingerprintAvailable = true,
+            doodleAvailable = true,
         )
         val host = HostSession(
             token = "tok",
@@ -28,7 +28,7 @@ class SpatialCompatibilityTest {
             projectId = "p1",
             snapshotProvider = {
                 ProjectSnapshot(
-                    fingerprintBytes = ByteArray(64) { it.toByte() },
+                    doodleBytes = ByteArray(64) { it.toByte() },
                     projectBytes = ByteArray(64),
                     layerCount = 0,
                     spatialFrame = normalized,
@@ -81,7 +81,7 @@ class SpatialCompatibilityTest {
         var currentFrame = testSpatialFrame(
             backend = CoopTrackingBackend.ARCORE,
             scale = CoopSpatialScale.METRIC,
-            fingerprintAvailable = true,
+            doodleAvailable = true,
             revision = 1L,
         )
         val host = HostSession(
@@ -91,7 +91,7 @@ class SpatialCompatibilityTest {
             projectId = "p1",
             snapshotProvider = {
                 ProjectSnapshot(
-                    fingerprintBytes = ByteArray(64) { it.toByte() },
+                    doodleBytes = ByteArray(64) { it.toByte() },
                     projectBytes = ByteArray(64),
                     layerCount = 0,
                     spatialFrame = currentFrame,

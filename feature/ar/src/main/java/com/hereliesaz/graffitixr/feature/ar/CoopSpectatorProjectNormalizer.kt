@@ -58,7 +58,7 @@ internal fun normalizeCoopSpectatorProject(
 
         CoopTrackingBackend.SPHERESLAM -> {
             // An ARCore-hosted archive can legitimately contain an old standalone target from some
-            // earlier visit. The live peer fingerprint is the coordinate object for this session;
+            // earlier visit. The live peer doodle is the coordinate object for this session;
             // keeping stale page metadata lets EditorViewModel treat its generation as authoritative
             // placement state. Drop only spectator metadata (files may remain in the isolated dir).
             project.copy(
@@ -68,7 +68,7 @@ internal fun normalizeCoopSpectatorProject(
                 sphereSlamAnchorGeneration = 0L,
                 sphereSlamPlacementAnchorGeneration = 0L,
                 sphereSlamModeAdjustment = hostAdjustment,
-                sphereSlamFingerprint = null,
+                sphereSlamDoodle = null,
                 sphereSlamWallFeatureMap = null,
                 sphereSlamAtlasPages = emptyList(),
             )

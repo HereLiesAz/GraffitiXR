@@ -6,7 +6,7 @@ Så jag gör något bättre genom att återanvända (vad de invigda kallar) rutn
 
 Så nu är det vad de där kladdarna gör.
 
-Jag var tvungen att uppfinna en egen **fingeravtrycksbaserad omlokaliserare** som fungerar på Android utan hjälp av molnet — för graffiti är, som ni vet, olagligt. När du låser mot en vägg tar appen ett OpenCV-baserat funktionsavtryck (**fingerprint**) av dina märken — deskriptorer plus en handfull triangulerade 3D-punkter. Även efter förlorad spårning eller en avstängd skärm matchar motorn den levande kamerabilden mot detta avtryck och löser positionen (PnP) för att **snäppa tillbaka** och rikta in väggmålningen mot väggen igen på millisekunder — utan moln och utan att förhandsskanna hela rummet.
+Jag var tvungen att uppfinna en egen **fingeravtrycksbaserad omlokaliserare** som fungerar på Android utan hjälp av molnet — för graffiti är, som ni vet, olagligt. När du låser mot en vägg tar appen ett OpenCV-baserat funktionsavtryck (**doodle**) av dina märken — deskriptorer plus en handfull triangulerade 3D-punkter. Även efter förlorad spårning eller en avstängd skärm matchar motorn den levande kamerabilden mot detta avtryck och löser positionen (PnP) för att **snäppa tillbaka** och rikta in väggmålningen mot väggen igen på millisekunder — utan moln och utan att förhandsskanna hela rummet.
 
 Och jag följde upp det med det jag kallar **teleologisk SLAM** — eftersom vi vet hur resultatet ska se ut använder jag OpenCV för att hålla koll på dina framsteg, vilket betyder att ju längre du kommit, desto tätare fäster överlägget mot väggen. Utan det skulle du täcka över de där märkena med själva målningen, vilket skulle göra appen mindre exakt ju längre du kom. Det är precis där andra liknande appar verkligen misslyckas.
 

@@ -45,17 +45,17 @@ class HybridKpmPageBindingTest {
     private val new = List(16) { 2f }
 
     @Test
-    fun `commits under the new fingerprint once it lands`() {
+    fun `commits under the new doodle once it lands`() {
         org.junit.Assert.assertEquals(new, HybridKpmPage.commitKeyOrNull("p", "p", new, old))
     }
 
     @Test
-    fun `first-ever target commits once a fingerprint exists`() {
+    fun `first-ever target commits once a doodle exists`() {
         org.junit.Assert.assertEquals(new, HybridKpmPage.commitKeyOrNull("p", "p", new, emptyList()))
     }
 
     @Test
-    fun `waits while the fingerprint is still the pre-capture one`() {
+    fun `waits while the doodle is still the pre-capture one`() {
         assertNull(HybridKpmPage.commitKeyOrNull("p", "p", old, old))
     }
 
@@ -68,7 +68,7 @@ class HybridKpmPageBindingTest {
     }
 
     @Test
-    fun `restores only against its own fingerprint`() {
+    fun `restores only against its own doodle`() {
         assertTrue(HybridKpmPage.isBoundTo(new, new))
         assertFalse(HybridKpmPage.isBoundTo(old, new))
         assertFalse(HybridKpmPage.isBoundTo(null, new))

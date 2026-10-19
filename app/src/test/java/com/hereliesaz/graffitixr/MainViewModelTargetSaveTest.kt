@@ -3,7 +3,7 @@ package com.hereliesaz.graffitixr
 import android.content.Context
 import android.graphics.Bitmap
 import android.widget.Toast
-import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.Doodle
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
@@ -61,8 +61,8 @@ class MainViewModelTargetSaveTest {
         }
         mockkStatic(Bitmap::class)
         every { Bitmap.createScaledBitmap(any(), any(), any(), any()) } returns mockk(relaxed = true)
-        every { slamManager.setWallFingerprint(any(), any(), any(), any(), any(), any(), any(), any()) } returns
-            mockk<Fingerprint>(relaxed = true)
+        every { slamManager.setWallDoodle(any(), any(), any(), any(), any(), any(), any(), any()) } returns
+            mockk<Doodle>(relaxed = true)
         viewModel = MainViewModel(projectRepository, slamManager, projectManager, settingsRepository, context)
     }
 

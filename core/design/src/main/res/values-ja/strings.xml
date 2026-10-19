@@ -382,13 +382,13 @@
     <string name="settings_anticipation_heat">発熱による制限</string>
     <string name="settings_anticipation_compute">負荷による制限</string>
     <string name="settings_anticipation_views">1ページあたり最大%1$d ビュー</string>
-    <string name="settings_fingerprint_features">らくがき</string>
-    <string name="settings_fingerprint_superpoint">SuperPoint</string>
-    <string name="settings_fingerprint_half_sphere">半球</string>
-    <string name="settings_fingerprint_both">両方</string>
-    <string name="settings_fingerprint_superpoint_desc">撮影画像のSuperPoint特徴のみ。光や摩耗に強く、らくがき1つあたり約1.5 MB。次のらくがきから適用されます。</string>
-    <string name="settings_fingerprint_half_sphere_desc">撮影画像と49枚のクローズアップのORB特徴。近距離に強く小さい（らくがき1つあたり0.1 MB未満）。次のらくがきから適用されます。</string>
-    <string name="settings_fingerprint_both_desc">撮影画像と49枚のクローズアップのSuperPoint特徴。最も強力で、らくがき1つあたり約2–3 MB。次のらくがきから適用されます。</string>
+    <string name="settings_doodle_features">らくがき</string>
+    <string name="settings_doodle_superpoint">SuperPoint</string>
+    <string name="settings_doodle_half_sphere">半球</string>
+    <string name="settings_doodle_both">両方</string>
+    <string name="settings_doodle_superpoint_desc">撮影画像のSuperPoint特徴のみ。光や摩耗に強く、らくがき1つあたり約1.5 MB。次のらくがきから適用されます。</string>
+    <string name="settings_doodle_half_sphere_desc">撮影画像と49枚のクローズアップのORB特徴。近距離に強く小さい（らくがき1つあたり0.1 MB未満）。次のらくがきから適用されます。</string>
+    <string name="settings_doodle_both_desc">撮影画像と49枚のクローズアップのSuperPoint特徴。最も強力で、らくがき1つあたり約2–3 MB。次のらくがきから適用されます。</string>
     <string name="settings_power_section">電源</string>
     <string name="settings_privacy_section">プライバシー</string>
     <string name="settings_developer_section">開発者</string>
@@ -447,7 +447,7 @@
     <string name="target_review_desc">抽出したらくがきを確認</string>
     <string name="target_unwarp_hint">コーナーをドラッグして歪みを修正</string>
     <string name="target_review_title">らくがきをロックしました</string>
-    <string name="fingerprint_closeups_progress">壁を学習中: ステージ %1$d / %2$d · ステップ %3$d / %4$d</string>
+    <string name="doodle_closeups_progress">壁を学習中: ステージ %1$d / %2$d · ステップ %3$d / %4$d</string>
 
     <string name="target_exclude">除外</string>
     <string name="target_include">含める</string>
@@ -748,7 +748,7 @@
     <string name="ar_feedback_open_project_first">共有する前にプロジェクトを開いてください。ゲストに送るものがまだありません</string>
     <string name="ar_feedback_host_need_target_arcore">ホストする前に、最新のらくがきを撮影してロックしてください</string>
     <string name="ar_feedback_host_need_target_standalone">ホストする前に、スタンドアロンの壁ターゲットを撮影してください</string>
-    <string name="ar_feedback_fingerprint_not_ready">らくがきの準備がまだできていません — 画面内に保ったまま、もう一度「ホスト」を試してください</string>
+    <string name="ar_feedback_doodle_not_ready">らくがきの準備がまだできていません — 画面内に保ったまま、もう一度「ホスト」を試してください</string>
     <string name="ar_feedback_package_failed">このプロジェクトを共有用にパッケージできませんでした。先に保存してみてください</string>
     <string name="ar_feedback_host_failed">共有を開始できませんでした：%1$s</string>
     <string name="ar_feedback_join_load_failed">ホストのプロジェクトを読み込めませんでした。セッションを終了しました。</string>

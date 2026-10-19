@@ -370,13 +370,13 @@
     <string name="settings_anticipation_heat">A hő ennyivel fojt</string>
     <string name="settings_anticipation_compute">A terhelés ennyivel fojt</string>
     <string name="settings_anticipation_views">Legfeljebb %1$d nézet oldalanként</string>
-    <string name="settings_fingerprint_features">Firka</string>
-    <string name="settings_fingerprint_superpoint">SuperPoint</string>
-    <string name="settings_fingerprint_half_sphere">Félgömb</string>
-    <string name="settings_fingerprint_both">Mindkettő</string>
-    <string name="settings_fingerprint_superpoint_desc">Csak a felvétel SuperPoint jellemzői. Bírja a fényt és a kopást; kb. 1,5 MB Firkánként. A következő Firkára érvényes.</string>
-    <string name="settings_fingerprint_half_sphere_desc">A felvétel és 49 közeli nézetének ORB jellemzői. Közelről erős és kicsi, 0,1 MB alatt Firkánként. A következő Firkára érvényes.</string>
-    <string name="settings_fingerprint_both_desc">A felvétel és 49 közeli nézetének SuperPoint jellemzői. A legerősebb; kb. 2–3 MB Firkánként. A következő Firkára érvényes.</string>
+    <string name="settings_doodle_features">Firka</string>
+    <string name="settings_doodle_superpoint">SuperPoint</string>
+    <string name="settings_doodle_half_sphere">Félgömb</string>
+    <string name="settings_doodle_both">Mindkettő</string>
+    <string name="settings_doodle_superpoint_desc">Csak a felvétel SuperPoint jellemzői. Bírja a fényt és a kopást; kb. 1,5 MB Firkánként. A következő Firkára érvényes.</string>
+    <string name="settings_doodle_half_sphere_desc">A felvétel és 49 közeli nézetének ORB jellemzői. Közelről erős és kicsi, 0,1 MB alatt Firkánként. A következő Firkára érvényes.</string>
+    <string name="settings_doodle_both_desc">A felvétel és 49 közeli nézetének SuperPoint jellemzői. A legerősebb; kb. 2–3 MB Firkánként. A következő Firkára érvényes.</string>
     <string name="settings_power_section">Energia</string>
     <string name="settings_privacy_section">Adatvédelem</string>
     <string name="settings_developer_section">Fejlesztő</string>
@@ -435,7 +435,7 @@
     <string name="target_review_desc">Kinyert Firka áttekintése</string>
     <string name="target_unwarp_hint">Húzd a sarkokat a kiegyenesítéshez</string>
     <string name="target_review_title">FIRKA RÖGZÍTVE</string>
-    <string name="fingerprint_closeups_progress">A fal megismerése: %1$d. szakasz / %2$d · %3$d. lépés / %4$d</string>
+    <string name="doodle_closeups_progress">A fal megismerése: %1$d. szakasz / %2$d · %3$d. lépés / %4$d</string>
 
     <string name="target_exclude">Kizárás</string>
     <string name="target_include">Belefoglalás</string>
@@ -736,7 +736,7 @@
     <string name="ar_feedback_open_project_first">Megosztás előtt nyiss meg egy projektet – még nincs mit küldeni a vendégnek</string>
     <string name="ar_feedback_host_need_target_arcore">A „Hoszt” indítása előtt rögzíts és zárolj egy aktuális Firkát</string>
     <string name="ar_feedback_host_need_target_standalone">Házigazdaként indítás előtt rögzíts egy önálló falcélpontot</string>
-    <string name="ar_feedback_fingerprint_not_ready">A Firka még nem áll készen — tartsd a képben, és próbáld újra a „Hoszt” indítását</string>
+    <string name="ar_feedback_doodle_not_ready">A Firka még nem áll készen — tartsd a képben, és próbáld újra a „Hoszt” indítását</string>
     <string name="ar_feedback_package_failed">Nem sikerült becsomagolni a projektet a megosztáshoz – próbáld előbb elmenteni</string>
     <string name="ar_feedback_host_failed">Nem sikerült elindítani a megosztást: %1$s</string>
     <string name="ar_feedback_join_load_failed">Nem sikerült betölteni a házigazda projektjét – a munkamenet véget ért.</string>
