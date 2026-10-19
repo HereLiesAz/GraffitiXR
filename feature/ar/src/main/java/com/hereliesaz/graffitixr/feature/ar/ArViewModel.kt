@@ -5247,13 +5247,15 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val settled = kotlinx.coroutines.withTimeoutOrNull(ALIGN_REGISTRATION_WAIT_MS) {
-                    while (artworkRegInFlight.get() || pendingArtworkGuide.get() != null) kotlinx.coroutines.delay(50)
+                    while (artworkRegInFlight.get() || pendingArtworkGuide.get() != null || !guideSettled()) kotlinx.coroutines.delay(50)
                     true
                 } == true
                 val key = lastGuideKey
+                val guideAtStart = guideRequested.get()
                 val r = if (settled) slamManager.autoFitDesign(minimumEvidence = true) else null   // asked for: any possible fit
                 val notReady = !settled || (r == null && slamManager.lastAutoFitWasNotReady())
-                val current = key == lastGuideKey && !artworkRegInFlight.get() && pendingArtworkGuide.get() == null
+                val current = key == lastGuideKey && guideRequested.get() == guideAtStart && guideSettled() &&
+                    !artworkRegInFlight.get() && pendingArtworkGuide.get() == null
                 val fit = if (current) r?.let { DesignFit(it[0], it[1], it[2], it[3]) } else null
                 if (fit != null) autoFitArmed = false
                 withContext(Dispatchers.Main) { onResult(fit, notReady) }
@@ -5271,7 +5273,7 @@ class ArViewModel @Inject constructor(
         if (!autoFitArmed) return
         // A design still registering would be matched half-built (old features, no filter sets yet);
         // updatePaintingGuide calls back here once it has registered.
-        if (artworkRegInFlight.get() || pendingArtworkGuide.get() != null) { autoFitRetryPending = true; return }
+        if (artworkRegInFlight.get() || pendingArtworkGuide.get() != null || !guideSettled()) { autoFitRetryPending = true; return }
         // Shares Align's single flight: two matches from the same placement would both be applied.
         if (!alignInFlight.compareAndSet(false, true)) { autoFitRetryPending = true; return }
         autoFitRetryPending = false
@@ -5288,7 +5290,17 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Guide registrations asked for, and the last one that finished. Equal means native holds the
+     * newest design asked for: a deferred one handed over to its registration is still unequal.
+     */
+    private val guideRequested = java.util.concurrent.atomic.AtomicLong(0)
+    @Volatile private var guideRegistered = 0L
+
+    private fun guideSettled() = guideRegistered == guideRequested.get()
+
     fun updatePaintingGuide(bitmap: Bitmap, designKey: String? = null) {
+        val request = guideRequested.incrementAndGet()
         if (designKey != null && designKey != lastGuideKey) {
             lastGuideKey = designKey
             autoFitArmed = true
@@ -5309,6 +5321,7 @@ class ArViewModel @Inject constructor(
             try {
                 slamManager.setArtworkDoodle(bitmap, null, 0, 0, 0, intr, view)
             } finally {
+                guideRegistered = maxOf(guideRegistered, request)
                 artworkRegInFlight.set(false)
             }
             drainPendingArtworkGuide()

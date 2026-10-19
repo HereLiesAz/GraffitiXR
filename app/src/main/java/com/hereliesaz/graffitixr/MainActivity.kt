@@ -2509,8 +2509,11 @@ class MainActivity : AppCompatActivity() {
                         shape = AzButtonShape.NONE,
                         // Standalone's Doodle is a centred page frame, which the paint match
                         // cannot fit (MobileGS::autoFitDesign refuses it), so Align is off there.
+                        // With no visible design there is nothing to align (native may still hold the
+                        // last one registered).
                         disabled = showLibrary || arUiState.sphereSlamRuntimeStatus.mode ==
-                            com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.STANDALONE,
+                            com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.STANDALONE ||
+                            editorUiState.design?.let { it.isVisible && it.bitmap != null } != true,
                         onClick = {
                             // Fit the design to paint already on the wall, or say that nothing
                             // matched. Never a resize to a guess, never a tone change.
