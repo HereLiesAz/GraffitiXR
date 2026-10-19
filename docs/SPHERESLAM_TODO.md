@@ -887,9 +887,9 @@ Remaining:
   0.24.1 (`camera.CameraFillCenter`); the app copy is gone.
 - [ ] Add GL/instrumentation tests for standalone texture clear/replace if test infrastructure permits.
   Deferred by decision: verification is hands-on use of the app; no `androidTest` set-up for now.
-- [x] Sanitize and test standalone renderer transforms: non-finite values fall back safely, scale
-  uses the shared 0.1–10 editor bounds, rotations normalize, and pathological finite pan values are
-  bounded before GL matrix construction.
+- [x] Sanitize and test standalone renderer transforms: non-finite values fall back safely
+  (a non-finite or non-positive scale becomes 1), and rotations normalize. Scale and pan have no
+  bounds, by decision: the design goes wherever the artist or Align puts it.
 
 **ACCEPTANCE:** the same project adjustment produces the same intended artwork placement and visual
 treatment on ARCore and standalone backends, modulo explicitly documented backend capabilities.

@@ -419,6 +419,28 @@ TEST(MobileGSFrames, AutoFitFindsPaintWithTheDoodleBuildersDesignFeatures) {
     EXPECT_NEAR(0.0f, out5[1], 0.01f);
     EXPECT_NEAR(0.0f, out5[2], 0.02f);
     EXPECT_NEAR(1.0f, out5[3], 0.03f);
+
+    // Align on request takes the same fit.
+    float req5[5];
+    ASSERT_TRUE(g.autoFitDesign(req5, /*minimumEvidence=*/true));
+    EXPECT_NEAR(0.06f, req5[0], 0.01f);
+}
+
+TEST(MobileGSFrames, AutoFitOnRequestStillRefusesAnImpossibleMatch) {
+    // A blank photo has nothing to match: no fit even when any possible fit would be taken.
+    MobileGS g;
+    std::vector<cv::Point3f> wall;
+    for (int i = 0; i < 40; ++i) wall.emplace_back(-0.6f + 0.03f * i, (i % 8) * 0.1f - 0.35f, 2.0f);
+    const float anchor[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    const float K[4] = {500.f, 500.f, 320.f, 240.f};
+    g.restoreWallDoodleMetric(cv::Mat(40, 32, CV_8U, cv::Scalar(4)), wall, anchor, K);
+    g.setArtworkDoodle(makeWall(320, 256), nullptr, 0, 0, 0, nullptr, nullptr);
+    g.awaitFilterTargets();
+    const float fpFromDesign[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0,0,2,1};
+    g.setDesignPlacement(fpFromDesign, 0.5f, 0.4f);
+    g.setCaptureImage(cv::Mat(480, 640, CV_8UC3, cv::Scalar(150, 150, 150)), K);
+    float out5[5];
+    EXPECT_FALSE(g.autoFitDesign(out5, /*minimumEvidence=*/true));
 }
 
 TEST(MobileGSRelocScales, SuperPointPassesAreRelativeToWhatThePlainPassSaw) {

@@ -575,9 +575,10 @@ class SlamManager @Inject constructor(
     /**
      * Fit the registered design to paint already on the wall, from the capture photo. Returns
      * [dx, dy (m), dTheta (rad, CCW), scale ratio, inliers] in the current design's local frame, or
-     * null when there is no confident fit. Blocking (feature detection); call off the main thread.
+     * null when there is no fit. [minimumEvidence] (Align on request) takes any possible fit; without it
+     * (the automatic fit) a confident one is required. Blocking (feature detection); call off the main thread.
      */
-    fun autoFitDesign(): FloatArray? = nativeAutoFitDesign()
+    fun autoFitDesign(minimumEvidence: Boolean = false): FloatArray? = nativeAutoFitDesign(minimumEvidence)
 
     /** Opaque per-project progress state (painted cells + learned paint colours), or null. */
     fun exportPaintGrid(): ByteArray? = nativeExportPaintGrid()
@@ -1093,7 +1094,7 @@ class SlamManager @Inject constructor(
     private external fun nativeGetCleanWallStatus(): Int
     private external fun nativeSetChangePassEnabled(enabled: Boolean)
     private external fun nativeExportPaintGrid(): ByteArray?
-    private external fun nativeAutoFitDesign(): FloatArray?
+    private external fun nativeAutoFitDesign(minimumEvidence: Boolean): FloatArray?
     private external fun nativeRestorePaintGrid(state: ByteArray)
     private external fun nativeGetFeatureProgress(): Float
     private external fun nativeRestoreWallFeatureMap(

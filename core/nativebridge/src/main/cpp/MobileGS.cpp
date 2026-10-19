@@ -3393,7 +3393,9 @@ void MobileGS::buildPaintGridLocked(const cv::Mat& composite, const std::vector<
     mGrid = std::move(g);
 }
 
-bool MobileGS::autoFitDesign(float* out5) {
+bool MobileGS::autoFitDesign(float* out5, bool minimumEvidence) {
+    // Fewest agreeing matches for a fit to be possible at all: two fix any similarity, a third tests it.
+    constexpr int kPossible = 3;
     cv::Mat photoRgb, designGray; float K[4]; float fpFromDesign[16]; float halfW, halfH;
     std::vector<cv::Point3f> wall;
     // The Doodle builder's design features: the artwork's own, then each filter's target set (places
@@ -3460,7 +3462,7 @@ bool MobileGS::autoFitDesign(float* out5) {
             cv::ORB::create(2000)->detectAndCompute(g, cv::noArray(), k, d);
     };
     std::vector<cv::KeyPoint> pk; cv::Mat pd_; detect(photoGray, pk, pd_);
-    if (pk.size() < 20) return false;
+    if ((int)pk.size() < (minimumEvidence ? kPossible : 20)) return false;
 
     // Paint in the opposite tone of the design (light on dark): the inverted design, described as is.
     {
@@ -3473,7 +3475,7 @@ bool MobileGS::autoFitDesign(float* out5) {
     int bestInl = 0; cv::Mat bestM;
     for (const FitSet& fs : sets) {
         const cv::Mat& dd = fs.descs;
-        if (fs.pts.size() < 20 || dd.type() != pd_.type() || dd.cols != pd_.cols) continue;
+        if ((int)fs.pts.size() < (minimumEvidence ? kPossible : 20) || dd.type() != pd_.type() || dd.cols != pd_.cols) continue;
         cv::Ptr<cv::DescriptorMatcher> m = dd.type() == CV_32F
             ? cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE)
             : cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
@@ -3494,12 +3496,13 @@ bool MobileGS::autoFitDesign(float* out5) {
             const glm::vec4 X = designFromFp * glm::vec4((float)(lam * dir[0]), (float)(lam * dir[1]), (float)(lam * dir[2]), 1.0f);
             src.push_back(lp); dst.emplace_back(X.x, X.y);
         }
-        if (src.size() < 12) continue;
+        if ((int)src.size() < (minimumEvidence ? kPossible : 12)) continue;
         std::vector<uchar> inl;
         cv::Mat M = cv::estimateAffinePartial2D(src, dst, inl, cv::RANSAC, 0.03, 2000, 0.995);
         const int n = M.empty() ? 0 : cv::countNonZero(inl);
         // Confidence: enough agreeing matches, and a fair share of those that survived the ratio test.
-        if (n >= 15 && n * 4 >= (int)src.size() && n > bestInl) { bestInl = n; bestM = M; }
+        const bool confident = minimumEvidence ? n >= kPossible : (n >= 15 && n * 4 >= (int)src.size());
+        if (confident && n > bestInl) { bestInl = n; bestM = M; }
     }
     if (bestM.empty()) return false;
     // The fit is relative to the placement, design, Doodle and photo snapshotted above. Any of them

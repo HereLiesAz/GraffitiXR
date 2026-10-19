@@ -5250,7 +5250,7 @@ class ArViewModel @Inject constructor(
                     true
                 } == true
                 val key = lastGuideKey
-                val r = if (settled) slamManager.autoFitDesign() else null
+                val r = if (settled) slamManager.autoFitDesign(minimumEvidence = true) else null   // asked for: any possible fit
                 val current = key == lastGuideKey && !artworkRegInFlight.get() && pendingArtworkGuide.get() == null
                 val fit = if (current) r?.let { DesignFit(it[0], it[1], it[2], it[3]) } else null
                 if (fit != null) autoFitArmed = false

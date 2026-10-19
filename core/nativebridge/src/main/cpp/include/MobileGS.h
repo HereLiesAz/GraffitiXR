@@ -878,8 +878,12 @@ public:
      * a RANSAC similarity in the CURRENT design's local frame. Waits for a filter build in flight, and
      * returns no fit when the placement, design, Doodle or capture photo changed while matching. out5 = {dx, dy (m), dTheta (rad, CCW
      * in the design plane), scale ratio, inliers}. Returns false when there is no confident fit.
+     *
+     * [minimumEvidence] (Align on request): any fit is taken unless one is impossible -- fewer than
+     * three matches agreeing on one similarity (two define any similarity, so they prove nothing).
+     * Without it (the automatic fit, which nobody asked for) a fit also needs a confident consensus.
      */
-    bool autoFitDesign(float* out5);
+    bool autoFitDesign(float* out5, bool minimumEvidence = false);
     /** Waits for the filter targets of the registered design to finish building (tests; shutdown does it too). */
     void awaitFilterTargets() { joinFilterBuild(); }
     /** How many filters' targets are installed and usable right now. */

@@ -1272,7 +1272,7 @@ class EditorViewModel @Inject constructor(
             val rz = if (axis == RotationAxis.Z) layer.rotationZ + rotationDelta else layer.rotationZ
             // Clamped to the same [0.1, 10] range ApplyModeTransformGesture already enforces for
             // every non-Design mode's pinch — the same gesture source had two different contracts.
-            layer.copy(scale = (layer.scale * zoom).coerceIn(0.1f, 10f), offset = layer.offset + pan, rotationX = rx, rotationY = ry, rotationZ = rz)
+            layer.copy(scale = (layer.scale * zoom).takeIf { it.isFinite() && it > 0f } ?: layer.scale, offset = layer.offset + pan, rotationX = rx, rotationY = ry, rotationZ = rz)
         }
     }
 

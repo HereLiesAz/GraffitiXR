@@ -10,10 +10,6 @@ internal data class StandaloneRenderTransform(
 )
 
 internal object StandaloneRenderTransformSanitizer {
-    const val MIN_SCALE = 0.1f
-    const val MAX_SCALE = 10f
-    const val MAX_ABS_PAN = 10_000f
-
     fun sanitize(
         panX: Float,
         panY: Float,
@@ -24,14 +20,14 @@ internal object StandaloneRenderTransformSanitizer {
     ): StandaloneRenderTransform = StandaloneRenderTransform(
         panX = finitePan(panX),
         panY = finitePan(panY),
-        scale = if (scale.isFinite()) scale.coerceIn(MIN_SCALE, MAX_SCALE) else 1f,
+        scale = if (scale.isFinite() && scale > 0f) scale else 1f,   // no bounds: only unusable values are replaced
         rotationZDeg = normalizeDegrees(rotationZDeg),
         rotationXDeg = normalizeDegrees(rotationXDeg),
         rotationYDeg = normalizeDegrees(rotationYDeg),
     )
 
     private fun finitePan(value: Float): Float =
-        if (value.isFinite()) value.coerceIn(-MAX_ABS_PAN, MAX_ABS_PAN) else 0f
+        if (value.isFinite()) value else 0f
 
     private fun normalizeDegrees(value: Float): Float {
         if (!value.isFinite()) return 0f
