@@ -1533,8 +1533,6 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
     constexpr float kMapDeadConfidence = 0.02f;
     constexpr float kMapFreshProtect = 1.0f;
     constexpr float kMapMissDecay = 0.01f;
-    // A plane point whose depth disagrees by more than this fraction is in front of the wall.
-    constexpr float kMapOffPlaneTolerance = 0.15f;
     if (mMapPoints3D.size() >= kMapCap) {
         const size_t n = mMapPoints3D.size();
         std::vector<char> drop(n, 0);
@@ -1694,11 +1692,6 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
             // Reject MiDaS outliers: keep radii within a sane band around the wall distance so a
             // single bad depth pixel can't scatter a point to infinity.
             if (t < 0.1f * wallZ || t > 10.f * wallZ) continue;
-        } else if (depthFit.ok) {
-            // On the plane's ray, but depth says something nearer stands in front of the wall (a
-            // hand, a ladder, the can): clutter, not wall. Without depth the plane is all there is.
-            const float dz = depthFit.depthFor(sampleInvDepth(kps[i].pt.x, kps[i].pt.y));
-            if (dz > 0.f && std::fabs(dz - t) > kMapOffPlaneTolerance * t) continue;
         }
         glm::vec3 P = camCenter + t * dir;
         // P is already in the doodle object frame. For standalone that is the centred
