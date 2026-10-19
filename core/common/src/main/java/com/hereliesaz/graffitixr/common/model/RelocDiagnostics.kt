@@ -159,6 +159,8 @@ enum class GrowOutcome {
     AT_CAP,
     /** Marks were written into the map. */
     PROMOTED,
+    /** The design was described in another descriptor type than the Doodle; it is re-registered. */
+    TYPE_MISMATCH,
     /** A code this build does not know — a newer native library. */
     UNKNOWN,
 }
@@ -212,6 +214,8 @@ enum class RelocReject {
     PNP_FAILED,
     /** PnP solved but fewer than 6 inliers agreed. */
     FEW_INLIERS,
+    /** The live descriptors can't compare with the Doodle's (a SuperPoint Doodle, SuperPoint unavailable). */
+    TYPE_MISMATCH,
     /** The native side reported a code this build doesn't know. */
     UNKNOWN,
 }

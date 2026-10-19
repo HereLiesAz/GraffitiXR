@@ -6,7 +6,7 @@
 ## Key Components
 
 ### 1. The wall doodle
-A doodle is ORB (`cv::ORB::create(1500)`) or SuperPoint descriptors paired with the triangulated 3D positions of the marks the artist drew, captured once when the target is confirmed (`restoreWallDoodleMetric`). It optionally carries a per-point region tag (`Footprint::Region` — INSIDE/BAND/OUTSIDE) so relocalization can exclude points that sit under the artwork itself and will be painted over.
+A doodle is ORB (`cv::ORB::create(1500)`) or SuperPoint descriptors paired with the triangulated 3D positions of the marks the artist drew, captured once when the target is confirmed (`restoreWallDoodleMetric`). It optionally carries a per-point region tag (`Footprint::Region` — INSIDE/BAND/OUTSIDE) so relocalization can exclude points under the artwork once the paint grid has them painted over.
 
 Both app builders (`MetricDoodleBuilder`, `StandaloneFingerprintBuilder`) add the capture
 photo's **close-ups** (`CloseUpFeatures`): crops at zooms 6×, 3× and 2× (the anticipation
@@ -67,7 +67,7 @@ there for the first relocalization of the next session; a new target forgets it.
 ### 3. Teleological corroboration and self-grow (both off by default)
 Two optional, separately-gated mechanisms sit on top of relocalization:
 - **Corroboration**: compares descriptors from the design composite against the live wall to produce a confidence signal (Lowe ratio `kCorrobLoweRatio = 0.85`) — see `docs/TELEOLOGICAL_SLAM.md` for what it does and does not measure.
-- **Self-grow** (`mSelfGrowEnabled`, default **off**, `setSelfGrowEnabled`): lets validated new marks extend the doodle as the artist paints, so relocalization can survive the original reference being covered. Capped at `kMaxWallMarks = 5000` points. Two further, independent 5000 caps exist: `kMaxPaintMarks = 5000` (painted-design reference marks) and `kMapCap = 5000` (the persistent feature map, which confidence-prunes when full).
+- **Self-grow** (`mSelfGrowEnabled`, default **off**, `setSelfGrowEnabled`): lets validated new marks extend the doodle as the artist paints, so relocalization can survive the original reference being covered. Grown rows are capped at `kMaxGrownRows = 5000` behind the captured Doodle, and past it the least recently seen grown rows are evicted, so growth never stops. Two further, independent 5000 caps exist: `kMaxPaintMarks = 5000` (painted-design reference marks) and `kMapCap = 5000` (the persistent feature map, which confidence-prunes when full).
 
 Both are reachable only from the diagnostic overlay (Settings > diagnostic overlay), not the artist-facing UI — see that doc for why, and for the open questions around self-grow's promotion gate.
 
@@ -81,7 +81,7 @@ doodle-anchor transform on save and restore; incompatible anchors are refused ra
 implicitly converted.
 
 ## Memory Management
-- The doodle itself is small (a few thousand descriptor+point pairs at most); there is no fixed-size point-cloud or voxel budget to speak of beyond `kMaxWallMarks`.
+- The doodle itself is small (a few thousand descriptor+point pairs at most); there is no fixed-size point-cloud or voxel budget to speak of beyond `kMaxGrownRows`.
 
 ## JNI Interface (`GraffitiJNI.cpp` → `SlamManager.kt`)
 

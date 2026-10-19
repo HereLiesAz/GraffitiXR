@@ -121,6 +121,7 @@ public:
         kRelocFewMatches = 4,    //!< fewer than 8 correspondences survived the Lowe ratio test
         kRelocPnpFailed = 5,     //!< solvePnPRansac found no consistent pose
         kRelocFewInliers = 6,    //!< PnP solved but fewer than 6 inliers agreed
+        kRelocTypeMismatch = 7,  //!< the live descriptors can't compare with the doodle's (e.g. a SuperPoint doodle, SuperPoint unavailable)
     };
 
     /**
@@ -244,12 +245,6 @@ public:
         return kRegionBand;
     }
 
-    /** Hard ceiling on stored wall marks — a memory guard on the self-grow append. */
-    static constexpr size_t kMaxWallMarks = 5000;
-    // Fewer OUTSIDE marks than this and the partition is ignored for reloc matching: with almost no
-    // backbone nothing could localize, and paint marks (which only appear after a lock) could never
-    // bootstrap. Every stored mark is used instead until real backbone returns.
-    static constexpr int kMinBackboneMarks = 12;
     // solvePnPRansac budget. 100 iterations at 0.99 fails a solvable frame about 4% of the time at a
     // 50% inlier ratio and about a third of the time at 40%; the point sets here are small enough
     // that more iterations are cheap.
@@ -294,8 +289,9 @@ public:
         kGrowUntrusted = 4,        //!< the promotion gate refused — inlier spread or match quality
         kGrowNoGeometry = 5,       //!< intrinsics, wall size or plane fit degenerate
         kGrowNoNewPoints = 6,      //!< every candidate back-projected behind the camera or deduped
-        kGrowAtCap = 7,            //!< the wall is at kMaxWallMarks
+        kGrowAtCap = 7,            //!< no longer reported: past kMaxGrownRows the least-seen grown rows give way
         kGrowPromoted = 8,         //!< marks were written into the map
+        kGrowTypeMismatch = 9,     //!< the artwork's descriptors are not the wall doodle's type
     };
 
     /** Last [CorrobGate]; see the enum for why this is worth a channel of its own. */
@@ -893,7 +889,20 @@ private:
      * mMutex.
      */
     size_t mDoodleBaseCount = 0;
+    /** Per wall row: the reloc seq of the last lock it was an inlier of (lazily sized). Guarded by mMutex. */
+    std::vector<long> mWallLastSeen;
+    /** When the current reloc pose was published, for priorFresh. Guarded by mMutex. */
+    std::chrono::steady_clock::time_point mPnpPublishTime{};
+    /** A reloc pose older than this is not a prior for gating (the camera has moved, or was lost). */
+    static constexpr int kRelocPriorMaxAgeMs = 1500;
+    /** Map points must have been re-observed, or carry real confidence, to join a reloc solve. */
+    static constexpr int kMapMinObsForReloc = 2;
+    static constexpr float kMapMinConfForReloc = 0.2f;
+    /** Grown rows behind the captured Doodle; at the cap the least recently seen give way. */
+    static constexpr size_t kMaxGrownRows = 5000;
     void detectCleanWallFeaturesLocked();
+    /** Drop [count] grown rows, least recently seen by a lock first. Needs mMutex. */
+    void evictLeastSeenGrownLocked(size_t count);
     void cleanWallExclusionLocked(cv::Mat& descs, std::vector<cv::Point3f>& pts);
     float mCaptureIntr[4] = {0,0,0,0};
     std::vector<uint8_t> mPendingGridRestore;      // applied when a grid of matching shape is built

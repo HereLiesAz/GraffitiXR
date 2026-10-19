@@ -241,3 +241,45 @@ TEST(MobileGSDoodleState, GrownRowsRoundTripBehindTheCapturedDoodle) {
     EXPECT_EQ(4, g.getWallKeypointCount());
     EXPECT_TRUE(g.exportGrownWall().empty());
 }
+
+// At the grown-row cap growth goes on: the grown rows the locks have gone longest without seeing make
+// room. The captured Doodle is never evicted.
+TEST(MobileGSDoodleState, EvictionDropsTheLeastSeenGrownRowsOnly) {
+    MobileGS g;
+    seedMetric(g);
+    cv::Mat grownDescs(3, 32, CV_8U, cv::Scalar(9));
+    g.restoreGrownWall(grownDescs, {{0.2f,0,0}, {0.3f,0,0}, {0.4f,0,0}});
+    ASSERT_EQ(7, g.getWallKeypointCount());
+    MobileGSTestPeer::setWallLastSeen(g, {0, 0, 0, 0, 5, 1, 3});   // base rows unseen, on purpose
+    MobileGSTestPeer::evictGrown(g, 1);
+    const auto pts = MobileGSTestPeer::wallPoints(g);
+    ASSERT_EQ(6u, pts.size());
+    EXPECT_FLOAT_EQ(0.0f, pts[0].x);   // the captured four are all still there
+    EXPECT_FLOAT_EQ(0.2f, pts[4].x);
+    EXPECT_FLOAT_EQ(0.4f, pts[5].x);   // 0.3 (seen longest ago) went
+}
+
+// The Doodle build installs in stages, each the previous plus more rows: rows self-grow added in
+// between, and the partition pushed for the shared rows, survive the next stage.
+TEST(MobileGSDoodleState, AStagedBuildKeepsGrownRowsAndThePartition) {
+    MobileGS g;
+    cv::Mat base(4, 32, CV_8U, cv::Scalar(7));
+    std::vector<cv::Point3f> basePts = {{0,0,1}, {0.1f,0,1}, {0,0.1f,1}, {0.1f,0.1f,1}};
+    g.restoreWallDoodleMetric(base, basePts, kAnchor, kIntr, kView, {2, 2, 0, 1});
+    cv::Mat grownDescs(2, 32, CV_8U, cv::Scalar(9));
+    g.restoreGrownWall(grownDescs, {{0.2f,0,1}, {0.3f,0,1}});
+    ASSERT_EQ(6, g.getWallKeypointCount());
+    // Next stage: the same four rows plus two close-up rows, no partition yet.
+    cv::Mat staged(6, 32, CV_8U, cv::Scalar(7));
+    std::vector<cv::Point3f> stagedPts = basePts;
+    stagedPts.push_back({0.05f,0.05f,1}); stagedPts.push_back({0.06f,0.05f,1});
+    g.restoreWallDoodleMetric(staged, stagedPts, kAnchor, kIntr, kView);
+    EXPECT_EQ(8, g.getWallKeypointCount()) << "the grown rows went with the staged re-push";
+    const auto pts = MobileGSTestPeer::wallPoints(g);
+    EXPECT_FLOAT_EQ(0.2f, pts[6].x);
+    EXPECT_FLOAT_EQ(0.3f, pts[7].x);
+    const std::vector<uint8_t> grownBlob = g.exportGrownWall();
+    ASSERT_GE(grownBlob.size(), 12u);
+    int32_t rows; std::memcpy(&rows, grownBlob.data(), sizeof rows);
+    EXPECT_EQ(2, rows) << "the close-up rows are captured, not grown";
+}

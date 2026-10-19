@@ -28,10 +28,10 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
   - Where: `PoseFusion.kt:314` (`needsAgreement = !coldStart && …`). `coldStart` is set again on every non-tracking frame (`ArRenderer.kt:2086`).
   - Effect: a "false twin" on brick or tile moves the overlay.
   - Fix: exempt only the very first lock (no correction yet), not every relock after a loss.
-- [ ] **A5. A correct relock after a loss eases in instead of snapping.**
+- [x] **A5. A correct relock after a loss eases in instead of snapping.**
   - Where: `PoseFusion.kt:309, 327-337`. Below COLD_SNAP the blend is about 0.07 per relock. The ratio's denominator (`MobileGS.cpp:1222`) counts every pass plus the map and paint correspondences.
   - Fix: on a cold start, snap on a spread-gated bar, and compute the inlier ratio per correspondence source.
-  - Done: the snap bar. The per-source ratio lands with B10.
+  - Done: the snap bar here; the ratio dilution by paint and map correspondences is removed at its source (B10 dedupe and prior gating, B7 map gating).
 - [ ] **A6. No touch lock in AR while pocketed.**
   - Where: `MainActivity.kt:741` keeps the screen on, but Freeze exists only in TRACE (`:2758-2770`).
   - Effect: fabric touches drag the overlay, switch modes (tearing AR down) or re-capture.
@@ -58,41 +58,41 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
   - Where: `MobileGS.cpp:2162-2188` grows in memory only. `exportDoodle` is co-op only (`ArViewModel.kt:429, 462`); the save (`:4001-4011`, `:4303`) and the load (`:4519, 4541`) use the original capture.
   - Fix: persist the grown tail (rows and regions) with the project and restore it after the base. ARCore and standalone both.
   - Done: ARCore (`grownDoodle`). Standalone lands with C3.
-- [ ] **B2. Self-grow hits a hard cap with no eviction.**
+- [x] **B2. Self-grow hits a hard cap with no eviction.**
   - Where: `kMaxWallMarks = 5000` is shared with the capture and close-ups (`MobileGS.h:248`; `MobileGS.cpp:2056, 2118, 2139-2148`).
   - Fix: evict rows that are no longer re-observed (painted-over originals first) instead of refusing growth. The 5000 cap is memory and stays.
-- [ ] **B3. The partition flips on suddenly after about 12 grown rows and drops every INSIDE original.**
+- [x] **B3. The partition flips on suddenly after about 12 grown rows and drops every INSIDE original.**
   - Where: `MobileGS.cpp:734-736, 824, 2187`.
   - Fix: count only original backbone rows toward the threshold, and keep unpainted INSIDE originals in the match set.
-- [ ] **B4. Marks under the design are excluded from reloc even before any paint.**
+- [x] **B4. Marks under the design are excluded from reloc even before any paint.**
   - Where: `MobileGS.cpp:824`; `DoodlePartition.kt:136-137`.
   - Fix: INSIDE marks stay in reloc until corroboration says paint covers them.
-- [ ] **B5. Artwork and wall descriptor types can drift apart.**
+- [x] **B5. Artwork and wall descriptor types can drift apart.**
   - Where: `MobileGS.cpp:2921-2926`.
   - Effect: self-grow is refused (`:2138`, misleading `kGrowNoGeometry`), paint marks are skipped in reloc (`:1057`), and SuperPoint runs again every pass (`:1706-1711`).
   - Fix: re-register the artwork whenever the wall Doodle's descriptor type changes, and report a distinct code.
-- [ ] **B6. A SuperPoint Doodle with SuperPoint unavailable fails silently as `kRelocFewMatches`.**
+- [x] **B6. A SuperPoint Doodle with SuperPoint unavailable fails silently as `kRelocFewMatches`.**
   - Where: `MobileGS.cpp:805, 1102`.
   - Fix: a distinct reject code, surfaced to the UI.
-- [ ] **B7. The feature map is weakest when it is needed most.**
+- [x] **B7. The feature map is weakest when it is needed most.**
   - Where: `MobileGS.cpp:946, 1609-1636`. It needs only `mapPriorSeq > 0`, so it gates with a stale pre-pocket pose; growth adds foreground clutter.
   - Fix: require a recent prior and a minimum map confidence before using it; only grow points that land on the wall plane within tolerance.
 - [ ] **B8. The low-light enhancer is missing or one-sided.**
   - Where: standalone never sets the light level (`MobileGS.h:1098`). The ORB builds use CLAHE only, with no Zero-DCE (`MetricDoodleBuilder.kt:294-302`, `StandaloneFingerprintBuilder.detectOrb:242-252`), while live reloc enhances (`MobileGS.cpp:752`, `3034-3039`).
   - Fix: a luma-based light level in standalone, and ORB builds through the native enhancer.
-- [ ] **B9. Paint marks are matched on the plain pass only.**
+- [x] **B9. Paint marks are matched on the plain pass only.**
   - Where: `MobileGS.cpp:1047-1072`. No scaled, rectified or sensor-turn passes.
   - Fix: include paint marks in those passes.
-- [ ] **B10. Paint-mark matching is unconstrained and double counts.**
+- [x] **B10. Paint-mark matching is unconstrained and double counts.**
   - Where: `MobileGS.cpp:1050-1072`, with no live-keypoint dedupe against wall correspondences. This lowers the inlier ratio (`PoseFusion.kt:294-296, 334`; `growTrusted` 0.6) and inflates the absolute inlier gates.
   - Fix: constrain to the predicted position when a prior exists, and dedupe on the live keypoint.
-- [ ] **B11. Build-time re-installs drop rows grown during the build, and any partition pushed meanwhile.**
+- [x] **B11. Build-time re-installs drop rows grown during the build, and any partition pushed meanwhile.**
   - Where: `MetricDoodleBuilder.kt:547-560`; `MobileGS.cpp:2313-2350`.
   - Fix: install the build result as a prefix and keep the grown tail and partition.
 - [ ] **B12. A depth-path Doodle may rectify with the wrong orientation.**
   - Where: `MobileGS.cpp:3230-3233` with `MainViewModel.kt:641-645`. Sensor-frame points against a display-oriented view.
   - Fix: verify the view convention and apply the same correction `MetricDoodleBuilder` uses.
-- [ ] **B13. The distortion head goes blind once only paint carries the lock.**
+- [x] **B13. The distortion head goes blind once only paint carries the lock.**
   - Where: `MobileGS.cpp:998` runs before paint marks are appended (`:1050`).
   - Fix: run it on all correspondences, paint included.
 

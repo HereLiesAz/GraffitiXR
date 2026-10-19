@@ -4987,6 +4987,12 @@ class ArViewModel @Inject constructor(
         // Read every tick (~15 Hz) rather than only on a successful lock — the whole point is to show
         // the FAILING states, which by definition never reach a success path.
         val relocDiag = slamManager.getRelocDiagnostics()
+        // The design was registered against a Doodle of another descriptor type (re-captured with
+        // another detector, or SuperPoint became (un)available): nothing it corroborates can grow
+        // the Doodle or become a paint mark. Register it again for the current Doodle.
+        if (relocDiag.growOutcome == com.hereliesaz.graffitixr.common.model.GrowOutcome.TYPE_MISMATCH) {
+            reRegisterGuideForWallType()
+        }
         // IMPLEMENTATION.md 4.6, read on the same tick and for the same reason. Separate call
         // because these are floats and the record above arrives as an int[]; the two are read one
         // after the other rather than merged natively, so they can disagree by one reloc cycle. That
@@ -5376,7 +5382,24 @@ class ArViewModel @Inject constructor(
 
     private fun guideSettled() = guideRegistered == guideRequested.get()
 
+    /** The last design composite registered (a copy: the caller may recycle its own), for [reRegisterGuideForWallType]. */
+    @Volatile private var lastGuide: Pair<Bitmap, String?>? = null
+    @Volatile private var lastTypeReRegisterMs = 0L
+
+    private fun reRegisterGuideForWallType() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastTypeReRegisterMs < TYPE_REREGISTER_MIN_INTERVAL_MS) return
+        val (bitmap, key) = lastGuide ?: return
+        if (bitmap.isRecycled) return
+        lastTypeReRegisterMs = now
+        updatePaintingGuide(bitmap, key)
+    }
+
     fun updatePaintingGuide(bitmap: Bitmap, designKey: String? = null) {
+        if (lastGuide?.first !== bitmap) {
+            val copy = runCatching { bitmap.copy(Bitmap.Config.ARGB_8888, false) }.getOrNull()
+            if (copy != null) lastGuide = copy to designKey
+        }
         val request = guideRequested.incrementAndGet()
         if (designKey != null && designKey != lastGuideKey) {
             lastGuideKey = designKey
@@ -6434,6 +6457,9 @@ class ArViewModel @Inject constructor(
          * always [com.hereliesaz.graffitixr.feature.ar.rendering.OverlayRenderer.QUAD_HALF_EXTENT].
          */
         const val ANCHOR_BORDER_FRAME_FRACTION = 0.18f
+
+        /** How often the design may be re-registered for a Doodle of another descriptor type. */
+        const val TYPE_REREGISTER_MIN_INTERVAL_MS = 10_000L
 
         /** Longest Align waits for a design registration in flight before giving up as "no match". */
         const val ALIGN_REGISTRATION_WAIT_MS = 5_000L

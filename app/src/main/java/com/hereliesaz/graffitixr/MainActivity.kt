@@ -3298,6 +3298,8 @@ private fun RelocDiagnosticsOverlay(
             "NO POSE" to "${d.matches} matches, none geometrically consistent"
         RelocReject.FEW_INLIERS ->
             "${d.inliers}/6 INLIERS" to "close — hold steadier, or get square to the wall"
+        RelocReject.TYPE_MISMATCH ->
+            "TYPE MISMATCH" to "the Doodle needs the SuperPoint model, which isn't available — re-capture the Doodle"
         RelocReject.UNKNOWN -> "—" to "waiting for the first attempt"
     }
     val locked = d.reject == RelocReject.OK

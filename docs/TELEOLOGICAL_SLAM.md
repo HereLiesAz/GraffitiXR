@@ -256,14 +256,27 @@ The artist taps their painted reference marks and the capture is masked to them,
 tapped marks are recorded per point as `Doodle.pinned`. When the design is placed,
 `DoodlePartition` forces the pinned marks OUTSIDE (the backbone the relocalizer matches against)
 wherever the design falls, instead of classifying them INSIDE just because the design is laid over
-them. Any point that is not pinned is classified by where the design falls. If the backbone is still
-tiny (fewer than `kMinBackboneMarks` OUTSIDE marks) native ignores the partition for matching rather
-than sitting at FEW_MATCHES forever.
+them. Any point that is not pinned is classified by where the design falls. A mark under the design
+(INSIDE or BAND) stays in the relocalizer's solve until the paint grid has its cell painted over; only
+then is it dropped, because only then is it no longer the doodle the artist drew. (The old rule
+dropped every non-OUTSIDE mark as soon as a dozen OUTSIDE rows existed, and self-grow tags every grown
+row OUTSIDE, so a few promotions threw away every mark inside the work area.)
+
+Paint marks are matched in every reloc pass (plain, scaled, rectified, sensor-turned), never from a
+live keypoint the Doodle already took, and, when a fresh prior pose exists, only near where that pose
+predicts them. The persistent map joins a solve only with a fresh prior (published in the last
+`kRelocPriorMaxAgeMs` with tracking in between) and only through points re-observed or carrying real
+confidence.
 
 Other behaviour worth knowing:
 - A repartition (design nudged) keeps marks self-grow appended and the distortion head's patch: the
   Kotlin copy it re-pushes is only the base, and native treats "base is a prefix of what I hold" as
-  the same doodle.
+  the same doodle. The staged Doodle build (photo features, then close-ups) is treated the same way:
+  each stage is the previous plus rows, and keeps the grown tail and the partition.
+- Grown rows are capped at `kMaxGrownRows` behind the captured Doodle; past it, the grown rows no lock
+  has seen for longest make room, so self-grow never stops. The captured rows are never evicted.
+- If the design was registered in another descriptor type than the Doodle (`GrowOutcome.TYPE_MISMATCH`),
+  the app registers it again; paint marks of the old type are dropped then.
 - Corroboration needs `kCorrobConfirmations` CONSECUTIVE hits for a feature predicted in view;
   an observed miss resets an unconfirmed feature. Moving the design resets corroboration; paint marks
   already on the wall are kept. Paint marks store the LIVE descriptor that corroborated them.

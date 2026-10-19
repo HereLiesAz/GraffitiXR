@@ -630,6 +630,11 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
     std::vector<cv::Point3f> mapKps3d;
     float mapPriorPose[16];
     long mapPriorSeq = 0;
+    bool priorFresh = false;
+    std::vector<float> mapConf;
+    std::vector<int> mapObs;
+    std::vector<uint8_t> wallCovered;   // 1 = a mark under the design whose cell is painted over
+    cv::Mat paintDescs; std::vector<cv::Point3f> paintPts;
     // The sensor turn's inputs: the wall's normal (East-North-Up) and this frame's attitude.
     bool hasWallNormal = false;
     cv::Vec3d wallNormal;
@@ -652,6 +657,32 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
         mapKps3d = mMapPoints3D;
         memcpy(mapPriorPose, mPnpCamFromFpWorld, 16 * sizeof(float));
         mapPriorSeq = mPnpResultSeq.load(std::memory_order_relaxed);
+        // A prior is only a prior while it still describes where the camera is: published recently,
+        // with tracking in between. Out of a pocket the last pose is from before the loss.
+        priorFresh = mapPriorSeq > 0 && mHasTrackingPose.load(std::memory_order_relaxed) &&
+            (std::chrono::steady_clock::now() - mPnpPublishTime) < std::chrono::milliseconds(kRelocPriorMaxAgeMs);
+        mapConf = mMapConfidence;
+        mapObs = mMapObs;
+        // Marks under the design (INSIDE / BAND) stay in the global solve until the paint grid has
+        // their cell painted: before that they are still the doodles the artist drew, and dropping
+        // them on classification alone threw away the marks inside the work area before any paint.
+        if (mWallRegions.size() == mWallKeypoints3D.size() && mHasDesignPlacement &&
+            mDesignHalfW > 0.0f && mDesignHalfH > 0.0f && mGrid.cols > 0 && mGrid.rows > 0 &&
+            mGrid.painted.size() == (size_t)mGrid.cols * mGrid.rows) {
+            const glm::mat4 designFromFp = glm::inverse(glm::make_mat4(mDesignFpFromDesign));
+            wallCovered.assign(mWallKeypoints3D.size(), 0);
+            for (size_t i = 0; i < mWallKeypoints3D.size(); ++i) {
+                if (mWallRegions[i] == kRegionOutside) continue;
+                const cv::Point3f& P = mWallKeypoints3D[i];
+                const glm::vec4 X = designFromFp * glm::vec4(P.x, P.y, P.z, 1.0f);
+                const int c = (int)std::floor((X.x / mDesignHalfW + 1.0f) * 0.5f * mGrid.cols);
+                const int r = (int)std::floor((1.0f - X.y / mDesignHalfH) * 0.5f * mGrid.rows);
+                if (c < 0 || r < 0 || c >= mGrid.cols || r >= mGrid.rows) continue;
+                if (mGrid.painted[(size_t)r * mGrid.cols + c]) wallCovered[i] = 1;
+            }
+        }
+        paintDescs = mPaintDescriptors.clone();
+        paintPts = mPaintPoints3D;
         // Which doodle every snapshot above belongs to. Checked again under the same mutex
         // before this pass publishes: a doodle replaced or cleared while the (hundreds of ms)
         // solve ran must not have its result latched as if it described the NEW wall.
@@ -727,13 +758,10 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
     // apart: they must agree about which doodle is partitioned or the diagnostics describe
     // a different point set from the one PnP saw.
     const bool usePartition = wallRegions.size() == wallKps3d.size();
-    // A partition that leaves (almost) nothing outside the artwork cannot localize anything, and
-    // paint marks, which only appear after a lock, can never bootstrap from nothing. Fall back to
-    // every stored mark: the originals under the artwork still match until they are painted over,
-    // which is far better than a permanent FEW_MATCHES. Counted from the same regions.
-    const int outsideMarks = usePartition
-        ? (int)std::count(wallRegions.begin(), wallRegions.end(), kRegionOutside) : 0;
-    const bool partitionActive = usePartition && outsideMarks >= kMinBackboneMarks;
+    // The partition no longer decides what the global solve sees: a mark under the design stays in
+    // it until the paint grid has its cell painted (wallCovered, from the snapshot above). That also
+    // removes the old all-or-nothing switch, which flipped on once a dozen OUTSIDE rows existed --
+    // and self-grow tags every grown row OUTSIDE, so a few promotions dropped every original inside.
     // 2.11: how many stored points PnP is allowed to draw on. An UNPARTITIONED doodle is
     // 2.7's legacy all-backbone case, so it reports its FULL point count — not zero, and not the
     // -1 sentinel. Zero here is a real measurement meaning F_out is empty (the artwork covers
@@ -788,6 +816,16 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
     // as three inliers, and PoseFusion's COLD_SNAP_MIN_INLIERS / ratio gates passed on a fraction of
     // the independent evidence they assume. First pass wins (the plain pass runs first).
     std::vector<uint8_t> corrSeen(wallKps3d.size(), 0);
+    // Same rule for paint marks, and per correspondence: which wall row it came from (-1 for map and
+    // paint), so a lock can say which rows it actually saw (mWallLastSeen, the grown-row eviction).
+    std::vector<uint8_t> paintSeen(paintPts.size(), 0);
+    std::vector<int> corrRow;
+    const bool paintUsable = !paintDescs.empty() && (size_t)paintDescs.rows == paintPts.size() &&
+        (wallDescs.empty() || (paintDescs.type() == wallDescs.type() && paintDescs.cols == wallDescs.cols));
+    // Paint marks have no partition and no frustum gate of their own, so on repetitive mural texture
+    // they bring outliers. With a fresh prior pose each one must land near where it is predicted.
+    const glm::mat4 priorCamFromFp = glm::make_mat4(mapPriorPose);
+    const float paintGatePx = 0.1f * std::sqrt((float)(gray.cols * gray.cols + gray.rows * gray.rows));
 
     auto buildCorr = [&](const cv::Mat& g, const cv::Mat& Hback,
                          std::vector<cv::Point2f>& outImg, std::vector<cv::Point3f>& outObj,
@@ -813,6 +851,8 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
         cv::Ptr<cv::DescriptorMatcher>& matcher = (descs.type() == CV_32F) ? mL2Matcher : mMatcher;
         std::vector<std::vector<cv::DMatch>> matches;
         matcher->knnMatch(descs, wallDescs, matches, 2);
+        // A live keypoint answers for one stored point at most, across the wall and paint sets.
+        std::vector<uint8_t> usedQuery(kps.size(), 0);
         for (auto& match : matches) {
             if (match.size() < 2) continue;
             if (match[0].distance < kRelocLoweRatio * match[1].distance) {
@@ -821,9 +861,11 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
                 // work surface — they decay as it is painted, which is exactly what makes
                 // accuracy degrade with task progress. BAND straddles the edge and is trusted by
                 // neither side. Corroboration against F_in happens later, once a pose exists.
-                if (partitionActive && wallRegions[match[0].trainIdx] != kRegionOutside) continue;
+                if (!wallCovered.empty() && wallCovered[match[0].trainIdx]) continue;
                 if (corrSeen[match[0].trainIdx]) continue;
                 corrSeen[match[0].trainIdx] = 1;
+                usedQuery[(size_t)match[0].queryIdx] = 1;
+                corrRow.push_back(match[0].trainIdx);
                 cv::Point2f p = kps[match[0].queryIdx].pt;
                 if (!Hback.empty()) {
                     std::vector<cv::Point2f> in{p}, outp;
@@ -839,6 +881,36 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
                 outFromBackbone.push_back(
                     (!usePartition || wallRegions[match[0].trainIdx] == kRegionOutside) ? 1 : 0);
             }
+        }
+        // Painted design features, in this pass too: SuperPoint is not scale-invariant, and the
+        // scaled, rectified and turned passes are what reach paint seen from another distance or
+        // angle. Never from a keypoint the wall already took.
+        if (!paintUsable || descs.type() != paintDescs.type() || descs.cols != paintDescs.cols) return;
+        std::vector<std::vector<cv::DMatch>> pm;
+        matcher->knnMatch(descs, paintDescs, pm, 2);
+        for (auto& m : pm) {
+            if (m.size() < 2 || !(m[0].distance < kRelocLoweRatio * m[1].distance)) continue;
+            if (usedQuery[(size_t)m[0].queryIdx] || paintSeen[(size_t)m[0].trainIdx]) continue;
+            cv::Point2f p = kps[m[0].queryIdx].pt;
+            if (!Hback.empty()) {
+                std::vector<cv::Point2f> in{p}, outp;
+                cv::perspectiveTransform(in, outp, Hback);
+                p = outp[0];
+            }
+            const cv::Point3f& P = paintPts[(size_t)m[0].trainIdx];
+            if (priorFresh) {
+                const glm::vec4 pc = priorCamFromFp * glm::vec4(P.x, P.y, P.z, 1.0f);
+                if (!(pc.z > 1e-3f)) continue;
+                const float u = (float)(liveK[0] * pc.x / pc.z + liveK[2]);
+                const float v = (float)(liveK[1] * pc.y / pc.z + liveK[3]);
+                if (std::hypot(u - p.x, v - p.y) > paintGatePx) continue;
+            }
+            paintSeen[(size_t)m[0].trainIdx] = 1;
+            usedQuery[(size_t)m[0].queryIdx] = 1;
+            outImg.push_back(p);
+            outObj.push_back(P);
+            outFromBackbone.push_back(0);
+            corrRow.push_back(-1);
         }
     };
 
@@ -943,7 +1015,9 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
     // solves over both.
     // Requires a prior pose (mapPriorSeq>0, i.e. the doodle has locked at least once) and a
     // matching descriptor type. Default-off, so this is inert until device-validated.
-    if (mMapRelocEnabled.load(std::memory_order_relaxed) && !mapDescs.empty() && mapPriorSeq > 0
+    // Only with a FRESH prior (see priorFresh): out of a pocket the last pose is from before the loss,
+    // and gating with it matches a small, wrong subset whose ratio test is weak.
+    if (mMapRelocEnabled.load(std::memory_order_relaxed) && !mapDescs.empty() && priorFresh
             && mapDescs.type() == wallDescs.type() && mapKps3d.size() == (size_t)mapDescs.rows) {
         glm::mat4 camFromFp = glm::make_mat4(mapPriorPose);
         // The gate asks "which map points land in THIS frame", so it projects with this frame's
@@ -951,7 +1025,11 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
         const double gfx = liveK[0], gfy = liveK[1], gcx = liveK[2], gcy = liveK[3];
         std::vector<int> visible;
         visible.reserve(mapKps3d.size());
+        const bool haveConf = mapConf.size() == mapKps3d.size() && mapObs.size() == mapKps3d.size();
         for (int i = 0; i < (int)mapKps3d.size(); ++i) {
+            // A point seen once and never again is as likely clutter as wall: wait for it to be
+            // re-observed (or to carry real confidence) before it can steer a solve.
+            if (haveConf && mapObs[(size_t)i] < kMapMinObsForReloc && mapConf[(size_t)i] < kMapMinConfForReloc) continue;
             glm::vec4 pc = camFromFp * glm::vec4(mapKps3d[i].x, mapKps3d[i].y, mapKps3d[i].z, 1.0f);
             if (pc.z <= 0.05f) continue; // behind / too close to the camera
             float u = (float)(gfx * pc.x / pc.z + gcx);
@@ -975,6 +1053,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
                     if (m[0].distance < kRelocLoweRatio * m[1].distance) {
                         imgPts.push_back(baseKps[m[0].queryIdx].pt);
                         objPts.push_back(mapKps3d[visible[m[0].trainIdx]]);
+                        corrRow.push_back(-1);
                         // NOT backbone: the persistent map is a separate point set that Φ has
                         // never classified, so counting it in F_out would report a backbone the
                         // partition never vouched for — and mask an empty F_out on exactly the
@@ -1044,32 +1123,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
         decayCorroboration();
     }
 
-    // Teleological reference set: painted design features (see kMaxPaintMarks). Matched on the plain
-    // pass only, with the same ratio test; unlike the backbone they are never partition-filtered,
-    // because they ARE the artwork — they only exist once the wall has confirmed them.
-    {
-        cv::Mat paintDescs; std::vector<cv::Point3f> paintPts;
-        {
-            std::lock_guard<std::mutex> lock(mMutex);
-            paintDescs = mPaintDescriptors.clone();
-            paintPts = mPaintPoints3D;
-        }
-        if (!paintDescs.empty() && !baseDescs.empty() && paintDescs.type() == baseDescs.type() &&
-            paintDescs.cols == baseDescs.cols && (size_t)paintDescs.rows == paintPts.size()) {
-            cv::Ptr<cv::DescriptorMatcher>& matcher = (baseDescs.type() == CV_32F) ? mL2Matcher : mMatcher;
-            std::vector<std::vector<cv::DMatch>> pm;
-            matcher->knnMatch(baseDescs, paintDescs, pm, 2);
-            std::vector<uint8_t> seen(paintPts.size(), 0);
-            for (auto& m : pm) {
-                if (m.size() < 2 || !(m[0].distance < kRelocLoweRatio * m[1].distance)) continue;
-                if (seen[m[0].trainIdx]) continue;
-                seen[m[0].trainIdx] = 1;
-                imgPts.push_back(baseKps[m[0].queryIdx].pt);
-                objPts.push_back(paintPts[m[0].trainIdx]);
-                corrFromBackbone.push_back(0);
-            }
-        }
-    }
+    // Paint marks (the teleological reference set) were matched inside buildCorr, in every pass.
 
     // Published AFTER the paint-mark correspondences are appended, so this is the exact set
     // solvePnPRansac sees. It used to be published before them, which let a lock carried by paint
@@ -1096,10 +1150,14 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
             : -1,
         std::memory_order_relaxed);
     if (imgPts.size() < 8) {
-        // Distinguish "the detector found nothing / the descriptors don't even compare" from
-        // "features were found but too few agreed with the doodle" — they call for opposite
-        // fixes (light/focus/texture vs. aim at the registered area).
-        mLastRelocReject.store(baseDescs.empty() ? kRelocNoFeatures : kRelocFewMatches,
+        // Distinguish "the detector found nothing", "the descriptors can't compare with the
+        // doodle at all" (a SuperPoint doodle while SuperPoint is unavailable: nothing will ever
+        // match until it is) and "features were found but too few agreed with the doodle" -- they
+        // call for different fixes (light/focus/texture, a re-capture, aim at the registered area).
+        const bool typeMismatch = !baseDescs.empty() && !wallDescs.empty() &&
+            (baseDescs.type() != wallDescs.type() || baseDescs.cols != wallDescs.cols);
+        mLastRelocReject.store(baseDescs.empty() ? kRelocNoFeatures
+                               : (typeMismatch ? kRelocTypeMismatch : kRelocFewMatches),
                                std::memory_order_relaxed);
     }
     if (imgPts.size() >= 8) {
@@ -1221,7 +1279,18 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
                         mPnpInlierCount.store((int)inliers.size(), std::memory_order_relaxed);
                         mPnpMatchCount.store((int)imgPts.size(), std::memory_order_relaxed);
                         mPnpInlierSpread = mLastRelocInlierSpread.load(std::memory_order_relaxed);
-                        mPnpResultSeq.fetch_add(1, std::memory_order_relaxed);
+                        const long seqNow = mPnpResultSeq.fetch_add(1, std::memory_order_relaxed) + 1;
+                        mPnpPublishTime = std::chrono::steady_clock::now();
+                        // Which wall rows this lock actually saw: the grown-row eviction keeps those.
+                        if (mWallLastSeen.size() != mWallKeypoints3D.size())
+                            mWallLastSeen.resize(mWallKeypoints3D.size(), seqNow);
+                        if (corrRow.size() == imgPts.size()) {
+                            for (int idx : inliers) {
+                                if (idx < 0 || idx >= (int)corrRow.size()) continue;
+                                const int row = corrRow[(size_t)idx];
+                                if (row >= 0 && (size_t)row < mWallLastSeen.size()) mWallLastSeen[(size_t)row] = seqNow;
+                            }
+                        }
                         published = true;
                     }
                 }
@@ -2052,14 +2121,11 @@ void MobileGS::tryUpdateDoodle(const cv::Mat& grayClean,
         trusted = growTrusted(inliers, pnpMatches, spread);
         if (trusted) mLastGrowSeq = seq;          // claim it (yield or not)
     }
-    if (!trusted || fx <= 0 || fy <= 0 ||
-        wall.size() < 12 || wall.size() >= kMaxWallMarks) {
+    if (!trusted || fx <= 0 || fy <= 0 || wall.size() < 12) {
         // Split so "the gate refused this pose" is distinguishable from "there is nothing to grow
-        // onto" and from "the map is full". The first is tuning (E5 sets MIN_INLIER_SPREAD), the
-        // second is a capture problem, the third is a hard ceiling and not a fault at all.
-        mGrowOutcome.store(
-            wall.size() >= kMaxWallMarks ? kGrowAtCap : (!trusted ? kGrowUntrusted : kGrowNoGeometry),
-            std::memory_order_relaxed);
+        // onto". The first is tuning (E5 sets MIN_INLIER_SPREAD), the second a capture problem.
+        // There is no "full" any more: at the grown-row cap the least recently seen rows give way.
+        mGrowOutcome.store(!trusted ? kGrowUntrusted : kGrowNoGeometry, std::memory_order_relaxed);
         return;
     }
 
@@ -2135,18 +2201,22 @@ void MobileGS::tryUpdateDoodle(const cv::Mat& grayClean,
             mGrowOutcome.store(kGrowStaleSeq, std::memory_order_relaxed);
             return;
         }
-        if (mWallDescriptors.type() != newDescs.type() || mWallDescriptors.cols != newDescs.cols ||
-            mWallKeypoints3D.size() >= kMaxWallMarks) {
-            mGrowOutcome.store(
-                mWallKeypoints3D.size() >= kMaxWallMarks ? kGrowAtCap : kGrowNoGeometry,
-                std::memory_order_relaxed);
+        if (mWallDescriptors.type() != newDescs.type() || mWallDescriptors.cols != newDescs.cols) {
+            // The artwork was described in another type than the wall doodle (it was registered
+            // against an earlier doodle): nothing it corroborates can join this one. Reported as
+            // itself, not as "no geometry"; the host re-registers the design when it sees it.
+            mGrowOutcome.store(kGrowTypeMismatch, std::memory_order_relaxed);
             return;
         }
-        // Fill to the cap exactly. Testing the size only BEFORE the loop let a wall sitting at
-        // kMaxWallMarks-1 grow by the full per-relock batch, so the documented ceiling was really
-        // ceiling + batch.
-        const size_t room = kMaxWallMarks - mWallKeypoints3D.size();
-        const size_t take = std::min(room, newPts.size());
+        // The grown rows are capped (a memory guard), but growth never stops: past the cap, the grown
+        // rows the locks have gone longest without seeing -- paint since covered, clutter, a mark
+        // from an angle never revisited -- make room. The captured Doodle is never evicted.
+        const size_t base = std::min(mDoodleBaseCount, mWallKeypoints3D.size());
+        const size_t grownNow = mWallKeypoints3D.size() - base;
+        const size_t take = std::min(newPts.size(), kMaxGrownRows);
+        if (grownNow + take > kMaxGrownRows) evictLeastSeenGrownLocked(grownNow + take - kMaxGrownRows);
+        const long seqNow = mPnpResultSeq.load(std::memory_order_relaxed);
+        if (mWallLastSeen.size() != mWallKeypoints3D.size()) mWallLastSeen.resize(mWallKeypoints3D.size(), seqNow);
         // IMPLEMENTATION.md 3.4 — classify each promotion candidate with Φ, HERE, at promotion time.
         //
         // Until this landed every promoted mark was tagged BAND: correct as a refusal (an
@@ -2162,6 +2232,7 @@ void MobileGS::tryUpdateDoodle(const cv::Mat& grayClean,
         for (size_t i = 0; i < take; ++i) {
             mWallKeypoints3D.push_back(newPts[i]);
             mWallDescriptors.push_back(newDescs.row((int)i));
+            mWallLastSeen.push_back(seqNow);
             // Keep the partition 1:1 with the points it indexes, or the reloc filter silently
             // switches itself off (its length check fails) and the whole map goes back to being
             // undifferentiated.
@@ -2315,9 +2386,39 @@ void MobileGS::restoreWallDoodleMetric(const cv::Mat& d, const std::vector<cv::P
         d.rows == (int)baseN && d.cols == mWallDescriptors.cols && d.type() == mWallDescriptors.type() &&
         std::equal(p.begin(), p.end(), mWallKeypoints3D.begin()) &&
         cv::norm(d, mWallDescriptors.rowRange(0, (int)baseN), cv::NORM_INF) == 0.0;
+    // The Doodle build installs in stages (the photo's own features, then the quick close-ups, then
+    // all of them), each re-push the previous stage PLUS more rows. That is the same capture
+    // growing, not a new wall: keep the self-grown tail behind it, and the partition already pushed
+    // for the rows it shares (new rows read BAND until the next partition push).
+    const size_t oldBase = std::min(mDoodleBaseCount, mWallKeypoints3D.size());
+    const bool extensionOfSame = !growthOfSame && oldBase > 0 && (size_t)d.rows == p.size() &&
+        p.size() > oldBase && d.cols == mWallDescriptors.cols && d.type() == mWallDescriptors.type() &&
+        (size_t)mWallDescriptors.rows == mWallKeypoints3D.size() &&
+        std::equal(p.begin(), p.begin() + (long)oldBase, mWallKeypoints3D.begin()) &&
+        cv::norm(d.rowRange(0, (int)oldBase), mWallDescriptors.rowRange(0, (int)oldBase), cv::NORM_INF) == 0.0;
     cv::Mat useD = d;
     std::vector<cv::Point3f> useP = p;
     std::vector<uint8_t> useRegions = regions;
+    if (extensionOfSame) {
+        const size_t total = mWallKeypoints3D.size();
+        if (total > oldBase) {
+            cv::Mat merged = d.clone();
+            merged.push_back(mWallDescriptors.rowRange((int)oldBase, (int)total).clone());
+            useD = merged;
+            useP.insert(useP.end(), mWallKeypoints3D.begin() + (long)oldBase, mWallKeypoints3D.end());
+        }
+        const bool oldRegions = mWallRegions.size() == total;
+        if (regions.size() == p.size()) {
+            if (oldRegions) useRegions.insert(useRegions.end(), mWallRegions.begin() + (long)oldBase, mWallRegions.end());
+            else useRegions.insert(useRegions.end(), total - oldBase, kRegionOutside);
+        } else if (oldRegions) {
+            useRegions.assign(mWallRegions.begin(), mWallRegions.begin() + (long)oldBase);
+            useRegions.insert(useRegions.end(), p.size() - oldBase, kRegionBand);
+            useRegions.insert(useRegions.end(), mWallRegions.begin() + (long)oldBase, mWallRegions.end());
+        } else {
+            useRegions.clear();
+        }
+    }
     if (growthOfSame) {
         const size_t total = mWallKeypoints3D.size();
         cv::Mat merged = d.clone();
@@ -2332,7 +2433,7 @@ void MobileGS::restoreWallDoodleMetric(const cv::Mat& d, const std::vector<cv::P
             useRegions.clear();
         }
     }
-    const bool sameDoodle = growthOfSame || (p == mWallKeypoints3D && d.rows == mWallDescriptors.rows &&
+    const bool sameDoodle = growthOfSame || extensionOfSame || (p == mWallKeypoints3D && d.rows == mWallDescriptors.rows &&
         d.cols == mWallDescriptors.cols && d.type() == mWallDescriptors.type() &&
         (d.empty() || cv::norm(d, mWallDescriptors, cv::NORM_INF) == 0.0));
     if (!sameDoodle) mWallPatch.release();
@@ -2345,7 +2446,7 @@ void MobileGS::restoreWallDoodleMetric(const cv::Mat& d, const std::vector<cv::P
     if (!sameFrame) invalidateRelocResultLocked();
     // The captured part of the stored set: the base alone when grown rows ride behind it, the standing
     // count when the identical set is re-pushed, otherwise everything.
-    mDoodleBaseCount = growthOfSame ? baseN
+    mDoodleBaseCount = (growthOfSame || extensionOfSame) ? baseN
         : (sameDoodle && mDoodleBaseCount > 0 ? std::min(mDoodleBaseCount, (size_t)useD.rows) : (size_t)useD.rows);
     mWallDescriptors = useD.clone();
     mWallKeypoints3D = useP;
@@ -2995,6 +3096,13 @@ void MobileGS::setArtworkDoodle(const cv::Mat& composite, const uint8_t* depthDa
     {
         std::lock_guard<std::mutex> lock(mMutex);
         mArtworkDescriptors = keepDescs.clone();
+        // Paint marks carry the descriptor of the live keypoint that confirmed them, in the type the
+        // artwork had then. Of another type they can never match a live frame again: drop them.
+        if (!mPaintDescriptors.empty() &&
+            (mPaintDescriptors.type() != keepDescs.type() || mPaintDescriptors.cols != keepDescs.cols)) {
+            mPaintDescriptors.release();
+            mPaintPoints3D.clear();
+        }
         mArtworkKeypoints3D = std::move(pts3d);
         mArtworkKeypoints2D = std::move(keepPts2d);
         mArtworkImageW = gray.cols;
@@ -4096,6 +4204,34 @@ std::vector<uint8_t> MobileGS::exportGrownWall() const {
     return out;
 }
 
+void MobileGS::evictLeastSeenGrownLocked(size_t count) {
+    const size_t total = mWallKeypoints3D.size();
+    const size_t base = std::min(mDoodleBaseCount, total);
+    if (count == 0 || total <= base || (size_t)mWallDescriptors.rows != total) return;
+    if (mWallLastSeen.size() != total) mWallLastSeen.resize(total, 0);
+    std::vector<size_t> grown;
+    for (size_t i = base; i < total; ++i) grown.push_back(i);
+    count = std::min(count, grown.size());
+    // Oldest last sighting first; among equals, the earliest grown (lowest index).
+    std::stable_sort(grown.begin(), grown.end(), [&](size_t a, size_t b) { return mWallLastSeen[a] < mWallLastSeen[b]; });
+    std::vector<uint8_t> drop(total, 0);
+    for (size_t k = 0; k < count; ++k) drop[grown[k]] = 1;
+    const bool regionsTracked = mWallRegions.size() == total;
+    cv::Mat keepD; std::vector<cv::Point3f> keepP; std::vector<uint8_t> keepR; std::vector<long> keepS;
+    keepP.reserve(total - count); keepS.reserve(total - count);
+    for (size_t i = 0; i < total; ++i) {
+        if (drop[i]) continue;
+        keepD.push_back(mWallDescriptors.row((int)i));
+        keepP.push_back(mWallKeypoints3D[i]);
+        keepS.push_back(mWallLastSeen[i]);
+        if (regionsTracked) keepR.push_back(mWallRegions[i]);
+    }
+    mWallDescriptors = keepD;
+    mWallKeypoints3D.swap(keepP);
+    mWallLastSeen.swap(keepS);
+    if (regionsTracked) mWallRegions.swap(keepR);
+}
+
 void MobileGS::restoreGrownWall(const cv::Mat& descs, const std::vector<cv::Point3f>& pts) {
     std::lock_guard<std::mutex> lock(mMutex);
     if (descs.empty() || descs.rows != (int)pts.size() || mWallDescriptors.empty() ||
@@ -4105,11 +4241,13 @@ void MobileGS::restoreGrownWall(const cv::Mat& descs, const std::vector<cv::Poin
     // restore, not a merge).
     if ((size_t)mWallDescriptors.rows != mDoodleBaseCount) return;
     const bool regionsTracked = mWallRegions.size() == mWallKeypoints3D.size();
-    const int room = (int)std::max<long>(0, (long)kMaxWallMarks - (long)mWallDescriptors.rows);
-    const int n = std::min(descs.rows, room);
+    const int n = std::min(descs.rows, (int)kMaxGrownRows);
+    const long seqNow = mPnpResultSeq.load(std::memory_order_relaxed);
+    if (mWallLastSeen.size() != mWallKeypoints3D.size()) mWallLastSeen.resize(mWallKeypoints3D.size(), seqNow);
     for (int i = 0; i < n; ++i) {
         mWallDescriptors.push_back(descs.row(i));
         mWallKeypoints3D.push_back(pts[(size_t)i]);
+        mWallLastSeen.push_back(seqNow);
         if (regionsTracked) mWallRegions.push_back(kRegionOutside);
     }
 }
