@@ -8,6 +8,7 @@ import com.hereliesaz.graffitixr.common.serialization.BlendModeSerializer
 import com.hereliesaz.graffitixr.common.serialization.OffsetSerializer
 import com.hereliesaz.graffitixr.common.serialization.UriSerializer
 import kotlinx.parcelize.Parcelize
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.util.UUID
 
@@ -182,7 +183,9 @@ data class GraffitiProject(
      * frame. Mixing those two fields would make an ARCore loader interpret valid page points using
      * the wrong frame semantics.
      */
+    @SerialName("sphereSlamFingerprint")
     val sphereSlamFingerprint: Fingerprint? = null,
+    @SerialName("sphereSlamFingerprintFrameVersion")
     val sphereSlamFingerprintFrameVersion: Int = SPHERE_SLAM_FINGERPRINT_FRAME_VERSION,
 
     /**
@@ -193,6 +196,7 @@ data class GraffitiProject(
      * into the already-running SphereSLAM map. Empty means legacy/unknown and must fail closed rather
      * than being silently treated as identity.
      */
+    @SerialName("sphereSlamMapFromFingerprint")
     val sphereSlamMapFromFingerprint: List<Float> = emptyList(),
 
     /**
@@ -244,6 +248,7 @@ data class GraffitiProject(
      * The page is restored only while [fingerprint] still carries this exact value: a later target,
      * or a capture whose fingerprint never committed, leaves the page inert rather than wrong.
      */
+    @SerialName("hybridKpmFingerprintKey")
     val hybridKpmFingerprintKey: List<Float> = emptyList(),
 
     val refinementPaths: List<RefinementPath> = emptyList(),
@@ -251,9 +256,12 @@ data class GraffitiProject(
     // Legacy visual state grouped to fix binary compatibility issues with large data classes.
     val legacyVisuals: LegacyVisuals = LegacyVisuals(),
 
+    @SerialName("fingerprint")
+
     val fingerprint: Fingerprint? = null,
 
     // Teleological Fingerprinting
+    @SerialName("targetFingerprintPath")
     val targetFingerprintPath: String? = null,
 
     val drawingPaths: List<List<Pair<Float, Float>>> = emptyList(),
@@ -281,6 +289,8 @@ data class GraffitiProject(
     // Neural Scan ID
     val cloudAnchorId: String? = null,
 
+    @SerialName("targetFingerprint")
+
     val targetFingerprint: String? = null,
     // Per-mode whole-design adjustments, keyed by EditorMode.name. Defaulted for back-compat with
     // projects saved before this field existed.
@@ -292,7 +302,9 @@ data class GraffitiProject(
     // a default guess. Kept here rather than on Fingerprint because Fingerprint is constructed in
     // native JNI with a fixed constructor signature (changing it would break depth-path capture).
     // Both empty on depth-path or pre-existing projects, which keep the legacy descriptors-only restore.
+    @SerialName("fingerprintIntrinsics")
     val fingerprintIntrinsics: List<Float> = emptyList(),
+    @SerialName("fingerprintAnchor")
     val fingerprintAnchor: List<Float> = emptyList(),
 
     // The camera view (column-major 4x4, GL convention world→camera) at fingerprint capture. This is
@@ -303,6 +315,7 @@ data class GraffitiProject(
     // which is what happened to every metric fingerprint, since only the (dead, depth-API) capture
     // path ever set it. An artist working a wall at arm's length is oblique most of the time, so this
     // is exactly the case it exists for. Empty on projects saved before this field.
+    @SerialName("fingerprintViewMatrix")
     val fingerprintViewMatrix: List<Float> = emptyList(),
 
     // rotationNeeded at fingerprint capture (0/90/180/270), or -1 when unknown — IMPLEMENTATION.md
@@ -314,12 +327,14 @@ data class GraffitiProject(
     // from one captured before, so the legacy check in 0.7 would reject both. -1 therefore has to
     // mean "genuinely unknown" and not "not written yet", which is why it is defaulted rather than
     // inferred at load time.
+    @SerialName("fingerprintCaptureRotationDeg")
     val fingerprintCaptureRotationDeg: Int = -1,
 
     // The wall's normal in East-North-Up (out of the wall), learned by MobileGS at trusted locks in
     // either AR mode. With the phone's north-referenced attitude it lets relocalization turn a lost
     // frame square-on to the wall, from the first attempt of a session. Empty until learned; cleared
     // with a new target, which may be another wall.
+    @SerialName("fingerprintWallNormalEnu")
     val fingerprintWallNormalEnu: List<Float> = emptyList(),
 
     // The AR design quad's half-width in metres, fixed at its first placement in this project. The

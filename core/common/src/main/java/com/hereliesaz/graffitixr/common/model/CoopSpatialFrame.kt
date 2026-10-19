@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.common.model
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /** Wire/project-independent version of the co-op wall-frame contract. */
@@ -47,18 +48,21 @@ enum class CoopSpatialScale {
 data class CoopSpatialFrame(
     val schemaVersion: Int = COOP_SPATIAL_FRAME_SCHEMA_VERSION,
     val hostBackend: CoopTrackingBackend,
+    @SerialName("fingerprintFrameVersion")
     val fingerprintFrameVersion: Int,
     val scale: CoopSpatialScale,
     /**
      * Whether the bulk snapshot carries a PnP fingerprint in this frame. Standalone peers can share
      * one KPM page without it; every cross-backend pairing needs it as the geometric bridge.
      */
+    @SerialName("fingerprintAvailable")
     val fingerprintAvailable: Boolean,
     /** Stable for the host wall target; changes when the target/fingerprint is replaced. */
     val anchorRevision: Long,
     /** One useful wall-width scale in this frame. Metres for METRIC, page units otherwise. */
     val referenceWidthUnits: Float,
     /** Column-major rigid 4x4 transform: fingerprint object frame from host wall-local frame. */
+    @SerialName("fingerprintFromWall")
     val fingerprintFromWall: List<Float>,
 ) {
     init {
