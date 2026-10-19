@@ -214,6 +214,11 @@ private const val AR_UNAVAILABLE_EXPLAINER_KEY = "ar_unavailable_explainer"
  * only when the stored choice genuinely differs from the locale already in effect.
  */
 class MainActivity : AppCompatActivity() {
+    private companion object {
+        /** MainActivity instances alive in this process (a quick relaunch can overlap a teardown). */
+        val liveInstances = java.util.concurrent.atomic.AtomicInteger(0)
+    }
+
 
     @Inject lateinit var slamManager: SlamManager
     @Inject lateinit var projectRepository: com.hereliesaz.graffitixr.domain.repository.ProjectRepository
@@ -434,6 +439,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        liveInstances.incrementAndGet()
 
         // Interop: capture an image handed in by ACTION_SEND on this cold start (consumed in setContent).
         // Only on a genuinely new launch: on recreation (rotation is handled in place, but a locale
@@ -2217,8 +2223,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        arViewModel.destroyArSession()
-        if (isFinishing) slamManager.destroy()
+        liveInstances.decrementAndGet()
+        // The teardown saves the session's map, paint and grown Doodle before it closes ARCore; the
+        // engine is destroyed only once that save has run (destroying it first made the save read a
+        // null engine and write nothing), and only if no new Activity has started using it meanwhile.
+        val teardown = arViewModel.destroyArSession()
+        if (isFinishing) {
+            teardown.invokeOnCompletion { if (liveInstances.get() == 0) slamManager.destroy() }
+        }
     }
 
     private fun AzNavHostScope.ConfigureRailItems(

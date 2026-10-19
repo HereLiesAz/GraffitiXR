@@ -370,6 +370,10 @@ data class GraffitiProject(
     // Area-progress state (painted grid cells + learned paint colours), Base64 of the native blob.
     // Tied to the doodle like paintMarks: a new target capture clears it.
     val paintGrid: String? = null,
+    // The Doodle's grown rows: what self-grow appended behind the captured marks, in the doodle frame.
+    // Restored after the Doodle so a return visit keeps what it learned instead of reverting to marks
+    // that may be painted over by now. Tied to the doodle like paintMarks: a new capture clears it.
+    val grownDoodle: WallFeatureMap? = null,
 
     // Per-host AzNavRail expansion state (host id -> expanded), so the rail restores exactly as the
     // user left it on reopen. Defaulted for back-compat with projects saved before this field

@@ -584,6 +584,13 @@ class ArViewModel @Inject constructor(
                             // PnP object frame -> host wall frame is now explicit. Existing ARCore
                             // PoseFusion/return-visit anchoring consumes this exact bridge.
                             slamManager.alignToPeer(doodle)
+                            // The host's paint marks are in that same doodle frame: install them too,
+                            // or a guest at a painted-over wall has only the original marks to relock
+                            // on (alignToPeer clears paint marks; the host's grown rows ride in the
+                            // doodle blob itself).
+                            projectRepository.currentProject.value?.paintMarks
+                                ?.takeIf { it.pointCount > 0 }
+                                ?.let { slamManager.restorePaintMarks(it) }
                             slamManager.captureAnchorCam =
                                 spatialFrame.doodleFromWall.toFloatArray()
                             // coopPeerSpatialFrame/role were published before spectator load so the
@@ -1824,6 +1831,10 @@ class ArViewModel @Inject constructor(
     // the threshold and the project was rewritten every 30 s for the whole session.)
     private val lastSavedMapPointCount = AtomicInteger(0)
     private val lastSavedPaintCount = AtomicInteger(0)
+    /** The project native was last loaded for, kept so a switch can save it after the repository moved on. */
+    @Volatile private var lastLoadedProjectSnapshot: com.hereliesaz.graffitixr.common.model.GraffitiProject? = null
+    /** The Doodle's row count at the last save: it only grows (self-grow), so a rise is unsaved growth. */
+    private val lastSavedWallRows = AtomicInteger(0)
     @Volatile private var lastSavedProgress = 0f
     private var autoSaveJob: kotlinx.coroutines.Job? = null
     private var loadedProjectId: String? = null
@@ -2001,6 +2012,18 @@ class ArViewModel @Inject constructor(
                     // A restored hybrid page belongs to its project; drop it on a switch (including
                     // to a co-op spectator project, which never offers a replacement).
                     if (project.id != loadedProjectId) {
+                        // Native still holds the outgoing project's paint, grown Doodle and map, and
+                        // the loader below is about to replace them: write them to that project first.
+                        val outgoing = lastLoadedProjectSnapshot
+                        if (outgoing != null && outgoing.id == loadedProjectId) {
+                            try {
+                                withContext(dispatchers.io) { saveProjectWallMap(outgoing) }
+                            } catch (e: kotlinx.coroutines.CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                Timber.e(e, "Saving the outgoing project's AR state failed")
+                            }
+                        }
                         renderer?.restoreHybridPage(null)
                         // The yaw sweep and the COMPLETE latch describe the previous project's wall.
                         if (loadedProjectId != null) resetScanProgress()
@@ -2008,6 +2031,7 @@ class ArViewModel @Inject constructor(
                     // BEFORE anything can be written: native still holds the previous project's state.
                     nativeStateOwner.beginSwitch(project.id)
                     loadedProjectId = project.id
+                    lastLoadedProjectSnapshot = project
                     // Native MobileGS has exactly one active doodle frame. Standalone owns it
                     // on non-ARCore devices; an ARCore co-op GUEST also owns it once protocol-v3 peer
                     // geometry has been installed. Never let a later spectator-project emission run
@@ -2505,6 +2529,15 @@ class ArViewModel @Inject constructor(
     fun onActivityPaused() {
         isActivityResumed = false
         updateSessionStateLocked()
+    }
+
+    /**
+     * Screen-off, home, another app: save now. Autosave runs every 30 s and only past its deltas, and
+     * a process killed in the background never reaches the teardown save, so without this whatever
+     * was learned since the last autosave (paint, grown Doodle rows, map points) was lost.
+     */
+    fun onActivityStopped() {
+        if (loadedProjectId != null) saveMapNow()
     }
 
     /**
@@ -3913,10 +3946,18 @@ class ArViewModel @Inject constructor(
      * Phase 3b: persist the in-session passive feature map into the project record (.gxr), preserving the
      * rest of the current project. No-op when building is off / the map is empty. Async + best-effort.
      */
-    suspend fun saveProjectWallMap() {
-        val projectId = loadedProjectId ?: return
-        val currentProject = projectRepository.currentProject.value ?: return
+    suspend fun saveProjectWallMap(outgoing: com.hereliesaz.graffitixr.common.model.GraffitiProject? = null) {
+        // [outgoing]: the project being switched AWAY from, whose state native still holds. The
+        // repository already publishes the incoming one as current, so the outgoing snapshot is written
+        // whole (ProjectManager merges what it omits) instead of through the current-project transform.
+        val projectId = outgoing?.id ?: loadedProjectId ?: return
+        val currentProject = outgoing ?: projectRepository.currentProject.value ?: return
         if (currentProject.id != projectId) return
+        suspend fun write(transform: (com.hereliesaz.graffitixr.common.model.GraffitiProject) ->
+            com.hereliesaz.graffitixr.common.model.GraffitiProject) {
+            if (outgoing != null) projectRepository.updateProject(transform(outgoing))
+            else projectRepository.updateProject { project -> if (project.id == projectId) transform(project) else project }
+        }
         val ui = _uiState.value
         val standaloneBackend =
             ui.isArCoreAvailabilityResolved &&
@@ -3933,7 +3974,7 @@ class ArViewModel @Inject constructor(
             Timber.d("Wall map save skipped: native state is not (yet) project $projectId's")
             return
         }
-        saveWallNormalIfChanged(projectId, currentProject)
+        if (outgoing == null) saveWallNormalIfChanged(projectId, currentProject)
 
         val map = slamManager.getWallFeatureMap()?.takeIf { it.pointCount > 0 }
 
@@ -3950,7 +3991,7 @@ class ArViewModel @Inject constructor(
                 )
                 return
             }
-            projectRepository.updateProject { project ->
+            write { project ->
                 if (
                     project.id == projectId &&
                     project.sphereSlamReferenceUri == currentProject.sphereSlamReferenceUri
@@ -3981,19 +4022,23 @@ class ArViewModel @Inject constructor(
         val paint = slamManager.getPaintMarks()
         val grid = slamManager.exportPaintGrid()
             ?.let { java.util.Base64.getEncoder().encodeToString(it) }
-        if (map == null && paint == null && grid == null) return
-        projectRepository.updateProject { project ->
+        // What the Doodle grew this session (and the restored earlier growth it still carries).
+        val grown = slamManager.getGrownWall()
+        if (map == null && paint == null && grid == null && grown == null) return
+        write { project ->
             if (project.id == projectId) {
                 project.copy(
                     wallFeatureMap = map ?: project.wallFeatureMap,
                     paintMarks = paint ?: project.paintMarks,
                     paintGrid = grid ?: project.paintGrid,
+                    grownDoodle = grown ?: project.grownDoodle,
                 )
             } else {
                 project
             }
         }
         paint?.let { lastSavedPaintCount.set(it.pointCount) }
+        lastSavedWallRows.set(slamManager.getWallKeypointCount())
         lastSavedProgress = slamManager.getPaintingProgress()
     }
 
@@ -4553,6 +4598,13 @@ class ArViewModel @Inject constructor(
             // Only after the state above is consistent, because this can launch a partition that
             // reads it.
             if (fp != null && !legacyFrame && hasCoRegistration) partitionLiveDoodleIfNeeded()
+            // What the Doodle grew in earlier sessions, behind the captured rows it grew from. A
+            // partition re-push of the same base keeps it (MobileGS::restoreWallDoodleMetric).
+            val grown = project.grownDoodle
+            if (fp != null && !legacyFrame && grown != null && grown.pointCount > 0) {
+                slamManager.restoreGrownWall(grown)
+            }
+            lastSavedWallRows.set(slamManager.getWallKeypointCount())
 
             val map = project.wallFeatureMap
             if (map != null && map.pointCount > 0) {
@@ -4638,6 +4690,8 @@ class ArViewModel @Inject constructor(
                         savedPaintMarks = lastSavedPaintCount.get(),
                         progress = slamManager.getPaintingProgress(),
                         savedProgress = lastSavedProgress,
+                        wallRows = slamManager.getWallKeypointCount(),
+                        savedWallRows = lastSavedWallRows.get(),
                     )
                 ) {
                     saveMapNow()
@@ -6787,7 +6841,11 @@ internal fun shouldAutosaveWallMap(
     savedPaintMarks: Int,
     progress: Float,
     savedProgress: Float,
+    wallRows: Int = 0,
+    savedWallRows: Int = 0,
 ): Boolean =
     (mapPoints > 0 && mapPoints - savedMapPoints >= ArViewModel.AUTOSAVE_POINT_DELTA) ||
         paintMarks - savedPaintMarks >= ArViewModel.AUTOSAVE_PAINT_DELTA ||
+        // Self-grown Doodle rows: as valuable as paint marks, on the same delta.
+        wallRows - savedWallRows >= ArViewModel.AUTOSAVE_PAINT_DELTA ||
         progress - savedProgress >= ArViewModel.AUTOSAVE_PROGRESS_DELTA

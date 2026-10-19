@@ -991,6 +991,48 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportPaintMarks(J
     return out;
 }
 
+JNIEXPORT jbyteArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportGrownWall(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return nullptr;
+    std::vector<uint8_t> blob = gSlamEngine->exportGrownWall();
+    if (blob.empty()) return nullptr;
+    jbyteArray out = env->NewByteArray((jsize)blob.size());
+    if (!out) return nullptr;
+    env->SetByteArrayRegion(out, 0, (jsize)blob.size(), reinterpret_cast<const jbyte*>(blob.data()));
+    return out;
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreGrownWall(
+        JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type,
+        jfloatArray ptsArray) {
+    // Same validation as nativeRestorePaintMarks.
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine || !descArray || !ptsArray) return;
+    if (rows < 0 || cols < 0) return;
+    int depth = CV_MAT_DEPTH(type);
+    int channels = CV_MAT_CN(type);
+    if (depth < 0 || depth > CV_64F || channels < 1 || channels > 4) return;
+    if ((jlong)rows * (jlong)cols * (jlong)CV_ELEM_SIZE(type) > (jlong)env->GetArrayLength(descArray)) return;
+    if ((jlong)env->GetArrayLength(ptsArray) != (jlong)rows * 3LL) return;
+    jbyte* descData = env->GetByteArrayElements(descArray, nullptr);
+    jfloat* ptsData = env->GetFloatArrayElements(ptsArray, nullptr);
+    try {
+        cv::Mat descriptors(rows, cols, type, descData);
+        std::vector<cv::Point3f> pts;
+        pts.reserve((size_t)rows);
+        for (int i = 0; i < rows; ++i) pts.emplace_back(ptsData[3*i], ptsData[3*i+1], ptsData[3*i+2]);
+        gSlamEngine->restoreGrownWall(descriptors, pts); // copies the rows
+    } catch (const std::exception& e) {
+        LOGE("nativeRestoreGrownWall: exception: %s", e.what());
+    } catch (...) {
+        LOGE("nativeRestoreGrownWall: unknown exception");
+    }
+    env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
+    env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
+}
+
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestorePaintMarks(
         JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type,

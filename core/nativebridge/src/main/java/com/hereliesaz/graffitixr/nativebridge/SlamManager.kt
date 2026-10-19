@@ -478,8 +478,22 @@ class SlamManager @Inject constructor(
      * as they get painted over. Returned as a [WallFeatureMap] (points + descriptors only) for
      * project persistence, or null when empty. Blob: [rows, cols, type][rows*3 floats][descriptors].
      */
-    fun getPaintMarks(): WallFeatureMap? {
-        val blob = nativeExportPaintMarks() ?: return null
+    fun getPaintMarks(): WallFeatureMap? = nativeExportPaintMarks()?.let(::parseMarkBlob)
+
+    /**
+     * The Doodle's grown rows: everything self-grow added after the captured ones. Saved with the
+     * project so the Doodle keeps what it learned (README: it self-extends so snap-back survives the
+     * original marks being painted over). Null when nothing has grown.
+     */
+    fun getGrownWall(): WallFeatureMap? = nativeExportGrownWall()?.let(::parseMarkBlob)
+
+    /** Append saved [getGrownWall] rows behind the captured Doodle. Must follow the Doodle restore. */
+    fun restoreGrownWall(map: WallFeatureMap) = nativeRestoreGrownWall(
+        map.descriptorsData, map.descriptorsRows, map.descriptorsCols, map.descriptorsType, map.points3d,
+    )
+
+    /** The exportPaintMarks / exportGrownWall blob: int rows, cols, type; rows*3 floats; descriptors. */
+    private fun parseMarkBlob(blob: ByteArray): WallFeatureMap? {
         if (blob.size < 12) return null
         val bb = ByteBuffer.wrap(blob).order(ByteOrder.nativeOrder())
         val rows = bb.int; val cols = bb.int; val type = bb.int
@@ -498,7 +512,6 @@ class SlamManager @Inject constructor(
         }
     }
 
-    /** Restore a persisted [getPaintMarks] set. Must follow the doodle restore it belongs to. */
     fun restorePaintMarks(map: WallFeatureMap) = nativeRestorePaintMarks(
         map.descriptorsData, map.descriptorsRows, map.descriptorsCols, map.descriptorsType, map.points3d,
     )
@@ -1101,6 +1114,8 @@ class SlamManager @Inject constructor(
     private external fun nativeSetChangePassEnabled(enabled: Boolean)
     private external fun nativeExportPaintGrid(): ByteArray?
     private external fun nativeRelocWantsFrame(): Boolean
+    private external fun nativeExportGrownWall(): ByteArray?
+    private external fun nativeRestoreGrownWall(desc: ByteArray, rows: Int, cols: Int, type: Int, points: FloatArray)
     private external fun nativeAutoFitDesign(minimumEvidence: Boolean): FloatArray?
     private external fun nativeGetLastAutoFitResult(): Int
     private external fun nativeRestorePaintGrid(state: ByteArray)

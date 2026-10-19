@@ -57,6 +57,7 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
 - [ ] **B1. Self-grown rows are never saved.**
   - Where: `MobileGS.cpp:2162-2188` grows in memory only. `exportDoodle` is co-op only (`ArViewModel.kt:429, 462`); the save (`:4001-4011`, `:4303`) and the load (`:4519, 4541`) use the original capture.
   - Fix: persist the grown tail (rows and regions) with the project and restore it after the base. ARCore and standalone both.
+  - Done: ARCore (`grownDoodle`). Standalone lands with C3.
 - [ ] **B2. Self-grow hits a hard cap with no eviction.**
   - Where: `kMaxWallMarks = 5000` is shared with the capture and close-ups (`MobileGS.h:248`; `MobileGS.cpp:2056, 2118, 2139-2148`).
   - Fix: evict rows that are no longer re-observed (painted-over originals first) instead of refusing growth. The 5000 cap is memory and stays.
@@ -174,13 +175,13 @@ Status: `[ ]` open, `[x]` fixed (with the commit).
 
 The self-grown rows not being saved is B1, and standalone paint marks and grid not being saved is C3. Both appear here too.
 
-- [ ] **F1. The save on app exit loses the race with engine teardown.**
+- [x] **F1. The save on app exit loses the race with engine teardown.**
   - Where: `MainActivity.kt:2218-2219` starts `destroyArSession()` asynchronously, then calls `slamManager.destroy()`. The save (`ArViewModel.kt:3825-3827`, after up to 1.5 s in `detachSessionBounded`) finds a null engine (`GraffitiJNI.cpp:321`) and returns silently (`:4004`).
   - Fix: wait for the teardown save to finish before destroying native.
-- [ ] **F2. Screen-off and backgrounding don't save.**
+- [x] **F2. Screen-off and backgrounding don't save.**
   - Where: the pause path `ArViewModel.kt:2832-2833` → `pauseArSessionInternal` (`:3770`). Autosave runs every 30 s, past thresholds only.
   - Fix: save on `ON_STOP`.
-- [ ] **F3. Switching projects, or joining Link, drops the outgoing project's unsaved native state.**
+- [x] **F3. Switching projects, or joining Link, drops the outgoing project's unsaved native state.**
   - Where: `ArViewModel.kt:2001-2013`; `alignToPeer` (`:586`).
   - Fix: run `saveMapBlocking` for the current project before the switch or `alignToPeer`.
 - [ ] **F4. The angled-view rectification compares camera poses from two sessions on a return visit.**
@@ -189,7 +190,7 @@ The self-grown rows not being saved is B1, and standalone paint marks and grid n
 - [ ] **F5. A depth-path capture can never re-anchor on reopen, yet says "Doodle Saved & Locked".**
   - Where: `MainViewModel.kt:585-595, 664, 690-693, 711`; reload at `ArViewModel.kt:4539-4548`; `ArRenderer.kt:1728-1729, 2242-2247`; hosting refused at `CoopSpatialFrameFactory.kt:58-63`.
   - Fix: record `captureAnchorCam` (and intrinsics and view) from the anchor on the depth path.
-- [ ] **F6. A Link guest gets none of the host's paint-derived references.**
+- [x] **F6. A Link guest gets none of the host's paint-derived references.**
   - Where: host sends Doodle rows only (`ArViewModel.kt:462`); `alignToDoodle` clears the guest's paint marks and map (`MobileGS.cpp:2585-2587, 2622-2628`); the archive's `paintMarks` are never installed (`ArViewModel.kt:116-123, 2222-2230`).
   - Fix: after `alignToPeer`, install the host's paint marks (they are in the Doodle frame), and send the grown rows (B1).
 - [ ] **F7. Entering AR as a guest skips the guest guard.**

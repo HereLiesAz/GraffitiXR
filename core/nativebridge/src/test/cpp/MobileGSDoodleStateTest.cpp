@@ -205,3 +205,39 @@ TEST(MobileGSDoodleState, PeerDoodleWithMismatchedPointAndDescriptorCountsIsReje
     EXPECT_EQ(4, guest.getWallKeypointCount()) << "a mismatched peer doodle replaced the local one";
     EXPECT_TRUE(MobileGSTestPeer::hasView(guest));
 }
+
+// The Doodle's grown rows survive a save and reload: exported apart from the captured ones, appended
+// behind a freshly restored Doodle, and kept through a partition re-push of the same base.
+TEST(MobileGSDoodleState, GrownRowsRoundTripBehindTheCapturedDoodle) {
+    MobileGS g;
+    seedMetric(g);
+    EXPECT_TRUE(g.exportGrownWall().empty()) << "nothing has grown yet";
+    cv::Mat grownDescs(3, 32, CV_8U, cv::Scalar(9));
+    const std::vector<cv::Point3f> grownPts = {{0.2f,0,0}, {0,0.2f,0}, {0.2f,0.2f,0}};
+    g.restoreGrownWall(grownDescs, grownPts);
+    EXPECT_EQ(7, g.getWallKeypointCount());
+    // Not twice: a set that already carries grown rows keeps them.
+    g.restoreGrownWall(grownDescs, grownPts);
+    EXPECT_EQ(7, g.getWallKeypointCount());
+
+    const std::vector<uint8_t> blob = g.exportGrownWall();
+    ASSERT_GE(blob.size(), 12u);
+    int32_t hdr[3]; std::memcpy(hdr, blob.data(), sizeof hdr);
+    EXPECT_EQ(3, hdr[0]); EXPECT_EQ(32, hdr[1]); EXPECT_EQ(CV_8U, hdr[2]);
+    float first[3]; std::memcpy(first, blob.data() + sizeof hdr, sizeof first);
+    EXPECT_FLOAT_EQ(0.2f, first[0]);
+    EXPECT_EQ(9, blob.back()) << "descriptors are the grown rows', not the captured ones'";
+
+    // A repartition re-push of the identical base keeps the grown tail.
+    cv::Mat base(4, 32, CV_8U, cv::Scalar(7));
+    std::vector<cv::Point3f> basePts = {{0,0,0}, {0.1f,0,0}, {0,0.1f,0}, {0.1f,0.1f,0}};
+    g.restoreWallDoodleMetric(base, basePts, kAnchor, kIntr, kView);
+    EXPECT_EQ(7, g.getWallKeypointCount());
+    EXPECT_FALSE(g.exportGrownWall().empty());
+
+    // A different Doodle replaces everything, grown rows included.
+    cv::Mat other(4, 32, CV_8U, cv::Scalar(1));
+    g.restoreWallDoodleMetric(other, {{1,0,0}, {1.1f,0,0}, {1,0.1f,0}, {1.1f,0.1f,0}}, kAnchor, kIntr, kView);
+    EXPECT_EQ(4, g.getWallKeypointCount());
+    EXPECT_TRUE(g.exportGrownWall().empty());
+}

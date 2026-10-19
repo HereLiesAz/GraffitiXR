@@ -531,6 +531,7 @@ class MainViewModel @Inject constructor(
                         sphereSlamAtlasPages = p.sphereSlamAtlasPages,
                         paintMarks = p.paintMarks,
                         paintGrid = p.paintGrid,
+                        grownDoodle = p.grownDoodle,
                     )
                 }
             }
@@ -683,6 +684,7 @@ class MainViewModel @Inject constructor(
                     // and so is the wall feature map (its points are in the old frame too).
                     paintMarks = null,
                     paintGrid = null,
+                    grownDoodle = null,
                     wallFeatureMap = null,
                     // This path records no co-registration. Clear any left by an earlier single
                     // capture: reload would otherwise pair these new points with the old capture's
@@ -890,6 +892,7 @@ class MainViewModel @Inject constructor(
                     // and so is the wall feature map (its points are in the old frame too).
                     paintMarks = null,
                     paintGrid = null,
+                    grownDoodle = null,
                     wallFeatureMap = null,
                     // Persist the capture's intrinsics + anchor + view — the exact values just fed to
                     // restoreWallDoodleMetric — so reload relocalizes with the true intrinsics

@@ -605,6 +605,17 @@ public:
 
     // Collaboration methods
     std::vector<uint8_t> exportDoodle();
+    /**
+     * The Doodle's GROWN rows (everything self-grow appended after the captured ones), in the
+     * exportPaintMarks blob layout, so a project can keep what the Doodle learned across sessions.
+     * Empty when nothing has grown.
+     */
+    std::vector<uint8_t> exportGrownWall() const;
+    /**
+     * Append saved grown rows behind the captured Doodle (call after restoring it). Refused when
+     * there is no Doodle or the descriptor type differs; tagged OUTSIDE like every grown row.
+     */
+    void restoreGrownWall(const cv::Mat& descs, const std::vector<cv::Point3f>& pts);
     void alignToDoodle(const uint8_t* data, size_t size);
 
     void destroy();
@@ -876,6 +887,12 @@ private:
     cv::Mat mCleanExclDescs;
     std::vector<cv::Point3f> mCleanExclPts;
     const uchar* mCleanExclFor = nullptr; size_t mCleanExclWallN = 0; uint64_t mCleanExclDoodleGen = 0;
+    /**
+     * How many rows at the front of mWallDescriptors / mWallKeypoints3D are the Doodle as captured.
+     * Self-grow only appends, so every row after it is grown -- what exportGrownWall saves. Guarded by
+     * mMutex.
+     */
+    size_t mDoodleBaseCount = 0;
     void detectCleanWallFeaturesLocked();
     void cleanWallExclusionLocked(cv::Mat& descs, std::vector<cv::Point3f>& pts);
     float mCaptureIntr[4] = {0,0,0,0};

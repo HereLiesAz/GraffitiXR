@@ -67,7 +67,10 @@ on top of the OpenCV relocalizer:
    promoted into the reloc doodle (`mSelfGrowEnabled`: the engine starts with it off and
    the app pushes the persisted setting, default **on**, switchable from the diagnostic overlay).
    Promoted marks are placed where they were SEEN and tagged OUTSIDE, so the reloc filter uses
-   them, and relocalization survives the original marks being painted over. The promotion
+   them, and relocalization survives the original marks being painted over. The grown rows
+   are saved with the project (`grownDoodle`, `MobileGS::exportGrownWall`) and appended behind
+   the captured Doodle on reload (`restoreGrownWall`), so what the Doodle learned outlives the
+   session. The promotion
    gate is `MobileGS::growTrusted` — a strong inlier ratio qualifies at a lower
    absolute count, because a half-covered wall rarely reaches a large raw inlier
    count and the old flat `inliers >= 20` meant the doodle could only grow

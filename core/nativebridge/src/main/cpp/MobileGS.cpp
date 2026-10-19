@@ -2273,6 +2273,7 @@ void MobileGS::restoreWallDoodle(const cv::Mat& d, const std::vector<cv::Point3f
     std::lock_guard<std::mutex> lock(mMutex);
     invalidateRelocResultLocked();
     mWallDescriptors = d.clone();
+    mDoodleBaseCount = (size_t)mWallDescriptors.rows;
     mWallKeypoints3D = p;
     // This path carries no partition, and the previous doodle's must not survive onto it: the
     // bytes would index a different point set entirely. Empty = all backbone, as before Phase 2.
@@ -2342,6 +2343,10 @@ void MobileGS::restoreWallDoodleMetric(const cv::Mat& d, const std::vector<cv::P
         (!anchorMatrix16 || memcmp(anchorMatrix16, mDoodleAnchorMatrix, 16 * sizeof(float)) == 0) &&
         (!intrinsics4 || memcmp(intrinsics4, mDoodleIntrinsics, 4 * sizeof(float)) == 0);
     if (!sameFrame) invalidateRelocResultLocked();
+    // The captured part of the stored set: the base alone when grown rows ride behind it, the standing
+    // count when the identical set is re-pushed, otherwise everything.
+    mDoodleBaseCount = growthOfSame ? baseN
+        : (sameDoodle && mDoodleBaseCount > 0 ? std::min(mDoodleBaseCount, (size_t)useD.rows) : (size_t)useD.rows);
     mWallDescriptors = useD.clone();
     mWallKeypoints3D = useP;
     // Belt and braces over the JNI-side length check: a partition that does not index the points it
@@ -2364,6 +2369,7 @@ void MobileGS::clearWallDoodle() {
     std::lock_guard<std::mutex> lock(mMutex);
     mWallDescriptors.release();
     mWallKeypoints3D.clear();
+    mDoodleBaseCount = 0;
     mWallRegions.clear();
     // Back to the constructed defaults, so a later project can't inherit this one's co-registration.
     static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
@@ -2586,6 +2592,8 @@ void MobileGS::alignToDoodle(const uint8_t* data, size_t size) {
         mPaintDescriptors.release();
         mPaintPoints3D.clear();
         mWallDescriptors = descs.clone();
+        // A peer's blob has no boundary between captured and grown rows: all of it counts as captured.
+        mDoodleBaseCount = (size_t)mWallDescriptors.rows;
         // A peer's doodle carries no partition, and the local one indexes a different point
         // set. Empty = all backbone, i.e. pre-Phase-2 behaviour, which is the right default for a
         // map whose design footprint this device never saw.
@@ -3222,6 +3230,7 @@ MobileGS::DoodleData MobileGS::generateDoodle(
         mPaintDescriptors.release();
         mPaintPoints3D.clear();
         mWallKeypoints3D  = std::move(pts3d);
+        mDoodleBaseCount = (size_t)mWallDescriptors.rows;
         // The depth path supplies no partition. Clearing rather than leaving the previous
         // doodle's is not optional: those bytes index a point set that no longer exists.
         mWallRegions.clear();
@@ -4062,6 +4071,46 @@ void MobileGS::restorePaintGrid(const std::vector<uint8_t>& blob) {
             mGrid.paintSum[k] = cv::Vec3f(f[4*k], f[4*k+1], f[4*k+2]);
             mGrid.paintN[k] = (int)f[4*k+3];
         }
+    }
+}
+
+std::vector<uint8_t> MobileGS::exportGrownWall() const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    std::vector<uint8_t> out;
+    const int total = mWallDescriptors.rows;
+    const int base = (int)std::min(mDoodleBaseCount, (size_t)std::max(total, 0));
+    const int rows = total - base;
+    if (rows <= 0 || (size_t)total != mWallKeypoints3D.size() || !mWallDescriptors.isContinuous()) return out;
+    const cv::Mat grown = mWallDescriptors.rowRange(base, total);
+    const int32_t hdr[3] = {rows, grown.cols, grown.type()};
+    const size_t descBytes = (size_t)rows * grown.cols * grown.elemSize();
+    out.resize(sizeof(hdr) + (size_t)rows * 3 * sizeof(float) + descBytes);
+    uint8_t* p = out.data();
+    memcpy(p, hdr, sizeof(hdr)); p += sizeof(hdr);
+    for (int i = base; i < total; ++i) {
+        const auto& X = mWallKeypoints3D[(size_t)i];
+        const float xyz[3] = {X.x, X.y, X.z};
+        memcpy(p, xyz, sizeof(xyz)); p += sizeof(xyz);
+    }
+    memcpy(p, grown.data, descBytes);   // rowRange of a continuous Mat is contiguous
+    return out;
+}
+
+void MobileGS::restoreGrownWall(const cv::Mat& descs, const std::vector<cv::Point3f>& pts) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (descs.empty() || descs.rows != (int)pts.size() || mWallDescriptors.empty() ||
+        descs.type() != mWallDescriptors.type() || descs.cols != mWallDescriptors.cols ||
+        (size_t)mWallDescriptors.rows != mWallKeypoints3D.size()) return;
+    // Only onto the captured Doodle: a set that already carries grown rows keeps them (this is a
+    // restore, not a merge).
+    if ((size_t)mWallDescriptors.rows != mDoodleBaseCount) return;
+    const bool regionsTracked = mWallRegions.size() == mWallKeypoints3D.size();
+    const int room = (int)std::max<long>(0, (long)kMaxWallMarks - (long)mWallDescriptors.rows);
+    const int n = std::min(descs.rows, room);
+    for (int i = 0; i < n; ++i) {
+        mWallDescriptors.push_back(descs.row(i));
+        mWallKeypoints3D.push_back(pts[(size_t)i]);
+        if (regionsTracked) mWallRegions.push_back(kRegionOutside);
     }
 }
 

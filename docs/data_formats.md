@@ -91,6 +91,9 @@ missing from an old file just uses its Kotlin default). Notably:
   `descriptorsRows`/`descriptorsCols`/`descriptorsType` to reconstruct an OpenCV `Mat`.
 - `wallFeatureMap: WallFeatureMap?` carries the passively-built wide-area feature map the same
   way — flat `FloatArray`/`ByteArray`/`IntArray` fields, not a separate file (see §1).
+- `grownDoodle: WallFeatureMap?` is the Doodle's self-grown rows (in the doodle frame), stored the
+  same way and restored behind the captured `doodle`. A new capture clears it, as it clears
+  `paintMarks` and `paintGrid`.
 - `sphereSlamAnchorGeneration` + `sphereSlamAnchorFrameVersion` identify the canonical standalone
   wall frame; `sphereSlamModeAdjustment` stores standalone AR's adjustment separately from
   `modeAdjustments[AR]` (ARCore), and `sphereSlamPlacementAnchorGeneration` says which standalone

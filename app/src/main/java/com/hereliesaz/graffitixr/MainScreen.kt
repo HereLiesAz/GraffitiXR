@@ -120,6 +120,7 @@ fun MainScreen(
                 when (event) {
                     Lifecycle.Event.ON_RESUME -> arViewModel.onActivityResumed()
                     Lifecycle.Event.ON_PAUSE -> arViewModel.onActivityPaused()
+                    Lifecycle.Event.ON_STOP -> arViewModel.onActivityStopped()
                     else -> {}
                 }
             }
