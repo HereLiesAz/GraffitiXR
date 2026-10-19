@@ -59,7 +59,9 @@ Each filter's places form a target set (`MobileGS::TargetSet`) that corroborates
 the same pose-gated match (`gatedMatchSet`), consecutive confirmations, reset when the design moves
 or is replaced. A cell's vote is "present" when at least half of that filter's places inside it are
 confirmed, "absent" when some are not, and no data when it has none. Filter targets never become
-reloc marks: they judge progress only.
+reloc marks: they judge progress, and Align uses them too. `MobileGS::autoFitDesign` matches the capture
+photo against the artwork's features, every installed target set and the inverted design, and keeps
+the set whose similarity fit has the most inliers.
 
 ## Guards on every set
 

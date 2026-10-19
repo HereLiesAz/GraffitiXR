@@ -2507,16 +2507,20 @@ class MainActivity : AppCompatActivity() {
                         text = navStrings.magic,
                         color = navItemColor,
                         shape = AzButtonShape.NONE,
-                        disabled = showLibrary,
+                        // Standalone's Doodle is a centred page frame, which the paint match
+                        // cannot fit (MobileGS::autoFitDesign refuses it), so Align is off there.
+                        disabled = showLibrary || arUiState.sphereSlamRuntimeStatus.mode ==
+                            com.hereliesaz.graffitixr.common.model.SphereSlamRuntimeMode.STANDALONE,
                         onClick = {
                             // Fit the design to paint already on the wall, or say that nothing
                             // matched. Never a resize to a guess, never a tone change.
                             if (!editorViewModel.arPlacementLocked()) {
                                 arViewModel.alignToPaint { fit ->
-                                    if (fit != null) {
+                                    val applied = fit != null &&
                                         editorViewModel.applyArFit(fit.dx, fit.dy, fit.dThetaRad, fit.scale)
-                                    }
-                                    val msg = if (fit != null) DesignR.string.align_done_paint else DesignR.string.align_unavailable
+                                    // Pinned while matching: the locked notice, not a success.
+                                    if (!applied && fit != null && editorViewModel.arPlacementLocked()) return@alignToPaint
+                                    val msg = if (applied) DesignR.string.align_done_paint else DesignR.string.align_unavailable
                                     Toast.makeText(context, context.getString(msg), Toast.LENGTH_SHORT).show()
                                 }
                             }

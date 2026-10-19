@@ -390,6 +390,37 @@ TEST(MobileGSFrames, AutoFitRefusesAPageFrameDoodleWithAReason) {
     EXPECT_EQ(MobileGS::kAutoFitPageFrame, g.lastAutoFitResult());
 }
 
+TEST(MobileGSFrames, AutoFitFindsPaintWithTheDoodleBuildersDesignFeatures) {
+    // Capture-camera doodle: the wall 2 m ahead. The design is placed 1 m x 0.8 m, centred, upright;
+    // the paint in the photo is the same design 6 cm to the right.
+    MobileGS g;
+    std::vector<cv::Point3f> wall;
+    for (int i = 0; i < 40; ++i) wall.emplace_back(-0.6f + 0.03f * i, (i % 8) * 0.1f - 0.35f, 2.0f);
+    const float anchor[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    const float K[4] = {500.f, 500.f, 320.f, 240.f};
+    g.restoreWallDoodleMetric(cv::Mat(40, 32, CV_8U, cv::Scalar(4)), wall, anchor, K);   // ORB doodle
+    const cv::Mat design = makeWall(320, 256);
+    g.setArtworkDoodle(design, nullptr, 0, 0, 0, nullptr, nullptr);
+    g.awaitFilterTargets();
+    ASSERT_GT(g.readyFilterTargets(), 0);
+    const float fpFromDesign[16] = {1,0,0,0, 0,-1,0,0, 0,0,-1,0, 0,0,2,1};   // local y up, facing the camera
+    g.setDesignPlacement(fpFromDesign, 0.5f, 0.4f);
+
+    // 1 m at 2 m is 250 px; 6 cm is 15 px.
+    cv::Mat photo(480, 640, CV_8UC3, cv::Scalar(150, 150, 150)), paint;
+    cv::resize(design, paint, cv::Size(250, 200), 0, 0, cv::INTER_AREA);
+    paint.copyTo(photo(cv::Rect(320 - 125 + 15, 240 - 100, 250, 200)));
+    g.setCaptureImage(photo, K);
+
+    float out5[5];
+    ASSERT_TRUE(g.autoFitDesign(out5));
+    EXPECT_EQ(MobileGS::kAutoFitOk, g.lastAutoFitResult());
+    EXPECT_NEAR(0.06f, out5[0], 0.01f);
+    EXPECT_NEAR(0.0f, out5[1], 0.01f);
+    EXPECT_NEAR(0.0f, out5[2], 0.02f);
+    EXPECT_NEAR(1.0f, out5[3], 0.03f);
+}
+
 TEST(MobileGSRelocScales, SuperPointPassesAreRelativeToWhatThePlainPassSaw) {
     // 640x480 is exactly at the network cap: plain pass sees 1.0, so 0.5x full frame and a 2x
     // magnified centred half-size window (which fits the cap after magnification).

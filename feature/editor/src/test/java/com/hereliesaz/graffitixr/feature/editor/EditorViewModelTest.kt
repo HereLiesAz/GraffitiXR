@@ -913,6 +913,18 @@ class EditorViewModelTest {
     }
 
     @Test
+    fun `applyArFit reports whether it moved the design`() = runTest {
+        viewModel.setEditorMode(EditorMode.AR)
+        addDesign()
+        assertTrue(viewModel.applyArFit(dx = 0.1f, dy = 0f, dThetaRad = 0f, scaleRatio = 1f))
+        assertFalse(viewModel.applyArFit(dx = Float.NaN, dy = 0f, dThetaRad = 0f, scaleRatio = 1f))
+        viewModel.onToggleModeTransformLocked(EditorMode.AR)
+        testDispatcher.scheduler.advanceUntilIdle()
+        // Pinned while Align was matching: nothing moves, and the caller must not report success.
+        assertFalse(viewModel.applyArFit(dx = 0.1f, dy = 0f, dThetaRad = 0f, scaleRatio = 1f))
+    }
+
+    @Test
     fun `a mode knob edit emits the mode adjustment to peers`() = runTest {
         viewModel.setEditorMode(EditorMode.TRACE)
         addDesign()

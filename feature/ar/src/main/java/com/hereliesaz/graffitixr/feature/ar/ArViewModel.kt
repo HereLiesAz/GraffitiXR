@@ -5229,18 +5229,34 @@ class ArViewModel @Inject constructor(
     @Volatile private var autoFitArmed = false
     @Volatile private var lastGuideKey: String? = null
 
+    private val alignInFlight = AtomicBoolean(false)
+
     /**
-     * Align, first choice: fit the design to paint already on the wall (the same native match the
-     * automatic fit runs), on demand. [onResult] gets the fit, or null when there is no match (bare
-     * wall, no capture photo, standalone page frame, too few agreeing features); it runs on the main
-     * thread. A success also disarms the automatic fit, which would only repeat it.
+     * Align: fit the design to paint already on the wall (the same native match the automatic fit
+     * runs), on demand. [onResult] gets the fit, or null when there is no match (bare wall, no capture
+     * photo, standalone page frame, too few agreeing features); it runs on the main thread. A tap
+     * while one is matching is ignored: two fits from the same placement would both be applied. The
+     * fit is only reported for the design that is registered: a registration in flight is waited out,
+     * and a design that changed during the match voids the result. A success also disarms the
+     * automatic fit, which would only repeat it.
      */
     fun alignToPaint(onResult: (DesignFit?) -> Unit) {
+        if (!alignInFlight.compareAndSet(false, true)) return
         viewModelScope.launch(Dispatchers.IO) {
-            val r = slamManager.autoFitDesign()
-            if (r != null) autoFitArmed = false
-            val fit = r?.let { DesignFit(it[0], it[1], it[2], it[3]) }
-            withContext(Dispatchers.Main) { onResult(fit) }
+            try {
+                val settled = kotlinx.coroutines.withTimeoutOrNull(ALIGN_REGISTRATION_WAIT_MS) {
+                    while (artworkRegInFlight.get() || pendingArtworkGuide.get() != null) kotlinx.coroutines.delay(50)
+                    true
+                } == true
+                val key = lastGuideKey
+                val r = if (settled) slamManager.autoFitDesign() else null
+                val current = key == lastGuideKey && !artworkRegInFlight.get() && pendingArtworkGuide.get() == null
+                val fit = if (current) r?.let { DesignFit(it[0], it[1], it[2], it[3]) } else null
+                if (fit != null) autoFitArmed = false
+                withContext(Dispatchers.Main) { onResult(fit) }
+            } finally {
+                alignInFlight.set(false)
+            }
         }
     }
 
@@ -6310,6 +6326,9 @@ class ArViewModel @Inject constructor(
          * always [com.hereliesaz.graffitixr.feature.ar.rendering.OverlayRenderer.QUAD_HALF_EXTENT].
          */
         const val ANCHOR_BORDER_FRAME_FRACTION = 0.18f
+
+        /** Longest Align waits for a design registration in flight before giving up as "no match". */
+        const val ALIGN_REGISTRATION_WAIT_MS = 5_000L
 
         /**
          * How many new cloud points must accumulate since the last save before the autosave rewrites.

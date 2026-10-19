@@ -1336,12 +1336,15 @@ class EditorViewModel @Inject constructor(
      * adjustment, as one undoable step. [dx]/[dy] metres, [dThetaRad] CCW and [scaleRatio] are the
      * design's move in its CURRENT local frame. The renderer composes T(pan) · Rz(-rotation) · S(scale),
      * so the offset is rotated into the pan frame and the rotation sign flipped to match.
+     * Returns whether the fit was applied (false for a pinned placement or a malformed fit). A move
+     * voids a pending Reset restore, like any other direct placement edit.
      */
-    fun applyArFit(dx: Float, dy: Float, dThetaRad: Float, scaleRatio: Float) {
-        if (!scaleRatio.isFinite() || scaleRatio <= 0f || !dx.isFinite() || !dy.isFinite() || !dThetaRad.isFinite()) return
+    fun applyArFit(dx: Float, dy: Float, dThetaRad: Float, scaleRatio: Float): Boolean {
+        if (!scaleRatio.isFinite() || scaleRatio <= 0f || !dx.isFinite() || !dy.isFinite() || !dThetaRad.isFinite()) return false
         prepareArPlacementEdit()
         val cur = _uiState.value.modeAdjustments[EditorMode.AR] ?: ModeAdjustment()
-        if (cur.isTransformLocked) return
+        if (cur.isTransformLocked) return false
+        clearTransformStash()
         // Snapshot AR explicitly: the fit may land while another mode is on screen.
         history.pushProperty(currentDesignSnapshot(), EditorMode.AR, cur)
         updateHistoryCounts()
@@ -1356,6 +1359,7 @@ class EditorViewModel @Inject constructor(
         dispatch(EditorIntent.SetModeAdjustment(EditorMode.AR, next))
         saveProject()
         emitModeTransform(EditorMode.AR)
+        return true
     }
 
     /**
@@ -1729,7 +1733,7 @@ class EditorViewModel @Inject constructor(
 
     /**
      * Voids a pending Reset restore. The reducer does this for the intents it owns; this is for the
-     * paths that mutate the design directly (gesture transform, magic align).
+     * paths that mutate the design directly (gesture transform, Align).
      */
     private fun clearTransformStash() {
         if (_uiState.value.transformStash != null) _uiState.update { it.copy(transformStash = null) }

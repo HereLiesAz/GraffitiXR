@@ -872,8 +872,9 @@ private:
 public:
     /**
      * Fit the registered design to paint already on the wall (a project restarted in the app but not
-     * on the wall). Matches the design against the capture photo (in both polarities, since paint
-     * rarely keeps the design's colours), back-projects the photo side onto the wall plane, and solves
+     * on the wall). Matches the capture photo against the Doodle builder's design features -- the
+     * artwork's own, each design filter's target set (mTargetSets), and the inverted design, since
+     * paint rarely keeps the design's colours -- takes the set with the most inliers, back-projects the photo side onto the wall plane, and solves
      * a RANSAC similarity in the CURRENT design's local frame. out5 = {dx, dy (m), dTheta (rad, CCW
      * in the design plane), scale ratio, inliers}. Returns false when there is no confident fit.
      */

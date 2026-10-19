@@ -3396,6 +3396,11 @@ void MobileGS::buildPaintGridLocked(const cv::Mat& composite, const std::vector<
 bool MobileGS::autoFitDesign(float* out5) {
     cv::Mat photoRgb, designGray; float K[4]; float fpFromDesign[16]; float halfW, halfH;
     std::vector<cv::Point3f> wall;
+    // The Doodle builder's design features: the artwork's own, then each filter's target set (places
+    // a filter chose, described on the unfiltered design). Paint that only resembles a filtered
+    // version of the design (a stencil, a posterized fill, a sketch) is found by that filter's set.
+    struct FitSet { std::vector<cv::Point2f> pts; cv::Mat descs; };
+    std::vector<FitSet> sets;
     {
         std::lock_guard<std::mutex> lock(mMutex);
         if (mCaptureRgb.empty() || mArtworkGray.empty() || !mHasDesignPlacement ||
@@ -3406,6 +3411,10 @@ bool MobileGS::autoFitDesign(float* out5) {
         photoRgb = mCaptureRgb.clone(); designGray = mArtworkGray.clone();
         memcpy(K, mCaptureIntr, sizeof(K)); memcpy(fpFromDesign, mDesignFpFromDesign, sizeof(fpFromDesign));
         halfW = mDesignHalfW; halfH = mDesignHalfH; wall = mWallKeypoints3D;
+        if (!mArtworkDescriptors.empty() && mArtworkKeypoints2D.size() == (size_t)mArtworkDescriptors.rows)
+            sets.push_back({mArtworkKeypoints2D, mArtworkDescriptors.clone()});
+        for (const auto& ts : mTargetSets)
+            if (!ts.descs.empty() && ts.pts.size() == (size_t)ts.descs.rows) sets.push_back({ts.pts, ts.descs.clone()});
     }
     // Everything below casts photo rays from the doodle frame's ORIGIN, i.e. assumes the
     // doodle frame is the capture camera's. That holds for ARCore metric/depth doodles and
@@ -3436,19 +3445,28 @@ bool MobileGS::autoFitDesign(float* out5) {
 
     cv::Mat photoGray; cv::cvtColor(photoRgb, photoGray, cv::COLOR_RGB2GRAY);
     normalizeForFeatures(photoGray);
+    // The photo is described in the design features' type (ORB when the Doodle is ORB), so every set
+    // can be matched against it.
+    const bool wantOrb = !sets.empty() && sets.front().descs.type() == CV_8U;
     auto detect = [&](const cv::Mat& g, std::vector<cv::KeyPoint>& k, cv::Mat& d) {
-        if (!(mSuperPoint.isLoaded() && mSuperPoint.detect(g, k, d)) || k.empty())
+        if (wantOrb || !(mSuperPoint.isLoaded() && mSuperPoint.detect(g, k, d)) || k.empty())
             cv::ORB::create(2000)->detectAndCompute(g, cv::noArray(), k, d);
     };
     std::vector<cv::KeyPoint> pk; cv::Mat pd_; detect(photoGray, pk, pd_);
     if (pk.size() < 20) return false;
 
+    // Paint in the opposite tone of the design (light on dark): the inverted design, described as is.
+    {
+        std::vector<cv::KeyPoint> dk; FitSet fs; detect(255 - designGray, dk, fs.descs);
+        for (const auto& kp : dk) fs.pts.push_back(kp.pt);
+        sets.push_back(std::move(fs));
+    }
+
     const float W = (float)designGray.cols, Hh = (float)designGray.rows;
     int bestInl = 0; cv::Mat bestM;
-    for (int polarity = 0; polarity < 2; ++polarity) {
-        cv::Mat g = polarity ? (255 - designGray) : designGray;
-        std::vector<cv::KeyPoint> dk; cv::Mat dd; detect(g, dk, dd);
-        if (dk.size() < 20 || dd.type() != pd_.type() || dd.cols != pd_.cols) continue;
+    for (const FitSet& fs : sets) {
+        const cv::Mat& dd = fs.descs;
+        if (fs.pts.size() < 20 || dd.type() != pd_.type() || dd.cols != pd_.cols) continue;
         cv::Ptr<cv::DescriptorMatcher> m = dd.type() == CV_32F
             ? cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE)
             : cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
@@ -3457,7 +3475,7 @@ bool MobileGS::autoFitDesign(float* out5) {
         for (auto& mm : km) {
             if (mm.size() < 2 || !(mm[0].distance < 0.8f * mm[1].distance)) continue;
             // Design pixel -> design-local metres at the CURRENT extents.
-            const cv::Point2f dp = dk[mm[0].queryIdx].pt;
+            const cv::Point2f dp = fs.pts[mm[0].queryIdx];
             const cv::Point2f lp(halfW * (2.0f * dp.x / W - 1.0f), halfH * (1.0f - 2.0f * dp.y / Hh));
             // Photo pixel -> ray from the capture camera -> wall plane -> current design-local frame.
             const cv::Point2f pp = pk[mm[0].trainIdx].pt;
