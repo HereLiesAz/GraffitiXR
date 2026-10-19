@@ -4,6 +4,7 @@
 #include "include/DepthScaleFit.h"
 #include "include/DesignFilters.h"
 #include "include/ShapeMatch.h"
+#include <limits>
 #include <jni.h>
 #include <EGL/egl.h>
 #include <algorithm>
@@ -73,8 +74,8 @@ struct GatedMatch {
     bool marginFailed = false;      // gatedMatchWithBaseline: true alignment did not beat chance
 };
 
-// The wall exclusion list: features known to be bare wall (the doodle as captured, before any
-// paint), projected into the live frame through the lock's pose.
+// The wall exclusion list: features known to be bare wall (the clean-wall photo, the wall before any
+// doodle or paint), projected into the live frame through the lock's pose.
 struct WallExclusion {
     std::vector<cv::Point2f> uv;    // projected pixel of each bare-wall feature that lands in the frame
     std::vector<int> row;           // its row in [descs]
@@ -1653,7 +1654,7 @@ void MobileGS::tryUpdateDoodle(const cv::Mat& grayClean,
     cv::Mat artDescs;
     std::vector<cv::Point2f> artPts2d;
     int artImgW = 0, artImgH = 0;
-    cv::Mat bareDescs;                   // the wall as captured: the exclusion list's source
+    cv::Mat bareDescs;                   // the clean-wall photo's features: the exclusion list's source
     std::vector<cv::Point3f> barePts;
     std::vector<TargetSet> targetSets;   // snapshot; matched below, folded back under the generation check
     long artGeneration = 0;
@@ -1675,11 +1676,9 @@ void MobileGS::tryUpdateDoodle(const cv::Mat& grayClean,
         artDescs = mArtworkDescriptors;
         artPts2d = mArtworkKeypoints2D;
         targetSets = mTargetSets;
-        const size_t nBare = std::min(mBareWallCount, (size_t)mWallDescriptors.rows);
-        if (nBare > 0 && mWallKeypoints3D.size() >= nBare) {
-            bareDescs = mWallDescriptors.rowRange(0, (int)nBare).clone();
-            barePts.assign(mWallKeypoints3D.begin(), mWallKeypoints3D.begin() + nBare);
-        }
+        // Bare wall is the clean-wall photo only. The Doodle (and its close-ups) is for reloc; with no
+        // clean-wall photo there is no exclusion list.
+        cleanWallExclusionLocked(bareDescs, barePts);
         artImgW = mArtworkImageW;
         artImgH = mArtworkImageH;
         artGeneration = mArtworkGeneration;
@@ -1770,7 +1769,7 @@ void MobileGS::tryUpdateDoodle(const cv::Mat& grayClean,
         KeypointGrid grid;
         grid.build(kps, radiusPx);
 
-        // The exclusion list: the captured bare wall, projected through this lock's pose.
+        // The exclusion list: the clean-wall photo's features, projected through this lock's pose.
         WallExclusion wallList;
         const WallExclusion* wallPtr = nullptr;
         if (bareDescs.rows > 0 && bareDescs.type() == descs.type() && bareDescs.cols == descs.cols &&
@@ -2271,7 +2270,6 @@ void MobileGS::restoreWallDoodle(const cv::Mat& d, const std::vector<cv::Point3f
     std::lock_guard<std::mutex> lock(mMutex);
     invalidateRelocResultLocked();
     mWallDescriptors = d.clone();
-    mBareWallCount = (size_t)mWallDescriptors.rows;
     mWallKeypoints3D = p;
     // This path carries no partition, and the previous doodle's must not survive onto it: the
     // bytes would index a different point set entirely. Empty = all backbone, as before Phase 2.
@@ -2341,10 +2339,6 @@ void MobileGS::restoreWallDoodleMetric(const cv::Mat& d, const std::vector<cv::P
         (!anchorMatrix16 || memcmp(anchorMatrix16, mDoodleAnchorMatrix, 16 * sizeof(float)) == 0) &&
         (!intrinsics4 || memcmp(intrinsics4, mDoodleIntrinsics, 4 * sizeof(float)) == 0);
     if (!sameFrame) invalidateRelocResultLocked();
-    // The captured (bare) part of the stored set: the base alone when grown marks ride behind it, the
-    // standing count when the identical set is re-pushed, otherwise everything.
-    mBareWallCount = growthOfSame ? baseN
-        : (sameDoodle && mBareWallCount > 0 ? std::min(mBareWallCount, (size_t)useD.rows) : (size_t)useD.rows);
     mWallDescriptors = useD.clone();
     mWallKeypoints3D = useP;
     // Belt and braces over the JNI-side length check: a partition that does not index the points it
@@ -2367,7 +2361,6 @@ void MobileGS::clearWallDoodle() {
     std::lock_guard<std::mutex> lock(mMutex);
     mWallDescriptors.release();
     mWallKeypoints3D.clear();
-    mBareWallCount = 0;
     mWallRegions.clear();
     // Back to the constructed defaults, so a later project can't inherit this one's co-registration.
     static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
@@ -2590,11 +2583,6 @@ void MobileGS::alignToDoodle(const uint8_t* data, size_t size) {
         mPaintDescriptors.release();
         mPaintPoints3D.clear();
         mWallDescriptors = descs.clone();
-        // A peer's blob is the host's set INCLUDING anything self-grow appended, with no boundary between
-        // the captured wall and the grown tail. Treating all of it as bare wall would exclude learned
-        // (painted) features from the evidence, so this device has no exclusion list for a peer's
-        // doodle: the pass loses its guard here rather than gaining a wrong one.
-        mBareWallCount = 0;
         // A peer's doodle carries no partition, and the local one indexes a different point
         // set. Empty = all backbone, i.e. pre-Phase-2 behaviour, which is the right default for a
         // map whose design footprint this device never saw.
@@ -3231,7 +3219,6 @@ MobileGS::DoodleData MobileGS::generateDoodle(
         mPaintDescriptors.release();
         mPaintPoints3D.clear();
         mWallKeypoints3D  = std::move(pts3d);
-        mBareWallCount = (size_t)mWallDescriptors.rows;
         // The depth path supplies no partition. Clearing rather than leaving the previous
         // doodle's is not optional: those bytes index a point set that no longer exists.
         mWallRegions.clear();
@@ -3401,7 +3388,7 @@ void MobileGS::buildPaintGridLocked(const cv::Mat& composite, const std::vector<
 bool MobileGS::autoFitDesign(float* out5, bool minimumEvidence) {
     // Fewest agreeing matches for a fit to be possible at all: two fix any similarity, a third tests it.
     constexpr int kPossible = 3;
-    cv::Mat photoRgb, designGray; float K[4]; float fpFromDesign[16]; float halfW, halfH;
+    cv::Mat photoRgb, designGray, wallDescs; float K[4] = {0, 0, 0, 0}; float fpFromDesign[16]; float halfW, halfH;
     std::vector<cv::Point3f> wall;
     // The Doodle builder's design features: the artwork's own, then each filter's target set (places
     // a filter chose, described on the unfiltered design). Paint that only resembles a filtered
@@ -3416,27 +3403,32 @@ bool MobileGS::autoFitDesign(float* out5, bool minimumEvidence) {
     joinFilterBuild();
     {
         std::lock_guard<std::mutex> lock(mMutex);
-        if (mCaptureRgb.empty() || mArtworkGray.empty() || !mHasDesignPlacement ||
-            !(mDesignHalfW > 0) || !(mDesignHalfH > 0) || !(mCaptureIntr[0] > 0) || mWallKeypoints3D.size() < 12) {
+        // The fit is matched against two things on the wall: the capture photo, and the Doodle itself
+        // (its base features and close-ups, already on the wall plane). Either one is enough.
+        const bool havePhoto = !mCaptureRgb.empty() && mCaptureIntr[0] > 0 && mCaptureIntr[1] > 0;
+        const bool haveDoodle = !mWallDescriptors.empty() && (size_t)mWallDescriptors.rows == mWallKeypoints3D.size();
+        if (mArtworkGray.empty() || !mHasDesignPlacement || !(mDesignHalfW > 0) || !(mDesignHalfH > 0) ||
+            mWallKeypoints3D.size() < 12 || !(havePhoto || haveDoodle)) {
             mLastAutoFitResult.store(kAutoFitNotReady, std::memory_order_relaxed);
             return false;
         }
-        photoRgb = mCaptureRgb.clone(); designGray = mArtworkGray.clone();
-        photoRef = mCaptureRgb; artworkGen = mArtworkGeneration;
-        memcpy(K, mCaptureIntr, sizeof(K)); memcpy(fpFromDesign, mDesignFpFromDesign, sizeof(fpFromDesign));
+        if (havePhoto) {
+            photoRgb = mCaptureRgb.clone(); photoRef = mCaptureRgb;
+            memcpy(K, mCaptureIntr, sizeof(K));
+        }
+        if (haveDoodle) wallDescs = mWallDescriptors.clone();
+        designGray = mArtworkGray.clone(); artworkGen = mArtworkGeneration;
+        memcpy(fpFromDesign, mDesignFpFromDesign, sizeof(fpFromDesign));
         halfW = mDesignHalfW; halfH = mDesignHalfH; wall = mWallKeypoints3D;
         if (!mArtworkDescriptors.empty() && mArtworkKeypoints2D.size() == (size_t)mArtworkDescriptors.rows)
             sets.push_back({mArtworkKeypoints2D, mArtworkDescriptors.clone()});
         for (const auto& ts : mTargetSets)
             if (!ts.descs.empty() && ts.pts.size() == (size_t)ts.descs.rows) sets.push_back({ts.pts, ts.descs.clone()});
     }
-    // Everything below casts photo rays from the doodle frame's ORIGIN, i.e. assumes the
-    // doodle frame is the capture camera's. That holds for ARCore metric/depth doodles and
-    // is false for a standalone SphereSLAM fingerprint (the centred page frame: the wall plane
-    // passes through the origin, so every ray/plane intersection is at lambda = 0 and the fit could
-    // only ever fail -- after two detector passes). Today no standalone flow calls setCaptureImage,
-    // but a project that also carries an ARCore capture photo can leave one loaded under a
-    // standalone seed. Refuse up front with a reason instead of failing silently and expensively.
+    // Everything below assumes the doodle frame is the capture camera's (photo rays leave its origin,
+    // and the design placement is in it). That holds for ARCore metric/depth doodles and is false for
+    // a standalone SphereSLAM fingerprint (the centred page frame: the wall plane passes through the
+    // origin, so every ray/plane intersection is at lambda = 0). Refuse up front with a reason.
     if (!doodleFrameIsCaptureCamera(wall)) {
         mLastAutoFitResult.store(kAutoFitPageFrame, std::memory_order_relaxed);
         LOGI("autoFitDesign: doodle frame is a centred page frame (standalone), not a capture "
@@ -3444,30 +3436,55 @@ bool MobileGS::autoFitDesign(float* out5, bool minimumEvidence) {
         return false;
     }
     mLastAutoFitResult.store(kAutoFitNoFit, std::memory_order_relaxed);
-    // Wall plane in the doodle (= capture camera) frame, fit to the marks.
-    cv::Mat data((int)wall.size(), 3, CV_32F);
-    for (int i = 0; i < (int)wall.size(); ++i) {
-        data.at<float>(i, 0) = wall[i].x; data.at<float>(i, 1) = wall[i].y; data.at<float>(i, 2) = wall[i].z;
-    }
-    cv::PCA pca(data, cv::Mat(), cv::PCA::DATA_AS_ROW);
-    cv::Vec3d nrm(pca.eigenvectors.at<float>(2, 0), pca.eigenvectors.at<float>(2, 1), pca.eigenvectors.at<float>(2, 2));
-    const cv::Vec3d cen(pca.mean.at<float>(0, 0), pca.mean.at<float>(0, 1), pca.mean.at<float>(0, 2));
-    if (cv::norm(nrm) < 1e-6) return false;
-    nrm /= cv::norm(nrm);
-    const double pd = nrm.dot(cen);
     const glm::mat4 designFromFp = glm::inverse(glm::make_mat4(fpFromDesign));
+    auto toDesign = [&](double x, double y, double z) {
+        const glm::vec4 X = designFromFp * glm::vec4((float)x, (float)y, (float)z, 1.0f);
+        return cv::Point2f(X.x, X.y);
+    };
+    const cv::Point2f kNoPoint(std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN());
 
-    cv::Mat photoGray; cv::cvtColor(photoRgb, photoGray, cv::COLOR_RGB2GRAY);
-    normalizeForFeatures(photoGray);
-    // The photo is described in the design features' type (ORB when the Doodle is ORB), so every set
-    // can be matched against it.
-    const bool wantOrb = !sets.empty() && sets.front().descs.type() == CV_8U;
+    // What the design is matched against, each with every row's place on the wall in the CURRENT
+    // design-local frame (NaN where a row has none).
+    struct Target { cv::Mat descs; std::vector<cv::Point2f> local; };
+    std::vector<Target> targets;
+    // The Doodle: its base features and close-ups, and anything grown since, all on the wall plane.
+    if (!wallDescs.empty()) {
+        Target t; t.descs = wallDescs;
+        for (const auto& p : wall) t.local.push_back(toDesign(p.x, p.y, p.z));
+        targets.push_back(std::move(t));
+    }
+    // The descriptor type every source must share: the Doodle's (the artwork follows it).
+    const int descType = !wallDescs.empty() ? wallDescs.type() : (!sets.empty() ? sets.front().descs.type() : CV_32F);
+    const bool wantOrb = descType == CV_8U;
     auto detect = [&](const cv::Mat& g, std::vector<cv::KeyPoint>& k, cv::Mat& d) {
         if (wantOrb || !(mSuperPoint.isLoaded() && mSuperPoint.detect(g, k, d)) || k.empty())
             cv::ORB::create(2000)->detectAndCompute(g, cv::noArray(), k, d);
     };
-    std::vector<cv::KeyPoint> pk; cv::Mat pd_; detect(photoGray, pk, pd_);
-    if ((int)pk.size() < (minimumEvidence ? kPossible : 20)) return false;
+    // The capture photo: each feature's ray from the capture camera, onto the wall plane fitted to the
+    // Doodle's points.
+    if (!photoRgb.empty()) {
+        cv::Mat data((int)wall.size(), 3, CV_32F);
+        for (int i = 0; i < (int)wall.size(); ++i) {
+            data.at<float>(i, 0) = wall[i].x; data.at<float>(i, 1) = wall[i].y; data.at<float>(i, 2) = wall[i].z;
+        }
+        cv::PCA pca(data, cv::Mat(), cv::PCA::DATA_AS_ROW);
+        cv::Vec3d nrm(pca.eigenvectors.at<float>(2, 0), pca.eigenvectors.at<float>(2, 1), pca.eigenvectors.at<float>(2, 2));
+        const cv::Vec3d cen(pca.mean.at<float>(0, 0), pca.mean.at<float>(0, 1), pca.mean.at<float>(0, 2));
+        cv::Mat photoGray; cv::cvtColor(photoRgb, photoGray, cv::COLOR_RGB2GRAY);
+        normalizeForFeatures(photoGray);
+        std::vector<cv::KeyPoint> pk; Target t; detect(photoGray, pk, t.descs);
+        if (cv::norm(nrm) > 1e-6 && (int)pk.size() >= (minimumEvidence ? kPossible : 20)) {
+            nrm /= cv::norm(nrm);
+            const double pd = nrm.dot(cen);
+            for (const auto& kp : pk) {
+                const cv::Vec3d dir((kp.pt.x - K[2]) / K[0], (kp.pt.y - K[3]) / K[1], 1.0);
+                const double den = nrm.dot(dir);
+                const double lam = std::abs(den) < 1e-6 ? -1.0 : pd / den;
+                t.local.push_back(lam > 0 ? toDesign(lam * dir[0], lam * dir[1], lam * dir[2]) : kNoPoint);
+            }
+            targets.push_back(std::move(t));
+        }
+    }
 
     // Paint in the opposite tone of the design (light on dark): the inverted design, described as is.
     {
@@ -3478,46 +3495,49 @@ bool MobileGS::autoFitDesign(float* out5, bool minimumEvidence) {
 
     const float W = (float)designGray.cols, Hh = (float)designGray.rows;
     int bestInl = 0; cv::Mat bestM;
-    for (const FitSet& fs : sets) {
-        const cv::Mat& dd = fs.descs;
-        if ((int)fs.pts.size() < (minimumEvidence ? kPossible : 20) || dd.type() != pd_.type() || dd.cols != pd_.cols) continue;
-        cv::Ptr<cv::DescriptorMatcher> m = dd.type() == CV_32F
-            ? cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE)
-            : cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
-        std::vector<std::vector<cv::DMatch>> km; m->knnMatch(dd, pd_, km, 2);
-        std::vector<cv::Point2f> src, dst;
-        for (auto& mm : km) {
-            if (mm.size() < 2 || !(mm[0].distance < 0.8f * mm[1].distance)) continue;
-            // Design pixel -> design-local metres at the CURRENT extents.
-            const cv::Point2f dp = fs.pts[mm[0].queryIdx];
-            const cv::Point2f lp(halfW * (2.0f * dp.x / W - 1.0f), halfH * (1.0f - 2.0f * dp.y / Hh));
-            // Photo pixel -> ray from the capture camera -> wall plane -> current design-local frame.
-            const cv::Point2f pp = pk[mm[0].trainIdx].pt;
-            const cv::Vec3d dir((pp.x - K[2]) / K[0], (pp.y - K[3]) / K[1], 1.0);
-            const double den = nrm.dot(dir);
-            if (std::abs(den) < 1e-6) continue;
-            const double lam = pd / den;
-            if (!(lam > 0)) continue;
-            const glm::vec4 X = designFromFp * glm::vec4((float)(lam * dir[0]), (float)(lam * dir[1]), (float)(lam * dir[2]), 1.0f);
-            src.push_back(lp); dst.emplace_back(X.x, X.y);
+    for (const Target& t : targets) {
+        if (t.descs.empty() || t.descs.type() != descType) continue;
+        for (const FitSet& fs : sets) {
+            const cv::Mat& dd = fs.descs;
+            if ((int)fs.pts.size() < (minimumEvidence ? kPossible : 20) || dd.type() != t.descs.type() || dd.cols != t.descs.cols) continue;
+            cv::Ptr<cv::DescriptorMatcher> m = dd.type() == CV_32F
+                ? cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE)
+                : cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
+            std::vector<std::vector<cv::DMatch>> km; m->knnMatch(dd, t.descs, km, 2);
+            std::vector<cv::Point2f> src, dst;
+            for (auto& mm : km) {
+                if (mm.size() < 2 || !(mm[0].distance < 0.8f * mm[1].distance)) continue;
+                const cv::Point2f& to = t.local[(size_t)mm[0].trainIdx];
+                if (!std::isfinite(to.x) || !std::isfinite(to.y)) continue;
+                // Design pixel -> design-local metres at the CURRENT extents.
+                const cv::Point2f dp = fs.pts[mm[0].queryIdx];
+                src.emplace_back(halfW * (2.0f * dp.x / W - 1.0f), halfH * (1.0f - 2.0f * dp.y / Hh));
+                dst.push_back(to);
+            }
+            if ((int)src.size() < (minimumEvidence ? kPossible : 12)) continue;
+            std::vector<uchar> inl;
+            cv::Mat M = cv::estimateAffinePartial2D(src, dst, inl, cv::RANSAC, 0.03, 2000, 0.995);
+            const int n = M.empty() ? 0 : cv::countNonZero(inl);
+            // Confidence: enough agreeing matches, and a fair share of those that survived the ratio test.
+            const bool confident = minimumEvidence ? n >= kPossible : (n >= 15 && n * 4 >= (int)src.size());
+            if (confident && n > bestInl) { bestInl = n; bestM = M; }
         }
-        if ((int)src.size() < (minimumEvidence ? kPossible : 12)) continue;
-        std::vector<uchar> inl;
-        cv::Mat M = cv::estimateAffinePartial2D(src, dst, inl, cv::RANSAC, 0.03, 2000, 0.995);
-        const int n = M.empty() ? 0 : cv::countNonZero(inl);
-        // Confidence: enough agreeing matches, and a fair share of those that survived the ratio test.
-        const bool confident = minimumEvidence ? n >= kPossible : (n >= 15 && n * 4 >= (int)src.size());
-        if (confident && n > bestInl) { bestInl = n; bestM = M; }
     }
     if (bestM.empty()) return false;
     // The fit is relative to the placement, design, Doodle and photo snapshotted above. Any of them
-    // replaced while matching would have it applied to the wrong thing.
+    // replaced while matching would have it applied to the wrong thing. The Doodle may only have GROWN
+    // meanwhile (self-grow appends): the rows matched against are still there, unchanged.
     {
         std::lock_guard<std::mutex> lock(mMutex);
+        const size_t n = wall.size();
+        const bool wallKept = mWallKeypoints3D.size() >= n && std::equal(wall.begin(), wall.end(), mWallKeypoints3D.begin()) &&
+            (wallDescs.empty() || (mWallDescriptors.rows >= wallDescs.rows && mWallDescriptors.type() == wallDescs.type() &&
+                                   mWallDescriptors.cols == wallDescs.cols &&
+                                   cv::norm(mWallDescriptors.rowRange(0, wallDescs.rows), wallDescs, cv::NORM_INF) == 0.0));
         if (!mHasDesignPlacement || mDesignHalfW != halfW || mDesignHalfH != halfH ||
             memcmp(mDesignFpFromDesign, fpFromDesign, sizeof(fpFromDesign)) != 0 ||
             mArtworkGeneration != artworkGen || mCaptureRgb.data != photoRef.data ||
-            memcmp(mCaptureIntr, K, sizeof(K)) != 0 || mWallKeypoints3D != wall) {
+            (!photoRef.empty() && memcmp(mCaptureIntr, K, sizeof(K)) != 0) || !wallKept) {
             LOGI("autoFitDesign: placement, design, Doodle or photo changed while matching; fit dropped");
             return false;
         }
@@ -3610,6 +3630,71 @@ void MobileGS::registerCleanWallLocked() {
     cv::erode(mCleanWallValid, mCleanWallValid, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(9, 9)));
     mCleanWallStatus.store(kCleanRegistered, std::memory_order_relaxed);
     std::fill(mGrid.hasBaseClean.begin(), mGrid.hasBaseClean.end(), 0);
+
+    detectCleanWallFeaturesLocked();
+}
+
+void MobileGS::detectCleanWallFeaturesLocked() {
+    // The bare wall's features, in the wall doodle's descriptor type so live frames can be compared
+    // with them, and only where the warp has real clean-wall pixels.
+    mCleanFeatPx.clear(); mCleanFeatDescs.release(); mCleanFeatSrc.release();
+    mCleanFeatTriedFor = mCleanWallRgb.data; mCleanFeatTriedType = mWallDescriptors.type();
+    if (mCleanWallRgb.empty() || !mFeatureDetector) return;
+    cv::Mat gray; cv::cvtColor(mCleanWallRgb, gray, cv::COLOR_RGB2GRAY);
+    normalizeForFeatures(gray);
+    std::vector<cv::KeyPoint> kps; cv::Mat descs;
+    const bool sp = mWallDescriptors.type() == CV_32F && mSuperPoint.isLoaded() && mSuperPoint.detect(gray, kps, descs);
+    if (!sp) { kps.clear(); descs.release(); mFeatureDetector->detectAndCompute(gray, mCleanWallValid, kps, descs); }
+    for (int r = 0; r < descs.rows && r < (int)kps.size(); ++r) {
+        const cv::Point2f& p = kps[(size_t)r].pt;
+        const int x = (int)std::lround(p.x), y = (int)std::lround(p.y);
+        if (x < 0 || y < 0 || x >= mCleanWallValid.cols || y >= mCleanWallValid.rows || !mCleanWallValid.at<uchar>(y, x)) continue;
+        mCleanFeatPx.push_back(p);
+        mCleanFeatDescs.push_back(descs.row(r));
+    }
+    mCleanFeatSrc = mCleanWallRgb;
+    mCleanExclFor = nullptr;   // re-place on the wall
+}
+
+void MobileGS::cleanWallExclusionLocked(cv::Mat& descs, std::vector<cv::Point3f>& pts) {
+    descs.release(); pts.clear();
+    // Detected before the doodle existed (or under another descriptor type): detect again, once.
+    if (!mCleanWallRgb.empty() && !mWallDescriptors.empty() &&
+        (mCleanFeatTriedFor != mCleanWallRgb.data || mCleanFeatTriedType != mWallDescriptors.type()))
+        detectCleanWallFeaturesLocked();
+    // Current only for the registered clean-wall photo, and placeable only through a capture camera.
+    if (mCleanWallRgb.empty() || mCleanFeatSrc.data != mCleanWallRgb.data || mCleanFeatDescs.empty() ||
+        !(mCaptureIntr[0] > 0) || !(mCaptureIntr[1] > 0) || mWallKeypoints3D.size() < 12) return;
+    if (mCleanExclFor != mCleanWallRgb.data || mCleanExclWallN != mWallKeypoints3D.size() ||
+        mCleanExclDoodleGen != mDoodleGeneration) {
+        mCleanExclFor = mCleanWallRgb.data; mCleanExclWallN = mWallKeypoints3D.size(); mCleanExclDoodleGen = mDoodleGeneration;
+        mCleanExclDescs.release(); mCleanExclPts.clear();
+        if (!doodleFrameIsCaptureCamera(mWallKeypoints3D)) return;
+        // The wall plane in the doodle (= capture camera) frame; each clean-wall pixel's ray lands on it.
+        cv::Mat data((int)mWallKeypoints3D.size(), 3, CV_32F);
+        for (int i = 0; i < data.rows; ++i) {
+            data.at<float>(i, 0) = mWallKeypoints3D[(size_t)i].x;
+            data.at<float>(i, 1) = mWallKeypoints3D[(size_t)i].y;
+            data.at<float>(i, 2) = mWallKeypoints3D[(size_t)i].z;
+        }
+        cv::PCA pca(data, cv::Mat(), cv::PCA::DATA_AS_ROW);
+        cv::Vec3d n(pca.eigenvectors.at<float>(2, 0), pca.eigenvectors.at<float>(2, 1), pca.eigenvectors.at<float>(2, 2));
+        if (cv::norm(n) < 1e-9) return;
+        n /= cv::norm(n);
+        const double pd = n.dot(cv::Vec3d(pca.mean.at<float>(0, 0), pca.mean.at<float>(0, 1), pca.mean.at<float>(0, 2)));
+        for (int r = 0; r < mCleanFeatDescs.rows; ++r) {
+            const cv::Point2f& p = mCleanFeatPx[(size_t)r];
+            const cv::Vec3d dir((p.x - mCaptureIntr[2]) / mCaptureIntr[0], (p.y - mCaptureIntr[3]) / mCaptureIntr[1], 1.0);
+            const double den = n.dot(dir);
+            if (std::abs(den) < 1e-9) continue;
+            const double lam = pd / den;
+            if (!(lam > 0) || !std::isfinite(lam)) continue;
+            mCleanExclPts.emplace_back((float)(lam * dir[0]), (float)(lam * dir[1]), (float)(lam * dir[2]));
+            mCleanExclDescs.push_back(mCleanFeatDescs.row(r));
+        }
+    }
+    descs = mCleanExclDescs.clone();
+    pts = mCleanExclPts;
 }
 
 bool MobileGS::setCleanWallImage(const cv::Mat& img) {
