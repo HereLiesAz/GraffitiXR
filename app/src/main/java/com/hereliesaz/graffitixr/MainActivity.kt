@@ -2518,8 +2518,10 @@ class MainActivity : AppCompatActivity() {
                                 // The fit is relative to the placement at the tap; moved since, it is
                                 // dropped. Only the spatial fields count: a tone edit moves nothing, and
                                 // a pin is answered below with the locked notice.
-                                fun placement() = editorViewModel.uiState.value.modeAdjustments[EditorMode.AR]
-                                    ?.let { listOf(it.offsetX, it.offsetY, it.scale, it.rotation, it.rotationX, it.rotationY) }
+                                // No entry yet is the default placement, which a first tone edit creates.
+                                fun placement() = (editorViewModel.uiState.value.modeAdjustments[EditorMode.AR]
+                                    ?: com.hereliesaz.graffitixr.common.model.ModeAdjustment())
+                                    .let { listOf(it.offsetX, it.offsetY, it.scale, it.rotation, it.rotationX, it.rotationY) }
                                 val placedAtTap = placement()
                                 arViewModel.alignToPaint { fit, notReady ->
                                     if (placement() != placedAtTap && !editorViewModel.arPlacementLocked()) return@alignToPaint
