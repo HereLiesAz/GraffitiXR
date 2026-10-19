@@ -918,9 +918,9 @@ class EditorViewModelTest {
         addDesign()
         assertTrue(viewModel.applyArFit(dx = 0.1f, dy = 0f, dThetaRad = 0f, scaleRatio = 1f))
         assertFalse(viewModel.applyArFit(dx = Float.NaN, dy = 0f, dThetaRad = 0f, scaleRatio = 1f))
-        // A scale past the bounds would be applied only in part: refused, nothing moves.
-        assertFalse(viewModel.applyArFit(dx = 0.1f, dy = 0f, dThetaRad = 0f, scaleRatio = 20f))
-        assertEquals(1f, viewModel.uiState.value.modeAdjustments[EditorMode.AR]!!.scale, 1e-4f)
+        // No scale bounds: a large ratio is applied whole.
+        assertTrue(viewModel.applyArFit(dx = 0f, dy = 0f, dThetaRad = 0f, scaleRatio = 20f))
+        assertEquals(20f, viewModel.uiState.value.modeAdjustments[EditorMode.AR]!!.scale, 1e-4f)
         viewModel.onToggleModeTransformLocked(EditorMode.AR)
         testDispatcher.scheduler.advanceUntilIdle()
         // Pinned while Align was matching: nothing moves, and the caller must not report success.

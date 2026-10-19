@@ -3516,7 +3516,7 @@ bool MobileGS::autoFitDesign(float* out5) {
     }
     const double a = bestM.at<double>(0, 0), b = bestM.at<double>(1, 0);
     const double k = std::sqrt(a * a + b * b);
-    if (!(k > 0.05 && k < 20.0)) return false;
+    if (!(k > 0) || !std::isfinite(k)) return false;   // degenerate only; no scale bounds
     out5[0] = (float)bestM.at<double>(0, 2);
     out5[1] = (float)bestM.at<double>(1, 2);
     out5[2] = (float)std::atan2(b, a);
