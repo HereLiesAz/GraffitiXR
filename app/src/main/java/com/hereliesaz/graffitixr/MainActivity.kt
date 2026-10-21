@@ -1913,6 +1913,7 @@ class MainActivity : AppCompatActivity() {
                                     isWaitingForTap = mainUiState.isWaitingForTap,
                                     hasCleanWall = arUiState.hasCleanWall,
                                     onCleanWallPhoto = { arViewModel.requestCleanWallPhoto() },
+                                    onCancel = { mainViewModel.cancelTapMode() },
                                     strings = strings,
                                     onConfirmDoodle = { bitmap, mask ->
                                         if (

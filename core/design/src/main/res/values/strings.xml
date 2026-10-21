@@ -790,6 +790,11 @@
     <!-- Spoken labels for the round shutter on the Doodle grid screen, which photographs the bare wall. -->
     <string name="doodle_shutter_cd">Photograph the bare wall</string>
     <string name="doodle_shutter_retake_cd">Retake the bare-wall photo</string>
+    <!-- Doodle grid screen: each line sits above the thing it explains. Over the middle of the screen: -->
+    <string name="doodle_tap_grid_hint">Tap your doodle grid to capture it.</string>
+    <!-- Above the shutter, before and after the bare-wall photo is kept. -->
+    <string name="doodle_blank_wall_hint">If the wall is blank, take a picture.</string>
+    <string name="doodle_blank_wall_saved_hint">Blank wall saved. Now tap your doodle grid.</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">CV view</string>
