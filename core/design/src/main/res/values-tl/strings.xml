@@ -4,9 +4,9 @@
     <string name="nav_modes">Mga mode</string>
     <string name="nav_modes_info">Lumipat sa pagitan ng AR Projection, Overlay, Mockup, at Trace mode.</string>
     <string name="nav_ar_mode">AR</string>
-    <string name="nav_ar_mode_info">I-project ang iyong likhang sining sa isang tunay na pader gamit ang augmented reality. I-scan muna ang dingding upang ilagay ang anchor, pagkatapos ay idagdag ang iyong mga layer ng disenyo.</string>
+    <string name="nav_ar_mode_info">I-project ang iyong likhang sining sa isang tunay na pader gamit ang augmented reality. I-scan muna ang dingding upang ilagay ang anchor, pagkatapos ay idagdag ang iyong disenyo.</string>
     <string name="nav_overlay">Overlay</string>
-    <string name="nav_overlay_info">I-layer ang iyong disenyo sa live na feed ng camera nang walang AR na naka-angkla. Mahusay para sa mabilis na pag-frame at mga pagsusuri sa pagkakalagay.</string>
+    <string name="nav_overlay_info">Palutangin ang iyong disenyo sa ibabaw ng live na feed ng camera nang walang AR na naka-angkla. Mahusay para sa mabilis na pag-frame at mga pagsusuri sa pagkakalagay.</string>
     <string name="nav_mockup">Mockup</string>
     <string name="nav_mockup_info">I-preview ang iyong disenyo na pinagsama-sama sa isang larawan ng isang pader. Walang kinakailangang camera o pag-scan.</string>
     <string name="nav_trace">Bakas</string>
@@ -17,28 +17,26 @@
     <string name="nav_create_info">Kuhanan ng larawan ang isang reference mark sa dingding upang lumikha ng bagong AR anchor. Susubaybayan ng app ang markang ito upang panatilihing nakahanay ang iyong projection.</string>
     <string name="nav_refine">Pinuhin</string>
     <string name="nav_refine_info">I-fine-tune ang posisyon ng isang umiiral na Guhit-guhit.</string>
-    <string name="nav_update">Pag-unlad</string>
-    <string name="nav_update_info">Markahan ang mga natapos na bahagi ng iyong mural upang subaybayan ang pag-unlad ng pagpipinta.</string>
     <string name="nav_design">Disenyo</string>
-    <string name="nav_design_info">Magdagdag at pamahalaan ang mga layer ng disenyo. Ang bawat layer ay maaaring isang imported na imahe o isang freehand drawing.</string>
+    <string name="nav_design_info">Ang iyong workspace. Ang disenyong idinagdag mo gamit ang \'Bukas\' — at ine-edit gamit ang mga tool sa ibaba — ay dadalhin sa bawat mode.</string>
     <string name="nav_open">Bukas</string>
-    <string name="nav_open_info">Magdagdag ng larawan mula sa iyong gallery bilang bagong layer.</string>
+    <string name="nav_open_info">Magdagdag ng larawan mula sa iyong gallery bilang disenyo.</string>
     <string name="nav_wall">Pader</string>
     <string name="nav_wall_info">Palitan ang background na larawan sa dingding na ginamit sa Mockup mode.</string>
     <string name="nav_isolate">Ihiwalay</string>
     <string name="nav_isolate_info">Awtomatikong alisin ang background mula sa layer na ito, iiwan lamang ang paksa sa isang transparent na background.</string>
     <string name="nav_invert">Baliktarin</string>
     <string name="nav_blend">Paghalo</string>
-    <string name="nav_invert_info">Lumikha ng negatibo ng kasalukuyang layer. Ang mga itim ay nagiging puti, at ang mga kulay ay binabaligtad sa kanilang mga kabaligtaran — kapaki-pakinabang para sa pagsusuri ng stencil at overlay.</string>
+    <string name="nav_invert_info">Lumikha ng negatibo ng disenyo. Ang mga itim ay nagiging puti, at ang mga kulay ay binabaligtad sa kanilang mga kabaligtaran — kapaki-pakinabang para sa pagsusuri ng stencil at overlay.</string>
     <string name="nav_outline">Balangkas</string>
     <string name="nav_outline_info">I-convert ang layer na ito sa black line art sa isang transparent na background — perpekto para sa paggawa ng mga template ng stencil.</string>
     <string name="nav_adjust">Ayusin</string>
-    <string name="nav_adjust_info">I-fine-tune ang liwanag, contrast, saturation, at balanse ng kulay para sa layer na ito.</string>
+    <string name="nav_adjust_info">I-fine-tune ang liwanag, contrast, saturation, at balanse ng kulay ng disenyo.</string>
     <string name="nav_edit">I-edit</string>
     <string name="nav_balance">Kulay</string>
-    <string name="nav_balance_info">Tint ang mga kulay ng layer gamit ang pula, berde, at asul na mga slider ng channel.</string>
+    <string name="nav_balance_info">I-tint ang mga kulay ng disenyo gamit ang pula, berde, at asul na mga slider ng channel.</string>
     <string name="nav_blending">Haluin</string>
-    <string name="nav_blending_info">Umikot sa mga blend mode (Normal, Multiply, Screen, Overlay...) upang kontrolin kung paano pinagsama ang layer na ito sa mga layer sa ibaba.</string>
+    <string name="nav_blending_info">Umikot sa mga blend mode (Normal, Multiply, Screen, Overlay...) upang kontrolin kung paano pinagsasama ang disenyo sa nasa likod nito.</string>
     <string name="nav_settings">Mga setting</string>
     <string name="nav_settings_info">I-configure ang handedness, AR scan mode, mga unit, at iba pang mga kagustuhan sa app.</string>
     <string name="nav_project">Proyekto</string>
@@ -50,7 +48,7 @@
     <string name="nav_load">Magkarga</string>
     <string name="nav_load_info">Buksan ang library ng proyekto upang mag-load ng isang naunang na-save na proyekto.</string>
     <string name="nav_export">I-export</string>
-    <string name="nav_export_info">Mag-export ng flat merged na imahe ng lahat ng nakikitang layer sa iyong photo gallery.</string>
+    <string name="nav_export_info">I-export ang disenyo bilang isang flat na imahe sa iyong photo gallery.</string>
     <string name="nav_help">Tulong</string>
     <string name="nav_help_info">I-tap ang anumang button habang aktibo ang Help para makita kung ano ang ginagawa nito.</string>
     <string name="nav_light">Liwanag</string>
@@ -66,17 +64,12 @@
     <string name="double_tap_hint">I-double tap para lumipat ng rotation axis.</string>
     <string name="ok_button">OK</string>
     <string name="generating">PAGBUBUO...</string>
-    <string name="stencil_hint">Pindutin muli upang magdagdag ng isang layer.</string>
     <string name="rename_hint">Palitan ang pangalan</string>
     <string name="edit_text_hint">I-edit ang text</string>
     <string name="copy_edits">Kopyahin ang Mga Pag-edit</string>
     <string name="paste_edits">Idikit ang Mga Pag-edit</string>
     <string name="generate_poster">Bumuo ng Poster</string>
     <string name="duplicate">Duplicate</string>
-    <string name="unlink_layer">I-unlink ang Layer</string>
-    <string name="link_layer">Link Layer</string>
-    <string name="hide_layer">Itago ang Layer</string>
-    <string name="show_layer">Ipakita ang Layer</string>
     <string name="flatten_all">Patag Lahat</string>
     <string name="delete">Tanggalin</string>
     <string name="new_project_name">Bagong Proyekto</string>
@@ -140,8 +133,9 @@
     <string name="lib_new_project">Bago</string>
     <string name="lib_import_project">Mag-import</string>
     <string name="lib_no_projects">Wala pang projects</string>
-    <string name="lib_no_projects_hint">I-tap ang Bago sa itaas para simulan ang iyong unang mural.\n\nDadalhin ka sa editor kung saan maaari kang:\n \u2022 Magdagdag ng likhang sining mula sa menu ng Disenyo\n \u2022 Lumipat sa AR mode para i-project sa totoong pader\n \u2022 Gamitin ang Overlay para palutangin ang iyong disenyo sa live na camera\n \u2022 Gamitin ang Mockup para i-preview ang iyong larawan\npapel</string>
+    <string name="lib_no_projects_hint">I-tap ang Bago sa ibaba para simulan ang iyong unang obra.\n\nDadalhin ka sa editor kung saan maaari kang:\n • Magdagdag ng likhang sining mula sa menu ng Disenyo\n • Lumipat sa AR mode para i-project sa totoong pader\n • Gamitin ang Overlay para palutangin ang iyong disenyo sa live na camera\n • Gamitin ang Mockup para i-preview sa larawan ng pader\n • Gamitin ang Bakas para ibakas ang iyong disenyo sa papel</string>
     <string name="lib_project_thumbnail">Thumbnail ng Proyekto</string>
+    <string name="lib_project_damaged">Sira: hindi mabuksan</string>
     <string name="lib_delete_project_desc">Tanggalin ang proyekto %1$s</string>
     <string name="settings_title">Mga setting</string>
     <string name="settings_general_section">Pangkalahatan</string>
@@ -210,8 +204,6 @@
     <string name="settings_denied">Tinanggihan</string>
     <string name="settings_open_app_settings">Buksan ang Mga Setting ng App</string>
     <string name="settings_copyright">GraffitiXR © 2025</string>
-    <string name="layers_title">Mga layer</string>
-    <string name="brush_size_title">Laki ng Brush</string>
     <string name="save_project_hint">Pangalan ng Proyekto</string>
     <string name="doodle_guide_desc">Gabay sa Pag-align ng Guhit-guhit</string>
     <string name="doodle_captured_desc">Nakuhang Guhit-guhit</string>
@@ -225,7 +217,6 @@
     <string name="doodle_show_features">Ipakita ang Mga Tampok</string>
     <string name="reset_button">I-reset</string>
     <string name="poster_title">GUMAWA NG POSTER</string>
-    <string name="poster_select_layers">Pumili ng mga layer na isasama:</string>
     <string name="poster_physical_size">Pisikal na Sukat (Lapad sa mm):</string>
     <string name="poster_generate_pdf">GENERATE PDF</string>
     <string name="scan_hint_recover">Ilipat ang device nang dahan-dahan upang mabawi ang pagsubaybay</string>
@@ -240,19 +231,20 @@
     <string name="help_mode_host">Mode Switcher: Lumipat sa pagitan ng mga mode ng app. Mga Tagubilin: I-tap para palawakin, pagkatapos ay piliin ang AR, Overlay, Mockup, o Lightbox.</string>
     <string name="help_ar">AR Mode: Ang disenyo ng proyekto sa isang pader gamit ang spatial mapping. Mga Tagubilin: I-scan ang kapaligiran hanggang sa matukoy ang pader, pagkatapos ay tapikin upang ilagay ang anchor.</string>
     <string name="help_overlay">Overlay Mode: Ipakita ang disenyo sa ibabaw ng live na camera nang walang spatial na pagsubaybay. Mga Tagubilin: Manu-manong sukat at ilipat ang disenyo upang magkasya sa iyong frame.</string>
-    <string name="help_mockup">Mockup Mode: I-preview ang disenyo sa isang static na larawan. Mga Tagubilin: Gamitin ang \'Wall\' upang magtakda ng larawan sa background, pagkatapos ay ayusin ang mga layer sa itaas.</string>
+    <string name="help_mockup">Mockup Mode: I-preview ang disenyo sa isang static na larawan. Mga Tagubilin: Gamitin ang \'Wall\' upang magtakda ng larawan sa background, pagkatapos ay ilagay ang disenyo sa ibabaw nito.</string>
     <string name="help_trace">Lightbox Mode: High-brightness tracing surface. Mga Tagubilin: Ilagay ang papel sa ibabaw ng screen at i-trace. Pindutin nang mabilis ang Volume Up, Down, Up, Down para lumabas.</string>
     <string name="help_create">Gumawa ng Anchor: Kuhanan ng larawan ang isang marka sa dingding upang i-lock ang projection. Mga Tagubilin: Ituro ang isang natatanging texture at i-tap. Susubaybayan ng app ang markang ito.</string>
-    <string name="help_add_img">Mag-import ng Larawan: Magdagdag ng sketch o reference na larawan. Mga Tagubilin: Pumili ng larawan mula sa iyong gallery. Lilitaw ito bilang isang bagong layer ng disenyo.</string>
+    <string name="help_add_img">Mag-import ng Larawan: Magdagdag ng sketch o reference na larawan. Mga Tagubilin: Pumili ng larawan mula sa iyong gallery. Ito ang magiging disenyo.</string>
     <string name="help_wall">Baguhin ang Wall: Itakda ang background para sa Mockup mode. Mga Tagubilin: Pumili ng larawan ng pisikal na pader na plano mong lagyan ng pintura.</string>
-    <string name="help_project_host">Pamamahala ng Proyekto: I-save, i-load, at i-export ang trabaho. Mga Tagubilin: I-tap para ma-access ang mga administratibong gawain para sa iyong mural.</string>
-    <string name="help_new">Bagong Proyekto: Magsimula ng bagong mural. Mga Tagubilin: I-tap para i-reset. Babala: Nililinis nito ang lahat ng kasalukuyang gawain. I-save muna!</string>
-    <string name="help_save">I-save ang Proyekto: Mag-imbak ng mural at AR na mapa. Mga Tagubilin: Maglagay ng pangalan ng proyekto at i-tap ang I-save upang mapanatili ang iyong pag-unlad.</string>
-    <string name="help_load">Project Library: I-access ang mga naka-save na mural. Mga Tagubilin: Mag-browse sa library upang ipagpatuloy ang trabaho o mag-import ng mga nakabahaging file ng proyekto.</string>
-    <string name="help_export">I-export ang Larawan: I-save ang high-res na snapshot. Mga Tagubilin: Nire-render ang lahat ng nakikitang layer sa isang PNG sa iyong photo gallery.</string>
+    <string name="help_project_host">Pamamahala ng Proyekto: I-save, i-load, at i-export ang trabaho. Mga Tagubilin: I-tap para ma-access ang mga administratibong gawain para sa iyong proyekto.</string>
+    <string name="help_new">Bagong Proyekto: Magsimula ng bagong obra. Mga Tagubilin: I-tap para i-reset. Babala: Nililinis nito ang lahat ng kasalukuyang gawain. I-save muna!</string>
+    <string name="help_save">I-save ang Proyekto: Iimbak ang obra at ang AR na mapa nito. Mga Tagubilin: Maglagay ng pangalan ng proyekto at i-tap ang I-save upang mapanatili ang iyong pag-unlad.</string>
+    <string name="help_load">Project Library: I-access ang mga naka-save na proyekto. Mga Tagubilin: Mag-browse sa library upang ipagpatuloy ang trabaho o mag-import ng mga nakabahaging file ng proyekto.</string>
+    <string name="help_export">I-export ang Larawan: I-save ang high-res na snapshot. Mga Tagubilin: Nire-render ang disenyo sa isang PNG sa iyong photo gallery.</string>
     <string name="help_settings">Mga Setting ng App: I-configure ang mga kagustuhan. Mga Tagubilin: Buksan para isaayos ang handedness, mga unit, at mga parameter ng pag-scan.</string>
     <string name="help_light">Flashlight: I-toggle ang LED ng device. Mga Tagubilin: Gamitin ito upang maipaliwanag ang madilim na pader para sa mas mahusay na pagsubaybay sa AR.</string>
     <string name="help_lock_trace">I-freeze: ni-lock ang buong touchscreen para hindi maigalaw ang disenyo ng tracing paper — hindi tulad ng Lock, ino-block din nito ang pag-scroll at pagtap. Para lumabas, pindutin nang mabilis ang Volume Up, Down, Up, Down.</string>
+    <string name="help_lock_ar">I-freeze: nila-lock ang buong touchscreen habang nagpipinta ka, para hindi magalaw ng kamay, manggas o bulsa ang disenyo o makapagpalit ng mode. Kusa ring nala-lock ang screen kapag natatakpan ito (nasa bulsa, nakataob). Para lumabas, pindutin nang mabilis ang Volume Up, Down, Up, Down.</string>
     <string name="unit_feet">ft</string>
     <string name="unit_centimeters">cm</string>
     <string name="unit_meters">m</string>
@@ -301,12 +293,11 @@
     <string name="settings_reset_tutorials_label">I-reset ang mga Tutorial</string>
     <string name="settings_reset_tutorials_value">Ipakita muli ang mga unang gabay</string>
     <string name="settings_scan_mode_voxel_hash">Voxel Hash</string>
-    <string name="settings_mural_method_label">Mural Engine</string>
     <string name="settings_scan_mode_surface_mesh">Surface Mesh</string>
     <string-array name="onboarding_trace">
         <item>Ito ang Bakas mode.</item>
-        <item>Pindutin ang \'Bukas\' para idagdag ang iyong unang layer. Kapag nailagay na ito, pisilin at i-drag sa canvas para i-resize at ilagay ito.</item>
-        <item>Kapag nasa tamang lugar at anyo na ang mga ito, pindutin ang Freeze button para gawing light box ang iyong telepono para sa pagbabakas sa papel.</item>
+        <item>Pindutin ang \'Bukas\' para idagdag ang iyong disenyo. Kapag nailagay na ito, pisilin at i-drag sa canvas para i-resize at ilagay ito.</item>
+        <item>Kapag nasa tamang lugar at anyo na ito, pindutin ang Freeze button para gawing light box ang iyong telepono para sa pagbabakas sa papel.</item>
         <item>Inirerekomenda naming gamitin ang Bakas mode o Mockup mode para sa pag-edit.</item>
         <item>Sa ganoong paraan, handa na ang iyong mga imahe at makakapag-focus ang iyong telepono sa augmented reality kapag pinindot mo ang AR button.</item>
     </string-array>
@@ -314,12 +305,12 @@
         <item>AR Projection — inipoprojekta ang iyong disenyo sa isang tunay na pader gamit ang depth sensor at spatial tracking ng telepono.</item>
         <item>Itutok ang telepono sa pader at dahan-dahang gumalaw paikot. Lalabas ang makukulay na hugis habang pinepeke-mapa ng engine ang ibabaw. Maghintay hanggang matakpan ang buong lugar ng pader.</item>
         <item>Pindutin lang ang screen. Kukunan ng app ang larawan ng pader, kukunin ang mga tracking feature, at agad na iko-lock ang anchor.</item>
-        <item>Pindutin ang \'Bukas\' para magdagdag ng design layer — ito ay ipoprojekta sa pader gamit ang anchor na kakalagay mo lang.</item>
+        <item>Pindutin ang \'Bukas\' para idagdag ang iyong disenyo — ito ay ipoprojekta sa pader gamit ang anchor na kakalagay mo lang.</item>
         <item>Tip — ang mga blangkong puting pader, makinis na semento, at solidong-kulay na ibabaw ay hindi matra-track. Ituon ang iyong anchor point sa graffiti, magaspang na plaster, o anumang natatanging marka.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Live Overlay — lumulutang ang iyong disenyo sa ibabaw ng live camera feed, walang kailangang i-scan na ibabaw.</item>
-        <item>Pindutin ang \'Bukas\' para magdagdag ng layer — pumili ng larawan at lalabas ito rito, lumulutang sa ibabaw ng live camera feed.</item>
+        <item>Pindutin ang \'Bukas\' para idagdag ang iyong disenyo — pumili ng larawan at lalabas ito rito, lumulutang sa ibabaw ng live camera feed.</item>
         <item>Pisilin para i-resize, i-drag para muling ilagay. Nananatiling nakapirmi sa iyong screen ang overlay — umatras para makita kung paano ito bumagay sa pader.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
@@ -328,18 +319,15 @@
         <item>Gumagana gaya ng dati ang Bakas, Mockup at Overlay. I-tap para isara.</item>
     </string-array>
     <string-array name="onboarding_mockup">
-        <item>Photo Mockup — i-preview ang iyong disenyo sa isang larawan bago ka pa man humawak ng brush.</item>
+        <item>Photo Mockup — i-preview ang iyong disenyo sa isang larawan bago ka pa man humawak ng spray can.</item>
         <item>Pindutin ang \'Pader\' para pumili o kumuha ng larawan ng iyong ibabaw. Gawin muna ito!</item>
-        <item>Pindutin ang \'Bukas\' para magdagdag ng layer sa ibabaw ng larawan ng pader. Pisilin at i-drag para i-resize at i-position ito.</item>
+        <item>Pindutin ang \'Bukas\' para ilagay ang iyong disenyo sa ibabaw ng larawan ng pader. Pisilin at i-drag para i-resize at i-position ito.</item>
     </string-array>
     <string-array name="onboarding_design">
         <item>Ito ang Disenyo — ang iyong workspace. Anumang gawin mo rito ay dadalhin sa bawat ibang mode.</item>
-        <item>Pindutin ang \'Bukas\' para idagdag ang iyong unang layer — pumili ng larawan mula sa iyong gallery at ito ay lalapag dito bilang iyong obra.</item>
-        <item>Pindutin ang isang layer para buksan ang mga tool nito — nakagrupo sa mga folder na Paint, Retouch, Adjust, at Effects. Pisilin at i-drag sa canvas para i-resize at ilagay ito.</item>
+        <item>Pindutin ang \'Bukas\' para idagdag ang iyong disenyo — pumili ng larawan mula sa iyong gallery at ito ay lalapag dito bilang iyong obra.</item>
+        <item>Gamitin ang mga tool ng I-edit para ayusin, baliktarin, lagyan ng balangkas, o ihiwalay ito. Pisilin at i-drag sa canvas para i-resize at ilagay ito.</item>
         <item>Kapag tama na ang itsura nito, piliin kung paano ito gagamitin: \'Bakas\' para gawing light box ang iyong telepono, \'Mockup\' para i-preview sa isang larawan, o \'AR\' para i-projekta ito sa isang pader.</item>
-    </string-array>
-    <string-array name="onboarding_design_layers">
-        <item>Bukas — nag-i-import ng larawan mula sa iyong gallery; ito ay lalapag bilang bagong layer.</item>
     </string-array>
     <string name="nav_measure">Sukatin</string>
     <string name="nav_measure_info">Sukatin ang totoong pader: i-tap ang isang gilid, pagkatapos ang kabila, sa pader kung nasaan ang disenyo. Ise-save ang lapad sa proyekto — sinukat, hindi hinulaan.</string>
@@ -440,10 +428,10 @@
     <string name="doodle_cd_detected_marks">Mga natukoy na marka</string>
     <string name="doodle_cd_confirm">Kumpirmahin</string>
     <string name="doodle_cd_unwarp_base">Nakuhang larawan ng pader na may mga hawakan sa sulok</string>
-    <string name="guidance_open_via_design_overlay">I-tap ang \'Disenyo\' sa rail, pagkatapos ang \'Bukas\', para magdagdag ng layer — pumili ng larawan at lalabas ito rito, lumulutang sa ibabaw ng live na tanaw ng camera.</string>
-    <string name="guidance_open_via_design_mockup">I-tap ang \'Disenyo\' sa rail, pagkatapos ang \'Bukas\', para magdagdag ng layer sa ibabaw ng larawan ng pader. I-pinch at i-drag para itakda ang laki at posisyon nito.</string>
-    <string name="guidance_open_via_design_trace">I-tap ang \'Disenyo\' sa rail, pagkatapos ang \'Bukas\', para idagdag ang una mong layer. Kapag nailagay na, mag-pinch at mag-drag sa canvas para itakda ang laki at lugar nito.</string>
-    <string name="guidance_open_via_design_ar">I-tap ang \'Disenyo\' sa rail, pagkatapos ang \'Bukas\', para magdagdag ng design layer — ipo-project ito sa pader gamit ang anchor na katatakda mo lang.</string>
+    <string name="guidance_open_via_design_overlay">I-tap ang \'Disenyo\' sa rail, pagkatapos ang \'Bukas\', para idagdag ang iyong disenyo — pumili ng larawan at lalabas ito rito, lumulutang sa ibabaw ng live na tanaw ng camera.</string>
+    <string name="guidance_open_via_design_mockup">I-tap ang \'Disenyo\' sa rail, pagkatapos ang \'Bukas\', para ilagay ang iyong disenyo sa ibabaw ng larawan ng pader. I-pinch at i-drag para itakda ang laki at posisyon nito.</string>
+    <string name="guidance_open_via_design_trace">I-tap ang \'Disenyo\' sa rail, pagkatapos ang \'Bukas\', para idagdag ang iyong disenyo. Kapag nailagay na, mag-pinch at mag-drag sa canvas para itakda ang laki at lugar nito.</string>
+    <string name="guidance_open_via_design_ar">I-tap ang \'Disenyo\' sa rail, pagkatapos ang \'Bukas\', para idagdag ang iyong disenyo — ipo-project ito sa pader gamit ang anchor na katatakda mo lang.</string>
     <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
     <string name="ar_feedback_guest_edit_dropped">Hindi maibabahagi sa host ang pagbabagong iyon — mananatili ito sa device na ito</string>
     <string name="ar_feedback_backend_resolving">Tinutukoy pa ang AR backend — subukang mag-host ulit sa ilang saglit</string>
@@ -453,6 +441,7 @@
     <string name="ar_feedback_doodle_not_ready">Hindi pa handa ang Guhit-guhit — panatilihin ito sa view at subukan muli ang \"I-host\"</string>
     <string name="ar_feedback_package_failed">Hindi ma-package ang proyektong ito para ibahagi — subukan munang i-save ito</string>
     <string name="ar_feedback_host_failed">Hindi masimulan ang pagbabahagi: %1$s</string>
+    <string name="ar_feedback_host_too_large">Masyadong malaki ang proyektong ito para ibahagi sa Link (%1$d MB; ang limitasyon ay %2$d MB). I-export ito para maibahagi.</string>
     <string name="ar_feedback_join_load_failed">Hindi ma-load ang proyekto ng host — natapos ang session.</string>
     <string name="ar_feedback_join_no_geometry">Hindi nagbigay ang host ng geometry na maaaring pagtugmaan ng ARCore.</string>
     <string name="ar_feedback_join_failed">Hindi nakasali: %1$s</string>
@@ -502,6 +491,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">Hindi ma-save ang larawan ng malinis na pader. Kunan ulit.</string>
+    <string name="ar_feedback_progress_save_failed">Hindi ma-save ang mapa ng pader at ang progreso ng pagpinta. Nananatili ang mga ito sa session na ito. Magbakante ng espasyo, saka i-save ulit.</string>
     <string name="ar_feedback_clean_wall_register_failed">Hindi tugma ang larawang iyon ng malinis na pader sa pader na ito. Kunan ulit mula sa lugar na halos kung saan ka tatayo.</string>
 
     <!-- The CV view legend: the name of each way of looking. -->

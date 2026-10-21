@@ -55,7 +55,7 @@ Full-screen bottom sheet over the main viewport. Lists saved `.gxr` projects; su
 ### Settings (Flyout)
 *   Handedness (left/right rail docking).
 *   Diagnostic overlay, feature points, plane grids, points perception toggles.
-*   Drift correction, self-grow, and feature-map relocalization diagnostics toggles (all off by default).
+*   The diagnostic overlay (shown in AR when it is on) carries the drift correction, self-grow and wall feature map switches. All three are on by default, and a choice is remembered.
 *   Crash reporting consent (opt-in, off by default).
 *   Version info, and a link that opens the GitHub releases page in the browser (the app itself never checks for updates).
 

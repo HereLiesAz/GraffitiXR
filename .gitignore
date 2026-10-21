@@ -52,7 +52,6 @@ google-services.json
 # here; these patterns are for genuinely transient/locally-fetched deps only.
 core/nativebridge/libs/opencv/
 core/nativebridge/libs/litert/
-core/nativebridge/libs/mlkit-subject-segmentation/
 core/nativebridge/libs/*.aar
 core/nativebridge/libs/litert_npu_runtime_libraries/
 

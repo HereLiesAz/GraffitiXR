@@ -53,9 +53,10 @@ import com.hereliesaz.graffitixr.design.theme.HotPink
  * @param hasCleanWall / [onCleanWallPhoto] the bare-wall photo, taken with the round shutter at the
  *   bottom of the screen before the Doodle grid is painted. [hasCleanWall] fills the shutter to show
  *   one is already kept (pressing it again retakes it).
- *   The card's Cancel only puts the card and shutter away: its two steps are instructions, not
- *   modes, so tapping the painted marks works the whole time, with or without the card. Doodle
- *   capture itself is left from the rail item or Back.
+ *   No card: each instruction sits right above the thing it explains — "tap your doodle grid" over
+ *   the middle of the screen (the tap itself is handled by MainScreen), "if the wall is blank, take
+ *   a picture" over the shutter. Tapping the painted marks works the whole time.
+ * @param onCancel leaves Doodle capture entirely (same as re-tapping the rail item or Back).
  * @param latestCapture the photo and mask as they stand when Confirm is tapped, after every queued
  *   mark erase has been applied (`ArViewModel.awaitLatestDoodleCapture`). Erases are asynchronous, so
  *   the composition's own bitmaps can predate the last tap; Confirm uses this instead. The default
@@ -69,6 +70,7 @@ fun DoodleCreationUi(
     isWaitingForTap: Boolean,
     hasCleanWall: Boolean = false,
     onCleanWallPhoto: (() -> Unit)? = null,
+    onCancel: () -> Unit = {},
     strings: AppStrings,
     onConfirmDoodle: (bitmap: Bitmap?, mask: Bitmap?) -> Unit,
     onRetake: () -> Unit,
@@ -116,29 +118,38 @@ fun DoodleCreationUi(
             }
 
             else -> {
-                // Re-shown each time Doodle capture is armed again.
-                var cardDismissed by remember(isWaitingForTap) { mutableStateOf(false) }
-                if (isWaitingForTap && !cardDismissed) {
+                if (isWaitingForTap) {
                     Box(Modifier.fillMaxSize()) {
-                        DoodleInstructionCard(
-                            isWaitingForTap = true,
-                            captureStep = CaptureStep.NONE,
-                            strings = strings,
-                            onCancel = { cardDismissed = true },
-                            onNext = null,
-                            // Top of screen so it clears the bottom adjustment + undo/redo controls.
+                        // Over the middle: the grid is what gets tapped.
+                        DoodleHint(
+                            text = stringResource(DesignR.string.doodle_tap_grid_hint),
                             modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = 32.dp)
+                                .align(Alignment.Center)
+                                .offset(y = (-96).dp)
                         )
-                        if (onCleanWallPhoto != null) {
-                            ShutterButton(
-                                saved = hasCleanWall,
-                                onClick = onCleanWallPhoto,
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .navigationBarsPadding()
-                                    .padding(bottom = 32.dp)
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .navigationBarsPadding()
+                                .padding(bottom = 32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            if (onCleanWallPhoto != null) {
+                                DoodleHint(
+                                    text = stringResource(
+                                        if (hasCleanWall) DesignR.string.doodle_blank_wall_saved_hint
+                                        else DesignR.string.doodle_blank_wall_hint
+                                    )
+                                )
+                                Spacer(Modifier.height(12.dp))
+                                ShutterButton(saved = hasCleanWall, onClick = onCleanWallPhoto)
+                                Spacer(Modifier.height(16.dp))
+                            }
+                            AzButton(
+                                text = strings.common.cancel.uppercase(),
+                                onClick = onCancel,
+                                color = HotPink,
+                                shape = AzButtonShape.RECTANGLE
                             )
                         }
                     }
@@ -217,6 +228,21 @@ private fun DoodleInstructionCard(
             }
         }
     }
+}
+
+/** A one-line instruction pill, placed directly above the control it explains. */
+@Composable
+private fun DoodleHint(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        color = Color.White,
+        style = MaterialTheme.typography.labelLarge,
+        textAlign = TextAlign.Center,
+        modifier = modifier
+            .padding(horizontal = 24.dp)
+            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(24.dp))
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    )
 }
 
 /**

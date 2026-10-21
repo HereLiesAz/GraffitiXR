@@ -8,6 +8,7 @@
 #include <cstring>
 #include "MobileGS.h"
 #include "KeypointGrid.h"
+#include "DesignFilters.h"
 #include "MobileGSTestPeer.h"
 
 namespace {
@@ -669,4 +670,41 @@ TEST(MobileGSSensorTurn, ALostLookUpRelocksThroughTheTurnAndTheLockTeachesTheNor
     EXPECT_FALSE(g.getWallNormalEnu(n));
     g.setEvalSyncReloc(false, 1);
     g.destroy();
+}
+
+// C10: the per-feature confirmation counts ride with the paint grid, applied to the same design on
+// reload (artwork rows at once, each filter's rows once built) and dropped for another design.
+TEST(MobileGSTeleological, ConfirmationCountsSurviveAReload) {
+    const cv::Mat design = makeWall(320, 256);
+    MobileGS g;
+    g.setArtworkDoodle(design, nullptr, 0, 0, 0, nullptr, nullptr);
+    g.awaitFilterTargets();
+    const size_t nArt = MobileGSTestPeer::corroborated(g).size();
+    ASSERT_GT(nArt, 4u);
+    int f = -1;
+    for (int i = 0; i < designfilters::kCount && f < 0; ++i)
+        if (MobileGSTestPeer::targetSetRows(g, i) > 2) f = i;
+    ASSERT_GE(f, 0);
+    std::vector<uint8_t> art(nArt, 0), prom(nArt, 0);
+    art[0] = 3; art[2] = 1; prom[0] = 1;
+    MobileGSTestPeer::setCorroboratedOnly(g, art, prom);
+    std::vector<uint8_t> set(MobileGSTestPeer::targetCorrob(g, f).size(), 0);
+    set[1] = 2;
+    MobileGSTestPeer::setTargetCorrob(g, f, set);
+    const std::vector<uint8_t> blob = g.exportPaintGrid();
+
+    MobileGS h;                                     // restore before the design registers
+    h.restorePaintGrid(blob);
+    h.setArtworkDoodle(design, nullptr, 0, 0, 0, nullptr, nullptr);
+    h.awaitFilterTargets();
+    EXPECT_EQ(art, MobileGSTestPeer::corroborated(h));
+    EXPECT_EQ(prom, MobileGSTestPeer::promoted(h));
+    EXPECT_EQ(set, MobileGSTestPeer::targetCorrob(h, f));
+
+    MobileGS k;                                     // another design: nothing carries over
+    k.restorePaintGrid(blob);
+    k.setArtworkDoodle(makeWall(320, 256, 0x77), nullptr, 0, 0, 0, nullptr, nullptr);
+    k.awaitFilterTargets();
+    for (uint8_t c : MobileGSTestPeer::corroborated(k)) EXPECT_EQ(0, c);
+    g.destroy(); h.destroy(); k.destroy();
 }

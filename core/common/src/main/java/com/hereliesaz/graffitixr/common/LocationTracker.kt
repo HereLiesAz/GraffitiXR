@@ -75,10 +75,40 @@ class LocationTracker(private val context: Context) {
         }
     }
 
+    /** A [requestSingleFix] that waits for permission (see [pendingUpdate]). */
+    @Volatile private var pendingSingle: ((Location) -> Unit)? = null
+    private var singleFixToken: com.google.android.gms.tasks.CancellationTokenSource? = null
+
+    /**
+     * One location fix at balanced-power accuracy (cell and Wi-Fi first, GPS only if it must), for
+     * the capture about to be geotagged: no subscription stays open. Without permission it waits,
+     * like [startLocationUpdates], and runs the moment permission is granted.
+     */
+    @SuppressLint("MissingPermission")
+    fun requestSingleFix(onFix: (Location) -> Unit) {
+        if (!hasPermissions()) {
+            pendingSingle = onFix
+            synchronized(awaitingPermission) { awaitingPermission.add(this) }
+            return
+        }
+        pendingSingle = null
+        singleFixToken?.cancel()
+        val token = com.google.android.gms.tasks.CancellationTokenSource().also { singleFixToken = it }
+        try {
+            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, token.token)
+                .addOnSuccessListener { location -> if (location != null) onFix(location) }
+        } catch (e: SecurityException) {
+            Log.e("LocationTracker", "SecurityException requesting a location fix", e)
+        }
+    }
+
     /**
      * Stops receiving location updates.
      */
     fun stopLocationUpdates() {
+        pendingSingle = null
+        singleFixToken?.cancel()
+        singleFixToken = null
         pendingUpdate = null
         synchronized(awaitingPermission) { awaitingPermission.remove(this) }
         locationCallback?.let {
@@ -94,8 +124,9 @@ class LocationTracker(private val context: Context) {
      */
     /** Starts the updates a permission-less [startLocationUpdates] deferred, if permission is now held. */
     private fun retryPendingStart() {
-        val pending = pendingUpdate ?: return
-        if (hasPermissions()) startLocationUpdates(pending)
+        if (!hasPermissions()) return
+        pendingSingle?.let { requestSingleFix(it) }
+        pendingUpdate?.let { startLocationUpdates(it) }
     }
 
     fun hasPermissions(): Boolean {

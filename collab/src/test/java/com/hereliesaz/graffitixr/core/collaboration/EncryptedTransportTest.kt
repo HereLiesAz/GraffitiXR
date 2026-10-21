@@ -32,7 +32,6 @@ class EncryptedTransportTest {
             ProjectSnapshot(
                 doodleBytes = ByteArray(64) { it.toByte() },
                 projectBytes = project,
-                layerCount = 0,
                 spatialFrame = testSpatialFrame(),
             )
         },

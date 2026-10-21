@@ -1,6 +1,6 @@
 # Privacybeleid voor GraffitiXR
 
-**Laatst bijgewerkt:** [Huidige datum]
+**Laatst bijgewerkt:** 2026-10-19
 
 HereLiesAZ heeft de GraffitiXR-app gebouwd als een source-available app (zie de LICENSE en docs/LICENSING.md van de repository voor de voorwaarden). Deze DIENST wordt kosteloos door HereLiesAZ geleverd en is bedoeld voor gebruik zoals deze is.
 
@@ -14,7 +14,7 @@ Voor een betere ervaring tijdens het gebruik van onze Service kunnen we van u ve
 
 *   **Cameragegevens:** De app heeft toegang tot de camera van uw apparaat nodig om de Augmented Reality (AR)-weergave en de overlay-modus weer te geven en om afbeeldingen vast te leggen voor projectdoelen. Cameragegevens worden lokaal op uw apparaat verwerkt en worden niet naar onze servers verzonden, tenzij u er expliciet voor kiest om een ​​projectbestand te delen.
 *   **Opslag / Foto's:** De app vraagt geen opslagrechten. Afbeeldingen die u toevoegt komen via de foto- of bestandskiezer van het Android-systeem, die de app alleen toegang geven tot het bestand dat u kiest. Projecten worden opgeslagen in de privéopslag van de app en geëxporteerde afbeeldingen in de fotogalerij van uw apparaat.
-*   **Locatiegegevens (optioneel):** De app vraagt alleen om locatietoestemming wanneer u begint met het vastleggen van een AR-doel. Als u die geeft, slaat het vastlegrecord van dat doel op waar het is vastgelegd (breedtegraad, lengtegraad, hoogte en nauwkeurigheid). Dit wordt lokaal in het projectbestand opgeslagen en verlaat uw apparaat alleen als u dat projectbestand zelf deelt of exporteert.
+*   **Locatiegegevens (optioneel):** De app vraagt alleen om locatietoestemming wanneer u begint met het vastleggen van een AR-doel. Als u die geeft, slaat het vastlegrecord van dat doel op waar het is vastgelegd (breedtegraad, lengtegraad, hoogte en nauwkeurigheid). Dit wordt lokaal in het projectbestand opgeslagen en verlaat uw apparaat alleen als u dat projectbestand zelf deelt of exporteert. Link (een sessie delen met een tweede apparaat) verstuurt ze nooit: het andere apparaat ontvangt het project zonder enige locatie.
 
 ## Crashrapporten (Opt-In)
 
@@ -40,7 +40,9 @@ We kunnen om de volgende redenen externe bedrijven en personen in dienst nemen:
 *   Om Servicegerelateerde diensten uit te voeren; of
 *   Om ons te helpen analyseren hoe onze Dienst wordt gebruikt.
 
-We gebruiken **Google ML Kit** voor onderwerpsegmentatie (achtergrondverwijdering). Deze verwerking gebeurt lokaal op uw apparaat.
+Onderwerpisolatie (achtergrondverwijdering) gebruikt **U²-Net**, een model dat in de app is ingebouwd, volledig op uw apparaat. Er wordt niets voor gedownload en geen enkele afbeelding verlaat het apparaat.
+
+Op apparaten die het ondersteunen, draait de AR-modus op **Google Play-services voor AR (ARCore)**, geleverd door Google LLC en vallend onder het [privacybeleid van Google](https://policies.google.com/privacy). ARCore verwerkt camerabeelden en gegevens van bewegingssensoren om het apparaat te volgen; zie Google's [privacyvereisten voor ARCore](https://developers.google.com/ar/develop/privacy-requirements) voor wat het verzamelt. Op apparaten zonder ARCore gebruikt de app zijn eigen tracking en komt ARCore er nooit aan te pas.
 
 ## Updates
 

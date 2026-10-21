@@ -147,6 +147,24 @@ TEST(MobileGSTeleological, TheInlierSpreadRidesWithThePose) {
     EXPECT_LT(out[35], 0.f) << "a cleared doodle's spread must read as not measured";
 }
 
+// A nudge within the search scale keeps the confirmations that still land; a scale-up keeps only
+// those near the design's centre, which barely move.
+TEST(MobileGSTeleological, ADesignNudgeKeepsTheConfirmationsThatStillLand) {
+    MobileGS g;
+    float place[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,1,1};
+    g.setDesignPlacement(place, 0.5f, 0.4f);
+    // Centre, and the right edge of a 100x100 composite.
+    MobileGSTestPeer::setArtworkPoints(g, {{50.f, 50.f}, {100.f, 50.f}}, 100, 100);
+    MobileGSTestPeer::setCorroborated(g, {2, 2});
+    place[12] += 0.01f;                                     // 1 cm: under kRho of the extent (~2.2 cm)
+    g.setDesignPlacement(place, 0.5f, 0.4f);
+    EXPECT_EQ((std::vector<uint8_t>{2, 2}), MobileGSTestPeer::corroborated(g));
+    EXPECT_EQ((std::vector<uint8_t>{1, 1}), MobileGSTestPeer::promoted(g));
+    g.setDesignPlacement(place, 0.55f, 0.44f);              // 10% larger: the edge moves 5 cm
+    EXPECT_EQ((std::vector<uint8_t>{2, 0}), MobileGSTestPeer::corroborated(g));
+    EXPECT_EQ((std::vector<uint8_t>{1, 0}), MobileGSTestPeer::promoted(g));
+}
+
 // Moving the design invalidates what was confirmed under the old placement; re-pushing the same
 // placement (a load, a repartition) must not.
 TEST(MobileGSTeleological, ADesignMoveResetsCorroborationButARepushDoesNot) {

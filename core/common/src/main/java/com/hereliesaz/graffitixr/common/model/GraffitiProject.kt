@@ -117,6 +117,13 @@ data class GraffitiProject(
     val created: Long = System.currentTimeMillis(),
     val lastModified: Long = System.currentTimeMillis(),
 
+    /**
+     * A library placeholder for a project whose project.json could not be read: listed so it is not
+     * lost from sight, never opened, never written (its files stay exactly as they are). Not saved.
+     */
+    @kotlinx.serialization.Transient
+    val isDamaged: Boolean = false,
+
     @Serializable(with = UriSerializer::class)
     val backgroundImageUri: Uri? = null,
 
@@ -132,6 +139,14 @@ data class GraffitiProject(
     @SerialName("targetImageUris")
 
     val doodleImageUris: List<@Serializable(with = UriSerializer::class) Uri> = emptyList(),
+
+    /**
+     * The ARCore doodle's capture photo, one of [doodleImageUris]: the picture the paint grid takes
+     * bare-wall colours from, with [doodleIntrinsics]. Standalone captures append to the same list,
+     * so the last entry is not necessarily this one. Kept through pruning; bound to [doodle].
+     */
+    @Serializable(with = UriSerializer::class)
+    val arCoreCaptureImageUri: Uri? = null,
 
     /**
      * The clean-wall photo: the bare wall BEFORE it was marked or painted (pass B compares the live
@@ -370,6 +385,16 @@ data class GraffitiProject(
     // Area-progress state (painted grid cells + learned paint colours), Base64 of the native blob.
     // Tied to the doodle like paintMarks: a new target capture clears it.
     val paintGrid: String? = null,
+    // The Doodle's grown rows: what self-grow appended behind the captured marks, in the doodle frame.
+    // Restored after the Doodle so a return visit keeps what it learned instead of reverting to marks
+    // that may be painted over by now. Tied to the doodle like paintMarks: a new capture clears it.
+    val grownDoodle: WallFeatureMap? = null,
+    // The same three for the standalone (no-ARCore) backend, in the SphereSLAM page frame its MobileGS
+    // seed lives in: paint marks, area progress (Base64 grid blob) and grown Doodle rows. Saved under
+    // the same map_from_doodle guard as sphereSlamWallFeatureMap; a new standalone capture clears them.
+    val sphereSlamPaintMarks: WallFeatureMap? = null,
+    val sphereSlamPaintGrid: String? = null,
+    val sphereSlamGrownDoodle: WallFeatureMap? = null,
 
     // Per-host AzNavRail expansion state (host id -> expanded), so the rail restores exactly as the
     // user left it on reopen. Defaulted for back-compat with projects saved before this field

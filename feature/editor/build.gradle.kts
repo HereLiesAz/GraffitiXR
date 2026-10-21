@@ -49,10 +49,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
 
-    implementation(libs.kotlinx.coroutines.play.services)
-
-    // Subject segmentation, for the isolation effect (SubjectIsolator).
-    implementation(libs.mlkit.subject.segmentation)
+    // Subject isolation (SubjectIsolator) runs a bundled model (assets/u2netp.onnx) through OpenCV's
+    // DNN module, which arrives with core:common's OpenCV; no Play services model download.
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

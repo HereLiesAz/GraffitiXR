@@ -196,8 +196,8 @@ permissiveness is *why* the ecosystem exploded and why other editors run the sam
 - **Contributions / CLA.** Outside contributions under AGPL/PolyForm are owned by their authors; to keep
   dual-licensing/acquisition open you need a CLA (or don't accept outside contributions to parts you might
   commercialize).
-- **Third-party dependencies keep their own licenses** and can't be relicensed: OpenCV (Apache-2.0), ML Kit
-  segmentation — and note a **GPL-2.0** component (`ittnotify`) bundled inside OpenCV, which is a separate
+- **Third-party dependencies keep their own licenses** and can't be relicensed: OpenCV (Apache-2.0), the U²-Net
+  segmentation weights (Apache-2.0) — and note a **GPL-2.0** component (`ittnotify`) bundled inside OpenCV, which is a separate
   compliance item worth checking regardless of the first-party license plan.
 - **PolyForm is not OSI-"open source."** Neither is the app as a whole once the NC engine is inside it.
   Describe it accurately as *source-available; core PolyForm Noncommercial, extension layer MIT* — not

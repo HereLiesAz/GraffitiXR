@@ -1,6 +1,6 @@
 # Política de Privacidade do GraffitiXR
 
-**Última Atualização:** 2026-09-04
+**Última Atualização:** 2026-10-19
 
 A HereLiesAZ criou o aplicativo GraffitiXR como um aplicativo de código disponível (source-available) (consulte o LICENSE do repositório e docs/LICENSING.md para os termos). Este SERVIÇO é fornecido pela HereLiesAZ sem nenhum custo e destina-se a ser usado no estado em que se encontra.
 
@@ -14,7 +14,7 @@ Para uma melhor experiência, ao usar nosso Serviço, podemos exigir que você n
 
 *   **Dados da Câmera:** O aplicativo requer acesso à câmera do seu dispositivo para exibir a visualização de Realidade Aumentada (AR), o modo de Sobreposição e para capturar imagens para alvos do projeto. Os dados da câmera são processados localmente em seu dispositivo e não são transmitidos aos nossos servidores, a menos que você escolha explicitamente compartilhar um arquivo de projeto.
 *   **Armazenamento / Fotos:** O aplicativo não solicita nenhuma permissão de armazenamento. As imagens que você adiciona chegam pelo seletor de fotos ou de arquivos do sistema Android, que dão ao aplicativo acesso apenas ao arquivo que você escolhe. Os projetos são salvos no armazenamento privado do aplicativo, e as imagens exportadas são salvas na galeria de fotos do seu dispositivo.
-*   **Dados de Localização (Opcional):** O aplicativo só pede a permissão de localização quando você começa a capturar um alvo de AR. Se você a conceder, o registro de captura desse alvo armazena onde ele foi capturado (latitude, longitude, altitude e precisão). Ele é salvo localmente no arquivo do projeto e só sai do seu dispositivo se você mesmo compartilhar ou exportar esse arquivo de projeto.
+*   **Dados de Localização (Opcional):** O aplicativo só pede a permissão de localização quando você começa a capturar um alvo de AR. Se você a conceder, o registro de captura desse alvo armazena onde ele foi capturado (latitude, longitude, altitude e precisão). Ele é salvo localmente no arquivo do projeto e só sai do seu dispositivo se você mesmo compartilhar ou exportar esse arquivo de projeto. O Link (compartilhar uma sessão com um segundo dispositivo) nunca a envia: o outro dispositivo recebe o projeto sem nenhuma localização.
 
 ## Relatórios de Falha (Opt-In)
 
@@ -40,7 +40,9 @@ Podemos empregar empresas de terceiros e indivíduos pelos seguintes motivos:
 *   Para realizar serviços relacionados ao Serviço; ou
 *   Para nos auxiliar na análise de como nosso Serviço é usado.
 
-Nós usamos o **Google ML Kit** para segmentação de objetos (remoção de fundo). Esse processamento ocorre localmente em seu dispositivo.
+O isolamento do sujeito (remoção de fundo) usa o **U²-Net**, um modelo incluído no app, inteiramente no seu dispositivo. Nada é baixado para isso e nenhuma imagem sai do dispositivo.
+
+Nos dispositivos compatíveis, o modo AR funciona com o **Google Play Services para RA (ARCore)**, fornecido pela Google LLC e regido pela [Política de Privacidade do Google](https://policies.google.com/privacy). O ARCore processa quadros da câmera e dados dos sensores de movimento para rastrear o dispositivo; veja os [requisitos de privacidade do ARCore](https://developers.google.com/ar/develop/privacy-requirements) do Google para saber o que ele coleta. Em dispositivos sem ARCore, o app usa seu próprio rastreamento e o ARCore nunca participa.
 
 ## Atualizações
 

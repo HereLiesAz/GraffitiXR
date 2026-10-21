@@ -66,13 +66,13 @@ object StandaloneFingerprintBuilder {
         val base = (if (features.superPoint) detectSuperPoint(slam, bitmap) else null)
             ?.let { filterByMask(it, mask, bitmap.width, bitmap.height) }
             ?.takeIf { it.rows >= minPoints }
-            ?: detectOrb(bitmap, mask)?.takeIf { it.rows >= minPoints }
+            ?: detectOrb(bitmap, mask, slam = slam)?.takeIf { it.rows >= minPoints }
             ?: return null
         // The close-ups, by the base's own detector (its descriptors are the ones the relocalizer
         // matches against), kept to the same selected marks.
         val superPoint = base.type == CvType.CV_32F
         val closeUps = if (!features.closeUps) null else CloseUpFeatures.detect(bitmap, base.rows) { view, n ->
-            if (superPoint) detectSuperPoint(slam, view) else detectOrb(view, null, n)
+            if (superPoint) detectSuperPoint(slam, view) else detectOrb(view, null, n, slam)
         }?.let { filterByMask(it, mask, bitmap.width, bitmap.height) }
         val detected = CloseUpFeatures.concat(listOfNotNull(base, closeUps)) ?: base
 
@@ -232,7 +232,26 @@ object StandaloneFingerprintBuilder {
         )
     }
 
-    internal fun detectOrb(bitmap: Bitmap, selectionMask: Bitmap?, nFeatures: Int = ORB_FEATURES): DetectedFeatures? {
+    /**
+     * ORB on [bitmap], CLAHE-normalised like native's reloc. With [slam], the picture first goes
+     * through native's low-light enhancer as every native detect path does, so these descriptors
+     * match live reloc frames taken in the same light.
+     */
+    internal fun detectOrb(
+        bitmap: Bitmap,
+        selectionMask: Bitmap?,
+        nFeatures: Int = ORB_FEATURES,
+        slam: SlamManager? = null,
+    ): DetectedFeatures? {
+        val source = slam?.enhanceIfDark(bitmap) ?: bitmap
+        try {
+            return detectOrbOn(source, selectionMask, nFeatures)
+        } finally {
+            if (source !== bitmap) source.recycle()
+        }
+    }
+
+    private fun detectOrbOn(bitmap: Bitmap, selectionMask: Bitmap?, nFeatures: Int): DetectedFeatures? {
         val rgba = Mat()
         val gray = Mat()
         val normalized = Mat()

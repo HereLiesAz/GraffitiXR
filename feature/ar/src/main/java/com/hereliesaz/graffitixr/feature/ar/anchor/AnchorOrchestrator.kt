@@ -94,6 +94,10 @@ class AnchorOrchestrator {
     private val lastGoodMatrix = FloatArray(16)
     private var hasLastGood = false
 
+    /** True while [getConsensusMatrix] is holding the last good matrix (no anchor tracking). */
+    @Volatile var isHolding: Boolean = false
+        private set
+
     /**
      * Resets only this orchestrator's Kotlin state. No ARCore native calls occur here, by design.
      *
@@ -164,6 +168,7 @@ class AnchorOrchestrator {
             consensusAnchors.filter { it.anchor.trackingState == TrackingState.TRACKING }
         }
 
+        isHolding = tracking.isEmpty()
         if (tracking.isEmpty()) {
             // No anchor is tracking this frame. HOLD the last good matrix rather than writing identity.
             // This is presentation only; no new anchor-relative geometry is derived from this stale

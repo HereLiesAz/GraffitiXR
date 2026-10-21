@@ -108,8 +108,9 @@ object MetricDoodleBuilder {
             }
             keptDesc.release()
 
-            slam.clearPaintMarks() // new capture = new doodle frame
-            slam.clearWallFeatureMap() // its points are in the old frame too
+            // New capture = new doodle frame: no capture view here to relate it to the old one, so
+            // paint marks and the map go; area progress (design-relative) stays.
+            slam.carryDoodleFrameState(null)
             slam.restoreWallDoodleMetric(
                 bytes, rows, cols, type, tri.points, anchorModel, intr0,
             )
@@ -292,7 +293,10 @@ object MetricDoodleBuilder {
         }
 
         // ORB fallback — CLAHE-normalize identically to the native reloc path so descriptors match.
-        val gray = toGray(bitmap)
+        // Through native's low-light enhancer first, as every native detect path is.
+        val gray = slam.enhanceIfDark(bitmap).let { src ->
+            try { toGray(src) } finally { if (src !== bitmap) src.recycle() }
+        }
         val orb = ORB.create(1500)
         val clahe = Imgproc.createCLAHE(2.0, org.opencv.core.Size(8.0, 8.0))
         val norm = Mat()
@@ -313,7 +317,7 @@ object MetricDoodleBuilder {
             if (features.closeUps) early.installBase(basePixels, baseDescs, bitmap)
             val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps,
                 onQuickSet = { p, dd -> early.install(p, dd) }, firstStage = 2, stages = 3, stepsBefore = 1) { view, n ->
-                StandaloneFingerprintBuilder.detectOrb(view, null, n)
+                StandaloneFingerprintBuilder.detectOrb(view, null, n, slam)
             }
             if (baseDescs !== d && baseDescs !== mDescs) baseDescs.release()
             try {
@@ -544,12 +548,13 @@ object MetricDoodleBuilder {
         // Native pairs the two in computeRectifyHomography (viewFp / mWallKeypoints3D) against a
         // display-oriented viewCur, so handing it the raw sensor-frame view leaves the rectifying
         // homography rotated by R_z. Note the GL sign is NEGATED — see glViewDisplayOriented.
-        slam.clearPaintMarks() // new capture = new doodle frame
-        slam.clearWallFeatureMap() // its points are in the old frame too
+        // New capture = new doodle frame. A fresh lock of the old Doodle relates the two, so the
+        // paint marks and map are carried across (native), not thrown away; area progress stays.
+        val captureView = glView?.let { MetricMarks.glViewDisplayOriented(it, rotationDeg) }
+        slam.carryDoodleFrameState(captureView)
         slam.restoreWallDoodleMetric(
             bytes, rows, cols, type, res.points, anchorModel, intr,
-            viewMatrix = glView?.let { MetricMarks.glViewDisplayOriented(it, rotationDeg) }
-                ?: FloatArray(0),
+            viewMatrix = captureView ?: FloatArray(0),
             // IMPLEMENTATION.md 2.6 — native filters the reloc correspondence build by these, and
             // reads a zero-length array as all-backbone, so an unpartitioned capture behaves as it
             // did before Phase 2 rather than losing its whole map.

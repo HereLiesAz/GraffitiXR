@@ -11,7 +11,7 @@
 
     <string name="nav_ar_mode">AR</string>
 
-    <string name="nav_ar_mode_info">使用增强现实将您的艺术作品投影到真实的墙壁上。首先扫描墙壁以放置锚点，然后添加您的设计图层。</string>
+    <string name="nav_ar_mode_info">使用增强现实将您的艺术作品投影到真实的墙壁上。首先扫描墙壁以放置锚点，然后添加您的设计。</string>
 
 
     <string name="nav_overlay">覆盖</string>
@@ -55,19 +55,17 @@
     <string name="nav_refine_info">微调现有随手画的位置。</string>
 
 
-    <string name="nav_update">进度</string>
 
-    <string name="nav_update_info">标记壁画的已完成区域以跟踪绘画进度。</string>
 
 
     <string name="nav_design">设计</string>
 
-    <string name="nav_design_info">添加和管理设计图层。每个图层可以是导入的图像或手绘图。</string>
+    <string name="nav_design_info">您的工作区。通过“打开”添加、并用下方工具编辑的设计，会延续到每一种模式中。</string>
 
 
     <string name="nav_open">打开</string>
 
-    <string name="nav_open_info">从您的图库中添加一张图片作为新图层。</string>
+    <string name="nav_open_info">从您的图库中添加一张图片作为设计。</string>
 
 
     <string name="nav_wall">墙壁</string>
@@ -85,7 +83,7 @@
 
     <string name="nav_blend">混合</string>
 
-    <string name="nav_invert_info">创建当前图层的负片。黑色变为白色，颜色反转为其补色 — 适用于模板和覆盖层分析。</string>
+    <string name="nav_invert_info">创建设计的负片。黑色变为白色，颜色反转为其补色 — 适用于模板和覆盖层分析。</string>
 
 
     <string name="nav_outline">轮廓</string>
@@ -95,18 +93,18 @@
 
     <string name="nav_adjust">调整</string>
 
-    <string name="nav_adjust_info">微调此图层的亮度、对比度、饱和度和色彩平衡。</string>
+    <string name="nav_adjust_info">微调设计的亮度、对比度、饱和度和色彩平衡。</string>
     <string name="nav_edit">编辑</string>
 
 
     <string name="nav_balance">颜色</string>
 
-    <string name="nav_balance_info">使用红、绿、蓝通道滑块对图层颜色进行着色。</string>
+    <string name="nav_balance_info">使用红、绿、蓝通道滑块对设计的颜色进行着色。</string>
 
 
     <string name="nav_blending">混合</string>
 
-    <string name="nav_blending_info">循环切换混合模式（正常、正片叠底、滤色、叠加…）以控制此图层与下方图层的合成方式。</string>
+    <string name="nav_blending_info">循环切换混合模式（正常、正片叠底、滤色、叠加…）以控制设计与其后方内容的合成方式。</string>
 
 
     <string name="nav_settings">设置</string>
@@ -136,7 +134,7 @@
 
     <string name="nav_export">导出</string>
 
-    <string name="nav_export_info">将所有可见图层合并后导出为一张平面图像到您的照片库。</string>
+    <string name="nav_export_info">将设计导出为一张平面图像到您的照片库。</string>
 
 
     <string name="nav_help">帮助</string>
@@ -220,7 +218,6 @@
 
     <string name="generating">正在生成...</string>
 
-    <string name="stencil_hint">再次按下以添加图层。</string>
 
     <string name="rename_hint">重命名</string>
 
@@ -234,13 +231,9 @@
 
     <string name="duplicate">复制</string>
 
-    <string name="unlink_layer">取消链接图层</string>
 
-    <string name="link_layer">链接图层</string>
 
-    <string name="hide_layer">隐藏图层</string>
 
-    <string name="show_layer">显示图层</string>
 
     <string name="flatten_all">拼合所有图层</string>
 
@@ -360,15 +353,9 @@
     <string name="lib_new_project">新建</string>
     <string name="lib_import_project">导入</string>
     <string name="lib_no_projects">还没有项目</string>
-    <string name="lib_no_projects_hint">点击上方的“新建”以开始您的第一幅壁画。
-
-您将被带入编辑器，在其中您可以：
-  •  从“设计”菜单添加艺术作品
-  •  切换到 AR 模式以投影到真实的墙上
-  •  使用“覆盖”让您的设计悬浮在实时相机画面上
-  •  使用“效果图”在墙壁照片上预览
-  •  使用“透写台”将您的设计描绘到纸上</string>
+    <string name="lib_no_projects_hint">点击下方的“新建”以开始您的第一件作品。\n\n您将被带入编辑器，在其中您可以：\n  •  从“设计”菜单添加艺术作品\n  •  切换到 AR 模式以投影到真实的墙上\n  •  使用“覆盖”让您的设计悬浮在实时相机画面上\n  •  使用“效果图”在墙壁照片上预览\n  •  使用“追踪”将您的设计描绘到纸上</string>
     <string name="lib_project_thumbnail">项目缩略图</string>
+    <string name="lib_project_damaged">已损坏：无法打开</string>
     <string name="lib_delete_project_desc">删除项目 %1$s</string>
 
 
@@ -441,8 +428,6 @@
     <string name="settings_copyright">GraffitiXR © 2025</string>
 
 
-    <string name="layers_title">图层</string>
-    <string name="brush_size_title">画笔大小</string>
     <string name="save_project_hint">项目名称</string>
 
 
@@ -460,7 +445,6 @@
     <string name="reset_button">重置</string>
 
     <string name="poster_title">生成海报</string>
-    <string name="poster_select_layers">选择要包含的图层：</string>
     <string name="poster_physical_size">物理尺寸（宽度以毫米为单位）：</string>
     <string name="poster_generate_pdf">生成 PDF</string>
 
@@ -485,7 +469,7 @@
 
     <string name="help_overlay">覆盖模式：在没有空间追踪的实时相机上显示设计。说明：手动缩放和移动设计以适应您的画面。</string>
 
-    <string name="help_mockup">效果图模式：在静态照片上预览设计。说明：使用“墙壁”设置背景图像，然后在顶部排列图层。</string>
+    <string name="help_mockup">效果图模式：在静态照片上预览设计。说明：使用“墙壁”设置背景图像，然后将设计放在上面。</string>
 
     <string name="help_trace">透写台模式：高亮度描摹表面。说明：将纸张放在屏幕上进行描摹。快速按 音量上、下、上、下 即可退出。</string>
 
@@ -494,27 +478,28 @@
     <string name="help_create">创建锚点：拍摄墙上的标记以锁定投影。说明：指向明显的纹理并点按。应用程序将追踪此标记。</string>
 
 
-    <string name="help_add_img">导入图像：添加草图或参考照片。说明：从您的图库中选择一张图片。它将作为新的设计图层出现。</string>
+    <string name="help_add_img">导入图像：添加草图或参考照片。说明：从您的图库中选择一张图片。它将成为您的设计。</string>
 
 
 
     <string name="help_wall">更换墙壁：设置效果图模式的背景。说明：选择您计划在上面作画的实体墙的照片。</string>
 
-    <string name="help_project_host">项目管理：保存、加载和导出工作。说明：点击访问您的壁画管理任务。</string>
+    <string name="help_project_host">项目管理：保存、加载和导出工作。说明：点击访问您的项目管理任务。</string>
 
-    <string name="help_new">新建项目：开始一幅新壁画。说明：点击以重置。警告：这将清除当前的所有工作。请先保存！</string>
+    <string name="help_new">新建项目：开始一件新作品。说明：点击以重置。警告：这将清除当前的所有工作。请先保存！</string>
 
-    <string name="help_save">保存项目：存储壁画和 AR 地图。说明：输入项目名称并点击保存以保留您的进度。</string>
+    <string name="help_save">保存项目：存储作品和 AR 地图。说明：输入项目名称并点击保存以保留您的进度。</string>
 
-    <string name="help_load">项目库：访问保存的壁画。说明：浏览图库以恢复工作或导入共享的项目文件。</string>
+    <string name="help_load">项目库：访问保存的项目。说明：浏览项目库以继续工作或导入共享的项目文件。</string>
 
-    <string name="help_export">导出图像：保存高分辨率快照。说明：将所有可见图层渲染到您的照片库中的单个 PNG 中。</string>
+    <string name="help_export">导出图像：保存高分辨率快照。说明：将设计渲染为您照片库中的单个 PNG。</string>
 
     <string name="help_settings">应用程序设置：配置首选项。说明：打开以调整用手习惯、单位和扫描参数。</string>
 
     <string name="help_light">手电筒：切换设备 LED。说明：使用它照亮黑暗的墙壁以获得更好的 AR 追踪。</string>
 
     <string name="help_lock_trace">冻结：锁定整个触摸屏，以免描图纸拖动设计——与锁定不同，这也会阻止滚动和点按。要退出，请快速按 音量上、下、上、下。</string>
+    <string name="help_lock_ar">冻结：在你喷涂时锁定整个触摸屏，让手、袖子或口袋都无法移动设计或切换模式。屏幕被遮住时（在口袋里、屏幕朝下）也会自动锁定。要退出，请快速按 音量加、减、加、减。</string>
 
 
 
@@ -560,7 +545,6 @@
 
     <string name="settings_scan_mode_voxel_hash">体素哈希</string>
     <string name="settings_scan_mode_surface_mesh">表面网格</string>
-    <string name="settings_mural_method_label">壁画引擎</string>
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
@@ -607,8 +591,8 @@
     <string name="settings_reset_tutorials_value">重新显示新手指南</string>
     <string-array name="onboarding_trace">
         <item>这是追踪模式。</item>
-        <item>点击“打开”添加你的第一个图层。添加后，可在画布上双指缩放和拖动来调整大小和位置。</item>
-        <item>当图层处于你想要的位置和状态后，按下冻结按钮，把手机变成用于拓印到纸上的透光台。</item>
+        <item>点击“打开”添加你的设计。添加后，可在画布上双指缩放和拖动来调整大小和位置。</item>
+        <item>当设计处于你想要的位置和状态后，按下冻结按钮，把手机变成用于拓印到纸上的透光台。</item>
         <item>我们建议使用追踪模式或效果图模式进行编辑。</item>
         <item>这样你的图像就准备就绪，按下AR按钮时手机就能专注于增强现实。</item>
     </string-array>
@@ -616,12 +600,12 @@
         <item>AR投影 — 利用手机的深度传感器和空间追踪，将你的设计投影到真实墙面上。</item>
         <item>将手机对准墙面并缓慢左右移动。随着引擎对表面进行建图，会出现彩色形状。请等待墙面区域被完全覆盖。</item>
         <item>只需点击屏幕。应用会拍摄墙面照片，提取追踪特征，并立即锁定锚点。</item>
-        <item>点击“打开”添加设计图层 — 它会使用你刚设置的锚点投影到墙面上。</item>
+        <item>点击“打开”添加你的设计 — 它会使用你刚设置的锚点投影到墙面上。</item>
         <item>提示 — 空白的白墙、光滑的混凝土和纯色表面无法被追踪。请将锚点对准涂鸦、粗糙的灰泥或任何明显的标记。</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>实时叠加 — 你的设计悬浮在实时摄像头画面上方，无需扫描任何表面。</item>
-        <item>点击“打开”添加图层 — 选择一张照片，它会悬浮在实时摄像头画面上方显示于此。</item>
+        <item>点击“打开”添加你的设计 — 选择一张照片，它会悬浮在实时摄像头画面上方显示于此。</item>
         <item>双指缩放以调整大小，拖动以重新定位。叠加层会固定在屏幕上 — 后退一步查看它与墙面的贴合效果。</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
@@ -630,18 +614,15 @@
         <item>追踪、效果图和覆盖模式可照常使用。点按即可关闭。</item>
     </string-array>
     <string-array name="onboarding_mockup">
-        <item>照片效果图 — 在动笔之前，先在照片上预览你的设计。</item>
+        <item>照片效果图 — 在拿起喷漆罐之前，先在照片上预览你的设计。</item>
         <item>点击“墙面”以选择或拍摄你的表面照片。请先完成此步骤！</item>
-        <item>点击“打开”在墙面照片上方添加图层。双指缩放和拖动以调整大小和位置。</item>
+        <item>点击“打开”将你的设计放到墙面照片上方。双指缩放和拖动以调整大小和位置。</item>
     </string-array>
     <string-array name="onboarding_design">
         <item>这是设计界面 — 你的工作空间。你在这里创建的内容会延续到其他所有模式中。</item>
-        <item>点击“打开”添加你的第一个图层 — 从相册中选择一张照片，它会作为你的作品出现在这里。</item>
-        <item>点击图层以打开其工具 — 分组在绘画、修饰、调整和效果文件夹中。在画布上双指缩放和拖动以调整大小和位置。</item>
+        <item>点击“打开”添加你的设计 — 从相册中选择一张照片，它会作为你的作品出现在这里。</item>
+        <item>使用“编辑”工具对其进行调整、反色、描轮廓或分离。在画布上双指缩放和拖动以调整大小和位置。</item>
         <item>满意效果后，选择使用方式：“追踪”将手机变为透光台，“效果图”在照片上预览，或“AR”将其投影到墙面上。</item>
-    </string-array>
-    <string-array name="onboarding_design_layers">
-        <item>打开 — 从相册导入一张照片；它会作为新图层放置。</item>
     </string-array>
     <string name="nav_measure">测量</string>
     <string name="nav_measure_info">测量真实的墙面:在放置设计的墙上先点一侧边缘,再点另一侧。宽度会随项目保存——是测量值,而非估计值。</string>
@@ -742,10 +723,10 @@
     <string name="doodle_cd_detected_marks">检测到的标记</string>
     <string name="doodle_cd_confirm">确认</string>
     <string name="doodle_cd_unwarp_base">带角点手柄的墙面照片</string>
-    <string name="guidance_open_via_design_overlay">点按导轨上的“设计”，再点按“打开”以添加图层 — 选择一张照片，它会显示在这里，悬浮在实时相机画面之上。</string>
-    <string name="guidance_open_via_design_mockup">点按导轨上的“设计”，再点按“打开”，在墙面照片上方添加图层。双指捏合并拖动以调整大小和位置。</string>
-    <string name="guidance_open_via_design_trace">点按导轨上的“设计”，再点按“打开”以添加你的第一个图层。添加后，在画布上双指捏合并拖动以调整大小和位置。</string>
-    <string name="guidance_open_via_design_ar">点按导轨上的“设计”，再点按“打开”以添加设计图层 — 它会借助你刚设置的锚点投影到墙上。</string>
+    <string name="guidance_open_via_design_overlay">点按导轨上的“设计”，再点按“打开”以添加你的设计 — 选择一张照片，它会显示在这里，悬浮在实时相机画面之上。</string>
+    <string name="guidance_open_via_design_mockup">点按导轨上的“设计”，再点按“打开”，将你的设计放到墙面照片上方。双指捏合并拖动以调整大小和位置。</string>
+    <string name="guidance_open_via_design_trace">点按导轨上的“设计”，再点按“打开”以添加你的设计。添加后，在画布上双指捏合并拖动以调整大小和位置。</string>
+    <string name="guidance_open_via_design_ar">点按导轨上的“设计”，再点按“打开”以添加你的设计 — 它会借助你刚设置的锚点投影到墙上。</string>
     <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
     <string name="ar_feedback_guest_edit_dropped">该更改无法与主机共享，只会保留在此设备上</string>
     <string name="ar_feedback_backend_resolving">AR 后端仍在确定中，请稍后再次尝试托管</string>
@@ -755,6 +736,7 @@
     <string name="ar_feedback_doodle_not_ready">随手画尚未就绪 — 请让它保持在画面中，然后再次尝试 “主持”</string>
     <string name="ar_feedback_package_failed">无法打包此项目以供分享，请先尝试保存</string>
     <string name="ar_feedback_host_failed">无法开始分享：%1$s</string>
+    <string name="ar_feedback_host_too_large">此项目太大，无法通过 Link 共享（%1$d MB；上限为 %2$d MB）。请导出后再共享。</string>
     <string name="ar_feedback_join_load_failed">无法加载主机的项目，会话已结束。</string>
     <string name="ar_feedback_join_no_geometry">主机未提供 ARCore 可用于对齐的几何数据。</string>
     <string name="ar_feedback_join_failed">无法加入：%1$s</string>
@@ -804,6 +786,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">无法保存干净墙面的照片。请重新拍摄。</string>
+    <string name="ar_feedback_progress_save_failed">无法保存墙面地图和绘画进度。本次会话中仍会保留。请释放一些空间后再保存。</string>
     <string name="ar_feedback_clean_wall_register_failed">这张干净墙面的照片与当前墙面对不上。请从大致你将要站的位置重新拍摄。</string>
 
     <!-- The CV view legend: the name of each way of looking. -->

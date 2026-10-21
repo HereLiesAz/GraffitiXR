@@ -160,6 +160,8 @@ class ProjectManager @Inject constructor(
         thumbnail: Bitmap?,
         preserveExistingCaptureState: Boolean,
     ): GraffitiProject = withContext(Dispatchers.IO) {
+        // A damaged placeholder carries none of the project: writing it would replace what is left.
+        if (projectData.isDamaged) throw java.io.IOException("Refusing to save damaged project ${projectData.id}")
         val root = File(context.filesDir, "projects/${projectData.id}")
         if (!root.exists()) root.mkdirs()
 
@@ -199,6 +201,7 @@ class ProjectManager @Inject constructor(
                     doodleAnchor = existing.doodleAnchor,
                     doodleViewMatrix = existing.doodleViewMatrix,
                     doodleCaptureRotationDeg = existing.doodleCaptureRotationDeg,
+                    arCoreCaptureImageUri = existing.arCoreCaptureImageUri,
                     // Learned by MobileGS at trusted locks (so a routine save may carry a newer one);
                     // an older whole-object writer that never saw it must not clear it.
                     doodleWallNormalEnu =
@@ -212,6 +215,10 @@ class ProjectManager @Inject constructor(
                     wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
                     paintMarks = projectData.paintMarks ?: existing.paintMarks,
                     paintGrid = projectData.paintGrid ?: existing.paintGrid,
+                    grownDoodle = projectData.grownDoodle ?: existing.grownDoodle,
+                    sphereSlamPaintMarks = projectData.sphereSlamPaintMarks ?: existing.sphereSlamPaintMarks,
+                    sphereSlamPaintGrid = projectData.sphereSlamPaintGrid ?: existing.sphereSlamPaintGrid,
+                    sphereSlamGrownDoodle = projectData.sphereSlamGrownDoodle ?: existing.sphereSlamGrownDoodle,
                     cloudAnchorId = projectData.cloudAnchorId ?: existing.cloudAnchorId,
                     // Written once by the AR placement; a stale snapshot must not reset it.
                     arDesignHalfWidthM = if (projectData.arDesignHalfWidthM > 0f) projectData.arDesignHalfWidthM
@@ -350,7 +357,7 @@ class ProjectManager @Inject constructor(
                 writePngAtomically(bitmap, file, "target image")
                 uriProvider.getUriForFile(file)
             }
-            pruneDoodleImages(incoming.doodleImageUris + newUris)
+            pruneDoodleImages(incoming.doodleImageUris + newUris, keep = incoming.arCoreCaptureImageUri)
         } else {
             incoming.doodleImageUris
         }
@@ -423,10 +430,10 @@ class ProjectManager @Inject constructor(
      * Drops the oldest entries once [uris] exceeds [MAX_TARGET_IMAGES], deleting their backing files
      * so a pruned entry doesn't leak a PNG that nothing references any more.
      */
-    private fun pruneDoodleImages(uris: List<Uri>): List<Uri> {
-        if (uris.size <= MAX_TARGET_IMAGES) return uris
-        val overflow = uris.size - MAX_TARGET_IMAGES
-        uris.take(overflow).forEach { uri ->
+    private fun pruneDoodleImages(uris: List<Uri>, keep: Uri? = null): List<Uri> {
+        val kept = keepNewest(uris, keep)
+        if (kept.size == uris.size) return uris
+        (uris - kept.toSet()).forEach { uri ->
             try {
                 uri.path?.let { File(it).delete() }
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -435,7 +442,15 @@ class ProjectManager @Inject constructor(
                 // Best-effort: a failed delete just leaves an orphaned file, not a correctness issue.
             }
         }
-        return uris.drop(overflow)
+        return kept
+    }
+
+    /** The newest [MAX_TARGET_IMAGES] of [uris], oldest first, never dropping [keep]. */
+    private fun keepNewest(uris: List<Uri>, keep: Uri?): List<Uri> {
+        if (uris.size <= MAX_TARGET_IMAGES) return uris
+        val held = keep?.takeIf { it in uris }
+        val rest = uris.filter { it != held }.takeLast(if (held != null) MAX_TARGET_IMAGES - 1 else MAX_TARGET_IMAGES)
+        return if (held == null) rest else uris.filter { it == held || it in rest }
     }
 
     /**
@@ -643,6 +658,7 @@ class ProjectManager @Inject constructor(
         projectId: String,
         existingUris: List<Uri>,
         bitmap: Bitmap,
+        keep: Uri? = null,
     ): List<Uri> = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/$projectId").also { if (!it.exists()) it.mkdirs() }
         // Unique filename, not size-indexed — see the comment in saveProject's target-image block for
@@ -651,7 +667,8 @@ class ProjectManager @Inject constructor(
         writePngAtomically(bitmap, file, "target image")
         // Only the LIST is pruned here: the dropped files are still referenced by project.json until the
         // caller commits this list, so the caller deletes them afterwards ([deleteDoodleImages]).
-        (existingUris + uriProvider.getUriForFile(file)).takeLast(MAX_TARGET_IMAGES)
+        // [keep] (the ARCore capture photo) survives the pruning.
+        keepNewest(existingUris + uriProvider.getUriForFile(file), keep)
     }
 
     /**
@@ -732,8 +749,27 @@ class ProjectManager @Inject constructor(
             throw e // never swallow cancellation
         } catch (e: Exception) {
             Log.e("ProjectManager", "Failed to load project metadata", e)
-            null
+            damagedPlaceholder(projectId, projectFile)
         }
+    }
+
+    /**
+     * An unreadable project.json (a decode or validation failure) keeps the project in the library as
+     * damaged instead of dropping it: its files stay intact, it can be deleted, and it is never opened
+     * or written. The name is salvaged from the raw JSON when it can be.
+     */
+    private fun damagedPlaceholder(projectId: String, projectFile: File): GraffitiProject? {
+        if (!isSafeProjectId(projectId)) return null
+        val name = runCatching {
+            (Json.parseToJsonElement(projectFile.readText()) as? kotlinx.serialization.json.JsonObject)
+                ?.get("name")?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: projectId
+        return GraffitiProject(
+            id = projectId,
+            name = name,
+            lastModified = projectFile.lastModified(),
+            isDamaged = true,
+        )
     }
 
     /**
@@ -757,6 +793,7 @@ class ProjectManager @Inject constructor(
             thumbnailUri = uri(project.thumbnailUri),
             doodleImageUris = project.doodleImageUris.map { uri(it) },
             cleanWallUri = uri(project.cleanWallUri),
+            arCoreCaptureImageUri = uri(project.arCoreCaptureImageUri),
             sphereSlamReferenceUri = uri(project.sphereSlamReferenceUri),
             sphereSlamAtlasPages = project.sphereSlamAtlasPages.map { it.copy(referenceUri = uri(it.referenceUri)) },
             evolutionImageUris = project.evolutionImageUris.map { uri(it) },
@@ -1096,6 +1133,7 @@ class ProjectManager @Inject constructor(
                 thumbnailUri = localUri(migrated.thumbnailUri),
                 doodleImageUris = migrated.doodleImageUris.map { localUri(it)!! },
                 cleanWallUri = localUri(migrated.cleanWallUri),
+                arCoreCaptureImageUri = localUri(migrated.arCoreCaptureImageUri),
                 sphereSlamReferenceUri = localUri(migrated.sphereSlamReferenceUri),
                 sphereSlamAtlasPages = migrated.sphereSlamAtlasPages.map { page ->
                     page.copy(referenceUri = localUri(page.referenceUri)!!)
@@ -1192,13 +1230,29 @@ class ProjectManager @Inject constructor(
         val sourceFolder = File(appContext.filesDir, "projects/${project.id}")
         if (!sourceFolder.exists()) return@withContext ByteArray(0)
 
+        // Where the wall is stays on this device: the peer gets project.json with every location
+        // (the capture's fix, the project's and the calibration snapshots' GPS) removed.
+        val manifest = File(sourceFolder, "project.json")
+        val stripped = runCatching {
+            json.encodeToString(withoutLocation(json.decodeFromString<GraffitiProject>(manifest.readText())))
+        }.getOrNull() ?: return@withContext ByteArray(0)
         ByteArrayOutputStream().use { baos ->
             ZipOutputStream(baos).use { zos ->
-                zipFolder(sourceFolder, "", zos, unreferencedDesignFiles(sourceFolder))
+                zipFolder(sourceFolder, "", zos, unreferencedDesignFiles(sourceFolder) + "project.json")
+                zos.putNextEntry(ZipEntry("project.json"))
+                zos.write(stripped.toByteArray(Charsets.UTF_8))
+                zos.closeEntry()
             }
             baos.toByteArray()
         }
     }
+
+    /** [project] with no location in it, for anything that leaves the device over Link. */
+    internal fun withoutLocation(project: GraffitiProject): GraffitiProject = project.copy(
+        gpsData = null,
+        captureEnvironment = project.captureEnvironment?.copy(location = null),
+        calibrationSnapshots = project.calibrationSnapshots.map { it.copy(gpsData = null) },
+    )
 
     /**
      * Loads a project received as raw bytes from a host device (spectator/guest path).

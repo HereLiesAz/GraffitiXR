@@ -11,7 +11,7 @@
 
     <string name="nav_ar_mode">AR</string>
 
-    <string name="nav_ar_mode_info">Projecteer uw kunstwerk op een echte muur met behulp van augmented reality. Scan eerst de muur om het anker te plaatsen en voeg vervolgens uw ontwerplagen toe.</string>
+    <string name="nav_ar_mode_info">Projecteer uw kunstwerk op een echte muur met behulp van augmented reality. Scan eerst de muur om het anker te plaatsen en voeg vervolgens uw ontwerp toe.</string>
 
 
     <string name="nav_overlay">Overlay</string>
@@ -55,19 +55,17 @@
     <string name="nav_refine_info">Verfijn de positie van een bestaande Krabbel.</string>
 
 
-    <string name="nav_update">Voortgang</string>
 
-    <string name="nav_update_info">Markeer voltooide delen van uw muurschildering om de voortgang van het schilderen te volgen.</string>
 
 
     <string name="nav_design">Ontwerp</string>
 
-    <string name="nav_design_info">Ontwerplagen toevoegen en beheren. Elke laag kan een geïmporteerde afbeelding of een tekening uit de vrije hand zijn.</string>
+    <string name="nav_design_info">Uw werkruimte. Het ontwerp dat u met \'Open\' toevoegt — en met de tools hieronder bewerkt — blijft in elke modus behouden.</string>
 
 
     <string name="nav_open">Open</string>
 
-    <string name="nav_open_info">Voeg een afbeelding uit je galerij toe als nieuwe laag.</string>
+    <string name="nav_open_info">Voeg een afbeelding uit je galerij toe als ontwerp.</string>
 
 
     <string name="nav_wall">Muur</string>
@@ -85,7 +83,7 @@
 
     <string name="nav_blend">Overvloeien</string>
 
-    <string name="nav_invert_info">Maak een negatief van de huidige laag. Zwart wordt wit en kleuren worden omgedraaid naar hun tegenpolen – handig voor stencil- en overlay-analyse.</string>
+    <string name="nav_invert_info">Maak een negatief van het ontwerp. Zwart wordt wit en kleuren worden omgedraaid naar hun tegenpolen – handig voor stencil- en overlay-analyse.</string>
 
 
     <string name="nav_outline">Overzicht</string>
@@ -95,18 +93,18 @@
 
     <string name="nav_adjust">Aanpassen</string>
 
-    <string name="nav_adjust_info">Verfijn de helderheid, het contrast, de verzadiging en de kleurbalans voor deze laag.</string>
+    <string name="nav_adjust_info">Verfijn de helderheid, het contrast, de verzadiging en de kleurbalans van het ontwerp.</string>
     <string name="nav_edit">Bewerken</string>
 
 
     <string name="nav_balance">Kleur</string>
 
-    <string name="nav_balance_info">Tint de laagkleuren met behulp van de rode, groene en blauwe kanaalschuifregelaars.</string>
+    <string name="nav_balance_info">Tint de kleuren van het ontwerp met behulp van de rode, groene en blauwe kanaalschuifregelaars.</string>
 
 
     <string name="nav_blending">Mengen</string>
 
-    <string name="nav_blending_info">Blader door de overvloeimodi (Normaal, Vermenigvuldigen, Scherm, Overlay...) om te bepalen hoe deze laag wordt samengesteld met de onderliggende lagen.</string>
+    <string name="nav_blending_info">Blader door de overvloeimodi (Normaal, Vermenigvuldigen, Scherm, Overlay...) om te bepalen hoe het ontwerp wordt samengesteld met wat erachter ligt.</string>
 
 
     <string name="nav_settings">Instellingen</string>
@@ -136,7 +134,7 @@
 
     <string name="nav_export">Exporteren</string>
 
-    <string name="nav_export_info">Exporteer een platte samengevoegde afbeelding van alle zichtbare lagen naar uw fotogalerij.</string>
+    <string name="nav_export_info">Exporteer het ontwerp als platte afbeelding naar uw fotogalerij.</string>
 
 
     <string name="nav_help">Hulp</string>
@@ -220,7 +218,6 @@
 
     <string name="generating">GENEREREN...</string>
 
-    <string name="stencil_hint">Druk nogmaals op om een ​​laag toe te voegen.</string>
 
     <string name="rename_hint">Hernoemen</string>
 
@@ -234,13 +231,9 @@
 
     <string name="duplicate">Duplicaat</string>
 
-    <string name="unlink_layer">Laag ontkoppelen</string>
 
-    <string name="link_layer">Linklaag</string>
 
-    <string name="hide_layer">Laag verbergen</string>
 
-    <string name="show_layer">Laag tonen</string>
 
     <string name="flatten_all">Maak alles plat</string>
 
@@ -355,8 +348,9 @@
     <string name="lib_new_project">Nieuw</string>
     <string name="lib_import_project">Importeren</string>
     <string name="lib_no_projects">Nog geen projecten</string>
-    <string name="lib_no_projects_hint">Tik hierboven op Nieuw om uw eerste muurschildering te starten.\n\nU wordt naar de editor geleid waar u het volgende kunt doen:\n  \u2022 Voeg illustraties toe via het Ontwerpmenu\n  \u2022 Schakel over naar de AR-modus om op een echte muur te projecteren\n  \u2022 Gebruik Overlay om uw ontwerp op de live camera te laten verschijnen\n  \u2022 Gebruik Mockup om een voorbeeld op een muurfoto te bekijken\n  \u2022 Gebruik Lightbox om uw ontwerp op papier over te trekken</string>
+    <string name="lib_no_projects_hint">Tik hieronder op Nieuw om uw eerste werk te starten.\n\nU wordt naar de editor geleid waar u het volgende kunt doen:\n  \u2022 Voeg illustraties toe via het Ontwerpmenu\n  \u2022 Schakel over naar de AR-modus om op een echte muur te projecteren\n  \u2022 Gebruik Overlay om uw ontwerp op de live camera te laten verschijnen\n  \u2022 Gebruik Mockup om een voorbeeld op een muurfoto te bekijken\n  \u2022 Gebruik Spoor om uw ontwerp op papier over te trekken</string>
     <string name="lib_project_thumbnail">Projectminiatuur</string>
+    <string name="lib_project_damaged">Beschadigd: kan niet worden geopend</string>
     <string name="lib_delete_project_desc">Verwijder project %1$s</string>
 
 
@@ -429,8 +423,6 @@
     <string name="settings_copyright">GraffitiXR © 2025</string>
 
 
-    <string name="layers_title">Lagen</string>
-    <string name="brush_size_title">Penseelgrootte</string>
     <string name="save_project_hint">Projectnaam</string>
 
 
@@ -448,7 +440,6 @@
     <string name="reset_button">Opnieuw instellen</string>
 
     <string name="poster_title">GENEREER POSTER</string>
-    <string name="poster_select_layers">Selecteer lagen om op te nemen:</string>
     <string name="poster_physical_size">Fysieke maat (breedte in mm):</string>
     <string name="poster_generate_pdf">GENEREER PDF</string>
 
@@ -473,7 +464,7 @@
 
     <string name="help_overlay">Overlaymodus: weergaveontwerp via livecamera zonder ruimtelijke tracking. Instructies: Schaal en verplaats het ontwerp handmatig zodat het in uw frame past.</string>
 
-    <string name="help_mockup">Mockup-modus: bekijk een voorbeeld van het ontwerp op een statische foto. Instructies: Gebruik \'Muur\' om een ​​achtergrondafbeelding in te stellen en plaats vervolgens de lagen erbovenop.</string>
+    <string name="help_mockup">Mockup-modus: bekijk een voorbeeld van het ontwerp op een statische foto. Instructies: Gebruik \'Muur\' om een achtergrondafbeelding in te stellen en plaats vervolgens het ontwerp erbovenop.</string>
 
     <string name="help_trace">Lightbox-modus: traceeroppervlak met hoge helderheid. Instructies: Plaats papier over het scherm en trek over. Druk snel op Volume Omhoog, Omlaag, Omhoog, Omlaag om af te sluiten.</string>
 
@@ -482,27 +473,28 @@
     <string name="help_create">Anker maken: Maak een foto van een markering op de muur om de projectie te vergrendelen. Instructies: Wijs naar een duidelijke textuur en tik erop. De app houdt deze markering bij.</string>
 
 
-    <string name="help_add_img">Afbeelding importeren: Voeg een schets- of referentiefoto toe. Instructies: Selecteer een afbeelding uit uw galerij. Het zal verschijnen als een nieuwe ontwerplaag.</string>
+    <string name="help_add_img">Afbeelding importeren: Voeg een schets- of referentiefoto toe. Instructies: Selecteer een afbeelding uit uw galerij. Die wordt het ontwerp.</string>
 
 
 
     <string name="help_wall">Wand wijzigen: stel de achtergrond in voor de Mockup-modus. Instructies: Selecteer een foto van de fysieke muur waarop u wilt schilderen.</string>
 
-    <string name="help_project_host">Projectbeheer: werk opslaan, laden en exporteren. Instructies: Tik om toegang te krijgen tot administratieve taken voor uw muurschildering.</string>
+    <string name="help_project_host">Projectbeheer: werk opslaan, laden en exporteren. Instructies: Tik om toegang te krijgen tot administratieve taken voor uw project.</string>
 
-    <string name="help_new">Nieuw project: start een nieuwe muurschildering. Instructies: Tik om te resetten. Waarschuwing: hiermee wordt al het huidige werk gewist. Bespaar eerst!</string>
+    <string name="help_new">Nieuw project: start een nieuw werk. Instructies: Tik om te resetten. Waarschuwing: hiermee wordt al het huidige werk gewist. Sla eerst op!</string>
 
-    <string name="help_save">Project opslaan: muurschildering en AR-kaart opslaan. Instructies: Voer een projectnaam in en tik op Opslaan om uw voortgang te bewaren.</string>
+    <string name="help_save">Project opslaan: werk en AR-kaart opslaan. Instructies: Voer een projectnaam in en tik op Opslaan om uw voortgang te bewaren.</string>
 
-    <string name="help_load">Projectbibliotheek: toegang tot opgeslagen muurschilderingen. Instructies: Blader door de bibliotheek om het werk te hervatten of gedeelde projectbestanden te importeren.</string>
+    <string name="help_load">Projectbibliotheek: toegang tot opgeslagen projecten. Instructies: Blader door de bibliotheek om het werk te hervatten of gedeelde projectbestanden te importeren.</string>
 
-    <string name="help_export">Afbeelding exporteren: momentopname met hoge resolutie opslaan. Instructies: Rendert alle zichtbare lagen in één PNG in uw fotogalerij.</string>
+    <string name="help_export">Afbeelding exporteren: momentopname met hoge resolutie opslaan. Instructies: Rendert het ontwerp in één PNG in uw fotogalerij.</string>
 
     <string name="help_settings">App-instellingen: Configureer voorkeuren. Instructies: Openen om handigheid, eenheden en scanparameters aan te passen.</string>
 
     <string name="help_light">Zaklamp: Schakel apparaat-LED in. Instructies: Gebruik dit om donkere muren te verlichten voor betere AR-tracking.</string>
 
     <string name="help_lock_trace">Bevriezen: vergrendelt het hele touchscreen zodat calqueerpapier het ontwerp niet verschuift — in tegenstelling tot Vergrendelen blokkeert dit ook scrollen en tikken. Om te stoppen: snel Volume Omhoog, Omlaag, Omhoog, Omlaag indrukken.</string>
+    <string name="help_lock_ar">Bevriezen: vergrendelt het hele touchscreen terwijl je schildert, zodat een hand, een mouw of een broekzak het ontwerp niet verschuift en geen modus wisselt. Het scherm vergrendelt ook vanzelf zodra het bedekt is (in een zak, met de voorkant omlaag). Om te stoppen druk je snel op Volume omhoog, omlaag, omhoog, omlaag.</string>
 
 
 
@@ -548,7 +540,6 @@
 
     <string name="settings_scan_mode_voxel_hash">Voxel-hash</string>
     <string name="settings_scan_mode_surface_mesh">Oppervlaktemesh</string>
-    <string name="settings_mural_method_label">Muurschildering-engine</string>
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
@@ -595,8 +586,8 @@
     <string name="settings_reset_tutorials_value">Introductiegidsen opnieuw weergeven</string>
     <string-array name="onboarding_trace">
         <item>Dit is de Spoor-modus.</item>
-        <item>Tik op \'Open\' om je eerste laag toe te voegen. Zodra deze is toegevoegd, kun je knijpen en slepen op het canvas om hem te schalen en te plaatsen.</item>
-        <item>Wanneer ze zijn waar en hoe je ze wilt, druk je op de Bevries-knop om van je telefoon een lichtbak te maken om op papier over te trekken.</item>
+        <item>Tik op \'Open\' om je ontwerp toe te voegen. Zodra het is toegevoegd, kun je knijpen en slepen op het canvas om het te schalen en te plaatsen.</item>
+        <item>Wanneer het is waar en hoe je het wilt, druk je op de Bevries-knop om van je telefoon een lichtbak te maken om op papier over te trekken.</item>
         <item>We raden aan om voor het bewerken de Spoor-modus of de Mock-up-modus te gebruiken.</item>
         <item>Zo staat je beeldmateriaal klaar en kan je telefoon zich volledig richten op augmented reality wanneer je op de AR-knop drukt.</item>
     </string-array>
@@ -604,12 +595,12 @@
         <item>AR-projectie — projecteert je ontwerp op een echte muur met behulp van de dieptesensor en ruimtelijke tracking van de telefoon.</item>
         <item>Richt op de muur en beweeg langzaam heen en weer. Er verschijnen gekleurde vormen terwijl de engine het oppervlak in kaart brengt. Wacht tot het hele muuroppervlak is gedekt.</item>
         <item>Tik gewoon op het scherm. De app fotografeert de muur, haalt trackingkenmerken eruit en vergrendelt het anker direct.</item>
-        <item>Tik op \'Open\' om een ontwerplaag toe te voegen — deze wordt op de muur geprojecteerd met behulp van het anker dat je zojuist hebt ingesteld.</item>
+        <item>Tik op \'Open\' om je ontwerp toe te voegen — het wordt op de muur geprojecteerd met behulp van het anker dat je zojuist hebt ingesteld.</item>
         <item>Tip — lege witte muren, glad beton en effen oppervlakken kunnen niet worden getrackt. Richt je ankerpunt op graffiti, ruwe pleister of een ander duidelijk kenmerk.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Live overlay — je ontwerp zweeft boven het live camerabeeld, zonder dat een oppervlak hoeft te worden gescand.</item>
-        <item>Tik op \'Open\' om een laag toe te voegen — kies een foto en deze verschijnt hier, zwevend boven het live camerabeeld.</item>
+        <item>Tik op \'Open\' om je ontwerp toe te voegen — kies een foto en deze verschijnt hier, zwevend boven het live camerabeeld.</item>
         <item>Knijp om te schalen, sleep om te verplaatsen. De overlay blijft vast op je scherm — stap achteruit om te zien hoe hij op de muur past.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
@@ -618,18 +609,15 @@
         <item>Spoor, Mock-up en Overlay werken zoals gewoonlijk. Tik om te sluiten.</item>
     </string-array>
     <string-array name="onboarding_mockup">
-        <item>Foto-mockup — bekijk een voorbeeld van je ontwerp op een foto voordat je ook maar een kwast oppakt.</item>
+        <item>Foto-mockup — bekijk een voorbeeld van je ontwerp op een foto voordat je ook maar een spuitbus oppakt.</item>
         <item>Tik op \'Muur\' om een foto van je oppervlak te kiezen of te maken. Doe dit eerst!</item>
-        <item>Tik op \'Open\' om een laag toe te voegen boven op de muurfoto. Knijp en sleep om te schalen en te positioneren.</item>
+        <item>Tik op \'Open\' om je ontwerp boven op de muurfoto te plaatsen. Knijp en sleep om te schalen en te positioneren.</item>
     </string-array>
     <string-array name="onboarding_design">
         <item>Dit is Ontwerp — je werkruimte. Alles wat je hier bouwt, wordt meegenomen naar elke andere modus.</item>
-        <item>Tik op \'Open\' om je eerste laag toe te voegen — kies een foto uit je galerij en deze komt hier terecht als jouw kunstwerk.</item>
-        <item>Tik op een laag om de bijbehorende tools te openen — gegroepeerd in de mappen Schilderen, Retoucheren, Aanpassen en Effecten. Knijp en sleep op het canvas om te schalen en te plaatsen.</item>
+        <item>Tik op \'Open\' om je ontwerp toe te voegen — kies een foto uit je galerij en deze komt hier terecht als jouw kunstwerk.</item>
+        <item>Gebruik de Bewerken-tools om het aan te passen, om te keren, er een omtrek van te maken of het te isoleren. Knijp en sleep op het canvas om te schalen en te plaatsen.</item>
         <item>Als het er goed uitziet, kies je hoe je het wilt gebruiken: \'Spoor\' om van je telefoon een lichtbak te maken, \'Mock-up\' om op een foto te bekijken, of \'AR\' om het op een muur te projecteren.</item>
-    </string-array>
-    <string-array name="onboarding_design_layers">
-        <item>Open — importeert een foto uit je galerij; deze komt terecht als een nieuwe laag.</item>
     </string-array>
     <string name="nav_measure">Meten</string>
     <string name="nav_measure_info">Meet de echte muur: tik op de ene rand en dan op de andere, op de muur waar het ontwerp op staat. De breedte wordt bij het project opgeslagen: gemeten, niet geschat.</string>
@@ -730,10 +718,10 @@
     <string name="doodle_cd_detected_marks">Gedetecteerde markeringen</string>
     <string name="doodle_cd_confirm">Bevestigen</string>
     <string name="doodle_cd_unwarp_base">Opgenomen muurfoto met hoekgrepen</string>
-    <string name="guidance_open_via_design_overlay">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om een laag toe te voegen – kies een foto en die verschijnt hier, zwevend boven de live camerabeeld.</string>
-    <string name="guidance_open_via_design_mockup">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om een laag boven de muurfoto toe te voegen. Knijp en sleep om de grootte en positie aan te passen.</string>
-    <string name="guidance_open_via_design_trace">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om je eerste laag toe te voegen. Zodra die erin staat, knijp en sleep je op het canvas om de grootte en plaats te bepalen.</string>
-    <string name="guidance_open_via_design_ar">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om een ontwerplaag toe te voegen – die wordt op de muur geprojecteerd met het anker dat je net hebt gezet.</string>
+    <string name="guidance_open_via_design_overlay">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om je ontwerp toe te voegen – kies een foto en die verschijnt hier, zwevend boven het live camerabeeld.</string>
+    <string name="guidance_open_via_design_mockup">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om je ontwerp boven op de muurfoto te plaatsen. Knijp en sleep om de grootte en positie aan te passen.</string>
+    <string name="guidance_open_via_design_trace">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om je ontwerp toe te voegen. Zodra het erin staat, knijp en sleep je op het canvas om de grootte en plaats te bepalen.</string>
+    <string name="guidance_open_via_design_ar">Tik in de balk op \'Ontwerp\' en dan op \'Open\' om je ontwerp toe te voegen – het wordt op de muur geprojecteerd met het anker dat je net hebt gezet.</string>
     <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
     <string name="ar_feedback_guest_edit_dropped">Die wijziging kan niet met de host worden gedeeld – ze blijft op dit apparaat</string>
     <string name="ar_feedback_backend_resolving">De AR-backend wordt nog bepaald – probeer over een moment opnieuw te hosten</string>
@@ -743,6 +731,7 @@
     <string name="ar_feedback_doodle_not_ready">Krabbel is nog niet klaar — houd hem in beeld en probeer Hosten opnieuw</string>
     <string name="ar_feedback_package_failed">Dit project kon niet worden ingepakt om te delen – sla het eerst op</string>
     <string name="ar_feedback_host_failed">Delen starten is mislukt: %1$s</string>
+    <string name="ar_feedback_host_too_large">Dit project is te groot om via Link te delen (%1$d MB; de limiet is %2$d MB). Exporteer het om het te delen.</string>
     <string name="ar_feedback_join_load_failed">Het project van de host kon niet worden geladen – de sessie is beëindigd.</string>
     <string name="ar_feedback_join_no_geometry">De host heeft geen geometrie geleverd waarop ARCore zich kan uitlijnen.</string>
     <string name="ar_feedback_join_failed">Deelnemen is mislukt: %1$s</string>
@@ -793,6 +782,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">De foto van de schone muur kon niet worden bewaard. Maak hem opnieuw.</string>
+    <string name="ar_feedback_progress_save_failed">De muurkaart en de schildervoortgang konden niet worden bewaard. Ze blijven bewaard voor deze sessie. Maak ruimte vrij en bewaar opnieuw.</string>
     <string name="ar_feedback_clean_wall_register_failed">Die foto van de schone muur sluit niet aan op deze muur. Maak hem opnieuw vanaf ongeveer waar je gaat staan.</string>
 
     <!-- The CV view legend: the name of each way of looking. -->

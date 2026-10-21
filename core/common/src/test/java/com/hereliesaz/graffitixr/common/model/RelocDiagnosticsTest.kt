@@ -19,8 +19,9 @@ class RelocDiagnosticsTest {
         assertEquals(4, RelocReject.FEW_MATCHES.ordinal)
         assertEquals(5, RelocReject.PNP_FAILED.ordinal)
         assertEquals(6, RelocReject.FEW_INLIERS.ordinal)
+        assertEquals(7, RelocReject.TYPE_MISMATCH.ordinal)
         // UNKNOWN is Kotlin-only: it absorbs any code a future native build reports.
-        assertEquals(7, RelocReject.UNKNOWN.ordinal)
+        assertEquals(8, RelocReject.UNKNOWN.ordinal)
     }
 
     @Test

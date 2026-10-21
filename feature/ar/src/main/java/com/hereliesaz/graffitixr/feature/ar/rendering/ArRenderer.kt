@@ -348,6 +348,8 @@ class ArRenderer(
     private var haveIdlePose = false
     private var noMotionSinceMs = 0L
     private var resumeHoldUntilMs = 0L
+    // Set by [requestResume]; the next frame re-arms PoseFusion's cold snap.
+    @Volatile private var resumedSinceLastFrame = false
     private var lastHeavyWorkMs = 0L
 
     private val anchorOrchestrator = AnchorOrchestrator()
@@ -979,6 +981,10 @@ class ArRenderer(
     }
     private val mappingViewMatrixScratch = FloatArray(16)
     private val backboneScratch = FloatArray(16)
+    // The frozen backbone, and the correction standing when the hold began (GL thread).
+    private var backboneWasHolding = false
+    private var heldBackbone: FloatArray? = null
+    private var correctionAtHold: FloatArray? = null
     // Scratch for composing the overlay matrix (anchor frame * in-plane transform).
     private val overlayBaseScratch = FloatArray(16)
     private val overlayLocalScratch = FloatArray(16)
@@ -2002,6 +2008,7 @@ class ArRenderer(
                     // lastSeq rewound to 0 it looked brand new on the next frame and cold-snapped
                     // the new anchor onto the old wall.
                     poseFusion.reset(slamManager.getRelocResultInto(relocBuf)[18])
+                    backboneWasHolding = false; heldBackbone = null; correctionAtHold = null
                     correctionArbiter.reset()
                     anchorGeneration++
                     // KPM observations and pose-history samples from before this anchor existed
@@ -2083,7 +2090,8 @@ class ArRenderer(
             }
             // Re-arm the hard cold-snap whenever ARCore isn't tracking (pocket / screen-off / loss), so
             // the next confident relocalization snaps the overlay back instantly rather than easing in.
-            if (!isTracking) poseFusion.markRelocalizing()
+            if (!isTracking || resumedSinceLastFrame) poseFusion.markRelocalizing()
+            resumedSinceLastFrame = false
             val depthSupported = depthApiEnabled && activeSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
 
             val yawRad = kotlin.math.atan2(-viewMatrix[2].toDouble(), -viewMatrix[10].toDouble())
@@ -2097,6 +2105,25 @@ class ArRenderer(
             val backbone = backboneScratch
             if (anchorEstablished) {
                 anchorOrchestrator.getConsensusMatrix(backbone)
+                // While no anchor tracks, the backbone is frozen at its last good pose, and a relock
+                // then writes its correction against that frozen pose. When ARCore's anchor resumes
+                // the backbone jumps; re-base such a correction so the overlay doesn't jump with it.
+                // A correction untouched during the hold was made against the real anchor, and
+                // carries over as it is.
+                val holdingNow = anchorOrchestrator.isHolding
+                if (holdingNow && !backboneWasHolding) {
+                    heldBackbone = backbone.copyOf()
+                    correctionAtHold = poseFusion.correctionCopy()
+                } else if (!holdingNow && backboneWasHolding) {
+                    val held = heldBackbone
+                    val now = poseFusion.correctionCopy()
+                    if (held != null && now != null && !now.contentEquals(correctionAtHold)) {
+                        poseFusion.rebase(held, backbone)
+                    }
+                    heldBackbone = null
+                    correctionAtHold = null
+                }
+                backboneWasHolding = holdingNow
             } else {
                 // Null only under severe allocation pressure (see SlamManager.getAnchorTransform's
                 // doc) — leave backbone at whatever it already held (previous frame / identity)
@@ -2263,6 +2290,11 @@ class ArRenderer(
                         hybridFrameReady = hybridFrameReady,
                         hasRelocCapturePose = captureAnchorCam != null,
                         relocGated = relocGated,
+                        // A lock standing on paint gets through a degrading hybrid page: the page is
+                        // the wall before the paint, the paint is the wall now.
+                        relocPaintBacked = slamManager.getRelocPaintInliers() >=
+                            com.hereliesaz.graffitixr.feature.ar.anchor.CorrectionSourceArbiter.PAINT_BACKED_MIN_INLIERS,
+                        hybridConfidence = hybridAccepted?.confidence ?: 1f,
                     )
                 }
             val anchorMatrix: FloatArray = when {
@@ -2945,12 +2977,23 @@ class ArRenderer(
             // relocWantsFrame() now rejects that work up front, so a feed the reloc worker isn't ready
             // for costs only the YUV assembly. The worker itself self-limits (200 ms between attempts),
             // so feeding at ~6 Hz keeps it saturated without ever queueing.
+            //
+            // Once the anchor exists the worker sets the pace: every frame is offered and only one it
+            // is ready for (relocWantsFrame) is assembled, so it relocks at its own hunting / locked
+            // back-off. That includes frames while ARCore has LOST tracking -- out of a pocket, after
+            // screen-off -- which is exactly when the Doodle has to find the wall again; gating the
+            // feed on isTracking meant snap-back waited for ARCore to recover by itself first.
             lastStep = "slamFeed"
-            val throttleRate = if (anchorEstablished) 10 else 3 // 6Hz vs 20Hz
-            if (isTracking && frameCount % throttleRate == 0) {
-                // Calculate device motion (linear and angular velocity) for deblurring
+            val throttleRate = 3 // pre-anchor: 20 Hz at 60 fps
+            val feedThisFrame = if (anchorEstablished) slamManager.relocWantsFrame()
+                else isTracking && frameCount % throttleRate == 0
+            if (feedThisFrame) {
+                // Calculate device motion (linear and angular velocity) for deblurring. A lost frame's
+                // pose is ARCore's last guess, not a measurement: no motion from it.
                 val currentPose = camera.displayOrientedPose
-                if (frameCount > 0) {
+                // After a loss (lastQuat null) the first tracked sample only seeds the deltas: the
+                // stored position is from before the loss, so a velocity against it would be a jump.
+                if (isTracking && frameCount > 0 && lastQuat != null) {
                     // Delta-based velocity estimation, over the MEASURED interval. This was hardcoded
                     // to 1/20 s "approx 20Hz throttle", which only ever matched the pre-anchor rate —
                     // post-anchor the same divisor was applied to a 2 Hz sample interval, inflating
@@ -2976,7 +3019,12 @@ class ArRenderer(
                     slamManager.updateDeviceMotion(angVel, linVel)
                     lastQuat = q
                 }
-                lastPoseX = currentPose.tx(); lastPoseY = currentPose.ty(); lastPoseZ = currentPose.tz()
+                if (isTracking) {
+                    lastPoseX = currentPose.tx(); lastPoseY = currentPose.ty(); lastPoseZ = currentPose.tz()
+                    if (lastQuat == null) { lastQuat = currentPose.rotationQuaternion; lastMotionSampleNs = frame.timestamp }
+                } else {
+                    lastMotionSampleNs = 0L; lastQuat = null   // the next tracked sample starts fresh
+                }
 
                 // Calculate rotation code to align sensor-native data with display orientation
                 val displayRotation = displayRotationHelper.getRotation()
@@ -3866,6 +3914,9 @@ class ArRenderer(
         try {
             val s = session ?: return SessionLifecycleOutcome.NoSession
             s.resume()
+            // The phone may have moved anywhere while paused (pocket, screen off). ARCore does not
+            // always report a non-tracking frame first, so arm the cold snap here as well.
+            resumedSinceLastFrame = true
             return SessionLifecycleOutcome.Applied
         } catch (e: Exception) {
             return SessionLifecycleOutcome.Failed(e)

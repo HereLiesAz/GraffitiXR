@@ -1,6 +1,6 @@
 # Personvernerklæring for GraffitiXR
 
-**Sist oppdatert:** 2026-09-04
+**Sist oppdatert:** 2026-10-19
 
 HereLiesAZ bygde GraffitiXR-appen som en kildetilgjengelig app (source-available) (se LICENSE og docs/LICENSING.md i repositoriet for vilkårene). Denne TJENESTEN leveres av HereLiesAZ uten kostnad og er beregnet for bruk som den er.
 
@@ -14,7 +14,7 @@ For en bedre opplevelse, mens du bruker tjenesten vår, kan vi kreve at du gir o
 
 * **Kameradata:** Appen krever tilgang til enhetens kamera for å vise Augmented Reality (AR)-visningen, overleggsmodus og for å ta bilder for prosjektmål. Kameradata behandles lokalt på enheten din og overføres ikke til våre servere med mindre du eksplisitt velger å dele en prosjektfil.
 * **Lagring / Bilder:** Appen ber ikke om noen lagringstillatelse. Bilder du legger til kommer via Android-systemets bilde- eller filvelger, som bare gir appen tilgang til filen du velger. Prosjekter lagres i appens private lagring, og eksporterte bilder lagres i enhetens bildegalleri.
-* **Stedsdata (valgfritt):** Appen ber om stedstillatelse bare når du begynner å ta opp et AR-mål. Hvis du gir den, lagrer opptaksposten for målet hvor det ble tatt (breddegrad, lengdegrad, høyde og nøyaktighet). Den lagres lokalt i prosjektfilen og forlater enheten bare hvis du selv deler eller eksporterer prosjektfilen.
+* **Stedsdata (valgfritt):** Appen ber om stedstillatelse bare når du begynner å ta opp et AR-mål. Hvis du gir den, lagrer opptaksposten for målet hvor det ble tatt (breddegrad, lengdegrad, høyde og nøyaktighet). Den lagres lokalt i prosjektfilen og forlater enheten bare hvis du selv deler eller eksporterer prosjektfilen. Link (dele en økt med en annen enhet) sender den aldri: den andre enheten får prosjektet uten noen posisjon.
 
 ## Krasjrapporter (opt-in)
 
@@ -40,7 +40,9 @@ Vi kan ansette tredjepartsselskaper og enkeltpersoner på grunn av følgende år
 * For å utføre tjenesterelaterte tjenester; eller
 * For å hjelpe oss med å analysere hvordan tjenesten vår brukes.
 
-Vi bruker **Google ML Kit** for emnesegmentering (bakgrunnsfjerning). Denne behandlingen skjer lokalt på enheten din.
+Motivisolering (bakgrunnsfjerning) bruker **U²-Net**, en modell som er bygd inn i appen, helt på enheten din. Ingenting lastes ned for det, og ingen bilder forlater enheten.
+
+På enheter som støtter det, kjører AR-modus på **Google Play-tjenester for AR (ARCore)**, levert av Google LLC og underlagt [Googles personvernerklæring](https://policies.google.com/privacy). ARCore behandler kamerabilder og data fra bevegelsessensorene for å spore enheten; se Googles [personvernkrav for ARCore](https://developers.google.com/ar/develop/privacy-requirements) for hva det samler inn. På enheter uten ARCore bruker appen sin egen sporing, og ARCore er aldri involvert.
 
 ## Oppdateringer
 

@@ -67,7 +67,10 @@ on top of the OpenCV relocalizer:
    promoted into the reloc doodle (`mSelfGrowEnabled`: the engine starts with it off and
    the app pushes the persisted setting, default **on**, switchable from the diagnostic overlay).
    Promoted marks are placed where they were SEEN and tagged OUTSIDE, so the reloc filter uses
-   them, and relocalization survives the original marks being painted over. The promotion
+   them, and relocalization survives the original marks being painted over. The grown rows
+   are saved with the project (`grownDoodle`, `MobileGS::exportGrownWall`) and appended behind
+   the captured Doodle on reload (`restoreGrownWall`), so what the Doodle learned outlives the
+   session. The promotion
    gate is `MobileGS::growTrusted` — a strong inlier ratio qualifies at a lower
    absolute count, because a half-covered wall rarely reaches a large raw inlier
    count and the old flat `inliers >= 20` meant the doodle could only grow
@@ -133,7 +136,15 @@ standing anchor-local correction, so exactly one drives it on any frame
 
 The handover is one-way and timed — reloc until hybrid first accepts, hybrid while it keeps
 accepting, reloc again only after a full silent window — so the correction never flips between the two
-estimators frame by frame (they differ in latency and bias). A re-capture resets the history. The 3 s
+estimators frame by frame (they differ in latency and bias).
+
+**Paint goes through.** The KPM page is a photo of the wall before the paint, so it degrades as the
+wall is painted, while a reloc lock that stands on paint gets better. A lock with at least
+`PAINT_BACKED_MIN_INLIERS` (8) inliers on paint marks or grown rows (`SlamManager.getRelocPaintInliers`,
+fresh within `kRelocPriorMaxAgeMs`) drives whenever hybrid is not holding well: silent past the window,
+or its last accepted observation below `HYBRID_DEGRADED_CONF` (0.5). Once paint has driven it keeps the
+anchor the way hybrid does (held through frames without a paint-backed lock for the window; a hybrid
+acceptance meanwhile does not take it back). Both constants are unmeasured. A re-capture resets the history. The 3 s
 window is unmeasured; it belongs to the same eval sweep as the other fusion constants.
 
 On a re-capture `PoseFusion.reset(seq)` also adopts the native reloc seq current at that instant as
@@ -160,7 +171,16 @@ while a thousand features that don't match is an aiming problem.
 
 The reloc thread runs at 5 Hz once locked and ~16 Hz while hunting, since the
 cost of an extra attempt is far smaller than the cost of the overlay staying
-adrift.
+adrift. Once the anchor exists, the renderer offers every camera frame and
+assembles only the ones the worker is ready for (`relocWantsFrame`), so the
+worker's own pace is the real rate. Frames keep coming while ARCore has lost
+tracking (out of a pocket, after screen-off), which is when the Doodle has to
+find the wall.
+
+After a loss, PoseFusion snaps to a spread-gated relock with at least
+`COLD_SNAP_MIN_INLIERS` inliers instead of easing in. A weak fix that disagrees
+with the standing correction still needs `DIVERGED_AGREEMENT` agreeing fixes
+first; only the very first lock is exempt.
 
 ## Open question: the display-rotation convention
 
@@ -236,7 +256,7 @@ using the wall's normal learned at earlier locks and saved with the project.
   switched off from the diagnostic overlay (Settings > diagnostic overlay).
 
 ---
-*Documentation updated on 2026-10-12: added Anticipation (half-sphere views of the KPM page, close-ups first). Earlier: 2026-09-04 (later pass): corrected the mechanism section — the bundled ONNX distortion head, not the descriptor-similarity test, is the producer of `mPaintingProgress`/`mCorroborationConfidence` in a normal (asset-present) install; the descriptor test only runs as a fallback when that asset is stripped. Earlier same-day pass corrected the confGlobal formula's input (corroboration confidence, not painting progress), self-grow's actual default (off, not on), the corroboration Lowe ratio (0.85, not 0.75), and removed a stale reference to the deleted voxel/splat map. Prior update: 2026-06-22, SLAM right-size and documentation-accuracy pass.*
+*Documentation updated on 2026-10-19: self-grow, drift correction and the wall feature map are on by default (the app's settings; the native engine starts off until they are applied), switched from the AR diagnostic overlay. Earlier: 2026-10-12: added Anticipation (half-sphere views of the KPM page, close-ups first). Earlier: 2026-09-04 (later pass): corrected the mechanism section — the bundled ONNX distortion head, not the descriptor-similarity test, is the producer of `mPaintingProgress`/`mCorroborationConfidence` in a normal (asset-present) install; the descriptor test only runs as a fallback when that asset is stripped. Earlier same-day pass corrected the confGlobal formula's input (corroboration confidence, not painting progress), self-grow's actual default (off, not on), the corroboration Lowe ratio (0.85, not 0.75), and removed a stale reference to the deleted voxel/splat map. Prior update: 2026-06-22, SLAM right-size and documentation-accuracy pass.*
 
 ## The reference marks and the design (current flow)
 
@@ -244,17 +264,39 @@ The artist taps their painted reference marks and the capture is masked to them,
 tapped marks are recorded per point as `Doodle.pinned`. When the design is placed,
 `DoodlePartition` forces the pinned marks OUTSIDE (the backbone the relocalizer matches against)
 wherever the design falls, instead of classifying them INSIDE just because the design is laid over
-them. Any point that is not pinned is classified by where the design falls. If the backbone is still
-tiny (fewer than `kMinBackboneMarks` OUTSIDE marks) native ignores the partition for matching rather
-than sitting at FEW_MATCHES forever.
+them. Any point that is not pinned is classified by where the design falls. A mark under the design
+(INSIDE or BAND) stays in the relocalizer's solve until the paint grid has its cell painted over; only
+then is it dropped, because only then is it no longer the doodle the artist drew. (The old rule
+dropped every non-OUTSIDE mark as soon as a dozen OUTSIDE rows existed, and self-grow tags every grown
+row OUTSIDE, so a few promotions threw away every mark inside the work area.)
+
+Paint marks are matched in every reloc pass (plain, scaled, rectified, sensor-turned), never from a
+live keypoint the Doodle already took, and, when a fresh prior pose exists, only near where that pose
+predicts them. The persistent map joins a solve only with a fresh prior (published in the last
+`kRelocPriorMaxAgeMs` with tracking in between) and only through points re-observed or carrying real
+confidence.
 
 Other behaviour worth knowing:
 - A repartition (design nudged) keeps marks self-grow appended and the distortion head's patch: the
   Kotlin copy it re-pushes is only the base, and native treats "base is a prefix of what I hold" as
-  the same doodle.
+  the same doodle. The staged Doodle build (photo features, then close-ups) is treated the same way:
+  each stage is the previous plus rows, and keeps the grown tail and the partition.
+- Grown rows are capped at `kMaxGrownRows` behind the captured Doodle; past it, the grown rows no lock
+  has seen for longest make room, so self-grow never stops. The captured rows are never evicted.
+- If the design was registered in another descriptor type than the Doodle (`GrowOutcome.TYPE_MISMATCH`),
+  the app registers it again; paint marks of the old type are dropped then.
 - Corroboration needs `kCorrobConfirmations` CONSECUTIVE hits for a feature predicted in view;
-  an observed miss resets an unconfirmed feature. Moving the design resets corroboration; paint marks
-  already on the wall are kept. Paint marks store the LIVE descriptor that corroborated them.
+  an observed miss resets an unconfirmed feature. Moving the design re-projects corroboration: a
+  feature whose wall spot moved less than `kRho` of the design's extent keeps its count (and promoted
+  flag); one that moved further starts over. Paint marks already on the wall are kept. The counts are
+  saved in the paint-grid blob and resume on reload of the same design.
+- Tone and opacity are how the overlay looks, not what the artwork is: the painting guide is the
+  design at full opacity and neutral tone, and a tone edit never re-registers it (only the source
+  bitmap, scale or rotation do). Paint marks store the LIVE descriptor that corroborated them.
+- While no ARCore anchor tracks, the backbone holds its last good pose. A relock in that time is a
+  correction against the held pose; when the anchor resumes, that correction is re-based
+  (`PoseFusion.rebase`) so the overlay stays where it was drawn. A correction untouched during the
+  hold carries over as it is.
 - `PoseFusion` believes a diverged, not-high-confidence fix only after three consecutive agreeing
   fixes, and a cold snap needs the inliers spread across the frame (`reloc[35]`, published with the
   pose).

@@ -1,6 +1,6 @@
 # Politique de Confidentialité de GraffitiXR
 
-**Dernière Mise à Jour :** 2026-09-04
+**Dernière Mise à Jour :** 2026-10-19
 
 HereLiesAZ a conçu l'application GraffitiXR comme une application à code source disponible (source-available) — voir le fichier LICENSE et docs/LICENSING.md du dépôt pour les conditions exactes. Ce SERVICE est fourni par HereLiesAZ gratuitement et est destiné à être utilisé tel quel.
 
@@ -14,7 +14,7 @@ Pour une meilleure expérience lors de l'utilisation de notre Service, nous pouv
 
 *   **Données de la Caméra :** L'application nécessite l'accès à la caméra de votre appareil pour afficher la vue de Réalité Augmentée (AR), le mode Superposition, et pour capturer des images pour les cibles de projet. Les données de la caméra sont traitées localement sur votre appareil et ne sont pas transmises à nos serveurs, sauf si vous choisissez explicitement de partager un fichier de projet.
 *   **Stockage / Photos :** L'application ne demande aucune autorisation de stockage. Les images que vous ajoutez passent par le sélecteur de photos ou de fichiers du système Android, qui ne donne à l'application accès qu'au fichier que vous choisissez. Les projets sont enregistrés dans le stockage privé de l'application, et les images exportées dans la galerie photo de votre appareil.
-*   **Données de Localisation (Optionnel) :** L'application ne demande l'autorisation de localisation que lorsque vous commencez à capturer une cible AR. Si vous l'accordez, l'enregistrement de capture de cette cible conserve l'endroit où elle a été prise (latitude, longitude, altitude et précision). Il est enregistré localement dans le fichier du projet et ne quitte votre appareil que si vous partagez ou exportez vous-même ce fichier de projet.
+*   **Données de Localisation (Optionnel) :** L'application ne demande l'autorisation de localisation que lorsque vous commencez à capturer une cible AR. Si vous l'accordez, l'enregistrement de capture de cette cible conserve l'endroit où elle a été prise (latitude, longitude, altitude et précision). Il est enregistré localement dans le fichier du projet et ne quitte votre appareil que si vous partagez ou exportez vous-même ce fichier de projet. Link (partager une session avec un second appareil) ne l'envoie jamais : l'autre appareil reçoit le projet sans aucune localisation.
 
 ## Rapports de Plantage (Opt-In)
 
@@ -40,7 +40,9 @@ Nous pouvons employer des sociétés tierces et des personnes pour les raisons s
 *   Pour effectuer des services liés au Service ; ou
 *   Pour nous aider à analyser comment notre Service est utilisé.
 
-Nous utilisons **Google ML Kit** pour la segmentation des sujets (suppression de l'arrière-plan). Ce traitement s'effectue localement sur votre appareil.
+L'isolement du sujet (suppression de l'arrière-plan) utilise **U²-Net**, un modèle intégré à l'application, entièrement sur votre appareil. Rien n'est téléchargé pour cela et aucune image ne quitte l'appareil.
+
+Sur les appareils compatibles, le mode RA fonctionne avec **Services Google Play pour la RA (ARCore)**, fournis par Google LLC et régis par les [Règles de confidentialité de Google](https://policies.google.com/privacy). ARCore traite les images de la caméra et les données des capteurs de mouvement pour suivre l'appareil ; consultez les [exigences de confidentialité d'ARCore](https://developers.google.com/ar/develop/privacy-requirements) de Google pour savoir ce qu'il collecte. Sur les appareils sans ARCore, l'application utilise son propre suivi et ARCore n'intervient jamais.
 
 ## Mises à Jour
 

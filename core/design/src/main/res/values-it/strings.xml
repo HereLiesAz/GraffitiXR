@@ -11,7 +11,7 @@
     <!-- Label for the Augmented Reality (AR) projection mode. -->
     <string name="nav_ar_mode">AR</string>
     <!-- Instructions for AR mode, explaining how to project artwork onto a wall. -->
-    <string name="nav_ar_mode_info">Proietta la tua opera d\'arte su un muro reale usando la realtà aumentata. Scansiona prima il muro per posizionare l\'ancora, poi aggiungi i livelli del tuo design.</string>
+    <string name="nav_ar_mode_info">Proietta la tua opera d\'arte su un muro reale usando la realtà aumentata. Scansiona prima il muro per posizionare l\'ancora, poi aggiungi il tuo design.</string>
 
     <!-- Label for the camera overlay mode, which doesn\'t use AR tracking. -->
     <string name="nav_overlay">Sovrapposizione</string>
@@ -55,19 +55,17 @@
     <string name="nav_refine_info">Regola con precisione la posizione di uno Scarabocchio esistente.</string>
 
     <!-- Label for the progress tracking tool. -->
-    <string name="nav_update">Progresso</string>
     <!-- Description of the progress tool, used for marking completed parts of a mural. -->
-    <string name="nav_update_info">Segna le aree completate del tuo murale per tracciare il progresso della pittura.</string>
 
     <!-- Label for the design and layer management menu. -->
     <string name="nav_design">Design</string>
     <!-- Description of the design menu, where layers are added and managed. -->
-    <string name="nav_design_info">Aggiungi e gestisci i livelli di design. Ogni livello può essere un\'immagine importata o un disegno a mano libera.</string>
+    <string name="nav_design_info">Il tuo spazio di lavoro. Il design che aggiungi con \'Apri\' — e modifichi con gli strumenti qui sotto — resta in ogni modalità.</string>
 
     <!-- Action label to open or import an image. -->
     <string name="nav_open">Apri</string>
     <!-- Description of the Open action, used to add an image layer from the gallery. -->
-    <string name="nav_open_info">Aggiungi un\'immagine dalla tua galleria come nuovo livello.</string>
+    <string name="nav_open_info">Aggiungi un\'immagine dalla tua galleria come design.</string>
 
     <!-- Label for the background wall image in Mockup mode. -->
     <string name="nav_wall">Muro</string>
@@ -83,7 +81,7 @@
     <string name="nav_invert">Inverti</string>
     <string name="nav_blend">Fusione</string>
     <!-- Description of the Invert tool, explaining its use for stencil and overlay analysis. -->
-    <string name="nav_invert_info">Crea un negativo del livello corrente. I neri diventano bianchi e i colori vengono capovolti nei loro opposti — utile per l\'analisi di stencil e sovrapposizioni.</string>
+    <string name="nav_invert_info">Crea un negativo del design. I neri diventano bianchi e i colori vengono capovolti nei loro opposti — utile per l\'analisi di stencil e sovrapposizioni.</string>
 
     <!-- Label for the outline filter. -->
     <string name="nav_outline">Contorno</string>
@@ -93,18 +91,18 @@
     <!-- Label for image adjustment tools (brightness, contrast, etc.). -->
     <string name="nav_adjust">Regola</string>
     <!-- Description of the image adjustment tools. -->
-    <string name="nav_adjust_info">Regola finemente luminosità, contrasto, saturazione e bilanciamento del colore per questo livello.</string>
+    <string name="nav_adjust_info">Regola finemente luminosità, contrasto, saturazione e bilanciamento del colore del design.</string>
     <string name="nav_edit">Modifica</string>
 
     <!-- Label for color balance and tinting tools. -->
     <string name="nav_balance">Colore</string>
     <!-- Description of the color balance tool, mentioning RGB sliders. -->
-    <string name="nav_balance_info">Colora i livelli usando i cursori dei canali rosso, verde e blu.</string>
+    <string name="nav_balance_info">Colora il design usando i cursori dei canali rosso, verde e blu.</string>
 
     <!-- Label for layer blending mode selection. -->
     <string name="nav_blending">Fusione</string>
     <!-- Description of blending modes, used to control how layers composite. -->
-    <string name="nav_blending_info">Scorri le modalità di fusione (Normale, Moltiplica, Scolora, Sovrapponi...) per controllare come questo livello si compone con i livelli sottostanti.</string>
+    <string name="nav_blending_info">Scorri le modalità di fusione (Normale, Moltiplica, Scolora, Sovrapponi...) per controllare come il design si compone con ciò che sta dietro.</string>
 
     <!-- Label for the application settings menu. -->
     <string name="nav_settings">Impostazioni</string>
@@ -134,7 +132,7 @@
     <!-- Action label to export the final image. -->
     <string name="nav_export">Esporta</string>
     <!-- Description of the Export action, explaining it merges layers into one image. -->
-    <string name="nav_export_info">Esporta un\'immagine piatta unita di tutti i livelli visibili nella tua galleria fotografica.</string>
+    <string name="nav_export_info">Esporta il design come immagine piatta nella tua galleria fotografica.</string>
 
     <!-- Label for the interactive help system. -->
     <string name="nav_help">Aiuto</string>
@@ -218,7 +216,6 @@
 
     <string name="generating">GENERAZIONE...</string>
     <!-- Hint shown when user can add a layer by pressing again. -->
-    <string name="stencil_hint">Premi di nuovo per aggiungere un livello.</string>
     <!-- Hint for renaming a layer. -->
     <string name="rename_hint">Rinomina</string>
     <!-- Hint for editing text content. -->
@@ -232,13 +229,9 @@
     <!-- Action to duplicate a layer. -->
     <string name="duplicate">Duplica</string>
     <!-- Action to unlink a layer from others. -->
-    <string name="unlink_layer">Scollega Livello</string>
     <!-- Action to link a layer with others. -->
-    <string name="link_layer">Collega Livello</string>
     <!-- Action to hide a layer. -->
-    <string name="hide_layer">Nascondi Livello</string>
     <!-- Action to show a layer. -->
-    <string name="show_layer">Mostra Livello</string>
     <!-- Action to flatten all layers. -->
     <string name="flatten_all">Unisci Tutto</string>
     <!-- Action to delete a layer. -->
@@ -350,8 +343,9 @@
     <string name="lib_new_project">Nuovo</string>
     <string name="lib_import_project">Importa</string>
     <string name="lib_no_projects">Ancora nessun progetto</string>
-    <string name="lib_no_projects_hint">Tocca Nuovo in alto per iniziare il tuo primo murale.\n\nVerrai portato nell\'editor dove puoi:\n  •  Aggiungere opere d\'arte dal menu Design\n  •  Passare alla modalità AR per proiettare su un muro reale\n  •  Usare la Sovrapposizione per far fluttuare il tuo design sulla telecamera dal vivo\n  •  Usare Mockup per l\'anteprima su una foto del muro\n  •  Usare Tavolo luminoso per ricalcare il tuo design su carta</string>
+    <string name="lib_no_projects_hint">Tocca Nuovo in basso per iniziare la tua prima opera.\n\nVerrai portato nell\'editor dove puoi:\n  •  Aggiungere opere d\'arte dal menu Design\n  •  Passare alla modalità AR per proiettare su un muro reale\n  •  Usare la Sovrapposizione per far fluttuare il tuo design sulla telecamera dal vivo\n  •  Usare Mockup per l\'anteprima su una foto del muro\n  •  Usare Ricalco per ricalcare il tuo design su carta</string>
     <string name="lib_project_thumbnail">Miniatura del Progetto</string>
+    <string name="lib_project_damaged">Danneggiato: non si può aprire</string>
     <string name="lib_delete_project_desc">Elimina progetto %1$s</string>
 
     <!-- Settings Screen -->
@@ -424,8 +418,6 @@
     <string name="settings_copyright">GraffitiXR © 2025</string>
 
     <!-- Editor UI -->
-    <string name="layers_title">Livelli</string>
-    <string name="brush_size_title">Dimensione Pennello</string>
     <string name="save_project_hint">Nome Progetto</string>
 
     <!-- Target Creation -->
@@ -443,7 +435,6 @@
     <string name="reset_button">Ripristina</string>
 
     <string name="poster_title">GENERA POSTER</string>
-    <string name="poster_select_layers">Seleziona i livelli da includere:</string>
     <string name="poster_physical_size">Dimensione Fisica (Larghezza in mm):</string>
     <string name="poster_generate_pdf">GENERA PDF</string>
 
@@ -468,7 +459,7 @@
     <!-- Overlay Mode help text. -->
     <string name="help_overlay">Modalità Sovrapposizione: Mostra il design sulla telecamera dal vivo senza tracciamento spaziale. Istruzioni: Scala e sposta manualmente il design per adattarlo alla tua inquadratura.</string>
     <!-- Mockup Mode help text. -->
-    <string name="help_mockup">Modalità Mockup: Visualizza in anteprima il design su una foto statica. Istruzioni: Usa \'Muro\' per impostare un\'immagine di sfondo, poi disponi i livelli sopra.</string>
+    <string name="help_mockup">Modalità Mockup: Visualizza in anteprima il design su una foto statica. Istruzioni: Usa \'Muro\' per impostare un\'immagine di sfondo, poi posiziona il design sopra.</string>
     <!-- Lightbox Mode help text. -->
     <string name="help_trace">Modalità Tavolo luminoso: Superficie di tracciamento ad alta luminosità. Istruzioni: Posiziona la carta sullo schermo e traccia. Premi rapidamente Volume Su, Giù, Su, Giù per uscire.</string>
     <!-- Target Management help text. -->
@@ -477,27 +468,28 @@
     <string name="help_create">Crea Ancora: Fotografa un segno sul muro per bloccare la proiezione. Istruzioni: Punta verso una texture distinta e tocca. L\'app traccerà questo segno.</string>
     <!-- Layer Management help text. -->
     <!-- Import Image help text. -->
-    <string name="help_add_img">Importa Immagine: Aggiungi uno schizzo o una foto di riferimento. Istruzioni: Seleziona un\'immagine dalla tua galleria. Apparirà come un nuovo livello di design.</string>
+    <string name="help_add_img">Importa Immagine: Aggiungi uno schizzo o una foto di riferimento. Istruzioni: Seleziona un\'immagine dalla tua galleria. Diventerà il design.</string>
     <!-- New Sketch help text. -->
     <!-- Add Text help text. -->
     <!-- Change Wall help text. -->
     <string name="help_wall">Cambia Muro: Imposta lo sfondo per la modalità Mockup. Istruzioni: Seleziona una foto del muro fisico su cui intendi dipingere.</string>
     <!-- Project Management help text. -->
-    <string name="help_project_host">Gestione Progetto: Salva, carica ed esporta il lavoro. Istruzioni: Tocca per accedere alle attività amministrative per il tuo murale.</string>
+    <string name="help_project_host">Gestione Progetto: Salva, carica ed esporta il lavoro. Istruzioni: Tocca per accedere alle attività amministrative per il tuo progetto.</string>
     <!-- New Project help text. -->
-    <string name="help_new">Nuovo Progetto: Inizia un nuovo murale. Istruzioni: Tocca per ripristinare. Attenzione: Questo cancella tutto il lavoro corrente. Salva prima!</string>
+    <string name="help_new">Nuovo Progetto: Inizia una nuova opera. Istruzioni: Tocca per ripristinare. Attenzione: Questo cancella tutto il lavoro corrente. Salva prima!</string>
     <!-- Save Project help text. -->
-    <string name="help_save">Salva Progetto: Salva il murale e la mappa AR. Istruzioni: Inserisci un nome per il progetto e tocca Salva per conservare i tuoi progressi.</string>
+    <string name="help_save">Salva Progetto: Salva l\'opera e la mappa AR. Istruzioni: Inserisci un nome per il progetto e tocca Salva per conservare i tuoi progressi.</string>
     <!-- Project Library help text. -->
-    <string name="help_load">Libreria Progetti: Accedi ai murali salvati. Istruzioni: Sfoglia la libreria per riprendere il lavoro o importare file di progetto condivisi.</string>
+    <string name="help_load">Libreria Progetti: Accedi ai progetti salvati. Istruzioni: Sfoglia la libreria per riprendere il lavoro o importare file di progetto condivisi.</string>
     <!-- Export Image help text. -->
-    <string name="help_export">Esporta Immagine: Salva uno snapshot ad alta risoluzione. Istruzioni: Rende tutti i livelli visibili in un singolo PNG nella tua galleria fotografica.</string>
+    <string name="help_export">Esporta Immagine: Salva uno snapshot ad alta risoluzione. Istruzioni: Rende il design in un singolo PNG nella tua galleria fotografica.</string>
     <!-- App Settings help text. -->
     <string name="help_settings">Impostazioni App: Configura le preferenze. Istruzioni: Apri per regolare la manualità, le unità e i parametri di scansione.</string>
     <!-- Flashlight help text. -->
     <string name="help_light">Torcia: Attiva/disattiva il LED del dispositivo. Istruzioni: Usa questo per illuminare muri scuri per un migliore tracciamento AR.</string>
     <!-- Lock/Freeze help text. -->
     <string name="help_lock_trace">Congela: blocca l\'intero touchscreen in modo che la carta da lucido non trascini il disegno — a differenza di Blocca, questo blocca anche lo scorrimento e i tocchi. Per uscire, premi rapidamente Volume Su, Giù, Su, Giù.</string>
+    <string name="help_lock_ar">Blocca: blocca tutto il touchscreen mentre dipingi, così una mano, una manica o una tasca non spostano il design né cambiano modalità. Lo schermo si blocca anche da solo quando è coperto (in tasca, a faccia in giù). Per uscire, premi in fretta Volume su, giù, su, giù.</string>
     <!-- Interactive \'Help\' help text. -->
     <!-- Individual Layer help text. -->
 
@@ -543,7 +535,6 @@
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
     <string name="settings_scan_mode_voxel_hash">Voxel hash</string>
     <string name="settings_scan_mode_surface_mesh">Mesh di superficie</string>
-    <string name="settings_mural_method_label">Motore murale</string>
 
 
     <!-- Added by audit item 4: missing keys relative to core/design's default table -->
@@ -590,8 +581,8 @@
     <string name="settings_reset_tutorials_value">Mostra di nuovo le guide iniziali</string>
     <string-array name="onboarding_trace">
         <item>Questa è la modalità Ricalco.</item>
-        <item>Tocca «Apri» per aggiungere il tuo primo livello. Una volta inserito, pizzica e trascina sulla tela per ridimensionarlo e posizionarlo.</item>
-        <item>Quando sono dove e come li vuoi, premi il pulsante Blocca per trasformare il telefono in un tavolo luminoso per ricalcare su carta.</item>
+        <item>Tocca «Apri» per aggiungere il tuo design. Una volta inserito, pizzica e trascina sulla tela per ridimensionarlo e posizionarlo.</item>
+        <item>Quando è dove e come lo vuoi, premi il pulsante Blocca per trasformare il telefono in un tavolo luminoso per ricalcare su carta.</item>
         <item>Ti consigliamo di usare la modalità Ricalco o Mockup per la modifica.</item>
         <item>Così le tue immagini sono pronte e il telefono può concentrarsi sulla realtà aumentata quando premi il pulsante AR.</item>
     </string-array>
@@ -599,12 +590,12 @@
         <item>Proiezione AR — proietta il tuo design su un muro reale usando il sensore di profondità e il tracciamento spaziale del telefono.</item>
         <item>Punta il muro e muoviti lentamente da un lato all\'altro. Appariranno forme colorate mentre il motore mappa la superficie. Attendi finché l\'area del muro non è coperta.</item>
         <item>Basta toccare lo schermo. L\'app fotografa il muro, estrae punti di tracciamento e blocca l\'ancora all\'istante.</item>
-        <item>Tocca «Apri» per aggiungere un livello di design — verrà proiettato sul muro usando l\'ancora appena impostata.</item>
+        <item>Tocca «Apri» per aggiungere il tuo design — verrà proiettato sul muro usando l\'ancora appena impostata.</item>
         <item>Consiglio — muri bianchi vuoti, cemento liscio e superfici a tinta unita non possono essere tracciati. Punta l\'ancora su graffiti, intonaco ruvido o qualsiasi segno distintivo.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Overlay dal vivo — il tuo design fluttua sopra il flusso della fotocamera in diretta, senza bisogno di scansionare alcuna superficie.</item>
-        <item>Tocca «Apri» per aggiungere un livello — scegli una foto e apparirà qui, fluttuando sopra il flusso della fotocamera in diretta.</item>
+        <item>Tocca «Apri» per aggiungere il tuo design — scegli una foto e apparirà qui, fluttuando sopra il flusso della fotocamera in diretta.</item>
         <item>Pizzica per ridimensionare, trascina per riposizionare. L\'overlay resta fisso sullo schermo — allontanati per vedere come si adatta al muro.</item>
     </string-array>
     <string-array name="onboarding_ar_unavailable">
@@ -613,18 +604,15 @@
         <item>Ricalco, Mockup e Sovrapposizione funzionano come sempre. Tocca per chiudere.</item>
     </string-array>
     <string-array name="onboarding_mockup">
-        <item>Mockup fotografico — visualizza in anteprima il tuo design su una foto prima ancora di prendere un pennello.</item>
+        <item>Mockup fotografico — visualizza in anteprima il tuo design su una foto prima ancora di prendere in mano una bomboletta.</item>
         <item>Tocca «Muro» per scegliere o scattare una foto della tua superficie. Fallo per primo!</item>
-        <item>Tocca «Apri» per aggiungere un livello sopra la foto del muro. Pizzica e trascina per ridimensionarlo e posizionarlo.</item>
+        <item>Tocca «Apri» per posizionare il tuo design sopra la foto del muro. Pizzica e trascina per ridimensionarlo e posizionarlo.</item>
     </string-array>
     <string-array name="onboarding_design">
         <item>Questo è Design — il tuo spazio di lavoro. Tutto ciò che crei qui si riporta in ogni altra modalità.</item>
-        <item>Tocca «Apri» per aggiungere il tuo primo livello — scegli una foto dalla galleria e apparirà qui come tua opera.</item>
-        <item>Tocca un livello per aprire i suoi strumenti — raggruppati nelle cartelle Dipingi, Ritocca, Regola ed Effetti. Pizzica e trascina sulla tela per ridimensionarlo e posizionarlo.</item>
+        <item>Tocca «Apri» per aggiungere il tuo design — scegli una foto dalla galleria e apparirà qui come tua opera.</item>
+        <item>Usa gli strumenti di Modifica per regolarlo, invertirlo, estrarne il contorno o isolarlo. Pizzica e trascina sulla tela per ridimensionarlo e posizionarlo.</item>
         <item>Quando è come lo vuoi, scegli come usarlo: «Ricalco» per trasformare il telefono in un tavolo luminoso, «Mockup» per visualizzarlo su una foto, o «AR» per proiettarlo su un muro.</item>
-    </string-array>
-    <string-array name="onboarding_design_layers">
-        <item>Apri — importa una foto dalla galleria; viene aggiunta come nuovo livello.</item>
     </string-array>
     <string name="nav_measure">Misura</string>
     <string name="nav_measure_info">Misura il muro reale: tocca un bordo, poi l\'altro, sul muro su cui si trova il design. La larghezza viene salvata nel progetto: misurata, non stimata.</string>
@@ -725,10 +713,10 @@
     <string name="doodle_cd_detected_marks">Segni rilevati</string>
     <string name="doodle_cd_confirm">Conferma</string>
     <string name="doodle_cd_unwarp_base">Foto del muro acquisita con maniglie agli angoli</string>
-    <string name="guidance_open_via_design_overlay">Tocca «Design» nella barra, poi «Apri», per aggiungere un livello: scegli una foto e apparirà qui, sospesa sulla vista dal vivo della fotocamera.</string>
-    <string name="guidance_open_via_design_mockup">Tocca «Design» nella barra, poi «Apri», per aggiungere un livello sopra la foto del muro. Pizzica e trascina per regolarne dimensioni e posizione.</string>
-    <string name="guidance_open_via_design_trace">Tocca «Design» nella barra, poi «Apri», per aggiungere il tuo primo livello. Una volta inserito, pizzica e trascina sulla tela per regolarne dimensioni e posizione.</string>
-    <string name="guidance_open_via_design_ar">Tocca «Design» nella barra, poi «Apri», per aggiungere un livello di design: viene proiettato sul muro usando l\'ancora appena impostata.</string>
+    <string name="guidance_open_via_design_overlay">Tocca «Design» nella barra, poi «Apri», per aggiungere il tuo design: scegli una foto e apparirà qui, sospesa sulla vista dal vivo della fotocamera.</string>
+    <string name="guidance_open_via_design_mockup">Tocca «Design» nella barra, poi «Apri», per posizionare il tuo design sopra la foto del muro. Pizzica e trascina per regolarne dimensioni e posizione.</string>
+    <string name="guidance_open_via_design_trace">Tocca «Design» nella barra, poi «Apri», per aggiungere il tuo design. Una volta inserito, pizzica e trascina sulla tela per regolarne dimensioni e posizione.</string>
+    <string name="guidance_open_via_design_ar">Tocca «Design» nella barra, poi «Apri», per aggiungere il tuo design: viene proiettato sul muro usando l\'ancora appena impostata.</string>
     <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
     <string name="ar_feedback_guest_edit_dropped">Questa modifica non può essere condivisa con l\'host: resta su questo dispositivo</string>
     <string name="ar_feedback_backend_resolving">Il backend AR è ancora in fase di selezione: riprova a fare da host tra un attimo</string>
@@ -738,6 +726,7 @@
     <string name="ar_feedback_doodle_not_ready">Lo Scarabocchio non è ancora pronto — tienilo inquadrato e riprova «Ospita»</string>
     <string name="ar_feedback_package_failed">Impossibile preparare questo progetto per la condivisione: prova prima a salvarlo</string>
     <string name="ar_feedback_host_failed">Impossibile avviare la condivisione: %1$s</string>
+    <string name="ar_feedback_host_too_large">Questo progetto è troppo grande per condividerlo via Link (%1$d MB; il limite è %2$d MB). Esportalo per condividerlo.</string>
     <string name="ar_feedback_join_load_failed">Impossibile caricare il progetto dell\'host: la sessione è stata terminata.</string>
     <string name="ar_feedback_join_no_geometry">L\'host non ha fornito una geometria a cui ARCore possa allinearsi.</string>
     <string name="ar_feedback_join_failed">Impossibile partecipare: %1$s</string>
@@ -788,6 +777,7 @@
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
     <string name="ar_feedback_clean_wall_save_failed">Impossibile salvare la foto del muro pulito. Scattala di nuovo.</string>
+    <string name="ar_feedback_progress_save_failed">Impossibile salvare la mappa del muro e l’avanzamento della pittura. Restano per questa sessione. Libera spazio e salva di nuovo.</string>
     <string name="ar_feedback_clean_wall_register_failed">Quella foto del muro pulito non coincide con questo muro. Rifalla più o meno da dove starai.</string>
 
     <!-- The CV view legend: the name of each way of looking. -->
