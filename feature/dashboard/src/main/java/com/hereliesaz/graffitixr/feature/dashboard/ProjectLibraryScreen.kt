@@ -76,12 +76,7 @@ fun ProjectLibraryScreen(
     // (see EditorViewModel's Toast usage), then cleared via onDismissImportError so it doesn't
     // re-fire on the next recomposition.
     importErrorMessage: String? = null,
-    onDismissImportError: () -> Unit = {},
-    /**
-     * The actions sit at the bottom on the side of the thumb holding the phone (the off hand, where
-     * the rail docks elsewhere in the app): left for a right-handed artist.
-     */
-    isRightHanded: Boolean = true,
+    onDismissImportError: () -> Unit = {}
 ) {
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -146,11 +141,36 @@ fun ProjectLibraryScreen(
                 }
             }
 
+            // New, Import and Settings, between the intro and the project list
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AzButton(
+                    text = strings.lib.newProject,
+                    onClick = onNewProject,
+                    modifier = Modifier.width(120.dp),
+                    shape = com.hereliesaz.aznavrail.model.AzButtonShape.RECTANGLE
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                AzButton(
+                    text = strings.lib.importProject,
+                    onClick = { importLauncher.launch("*/*") },
+                    modifier = Modifier.width(120.dp),
+                    shape = com.hereliesaz.aznavrail.model.AzButtonShape.RECTANGLE
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                // The only route to Settings before a project exists — see onOpenSettings' doc.
+                IconButton(onClick = onOpenSettings) {
+                    Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Color.White)
+                }
+            }
+
             if (projects.isEmpty()) {
                 Column(
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
+                        .fillMaxSize()
                         .padding(top = 32.dp, start = 16.dp, end = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Top
@@ -171,7 +191,6 @@ fun ProjectLibraryScreen(
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(projects) { project ->
@@ -272,33 +291,6 @@ fun ProjectLibraryScreen(
                             }
                         }
                     }
-                }
-            }
-
-            // New, Import and Settings: at the bottom, on the phone-holding thumb's side.
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(
-                    16.dp,
-                    if (isRightHanded) Alignment.Start else Alignment.End,
-                ),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                AzButton(
-                    text = strings.lib.newProject,
-                    onClick = onNewProject,
-                    modifier = Modifier.width(120.dp),
-                    shape = com.hereliesaz.aznavrail.model.AzButtonShape.RECTANGLE
-                )
-                AzButton(
-                    text = strings.lib.importProject,
-                    onClick = { importLauncher.launch("*/*") },
-                    modifier = Modifier.width(120.dp),
-                    shape = com.hereliesaz.aznavrail.model.AzButtonShape.RECTANGLE
-                )
-                // The only route to Settings before a project exists — see onOpenSettings' doc.
-                IconButton(onClick = onOpenSettings) {
-                    Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Color.White)
                 }
             }
         }

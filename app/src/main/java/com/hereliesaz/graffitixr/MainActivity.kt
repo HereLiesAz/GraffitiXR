@@ -1447,7 +1447,6 @@ class MainActivity : AppCompatActivity() {
                                     val dashboardState by dashboardViewModel.uiState.collectAsState()
                                     LaunchedEffect(Unit) { dashboardViewModel.loadAvailableProjects() }
                                     ProjectLibraryScreen(
-                                        isRightHanded = editorUiState.isRightHanded,
                                         projects = dashboardState.availableProjects,
                                         onLoadProject = { project ->
                                             // Switching projects ends any active guest co-op session
@@ -1914,6 +1913,7 @@ class MainActivity : AppCompatActivity() {
                                     isWaitingForTap = mainUiState.isWaitingForTap,
                                     hasCleanWall = arUiState.hasCleanWall,
                                     onCleanWallPhoto = { arViewModel.requestCleanWallPhoto() },
+                                    onCancel = { mainViewModel.cancelTapMode() },
                                     strings = strings,
                                     onConfirmDoodle = { bitmap, mask ->
                                         if (
@@ -2304,6 +2304,33 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Mode folders (AR, Overlay, Mockup, Trace): exactly one is open — the active mode's. Entering a
+     * mode opens its folder and leaving it closes it (AzNavRail's expandWhen edges). AzNavRail also
+     * toggles a host on every tap, so tapping the active mode would fold it; that collapse is answered
+     * by pulsing the host's flag false→true, whose rising edge re-expands it.
+     * The mode is read live from the view model: AzNavRail keeps the first expandWhen lambda it sees,
+     * so one closing over a composition's editorUiState would go stale.
+     */
+    private val modeHostOpenPulse = androidx.compose.runtime.mutableStateMapOf<String, Boolean>()
+
+    private fun modeHostExpandWhen(hostId: String, mode: EditorMode, current: () -> EditorMode): () -> Boolean =
+        { current() == mode && modeHostOpenPulse[hostId] != false }
+
+    private fun modeHostOnExpandedChange(
+        hostId: String,
+        mode: EditorMode,
+        current: () -> EditorMode,
+    ): (Boolean) -> Unit = { expanded ->
+        if (!expanded && current() == mode) {
+            modeHostOpenPulse[hostId] = false
+            lifecycleScope.launch {
+                kotlinx.coroutines.delay(50)
+                modeHostOpenPulse[hostId] = true
+            }
+        }
+    }
+
     private fun AzNavHostScope.ConfigureRailItems(
         mainViewModel: MainViewModel,
         editorViewModel: EditorViewModel,
@@ -2367,8 +2394,9 @@ class MainActivity : AppCompatActivity() {
                 route = EditorMode.DESIGN.name,
                 color = HotPink,
                 disabled = showLibrary,
-                initiallyExpanded = railExpansion["mode.design"] ?: false,
-                expandWhen = { isDesignMode },
+                // Open from the start and never closed by a mode change: Design's tools stay
+                // reachable while AR/Overlay/Mockup/Trace swap below it. Only a tap on Design folds it.
+                initiallyExpanded = true,
                 onExpandedChange = { editorViewModel.onRailHostExpansionChanged("mode.design", it) },
             )
         // Open — opens an image picker so the chosen image lands as a new layer, staying in the
@@ -2501,9 +2529,9 @@ class MainActivity : AppCompatActivity() {
                     route = EditorMode.AR.name,
                     color = HotPink,
                     disabled = showLibrary,
-                    initiallyExpanded = railExpansion["mode.ar"] ?: false,
-                    expandWhen = { editorUiState.editorMode == EditorMode.AR },
-                    onExpandedChange = { editorViewModel.onRailHostExpansionChanged("mode.ar", it) },
+                    initiallyExpanded = editorUiState.editorMode == EditorMode.AR,
+                    expandWhen = modeHostExpandWhen("mode.ar", EditorMode.AR) { editorViewModel.uiState.value.editorMode },
+                    onExpandedChange = modeHostOnExpandedChange("mode.ar", EditorMode.AR) { editorViewModel.uiState.value.editorMode },
                 )
                 // Target capture — only meaningful while in AR mode.
                 if (editorUiState.editorMode == EditorMode.AR) {
@@ -2735,9 +2763,9 @@ class MainActivity : AppCompatActivity() {
                 route = EditorMode.OVERLAY.name,
                 color = HotPink,
                 disabled = showLibrary,
-                initiallyExpanded = railExpansion["mode.overlay"] ?: false,
-                expandWhen = { editorUiState.editorMode == EditorMode.OVERLAY },
-                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("mode.overlay", it) },
+                initiallyExpanded = editorUiState.editorMode == EditorMode.OVERLAY,
+                expandWhen = modeHostExpandWhen("mode.overlay", EditorMode.OVERLAY) { editorViewModel.uiState.value.editorMode },
+                onExpandedChange = modeHostOnExpandedChange("mode.overlay", EditorMode.OVERLAY) { editorViewModel.uiState.value.editorMode },
             )
             // Flashlight — illuminate the wall in low light while overlaying.
             if (editorUiState.editorMode == EditorMode.OVERLAY) {
@@ -2794,9 +2822,9 @@ class MainActivity : AppCompatActivity() {
                 route = EditorMode.MOCKUP.name,
                 color = HotPink,
                 disabled = showLibrary,
-                initiallyExpanded = railExpansion["mode.mockup"] ?: false,
-                expandWhen = { editorUiState.editorMode == EditorMode.MOCKUP },
-                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("mode.mockup", it) },
+                initiallyExpanded = editorUiState.editorMode == EditorMode.MOCKUP,
+                expandWhen = modeHostExpandWhen("mode.mockup", EditorMode.MOCKUP) { editorViewModel.uiState.value.editorMode },
+                onExpandedChange = modeHostOnExpandedChange("mode.mockup", EditorMode.MOCKUP) { editorViewModel.uiState.value.editorMode },
             )
             if (editorUiState.editorMode == EditorMode.MOCKUP) {
                 azRailSubHostItem(id = "mockup.wall", hostId = railHostOf("mockup.wall"), text = navStrings.wall, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary)
@@ -2852,9 +2880,9 @@ class MainActivity : AppCompatActivity() {
                 route = EditorMode.TRACE.name,
                 color = HotPink,
                 disabled = showLibrary,
-                initiallyExpanded = railExpansion["mode.trace"] ?: false,
-                expandWhen = { editorUiState.editorMode == EditorMode.TRACE },
-                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("mode.trace", it) },
+                initiallyExpanded = editorUiState.editorMode == EditorMode.TRACE,
+                expandWhen = modeHostExpandWhen("mode.trace", EditorMode.TRACE) { editorViewModel.uiState.value.editorMode },
+                onExpandedChange = modeHostOnExpandedChange("mode.trace", EditorMode.TRACE) { editorViewModel.uiState.value.editorMode },
             )
             if (editorUiState.editorMode == EditorMode.TRACE) {
                 azRailSubItem(
