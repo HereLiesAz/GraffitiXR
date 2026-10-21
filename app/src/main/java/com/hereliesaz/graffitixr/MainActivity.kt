@@ -2304,6 +2304,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** See the "mode.ar" host in [ConfigureRailItems]: dropping and raising it re-expands that folder. */
+    private val arHostOpenPulse = androidx.compose.runtime.mutableStateOf(true)
+
     private fun AzNavHostScope.ConfigureRailItems(
         mainViewModel: MainViewModel,
         editorViewModel: EditorViewModel,
@@ -2502,8 +2505,21 @@ class MainActivity : AppCompatActivity() {
                     color = HotPink,
                     disabled = showLibrary,
                     initiallyExpanded = railExpansion["mode.ar"] ?: false,
-                    expandWhen = { editorUiState.editorMode == EditorMode.AR },
-                    onExpandedChange = { editorViewModel.onRailHostExpansionChanged("mode.ar", it) },
+                    // AzNavRail toggles a host on tap, so tapping AR while its folder was open
+                    // closed it. Tapping AR always opens it: a collapse while in AR is answered by
+                    // pulsing arHostOpenPulse false→true, whose rising edge re-expands the host.
+                    expandWhen = { editorUiState.editorMode == EditorMode.AR && arHostOpenPulse.value },
+                    onExpandedChange = { expanded ->
+                        if (!expanded && editorUiState.editorMode == EditorMode.AR) {
+                            arHostOpenPulse.value = false
+                            lifecycleScope.launch {
+                                kotlinx.coroutines.delay(50)
+                                arHostOpenPulse.value = true
+                            }
+                        } else {
+                            editorViewModel.onRailHostExpansionChanged("mode.ar", expanded)
+                        }
+                    },
                 )
                 // Target capture — only meaningful while in AR mode.
                 if (editorUiState.editorMode == EditorMode.AR) {
