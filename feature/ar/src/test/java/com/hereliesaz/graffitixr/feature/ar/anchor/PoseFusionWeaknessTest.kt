@@ -88,10 +88,15 @@ class PoseFusionWeaknessTest {
         assertTrue("turned $turned deg on a clustered solve", turned < 1.0)
     }
 
-    @Test fun `a well-spread high-ratio fix snaps as before`() {
+    @Test fun `a well-spread high-ratio fix snaps once fixes agree`() {
         val f = PoseFusion()
         fused(f, identity(), 30f, 30f, 1f, spread = 0.5f)
-        val out = fused(f, rotZ(30.0), 25f, 30f, 2f, spread = 0.3f)
+        // Diverged: a lone confident fix holds (mirror/twin protection) ...
+        fused(f, rotZ(30.0), 25f, 30f, 2f, spread = 0.3f)
+        assertEquals(FusionState.RELOCK_REFUSED, f.diagnostics().state)
+        fused(f, rotZ(30.0), 25f, 30f, 3f, spread = 0.3f)
+        // ... and DIVERGED_AGREEMENT agreeing fixes snap.
+        val out = fused(f, rotZ(30.0), 25f, 30f, 4f, spread = 0.3f)
         assertEquals(FusionState.COLD_SNAP, f.diagnostics().state)
         val turned = abs(Math.toDegrees(Math.atan2(out[1].toDouble(), out[0].toDouble())))
         assertTrue("turned $turned deg", turned > 20.0 && turned < 40.0)
@@ -101,11 +106,11 @@ class PoseFusionWeaknessTest {
     @Test fun `an unmeasured spread does not block a snap`() {
         val f = PoseFusion()
         fused(f, identity(), 30f, 30f, 1f)
-        fused(f, rotZ(30.0), 25f, 30f, 2f)
+        for (seq in 2..4) fused(f, rotZ(30.0), 25f, 30f, seq.toFloat())
         assertEquals(FusionState.COLD_SNAP, f.diagnostics().state)
         val g = PoseFusion()
         fused(g, identity(), 30f, 30f, 1f, spread = 0.5f)
-        fused(g, rotZ(30.0), 25f, 30f, 2f, spread = -1f)
+        for (seq in 2..4) fused(g, rotZ(30.0), 25f, 30f, seq.toFloat(), spread = -1f)
         assertEquals(FusionState.COLD_SNAP, g.diagnostics().state)
     }
 }

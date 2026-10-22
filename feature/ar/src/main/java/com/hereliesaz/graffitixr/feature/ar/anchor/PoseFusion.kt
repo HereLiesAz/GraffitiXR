@@ -325,12 +325,14 @@ class PoseFusion {
             val spreadOk = !(spread >= 0f) || spread >= MIN_SNAP_SPREAD   // unmeasured does not block
             val highConf = inlierRatio >= COLD_SNAP_INLIER_RATIO && inliers >= COLD_SNAP_MIN_INLIERS && spreadOk
 
-            // A fix that DISAGREES with the standing correction but lacks the confidence to snap: hold
-            // it until enough consecutive fixes agree. Only the very first lock (no correction yet) is
-            // exempt -- it has nothing to disagree with. A relock after a tracking loss is not exempt:
-            // coming out of a pocket is exactly when a "false twin" on brick or tile shows up.
+            // A fix that DISAGREES with the standing correction: hold it until enough consecutive fixes
+            // agree, however confident it is. Only the very first lock (no correction yet) is exempt --
+            // it has nothing to disagree with. Confidence is no exemption: the two mirror (IPPE)
+            // solutions of a flat wall and the false twins of brick or tile each score high, and when
+            // a lone high-confidence fix could snap, they took turns -- the overlay jumped between a
+            // few spots. A relock after a tracking loss is not exempt either.
             val disagrees = applied != null && diverged(applied, corrected)
-            val needsAgreement = disagrees && !highConf
+            val needsAgreement = disagrees
             var agreed = true
             if (needsAgreement) {
                 val pending = pendingDivergent

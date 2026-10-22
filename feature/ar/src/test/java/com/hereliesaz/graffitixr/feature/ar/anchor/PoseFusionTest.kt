@@ -514,14 +514,34 @@ class PoseFusionTest {
         assertEquals(1f, out[14], 1e-3f)
     }
 
-    @Test fun `confident relock that diverges far hard-snaps (pocket case)`() {
+    @Test fun `confident relock that diverges far hard-snaps once fixes agree (pocket case)`() {
         val f = PoseFusion()
         f.currentAnchor(trans(0f,0f,0f), identity(),
             reloc(trans(10f,0f,0f), inliers = 90f, matches = 100f, seq = 1f), captureAtOrigin(), confGlobal = 1f)
-        // New confident snap puts the anchor 10m away -> beyond COLD_SNAP_DIST_M -> instant relock.
-        val out = f.currentAnchor(trans(0f,0f,0f), identity(),
+        // Confident fixes 10m away -> beyond COLD_SNAP_DIST_M. A lone one holds; once
+        // DIVERGED_AGREEMENT agree, it snaps (no easing in).
+        val first = f.currentAnchor(trans(0f,0f,0f), identity(),
             reloc(trans(20f,0f,0f), inliers = 90f, matches = 100f, seq = 2f), captureAtOrigin(), confGlobal = 1f)
+        assertEquals("a lone confident divergent fix moved the overlay", 10f, first[12], 1e-3f)
+        f.currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(20f,0f,0f), inliers = 90f, matches = 100f, seq = 3f), captureAtOrigin(), confGlobal = 1f)
+        val out = f.currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(20f,0f,0f), inliers = 90f, matches = 100f, seq = 4f), captureAtOrigin(), confGlobal = 1f)
         assertEquals(20f, out[12], 1e-3f)
+    }
+
+    /** Two confident solutions taking turns (mirror pose / false twin) must not move the overlay. */
+    @Test fun `alternating confident solutions never jump the overlay`() {
+        val f = PoseFusion()
+        f.currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(10f,0f,0f), inliers = 90f, matches = 100f, seq = 1f), captureAtOrigin(), confGlobal = 1f)
+        var seq = 2f
+        repeat(6) { i ->
+            val x = if (i % 2 == 0) 12f else 10f
+            val out = f.currentAnchor(trans(0f,0f,0f), identity(),
+                reloc(trans(x,0f,0f), inliers = 90f, matches = 100f, seq = seq++), captureAtOrigin(), confGlobal = 1f)
+            assertEquals("fix $i jumped the overlay", 10f, out[12], 0.05f)
+        }
     }
 
     @Test fun `small confident relock smooths instead of teleporting`() {
