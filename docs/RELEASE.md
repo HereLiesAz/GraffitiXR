@@ -15,11 +15,9 @@ export KEYSTORE_PASSWORD=... KEY_ALIAS=... KEY_PASSWORD=...
 # → app/build/outputs/bundle/release/app-release.aab
 ```
 
-CI publishing is `.github/workflows/release.yml` (see [§2](#2-publishing-via-the-workflow)):
-every push to `main` runs the unit + native host tests, then builds a signed AAB + APK, publishes
-the AAB to Google Play and the APK to a GitHub release. `android-ci.yml` separately publishes a
-**debug** APK to the `latest-debug-v<major>.<minor>` prerelease; `merged-build.yml` only builds and
-tests.
+CI publishing is the central HereLiesAz/workflows repository (see [§2](#2-publishing-via-the-workflow)):
+each merge to `main` is built, signed and published to Google Play and a GitHub release there.
+This repository runs no build workflows of its own.
 
 ---
 
@@ -42,66 +40,26 @@ The `release` signing config is only created when the keystore file exists
 
 ### versionCode and versionName
 
-`app/build.gradle.kts` only reads `version.properties`; nothing in the build increments or rewrites it.
+`app/build.gradle.kts` never increments or rewrites `version.properties`.
 
-- **versionName** is the shared version contract's version (HereLiesAz/workflows `version-contract`),
-  `major.minor.patch.build`. The contract bot assigns a pushed commit its version *after* the push
-  (`chore(version): M.m.p.b [skip ci]`, recording `source_sha` in `.version-state.json`), so the
-  pushed commit's own `version.properties` still holds the previous version. `release.yml` and
-  `android-ci.yml` (pushes to main) therefore wait for the bot's record of the built commit
-  (`.github/scripts/contract_version.py`, up to 15 min, failing without one) and pass it as
-  `CI_VERSION_NAME`. Without it (PR builds, local builds) the build uses `version.properties`.
-- **versionCode** is `CI_VERSION_CODE` when set, else 1 (local builds):
-
-  | Workflow | `CI_VERSION_CODE` | Published to |
-  |----------|-------------------|--------------|
-  | `release.yml` | one above the highest code Play holds (`play_multitrack_publish.py --next-version-code`) | Google Play + GitHub release |
-  | `android-ci.yml` | `20,000 + run_number` | `latest-debug-v<maj>.<min>` debug prerelease |
-  | `merged-build.yml` | `20,000 + run_number` | nothing (build/test only) |
-
-  Only `release.yml` codes reach Play, and each release advances the code by exactly 1.
+- **versionName** is `-PversionNameOverride` when set — the central release passes the version
+  contract's version (HereLiesAz/workflows `version-contract`, `major.minor.patch.build`) for the
+  built commit — else `version.properties`.
+- **versionCode** is `-PversionCodeOverride` when set — the central release's code, the only one that
+  reaches Play — else 1 (local and PR builds). Before the build read this property, every bundle
+  shipped versionCode 1 and Play rejected each upload ("Version code 1 has already been used").
 
 ---
 
 ## 2. Publishing via the workflow
 
-Workflow: **`.github/workflows/release.yml`**.
-
-Triggers: every push to `main` (except pushes that only touch `version.properties`) and
-`workflow_dispatch` with one input:
-
-| Input     | Default | Description |
-|-----------|---------|-------------|
-| `publish` | `true`  | Off ⇒ build + upload the signed AAB/APK as the `graffitixr-release` workflow artifact only. |
-
-Publishing (Play and GitHub release) only ever happens for `refs/heads/main`; a dispatch on another
-branch builds the artifact and stops. One concurrency group per workflow with `cancel-in-progress`:
-the newest run cancels the one in progress (an uncommitted Play edit is deleted on the way out). A
-dispatch — on any branch, or with `publish` off — therefore also cancels an in-progress publish of
-`main`, which then does not ship; re-run it.
-
-Jobs:
-
-1. **`unit-tests`** — `./gradlew test` (the same command as `android-ci.yml`'s unit-tests job) and
-   `tools/run_native_host_tests.sh`. Nothing below runs unless this passes.
-2. **`build-and-publish`** (`needs: unit-tests`):
-   1. Checks out with `fetch-depth: 0`; decodes the base64 `KEYSTORE_RAW` secret to
-      `app/keystore.jks` and fails if it or any of `KEYSTORE_PASSWORD` / `KEY_ALIAS` /
-      `KEY_PASSWORD` is missing, so an unsigned build is never published.
-   2. Sets up JDK 21 (Temurin) + Gradle, reads `applicationId` from `app/build.gradle.kts`, reads
-      `CI_VERSION_CODE` from Play and `CI_VERSION_NAME` from the version contract (see
-      [versionCode](#versioncode-and-versionname)).
-   3. Runs `./gradlew bundleRelease assembleRelease` with the signing env vars, uploads the AAB and
-      APK as the `graffitixr-release` artifact, and runs the SphereSLAM packaging/manifest checks
-      against the release variant.
-   4. Publishes the AAB to Google Play with `.github/scripts/play_multitrack_publish.py`: one Play
-      edit, one bundle upload, then `internal` = `completed` and `alpha` / `beta` / `production` =
-      `draft`, then commit. An uncommitted edit is deleted on failure or cancellation.
-   5. Only after Play succeeded, creates or updates the moving GitHub release
-      `latest-release-v<major>.<minor>` with the signed APK.
-
-Nothing is committed back to the repository: the versionCode comes from Play, the versionName from
-the version contract.
+Publishing lives in the central **HereLiesAz/workflows** repository, not here: its
+`android-play-release.yml` and `android-github-release.yml` run on each merge to `main`. They decode
+the `KEYSTORE_RAW` secret to `app/keystore.jks`, export `KEYSTORE_PASSWORD` / `KEY_ALIAS` /
+`KEY_PASSWORD` (the env vars `signingConfigs.release` reads), pass the version as Gradle properties,
+build the AAB/APK, upload `mapping.txt`, and publish: Play `internal` = `completed`, `alpha` / `beta`
+/ `production` = `draft`; then the GitHub release. Their runs, logs and artifacts are in that
+repository's Actions tab.
 
 ---
 
@@ -192,10 +150,9 @@ included here.
 
 ## 4. Required repository secrets
 
-### Signing (read only by `release.yml`)
+### Signing (read only by the central release workflows)
 
-`android-ci.yml` and `merged-build.yml` build debug APKs with the default debug key and read no
-signing secrets.
+Debug builds use the default debug key and read no signing secrets.
 
 | Secret | Purpose |
 |--------|---------|
@@ -237,9 +194,9 @@ The automated publish step cannot work until these are done **once**:
    secret, and add the signing secrets above if not already present.
 4. **Upload the very first release manually.** For a brand‑new app the Play
    Developer API **cannot** create the first release — the first `.aab` must be
-   uploaded by hand in the Play Console (Internal testing is fine). Run
-   `release.yml` via *Run workflow* with `publish` unchecked, download the
-   `graffitixr-release` artifact, and upload its `.aab` in the console. After
+   uploaded by hand in the Play Console (Internal testing is fine). Take
+   the `.aab` from a central Android Play Release run's artifacts (HereLiesAz/workflows) and
+   upload it in the console. After
    that first manual upload, pushes to `main` publish automatically.
 
 > If you opt into **Play App Signing** (recommended), the keystore above becomes
