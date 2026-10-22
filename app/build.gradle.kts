@@ -37,12 +37,18 @@ val localProperties = Properties().apply {
 //     record of the built commit (.github/scripts/contract_version.py) and pass it as CI_VERSION_NAME.
 //   - versionCode = CI_VERSION_CODE when set (release.yml: one above the highest code Play holds;
 //     android-ci / merged-build: a debug-only counter), else 1 for local builds.
+//   - The central Play / GitHub release workflows pass the same values as Gradle properties instead
+//     (-PversionCodeOverride / -PversionNameOverride); those win over the env vars. Without them the
+//     bundle shipped versionCode 1 and Play refused every upload ("Version code 1 has already been used").
 val verMajor = versionProps.getProperty("versionMajor", "1").trim()
 val verMinor = versionProps.getProperty("versionMinor", "0").trim()
 val verPatch = versionProps.getProperty("versionPatch", "0").trim()
 val verBuild = versionProps.getProperty("versionBuild", "0").trim()
-val currentVersionCode = System.getenv("CI_VERSION_CODE")?.toIntOrNull()?.takeIf { it > 0 } ?: 1
-val currentVersionName = System.getenv("CI_VERSION_NAME")?.trim()?.takeIf { it.isNotEmpty() }
+val currentVersionCode = (project.findProperty("versionCodeOverride") as String?)?.toIntOrNull()?.takeIf { it > 0 }
+    ?: System.getenv("CI_VERSION_CODE")?.toIntOrNull()?.takeIf { it > 0 }
+    ?: 1
+val currentVersionName = (project.findProperty("versionNameOverride") as String?)?.trim()?.takeIf { it.isNotEmpty() }
+    ?: System.getenv("CI_VERSION_NAME")?.trim()?.takeIf { it.isNotEmpty() }
     ?: "$verMajor.$verMinor.$verPatch.$verBuild"
 
 android {
