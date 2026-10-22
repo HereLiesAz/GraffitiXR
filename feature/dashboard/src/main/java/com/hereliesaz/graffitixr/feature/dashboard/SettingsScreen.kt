@@ -111,8 +111,8 @@ fun SettingsScreen(
     onAmbientScanEnabledChanged: (Boolean) -> Unit,
     changePassEnabled: Boolean,
     onChangePassEnabledChanged: (Boolean) -> Unit,
-    showAnchorBoundary: Boolean,
-    onAnchorBoundaryChanged: (Boolean) -> Unit,
+    cvPreviewOn: Boolean,
+    onCvPreviewChanged: (Boolean) -> Unit,
     isImperialUnits: Boolean,
     onImperialUnitsChanged: (Boolean) -> Unit,
     backgroundColor: Int,
@@ -343,7 +343,9 @@ fun SettingsScreen(
                             // Pass B: also judge progress by what has changed since the clean-wall photo. Off
                             // by default, never switched on for the user; it needs that photo to do anything.
                             SettingsSwitch(strings.settings.changePass, changePassEnabled, onChangePassEnabledChanged)
-                            SettingsSwitch(strings.settings.anchorBoundary, showAnchorBoundary, onAnchorBoundaryChanged)
+                            // CV view: everything the computer vision is looking for, drawn over the design
+                            // in AR (moved here from the rail).
+                            SettingsSwitch(strings.nav.cvView, cvPreviewOn, onCvPreviewChanged)
                             SettingsItem(
                                 label = strings.settings.cameraFps,
                                 value = cameraTargetFpsLabel(cameraTargetFps, strings),
