@@ -499,7 +499,11 @@ class ArViewModel @Inject constructor(
                 val tooLarge = generateSequence(e as Throwable) { it.cause }
                     .filterIsInstance<com.hereliesaz.graffitixr.core.collaboration.session.ProjectTooLargeToHostException>()
                     .firstOrNull()
-                val message = if (tooLarge != null) {
+                val noLan = generateSequence(e as Throwable) { it.cause }
+                    .any { it is com.hereliesaz.graffitixr.core.collaboration.NoLanAddressException }
+                val message = if (noLan) {
+                    appContext.getString(DesignR.string.ar_feedback_host_no_lan)
+                } else if (tooLarge != null) {
                     // Link holds one transfer in memory; export streams and takes twice that. Name
                     // the limit, and the way out.
                     appContext.getString(

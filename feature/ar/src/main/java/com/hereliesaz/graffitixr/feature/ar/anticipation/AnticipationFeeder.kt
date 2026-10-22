@@ -177,7 +177,8 @@ internal class AnticipationFeeder(
                 )
             }
             perfRenderMs.addAndGet((System.nanoTime() - renderStartNs) / 1_000_000L)
-            if (gen != generation) return
+            // Checked again right before handing over: close() may have run during the render.
+            if (gen != generation || closed.get()) return
             sink.addViews(target.pageNo, views)
             viewsAdded += views.size
         }
@@ -213,11 +214,24 @@ internal class AnticipationFeeder(
         }
     }
 
+    /**
+     * Stops building and waits (bounded) for a batch in flight to finish, so a caller may close the
+     * sink right after this returns without a late [AnticipationSink.addViews] reaching it.
+     */
     override fun close() {
-        if (closed.compareAndSet(false, true)) executor.shutdownNow()
+        if (!closed.compareAndSet(false, true)) return
+        executor.shutdownNow()
+        try {
+            executor.awaitTermination(CLOSE_WAIT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
     }
 
     companion object {
+        /** Longest [close] waits for an in-flight batch (a batch renders in well under this). */
+        const val CLOSE_WAIT_MS = 1_000L
+
         /** Views rendered and handed over together; the governor is read again between batches. */
         const val BATCH = 4
 

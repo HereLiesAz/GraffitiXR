@@ -1228,12 +1228,14 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         session.displayPosePredictor?.clear()
         session.displayPosePredictor = null
         lastRelocSeq = 0f
+        // The anticipation builder feeds the session from its own thread: stop it (and let a batch in
+        // flight finish) before the session closes, so no views reach a closed session.
+        anticipation.close()
         session.close()
         lastDiagnosticKey = null
         lastFailureReason = null
         lastReportedTrackingState = null
         frameBuffer = null
-        anticipation.close()
         // Shuts the depth thread down; an inference already running finishes and is discarded.
         depthWorker?.close()
         depthCadence.reset()

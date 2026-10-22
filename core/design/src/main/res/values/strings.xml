@@ -830,4 +830,5 @@
     <string name="crash_share">Share report</string>
     <string name="crash_copy">Copy</string>
     <string name="crash_dismiss">Dismiss</string>
+    <string name="ar_feedback_host_no_lan">Link needs Wi-Fi. Join a Wi-Fi network or start a hotspot, then host again.</string>
 </resources>
