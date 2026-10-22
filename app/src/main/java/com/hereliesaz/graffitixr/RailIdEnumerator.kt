@@ -116,7 +116,6 @@ internal val RAIL_ITEM_HOST_ID: Map<String, String> = mapOf(
     "mode.ar.freeze" to "mode.ar",
     "mode.ar.magic" to "mode.ar",
     "mode.ar.measure" to "mode.ar",
-    "mode.ar.cv" to "mode.ar",
     "coop" to "mode.ar",
     "coop.host" to "coop",
     "coop.join" to "coop",
@@ -136,6 +135,8 @@ internal val RAIL_ITEM_HOST_ID: Map<String, String> = mapOf(
     "proj.export" to "host.project",
     "proj.load" to "host.project",
     "proj.settings" to "host.project",
+    // CV view sits under Project, registered only in AR (its renderer is the one that draws it).
+    "mode.ar.cv" to "host.project",
 )
 
 /**

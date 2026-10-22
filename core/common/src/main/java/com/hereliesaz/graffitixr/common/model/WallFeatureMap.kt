@@ -20,20 +20,25 @@ import kotlinx.serialization.Serializable
  * Stored as **primitive arrays** (not boxed `List`s): at the cap this is tens of thousands of
  * floats, so boxing would cost real memory, and the native restore path (Phase 2) hands these
  * straight to JNI without a copy. Every field is defaulted so older projects (no map)
- * deserialize unchanged.
+ * deserialize unchanged. The four per-point arrays are written as Base64 strings
+ * ([PackedArraySerializer]); a JSON number list per element overflowed the heap on save.
  */
 @Serializable
 data class WallFeatureMap(
     // Flattened 3D points [x0,y0,z0, x1,y1,z1, ...] in the doodle-anchor frame; one triplet per point.
+    @Serializable(with = PackedFloatArraySerializer::class)
     val points3d: FloatArray = FloatArray(0),
     // Descriptors as a flat row-major byte blob: [descriptorsRows] rows (one per point), each
     // [descriptorsCols] wide, of OpenCV [descriptorsType] (CV_8U for ORB, CV_32F for SuperPoint).
+    @Serializable(with = PackedByteArraySerializer::class)
     val descriptorsData: ByteArray = ByteArray(0),
     val descriptorsRows: Int = 0,
     val descriptorsCols: Int = 0,
     val descriptorsType: Int = 0,
     // Per-point confidence in [0,1] and observation count, parallel to the points (size == rows, or empty).
+    @Serializable(with = PackedFloatArraySerializer::class)
     val confidence: FloatArray = FloatArray(0),
+    @Serializable(with = PackedIntArraySerializer::class)
     val obsCount: IntArray = IntArray(0),
     // Co-registration: the anchor pose (column-major 4x4, 16 floats) and intrinsics (fx,fy,cx,cy)
     // the points were built in — the SAME frame as the marks doodle's anchor. Empty => unset.

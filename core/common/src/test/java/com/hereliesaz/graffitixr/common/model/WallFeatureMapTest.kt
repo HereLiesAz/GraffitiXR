@@ -91,4 +91,31 @@ class WallFeatureMapTest {
             // expected
         }
     }
+
+    @Test
+    fun `per-point arrays are written as Base64 strings, not number lists`() {
+        val text = json.encodeToString(
+            WallFeatureMap(
+                points3d = floatArrayOf(1f, 2f, 3f),
+                descriptorsData = ByteArray(32) { it.toByte() },
+                descriptorsRows = 1,
+                descriptorsCols = 32,
+                confidence = floatArrayOf(0.5f),
+                obsCount = intArrayOf(4),
+            )
+        )
+        assertTrue(text, text.contains("\"descriptorsData\":\""))
+        assertTrue(text, text.contains("\"points3d\":\""))
+    }
+
+    @Test
+    fun `reads a map saved in the old number-list form`() {
+        val legacy = """{"points3d":[1.0,2.0,3.0],"descriptorsData":[1,2,3,4],"descriptorsRows":1,""" +
+            """"descriptorsCols":4,"confidence":[0.5],"obsCount":[7]}"""
+        val decoded = json.decodeFromString<WallFeatureMap>(legacy)
+        assertTrue(decoded.points3d.contentEquals(floatArrayOf(1f, 2f, 3f)))
+        assertTrue(decoded.descriptorsData.contentEquals(byteArrayOf(1, 2, 3, 4)))
+        assertTrue(decoded.confidence.contentEquals(floatArrayOf(0.5f)))
+        assertTrue(decoded.obsCount.contentEquals(intArrayOf(7)))
+    }
 }

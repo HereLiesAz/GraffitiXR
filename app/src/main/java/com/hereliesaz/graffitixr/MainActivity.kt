@@ -2671,19 +2671,6 @@ class MainActivity : AppCompatActivity() {
                             }
                         },
                     )
-                    // CV view — a composited preview of everything the computer vision is looking for,
-                    // drawn over the design, with a legend of what each colour is and how much of it
-                    // the wall has answered.
-                    azRailSubItem(
-                        id = "mode.ar.cv",
-                        hostId = railHostOf("mode.ar.cv"),
-                        text = navStrings.cvView,
-                        color = navItemColor,
-                        classifiers = setOf("toggle"),
-                        shape = AzButtonShape.NONE,
-                        disabled = showLibrary,
-                        onClick = { arViewModel.toggleCvPreview() },
-                    )
                     // Co-op requires an explicit shared coordinate frame. Protocol v3 now supplies
                     // that host wall-frame/backend/scale contract for both ARCore and standalone.
                     // The policy still gates unresolved capability; incompatible peers are rejected
@@ -2974,6 +2961,20 @@ class MainActivity : AppCompatActivity() {
                 shape = AzButtonShape.NONE,
                 disabled = showLibrary,
                 onClick = { showSettings = true },
+            )
+            // CV view — a composited preview of everything the computer vision is looking for,
+            // drawn over the design, with a legend of what each colour is and how much of it the
+            // wall has answered. Lives under Project (a diagnostic, not a painting tool); only
+            // registered in AR, the one mode whose renderer draws it.
+            if (editorUiState.editorMode == EditorMode.AR) azRailSubItem(
+                id = "mode.ar.cv",
+                hostId = railHostOf("mode.ar.cv"),
+                text = navStrings.cvView,
+                color = navItemColor,
+                classifiers = setOf("toggle"),
+                shape = AzButtonShape.NONE,
+                disabled = showLibrary,
+                onClick = { arViewModel.toggleCvPreview() },
             )
 
 
