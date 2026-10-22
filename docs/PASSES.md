@@ -118,7 +118,7 @@ region has the shape of the design. Colour plays no part in the second question.
 
 ## The CV view
 
-`AR ▸ CV view` (`mode.ar.cv`) draws everything the passes are looking for over the design, so the
+`Project ▸ CV view` (`mode.ar.cv`, shown in AR) draws everything the passes are looking for over the design, so the
 artist can see it. `MobileGS::renderCvPreview` composites it in the design's own pixel space: each
 pass's targets as dots in that pass's colour (`passes::passRgb`), a ring while the wall has not yet
 answered and a filled dot once it has, and the design cells already judged painted tinted green. A
