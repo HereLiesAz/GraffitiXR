@@ -17,7 +17,7 @@ export KEYSTORE_PASSWORD=... KEY_ALIAS=... KEY_PASSWORD=...
 
 CI publishing is the central HereLiesAz/workflows repository (see [§2](#2-publishing-via-the-workflow)):
 each merge to `main` is built, signed and published to Google Play and a GitHub release there.
-This repository's `android-ci.yml` is PR-only CI and publishes nothing.
+This repository runs no build workflows of its own.
 
 ---
 
@@ -152,7 +152,7 @@ included here.
 
 ### Signing (read only by the central release workflows)
 
-`android-ci.yml` builds debug APKs with the default debug key and reads no signing secrets.
+Debug builds use the default debug key and read no signing secrets.
 
 | Secret | Purpose |
 |--------|---------|

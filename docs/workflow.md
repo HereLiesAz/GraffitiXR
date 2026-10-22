@@ -9,9 +9,7 @@
 
 ## **2. CI/CD Pipeline**
 
--   **Pull requests → local CI.** `.github/workflows/android-ci.yml` runs on every PR into `main`:
-    unit tests, native/architecture/detekt gates, the minified release variant, and a debug APK
-    build. It publishes nothing. `label.yml` (central `pr-labeler.yml`) labels PRs.
+-   **Pull requests.** No build workflow lives here. `label.yml` (central `pr-labeler.yml`) labels PRs.
 -   **Merge to `main` → central builds.** Signed AAB/APK, Google Play and the GitHub release are run by
     the central HereLiesAz/workflows repository (Android Play Release / Android GitHub Release). No
     workflow in this repository builds on push to `main`.
@@ -38,5 +36,5 @@ don't exist (`android-ci-jules.yml`, `google-services-injection.yml`, `auto-rele
 Services injection is an inline step inside the real CI workflows, not a separate file. Corrected the
 build-number claim (auto-increments per build from `version.properties`, not from git commit count).*
 
-*Documentation updated on 2026-10-22: release.yml and merged-build.yml removed; merge builds and
-publishing moved to the central HereLiesAz/workflows repository. android-ci.yml is PR-only CI.*
+*Documentation updated on 2026-10-22: release.yml, merged-build.yml and android-ci.yml removed; merge builds and
+publishing moved to the central HereLiesAz/workflows repository.*
