@@ -148,6 +148,16 @@ internal class DeltaBuffer(
     @Synchronized
     fun opBySeq(seq: Long): Op? = ring.firstOrNull { it.seq == seq }?.op
 
+    /**
+     * True when [seq] is not held and lies inside the current evicted range, i.e. eviction may have
+     * discarded it rather than a newer op superseding it. The outbound path asks this for a queued op
+     * it can no longer find: an op evicted before it was ever sent is missing from the live guest's
+     * canvas too, not just from the replay history, so it needs a resync rather than a skip.
+     */
+    @Synchronized
+    fun mayHaveEvicted(seq: Long): Boolean =
+        gapped && seq <= gapThroughSeq && ring.none { it.seq == seq }
+
     /** True when eviction has left a hole that makes [opsAfter] unable to answer a replay. */
     @Synchronized
     fun hasGap(): Boolean = gapped

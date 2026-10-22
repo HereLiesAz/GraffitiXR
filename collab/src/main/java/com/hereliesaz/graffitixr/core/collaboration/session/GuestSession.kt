@@ -195,8 +195,11 @@ internal class GuestSession(
      * Attempts one connect+handshake. Returns true once the live phase has started, false on a
      * transient failure (so the reconnect loop can retry). Terminal handshake rejections close
      * the session themselves and return false; callers must check [phase] before re-closing.
+     *
+     * [inReconnectLoop] is true when called from [attemptReconnect] (whatever [isReconnect] says
+     * about resuming), and makes an AlreadyHosting rejection retryable instead of terminal.
      */
-    private suspend fun connectLoop(isReconnect: Boolean): Boolean {
+    private suspend fun connectLoop(isReconnect: Boolean, inReconnectLoop: Boolean = false): Boolean {
         return try {
             val s = Socket()
             // Publish the socket to the field before connecting so a connect() failure (timeout /
@@ -295,6 +298,17 @@ internal class GuestSession(
                 }
                 FrameType.HELLO_REJECTED -> {
                     val rej = OpCodec.decode<HelloRejectedPayload>(response.payload)
+                    // Inside the reconnect loop, AlreadyHosting means the host still holds our OLD
+                    // connection (it hasn't noticed the drop yet) — not that someone else took the
+                    // slot. Current hosts replace the old connection instead of refusing, but an
+                    // older host (or a race with its own teardown) can still answer this way; ending
+                    // the session as HostClosed here threw away the very session the reconnect
+                    // window exists to save. Treat it as transient and let the loop retry.
+                    if (inReconnectLoop && rej.reason == HelloRejectedPayload.RejectReason.AlreadyHosting) {
+                        try { s.close() } catch (_: Exception) {}
+                        socket = null
+                        return false
+                    }
                     val reason = when (rej.reason) {
                         HelloRejectedPayload.RejectReason.BadToken -> CoopSessionState.EndReason.BadToken
                         HelloRejectedPayload.RejectReason.VersionMismatch -> CoopSessionState.EndReason.VersionMismatch
@@ -451,6 +465,10 @@ internal class GuestSession(
                             }
                         }
                         FrameType.VIDEO -> if (wantVideo) _video.value = frame.payload
+                        // A reconnect's replay can fail partway, and the host then falls back to a
+                        // bulk snapshot on the same connection (HostSession.adopt). The snapshot
+                        // supersedes the partial replay; receiveBulk resets lastAppliedSeq.
+                        FrameType.BULK_BEGIN -> receiveBulk(frame, input, output, crypto)
                         else -> { /* ignore */ }
                     }
                 } catch (e: kotlinx.coroutines.CancellationException) {
@@ -464,6 +482,7 @@ internal class GuestSession(
                 }
             }
         }
+        val connection = socket
         scope.launch {
             // Periodic DELTA_ACK. Terminate on write failure so a stale ack loop from a prior
             // connection doesn't linger and double up after a reconnect.
@@ -471,7 +490,13 @@ internal class GuestSession(
                 delay(1_000)
                 try {
                     writeSecure(output, crypto, FrameType.DELTA_ACK, OpCodec.encode(DeltaAckPayload(lastAppliedSeq)))
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    // A failed write means the connection is dead: reconnect now rather than wait up
+                    // to READ_TIMEOUT_MS (15 s) for the read loop to notice. Only if this is still the
+                    // current connection, though — a stale loop from a connection already replaced
+                    // must not tear down its successor.
+                    if (socket === connection) attemptReconnect()
                     return@launch
                 }
             }
@@ -498,7 +523,7 @@ internal class GuestSession(
             // throws, so the previous single-shot try/return bug — which gave up after one
             // attempt — is gone.) isReconnect follows lastAppliedSeq so that a sessionId-mismatch
             // reset (see connectLoop) downgrades the next attempt to a fresh full join.
-            if (connectLoop(isReconnect = lastAppliedSeq > 0L)) return
+            if (connectLoop(isReconnect = lastAppliedSeq > 0L, inReconnectLoop = true)) return
             // A terminal rejection during reconnect already closed the session.
             if (phase == Phase.Ended) return
         }
