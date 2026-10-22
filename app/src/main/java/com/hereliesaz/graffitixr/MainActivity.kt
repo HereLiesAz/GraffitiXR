@@ -61,7 +61,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
@@ -297,12 +296,8 @@ class MainActivity : AppCompatActivity() {
                 putExtra(Intent.EXTRA_TEXT, text)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            Toast.makeText(
-                this@MainActivity,
-                if (text.isBlank()) "Report unreadable — ${uris.size} file(s) attached"
-                else "Report copied — ${uris.size} file(s) attached",
-                Toast.LENGTH_SHORT,
-            ).show()
+            com.hereliesaz.graffitixr.design.feedback.HudMessages.show(if (text.isBlank()) "Report unreadable — ${uris.size} file(s) attached"
+                else "Report copied — ${uris.size} file(s) attached", long = false)
             runCatching { startActivity(Intent.createChooser(send, "Share diagnostics")) }
                 .onFailure { Timber.w(it, "no share target for diagnostics") }
         }
@@ -336,9 +331,7 @@ class MainActivity : AppCompatActivity() {
             pendingGalleryExport = null
             when (val outcome = GalleryExportPolicy.onPermissionResult(pending, granted)) {
                 is GalleryPermissionOutcome.Run -> galleryExportToRun = outcome.request
-                GalleryPermissionOutcome.Fail -> Toast.makeText(
-                    this, getString(DesignR.string.export_failed_permission), Toast.LENGTH_LONG,
-                ).show()
+                GalleryPermissionOutcome.Fail -> com.hereliesaz.graffitixr.design.feedback.HudMessages.show(getString(DesignR.string.export_failed_permission), long = true)
             }
         }
 
@@ -512,6 +505,8 @@ class MainActivity : AppCompatActivity() {
 
         setContent {
             GraffitiXRTheme {
+                // Transient messages (formerly platform Toasts), drawn in the brand's HUD style.
+                com.hereliesaz.graffitixr.design.feedback.HudMessageHost()
                 pendingUpdate?.let { offer ->
                     com.hereliesaz.graffitixr.design.components.GxrDialog(
                         title = stringResource(DesignR.string.update_title),
@@ -688,11 +683,7 @@ class MainActivity : AppCompatActivity() {
                 val sharePending = sharedImage != null && projectIdForShare == null
                 LaunchedEffect(sharePending) {
                     if (sharePending) {
-                        Toast.makeText(
-                            shareToastContext,
-                            shareToastContext.getString(DesignR.string.shared_image_pick_project),
-                            Toast.LENGTH_LONG
-                        ).show()
+                        com.hereliesaz.graffitixr.design.feedback.HudMessages.show(shareToastContext.getString(DesignR.string.shared_image_pick_project), long = true)
                     }
                 }
 
@@ -740,7 +731,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 LaunchedEffect(dashboardUiState.projectErrorMessage) {
                     dashboardUiState.projectErrorMessage?.let {
-                        Toast.makeText(shareToastContext, it, Toast.LENGTH_LONG).show()
+                        com.hereliesaz.graffitixr.design.feedback.HudMessages.show(it, long = true)
                         dashboardViewModel.dismissProjectError()
                     }
                 }
@@ -1189,11 +1180,7 @@ class MainActivity : AppCompatActivity() {
                                     kotlinx.coroutines.delay(EXPORT_TIMEOUT_MS)
                                     if (isExporting) {
                                         isExporting = false
-                                        Toast.makeText(
-                                            context,
-                                            "Export timed out — try again",
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
+                                        com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Export timed out — try again", long = false)
                                     }
                                 }
                                 val requested = arViewModel.requestExport { bmp ->
@@ -1219,11 +1206,7 @@ class MainActivity : AppCompatActivity() {
                                     // successful export. Say why nothing was exported instead.
                                     timeoutJob.cancel()
                                     isExporting = false
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(DesignR.string.export_ar_unavailable),
-                                        Toast.LENGTH_LONG,
-                                    ).show()
+                                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(DesignR.string.export_ar_unavailable), long = true)
                                 }
                             }
                             EditorMode.OVERLAY -> {
@@ -2036,7 +2019,7 @@ class MainActivity : AppCompatActivity() {
                                                     isSavingProject = false
                                                     if (e is kotlinx.coroutines.CancellationException) throw e
                                                     android.util.Log.e("MainActivity", "Failed to save wall map", e)
-                                                    Toast.makeText(this@MainActivity, "Couldn't save the project", Toast.LENGTH_LONG).show()
+                                                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Couldn't save the project", long = true)
                                                 }
                                             }
                                         }
@@ -2701,7 +2684,7 @@ class MainActivity : AppCompatActivity() {
                                         notReady -> DesignR.string.align_not_ready
                                         else -> DesignR.string.align_unavailable
                                     }
-                                    Toast.makeText(context, context.getString(msg), Toast.LENGTH_SHORT).show()
+                                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(msg), long = false)
                                 }
                             }
                         },
@@ -2973,7 +2956,7 @@ class MainActivity : AppCompatActivity() {
                     // be composited; silently exporting "layers only" would violate the rail action's
                     // documented mode-screenshot contract.
                     if (exportBlockedReason != null) {
-                        Toast.makeText(context, context.getString(exportBlockedReason), Toast.LENGTH_LONG).show()
+                        com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(exportBlockedReason), long = true)
                     } else {
                         onExportRequested()
                     }

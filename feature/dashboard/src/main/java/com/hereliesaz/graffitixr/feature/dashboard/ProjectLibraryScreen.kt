@@ -87,7 +87,7 @@ fun ProjectLibraryScreen(
     val context = LocalContext.current
     LaunchedEffect(importErrorMessage) {
         if (importErrorMessage != null) {
-            Toast.makeText(context, importErrorMessage, Toast.LENGTH_LONG).show()
+            com.hereliesaz.graffitixr.design.feedback.HudMessages.show(importErrorMessage, long = true)
             onDismissImportError()
         }
     }
