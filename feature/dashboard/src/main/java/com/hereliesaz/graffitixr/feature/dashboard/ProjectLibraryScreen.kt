@@ -299,34 +299,21 @@ fun ProjectLibraryScreen(
         // Cancel button) only clears the pending state — it never deletes.
         // Only the destructive "Delete" button below invokes onDeleteProject.
         pendingDeleteProject?.let { project ->
-            AlertDialog(
-                onDismissRequest = { pendingDeleteProject = null },
-                title = { Text("Delete \"${project.name}\"?") },
-                text = {
-                    Text(
-                        "This will permanently delete this project, including its design " +
-                            "artifacts, thumbnail, and the scanned AR wall data. The wall " +
-                            "data cannot be recreated if the real-world surface changes, and " +
-                            "this action cannot be undone."
-                    )
+            com.hereliesaz.graffitixr.design.components.GxrDialog(
+                title = androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.delete_project_title, project.name),
+                confirmLabel = strings.editor.delete,
+                onConfirm = {
+                    onDeleteProject(project.id)
+                    pendingDeleteProject = null
                 },
-                confirmButton = {
-                    TextButton(onClick = {
-                        onDeleteProject(project.id)
-                        pendingDeleteProject = null
-                    }) {
-                        Text(
-                            text = strings.editor.delete,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { pendingDeleteProject = null }) {
-                        Text(strings.common.cancel)
-                    }
-                }
-            )
+                dismissLabel = strings.common.cancel,
+                onDismiss = { pendingDeleteProject = null },
+                destructive = true,
+            ) {
+                com.hereliesaz.graffitixr.design.components.GxrDialogText(
+                    androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.delete_project_text)
+                )
+            }
         }
 
         // Surfaces isLoading (set while loading the library or importing a project) so a large

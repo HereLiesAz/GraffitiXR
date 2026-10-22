@@ -28,11 +28,20 @@ private val DarkColorScheme = darkColorScheme(
     surface = Black,
     surfaceVariant = Black,
     onPrimary = White,
-    onSecondary = White,
-    onTertiary = White,
+    // Cyan and lime are bright: text on them is black, or it can't be read.
+    onSecondary = Black,
+    onTertiary = Black,
     onBackground = White,
     onSurface = White,
-    onSurfaceVariant = White
+    onSurfaceVariant = White,
+    // Dialogs, menus and sheets use the surface containers: brand near-black, not M3's purple grey.
+    surfaceContainerLowest = Black,
+    surfaceContainerLow = DialogSurface,
+    surfaceContainer = DialogSurface,
+    surfaceContainerHigh = DialogSurface,
+    surfaceContainerHighest = DialogSurface,
+    error = Danger,
+    onError = White,
 )
 
 private val LightColorScheme = lightColorScheme(

@@ -23,7 +23,7 @@ fun GlassesStatusBanner(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(if (isFallback) Color(0xFFB94B4B) else Color.Black.copy(alpha = 0.7f))
+            .background(if (isFallback) com.hereliesaz.graffitixr.design.theme.Danger else com.hereliesaz.graffitixr.design.theme.HudScrim)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

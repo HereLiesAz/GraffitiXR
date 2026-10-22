@@ -189,7 +189,7 @@ private fun DoodleInstructionCard(
     ) {
         Box(
             modifier = Modifier
-                .background(Color(0xCC000000), RoundedCornerShape(16.dp))
+                .background(com.hereliesaz.graffitixr.design.theme.HudScrim, com.hereliesaz.graffitixr.design.theme.HudPillShape)
                 .border(2.dp, Color.Cyan, RoundedCornerShape(16.dp))
                 .padding(20.dp)
         ) {

@@ -174,10 +174,16 @@ fun SettingsScreen(
         // overwrites the stored one. Prefilled with the current value so editing (not just replacing)
         // works. The field masks the token like a password — it grants issue-write to the repo.
         var draft by remember { mutableStateOf(crashReportToken) }
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showTokenDialog = false },
-            title = { Text(strings.settings.crashTokenLabel) },
-            text = {
+        com.hereliesaz.graffitixr.design.components.GxrDialog(
+            title = strings.settings.crashTokenLabel,
+            confirmLabel = strings.common.done,
+            onConfirm = {
+                onCrashReportTokenChanged(draft)
+                showTokenDialog = false
+            },
+            dismissLabel = strings.common.close,
+            onDismiss = { showTokenDialog = false },
+        ) {
                 Column {
                     Text(
                         text = strings.settings.crashTokenDesc,
@@ -197,24 +203,16 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-            },
-            confirmButton = {
-                AzButton(text = strings.common.done, onClick = {
-                    onCrashReportTokenChanged(draft)
-                    showTokenDialog = false
-                })
-            },
-            dismissButton = {
-                AzButton(text = strings.common.close, onClick = { showTokenDialog = false })
-            }
-        )
+        }
     }
 
     if (showLanguageDialog) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showLanguageDialog = false },
-            title = { Text(strings.settings.languageLabel) },
-            text = {
+        com.hereliesaz.graffitixr.design.components.GxrDialog(
+            title = strings.settings.languageLabel,
+            confirmLabel = strings.common.done,
+            onConfirm = { showLanguageDialog = false },
+            onDismiss = { showLanguageDialog = false },
+        ) {
                 Box(modifier = Modifier.fillMaxWidth().height(300.dp)) {
                     LazyColumn {
                         items(AppLanguage.entries.size) { index ->
@@ -249,11 +247,7 @@ fun SettingsScreen(
                         }
                     }
                 }
-            },
-            confirmButton = {
-                AzButton(text = strings.common.done, onClick = { showLanguageDialog = false })
-            }
-        )
+        }
     }
 
 

@@ -20,6 +20,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.graffitixr.design.theme.DisabledContainer
+import com.hereliesaz.graffitixr.design.theme.DisabledContent
 import com.hereliesaz.graffitixr.design.theme.HotPink
 import com.hereliesaz.graffitixr.design.theme.AppStrings
 import kotlin.math.roundToInt
@@ -62,15 +64,16 @@ fun UndoRedoRow(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(
                 shape = CircleShape,
-                // Light background when enabled, dark when disabled
-                color = if (canUndo) HotPink else HotPink.copy(alpha = 0.3f),
+                // Brand magenta when usable; neutral grey when not (a faded magenta still reads as
+                // tappable over a dark feed and vanishes over a bright one).
+                color = if (canUndo) HotPink else DisabledContainer,
                 shadowElevation = 4.dp
             ) {
                 IconButton(onClick = onUndo, enabled = canUndo) {
                     Icon(
                         Icons.AutoMirrored.Filled.Undo,
                         contentDescription = strings.adj.undo,
-                        tint = if (canUndo) Color.White else Color.White.copy(alpha = 0.38f)
+                        tint = if (canUndo) Color.White else DisabledContent
                     )
                 }
             }
@@ -87,14 +90,14 @@ fun UndoRedoRow(
         // Reset sits between undo and redo: a placement escape hatch that is itself reversible.
         Surface(
             shape = CircleShape,
-            color = if (canReset) HotPink else HotPink.copy(alpha = 0.3f),
+            color = if (canReset) HotPink else DisabledContainer,
             shadowElevation = 4.dp
         ) {
             IconButton(onClick = onReset, enabled = canReset) {
                 Icon(
                     if (isResetActive) Icons.Filled.SettingsBackupRestore else Icons.Filled.RestartAlt,
                     contentDescription = if (isResetActive) strings.adj.restorePlacement else strings.adj.reset,
-                    tint = if (canReset) Color.White else Color.White.copy(alpha = 0.38f)
+                    tint = if (canReset) Color.White else DisabledContent
                 )
             }
         }
@@ -111,15 +114,16 @@ fun UndoRedoRow(
             }
             Surface(
                 shape = CircleShape,
-                // Light background when enabled, dark when disabled
-                color = if (canRedo) HotPink else HotPink.copy(alpha = 0.3f),
+                // Brand magenta when usable; neutral grey when not (a faded magenta still reads as
+                // tappable over a dark feed and vanishes over a bright one).
+                color = if (canRedo) HotPink else DisabledContainer,
                 shadowElevation = 4.dp
             ) {
                 IconButton(onClick = onRedo, enabled = canRedo) {
                     Icon(
                         Icons.AutoMirrored.Filled.Redo,
                         contentDescription = strings.adj.redo,
-                        tint = if (canRedo) Color.White else Color.White.copy(alpha = 0.38f)
+                        tint = if (canRedo) Color.White else DisabledContent
                     )
                 }
             }

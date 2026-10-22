@@ -1104,7 +1104,7 @@ fun MainScreen(
             ) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(56.dp),
-                    color = Color(0xFFFFAA00),
+                    color = com.hereliesaz.graffitixr.design.theme.HotPink,
                     strokeWidth = 4.dp
                 )
             }

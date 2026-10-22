@@ -831,4 +831,12 @@
     <string name="crash_copy">Copy</string>
     <string name="crash_dismiss">Dismiss</string>
     <string name="ar_feedback_host_no_lan">Link needs Wi-Fi. Join a Wi-Fi network or start a hotspot, then host again.</string>
+    <string name="hud_progress">Progress</string>
+    <string name="replace_design_title">Replace design?</string>
+    <string name="replace_design_text">This swaps out the current design and its placement. You can undo it.</string>
+    <string name="replace_design_confirm">Replace</string>
+    <string name="dialog_cancel">Cancel</string>
+    <string name="delete_project_title">Delete “%1$s”?</string>
+    <string name="delete_project_text">This deletes the project for good: its design, thumbnail and saved Doodle. A Doodle can\'t be captured again if the surface has changed since. This can\'t be undone.</string>
+    <string name="save_project_title">Save project</string>
 </resources>
