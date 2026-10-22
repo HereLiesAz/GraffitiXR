@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
 import android.graphics.Bitmap
 import com.hereliesaz.graffitixr.common.model.AnticipationSettings
 import com.hereliesaz.graffitixr.feature.ar.anchor.StandaloneFingerprintBuilder.DetectedFeatures
+import com.hereliesaz.graffitixr.feature.ar.anticipation.HalfSphere
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -20,11 +21,13 @@ import kotlin.math.roundToInt
  * the sensors). Each close-up is a crop of the photo enlarged to about a live frame's size, run through
  * the base doodle's own detector; its features map back to the photo's pixels, so the builder
  * places them on the wall exactly like its own. Zooms under [MIN_ZOOM] are left to the matcher's own
- * scale passes.
+ * scale passes, and zooms over the cap ([NON_METRIC_MAX_ZOOM], or [maxZoomFor] when the capture
+ * distance is known in metres) are dropped: nearer than the lens can focus, the camera never sees
+ * the wall that sharp, so those crops (most of them, at zoom 6) were wasted work.
  */
 internal object CloseUpFeatures {
 
-    /** Half-spheres, from the capture distance in: zooms 6, 3 and 2 by default. */
+    /** Half-spheres, from the capture distance in: zooms 6, 3 and 2 before the [NON_METRIC_MAX_ZOOM] cap. */
     const val DISTANCE = AnticipationSettings.DEFAULT_DISTANCE
 
     /** Smaller zooms are covered by the relocalizer's own 0.5x/2x passes and ORB's pyramid. */
@@ -40,17 +43,35 @@ internal object CloseUpFeatures {
     const val MIN_PER_VIEW = 30
 
     /** Crops at or below this zoom are the "quick set": learned first, installed before the rest. */
-    const val QUICK_MAX_ZOOM = 3f
+    const val QUICK_MAX_ZOOM = 2f
+
+    /**
+     * Without a metric capture distance, zoom at most this much: a 40 cm page captured from about
+     * 30 cm is in focus at a third of that on most phones, not at a sixth.
+     */
+    const val NON_METRIC_MAX_ZOOM = 3f
+
+    /**
+     * The largest useful zoom for a photo captured from [captureDistanceMeters] by a lens that focuses
+     * no nearer than [minFocusMeters] (with [HalfSphere.MIN_FOCUS_MARGIN]); [NON_METRIC_MAX_ZOOM] when
+     * the distance is unknown.
+     */
+    fun maxZoomFor(
+        captureDistanceMeters: Double?,
+        minFocusMeters: Double = HalfSphere.DEFAULT_MIN_FOCUS_M,
+    ): Float =
+        if (captureDistanceMeters == null || !captureDistanceMeters.isFinite() || captureDistanceMeters <= 0.0) NON_METRIC_MAX_ZOOM
+        else (captureDistanceMeters / (minFocusMeters * HalfSphere.MIN_FOCUS_MARGIN)).toFloat()
 
     /** A close-up: the photo's crop at ([x], [y]), [w] × [h] pixels, seen [zoom] times nearer. */
     data class View(val x: Int, val y: Int, val w: Int, val h: Int, val zoom: Float)
 
     /**
      * The close-ups of a [width] × [height] photo: for each half-sphere i = 1, 2, … whose zoom
-     * `distance / i` is at least [MIN_ZOOM], a `ceil(distance / i)`-per-side grid of crops `1 / zoom`
-     * of the photo, centred on the grid's cells and kept inside the photo.
+     * `distance / i` is at least [MIN_ZOOM] and at most [maxZoom], a `ceil(distance / i)`-per-side grid
+     * of crops `1 / zoom` of the photo, centred on the grid's cells and kept inside the photo.
      */
-    fun views(width: Int, height: Int, distance: Int = DISTANCE): List<View> {
+    fun views(width: Int, height: Int, distance: Int = DISTANCE, maxZoom: Float = NON_METRIC_MAX_ZOOM): List<View> {
         if (width <= 0 || height <= 0) return emptyList()
         val settings = AnticipationSettings(distance = distance)
         val out = ArrayList<View>()
@@ -58,7 +79,7 @@ internal object CloseUpFeatures {
         // actually sees, so they are the most integral and are learned (and installed) first.
         for (i in (distance - 1) downTo 1) {
             val zoom = distance.toFloat() / i
-            if (zoom < MIN_ZOOM) continue
+            if (zoom < MIN_ZOOM || zoom > maxZoom * (1 + 1e-6f)) continue
             val n = settings.aimsPerSide(i - 1)
             val w = max(1, (width / zoom).roundToInt())
             val h = max(1, (height / zoom).roundToInt())
@@ -146,6 +167,7 @@ internal object CloseUpFeatures {
         stepsBefore: Int = 0,
         detect: (Bitmap, Int) -> DetectedFeatures?,
     ): DetectedFeatures? {
+        // No caller knows the capture distance in metres yet: the conservative cap.
         val views = views(photo.width, photo.height)
         val quickCount = views.count { it.zoom <= QUICK_MAX_ZOOM }
         val per = perViewBudget(baseRows, views.size)

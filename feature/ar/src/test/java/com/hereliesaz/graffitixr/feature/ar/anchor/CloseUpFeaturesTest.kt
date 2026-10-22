@@ -15,7 +15,7 @@ class CloseUpFeaturesTest {
 
     @Test
     fun `zooms 6, 3 and 2, each tiled by its aims, every crop inside the photo`() {
-        val views = CloseUpFeatures.views(w, h)
+        val views = CloseUpFeatures.views(w, h, maxZoom = 6f)
         assertEquals(mapOf(6f to 36, 3f to 9, 2f to 4), views.groupingBy { it.zoom }.eachCount())
         for (v in views) {
             assertTrue(v.toString(), v.x >= 0 && v.y >= 0 && v.x + v.w <= w && v.y + v.h <= h)
@@ -35,11 +35,24 @@ class CloseUpFeaturesTest {
     }
 
     @Test
+    fun `without a metric distance the zoom stops at 3, nearer than most lenses focus`() {
+        // The zoom-6 grid (36 of 49 crops) is a sixth of the capture distance: blur on a phone.
+        assertEquals(mapOf(3f to 9, 2f to 4), CloseUpFeatures.views(w, h).groupingBy { it.zoom }.eachCount())
+        assertEquals(CloseUpFeatures.NON_METRIC_MAX_ZOOM, CloseUpFeatures.maxZoomFor(null))
+        // Captured from 1.5 m with a lens focusing from 10 cm (+25 %): zoom 12 is still sharp, all three kept.
+        assertEquals(12f, CloseUpFeatures.maxZoomFor(1.5, 0.10), 1e-4f)
+        assertEquals(3, CloseUpFeatures.views(w, h, maxZoom = CloseUpFeatures.maxZoomFor(1.5, 0.10)).map { it.zoom }.distinct().size)
+        // Captured from 30 cm with a 10 cm lens: only zoom 2 (2.4 max).
+        assertEquals(setOf(2f), CloseUpFeatures.views(w, h, maxZoom = CloseUpFeatures.maxZoomFor(0.30, 0.10)).map { it.zoom }.toSet())
+    }
+
+    @Test
     fun `coarsest crops come first and the quick set is a leading prefix`() {
         val views = CloseUpFeatures.views(w, h)
         assertEquals(views.sortedBy { it.zoom }.map { it.zoom }, views.map { it.zoom })
         val quick = views.count { it.zoom <= CloseUpFeatures.QUICK_MAX_ZOOM }
-        assertEquals(13, quick)
+        assertEquals(4, quick)
+        assertTrue(quick < views.size)
         assertTrue(views.take(quick).all { it.zoom <= CloseUpFeatures.QUICK_MAX_ZOOM })
     }
 

@@ -264,15 +264,21 @@ class ArViewModel @Inject constructor(
     private val tripodEncoding = java.util.concurrent.atomic.AtomicBoolean(false)
 
     private fun applyTripodSink(wanted: Boolean) {
-        renderer?.streamSink = if (wanted) { bmp -> encodeTripodFrame(bmp) } else null
+        renderer?.let { r ->
+            r.streamMaxEdgePx = TRIPOD_MAX_EDGE_PX
+            r.streamBusy = { tripodEncoding.get() }
+            r.streamSink = if (wanted) { bmp -> encodeTripodFrame(bmp) } else null
+        }
     }
 
     /**
      * Runs on the GL thread, so it only hands the bitmap off: downscale and JPEG on a worker, one
-     * frame in flight (a frame arriving while the last is still encoding is dropped, latest wins).
+     * frame in flight. The renderer skips its readback while [tripodEncoding] is set, so a frame
+     * normally arrives only when the encoder is free; one that races in is dropped. The bitmap is the
+     * renderer's (reused next tick): read it, never recycle it.
      */
     private fun encodeTripodFrame(bmp: Bitmap) {
-        if (!tripodEncoding.compareAndSet(false, true)) { bmp.recycle(); return }
+        if (!tripodEncoding.compareAndSet(false, true)) return
         viewModelScope.launch(Dispatchers.Default) {
             try {
                 val edge = maxOf(bmp.width, bmp.height)
@@ -285,7 +291,6 @@ class ArViewModel @Inject constructor(
                 if (scaled !== bmp) scaled.recycle()
                 collaborationManager.offerVideo(out.toByteArray())
             } finally {
-                bmp.recycle()
                 tripodEncoding.set(false)
             }
         }

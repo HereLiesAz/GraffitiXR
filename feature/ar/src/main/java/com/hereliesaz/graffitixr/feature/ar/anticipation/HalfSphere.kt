@@ -119,18 +119,63 @@ internal object HalfSphere {
         if (count <= 0) emptyList() else List(count) { i -> capture * (i + 1) / count }
 
     /**
+     * Fixed-focus cameras (LENS_INFO_MINIMUM_FOCUS_DISTANCE 0) and cameras whose characteristics are
+     * unavailable: assume nothing nearer than this (metres) is sharp.
+     */
+    const val DEFAULT_MIN_FOCUS_M = 0.10
+
+    /** Views are kept this much farther than the lens's minimum focus: focus at the limit hunts. */
+    const val MIN_FOCUS_MARGIN = 1.25
+
+    /**
+     * Pages whose physical width is unknown zoom at most this much nearer than the capture: a view
+     * nearer than the lens can focus is blur KPM cannot match, so without a metric scale stay well
+     * outside it.
+     */
+    const val NON_METRIC_MAX_ZOOM = 3.0
+
+    /**
+     * The minimum focus distance (metres) of a lens whose LENS_INFO_MINIMUM_FOCUS_DISTANCE is
+     * [diopters]: `1 / diopters`; 0 (fixed focus), null or not finite: [DEFAULT_MIN_FOCUS_M].
+     */
+    fun minFocusMeters(diopters: Float?): Double =
+        if (diopters == null || !diopters.isFinite() || diopters <= 0f) DEFAULT_MIN_FOCUS_M
+        else 1.0 / diopters
+
+    /**
+     * The nearest radius (target widths) worth a view: [minFocusMeters] (times [MIN_FOCUS_MARGIN]) over
+     * the page's [widthMeters] when it is known, else `capture / NON_METRIC_MAX_ZOOM`.
+     */
+    fun nearestRadius(capture: Double, widthMeters: Double?, minFocusMeters: Double = DEFAULT_MIN_FOCUS_M): Double =
+        if (widthMeters != null && widthMeters.isFinite() && widthMeters > 0.0) minFocusMeters * MIN_FOCUS_MARGIN / widthMeters
+        else capture / NON_METRIC_MAX_ZOOM
+
+    /**
      * The previews of a [width] × [height] reference (the whole target) at [resolution], as [camera]
      * (the matched image's intrinsics) would see them: on each half-sphere, at each of its aim points
      * (the centres of an `aimsPerSide × aimsPerSide` grid over the target), the pole and every cut of
      * a meridian by a circle (the equator, edge-on, excluded), each at every roll. Partial views (the
      * target overflowing the frame, part of it behind the camera) are kept: up close they are all
-     * there is. Views that leave too little of the target in frame (under [MIN_SIDE_PX]) are dropped.
+     * there is. Views that leave too little of the target in frame (under [MIN_SIDE_PX]) are dropped,
+     * and so are whole half-spheres nearer than the lens focuses ([nearestRadius]: the page's
+     * [widthMeters], when metric, against [minFocusMeters]); the rest keep their shell index, so a
+     * view's label and site do not depend on the lens.
      */
-    fun plans(width: Int, height: Int, camera: CameraIntrinsics, resolution: AnticipationSettings): List<Plan> {
+    fun plans(
+        width: Int,
+        height: Int,
+        camera: CameraIntrinsics,
+        resolution: AnticipationSettings,
+        widthMeters: Double? = null,
+        minFocusMeters: Double = DEFAULT_MIN_FOCUS_M,
+    ): List<Plan> {
         val out = ArrayList<Plan>()
-        val radii = shells(resolution.distance, captureDistance(width, height, camera))
+        val capture = captureDistance(width, height, camera)
+        val nearest = nearestRadius(capture, widthMeters, minFocusMeters)
+        val radii = shells(resolution.distance, capture)
         val aspect = height.toDouble() / width
         for ((si, r) in radii.withIndex()) {
+            if (r < nearest * (1 - 1e-9)) continue
             val n = resolution.aimsPerSide(si)
             for (aim in 0 until n * n) {
                 val ax = ((aim % n) + 0.5) / n - 0.5
