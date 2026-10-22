@@ -1,8 +1,6 @@
 package com.hereliesaz.graffitixr
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material3.Icon
@@ -120,19 +118,13 @@ private fun DirectionalIndicator(
                 .offset(y = (-150).dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(color, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowUpward,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
+            // Just the arrow, in the indicator's colour: no disc behind it.
+            Icon(
+                imageVector = Icons.Default.ArrowUpward,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(40.dp)
+            )
             Spacer(Modifier.height(4.dp))
             Column(
                 modifier = Modifier.rotate(-angle), // Keep text upright
