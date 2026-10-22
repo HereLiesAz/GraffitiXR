@@ -1,5 +1,6 @@
 
 [versions]
+playAppUpdate = "2.1.0"
 activityCompose = "1.13.0"
 agp = "9.4.1"
 appcompat = "1.8.0"
@@ -42,6 +43,7 @@ zxingCore = "3.5.4"
 zxingAndroidEmbedded = "4.3.0"
 
 [libraries]
+play-app-update-ktx = { group = "com.google.android.play", name = "app-update-ktx", version.ref = "playAppUpdate" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }

@@ -819,4 +819,10 @@
     <string name="cv_pass_warm_luma">Warm light</string>
     <string name="cv_pass_stencil3">Stencil</string>
     <string name="cv_pass_change">Change</string>
+    <string name="update_title">Update available</string>
+    <string name="update_body_play">A newer version is on the Play Store.</string>
+    <string name="update_body_github">Version %1$s is on GitHub.</string>
+    <string name="update_go_play">Open Play Store</string>
+    <string name="update_go_github">Open GitHub</string>
+    <string name="update_later">Later</string>
 </resources>

@@ -235,6 +235,7 @@ dependencies {
     implementation(libs.androidx.camera.view)
 
     implementation(libs.play.services.base)
+    implementation(libs.play.app.update.ktx)
 
     implementation(libs.az.nav.rail)
     implementation(libs.coil.compose)
