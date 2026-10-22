@@ -247,6 +247,8 @@ class MainActivity : AppCompatActivity() {
     var isExporting by mutableStateOf(false)
     // Crash report captured on the previous run (native SIGSEGV and/or JVM), shown on launch.
     var pendingCrashReport by mutableStateOf<String?>(null)
+    // Newer build for this install source (Play or GitHub), checked once per launch.
+    var pendingUpdate by mutableStateOf<UpdateOffer?>(null)
 
     // Interop: an image handed in via ACTION_SEND (e.g. an edited overlay returning from Graffux),
     // consumed once by the editor as the project's design. Set from the launch intent / onNewIntent.
@@ -501,8 +503,41 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        lifecycleScope.launch { pendingUpdate = UpdateChecker.check(applicationContext) }
+
         setContent {
             GraffitiXRTheme {
+                pendingUpdate?.let { offer ->
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { pendingUpdate = null },
+                        title = { Text(stringResource(DesignR.string.update_title)) },
+                        text = {
+                            Text(
+                                when (offer) {
+                                    is UpdateOffer.Play -> stringResource(DesignR.string.update_body_play)
+                                    is UpdateOffer.GitHub -> stringResource(DesignR.string.update_body_github, offer.versionLabel)
+                                }
+                            )
+                        },
+                        confirmButton = {
+                            androidx.compose.material3.TextButton(onClick = {
+                                UpdateChecker.open(this@MainActivity, offer)
+                                pendingUpdate = null
+                            }) {
+                                Text(
+                                    stringResource(
+                                        if (offer is UpdateOffer.Play) DesignR.string.update_go_play else DesignR.string.update_go_github
+                                    )
+                                )
+                            }
+                        },
+                        dismissButton = {
+                            androidx.compose.material3.TextButton(onClick = { pendingUpdate = null }) {
+                                Text(stringResource(DesignR.string.update_later))
+                            }
+                        }
+                    )
+                }
                 pendingCrashReport?.let { report ->
                     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
                     androidx.compose.material3.AlertDialog(
