@@ -30,4 +30,17 @@ class ImageExtTest {
             fitWithinPixelBudget(1600, 1200),
         )
     }
+
+    @Test
+    fun aMostlyBlackBoardWithChalkMarksLooksForLightMarks() {
+        // 90% near-black board (luma 20), 10% chalk strokes (luma 220).
+        val luma = IntArray(1000) { if (it % 10 == 0) 220 else 20 }
+        assertTrue(marksAreLight(luma))
+    }
+
+    @Test
+    fun aLightWallWithDarkMarksLooksForDarkMarks() {
+        val luma = IntArray(1000) { if (it % 10 == 0) 30 else 200 }
+        assertTrue(!marksAreLight(luma))
+    }
 }

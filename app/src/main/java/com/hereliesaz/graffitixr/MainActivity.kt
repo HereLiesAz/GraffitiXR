@@ -3411,7 +3411,7 @@ private fun RelocDiagnosticsOverlay(
     val d = diagnostics
     // What to DO about it, not just what happened.
     val (label, hint) = when (d.reject) {
-        RelocReject.OK -> "LOCKED" to "matching the wall"
+        RelocReject.OK -> "LOCKED" to "matching the surface"
         RelocReject.NO_DOODLE ->
             "NO DOODLE" to "create a Doodle — nothing to match against"
         RelocReject.DISABLED -> "OFF" to "relocalization disabled"
@@ -3428,7 +3428,7 @@ private fun RelocDiagnosticsOverlay(
         RelocReject.PNP_FAILED ->
             "NO POSE" to "${d.matches} matches, none geometrically consistent"
         RelocReject.FEW_INLIERS ->
-            "${d.inliers}/6 INLIERS" to "close — hold steadier, or get square to the wall"
+            "${d.inliers}/6 INLIERS" to "close — hold steadier, or get square to the surface"
         RelocReject.TYPE_MISMATCH ->
             "TYPE MISMATCH" to "the Doodle needs the SuperPoint model, which isn't available — re-capture the Doodle"
         RelocReject.UNKNOWN -> "—" to "waiting for the first attempt"
@@ -3875,8 +3875,8 @@ private fun DoodleIncompleteOverlay(modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "The anchor is placed, but no wall features were matched to it — the overlay " +
-                    "will drift. Re-capture the Doodle: get squarer to the wall, closer, and aim at " +
+                text = "The anchor is placed, but no surface features were matched to it — the overlay " +
+                    "will drift. Re-capture the Doodle: get squarer to the surface, closer, and aim at " +
                     "a patch with more detail.",
                 color = Color.White,
                 fontSize = 14.sp,

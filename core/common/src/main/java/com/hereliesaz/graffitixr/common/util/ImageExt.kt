@@ -5,9 +5,9 @@ import android.graphics.Bitmap
 
 /**
  * Opaque colour every detected mark is painted with so the user can clearly SEE which marks
- * will feed the wall doodle. The marks are dark by definition (that is how they are
- * detected), so re-drawing them in their own colour would be near-invisible against a dark
- * wall — they must be highlighted. Only the ALPHA channel matters to the native doodle
+ * will feed the wall doodle. Marks contrast with the surface — darker on a light surface,
+ * lighter on a dark one (see [marksAreLight]) — so re-drawing them in their own colour would
+ * blend into their surroundings; they must be highlighted. Only the ALPHA channel matters to the native doodle
  * masker (opaque = detect, transparent = skip), so the RGB highlight is purely visual.
  */
 const val MARK_HIGHLIGHT_COLOR: Int = 0xFF00E5FF.toInt() // bright cyan
@@ -110,6 +110,8 @@ fun Bitmap.isolateMarkings(tapPos: Pair<Float, Float>? = null): Bitmap {
         }
     }
 
+    // Chalk or paint marks on a black canvas board are lighter than their surface, not darker.
+    val lightMarks = marksAreLight(luma)
     val radius = w / 16
     val baseThresholdOffset = 25 // Increased from 15 for more discerning default
 
@@ -145,7 +147,7 @@ fun Bitmap.isolateMarkings(tapPos: Pair<Float, Float>? = null): Bitmap {
             val effectiveOffset = (baseThresholdOffset * distFactor).toInt()
 
             val i = y * w + x
-            isMark[i] = luma[i] < avg - effectiveOffset
+            isMark[i] = if (lightMarks) luma[i] > avg + effectiveOffset else luma[i] < avg - effectiveOffset
         }
     }
 
@@ -154,6 +156,26 @@ fun Bitmap.isolateMarkings(tapPos: Pair<Float, Float>? = null): Bitmap {
     val outPixels = highlightWholeMarks(isMark, w, h, maxOf(MIN_MARK_PIXELS_FLOOR, n / NOISE_AREA_DIVISOR), integral)
     out.setPixels(outPixels, 0, w, 0, 0, w, h)
     return out
+}
+
+// A surface whose median luma is below this is dark, so its marks are the lighter pixels.
+private const val DARK_SURFACE_MEDIAN_LUMA = 96
+
+/**
+ * True when the marks to find are lighter than the surface: the image is mostly dark (median luma
+ * below [DARK_SURFACE_MEDIAN_LUMA]), as a black canvas board or a dark wall is. Marks are a small
+ * part of the frame, so the median is the surface's tone.
+ */
+internal fun marksAreLight(luma: IntArray): Boolean {
+    if (luma.isEmpty()) return false
+    val histogram = IntArray(256)
+    for (v in luma) histogram[v.coerceIn(0, 255)]++
+    var seen = 0
+    for (v in 0..255) {
+        seen += histogram[v]
+        if (seen * 2 >= luma.size) return v < DARK_SURFACE_MEDIAN_LUMA
+    }
+    return false
 }
 
 /**

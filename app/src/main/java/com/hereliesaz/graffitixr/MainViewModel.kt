@@ -292,7 +292,7 @@ class MainViewModel @Inject constructor(
         if (placement == null) {
             Toast.makeText(
                 context,
-                "SphereSLAM map is not ready to anchor this Doodle yet. Keep the camera on the wall and try again.",
+                "SphereSLAM map is not ready to anchor this Doodle yet. Keep the camera on the surface and try again.",
                 Toast.LENGTH_LONG,
             ).show()
             return
@@ -335,7 +335,7 @@ class MainViewModel @Inject constructor(
                     withContext(Dispatchers.Main) {
                         Toast.makeText(
                             context,
-                            "Doodle lacks enough selected visual detail. Keep more distinctive wall marks.",
+                            "Doodle lacks enough selected visual detail. Keep more distinctive surface marks.",
                             Toast.LENGTH_LONG,
                         ).show()
                     }
@@ -790,7 +790,7 @@ class MainViewModel @Inject constructor(
                     Toast.makeText(
                         context,
                         "Doodle saved for this session only: no anchor locked, so it won't re-anchor " +
-                            "when the project is reopened. Create it again holding steady on the wall.",
+                            "when the project is reopened. Create it again holding steady on the surface.",
                         Toast.LENGTH_LONG,
                     ).show()
                 }
@@ -860,7 +860,7 @@ class MainViewModel @Inject constructor(
             // MetricDoodleBuilder.lastRefusalReason: this Toast was the only record this
             // failure ever had, and a Toast a report can't see is not a record.
             MetricDoodleBuilder.recordPreconditionFailure(
-                "no wall plane under the tap — face the wall more squarely, closer, or with more light",
+                "no surface under the tap — face the surface more squarely, closer, or with more light",
             )
             Toast.makeText(context, notOnGreenWallMessage, Toast.LENGTH_LONG).show()
             return
@@ -931,11 +931,11 @@ class MainViewModel @Inject constructor(
                 val need = MetricDoodleBuilder.lastRequired
                 val message = when {
                     detected < need ->
-                        "Only $detected features on this wall (need $need). Too dark, too smooth, " +
+                        "Only $detected features on this surface (need $need). Too dark, too smooth, " +
                             "or out of focus — try a more detailed patch or more light."
                     else ->
-                        "Found $detected features but only $placed landed on the wall surface " +
-                            "(need $need). Aim at the middle of the detected wall, square on."
+                        "Found $detected features but only $placed landed on the surface " +
+                            "(need $need). Aim at the middle of the detected surface, square on."
                 }
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, message, Toast.LENGTH_LONG).show()

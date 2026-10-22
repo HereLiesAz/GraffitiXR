@@ -1431,6 +1431,10 @@ class ArViewModel @Inject constructor(
     // rest of the session. Reset on AR exit so each session starts with the automatic behavior again.
     @Volatile private var focusManuallyOverridden = false
 
+    // True while the placed anchor is within close range (see CLOSE_TARGET_*), with hysteresis so a
+    // target near the boundary doesn't flip focus modes.
+    @Volatile private var anchorIsClose = false
+
     /**
      * Acquire-then-lock autofocus. AUTO while the artist frames the wall — a sharp image is what gives
      * ARCore/KPM the features to acquire — then FIXED once the anchor is placed, so the focal length
@@ -1438,11 +1442,14 @@ class ArViewModel @Inject constructor(
      * its own default; AUTO's focal sweeps are a known tracking-instability source. This gets both: a
      * sharp acquisition and stable optics after. A manual focus toggle disables it for the session, and
      * a saved FIXED preference never acquires in AUTO at all. Changes only [effectiveAutoFocus].
+     *
+     * Exception: a close target (a canvas board or paper under the phone, [anchorIsClose]) keeps AUTO.
+     * FIXED parks the lens at infinity, and at arm's length that blurs every frame.
      */
     private fun applyAnchorFocusLock(anchorEstablished: Boolean) {
         if (focusManuallyOverridden) return
         if (!_evalAutoFocusEnabled.value) return
-        val auto = !anchorEstablished
+        val auto = !anchorEstablished || anchorIsClose
         if (effectiveAutoFocus == auto) return
         effectiveAutoFocus = auto
         renderer?.updateAutoFocus(auto)
@@ -2792,6 +2799,7 @@ class ArViewModel @Inject constructor(
         // preference, which re-arms acquire-then-lock for an AUTO preference. The preference itself
         // (UI state and DataStore) is untouched.
         focusManuallyOverridden = false
+        anchorIsClose = false
         effectiveAutoFocus = _evalAutoFocusEnabled.value
         // Cancel any in-flight session update (including a running stereo probe) so it stops pumping
         // the camera and releases the session mutex before cleanup tries to acquire it.
@@ -5090,6 +5098,14 @@ class ArViewModel @Inject constructor(
         isHardwareStereo: Boolean = false,
         centerDepth: Float = -1f,
     ) {
+        if (distanceToAnchorMeters > 0f) {
+            val close = if (anchorIsClose) distanceToAnchorMeters < CLOSE_TARGET_EXIT_M
+            else distanceToAnchorMeters < CLOSE_TARGET_ENTER_M
+            if (close != anchorIsClose) {
+                anchorIsClose = close
+                applyAnchorFocusLock(anchorEstablished = _uiState.value.isAnchorEstablished)
+            }
+        }
         val progress = if (isTracking) slamManager.getPaintingProgress() else _uiState.value.paintingProgress
         // Read every tick (~15 Hz) rather than only on a successful lock — the whole point is to show
         // the FAILING states, which by definition never reach a success path.
@@ -6564,6 +6580,11 @@ class ArViewModel @Inject constructor(
 
     // --- Doodle demo: headless doodle build ---
     internal companion object {
+        /** An anchor nearer than this is a close target (canvas, paper): focus stays AUTO. */
+        const val CLOSE_TARGET_ENTER_M = 1.0f
+        /** A close target becomes far again only beyond this, so focus doesn't flip at the edge. */
+        const val CLOSE_TARGET_EXIT_M = 1.3f
+
         /** Tripod stream (Link): longest edge and JPEG quality of each streamed frame. */
         const val TRIPOD_MAX_EDGE_PX = 960
         const val TRIPOD_JPEG_QUALITY = 70
