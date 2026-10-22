@@ -669,6 +669,9 @@ class ArRenderer(
     @Volatile private var lastTickMs = 0L
     @Volatile private var lastStep = "init"
     @Volatile private var stallReported = false
+    // True while the session is paused (requestPause → requestResume): no frames are expected, so the
+    // stall watchdog must not read the silence as a stall (nor blame the camera for it).
+    @Volatile private var stallWatchdogPaused = false
     // When the current camera config started being driven (attach/reconfigure). The no-first-frame
     // verdict is measured against this in wall time, not frames: this device's first camera frame
     // arrives ~3s after resume, which at 30fps blew past the old 90-frame check and produced a
@@ -829,11 +832,25 @@ class ArRenderer(
 
     /**
      * Tripod stream (Link): while set, the composited framebuffer is read back about [STREAM_INTERVAL_MS]
-     * apart and handed here as a bitmap this renderer no longer owns. Called on the GL thread, so the
-     * receiver must move the encode off it. Null (the default) costs nothing.
+     * apart, downscaled on the GPU to at most [streamMaxEdgePx] on its long side, and handed here.
+     * Called on the GL thread, so the receiver must move the encode off it. The bitmap stays this
+     * renderer's (it is reused for the next tick): the receiver must not recycle it, and must be done
+     * reading it before [streamBusy] reports false again. Null (the default) costs nothing.
      */
     @Volatile var streamSink: ((Bitmap) -> Unit)? = null
+
+    /**
+     * True while the stream's receiver is still busy with the last frame: no readback is done then
+     * (the frame would only be dropped), so a slow encode costs the GL thread nothing.
+     */
+    @Volatile var streamBusy: () -> Boolean = { false }
+
+    /** The streamed frame's long side, at most (the encoder's own cap; bigger is wasted readback). */
+    @Volatile var streamMaxEdgePx: Int = 960
     private var lastStreamMs = 0L
+    // GL-thread only: the small FBO the frame is blitted (downscaled, flipped) into, and the readback
+    // buffer and bitmap reused tick to tick.
+    private val streamReadback = StreamReadback()
 
     // Pre-allocated buffers for Surface Mesh updates (32x32 grid)
     private val meshVerticesBuffer = FloatArray(32 * 32 * 3)
@@ -897,11 +914,20 @@ class ArRenderer(
             anticipation.settings = value
         }
 
-    /** Anticipate the tracker's new reference page for [camera]. */
-    private fun anticipateReference(luma: ByteArray, width: Int, height: Int, camera: com.hereliesaz.sphereslam.SphereSlamTracker.CameraModel) {
+    /**
+     * Anticipate the tracker's new reference page for [camera]; [widthMeters] is the page's physical
+     * width (ARCore references are metric), so no view is built nearer than the lens focuses.
+     */
+    private fun anticipateReference(
+        luma: ByteArray,
+        width: Int,
+        height: Int,
+        camera: com.hereliesaz.sphereslam.SphereSlamTracker.CameraModel,
+        widthMeters: Float,
+    ) {
         anticipation.reset()
         anticipationCamera = com.hereliesaz.sphereslam.camera.CameraIntrinsics(camera.fx, camera.fy, camera.cx, camera.cy, camera.width, camera.height)
-        anticipation.setPage(0, luma, width, height)
+        anticipation.setPage(0, luma, width, height, widthMeters.toDouble().takeIf { it.isFinite() && it > 0.0 })
     }
     // KPM is asynchronous; this ring pairs each observation with the ARCore view + consensus anchor
     // from the SAME sensor timestamp before any correction enters PoseFusion.
@@ -1113,7 +1139,7 @@ class ArRenderer(
                 rowStride = page.width,
                 dpi = dpi,
             )
-            anticipateReference(page.luma, page.width, page.height, cameraModel)
+            anticipateReference(page.luma, page.width, page.height, cameraModel, page.widthMeters)
             hybridReferenceGeometry = com.hereliesaz.sphereslam.SphereSlamPoseMath
                 .pageGeometry(page.width, page.height, dpi)
             hybridReferencePhysicallyMetric = true
@@ -1189,12 +1215,17 @@ class ArRenderer(
                     val cameraId = session.cameraConfig.cameraId
                     val manager = context.getSystemService(android.content.Context.CAMERA_SERVICE)
                             as android.hardware.camera2.CameraManager
-                    sensorOrientation = manager
-                        .getCameraCharacteristics(cameraId)
+                    val characteristics = manager.getCameraCharacteristics(cameraId)
+                    sensorOrientation = characteristics
                         .get(android.hardware.camera2.CameraCharacteristics.SENSOR_ORIENTATION)
                         ?: 90
+                    // Anticipated views nearer than this lens focuses would be blur: not built.
+                    anticipation.minFocusMeters = com.hereliesaz.graffitixr.feature.ar.anticipation.HalfSphere.minFocusMeters(
+                        characteristics.get(android.hardware.camera2.CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE)
+                    )
                 } catch (_: Exception) {
                     sensorOrientation = 90
+                    anticipation.minFocusMeters = com.hereliesaz.graffitixr.feature.ar.anticipation.HalfSphere.DEFAULT_MIN_FOCUS_M
                 }
             } else {
                 displayRotationHelper.onPause()
@@ -1367,7 +1398,7 @@ class ArRenderer(
             while (!isDestroying) {
                 try { Thread.sleep(1000) } catch (_: InterruptedException) { break }
                 val tick = lastTickMs
-                if (tick == 0L || isDestroying) continue
+                if (tick == 0L || isDestroying || stallWatchdogPaused) continue
                 val age = android.os.SystemClock.elapsedRealtime() - tick
                 if (age > 2500 && !stallReported) {
                     stallReported = true
@@ -1409,6 +1440,19 @@ class ArRenderer(
         cameraNotFeedingReported = false
         lastTickMs = android.os.SystemClock.elapsedRealtime()
         camWaitStartMs = lastTickMs
+    }
+
+    /** Stops the stall watchdog's clock while the session is paused: no frames arrive then by design. */
+    private fun pauseStallWatchdog() {
+        stallWatchdogPaused = true
+    }
+
+    /** Restarts the stall watchdog's clock after a pause; a stall verdict from before it does not carry over. */
+    private fun resumeStallWatchdog() {
+        lastTickMs = android.os.SystemClock.elapsedRealtime()
+        camWaitStartMs = lastTickMs
+        stallReported = false
+        stallWatchdogPaused = false
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -2897,7 +2941,7 @@ class ArRenderer(
                                     rowStride = reference.width,
                                     dpi = reference.referenceDpi,
                                 )
-                                anticipateReference(reference.luma, reference.width, reference.height, cameraModel)
+                                anticipateReference(reference.luma, reference.width, reference.height, cameraModel, reference.widthMeters)
                                 hybridReferenceGeometry = reference.pageGeometry
                                 hybridReferencePhysicallyMetric = true
                                 // Held for persistence until the page↔artwork relation freezes
@@ -3550,18 +3594,12 @@ class ArRenderer(
                 val nowMs = android.os.SystemClock.elapsedRealtime()
                 val w = surfaceWidth
                 val h = surfaceHeight
-                if (nowMs - lastStreamMs >= STREAM_INTERVAL_MS && w > 0 && h > 0) {
+                // While the receiver is still encoding the last frame this one would be dropped: skip
+                // the readback entirely (and leave the clock alone, so the next free tick reads at once).
+                if (nowMs - lastStreamMs >= STREAM_INTERVAL_MS && w > 0 && h > 0 && !streamBusy()) {
                     lastStreamMs = nowMs
                     try {
-                        // Same readback as the export above (GL origin is bottom-left, hence the flip).
-                        val buf = ByteBuffer.allocateDirect(w * h * 4).order(java.nio.ByteOrder.nativeOrder())
-                        GLES30.glReadPixels(0, 0, w, h, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, buf)
-                        buf.rewind()
-                        val source = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                        source.copyPixelsFromBuffer(buf)
-                        val flipped = Bitmap.createBitmap(source, 0, 0, w, h, android.graphics.Matrix().apply { postScale(1f, -1f) }, false)
-                        if (flipped !== source) source.recycle()
-                        streamSinkNow(flipped)
+                        streamReadback.read(w, h, streamMaxEdgePx)?.let(streamSinkNow)
                     } catch (e: Exception) {
                         Timber.e(e, "Failed to capture stream frame")
                     }
@@ -3824,6 +3862,110 @@ class ArRenderer(
         planeRenderer.release()
         arDebugRenderer.release()
         perceptionFbo.release()
+        streamReadback.release()
+    }
+
+    /**
+     * The tripod stream's readback, GL thread only: the bound framebuffer ([w] × [h]) is blitted into
+     * a small FBO (long side at most maxEdge, linear filtering, flipped so the bitmap comes out
+     * top-left first) and only that is read back, into a buffer and bitmap kept across ticks. Where
+     * the blit is refused (a multisampled surface cannot be resolved into a different size) it falls
+     * back to a full-size readback, still into reused buffers, scaled on the CPU.
+     */
+    private class StreamReadback {
+        private var fbo = 0
+        private var rbo = 0
+        private var fboW = 0
+        private var fboH = 0
+        private var buffer: ByteBuffer? = null
+        private var bitmap: Bitmap? = null
+        private var blitUnsupported = false
+
+        fun read(w: Int, h: Int, maxEdge: Int): Bitmap? {
+            val k = minOf(1f, maxEdge.coerceAtLeast(1).toFloat() / maxOf(w, h))
+            val dw = (w * k).toInt().coerceAtLeast(1)
+            val dh = (h * k).toInt().coerceAtLeast(1)
+            if (!blitUnsupported) {
+                val out = blitAndRead(w, h, dw, dh)
+                if (out != null) return out
+                blitUnsupported = true
+                Timber.w("Tripod stream: framebuffer blit refused; falling back to full-size readback")
+            }
+            return fullRead(w, h, dw, dh)
+        }
+
+        private fun blitAndRead(w: Int, h: Int, dw: Int, dh: Int): Bitmap? {
+            val prev = IntArray(1)
+            GLES30.glGetIntegerv(GLES30.GL_FRAMEBUFFER_BINDING, prev, 0)
+            if (fbo == 0 || fboW != dw || fboH != dh) allocate(dw, dh)
+            while (GLES30.glGetError() != GLES30.GL_NO_ERROR) { /* clear stale errors */ }
+            GLES30.glBindFramebuffer(GLES30.GL_READ_FRAMEBUFFER, prev[0])
+            GLES30.glBindFramebuffer(GLES30.GL_DRAW_FRAMEBUFFER, fbo)
+            // Destination rows swapped: GL's bottom-left origin lands as the bitmap's top-left.
+            GLES30.glBlitFramebuffer(0, 0, w, h, 0, dh, dw, 0, GLES30.GL_COLOR_BUFFER_BIT, GLES30.GL_LINEAR)
+            val ok = GLES30.glGetError() == GLES30.GL_NO_ERROR
+            var out: Bitmap? = null
+            if (ok) {
+                GLES30.glBindFramebuffer(GLES30.GL_READ_FRAMEBUFFER, fbo)
+                out = readInto(dw, dh)
+            }
+            GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, prev[0])
+            return out
+        }
+
+        private fun fullRead(w: Int, h: Int, dw: Int, dh: Int): Bitmap {
+            val full = readInto(w, h, keep = false)
+            val target = bitmapOf(dw, dh)
+            val canvas = android.graphics.Canvas(target)
+            val m = android.graphics.Matrix().apply { postScale(dw.toFloat() / w, -dh.toFloat() / h); postTranslate(0f, dh.toFloat()) }
+            canvas.drawBitmap(full, m, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+            full.recycle()
+            return target
+        }
+
+        /** glReadPixels of the bound read framebuffer's [w] × [h] into the reused buffer, then a bitmap. */
+        private fun readInto(w: Int, h: Int, keep: Boolean = true): Bitmap {
+            val bytes = w * h * 4
+            val buf = buffer?.takeIf { it.capacity() >= bytes }
+                ?: ByteBuffer.allocateDirect(bytes).order(java.nio.ByteOrder.nativeOrder()).also { buffer = it }
+            buf.clear()
+            GLES30.glReadPixels(0, 0, w, h, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, buf)
+            buf.rewind()
+            val bmp = if (keep) bitmapOf(w, h) else Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            bmp.copyPixelsFromBuffer(buf)
+            return bmp
+        }
+
+        private fun bitmapOf(w: Int, h: Int): Bitmap =
+            bitmap?.takeIf { !it.isRecycled && it.width == w && it.height == h }
+                ?: Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also { bitmap?.recycle(); bitmap = it }
+
+        private fun allocate(w: Int, h: Int) {
+            releaseGl()
+            val ids = IntArray(1)
+            GLES30.glGenFramebuffers(1, ids, 0); fbo = ids[0]
+            GLES30.glGenRenderbuffers(1, ids, 0); rbo = ids[0]
+            GLES30.glBindRenderbuffer(GLES30.GL_RENDERBUFFER, rbo)
+            GLES30.glRenderbufferStorage(GLES30.GL_RENDERBUFFER, GLES30.GL_RGBA8, w, h)
+            GLES30.glBindRenderbuffer(GLES30.GL_RENDERBUFFER, 0)
+            GLES30.glBindFramebuffer(GLES30.GL_DRAW_FRAMEBUFFER, fbo)
+            GLES30.glFramebufferRenderbuffer(GLES30.GL_DRAW_FRAMEBUFFER, GLES30.GL_COLOR_ATTACHMENT0, GLES30.GL_RENDERBUFFER, rbo)
+            fboW = w; fboH = h
+        }
+
+        private fun releaseGl() {
+            if (fbo != 0) GLES30.glDeleteFramebuffers(1, intArrayOf(fbo), 0)
+            if (rbo != 0) GLES30.glDeleteRenderbuffers(1, intArrayOf(rbo), 0)
+            fbo = 0; rbo = 0; fboW = 0; fboH = 0
+        }
+
+        /** GL thread (releaseGlResources). The bitmap is dropped, not recycled: a receiver may still hold it. */
+        fun release() {
+            releaseGl()
+            buffer = null
+            bitmap = null
+            blitUnsupported = false
+        }
     }
 
     /**
@@ -3915,6 +4057,7 @@ class ArRenderer(
         try {
             val s = session ?: return SessionLifecycleOutcome.NoSession
             s.resume()
+            resumeStallWatchdog()
             // The phone may have moved anywhere while paused (pocket, screen off). ARCore does not
             // always report a non-tracking frame first, so arm the cold snap here as well.
             resumedSinceLastFrame = true
@@ -3932,6 +4075,8 @@ class ArRenderer(
      * implemented in terms of [withLockedSession].
      */
     fun requestPause(timeoutMs: Long = 1500L): SessionLifecycleOutcome {
+        // Before the lock: a GL thread already going quiet for the pause must not be reported as stalled.
+        pauseStallWatchdog()
         val locked = try {
             sessionLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)
         } catch (_: InterruptedException) {
