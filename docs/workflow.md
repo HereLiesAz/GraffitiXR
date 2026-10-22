@@ -7,35 +7,22 @@
     -   *Bad:* "Fix stuff"
     -   *Good:* "Fix rotation calculation in ArRenderer"
 
-## **2. CI/CD Pipeline (`.github/workflows/`)**
+## **2. CI/CD Pipeline**
 
-The workflow files in this repository are `android-ci.yml`, `merged-build.yml`, `release.yml`,
-`jekyll-gh-pages.yml` and `label.yml`.
-
-### **`android-ci.yml`** (with `merged-build.yml` running an overlapping build+test job)
--   **Triggers:** Pull Request into `main`, push to `main`, manual dispatch.
--   **Steps (common to both):**
-    1.  Checkout code.
-    2.  Set up JDK 21 (Temurin).
-    3.  **Test:** `./gradlew test` (unit tests, in a separate job).
-    4.  **Build:** `./gradlew assembleDebug` (always the default debug key; no keystore is decoded).
-
-`android-ci.yml` is the canonical publisher: on a push, it creates/updates the shared GitHub Release
-tagged `latest-debug-v<major>.<minor>` with the built debug APK. The two workflows previously raced
-each other over that same tag; check each workflow file's own header comment for the current division
-of responsibility, since it has changed more than once.
-
-Signed release builds and Google Play publishing are `release.yml`: on every push to `main` it runs
-the unit + native host tests, then builds a signed AAB/APK, publishes the AAB to Play and the APK
-to the `latest-release-v<major>.<minor>` GitHub release. See [`docs/RELEASE.md`](RELEASE.md).
+-   **Pull requests → local CI.** `.github/workflows/android-ci.yml` runs on every PR into `main`:
+    unit tests, native/architecture/detekt gates, the minified release variant, and a debug APK
+    build. It publishes nothing. `label.yml` (central `pr-labeler.yml`) labels PRs.
+-   **Merge to `main` → central builds.** Signed AAB/APK, Google Play and the GitHub release are run by
+    the central HereLiesAz/workflows repository (Android Play Release / Android GitHub Release). No
+    workflow in this repository builds on push to `main`.
+-   **Pages.** `jekyll-gh-pages.yml` stays local: a Pages deploy must run in the repository it deploys.
 
 ## **3. Release Process**
 -   **Versioning:** `version.properties` belongs to the shared version contract; the build reads it
-    as the versionName (`major.minor.patch.build`) and never rewrites it.
--   **Build Number:** `release.yml` takes `versionCode` from Play (highest + 1); debug workflows use a
-    run-number counter. See [`docs/RELEASE.md`](RELEASE.md) §1.
--   **Distribution:** Google Play + GitHub release via `release.yml`; debug APK prerelease via
-    `android-ci.yml` (see §2 above).
+    and never rewrites it.
+-   **versionCode / versionName:** passed by the central release as `-PversionCodeOverride` /
+    `-PversionNameOverride`; local and PR builds fall back to 1 and `version.properties`.
+    See [`docs/RELEASE.md`](RELEASE.md).
 
 ## **4. Local Environment Setup**
 -   **SDK:** Ensure `local.properties` points to your Android SDK.
@@ -50,3 +37,6 @@ to the `latest-release-v<major>.<minor>` GitHub release. See [`docs/RELEASE.md`]
 don't exist (`android-ci-jules.yml`, `google-services-injection.yml`, `auto-release.yml`) — the Google
 Services injection is an inline step inside the real CI workflows, not a separate file. Corrected the
 build-number claim (auto-increments per build from `version.properties`, not from git commit count).*
+
+*Documentation updated on 2026-10-22: release.yml and merged-build.yml removed; merge builds and
+publishing moved to the central HereLiesAz/workflows repository. android-ci.yml is PR-only CI.*

@@ -31,24 +31,18 @@ val localProperties = Properties().apply {
 // Version resolution. version.properties belongs to the shared version contract
 // (HereLiesAz/workflows `version-contract`): its bot commits `chore(version): M.m.p.b` and owns every
 // field. The build only READS it; nothing here increments or rewrites it.
-//   - versionName = CI_VERSION_NAME when set, else versionMajor.versionMinor.versionPatch.versionBuild.
-//     The bot assigns a pushed commit its version AFTER the push, so a CI build of that commit still
-//     has the previous version in version.properties: release.yml / android-ci.yml wait for the bot's
-//     record of the built commit (.github/scripts/contract_version.py) and pass it as CI_VERSION_NAME.
-//   - versionCode = CI_VERSION_CODE when set (release.yml: one above the highest code Play holds;
-//     android-ci / merged-build: a debug-only counter), else 1 for local builds.
-//   - The central Play / GitHub release workflows pass the same values as Gradle properties instead
-//     (-PversionCodeOverride / -PversionNameOverride); those win over the env vars. Without them the
-//     bundle shipped versionCode 1 and Play refused every upload ("Version code 1 has already been used").
+// Releases are built only by the central HereLiesAz/workflows Android Play / GitHub Release workflows,
+// which pass the contract's version as Gradle properties:
+//   - versionCode = -PversionCodeOverride, else 1 for local builds. Without it every bundle shipped
+//     versionCode 1 and Play refused each upload ("Version code 1 has already been used").
+//   - versionName = -PversionNameOverride, else versionMajor.versionMinor.versionPatch.versionBuild.
 val verMajor = versionProps.getProperty("versionMajor", "1").trim()
 val verMinor = versionProps.getProperty("versionMinor", "0").trim()
 val verPatch = versionProps.getProperty("versionPatch", "0").trim()
 val verBuild = versionProps.getProperty("versionBuild", "0").trim()
 val currentVersionCode = (project.findProperty("versionCodeOverride") as String?)?.toIntOrNull()?.takeIf { it > 0 }
-    ?: System.getenv("CI_VERSION_CODE")?.toIntOrNull()?.takeIf { it > 0 }
     ?: 1
 val currentVersionName = (project.findProperty("versionNameOverride") as String?)?.trim()?.takeIf { it.isNotEmpty() }
-    ?: System.getenv("CI_VERSION_NAME")?.trim()?.takeIf { it.isNotEmpty() }
     ?: "$verMajor.$verMinor.$verPatch.$verBuild"
 
 android {
@@ -98,7 +92,8 @@ android {
     // Release signing is a property of the project, not of each CI invocation. The keystore and
     // credentials come from the environment: CI decodes the base64 `KEYSTORE_RAW` secret to
     // app/keystore.jks and exports KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD (see
-    // .github/workflows/release.yml, the only workflow that signs). KEYSTORE_FILE may override the path.
+    // HereLiesAz/workflows android-play-release.yml / android-github-release.yml, the only workflows
+    // that sign). KEYSTORE_FILE may override the path.
     //
     // When no keystore is present (local dev without the secrets) the "release" config is simply
     // not created — `findByName` then returns null below, so release builds stay unsigned and debug

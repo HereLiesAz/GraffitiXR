@@ -1,43 +1,27 @@
 name: Android CI
 
-# GraffitiXR's CI: on every PR into main and every push to main it runs the unit tests and native/
-# architecture/detekt gates and proves the minified release variant builds; on push to main only it
-# then publishes the `latest-debug-vX.Y` debug-APK prerelease — a PR must never replace the public
-# build. The signed release AAB/APK and Play publishing are NOT here: they live in release.yml.
-# This is the ONLY workflow that tags/publishes that release — .github/workflows/merged-build.yml
-# builds and tests the same code but deliberately does not touch the shared release tag, so the
-# two workflows never race each other over it (see git history for the incident that caused this
-# split).
+# GraffitiXR's CI: on every PR into main it runs the unit tests and native/architecture/detekt
+# gates, proves the minified release variant builds, and builds the debug APK. It publishes nothing.
+# Builds on merge to main — the signed AAB/APK, Google Play and the GitHub release — belong to the
+# central HereLiesAz/workflows Android Play / GitHub Release workflows, not to this repository.
 #
-# Auto-detects app name from settings.gradle.kts / settings.gradle.
-# Debug APK is named Major.Minor.Patch.Build: the shared version contract's version for the pushed
-# commit (.github/scripts/contract_version.py) — the app's versionName.
-#
-# Required secrets: none. The published debug APK is always signed with the default debug key
-# (app/build.gradle.kts never uses the production key for debug builds), so this workflow does not
-# decode KEYSTORE_RAW. Release signing and Play publishing live in .github/workflows/release.yml.
+# Required secrets: none. Debug builds use the default debug key.
 # (The crash-report credential is NOT a CI secret: the artist enters it in Settings and it lives only
 #  on-device, never in the APK. See SettingsRepository.crashReportToken.)
 
 on:
-  # PRs into main, and the merge itself. Plain branch pushes don't run it, so a PR commit
-  # triggers exactly one event.
+  # PRs into main only. The merge itself is built by the central workflows repo.
   pull_request:
-    branches: [ "main" ]
-  push:
     branches: [ "main" ]
   workflow_dispatch:
 
 concurrency:
-  # PR pushes cancel only their own earlier run (a newer commit supersedes it). Main pushes and
-  # manual dispatches share one lane and QUEUE rather than cancel: cancelling a publish between
-  # `gh release upload` and the tag/notes update leaves the release carrying one commit's APK
-  # under another commit's tag. A PR event never shares a lane with main.
+  # PR pushes cancel only their own earlier run (a newer commit supersedes it).
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'main' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   unit-tests:
@@ -46,10 +30,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-
-      - name: Derive CI versionCode
-        # Debug-only versionCode, monotonic per workflow; release.yml takes its code from Play.
-        run: echo "CI_VERSION_CODE=$((20000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6
@@ -120,10 +100,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Derive CI versionCode
-        # Debug-only versionCode, monotonic per workflow; release.yml takes its code from Play.
-        run: echo "CI_VERSION_CODE=$((20000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
-
       - name: Set up JDK 21
         uses: actions/setup-java@v6
         with:
@@ -145,12 +121,12 @@ jobs:
         run: python3 tools/check_sphereslam_manifest.py --variant release
 
   build-and-release:
-    # Both gates: a debug APK is only published for a commit whose release variant also builds.
+    # Runs after both gates; builds the debug APK. (Job id kept: it is the check name PRs report.)
     needs: [unit-tests, release-build]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: write
+      contents: read
       issues: write
       pull-requests: write
       checks: read
@@ -160,17 +136,6 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
-      - name: Derive CI versionCode
-        # Debug-only versionCode, monotonic per workflow; release.yml takes its code from Play.
-        # The versionName is version.properties verbatim (see app/build.gradle.kts).
-        run: echo "CI_VERSION_CODE=$((20000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
-
-      - name: Resolve versionName from the version contract
-        # A push to main is assigned its version by the contract bot after the push; the published
-        # debug APK carries that version (see .github/scripts/contract_version.py). PRs keep the file's.
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: echo "CI_VERSION_NAME=$(python3 .github/scripts/contract_version.py "$GITHUB_SHA")" >> "$GITHUB_ENV"
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6
@@ -194,8 +159,8 @@ jobs:
           # No crash-report token is injected: the crash-report credential is entered by the artist in
           # Settings and lives only on-device, never in the APK (see SettingsRepository.crashReportToken).
           # No signing secrets: assembleDebug always uses the default debug key (app/build.gradle.kts
-          # never signs debug builds with the production key), so the keystore is only decoded in
-          # release.yml.
+          # never signs debug builds with the production key); only the central release workflows
+          # decode the keystore.
         run: |
           set +e
           ./gradlew assembleDebug --build-cache --no-daemon > build.log 2>&1
@@ -218,8 +183,7 @@ jobs:
             let logTail = 'Log file not found.';
             try { logTail = fs.readFileSync('build.log', 'utf8').slice(-4000); } catch (e) {}
             const title = `Build Failure on ${context.eventName === 'pull_request' ? 'PR #' + context.issue.number : context.ref}`;
-            // Dedupe: android-ci.yml and merged-build.yml both run on every push and both report
-            // failures, so skip creating a second issue when an open one with this title already exists.
+            // Dedupe: skip creating a second issue when an open one with this title already exists.
             const existing = await github.rest.issues.listForRepo({
               owner: context.repo.owner, repo: context.repo.repo,
               state: 'open', labels: 'jules,bug', per_page: 100,
@@ -235,66 +199,3 @@ jobs:
               body: `**Log:**\n\`\`\`\n${logTail}\n\`\`\``,
               labels: ['jules', 'bug']
             });
-
-      - name: Prepare Release Variables
-        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
-        id: release_vars
-        run: |
-          # The app's versionName: the contract version of this commit (CI_VERSION_NAME, above).
-          VERSION_NAME="$CI_VERSION_NAME"
-          MAJOR=$(cut -d. -f1 <<<"$VERSION_NAME")
-          MINOR=$(cut -d. -f2 <<<"$VERSION_NAME")
-          TAG_NAME="latest-debug-v${MAJOR}.${MINOR}"
-          if [ -f "settings.gradle.kts" ]; then
-            APP_NAME=$(grep 'rootProject.name' settings.gradle.kts | sed -E "s/.*=.*[\"'](.*)[\"']/\1/")
-          elif [ -f "settings.gradle" ]; then
-            APP_NAME=$(grep 'rootProject.name' settings.gradle | sed -E "s/.*=.*[\"'](.*)[\"']/\1/")
-          else
-            APP_NAME="App"
-          fi
-          APK_ORIGINAL=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
-          if [ -z "$APK_ORIGINAL" ]; then
-            echo "Error: No APK found to release!"
-            exit 1
-          fi
-          TARGET_NAME="${APP_NAME}-${VERSION_NAME}-debug.apk"
-          mv "$APK_ORIGINAL" "$TARGET_NAME"
-          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
-          echo "APK_FILE=$TARGET_NAME" >> $GITHUB_ENV
-          mkdir -p build_tools_package/tools build_tools_package/native
-          [ -d "app/src/main/assets/tools" ] && cp -r app/src/main/assets/tools/* build_tools_package/tools/ || true
-          [ -d "app/src/main/jniLibs/arm64-v8a" ] && cp -r app/src/main/jniLibs/arm64-v8a/* build_tools_package/native/ || true
-          cd build_tools_package && zip -r ../build-tools.zip . && cd ..
-
-      - name: Publish Release
-        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # Order matters: the tag must never point at this commit while the release still carries the
-        # previous commit's APK. Existing release: upload the new assets FIRST (--clobber replaces in
-        # place), and only then force-move the tag and refresh the notes — a failed upload leaves the
-        # old tag and old APK consistent. New release: the tag is pushed and the release created with
-        # the APK in one call, so there is no earlier APK to disagree with.
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          BUILD_TOOLS="build-tools.zip"
-          if gh release view "$TAG_NAME" > /dev/null 2>&1; then
-            echo "Updating existing release..."
-            gh release upload "$TAG_NAME" "$APK_FILE" --clobber
-            if [ -f "$BUILD_TOOLS" ]; then gh release upload "$TAG_NAME" "$BUILD_TOOLS" --clobber; fi
-            git tag -fa "$TAG_NAME" -m "Latest Debug Build"
-            git push origin "$TAG_NAME" --force
-            gh release edit "$TAG_NAME" --prerelease \
-              --title "Latest Debug Build ($TAG_NAME)" \
-              --notes "Auto-build from commit $GITHUB_SHA"
-          else
-            echo "Creating new release..."
-            git tag -fa "$TAG_NAME" -m "Latest Debug Build"
-            git push origin "$TAG_NAME" --force
-            gh release create "$TAG_NAME" "$APK_FILE" --prerelease \
-              --title "Latest Debug Build ($TAG_NAME)" \
-              --notes "Auto-build from commit $GITHUB_SHA"
-            if [ -f "$BUILD_TOOLS" ]; then gh release upload "$TAG_NAME" "$BUILD_TOOLS" --clobber; fi
-          fi
