@@ -110,8 +110,12 @@ fun Bitmap.isolateMarkings(tapPos: Pair<Float, Float>? = null): Bitmap {
         }
     }
 
-    // Chalk or paint marks on a black canvas board are lighter than their surface, not darker.
+    // Chalk or paint marks on a black canvas board are lighter than their surface, not darker. The
+    // surface's own polarity is found by the local (adaptive) threshold, as before; marks of the other
+    // polarity also count, but only past the surface's median too, so the halo a dark mark casts on a
+    // light wall (lighter than its darkened local average, no lighter than the wall) never does.
     val lightMarks = marksAreLight(luma)
+    val median = medianLuma(luma)
     val radius = w / 16
     val baseThresholdOffset = 25 // Increased from 15 for more discerning default
 
@@ -147,7 +151,7 @@ fun Bitmap.isolateMarkings(tapPos: Pair<Float, Float>? = null): Bitmap {
             val effectiveOffset = (baseThresholdOffset * distFactor).toInt()
 
             val i = y * w + x
-            isMark[i] = if (lightMarks) luma[i] > avg + effectiveOffset else luma[i] < avg - effectiveOffset
+            isMark[i] = isMarkPixel(luma[i], avg, median, effectiveOffset, lightMarks)
         }
     }
 
@@ -166,16 +170,32 @@ private const val DARK_SURFACE_MEDIAN_LUMA = 96
  * below [DARK_SURFACE_MEDIAN_LUMA]), as a black canvas board or a dark wall is. Marks are a small
  * part of the frame, so the median is the surface's tone.
  */
-internal fun marksAreLight(luma: IntArray): Boolean {
-    if (luma.isEmpty()) return false
+internal fun marksAreLight(luma: IntArray): Boolean =
+    luma.isNotEmpty() && medianLuma(luma) < DARK_SURFACE_MEDIAN_LUMA
+
+/**
+ * Whether luma [v] is a mark pixel given its local average [avg], the image [median] and the
+ * contrast [offset]. Marks of the surface's usual polarity ([lightMarks]) need only beat the local
+ * average; the other polarity must also beat the median, so a dark mark's halo isn't a light mark.
+ */
+internal fun isMarkPixel(v: Int, avg: Int, median: Int, offset: Int, lightMarks: Boolean): Boolean =
+    if (lightMarks) {
+        v > avg + offset || (v < avg - offset && v < median - offset)
+    } else {
+        v < avg - offset || (v > avg + offset && v > median + offset)
+    }
+
+/** The median of [luma] (0..255); 0 when empty. */
+internal fun medianLuma(luma: IntArray): Int {
+    if (luma.isEmpty()) return 0
     val histogram = IntArray(256)
     for (v in luma) histogram[v.coerceIn(0, 255)]++
     var seen = 0
     for (v in 0..255) {
         seen += histogram[v]
-        if (seen * 2 >= luma.size) return v < DARK_SURFACE_MEDIAN_LUMA
+        if (seen * 2 >= luma.size) return v
     }
-    return false
+    return 255
 }
 
 /**
