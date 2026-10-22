@@ -825,4 +825,9 @@
     <string name="update_go_play">Open Play Store</string>
     <string name="update_go_github">Open GitHub</string>
     <string name="update_later">Later</string>
+    <string name="crash_title">GraffitiXR closed unexpectedly</string>
+    <string name="crash_body">Something went wrong last time. Sharing the report helps get it fixed; it holds your phone model and the app\'s recent log, nothing from your projects.</string>
+    <string name="crash_share">Share report</string>
+    <string name="crash_copy">Copy</string>
+    <string name="crash_dismiss">Dismiss</string>
 </resources>

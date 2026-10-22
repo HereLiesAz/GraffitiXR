@@ -87,6 +87,8 @@ fun SettingsScreen(
     onCrashReportingConsentChanged: (Boolean) -> Unit,
     crashReportToken: String,
     onCrashReportTokenChanged: (String) -> Unit,
+    // Debug builds only: the developer's crash upload (public issue tracker, developer token).
+    developerCrashUpload: Boolean = false,
     showDiagOverlay: Boolean,
     onDiagOverlayChanged: () -> Unit,
     showFeaturePoints: Boolean,
@@ -408,14 +410,14 @@ fun SettingsScreen(
                             )
                         }
 
-                        item {
+                        if (developerCrashUpload) item {
                             SettingsSectionTitle(strings.settings.privacy)
-                            // Off by default and must ask, not assume. On a crash, the report (device
-                            // model + recent logcat) goes to this project's PUBLIC GitHub issue
-                            // tracker — never silently, and never anywhere else. Apart from co-op
-                            // sessions the artist starts, this is the only network call the app
-                            // makes: there is no update check (Updates below just opens the
-                            // releases page in the browser when tapped).
+                            // Debug builds only. Off by default and must ask, not assume. On a crash,
+                            // the report (device model + recent logcat) goes to this project's PUBLIC
+                            // GitHub issue tracker with the developer's token. Release builds never
+                            // upload: the crash dialog offers the user a report to share themselves.
+                            // Other network calls: co-op sessions the artist starts, and the launch
+                            // update check (UpdateChecker: Play's update API or GitHub releases).
                             SettingsSwitch(
                                 label = strings.settings.crashReports,
                                 checked = crashReportingConsent,

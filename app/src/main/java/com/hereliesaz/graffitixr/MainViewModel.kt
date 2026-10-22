@@ -595,8 +595,17 @@ class MainViewModel @Inject constructor(
         rotationDeg: Int = 0,
         /** How and where the device was held at capture; persisted onto the project. */
         captureEnvironment: com.hereliesaz.graffitixr.common.model.CaptureEnvironment? = null,
+        /**
+         * Undoes what the caller armed for this capture (the pending anchor request) when confirm
+         * refuses before the build starts. The replacement gate is lowered here either way.
+         */
+        onAbandoned: () -> Unit = {},
     ) {
         if (bitmap == null || intrinsics == null || viewMatrix == null) {
+            // Refused before the build's own `finally` exists: lower the replacement gate and drop
+            // the pending anchor here, or reloc and fusion stay off for the rest of the session.
+            slamManager.abortDoodleReplacement()
+            onAbandoned()
             // Was a bare reset: the artist confirmed a target and the capture simply vanished with no
             // message, indistinguishable from the app ignoring the tap. Name it — these are ARCore
             // frame values that should always be present by confirm time, so if this fires it is a
@@ -619,7 +628,7 @@ class MainViewModel @Inject constructor(
             // co-registration (intrinsics, anchor, display-oriented view, captureAnchorCam), without
             // which a project can neither be drift-corrected nor re-anchored on a return visit. The
             // depth path below is the fallback for a capture with depth but no wall plane.
-            handleSingleCapture(bitmap, safeIntr, safeView, wallPlane, rotationDeg, captureEnvironment, selectionMask)
+            handleSingleCapture(bitmap, safeIntr, safeView, wallPlane, rotationDeg, captureEnvironment, selectionMask, onAbandoned)
             return
         }
         resetCaptureUi()
@@ -850,8 +859,12 @@ class MainViewModel @Inject constructor(
         bitmap: Bitmap, intr: FloatArray, view: FloatArray, wallPlane: FloatArray?, rotationDeg: Int,
         captureEnvironment: com.hereliesaz.graffitixr.common.model.CaptureEnvironment?,
         selectionMask: Bitmap? = null,
+        onAbandoned: () -> Unit = {},
     ) {
         if (wallPlane == null || wallPlane.size < 6) {
+            // As above: refused before the build starts, so nothing else lowers the gate.
+            slamManager.abortDoodleReplacement()
+            onAbandoned()
             resetCaptureUi()
             // Recorded into the SAME shared field `buildSingle` writes to below, on the OTHER two
             // preconditions here and in ArViewModel's doodle path — this call never reaches

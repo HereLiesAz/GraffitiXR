@@ -1665,6 +1665,9 @@ class ArViewModel @Inject constructor(
 
     // ── Glasses session lifecycle ─────────────────────────────────────────────
 
+    // The live glasses session's connection-state collector (see startGlassesSession).
+    private var glassesStateJob: kotlinx.coroutines.Job? = null
+
     fun startGlassesSession() {
         if (
             _uiState.value.isArCoreAvailabilityResolved &&
@@ -1690,7 +1693,10 @@ class ArViewModel @Inject constructor(
         _glassesSessionState.value = GlassesSessionState.PairingPrompt
         wearableManager.activate(provider)
         slamManager.startSensorCollection()
-        viewModelScope.launch {
+        // One collector per session: a reconnect restarts the session, so the previous collector
+        // goes first instead of running every state handler once more per reconnect.
+        glassesStateJob?.cancel()
+        glassesStateJob = viewModelScope.launch {
             provider.connectionState.collect { state ->
                 when (state) {
                     is ConnectionState.Connected -> {
@@ -1717,6 +1723,8 @@ class ArViewModel @Inject constructor(
     }
 
     fun endGlassesSession() {
+        glassesStateJob?.cancel()
+        glassesStateJob = null
         wearableManager.deactivate()
         slamManager.stopSensorCollection()
         phoneToGlassesXform = null
@@ -6495,6 +6503,16 @@ class ArViewModel @Inject constructor(
         renderer?.pendingAnchorEstablishment = true
     }
 
+    /**
+     * Undoes [setInitialAnchorFromCapture] when the confirm it preceded was refused before building:
+     * no anchor is re-placed wherever the camera now points, and the replacement gate comes down.
+     */
+    fun cancelInitialAnchorFromCapture() {
+        renderer?.pendingAnchorEstablishment = false
+        renderer?.pendingCapturedWallPlane = null
+        slamManager.abortDoodleReplacement()
+    }
+
     fun requestCapture() {
         slamManager.setMappingPaused(true)
         _uiState.update { it.copy(isCaptureRequested = true) }
@@ -6991,6 +7009,9 @@ class ArViewModel @Inject constructor(
     override fun onCleared() {
         isCleared = true
         super.onCleared()
+        // SlamManager is a singleton: left running, glasses frames and IMU samples would keep feeding
+        // native MobileGS for the life of the process after this screen is gone.
+        if (_glassesSessionState.value !is GlassesSessionState.Idle) endGlassesSession()
         stopSystemThrottleMonitoring()
         cameraAttitudeProvider.stop()
         if (depthEstimatorLazy.isInitialized()) depthEstimatorLazy.value.close()

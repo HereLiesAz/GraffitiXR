@@ -395,7 +395,12 @@ class MainActivity : AppCompatActivity() {
     private fun incomingImageUri(intent: Intent?): Uri? {
         if (intent == null || intent.type?.startsWith("image/") != true) return null
         if (intent.action != Intent.ACTION_SEND) return null
-        return IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
+        val uri = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java) ?: return null
+        // This activity is exported: only content:// from another app's provider. A file:// path or
+        // a uri on our own FileProvider would have us load our own private files on a stranger's say.
+        if (uri.scheme != android.content.ContentResolver.SCHEME_CONTENT) return null
+        if (uri.authority == "$packageName.fileprovider") return null
+        return uri
     }
 
     // Trace ▸ Freeze's touch lock (mainUiState.isTouchLocked) used to fall to a 4-tap gesture to
@@ -514,7 +519,7 @@ class MainActivity : AppCompatActivity() {
                         text = {
                             Text(
                                 when (offer) {
-                                    is UpdateOffer.Play -> stringResource(DesignR.string.update_body_play)
+                                    UpdateOffer.Play -> stringResource(DesignR.string.update_body_play)
                                     is UpdateOffer.GitHub -> stringResource(DesignR.string.update_body_github, offer.versionLabel)
                                 }
                             )
@@ -542,25 +547,43 @@ class MainActivity : AppCompatActivity() {
                     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
                     androidx.compose.material3.AlertDialog(
                         onDismissRequest = { pendingCrashReport = null },
-                        title = { androidx.compose.material3.Text("Previous crash captured") },
+                        title = { Text(stringResource(DesignR.string.crash_title)) },
                         text = {
-                            androidx.compose.foundation.text.selection.SelectionContainer {
-                                androidx.compose.material3.Text(
-                                    report,
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                    fontSize = 10.sp,
-                                    modifier = Modifier.verticalScroll(rememberScrollState())
-                                )
+                            if (BuildConfig.DEBUG) {
+                                // Developers get the raw report; release users a sentence and a choice.
+                                androidx.compose.foundation.text.selection.SelectionContainer {
+                                    Text(
+                                        report,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                        fontSize = 10.sp,
+                                        modifier = Modifier.verticalScroll(rememberScrollState())
+                                    )
+                                }
+                            } else {
+                                Text(stringResource(DesignR.string.crash_body))
                             }
                         },
                         confirmButton = {
                             androidx.compose.material3.TextButton(onClick = {
-                                clipboard.setText(androidx.compose.ui.text.AnnotatedString(report))
-                            }) { androidx.compose.material3.Text("Copy") }
+                                if (BuildConfig.DEBUG) {
+                                    clipboard.setText(androidx.compose.ui.text.AnnotatedString(report))
+                                } else {
+                                    // The user decides where the report goes (mail, chat): nothing is
+                                    // uploaded on their behalf.
+                                    val send = Intent(Intent.ACTION_SEND)
+                                        .setType("text/plain")
+                                        .putExtra(Intent.EXTRA_SUBJECT, "GraffitiXR crash report")
+                                        .putExtra(Intent.EXTRA_TEXT, report)
+                                    runCatching { startActivity(Intent.createChooser(send, null)) }
+                                    pendingCrashReport = null
+                                }
+                            }) {
+                                Text(stringResource(if (BuildConfig.DEBUG) DesignR.string.crash_copy else DesignR.string.crash_share))
+                            }
                         },
                         dismissButton = {
                             androidx.compose.material3.TextButton(onClick = { pendingCrashReport = null }) {
-                                androidx.compose.material3.Text("Dismiss")
+                                Text(stringResource(DesignR.string.crash_dismiss))
                             }
                         }
                     )
@@ -2000,6 +2023,7 @@ class MainActivity : AppCompatActivity() {
                                                 // view matrix now follows (Phase 0, convention B).
                                                 arUiState.doodleDisplayRotation,
                                                 arUiState.doodleCaptureEnvironment,
+                                                onAbandoned = { arViewModel.cancelInitialAnchorFromCapture() },
                                             )
                                         }
                                     },
@@ -2120,6 +2144,7 @@ class MainActivity : AppCompatActivity() {
                                     crashReportingConsent = crashReportingConsent,
                                     onCrashReportingConsentChanged = { settingsViewModel.setCrashReportingConsent(it) },
                                     crashReportToken = crashReportToken,
+                                    developerCrashUpload = BuildConfig.DEBUG,
                                     onCrashReportTokenChanged = { settingsViewModel.setCrashReportToken(it) },
                                     showDiagOverlay = editorUiState.showDiagOverlay,
                                     onDiagOverlayChanged = { editorViewModel.toggleDiagOverlay() },

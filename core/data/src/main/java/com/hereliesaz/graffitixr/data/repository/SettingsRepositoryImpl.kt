@@ -24,7 +24,19 @@ import kotlinx.coroutines.flow.map
 import java.io.IOException
 import javax.inject.Inject
 
-private val Context.dataStore by preferencesDataStore(name = "settings")
+// A corrupted settings file (e.g. power lost mid-write) is replaced with defaults: without this every
+// write would throw CorruptionException, crashing on each settings change until app data is cleared.
+private val Context.dataStore by preferencesDataStore(
+    name = "settings",
+    corruptionHandler = androidx.datastore.core.handlers.ReplaceFileCorruptionHandler { androidx.datastore.preferences.core.emptyPreferences() },
+)
+
+// The crash-report credential lives apart from the other settings so device-to-device transfer can
+// leave it behind (data_extraction_rules.xml excludes this file): a token never follows a phone.
+private val Context.crashTokenStore by preferencesDataStore(
+    name = "crash_token",
+    corruptionHandler = androidx.datastore.core.handlers.ReplaceFileCorruptionHandler { androidx.datastore.preferences.core.emptyPreferences() },
+)
 
 class SettingsRepositoryImpl @Inject constructor(
     @param:ApplicationContext private val context: Context
@@ -194,14 +206,16 @@ class SettingsRepositoryImpl @Inject constructor(
     // Blank by default: no token ever ships in the binary, so an install that never enters one has
     // nothing to leak and uploads nothing. Stored verbatim; trimmed on write so a pasted token with
     // stray whitespace still authenticates.
-    override val crashReportToken: Flow<String> = context.dataStore.data
+    override val crashReportToken: Flow<String> = context.crashTokenStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { preferences -> preferences[CRASH_REPORT_TOKEN] ?: "" }
 
     override suspend fun setCrashReportToken(token: String) {
-        context.dataStore.edit { preferences ->
+        context.crashTokenStore.edit { preferences ->
             preferences[CRASH_REPORT_TOKEN] = token.trim()
         }
+        // A token saved before it had its own store must not linger in the transferable settings.
+        context.dataStore.edit { it.remove(CRASH_REPORT_TOKEN) }
     }
 
     override val featureMapEnabled: Flow<Boolean> = context.dataStore.data

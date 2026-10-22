@@ -6,5 +6,7 @@
     </cloud-backup>
     <device-transfer>
         <include domain="root" path="."/>
+        <!-- The crash-report credential (SettingsRepositoryImpl.crashTokenStore) stays on this device. -->
+        <exclude domain="file" path="datastore/crash_token.preferences_pb"/>
     </device-transfer>
 </data-extraction-rules>

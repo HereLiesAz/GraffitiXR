@@ -3971,10 +3971,6 @@ class ArRenderer(
         // so a destroyed renderer is not kept alive by the DisplayManager. Idempotent.
         displayRotationHelper.onPause()
         backgroundScope.cancel("Renderer detached and destroyed.")
-        // Clear all non-ARCore hybrid state immediately, but do NOT call Anchor.detach() here: destroy
-        // runs off the GL thread and onDrawFrame may currently hold sessionLock inside a native ARCore
-        // call. The page anchor is detached only after the bounded lock succeeds below.
-        resetHybridReference(detachPageAnchor = false)
         anticipation.close()
         sphereSlamTracker.close()
         // Bounded acquisition only. If the GL thread is wedged mid-frame holding the lock, null the
@@ -3991,6 +3987,10 @@ class ArRenderer(
         try {
             session = null
             if (locked) {
+                // Hybrid state (pose history, references) is what an in-flight frame reads and
+                // writes on the GL thread, so it is cleared only while holding the frame lock.
+                // Unlocked, it is left to the GC: isDestroying stops every later frame from using it.
+                resetHybridReference(detachPageAnchor = false)
                 detachHybridPageAnchorLocked()
                 // clear() also calls Anchor.detach(), so it belongs under exactly the same lock.
                 anchorOrchestrator.clear()
