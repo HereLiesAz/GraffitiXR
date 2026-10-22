@@ -12,4 +12,6 @@ class OpEmitterImpl @Inject constructor(
     override fun emit(op: Op) {
         collaborationManager.enqueueHostOp(op)
     }
+
+    override fun hasSession(): Boolean = collaborationManager.hasSession()
 }

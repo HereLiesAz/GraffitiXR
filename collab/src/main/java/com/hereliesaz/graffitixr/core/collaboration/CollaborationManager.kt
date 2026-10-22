@@ -212,6 +212,9 @@ class CollaborationManager @Inject constructor() {
      */
     fun submitOp(op: Op) = enqueueHostOp(op)
 
+    /** True while hosting or joined; an op enqueued with neither has nowhere to go. */
+    internal fun hasSession(): Boolean = hostSession != null || guestSession != null
+
     internal fun enqueueHostOp(op: Op) {
         val host = hostSession
         if (host != null) {
