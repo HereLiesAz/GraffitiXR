@@ -282,11 +282,11 @@ class MainViewModel @Inject constructor(
     ) {
         if (bitmap == null) {
             resetCaptureUi()
-            com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Capture incomplete. Try creating the Doodle again.", long = true)
+            com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_capture_incomplete), long = true)
             return
         }
         if (placement == null) {
-            com.hereliesaz.graffitixr.design.feedback.HudMessages.show("SphereSLAM map is not ready to anchor this Doodle yet. Keep the camera on the surface and try again.", long = true)
+            com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_map_not_ready), long = true)
             return
         }
 
@@ -301,7 +301,7 @@ class MainViewModel @Inject constructor(
                         "no project open to save the standalone target into",
                     )
                     withContext(Dispatchers.Main) {
-                        com.hereliesaz.graffitixr.design.feedback.HudMessages.show("No project open — a Doodle is saved into a project. Open or create one first.", long = true)
+                        com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_no_project), long = true)
                     }
                     return@launch
                 }
@@ -321,7 +321,7 @@ class MainViewModel @Inject constructor(
                         "standalone target produced too few selected SphereSLAM fingerprint features",
                     )
                     withContext(Dispatchers.Main) {
-                        com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Doodle lacks enough selected visual detail. Keep more distinctive surface marks.", long = true)
+                        com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_low_detail_selected), long = true)
                     }
                     return@launch
                 }
@@ -397,7 +397,7 @@ class MainViewModel @Inject constructor(
                         candidateUri,
                     )
                     withContext(Dispatchers.Main) {
-                        com.hereliesaz.graffitixr.design.feedback.HudMessages.show("The Doodle changed while this one was saving — not saved. Try again.", long = true)
+                        com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_changed), long = true)
                     }
                     return@launch
                 }
@@ -438,7 +438,7 @@ class MainViewModel @Inject constructor(
                 projectRepository.loadProject(currentProject.id)
                 _uiState.update { it.copy(doodleCapturedThisSession = true) }
                 withContext(Dispatchers.Main) {
-                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Doodle Saved & Locked", long = false)
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_saved), long = false)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -456,7 +456,7 @@ class MainViewModel @Inject constructor(
                     "standalone target save failed: ${e.message ?: e.javaClass.simpleName}",
                 )
                 withContext(Dispatchers.Main) {
-                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Couldn't save the SphereSLAM target. Try again.", long = true)
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_save_failed), long = true)
                 }
             } finally {
                 // A build that failed or was abandoned leaves the replacement gate up; restore the old pair.
@@ -544,7 +544,7 @@ class MainViewModel @Inject constructor(
             runCatching { projectManager.deleteSphereSlamReference(context, rejected.projectId, uri) }
             projectRepository.loadProject(rejected.projectId)
             withContext(Dispatchers.Main) {
-                com.hereliesaz.graffitixr.design.feedback.HudMessages.show("That target has too little trackable detail — kept the previous one.", long = true)
+                com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_too_weak_kept), long = true)
             }
         }
         return true
@@ -583,7 +583,7 @@ class MainViewModel @Inject constructor(
             // frame values that should always be present by confirm time, so if this fires it is a
             // real bug worth reporting rather than something to re-aim around.
             resetCaptureUi()
-            com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Capture incomplete (missing camera pose). Try creating the Doodle again.", long = true)
+            com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_capture_incomplete), long = true)
             return
         }
         val safeIntr = intrinsics
@@ -611,7 +611,7 @@ class MainViewModel @Inject constructor(
             if (currentProject == null) {
                 MetricDoodleBuilder.recordPreconditionFailure("no project open to save the target into")
                 withContext(Dispatchers.Main) {
-                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show("No project open — a Doodle is saved into a project. Open or create one first.", long = true)
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_no_project), long = true)
                 }
                 return@launch
             }
@@ -649,7 +649,7 @@ class MainViewModel @Inject constructor(
 
             if (fp == null) {
                 withContext(Dispatchers.Main) {
-                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Doodle lacks visual detail. Please use a surface with more contrast.", long = true)
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_low_detail), long = true)
                 }
                 return@launch
             }
@@ -758,10 +758,9 @@ class MainViewModel @Inject constructor(
 
             withContext(Dispatchers.Main) {
                 if (coreg != null) {
-                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Doodle Saved & Locked", long = false)
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_saved), long = false)
                 } else {
-                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Doodle saved for this session only: no anchor locked, so it won't re-anchor " +
-                            "when the project is reopened. Create it again holding steady on the surface.", long = true)
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_session_only), long = true)
                 }
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -865,8 +864,7 @@ class MainViewModel @Inject constructor(
                     "anchor never established for this capture — held steady long enough?",
                 )
                 withContext(Dispatchers.Main) {
-                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Couldn't lock an anchor for this Doodle — hold the phone steady on the " +
-                            "wall and try again.", long = true)
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_anchor_failed), long = true)
                 }
                 return@launch
             }
@@ -877,7 +875,7 @@ class MainViewModel @Inject constructor(
             if (currentProject == null) {
                 MetricDoodleBuilder.recordPreconditionFailure("no project open to save the target into")
                 withContext(Dispatchers.Main) {
-                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show("No project open — a Doodle is saved into a project. Open or create one first.", long = true)
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_no_project), long = true)
                 }
                 return@launch
             }
@@ -981,7 +979,7 @@ class MainViewModel @Inject constructor(
             projectRepository.loadProject(currentProject.id)
             _uiState.update { it.copy(doodleCapturedThisSession = true) }
             withContext(Dispatchers.Main) {
-                com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Doodle Saved & Locked", long = false)
+                com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_saved), long = false)
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -1000,7 +998,7 @@ class MainViewModel @Inject constructor(
     private suspend fun notifyProjectChangedDuringSave() {
         MetricDoodleBuilder.recordPreconditionFailure("project changed before the target was saved")
         withContext(Dispatchers.Main) {
-            com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Another project was opened before the Doodle saved — it was not saved. Capture it again.", long = true)
+            com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_project_switched), long = true)
         }
     }
 
@@ -1011,7 +1009,7 @@ class MainViewModel @Inject constructor(
             "target save failed: ${e.message ?: e.javaClass.simpleName}",
         )
         withContext(Dispatchers.Main) {
-            com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Couldn't save the Doodle. Try again.", long = true)
+            com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_save_failed), long = true)
         }
     }
 

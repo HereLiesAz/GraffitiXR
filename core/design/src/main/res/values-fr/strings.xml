@@ -27,10 +27,8 @@
     <string name="align_not_ready">Aligner a d’abord besoin d’un Doodle et d’un design placé.</string>
 
     <!-- Overlays & Status -->
-    <string name="status_create_grid">Créez une Grille pour commencer.</string>
     <string name="status_scan_surfaces">Scannez les surfaces autour de vous.</string>
     <string name="status_tap_surface">Appuyez sur une surface pour placer l\'ancre.</string>
-    <string name="status_looking_grid">Recherche de votre Grille...</string>
     <string name="status_ready">Prêt. (%1$d pts)</string>
     <string name="unlock_hint">Volume Haut, Bas, Haut, Bas — rapidement — pour déverrouiller</string>
 
@@ -230,7 +228,6 @@
     <string name="wall_source_text">Comment souhaitez-vous définir le mur d\'arrière-plan ?</string>
     <string name="take_photo">Prendre photo</string>
     <string name="choose_from_gallery">Choisir depuis la galerie</string>
-    <string name="depth_unsupported">Cet appareil ne prend pas en charge l\'API Depth.\nPassez en mode Toile dans les paramètres.</string>
     <string name="arcore_required_title">ARCore requis</string>
     <string name="arcore_required_text">Cet appareil n\'a pas ARCore d\'installé ou n\'est pas pris en charge. Installez ARCore depuis le Play Store pour utiliser les fonctionnalités AR.</string>
     <string name="install_arcore">Installer ARCore</string>

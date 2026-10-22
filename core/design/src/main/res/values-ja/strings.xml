@@ -254,8 +254,6 @@
     <string name="choose_from_gallery">ギャラリーから選択</string>
 
 
-    <string name="depth_unsupported">このデバイスはDepth APIをサポートしていません。
-設定でキャンバスモードに切り替えてください。</string>
 
 
     <string name="arcore_required_title">ARCoreが必要です</string>
@@ -336,10 +334,8 @@
     <string name="align_not_ready">位置合わせには、まず Doodle と配置済みのデザインが必要です。</string>
 
 
-    <string name="status_create_grid">ターゲットを作成して開始します。</string>
     <string name="status_scan_surfaces">周囲の表面をスキャンします。</string>
     <string name="status_tap_surface">表面をタップしてアンカーを配置します。</string>
-    <string name="status_looking_grid">ターゲットを探しています...</string>
     <string name="status_ready">準備完了。 (%1$d pts)</string>
     <string name="unlock_hint">音量を上・下・上・下、素早く押してロック解除</string>
 

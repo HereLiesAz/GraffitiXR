@@ -79,7 +79,6 @@
     <string name="wall_source_text">Paano mo gustong itakda ang background wall?</string>
     <string name="take_photo">Kumuha ng Larawan</string>
     <string name="choose_from_gallery">Pumili mula sa Gallery</string>
-    <string name="depth_unsupported">Hindi sinusuportahan ng device na ito ang Depth API.\nLumipat sa Canvas mode sa Mga Setting.</string>
     <string name="arcore_required_title">Kinakailangan ang ARCore</string>
     <string name="arcore_required_text">Walang naka-install na ARCore o hindi sinusuportahan ang device na ito. I-install ang ARCore mula sa Play Store para magamit ang mga feature ng AR.</string>
     <string name="install_arcore">I-install ang ARCore</string>
@@ -122,10 +121,8 @@
     <string name="align_done_paint">Inihanay sa pintura sa pader.</string>
     <string name="align_unavailable">Wala pang pintura sa pader na tumutugma sa disenyo.</string>
     <string name="align_not_ready">Kailangan muna ng Ihanay ng Doodle at nakalagay na disenyo.</string>
-    <string name="status_create_grid">Gumawa ng Grid para magsimula.</string>
     <string name="status_scan_surfaces">I-scan ang mga surface sa paligid mo.</string>
     <string name="status_tap_surface">I-tap ang isang ibabaw upang ilagay ang anchor.</string>
-    <string name="status_looking_grid">Hinahanap ang iyong Grid...</string>
     <string name="status_ready">handa na. (%1$d pts)</string>
     <string name="unlock_hint">Volume Up, Down, Up, Down — mabilis — para i-unlock</string>
     <string name="lib_app_title">GraffitiXR</string>

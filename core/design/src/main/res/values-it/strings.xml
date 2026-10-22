@@ -252,7 +252,6 @@
     <string name="choose_from_gallery">Scegli dalla Galleria</string>
 
     <!-- Message shown when the device doesn\'t support the Depth API. -->
-    <string name="depth_unsupported">Questo dispositivo non supporta l\'API di Profondità.\nPassa alla modalità Tela in Impostazioni.</string>
 
     <!-- Title shown when ARCore is missing or unsupported. -->
     <string name="arcore_required_title">ARCore è richiesto</string>
@@ -330,10 +329,8 @@
     <string name="align_not_ready">Allinea richiede prima un Doodle e un design posizionato.</string>
 
     <!-- Overlays & Status -->
-    <string name="status_create_grid">Crea una Griglia per iniziare.</string>
     <string name="status_scan_surfaces">Scansiona le superfici intorno a te.</string>
     <string name="status_tap_surface">Tocca una superficie per posizionare l\'ancora.</string>
-    <string name="status_looking_grid">Cerco la tua Griglia...</string>
     <string name="status_ready">Pronto. (%1$d punti)</string>
     <string name="unlock_hint">Volume Su, Giù, Su, Giù — rapidamente — per sbloccare</string>
 

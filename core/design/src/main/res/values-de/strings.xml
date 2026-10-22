@@ -252,7 +252,6 @@
     <string name="choose_from_gallery">Aus Galerie auswählen</string>
 
     <!-- Message shown when the device doesn't support the Depth API. -->
-    <string name="depth_unsupported">Dieses Gerät unterstützt die Depth API nicht.\nWechseln Sie in den Einstellungen zum Leinwand-Modus.</string>
 
     <!-- Title shown when ARCore is missing or unsupported. -->
     <string name="arcore_required_title">ARCore ist erforderlich</string>
@@ -330,10 +329,8 @@
     <string name="align_not_ready">Ausrichten braucht zuerst ein Doodle und ein platziertes Design.</string>
 
     <!-- Overlays & Status -->
-    <string name="status_create_grid">Erstellen Sie ein Raster, um zu beginnen.</string>
     <string name="status_scan_surfaces">Scannen Sie Oberflächen in Ihrer Nähe.</string>
     <string name="status_tap_surface">Tippen Sie auf eine Oberfläche, um einen Anker zu platzieren.</string>
-    <string name="status_looking_grid">Suche nach Ihrem Raster...</string>
     <string name="status_ready">Bereit. (%1$d Pkt.)</string>
     <string name="unlock_hint">Lautstärke Hoch, Runter, Hoch, Runter — schnell — zum Entsperren</string>
 

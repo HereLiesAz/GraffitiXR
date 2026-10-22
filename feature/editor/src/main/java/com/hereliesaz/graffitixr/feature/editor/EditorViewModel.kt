@@ -642,7 +642,7 @@ class EditorViewModel @Inject constructor(
                 if (!adopted) runCatching { File(path).delete() }
             } else {
                 withContext(dispatchers.main) {
-                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Invalid image format or missing project", long = false)
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_image_invalid), long = false)
                 }
             }
             } catch (e: Exception) {
@@ -1063,7 +1063,7 @@ class EditorViewModel @Inject constructor(
      */
     fun shareProject() {
         if (projectRepository.currentProject.value == null) {
-            com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Nothing to share yet — save a project first.", long = false)
+            com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_nothing_to_share), long = false)
             return
         }
         // exportProjectToUri reads project.json straight off disk, not the editor's in-memory state.
@@ -1106,7 +1106,7 @@ class EditorViewModel @Inject constructor(
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 withContext(dispatchers.main) {
-                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Couldn't prepare this wall to share: ${e.message}", long = true)
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_share_failed), long = true)
                 }
             }
         }
@@ -1172,7 +1172,7 @@ class EditorViewModel @Inject constructor(
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 withContext(dispatchers.main) {
                     dispatch(EditorIntent.SetLoading(false))
-                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Export error: ${e.message}", long = true)
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_export_failed), long = true)
                 }
             }
         }

@@ -254,7 +254,6 @@
     <string name="choose_from_gallery">Választás a Galériából</string>
 
 
-    <string name="depth_unsupported">Ez az eszköz nem támogatja a Mélységi API-t.\nVálts Vászon módra a Beállításokban.</string>
 
 
     <string name="arcore_required_title">ARCore szükséges</string>
@@ -335,10 +334,8 @@
     <string name="align_not_ready">Az illesztéshez előbb Doodle és elhelyezett terv kell.</string>
 
 
-    <string name="status_create_grid">Hozz létre egy Rácsot a kezdéshez.</string>
     <string name="status_scan_surfaces">Szkenneld a körülötted lévő felületeket.</string>
     <string name="status_tap_surface">Koppints egy felületre a horgony elhelyezéséhez.</string>
-    <string name="status_looking_grid">A Rácsod keresése...</string>
     <string name="status_ready">Kész. (%1$d pont)</string>
     <string name="unlock_hint">Hangerő Fel, Le, Fel, Le — gyorsan — a feloldáshoz</string>
 

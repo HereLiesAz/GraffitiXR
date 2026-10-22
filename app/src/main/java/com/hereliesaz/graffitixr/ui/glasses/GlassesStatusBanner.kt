@@ -37,9 +37,9 @@ fun GlassesStatusBanner(
             modifier = Modifier.weight(1f),
         )
         if (isFallback) {
-            Button(onClick = onReconnect) { Text("Reconnect") }
+            Button(onClick = onReconnect) { Text(androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.glasses_reconnect)) }
         } else {
-            Button(onClick = onLeave) { Text("End") }
+            Button(onClick = onLeave) { Text(androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.glasses_end)) }
         }
     }
 }

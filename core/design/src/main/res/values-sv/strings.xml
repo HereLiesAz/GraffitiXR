@@ -254,7 +254,6 @@
     <string name="choose_from_gallery">Välj från Galleri</string>
 
 
-    <string name="depth_unsupported">Den här enheten stöder inte Depth API.\nVäxla till Canvas-läge i Inställningar.</string>
 
 
     <string name="arcore_required_title">ARCore krävs</string>
@@ -335,10 +334,8 @@
     <string name="align_not_ready">Rikta in behöver först en Doodle och en placerad design.</string>
 
 
-    <string name="status_create_grid">Skapa ett rutnät för att börja.</string>
     <string name="status_scan_surfaces">Skanna ytor runt dig.</string>
     <string name="status_tap_surface">Tryck på en yta för att placera ankare.</string>
-    <string name="status_looking_grid">Letar du efter ditt Grid...</string>
     <string name="status_ready">Redo. (%1$d poäng)</string>
     <string name="unlock_hint">Volym Upp, Ner, Upp, Ner — snabbt — för att låsa upp</string>
 

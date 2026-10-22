@@ -35,6 +35,7 @@ class GraffitiApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        com.hereliesaz.graffitixr.design.feedback.HudMessages.init(this)
 
         // 1. Initialize Logging
         if (BuildConfig.DEBUG) {

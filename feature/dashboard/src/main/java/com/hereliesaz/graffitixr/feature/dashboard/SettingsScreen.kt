@@ -328,30 +328,6 @@ fun SettingsScreen(
                             // stabilizes the feature cloud; off is the escape hatch for hardware whose
                             // ML depth graph destabilizes VIO. Both apply immediately, mid-AR included.
                             SettingsSwitch(strings.settings.useArCore, arCoreEnabled, onArCoreEnabledChanged)
-                            SettingsSwitch(strings.settings.arCoreDepth, arCoreDepthEnabled, onArCoreDepthEnabledChanged)
-                            // Monocular depth (MiDaS Small) — standalone (non-ARCore) backend only:
-                            // calibrates the sphere map's point radii while the feature map builds.
-                            // Default on; never loaded on the ARCore backend (MiDaS depth is relative,
-                            // so it can't stand in for ARCore depth). A self-test runs when it loads;
-                            // its result shows in the diag overlay.
-                            SettingsSwitch(strings.settings.monocularDepth, monocularDepthEnabled, onMonocularDepthEnabledChanged)
-                            SettingsSwitch(strings.settings.ambientScan, ambientScanEnabled, onAmbientScanEnabledChanged)
-                            // Pass B: also judge progress by what has changed since the clean-wall photo. Off
-                            // by default, never switched on for the user; it needs that photo to do anything.
-                            SettingsSwitch(strings.settings.changePass, changePassEnabled, onChangePassEnabledChanged)
-                            // CV view: everything the computer vision is looking for, drawn over the design
-                            // in AR (moved here from the rail).
-                            SettingsSwitch(strings.nav.cvView, cvPreviewOn, onCvPreviewChanged)
-                            SettingsItem(
-                                label = strings.settings.cameraFps,
-                                value = cameraTargetFpsLabel(cameraTargetFps, strings),
-                                modifier = Modifier.clickable {
-                                    onCameraTargetFpsChanged(
-                                        com.hereliesaz.graffitixr.common.model.CameraTargetFps
-                                            .next(cameraTargetFps),
-                                    )
-                                }
-                            )
                         }
 
                         item {
@@ -382,26 +358,6 @@ fun SettingsScreen(
                             // analyzer skips frames to stay under half duty (AnalysisFrameGate).
                             // Default on. Off = always full rate.
                             SettingsSwitch(strings.settings.adaptiveRate, adaptiveRateEnabled, onAdaptiveRateEnabledChanged)
-                        }
-
-                        item {
-                            SettingsSectionTitle(strings.settings.anticipationSection)
-                            AnticipationSettingsControls(anticipation, onAnticipationChanged, strings)
-                            // What the next target's doodle is made of: tap to cycle.
-                            SettingsItem(
-                                label = strings.settings.doodleFeatures,
-                                value = doodleFeaturesLabel(doodleFeatures, strings),
-                                modifier = Modifier.clickable {
-                                    onDoodleFeaturesChanged(
-                                        com.hereliesaz.graffitixr.common.model.DoodleFeatures.next(doodleFeatures),
-                                    )
-                                },
-                            )
-                            Text(
-                                text = doodleFeaturesDescription(doodleFeatures, strings),
-                                color = Color.Gray,
-                                fontSize = 12.sp,
-                            )
                         }
 
                         if (developerCrashUpload) item {
@@ -469,6 +425,50 @@ fun SettingsScreen(
                                 onToggle = { developerExpanded = !developerExpanded },
                             )
                             if (developerExpanded) {
+                                // Engine-level tuning lives here, out of an artist's way: depth and
+                                // scan passes, camera rate, and what the anticipation and Doodle
+                                // feature builders produce.
+                                SettingsSwitch(strings.settings.arCoreDepth, arCoreDepthEnabled, onArCoreDepthEnabledChanged)
+                                // Monocular depth (MiDaS Small) — standalone (non-ARCore) backend only:
+                                // calibrates the sphere map's point radii while the feature map builds.
+                                // Default on; never loaded on the ARCore backend (MiDaS depth is relative,
+                                // so it can't stand in for ARCore depth). A self-test runs when it loads;
+                                // its result shows in the diag overlay.
+                                SettingsSwitch(strings.settings.monocularDepth, monocularDepthEnabled, onMonocularDepthEnabledChanged)
+                                SettingsSwitch(strings.settings.ambientScan, ambientScanEnabled, onAmbientScanEnabledChanged)
+                                // Pass B: also judge progress by what has changed since the clean-wall photo. Off
+                                // by default, never switched on for the user; it needs that photo to do anything.
+                                SettingsSwitch(strings.settings.changePass, changePassEnabled, onChangePassEnabledChanged)
+                                // CV view: everything the computer vision is looking for, drawn over the design
+                                // in AR (moved here from the rail).
+                                SettingsSwitch(strings.nav.cvView, cvPreviewOn, onCvPreviewChanged)
+                                SettingsItem(
+                                    label = strings.settings.cameraFps,
+                                    value = cameraTargetFpsLabel(cameraTargetFps, strings),
+                                    modifier = Modifier.clickable {
+                                        onCameraTargetFpsChanged(
+                                            com.hereliesaz.graffitixr.common.model.CameraTargetFps
+                                                .next(cameraTargetFps),
+                                        )
+                                    }
+                                )
+                                SettingsSectionTitle(strings.settings.anticipationSection)
+                                AnticipationSettingsControls(anticipation, onAnticipationChanged, strings)
+                                // What the next target's doodle is made of: tap to cycle.
+                                SettingsItem(
+                                    label = strings.settings.doodleFeatures,
+                                    value = doodleFeaturesLabel(doodleFeatures, strings),
+                                    modifier = Modifier.clickable {
+                                        onDoodleFeaturesChanged(
+                                            com.hereliesaz.graffitixr.common.model.DoodleFeatures.next(doodleFeatures),
+                                        )
+                                    },
+                                )
+                                Text(
+                                    text = doodleFeaturesDescription(doodleFeatures, strings),
+                                    color = Color.Gray,
+                                    fontSize = 12.sp,
+                                )
                                 SettingsSwitch(strings.settings.diagOverlay, showDiagOverlay, { onDiagOverlayChanged() })
                                 SettingsSwitch(strings.settings.layerFeaturePoints, showFeaturePoints, { onFeaturePointsChanged() })
                                 SettingsSwitch(strings.settings.layerPlaneGrids, showPlaneGrids, { onPlaneGridsChanged() })

@@ -254,7 +254,6 @@
     <string name="choose_from_gallery">Kies uit Galerij</string>
 
 
-    <string name="depth_unsupported">Dit apparaat ondersteunt de Depth API niet.\nSchakel naar Canvas-modus in Instellingen.</string>
 
 
     <string name="arcore_required_title">ARCore is vereist</string>
@@ -335,10 +334,8 @@
     <string name="align_not_ready">Uitlijnen heeft eerst een Doodle en een geplaatst ontwerp nodig.</string>
 
 
-    <string name="status_create_grid">Maak een raster om te beginnen.</string>
     <string name="status_scan_surfaces">Scan oppervlakken om u heen.</string>
     <string name="status_tap_surface">Tik op een oppervlak om het anker te plaatsen.</string>
-    <string name="status_looking_grid">Op zoek naar jouw raster...</string>
     <string name="status_ready">Klaar. (%1$d punten)</string>
     <string name="unlock_hint">Volume Omhoog, Omlaag, Omhoog, Omlaag — snel — om te ontgrendelen</string>
 

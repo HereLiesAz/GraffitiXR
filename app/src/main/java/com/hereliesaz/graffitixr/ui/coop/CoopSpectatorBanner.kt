@@ -30,6 +30,6 @@ fun CoopSpectatorBanner(
             color = Color.White,
             modifier = Modifier.weight(1f),
         )
-        Button(onClick = onLeave) { Text("Leave") }
+        Button(onClick = onLeave) { Text(androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.coop_leave)) }
     }
 }

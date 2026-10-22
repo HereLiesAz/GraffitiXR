@@ -49,6 +49,16 @@ object HudMessages {
     fun show(text: String, long: Boolean = false, error: Boolean = false) {
         _messages.tryEmit(HudMessage(text, long, error))
     }
+
+    @Volatile private var appContext: android.content.Context? = null
+
+    /** Called once from Application.onCreate, so [appString] can resolve text outside a composition. */
+    fun init(context: android.content.Context) {
+        appContext = context.applicationContext
+    }
+
+    /** [id] in the app's current language, for messages posted from callbacks with no composition. */
+    fun appString(@androidx.annotation.StringRes id: Int): String = appContext?.getString(id) ?: ""
 }
 
 /**

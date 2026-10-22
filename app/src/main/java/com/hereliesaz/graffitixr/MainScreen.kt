@@ -196,7 +196,7 @@ fun MainScreen(
                             contentAlignment = Alignment.TopCenter,
                         ) {
                             androidx.compose.material3.Text(
-                                text = "Preparing SphereSLAM…",
+                                text = androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.status_preparing_tracking),
                                 color = Color.White,
                                 modifier = Modifier
                                     .padding(top = 32.dp)
@@ -223,7 +223,7 @@ fun MainScreen(
                             contentAlignment = Alignment.Center,
                         ) {
                             androidx.compose.material3.Text(
-                                text = "SphereSLAM tracking isn't available in this build.",
+                                text = androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.standalone_failure_native_library_unavailable),
                                 color = Color.White,
                                 modifier = Modifier
                                     .background(
@@ -284,7 +284,7 @@ fun MainScreen(
                                         "SphereSLAM shared target capture failed: " +
                                             (error.message ?: error.javaClass.simpleName)
                                     )
-                                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Couldn't capture the target — try again.", long = true)
+                                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(com.hereliesaz.graffitixr.design.feedback.HudMessages.appString(com.hereliesaz.graffitixr.design.R.string.standalone_capture_failed), long = true)
                                 }
                             }
                         }
@@ -825,7 +825,7 @@ fun MainScreen(
         // clearing the flag immediately so it doesn't repeat on every subsequent blocked gesture.
         LaunchedEffect(uiState.showLockedFeedback) {
             if (uiState.showLockedFeedback) {
-                com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Locked — tap Lock again to move this", long = false)
+                com.hereliesaz.graffitixr.design.feedback.HudMessages.show(com.hereliesaz.graffitixr.design.feedback.HudMessages.appString(com.hereliesaz.graffitixr.design.R.string.msg_locked), long = false)
                 editorViewModel.onLockedFeedbackShown()
             }
         }

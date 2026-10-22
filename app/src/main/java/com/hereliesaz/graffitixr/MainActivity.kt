@@ -1180,7 +1180,7 @@ class MainActivity : AppCompatActivity() {
                                     kotlinx.coroutines.delay(EXPORT_TIMEOUT_MS)
                                     if (isExporting) {
                                         isExporting = false
-                                        com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Export timed out — try again", long = false)
+                                        com.hereliesaz.graffitixr.design.feedback.HudMessages.show(com.hereliesaz.graffitixr.design.feedback.HudMessages.appString(com.hereliesaz.graffitixr.design.R.string.msg_export_timeout), long = false)
                                     }
                                 }
                                 val requested = arViewModel.requestExport { bmp ->
@@ -1583,14 +1583,22 @@ class MainActivity : AppCompatActivity() {
                             // produced no usable points — so the overlay could only ever drift, and
                             // the one screen that could have explained it claimed success instead.
                             // Gate on the thing that actually has to exist.
+                            // Not gated on "no design yet": adding artwork doesn't lock the doodle, and
+                            // that is exactly when the drift starts to matter.
                             val basePostTargetVisible = arUiState.isAnchorEstablished
-                                    && editorUiState.design == null
                                     && !mainUiState.isCapturingDoodle
+                                    && !mainUiState.isConfirmingDoodle
                                     && editorUiState.editorMode == EditorMode.AR
                                     && !showLibrary && !showSettings
                             val hasWallDoodle = arUiState.wallDoodlePoints > 0
                             if (basePostTargetVisible && !hasWallDoodle) {
                                 DoodleIncompleteOverlay(
+                                    onRecapture = {
+                                        // Same effect as the rail's Doodle item.
+                                        arViewModel.clearCaptureForRetry()
+                                        arViewModel.cancelMeasure()
+                                        mainViewModel.startDoodleCapture()
+                                    },
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
                                         .padding(bottom = 140.dp)
@@ -2019,7 +2027,7 @@ class MainActivity : AppCompatActivity() {
                                                     isSavingProject = false
                                                     if (e is kotlinx.coroutines.CancellationException) throw e
                                                     android.util.Log.e("MainActivity", "Failed to save wall map", e)
-                                                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show("Couldn't save the project", long = true)
+                                                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(com.hereliesaz.graffitixr.design.feedback.HudMessages.appString(com.hereliesaz.graffitixr.design.R.string.msg_project_save_failed), long = true)
                                                 }
                                             }
                                         }
@@ -2523,7 +2531,7 @@ class MainActivity : AppCompatActivity() {
             // only blocks pan/zoom/rotate. toggleImageLock() was implemented and tested but had no
             // rail entry, so it could never actually be reached from the UI.
             azRailSubItem(
-                id = "design.lock", hostId = railHostOf("design.lock"), text = "Lock",
+                id = "design.lock", hostId = railHostOf("design.lock"), text = strings.editor.lock,
                 color = navItemColor, classifiers = setOf("toggle", "lock"),
                 shape = AzButtonShape.NONE, disabled = showLibrary,
                 onClick = { editorViewModel.toggleImageLock() },
@@ -2604,7 +2612,7 @@ class MainActivity : AppCompatActivity() {
                     azRailSubItem(
                         id = "mode.ar.lock",
                         hostId = railHostOf("mode.ar.lock"),
-                        text = "Lock",
+                        text = strings.editor.lock,
                         color = navItemColor,
                         classifiers = setOf("toggle", "lock"),
                         shape = AzButtonShape.NONE,
@@ -2616,7 +2624,7 @@ class MainActivity : AppCompatActivity() {
                     azRailSubItem(
                         id = "mode.ar.freeze",
                         hostId = railHostOf("mode.ar.freeze"),
-                        text = "Freeze",
+                        text = strings.editor.freeze,
                         color = navItemColor,
                         classifiers = setOf("toggle"),
                         shape = AzButtonShape.NONE,
@@ -2787,7 +2795,7 @@ class MainActivity : AppCompatActivity() {
                 azRailSubItem(
                     id = "mode.overlay.lock",
                     hostId = railHostOf("mode.overlay.lock"),
-                    text = "Lock",
+                    text = strings.editor.lock,
                     color = navItemColor,
                     classifiers = setOf("toggle", "lock"),
                     shape = AzButtonShape.NONE,
@@ -2866,7 +2874,7 @@ class MainActivity : AppCompatActivity() {
                 azRailSubItem(
                     id = "mode.mockup.lock",
                     hostId = railHostOf("mode.mockup.lock"),
-                    text = "Lock",
+                    text = strings.editor.lock,
                     color = navItemColor,
                     classifiers = setOf("toggle", "lock"),
                     shape = AzButtonShape.NONE,
@@ -2893,7 +2901,7 @@ class MainActivity : AppCompatActivity() {
                 azRailSubItem(
                     id = "mode.trace.freeze",
                     hostId = railHostOf("mode.trace.freeze"),
-                    text = "Freeze",
+                    text = strings.editor.freeze,
                     color = navItemColor,
                     classifiers = setOf("toggle"),
                     shape = AzButtonShape.NONE,
@@ -3250,14 +3258,14 @@ private fun CoopNotFoundDialog(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "NO SESSIONS FOUND",
+                    text = androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.coop_none_title),
                     color = Color.Cyan,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = "Nearby GraffitiXR sessions could not be located. You can try searching again or host your own session.",
+                    text = androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.coop_none_text),
                     color = Color.White,
                     textAlign = TextAlign.Center,
                     fontSize = 14.sp,
@@ -3266,14 +3274,14 @@ private fun CoopNotFoundDialog(
                 Spacer(Modifier.height(24.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     AzButton(
-                        text = "HOST",
+                        text = androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.coop_host),
                         onClick = { if (canHost) onHost() },
                         color = if (canHost) HotPink else Color.Gray,
                         shape = AzButtonShape.RECTANGLE,
                         modifier = Modifier.weight(1f)
                     )
                     AzButton(
-                        text = "SEARCH",
+                        text = androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.coop_search),
                         onClick = onSearch,
                         color = HotPink,
                         shape = AzButtonShape.RECTANGLE,
@@ -3283,7 +3291,7 @@ private fun CoopNotFoundDialog(
                 if (!canHost) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = "Create a Doodle first to host.",
+                        text = androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.coop_need_doodle),
                         color = Color.Gray,
                         fontSize = 12.sp
                     )
@@ -3848,31 +3856,37 @@ private fun DiagnosticRow(label: String, value: String, color: Color) {
  * doesn't work".
  */
 @Composable
-private fun DoodleIncompleteOverlay(modifier: Modifier = Modifier) {
+private fun DoodleIncompleteOverlay(onRecapture: () -> Unit, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .background(com.hereliesaz.graffitixr.design.theme.DialogSurface, com.hereliesaz.graffitixr.design.theme.HudPillShape)
-            .border(2.dp, HotPink, RoundedCornerShape(20.dp))
+            .border(2.dp, HotPink, com.hereliesaz.graffitixr.design.theme.HudPillShape)
             .padding(horizontal = 24.dp, vertical = 20.dp)
             .widthIn(max = 340.dp)
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "DOODLE NOT LOCKED",
+                text = stringResource(DesignR.string.doodle_not_locked_title),
                 color = HotPink,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
+                style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "The anchor is placed, but no surface features were matched to it — the overlay " +
-                    "will drift. Re-capture the Doodle: get squarer to the surface, closer, and aim at " +
-                    "a patch with more detail.",
+                text = stringResource(DesignR.string.doodle_not_locked_text),
                 color = Color.White,
-                fontSize = 14.sp,
+                style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center
             )
+            Spacer(Modifier.height(16.dp))
+            // Not a dead end: the one fix is one tap away.
+            androidx.compose.material3.Button(
+                onClick = onRecapture,
+                modifier = Modifier.heightIn(min = 48.dp),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = HotPink, contentColor = Color.White),
+            ) {
+                Text(stringResource(DesignR.string.doodle_recapture), style = MaterialTheme.typography.labelLarge)
+            }
         }
     }
 }

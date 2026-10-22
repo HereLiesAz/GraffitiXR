@@ -252,7 +252,6 @@
     <string name="choose_from_gallery">Escolher da Galeria</string>
 
     <!-- Message shown when the device doesn't support the Depth API. -->
-    <string name="depth_unsupported">Este dispositivo não oferece suporte à Depth API.\nMude para o modo Tela nas Configurações.</string>
 
     <!-- Title shown when ARCore is missing or unsupported. -->
     <string name="arcore_required_title">O ARCore é necessário</string>
@@ -330,10 +329,8 @@
     <string name="align_not_ready">Alinhar precisa primeiro de um Doodle e de um design posicionado.</string>
 
     <!-- Overlays & Status -->
-    <string name="status_create_grid">Crie uma Grade para iniciar.</string>
     <string name="status_scan_surfaces">Escaneie superfícies ao seu redor.</string>
     <string name="status_tap_surface">Toque em uma superfície para posicionar a âncora.</string>
-    <string name="status_looking_grid">Procurando sua Grade...</string>
     <string name="status_ready">Pronto. (%1$d pts)</string>
     <string name="unlock_hint">Volume Aumentar, Diminuir, Aumentar, Diminuir — rápido — para desbloquear</string>
 

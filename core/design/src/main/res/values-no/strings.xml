@@ -252,7 +252,6 @@
     <string name="choose_from_gallery">Velg fra Galleri</string>
 
     <!-- Message shown when the device doesn't support the Depth API. -->
-    <string name="depth_unsupported">Denne enheten støtter ikke Depth API.\nBytt til Canvas-modus i Innstillinger.</string>
 
     <!-- Title shown when ARCore is missing or unsupported. -->
     <string name="arcore_required_title">ARCore kreves</string>
@@ -330,10 +329,8 @@
     <string name="align_not_ready">Rett inn trenger først en Doodle og et plassert design.</string>
 
     <!-- Overlays & Status -->
-    <string name="status_create_grid">Lag et rutenett for å starte.</string>
     <string name="status_scan_surfaces">Skann overflater rundt deg.</string>
     <string name="status_tap_surface">Trykk på en overflate for å plassere anker.</string>
-    <string name="status_looking_grid">Ser du etter rutenettet ditt...</string>
     <string name="status_ready">Ferdig. (%1$d poeng)</string>
     <string name="unlock_hint">Volum Opp, Ned, Opp, Ned — raskt — for å låse opp</string>
 

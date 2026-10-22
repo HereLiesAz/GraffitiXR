@@ -254,7 +254,6 @@
     <string name="choose_from_gallery">從圖庫中選擇</string>
 
 
-    <string name="depth_unsupported">此設備不支援 Depth API。 \n在「設定」中切換到「畫布」模式。</string>
 
 
     <string name="arcore_required_title">需要 ARCore</string>
@@ -335,10 +334,8 @@
     <string name="align_not_ready">對齊需要先有 Doodle 和已放置的設計。</string>
 
 
-    <string name="status_create_grid">建立一個網格以開始。</string>
     <string name="status_scan_surfaces">掃描您周圍的表面。</string>
     <string name="status_tap_surface">點擊表面以放置錨點。</string>
-    <string name="status_looking_grid">正在尋找您的網格...</string>
     <string name="status_ready">準備好。（%1$d 分）</string>
     <string name="unlock_hint">快速按 音量上、下、上、下 即可解鎖</string>
 
