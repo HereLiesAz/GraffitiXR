@@ -48,7 +48,7 @@ internal fun enumerateRailItemIdRegistrations(mode: EditorMode): List<String> {
     if (mode == EditorMode.AR) {
         // mode.ar.measure registers only with an established anchor on the ARCore backend; it is
         // listed here unconditionally because this enumerates every id the AR mode CAN register.
-        ids += listOf("doodle.create", "mode.ar.light", "mode.ar.lock", "mode.ar.freeze", "mode.ar.measure", "mode.ar.magic", "mode.ar.cv")
+        ids += listOf("doodle.create", "mode.ar.light", "mode.ar.lock", "mode.ar.freeze", "mode.ar.measure", "mode.ar.magic")
         ids += listOf("coop", "coop.host", "coop.join", "coop.leave", "coop.view")
     }
     if (mode == EditorMode.OVERLAY) {
@@ -135,8 +135,6 @@ internal val RAIL_ITEM_HOST_ID: Map<String, String> = mapOf(
     "proj.export" to "host.project",
     "proj.load" to "host.project",
     "proj.settings" to "host.project",
-    // CV view sits under Project, registered only in AR (its renderer is the one that draws it).
-    "mode.ar.cv" to "host.project",
 )
 
 /**

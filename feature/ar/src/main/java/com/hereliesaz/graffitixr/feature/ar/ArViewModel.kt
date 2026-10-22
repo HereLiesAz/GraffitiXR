@@ -2170,12 +2170,8 @@ class ArViewModel @Inject constructor(
                 _uiState.update { it.copy(isRightHanded = isRight) }
             }
         }
-        viewModelScope.launch {
-            settingsRepository.showAnchorBoundary.collect { show ->
-                _uiState.update { it.copy(showAnchorBoundary = show) }
-                renderer?.showAnchorBoundary = show
-            }
-        }
+        // The anchor-boundary toggle was removed from Settings; a stored "on" from before is ignored,
+        // so the boundary stays off (showAnchorBoundary keeps its false default).
         viewModelScope.launch {
             settingsRepository.isImperialUnits.collect { imperial ->
                 _uiState.update { it.copy(isImperialUnits = imperial) }

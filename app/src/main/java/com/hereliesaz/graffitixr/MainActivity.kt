@@ -2088,8 +2088,8 @@ class MainActivity : AppCompatActivity() {
                                     onAmbientScanEnabledChanged = { arViewModel.setAmbientScanEnabled(it) },
                                     changePassEnabled = arUiState.changePassEnabled,
                                     onChangePassEnabledChanged = { arViewModel.setChangePassEnabled(it) },
-                                    showAnchorBoundary = arUiState.showAnchorBoundary,
-                                    onAnchorBoundaryChanged = { arViewModel.setShowAnchorBoundary(it) },
+                                    cvPreviewOn = arUiState.cvPreviewOn,
+                                    onCvPreviewChanged = { on -> if (on != arUiState.cvPreviewOn) arViewModel.toggleCvPreview() },
                                     isImperialUnits = arUiState.isImperialUnits,
                                     onImperialUnitsChanged = { arViewModel.setImperialUnits(it) },
                                     backgroundColor = editorUiState.canvasBackground.toArgb(),
@@ -2962,20 +2962,6 @@ class MainActivity : AppCompatActivity() {
                 disabled = showLibrary,
                 onClick = { showSettings = true },
             )
-            // CV view — a composited preview of everything the computer vision is looking for,
-            // drawn over the design, with a legend of what each colour is and how much of it the
-            // wall has answered. Lives under Project (a diagnostic, not a painting tool); only
-            // registered in AR, the one mode whose renderer draws it.
-            if (editorUiState.editorMode == EditorMode.AR) azRailSubItem(
-                id = "mode.ar.cv",
-                hostId = railHostOf("mode.ar.cv"),
-                text = navStrings.cvView,
-                color = navItemColor,
-                classifiers = setOf("toggle"),
-                shape = AzButtonShape.NONE,
-                disabled = showLibrary,
-                onClick = { arViewModel.toggleCvPreview() },
-            )
 
 
             // Help — opens AzNavRail's built-in help overlay (populated by azAdvanced(helpList=...)).
@@ -3027,7 +3013,6 @@ class MainActivity : AppCompatActivity() {
             if (editorUiState.design?.isSketch == true) azHighlight("design.outline", active = Cyan)
             if (editorUiState.design?.isSubjectIsolated == true) azHighlight("design.isolate", active = Cyan)
             if (editorUiState.design?.isStencil == true) azHighlight("design.stencil", active = Cyan)
-            if (arUiState.cvPreviewOn) azHighlight("mode.ar.cv", active = Cyan)
             if (editorUiState.design?.isImageLocked == true) azHighlight("design.lock", active = Cyan)
 
             // State badges: surface important conditions as rail-item alerts.
