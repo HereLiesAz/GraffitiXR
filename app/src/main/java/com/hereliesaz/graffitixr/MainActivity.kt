@@ -1692,7 +1692,10 @@ class MainActivity : AppCompatActivity() {
                                     (arUiState.isScanning && arUiState.fusionDiagnostics.state in setOf(
                                         FusionState.COLD_SNAP, FusionState.BLENDING, FusionState.HOLDING
                                     ))
-                                if (mainUiState.hasArCoreDoodle == true && !relocLocked) {
+                                // Not while the target is still being built (stages 2-3 replace the doodle as
+                                // they go, so it can't match yet): the 20 s timer otherwise offered
+                                // "Recapture Doodle" mid-build.
+                                if (mainUiState.hasArCoreDoodle == true && !relocLocked && closeUpProgress == null) {
                                     // Shown with the bottom rail-side controls below (it carries Recapture).
                                     showDoodleSearch = true
                                 } else {
