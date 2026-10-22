@@ -908,6 +908,26 @@ class MainActivity : AppCompatActivity() {
                         pendingOverlayUri = null
                     }
                 }
+                // Every mode needs an image, so a new project opens the picker as soon as it exists.
+                // No instructions: the system photo picker is its own screen and nothing can be drawn
+                // above it.
+                var pickImageForNewProject by rememberSaveable { mutableStateOf(false) }
+                LaunchedEffect(
+                    pickImageForNewProject,
+                    dashboardUiState.isCreatingProject,
+                    editorUiState.projectId,
+                    dashboardUiState.projectErrorMessage,
+                ) {
+                    if (!pickImageForNewProject || dashboardUiState.isCreatingProject) return@LaunchedEffect
+                    if (dashboardUiState.projectErrorMessage != null) {
+                        pickImageForNewProject = false
+                    } else if (editorUiState.projectId != null &&
+                        editorUiState.projectId == dashboardUiState.currentProjectId
+                    ) {
+                        pickImageForNewProject = false
+                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
+                }
                 val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                     uri?.let { editorViewModel.setBackgroundImage(it) }
                 }
@@ -2009,6 +2029,7 @@ class MainActivity : AppCompatActivity() {
                                     onDismissRequest = { dashboardViewModel.dismissNewProjectDialog() },
                                     isBusy = dashboardUiState.isCreatingProject,
                                     onSaveRequest = { name ->
+                                        pickImageForNewProject = true
                                         dashboardViewModel.onCreateProject(name)
                                     },
                                     strings = strings
@@ -2370,6 +2391,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         val isDesignMode = editorUiState.editorMode == EditorMode.DESIGN
+        // Design tools (stencil, invert, blend, outline, isolate) rewrite the design, so they work only
+        // in Design. The adjustment knobs (Adjust, Balance) stay available in every mode.
+        val designToolsDisabled = showLibrary || !isDesignMode
         // railExpansion (param) is the per-host expansion restored from the project so the rail reopens
         // as the user left it. Seeded into initiallyExpanded below; captured by onExpandedChange (manual
         // toggles only). Each mode folder's expandWhen opens it while that mode is active.
@@ -2428,7 +2452,7 @@ class MainActivity : AppCompatActivity() {
                 color = navItemColor,
                 classifiers = setOf("toggle", "effect"),
                 shape = AzButtonShape.NONE,
-                disabled = showLibrary,
+                disabled = designToolsDisabled,
                 onClick = { editorViewModel.onToggleStencil() }
             )
             if (editorUiState.design?.isStencil == true) {
@@ -2448,7 +2472,7 @@ class MainActivity : AppCompatActivity() {
                     selectedOption = stencilLabels[editorUiState.design?.stencilView?.ordinal ?: 0],
                     color = navItemColor,
                     shape = AzButtonShape.NONE,
-                    disabled = showLibrary,
+                    disabled = designToolsDisabled,
                     onClick = { editorViewModel.onCycleStencilView() }
                 )
             }
@@ -2482,25 +2506,25 @@ class MainActivity : AppCompatActivity() {
             azRailSubItem(
                 id = "design.invert", hostId = railHostOf("design.invert"), text = navStrings.invert,
                 color = navItemColor, classifiers = setOf("toggle", "effect"),
-                shape = AzButtonShape.NONE, disabled = showLibrary,
+                shape = AzButtonShape.NONE, disabled = designToolsDisabled,
                 onClick = { editorViewModel.onToggleInvert() },
             )
             azRailSubItem(
                 id = "design.blend", hostId = railHostOf("design.blend"), text = navStrings.blend,
                 color = navItemColor, classifiers = setOf("effect"),
-                shape = AzButtonShape.NONE, disabled = showLibrary,
+                shape = AzButtonShape.NONE, disabled = designToolsDisabled,
                 onClick = { editorViewModel.onCycleBlendMode() },
             )
             azRailSubItem(
                 id = "design.outline", hostId = railHostOf("design.outline"), text = navStrings.outline,
                 color = navItemColor, classifiers = setOf("toggle", "effect"),
-                shape = AzButtonShape.NONE, disabled = showLibrary,
+                shape = AzButtonShape.NONE, disabled = designToolsDisabled,
                 onClick = { editorViewModel.onToggleOutline() },
             )
             azRailSubItem(
                 id = "design.isolate", hostId = railHostOf("design.isolate"), text = navStrings.isolate,
                 color = navItemColor, classifiers = setOf("toggle", "effect"),
-                shape = AzButtonShape.NONE, disabled = showLibrary,
+                shape = AzButtonShape.NONE, disabled = designToolsDisabled,
                 onClick = { editorViewModel.onToggleSubjectIsolation() },
             )
             // Layer.isImageLocked gates whether taps/gestures reach the design image at all (see

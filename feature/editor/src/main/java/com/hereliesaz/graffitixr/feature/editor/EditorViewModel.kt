@@ -555,9 +555,7 @@ class EditorViewModel @Inject constructor(
                             // leaves a guest with metadata pointing at a URI on the HOST's local
                             // filesystem and no pixels. Ship the actual bytes too, the same way
                             // recomputeDesignEffects does for effect toggles.
-                            if (shown != null) {
-                                opEmitter.emit(Op.DesignBitmapReplace(ImageUtils.bitmapToByteArray(shown)))
-                            }
+                            if (shown != null) emitDesignPixels(shown)
                         }
                     }
                 }
@@ -634,7 +632,7 @@ class EditorViewModel @Inject constructor(
                     // a guest with metadata pointing at a URI on the HOST's local filesystem and no
                     // pixels — nothing renders until some later, unrelated op happens to also carry
                     // bytes. Ship the pixels too, the same way recomputeDesignEffects does.
-                    opEmitter.emit(Op.DesignBitmapReplace(ImageUtils.bitmapToByteArray(bitmap)))
+                    emitDesignPixels(bitmap)
                     // Tracked so the file this import supersedes is deleted once the saved project
                     // and the undo history have both let go of it (saveProject prunes on success).
                     writtenDesignPaths += path
@@ -755,7 +753,7 @@ class EditorViewModel @Inject constructor(
                 }
                 saveProject()
                 // Guests are shown pixels, not a pipeline, so ship the result rather than the flag.
-                opEmitter.emit(Op.DesignBitmapReplace(ImageUtils.bitmapToByteArray(rendered)))
+                emitDesignPixels(rendered)
             }
         }
     }
@@ -1769,6 +1767,12 @@ class EditorViewModel @Inject constructor(
     }
 
     // ── Internals ─────────────────────────────────────────────────────────────
+
+    /** Ships the design's pixels to the co-op session, encoding them only when one exists. */
+    private fun emitDesignPixels(bitmap: Bitmap) {
+        if (!opEmitter.hasSession()) return
+        opEmitter.emit(Op.DesignBitmapReplace(ImageUtils.bitmapToByteArray(bitmap)))
+    }
 
     private fun updateDesign(transform: (Layer) -> Layer) {
         _uiState.update { state -> state.copy(design = state.design?.let(transform)) }
