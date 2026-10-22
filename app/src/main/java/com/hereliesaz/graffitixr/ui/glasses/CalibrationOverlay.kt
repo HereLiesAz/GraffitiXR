@@ -41,7 +41,7 @@ fun CalibrationOverlay(
             modifier = Modifier.padding(32.dp),
         ) {
             Text(
-                "Hold the phone so it sees the wall. Tap the wall to calibrate.",
+                "Hold the phone so it sees the surface. Tap the surface to calibrate.",
                 color = Color.White,
             )
             LinearProgressIndicator(

@@ -761,15 +761,14 @@ class ArRenderer(
     // identity) rather than this anchor's own pose — see the validation where this flag is consumed.
     private var overlayRotationCorrectionPending: Boolean = false
     // Measure gates (set at anchor establishment / correction outcome). The overlay base frame's
-    // local z is the real wall normal only when the anchor's normal came from a wall surface (a
-    // plane hit, or a reloc pose whose up axis faces the camera) AND the one-time rotation
+    // local z is the real surface normal (a wall, or a table under a canvas) only when the anchor's
+    // normal came from a surface (a plane hit, or a confirmed reloc pose) AND the one-time rotation
     // correction was applied. Depth/feature-point and fallback anchors use the anchor→camera
     // direction, a camera-facing plane that foreshortens an oblique wall.
     private var anchorNormalIsWall = false
     private var overlayRotationCorrectionApplied = false
-    // A reloc-restored anchor's wall-ness is only inferred from viewing angle (a floor or table
-    // seen obliquely passes too), so Measure stays off until a live VERTICAL plane hit at the
-    // anchor confirms it (see [confirmRelocWallFromPlaneHit]).
+    // A reloc-restored anchor's surface is only inferred from viewing angle, so Measure stays off
+    // until a live plane hit at the anchor confirms it (see [confirmRelocWallFromPlaneHit]).
     private var relocWallUnconfirmed = false
 
     /**
@@ -1793,9 +1792,12 @@ class ArRenderer(
 
                     val fallbackMatrix = FloatArray(16)
                     android.opengl.Matrix.invertM(fallbackMatrix, 0, viewMat, 0)
-                    fallbackMatrix[12] += -fallbackMatrix[8] * 2.0f
-                    fallbackMatrix[13] += -fallbackMatrix[9] * 2.0f
-                    fallbackMatrix[14] += -fallbackMatrix[10] * 2.0f
+                    // Column 2 of the camera's world matrix is its +z (backward) axis, so forward is
+                    // its negation. Looking down at a table, the fallback is arm's length, not 2 m.
+                    val fallbackDistance = fallbackPlacementDistance(-fallbackMatrix[9])
+                    fallbackMatrix[12] += -fallbackMatrix[8] * fallbackDistance
+                    fallbackMatrix[13] += -fallbackMatrix[9] * fallbackDistance
+                    fallbackMatrix[14] += -fallbackMatrix[10] * fallbackDistance
 
                     // Prefer a real surface (a wall/plane) over the nearest hit. hits[0] is the closest
                     // result, which is usually a stray feature point in front of the wall — anchoring to
@@ -1829,7 +1831,8 @@ class ArRenderer(
                         val axis = FloatArray(3)
                         pose.getTransformedAxis(1, 1f, axis, 0)
                         nrmX = axis[0]; nrmY = axis[1]; nrmZ = axis[2]
-                        anchorNormalIsWall = kotlin.math.abs(axis[1]) < 0.3f // horizontal normal = a wall
+                        // Any plane is a real surface to measure: a wall, or a table, canvas or paper.
+                        anchorNormalIsWall = true
                         relocWallUnconfirmed = false
                         haveNormal = true
                         return true
@@ -1910,10 +1913,9 @@ class ArRenderer(
                                 val axis = FloatArray(3)
                                 pose.getTransformedAxis(1, 1f, axis, 0) // local +Y = plane normal
                                 nrmX = axis[0]; nrmY = axis[1]; nrmZ = axis[2]
-                                // Any plane gives a real surface normal, but only a VERTICAL one is a
-                                // wall: a floor or tabletop hit must not offer "wall width".
-                                anchorNormalIsWall = (chosen.trackable as com.google.ar.core.Plane).type ==
-                                    com.google.ar.core.Plane.Type.VERTICAL
+                                // Any plane gives a real surface normal, so Measure works on it: a
+                                // wall, or a tabletop with a canvas board or paper on it.
+                                anchorNormalIsWall = true
                             } else {
                                 nrmX = -dx; nrmY = -dy; nrmZ = -dz // toward the camera
                                 anchorNormalIsWall = false
@@ -3673,9 +3675,9 @@ class ArRenderer(
     }
 
     /**
-     * Confirms a reloc-restored anchor as a wall: a screen-centre hit on a tracked VERTICAL plane
-     * whose normal matches [anchorSurfaceNormal] and which passes within a few cm of the anchor.
-     * Only then is [anchorNormalIsWall] set, so Measure never offers wall width on a floor/table.
+     * Confirms a reloc-restored anchor's surface: a screen-centre hit on a tracked plane (a wall, or a
+     * table under a canvas) whose normal matches [anchorSurfaceNormal] and which passes within a few
+     * cm of the anchor. Only then is [anchorNormalIsWall] set, so Measure works on a real surface.
      */
     private fun confirmRelocWallFromPlaneHit(frame: Frame, anchorMatrix: FloatArray) {
         val n = anchorSurfaceNormal
@@ -3685,7 +3687,6 @@ class ArRenderer(
         } catch (_: Exception) { return }
         for (h in hits) {
             val plane = h.trackable as? com.google.ar.core.Plane ?: continue
-            if (plane.type != com.google.ar.core.Plane.Type.VERTICAL) continue
             if (plane.trackingState != TrackingState.TRACKING || plane.subsumedBy != null) continue
             if (!plane.isPoseInPolygon(h.hitPose)) continue
             val axis = FloatArray(3)

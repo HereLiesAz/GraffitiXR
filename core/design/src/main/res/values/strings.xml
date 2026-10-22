@@ -11,7 +11,7 @@
     <!-- Label for the Augmented Reality (AR) projection mode. -->
     <string name="nav_ar_mode">AR</string>
     <!-- Instructions for AR mode, explaining how to project artwork onto a wall. -->
-    <string name="nav_ar_mode_info">Project your artwork onto a real wall using augmented reality. Scan the wall first to place the anchor, then add your design.</string>
+    <string name="nav_ar_mode_info">Project your artwork onto a real surface using augmented reality. Scan the surface first to place the anchor, then add your design.</string>
 
     <!-- Label for the camera overlay mode, which doesn't use AR tracking. -->
     <string name="nav_overlay">Overlay</string>
@@ -21,7 +21,7 @@
     <!-- Label for the Mockup mode, used for previewing on a static background. -->
     <string name="nav_mockup">Mockup</string>
     <!-- Description of Mockup mode, explaining that it uses a photo background instead of a live feed. -->
-    <string name="nav_mockup_info">Preview your design composited onto a photo of a wall. No camera or scanning required.</string>
+    <string name="nav_mockup_info">Preview your design composited onto a photo of a surface. No camera or scanning required.</string>
 
     <!-- Label for the Trace mode, which locks the screen for manual tracing. -->
     <string name="nav_trace">Trace</string>
@@ -35,7 +35,7 @@
     <!-- Label for the Target/Grid management menu in AR mode. -->
     <string name="nav_grid">Doodle</string>
     <!-- Description of Target management, used for anchor creation and management. -->
-    <string name="nav_grid_info">Create and manage your Doodle. Photograph the painted reference marks on the wall to lock the projection in place.</string>
+    <string name="nav_grid_info">Create and manage your Doodle. Photograph the painted reference marks on the surface to lock the projection in place.</string>
 
     <!-- Label for the wall survey tool, used to improve AR tracking. -->
     <!-- Description of the Survey tool, explaining its role in tracking accuracy. -->
@@ -43,7 +43,7 @@
     <!-- Label for the action to create a new AR anchor. -->
     <string name="nav_create">Create</string>
     <!-- Instructions for creating a new AR anchor by photographing a mark on the wall. -->
-    <string name="nav_create_info">Photograph a reference mark on the wall to create a new AR anchor. The app will track this mark to keep your projection aligned.</string>
+    <string name="nav_create_info">Photograph a reference mark on the surface to create a new AR anchor. The app will track this mark to keep your projection aligned.</string>
 
     <string name="nav_coop">Link</string>
     <string name="nav_host_coop">Host</string>
@@ -80,13 +80,13 @@
     <string name="nav_open_info">Add an image from your gallery as the design.</string>
 
     <!-- Label for the background wall image in Mockup mode. -->
-    <string name="nav_wall">Wall</string>
+    <string name="nav_wall">Surface</string>
     <!-- Description for the action to change the background wall image. -->
-    <string name="nav_wall_info">Replace the background wall photo used in Mockup mode.</string>
+    <string name="nav_wall_info">Replace the background surface photo used in Mockup mode.</string>
     <!-- Label for the action to remove the background wall photo. -->
     <string name="nav_wall_clear">Clear</string>
     <!-- Description for the action to remove the background wall photo. -->
-    <string name="nav_wall_clear_info">Remove the background wall photo used in Mockup mode.</string>
+    <string name="nav_wall_clear_info">Remove the background surface photo used in Mockup mode.</string>
 
     <!-- Label for the subject-isolation effect. -->
     <string name="nav_isolate">Isolate</string>
@@ -163,7 +163,7 @@
     <!-- Label for the flashlight toggle. -->
     <string name="nav_light">Light</string>
     <!-- Description of the flashlight toggle for working in low light. -->
-    <string name="nav_light_info">Toggle the device flashlight to illuminate your wall while working in low light.</string>
+    <string name="nav_light_info">Toggle the device flashlight to illuminate your surface while working in low light.</string>
 
     <!-- Label for the touch input lock feature. -->
     <!-- Description of the touch lock, explaining how to unlock it. -->
@@ -272,9 +272,9 @@
     <string name="freeze_button">Freeze</string>
 
     <!-- Dialog title for choosing a wall photo source. -->
-    <string name="wall_source_title">Choose Wall Photo</string>
+    <string name="wall_source_title">Choose Surface Photo</string>
     <!-- Message asking user how they want to set the wall photo. -->
-    <string name="wall_source_text">How would you like to set the background wall?</string>
+    <string name="wall_source_text">How would you like to set the background surface?</string>
     <!-- Action to take a new photo. -->
     <string name="take_photo">Take Photo</string>
     <!-- Action to choose a photo from the gallery. -->
@@ -300,7 +300,7 @@
     <!-- Title for the Doodle grid overlay. -->
     <string name="doodle_creation_title">DOODLE GRID</string>
     <!-- Instructions on the Doodle grid overlay: the bare-wall photo first, or Cancel to put the card away. -->
-    <string name="doodle_creation_text">If you haven\'t created your Doodle grid, then take a picture of the wall by pressing the capture button. Otherwise press Cancel.</string>
+    <string name="doodle_creation_text">If you haven\'t created your Doodle grid, then take a picture of the surface by pressing the capture button. Otherwise press Cancel.</string>
     <!-- Generic cancel action. -->
     <string name="cancel">Cancel</string>
 
@@ -314,10 +314,10 @@
     <!-- Coaching step 1 for scanning. -->
     <string name="scan_step_1">Step 1: Map your surroundings</string>
     <!-- Coaching step 2 for scanning. -->
-    <string name="scan_step_2">Step 2: Scan the wall</string>
+    <string name="scan_step_2">Step 2: Scan the surface</string>
 
     <!-- Question asking if the AR artwork is correctly placed on the wall. -->
-    <string name="plane_confirm_question">Is the artwork on the correct wall?</string>
+    <string name="plane_confirm_question">Is the artwork on the correct surface?</string>
     <!-- Action to confirm the current plane placement. -->
     <string name="looks_correct">Looks correct</string>
     <!-- Action to redetect the plane. -->
@@ -362,8 +362,8 @@
     <string name="adj_restore_placement">Restore placement</string>
     <string name="adj_magic_align">Align</string>
     <!-- Toasts after Align: fitted to the paint on the wall, or nothing matched. -->
-    <string name="align_done_paint">Aligned to the paint on the wall.</string>
-    <string name="align_unavailable">No paint on the wall matches the design yet.</string>
+    <string name="align_done_paint">Aligned to the paint on the surface.</string>
+    <string name="align_unavailable">No paint on the surface matches the design yet.</string>
     <string name="align_not_ready">Align needs a Doodle and a placed design first.</string>
 
     <!-- Overlays & Status -->
@@ -385,7 +385,7 @@
     <string name="lib_new_project">New</string>
     <string name="lib_import_project">Import</string>
     <string name="lib_no_projects">No projects yet</string>
-    <string name="lib_no_projects_hint">Tap New below to start your first piece.\n\nYou\'ll be taken into the editor where you can:\n \n \u2022  Add artwork from the Design menu\n \n \u2022  Switch to AR mode to project onto a real wall\n \n \u2022  Use Overlay to float your design on the live camera\n \n  \u2022  Use Mockup to preview on a wall photo\n\n  \u2022  Use Trace to trace your design onto paper</string>
+    <string name="lib_no_projects_hint">Tap New below to start your first piece.\n\nYou\'ll be taken into the editor where you can:\n \n \u2022  Add artwork from the Design menu\n \n \u2022  Switch to AR mode to project onto a real surface\n \n \u2022  Use Overlay to float your design on the live camera\n \n  \u2022  Use Mockup to preview on a surface photo\n\n  \u2022  Use Trace to trace your design onto paper</string>
     <string name="lib_project_thumbnail">Project Thumbnail</string>
     <string name="lib_project_damaged">Damaged: can\'t be opened</string>
     <string name="lib_delete_project_desc">Delete project %1$s</string>
@@ -396,7 +396,7 @@
     <string name="settings_ar_section">AR</string>
     <string name="settings_glow_section">Coverage glow</string>
     <string name="settings_anticipation_section">Anticipation</string>
-    <string name="settings_anticipation_desc">Views of the Doodle from all around, so a lost overlay finds the wall again. More views relock from more angles and cost more battery and heat.</string>
+    <string name="settings_anticipation_desc">Views of the Doodle from all around, so a lost overlay finds the surface again. More views relock from more angles and cost more battery and heat.</string>
     <string name="settings_anticipation_distance">Distance</string>
     <string name="settings_anticipation_latitude">Latitude</string>
     <string name="settings_anticipation_longitude">Longitude</string>
@@ -481,7 +481,7 @@
     <string name="doodle_review_desc">Review Extracted Doodle</string>
     <string name="doodle_unwarp_hint">Drag corners to unwarp</string>
     <string name="doodle_review_title">DOODLE LOCKED</string>
-    <string name="doodle_closeups_progress">Learning the wall: stage %1$d of %2$d · step %3$d of %4$d</string>
+    <string name="doodle_closeups_progress">Learning the surface: stage %1$d of %2$d · step %3$d of %4$d</string>
 
     <string name="doodle_exclude">Exclude</string>
     <string name="doodle_include">Include</string>
@@ -498,7 +498,7 @@
     <string name="scan_hint_ambient">Slowly rotate 360° to map your surroundings (%1$d°)</string>
     <string name="scan_hint_too_dark">Too dark. Turn on the flashlight.</string>
     <string name="scan_hint_build_map">Walk left and right to build map</string>
-    <string name="scan_hint_closer">Move closer to the wall</string>
+    <string name="scan_hint_closer">Move closer to the surface</string>
     <string name="scan_hint_higher_lower">Scan higher and lower</string>
     <string name="reacquiring_doodle">Reacquiring Doodle…</string>
 
@@ -510,25 +510,25 @@
     <!-- Mode Switcher help text. -->
     <string name="help_mode_host">Mode Switcher: Switch between app modes. Instructions: Tap to expand, then select AR, Overlay, Mockup, or Lightbox.</string>
     <!-- AR Mode help text. -->
-    <string name="help_ar">AR Mode: Project design onto a wall using spatial mapping. Instructions: Scan environment until wall is detected, then tap to place the anchor.</string>
+    <string name="help_ar">AR Mode: Project design onto a surface using spatial mapping. Instructions: Scan environment until the surface is detected, then tap to place the anchor.</string>
     <!-- Overlay Mode help text. -->
     <string name="help_overlay">Overlay Mode: Display design over live camera without spatial tracking. Instructions: Manually scale and move the design to fit your frame.</string>
     <!-- Mockup Mode help text. -->
-    <string name="help_mockup">Mockup Mode: Preview the design on a still photo. Instructions: Use \'Wall\' to set a background photo, then place the design on top.</string>
+    <string name="help_mockup">Mockup Mode: Preview the design on a still photo. Instructions: Use \'Surface\' to set a background photo, then place the design on top.</string>
     <!-- Lightbox Mode help text. -->
     <string name="help_trace">Lightbox Mode: High-brightness tracing surface. Instructions: Place paper over the screen and trace. Press Volume Up, Down, Up, Down quickly to exit.</string>
     <!-- Target Management help text. -->
     <!-- Scan Resolution help text. -->
     <!-- Cloud Offset help text. -->
     <!-- Create Anchor help text. -->
-    <string name="help_create">Create Anchor: Photograph a mark on the wall to lock projection. Instructions: Point at a distinct texture and tap. The app will track this mark.</string>
+    <string name="help_create">Create Anchor: Photograph a mark on the surface to lock projection. Instructions: Point at a distinct texture and tap. The app will track this mark.</string>
     <!-- Layer Management help text. -->
     <!-- Import Image help text. -->
     <string name="help_add_img">Import Image: Add a sketch or reference photo. Instructions: Select an image from your gallery. It becomes the design.</string>
     <!-- New Sketch help text. -->
     <!-- Add Text help text. -->
     <!-- Change Wall help text. -->
-    <string name="help_wall">Change Wall: Set background for Mockup mode. Instructions: Select a photo of the physical wall you plan to paint on.</string>
+    <string name="help_wall">Change Surface: Set background for Mockup mode. Instructions: Select a photo of the physical surface you plan to paint on.</string>
     <!-- Project Management help text. -->
     <string name="help_project_host">Project Management: Save, load, and export work. Instructions: Tap to access administrative tasks for your project.</string>
     <!-- New Project help text. -->
@@ -542,7 +542,7 @@
     <!-- App Settings help text. -->
     <string name="help_settings">App Settings: Configure preferences. Instructions: Open to adjust handedness, units, and scanning parameters.</string>
     <!-- Flashlight help text. -->
-    <string name="help_light">Flashlight: Toggle device LED. Instructions: Use this to illuminate dark walls for better AR tracking.</string>
+    <string name="help_light">Flashlight: Toggle device LED. Instructions: Use this to illuminate dark surfaces for better AR tracking.</string>
     <!-- Lock/Freeze help text. -->
     <string name="help_lock_trace">Freeze: locks the whole touchscreen so tracing paper doesn\'t drag the design — unlike Lock, this also blocks scrolling and taps. To exit, press Volume Up, Down, Up, Down — quickly.</string>
     <string name="help_lock_ar">Freeze: locks the whole touchscreen while you paint, so a hand, a sleeve or a pocket can\'t move the design or switch modes. The screen also locks by itself whenever it is covered (in a pocket, face-down). To exit Freeze, press Volume Up, Down, Up, Down — quickly.</string>
@@ -589,35 +589,35 @@
         <item>That way your imagery is all ready to go and your phone can focus on augmenting reality when you press the AR button.</item>
     </string-array>
     <string-array name="onboarding_ar">
-        <item>AR Projection — projects your design onto a real wall using the phone\'s depth sensor and spatial tracking.</item>
-        <item>Point at the wall and move slowly side-to-side. Coloured shapes appear as the engine maps the surface. Wait until the wall area is covered.</item>
-        <item>Just tap the screen. The app photographs the wall, extracts tracking features, and locks the anchor instantly.</item>
-        <item>Tap \'Open\' to add your design — it projects onto the wall using the anchor you just set.</item>
-        <item>Tip — blank white walls, smooth concrete, and single-colour surfaces won\'t track. Aim your anchor point at graffiti, rough plaster, or any distinct mark.</item>
+        <item>AR Projection — projects your design onto a real surface using the phone\'s depth sensor and spatial tracking.</item>
+        <item>Point at the surface and move slowly side-to-side. Coloured shapes appear as the engine maps the surface. Wait until the surface area is covered.</item>
+        <item>Just tap the screen. The app photographs the surface, extracts tracking features, and locks the anchor instantly.</item>
+        <item>Tap \'Open\' to add your design — it projects onto the surface using the anchor you just set.</item>
+        <item>Tip — blank white walls, smooth concrete, plain canvas and single-colour surfaces won\'t track. Aim your anchor point at graffiti, rough plaster, or any distinct mark.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Live Overlay — your design floats over the live camera view, no surface scanning needed.</item>
         <item>Tap \'Open\' to add your design — pick a photo and it appears here, floating over the live camera view.</item>
-        <item>Pinch to scale, drag to reposition. The overlay stays fixed to your screen — step back to see how it fits the wall.</item>
+        <item>Pinch to scale, drag to reposition. The overlay stays fixed to your screen — step back to see how it fits the surface.</item>
     </string-array>
     <!-- Shown once (ArUnavailableOverlay, key "ar_unavailable_explainer") on a device without ARCore.
          It must stay true to the standalone SphereSLAM path: AR still works there, via a captured
          wall target, so this explains the difference instead of saying AR is unavailable. -->
     <string-array name="onboarding_ar_unavailable">
-        <item>This device doesn\'t support ARCore, so AR mode uses standalone wall tracking instead.</item>
-        <item>In AR mode you\'ll first capture a photo of a textured patch of wall and mark its four corners. Tracking then locks onto that target.</item>
+        <item>This device doesn\'t support ARCore, so AR mode uses standalone surface tracking instead.</item>
+        <item>In AR mode you\'ll first capture a photo of a textured patch of the surface and mark its four corners. Tracking then locks onto that target.</item>
         <item>Trace, Mockup and Overlay work as usual. Tap to dismiss.</item>
     </string-array>
     <string-array name="onboarding_mockup">
         <item>Photo Mockup — preview your design on a photo before you ever pick up a can.</item>
-        <item>Tap \'Wall\' to choose or take a photo of your surface. Do this first!</item>
-        <item>Tap \'Open\' to put your design on top of the wall photo. Pinch and drag to size and position it.</item>
+        <item>Tap \'Surface\' to choose or take a photo of your surface. Do this first!</item>
+        <item>Tap \'Open\' to put your design on top of the surface photo. Pinch and drag to size and position it.</item>
     </string-array>
     <string-array name="onboarding_design">
         <item>This is Design — your workspace. Whatever you build here carries over into every other mode.</item>
         <item>Tap \'Open\' to add your design — pick a photo from your gallery and it lands here as your artwork.</item>
         <item>Use the Edit tools to adjust, invert, outline or isolate it. Pinch and drag on the canvas to size and place it.</item>
-        <item>When it looks right, choose how to use it: \'Trace\' to turn your phone into a lightbox, \'Mockup\' to preview on a photo, or \'AR\' to project it onto a wall.</item>
+        <item>When it looks right, choose how to use it: \'Trace\' to turn your phone into a lightbox, \'Mockup\' to preview on a photo, or \'AR\' to project it onto a surface.</item>
     </string-array>
     <!-- Guidance steps for "add the design" outside Design mode, where the rail's Open item lives
          under the Design host and is hidden until Design is opened first (expandWhen collapses
@@ -626,22 +626,22 @@
          control that isn't actually visible yet. Each locale names the two rail items with its own
          nav_design / nav_open labels so the words match what is on screen. -->
     <string name="guidance_open_via_design_overlay">Tap \'Design\' on the rail, then \'Open\', to add your design — pick a photo and it appears here, floating over the live camera view.</string>
-    <string name="guidance_open_via_design_mockup">Tap \'Design\' on the rail, then \'Open\', to put your design on top of the wall photo. Pinch and drag to size and position it.</string>
+    <string name="guidance_open_via_design_mockup">Tap \'Design\' on the rail, then \'Open\', to put your design on top of the surface photo. Pinch and drag to size and position it.</string>
     <string name="guidance_open_via_design_trace">Tap \'Design\' on the rail, then \'Open\', to add your design. Once it\'s in, pinch and drag on the canvas to size and place it.</string>
-    <string name="guidance_open_via_design_ar">Tap \'Design\' on the rail, then \'Open\', to add your design — it projects onto the wall using the anchor you just set.</string>
+    <string name="guidance_open_via_design_ar">Tap \'Design\' on the rail, then \'Open\', to add your design — it projects onto the surface using the anchor you just set.</string>
 
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
     <string name="nav_measure">Measure</string>
-    <string name="nav_measure_info">Measure the real wall: tap one edge, then the other, on the wall the design sits on. The width is saved with the project so scale is measured, not guessed.</string>
-    <string name="measure_tap_first">Tap the first edge of the wall</string>
+    <string name="nav_measure_info">Measure the real surface: tap one edge, then the other, on the surface the design sits on. The width is saved with the project so scale is measured, not guessed.</string>
+    <string name="measure_tap_first">Tap the first edge of the surface</string>
     <string name="measure_tap_second">Tap the other edge</string>
     <string name="measure_save">Save</string>
     <string name="measure_redo">Redo</string>
-    <string name="measure_failed">Couldn\'t place that point on the wall. Aim more squarely and tap again.</string>
-    <string name="measure_wall_width">Wall width</string>
+    <string name="measure_failed">Couldn\'t place that point on the surface. Aim more squarely and tap again.</string>
+    <string name="measure_wall_width">Surface width</string>
     <!-- Overlay > Gyro (tripod stabilisation) -->
     <string name="nav_gyro">Gyro</string>
-    <string name="nav_gyro_info">On a tripod, holds the design still on the wall against small vibrations using the motion sensor. Turn on once the phone is set; it lets go if the phone is moved.</string>
+    <string name="nav_gyro_info">On a tripod, holds the design still on the surface against small vibrations using the motion sensor. Turn on once the phone is set; it lets go if the phone is moved.</string>
     <string name="gyro_released_moved">Gyro released: the phone moved too far.</string>
     <string name="gyro_unavailable">Gyro needs a rotation sensor this device doesn\'t report.</string>
     <!-- Gallery export / AR export availability -->
@@ -680,11 +680,11 @@
     <string name="state_collapsed">Collapsed</string>
     <string name="settings_fps_device_default">Device default</string>
     <string name="settings_fps_device_max">Device max</string>
-    <string name="first_run_photo_title">See it on your wall</string>
-    <string name="first_run_photo_text">Pick a reference photo of your artwork and we\'ll show you how it looks on a real wall, in AR.</string>
+    <string name="first_run_photo_title">See it on your surface</string>
+    <string name="first_run_photo_text">Pick a reference photo of your artwork and we\'ll show you how it looks on a real surface, in AR.</string>
     <string name="first_run_choose_photo">Choose Photo</string>
     <string name="first_run_not_now">Not now</string>
-    <string name="first_run_draw_title">Draw this on your wall</string>
+    <string name="first_run_draw_title">Draw this on your surface</string>
     <string name="first_run_draw_hint">Make it big — roughly the size of your artwork. It only has to be recognisable, not neat.</string>
     <string name="first_run_draw_done">I\'ve drawn it</string>
     <string name="first_run_draw_skip">Skip — I\'ll place it myself</string>
@@ -697,53 +697,53 @@
     <string name="standalone_use_measured_width">Use Measured Width</string>
     <string name="standalone_continue_without_scale">Continue Without Physical Scale</string>
     <string name="standalone_recapture">Recapture</string>
-    <string name="standalone_capture_wall_target">Capture Wall Target</string>
-    <string name="standalone_capture_failed">Couldn\'t capture the wall target — try again.</string>
+    <string name="standalone_capture_wall_target">Capture Surface Target</string>
+    <string name="standalone_capture_failed">Couldn\'t capture the surface target — try again.</string>
     <string name="standalone_rectify_failed">Couldn\'t rectify that target — mark four clear corners.</string>
-    <string name="standalone_target_too_weak">That target has too little trackable detail (%1$d KPM features; need %2$d). Recapture a richer wall patch.</string>
+    <string name="standalone_target_too_weak">That target has too little trackable detail (%1$d KPM features; need %2$d). Recapture a richer surface patch.</string>
     <string name="standalone_new_target">New Target</string>
     <string name="standalone_copy_diagnostics">Copy Diagnostics</string>
-    <string name="standalone_wall_target_lost">Wall target lost</string>
+    <string name="standalone_wall_target_lost">Surface target lost</string>
     <string name="standalone_recapture_target">Recapture Target</string>
     <string name="standalone_sweep_hint">Turn slowly to map the space — %1$d%%</string>
     <string name="standalone_failure_native_library_unavailable">SphereSLAM isn\'t available in this build.</string>
     <string name="standalone_failure_camera_unavailable">Camera isn\'t available for standalone AR.</string>
     <string name="standalone_failure_intrinsics_unavailable">Camera calibration is unavailable for standalone AR.</string>
-    <string name="standalone_failure_reference_too_weak">That wall target has too little trackable detail. Capture a richer patch.</string>
-    <string name="standalone_failure_no_page_match">Keep the wall target in view.</string>
+    <string name="standalone_failure_reference_too_weak">That surface target has too little trackable detail. Capture a richer patch.</string>
+    <string name="standalone_failure_no_page_match">Keep the surface target in view.</string>
     <string name="standalone_failure_stale_observation">Tracking is lagging. Move the phone more slowly.</string>
-    <string name="standalone_failure_reprojection_error">Wall match is unstable. Reframe the target.</string>
+    <string name="standalone_failure_reprojection_error">Surface match is unstable. Reframe the target.</string>
     <string name="standalone_failure_insufficient_inliers">Not enough target detail is visible.</string>
-    <string name="standalone_failure_pose_jump">Tracking jump rejected. Hold on the wall target.</string>
-    <string name="standalone_failure_persisted_target_corrupt">Saved wall target is missing or unreadable. Capture a new target.</string>
+    <string name="standalone_failure_pose_jump">Tracking jump rejected. Hold on the surface target.</string>
+    <string name="standalone_failure_persisted_target_corrupt">Saved surface target is missing or unreadable. Capture a new target.</string>
     <string name="standalone_failure_internal">SphereSLAM couldn\'t continue tracking this target.</string>
     <string name="standalone_tracking_stopped">SphereSLAM tracking stopped. Recapture the target to restart it.</string>
     <string name="standalone_status_mapping">SphereSLAM mapping • tap Doodle to add your Doodle</string>
-    <string name="standalone_status_preparing">Preparing wall target…</string>
-    <string name="standalone_status_finding">Finding wall target…</string>
-    <string name="standalone_quality_too_small">That wall target is too small after rectification. Capture a larger patch.</string>
-    <string name="standalone_quality_low_contrast">That wall target has too little visual contrast. Include more texture or detail.</string>
-    <string name="standalone_quality_blurry">That wall target is too blurry for reliable tracking. Hold steady and recapture.</string>
-    <string name="standalone_quality_not_strong_enough">That wall target is not strong enough for reliable tracking.</string>
+    <string name="standalone_status_preparing">Preparing surface target…</string>
+    <string name="standalone_status_finding">Finding surface target…</string>
+    <string name="standalone_quality_too_small">That surface target is too small after rectification. Capture a larger patch.</string>
+    <string name="standalone_quality_low_contrast">That surface target has too little visual contrast. Include more texture or detail.</string>
+    <string name="standalone_quality_blurry">That surface target is too blurry for reliable tracking. Hold steady and recapture.</string>
+    <string name="standalone_quality_not_strong_enough">That surface target is not strong enough for reliable tracking.</string>
     <string name="standalone_quality_too_dark">This target is heavily underexposed; tracking may be less reliable.</string>
     <string name="standalone_quality_too_bright">This target is heavily overexposed; tracking may be less reliable.</string>
     <string name="standalone_photosphere_no_sensor">This phone has no rotation sensor, so SphereSLAM can\'t place a target here.</string>
     <string name="standalone_photosphere_compass_not_ready">Compass isn\'t ready yet — hold the phone still for a second, then retake.</string>
     <string name="standalone_photosphere_not_mapped">SphereSLAM hasn\'t mapped this view yet — hold the camera steady on a lit, detailed part of the surface for a second, then retake.</string>
     <string name="doodle_rectify_title">Rectify surface</string>
-    <string name="doodle_rectify_text">Now, drag the corners to align the cyan frame with the flat surface of your wall.</string>
+    <string name="doodle_rectify_text">Now, drag the corners to align the cyan frame with the edges of the surface you\'re painting.</string>
     <string name="doodle_remove_marks_title">Remove marks</string>
     <string name="doodle_erase_hint">Tap a mark to remove it, or drag across marks to remove several.</string>
     <string name="doodle_cd_raw_capture">Raw capture</string>
     <string name="doodle_cd_detected_marks">Detected marks</string>
     <string name="doodle_cd_confirm">Confirm</string>
-    <string name="doodle_cd_unwarp_base">Captured wall photo with corner handles</string>
+    <string name="doodle_cd_unwarp_base">Captured surface photo with corner handles</string>
     <!-- ArViewModel user-facing feedback (errors and toasts), resolved at emit time. -->
     <string name="ar_feedback_guest_edit_dropped">That change can\'t be shared with the host — it stays on this device</string>
     <string name="ar_feedback_backend_resolving">AR backend is still being resolved — try Host again in a moment</string>
     <string name="ar_feedback_open_project_first">Open a project before sharing — there\'s nothing to send to a guest yet</string>
     <string name="ar_feedback_host_need_doodle_arcore">Capture and lock a current Doodle before hosting</string>
-    <string name="ar_feedback_host_need_target_standalone">Capture a standalone Wall Target before hosting</string>
+    <string name="ar_feedback_host_need_target_standalone">Capture a standalone Surface Target before hosting</string>
     <string name="ar_feedback_doodle_not_ready">Doodle is not ready yet — keep it in view and try Host again</string>
     <string name="ar_feedback_package_failed">Couldn\'t package this project to share — try saving it first</string>
     <string name="ar_feedback_host_failed">Couldn\'t start sharing: %1$s</string>
@@ -751,21 +751,21 @@
     <string name="ar_feedback_join_load_failed">Couldn\'t load the host\'s project — the session was ended.</string>
     <string name="ar_feedback_join_no_geometry">The host did not provide geometry ARCore can align to.</string>
     <string name="ar_feedback_join_failed">Couldn\'t join: %1$s</string>
-    <string name="ar_feedback_wall_doodle_changed">Doodle changed — sharing ended. Start Host again for the new wall.</string>
+    <string name="ar_feedback_wall_doodle_changed">Doodle changed — sharing ended. Start Host again for the new surface.</string>
     <string name="ar_feedback_backend_changed">Tracking backend changed — sharing ended. Start sharing again.</string>
     <string name="ar_feedback_camera_busy">Camera is busy or unavailable — close other camera apps, then re-enter AR</string>
     <string name="ar_feedback_ar_start_failed">Couldn\'t start AR — your camera may be in use by another app</string>
     <string name="ar_feedback_camera_setting_apply_failed">Couldn\'t apply the camera setting to the running AR session — exit and re-enter AR</string>
-    <string name="ar_feedback_sphere_target_save_failed">Wall tracking works for this session, but the SphereSLAM target couldn\'t be saved.</string>
+    <string name="ar_feedback_sphere_target_save_failed">Surface tracking works for this session, but the SphereSLAM target couldn\'t be saved.</string>
     <string name="ar_feedback_camera_not_resumed">AR camera did not resume — try leaving and re-entering AR mode</string>
     <string name="ar_feedback_camera_permission">Camera unavailable — check the camera permission, then re-enter AR</string>
     <string name="ar_feedback_camera_not_paused">AR camera did not pause cleanly — it may keep running in the background</string>
-    <string name="ar_feedback_backbone_warning">The artwork covers nearly all the wall in view — only %1$d tracked features sit outside it. Make it smaller or step back, or the Doodle may not lock.</string>
+    <string name="ar_feedback_backbone_warning">The artwork covers nearly all the surface in view — only %1$d tracked features sit outside it. Make it smaller or step back, or the Doodle may not lock.</string>
     <string name="ar_feedback_legacy_doodle_geometry">This project\'s saved Doodle was made by an older version and its 3D geometry can\'t be corrected. Create the Doodle again to use it.</string>
     <string name="ar_feedback_camera_no_frames">Camera isn\'t delivering frames — exit AR and try again</string>
     <string name="ar_feedback_camera_recovery_timeout">AR camera recovery timed out safely — exit and re-enter AR</string>
     <string name="ar_feedback_target_prepare_failed">Couldn\'t prepare the captured target. Try again.</string>
-    <string name="ar_feedback_wall_width_save_failed">Couldn\'t save the wall width. Try Save again.</string>
+    <string name="ar_feedback_wall_width_save_failed">Couldn\'t save the surface width. Try Save again.</string>
     <string name="ar_feedback_unknown_error">unknown error</string>
     <string name="reloc_looking">Looking for your Doodle…</string>
     <string name="reloc_turn_right">Turn right %1$d°</string>
@@ -786,25 +786,25 @@
     <string name="nav_stencil_view_info">Cycles which stencil sheets are shown: all, black, grey or white.</string>
 
     <!-- Pass B: the Settings switch. -->
-    <string name="settings_change_pass">Change detection (needs a clean-wall photo)</string>
+    <string name="settings_change_pass">Change detection (needs a clean-surface photo)</string>
     <!-- Spoken labels for the round shutter on the Doodle grid screen, which photographs the bare wall. -->
-    <string name="doodle_shutter_cd">Photograph the bare wall</string>
-    <string name="doodle_shutter_retake_cd">Retake the bare-wall photo</string>
+    <string name="doodle_shutter_cd">Photograph the bare surface</string>
+    <string name="doodle_shutter_retake_cd">Retake the bare-surface photo</string>
     <!-- Doodle grid screen: each line sits above the thing it explains. Over the middle of the screen: -->
     <string name="doodle_tap_grid_hint">Tap your doodle grid to capture it.</string>
     <!-- Above the shutter, before and after the bare-wall photo is kept. -->
-    <string name="doodle_blank_wall_hint">If the wall is blank, take a picture.</string>
-    <string name="doodle_blank_wall_saved_hint">Blank wall saved. Now tap your doodle grid.</string>
+    <string name="doodle_blank_wall_hint">If the surface is blank, take a picture.</string>
+    <string name="doodle_blank_wall_saved_hint">Blank surface saved. Now tap your doodle grid.</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">CV view</string>
-    <string name="nav_cv_view_info">Shows everything the computer vision is looking for, drawn over your design. Each colour is one way of looking; a hollow ring is still waiting for the wall to answer and a filled dot has been found. Tap again to hide it.</string>
+    <string name="nav_cv_view_info">Shows everything the computer vision is looking for, drawn over your design. Each colour is one way of looking; a hollow ring is still waiting for the surface to answer and a filled dot has been found. Tap again to hide it.</string>
     <string name="nav_cv_legend_title">Looking for</string>
 
     <!-- Pass B: the clean-wall photo could not be kept, or does not line up with the wall. -->
-    <string name="ar_feedback_clean_wall_save_failed">Couldn\'t save the clean-wall photo. Take it again.</string>
-    <string name="ar_feedback_progress_save_failed">Couldn\'t save the wall map and painting progress. They\'re kept for this session. Free some space, then save again.</string>
-    <string name="ar_feedback_clean_wall_register_failed">That clean-wall photo doesn\'t line up with this wall. Retake it from about where you will stand.</string>
+    <string name="ar_feedback_clean_wall_save_failed">Couldn\'t save the clean-surface photo. Take it again.</string>
+    <string name="ar_feedback_progress_save_failed">Couldn\'t save the surface map and painting progress. They\'re kept for this session. Free some space, then save again.</string>
+    <string name="ar_feedback_clean_wall_register_failed">That clean-surface photo doesn\'t line up with this surface. Retake it from about where you will stand.</string>
 
     <!-- The CV view legend: the name of each way of looking. -->
     <string name="cv_pass_features">Features</string>
