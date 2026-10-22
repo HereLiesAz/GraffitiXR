@@ -146,7 +146,7 @@
 
     <!-- Label for the touch input lock feature. -->
     <!-- Description of the touch lock, explaining how to unlock it. -->
-    <string name="nav_lock_info">Bloqueie a tela de toque para evitar alterações acidentais enquanto você pinta. Dê três toques em qualquer lugar para desbloquear.</string>
+    <string name="nav_lock_info">Fixa o design para que pinçar e arrastar não o movam. Toque em Bloquear de novo para soltá-lo.</string>
 
 
     <!-- Tooltip info for the brush tool. -->
@@ -266,9 +266,9 @@
     <string name="open_settings">Abrir Configurações</string>
 
     <!-- Title for target creation overlay. -->
-    <string name="doodle_creation_title">GRADE DO RABISCO</string>
+    <string name="doodle_creation_title">RABISCO</string>
     <!-- Instructions for creating a target by tapping on reference marks. -->
-    <string name="doodle_creation_text">Se você ainda não criou sua grade do Rabisco, tire uma foto da parede pressionando o botão de captura. Caso contrário, pressione Cancelar.</string>
+    <string name="doodle_creation_text">Seu Rabisco são algumas marcas grandes que você pinta na superfície para que o app possa encontrá-la de novo. Pinte-as e depois fotografe a superfície com o botão de captura.</string>
     <!-- Generic cancel action. -->
     <string name="cancel">Cancelar</string>
 
@@ -412,7 +412,7 @@
     <string name="settings_granted">Concedida</string>
     <string name="settings_denied">Negada</string>
     <string name="settings_open_app_settings">Abrir Configurações do App</string>
-    <string name="settings_copyright">GraffitiXR © 2025</string>
+    <string name="settings_copyright">GraffitiXR © 2025–2026</string>
 
     <!-- Editor UI -->
     <string name="save_project_hint">Nome do Projeto</string>
@@ -450,7 +450,7 @@
 
     <!-- Help strings for main navigation rail. -->
     <!-- Mode Switcher help text. -->
-    <string name="help_mode_host">Seletor de Modo: Alterne entre os modos do aplicativo. Instruções: Toque para expandir e selecione AR, Sobreposição, Maquete ou Mesa de Luz.</string>
+    <string name="help_mode_host">Seletor de modo: alterne entre os modos do app. Instruções: toque para expandir e escolha AR, Sobreposição, Maquete ou Traçar.</string>
     <!-- AR Mode help text. -->
     <string name="help_ar">Modo AR: Projete o design em uma parede usando mapeamento espacial. Instruções: Escaneie o ambiente até que a parede seja detectada, então toque para posicionar a âncora.</string>
     <!-- Overlay Mode help text. -->
@@ -458,11 +458,11 @@
     <!-- Mockup Mode help text. -->
     <string name="help_mockup">Modo Maquete: Visualize o design em uma foto estática. Instruções: Use \'Parede\' para definir uma imagem de fundo e posicione o design por cima.</string>
     <!-- Lightbox Mode help text. -->
-    <string name="help_trace">Modo Mesa de Luz: Superfície de traçado de alto brilho. Instruções: Coloque o papel sobre a tela e trace. Pressione rapidamente Volume Aumentar, Diminuir, Aumentar, Diminuir para sair.</string>
+    <string name="help_trace">Modo Traçar: superfície de traçado de alto brilho. Instruções: coloque papel sobre a tela e trace. Pressione rapidamente Volume Aumentar, Diminuir, Aumentar, Diminuir para sair.</string>
     <!-- Target Management help text. -->
     <!-- Scan Resolution help text. -->
     <!-- Create Anchor help text. -->
-    <string name="help_create">Criar Âncora: Fotografe uma marca na parede para fixar a projeção. Instruções: Aponte para uma textura distinta e toque. O aplicativo rastreará esta marca.</string>
+    <string name="help_create">Capturar Rabisco: fotografe as marcas do seu Rabisco para fixar a projeção. Instruções: aponte para as marcas e toque. A partir daí o app as acompanha.</string>
     <!-- Layer Management help text. -->
     <!-- Import Image help text. -->
     <string name="help_add_img">Importar Imagem: Adicione um esboço ou foto de referência. Instruções: Selecione uma imagem da sua galeria. Ela se torna o design.</string>
@@ -584,11 +584,11 @@
         <item>Assim suas imagens ficam prontas e seu celular pode se concentrar na realidade aumentada ao pressionar o botão AR.</item>
     </string-array>
     <string-array name="onboarding_ar">
-        <item>Projeção AR — projeta seu design em uma parede real usando o sensor de profundidade e o rastreamento espacial do celular.</item>
-        <item>Aponte para a parede e mova-se devagar de um lado para o outro. Formas coloridas aparecem enquanto o motor mapeia a superfície. Espere até que a área da parede esteja coberta.</item>
-        <item>Basta tocar na tela. O app fotografa a parede, extrai pontos de rastreamento e trava a âncora instantaneamente.</item>
-        <item>Toque em \"Abrir\" para adicionar seu design — ele é projetado na parede usando a âncora que você acabou de definir.</item>
-        <item>Dica — paredes brancas vazias, concreto liso e superfícies de cor única não podem ser rastreados. Aponte sua âncora para grafites, reboco áspero ou qualquer marca distinta.</item>
+        <item>AR — projeta seu design na superfície real e o mantém lá enquanto você se move.</item>
+        <item>Pinte seu Rabisco: algumas marcas grandes e fortes na superfície, espalhadas e não todas com a mesma forma.</item>
+        <item>Toque em Rabisco e fotografe as marcas. O app fixa seu design nelas.</item>
+        <item>Toque em “Abrir” para adicionar seu design — ele aparece na superfície, preso pelo seu Rabisco.</item>
+        <item>Dica — uma superfície lisa não tem nada para acompanhar sozinha. Para isso serve seu Rabisco: marcas fortes que se destacam na superfície.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Sobreposição ao vivo — seu design flutua sobre a imagem da câmera ao vivo, sem necessidade de escanear nenhuma superfície.</item>
@@ -663,46 +663,46 @@
     <string name="first_run_detect_title">Agora aponte a câmera para o que você desenhou</string>
     <string name="first_run_detect_movement_hint">Mova o dispositivo lentamente em círculo</string>
     <string name="standalone_width_prompt">Meça a largura real entre as bordas esquerda e direita do alvo.</string>
-    <string name="standalone_width_label_metric">Largura do alvo (metros)</string>
-    <string name="standalone_width_label_imperial">Largura do alvo (pés e polegadas)</string>
+    <string name="standalone_width_label_metric">Largura da superfície (metros)</string>
+    <string name="standalone_width_label_imperial">Largura da superfície (pés e polegadas)</string>
     <string name="standalone_width_range_error">Informe uma largura de %1$s a %2$s.</string>
     <string name="standalone_use_measured_width">Usar a largura medida</string>
     <string name="standalone_continue_without_scale">Continuar sem escala física</string>
     <string name="standalone_recapture">Capturar de novo</string>
-    <string name="standalone_capture_wall_target">Capturar alvo da parede</string>
-    <string name="standalone_capture_failed">Não foi possível capturar o alvo da parede. Tente novamente.</string>
+    <string name="standalone_capture_wall_target">Capturar Rabisco</string>
+    <string name="standalone_capture_failed">Não foi possível capturar o Rabisco. Tente de novo.</string>
     <string name="standalone_rectify_failed">Não foi possível retificar esse alvo. Marque quatro cantos nítidos.</string>
-    <string name="standalone_target_too_weak">Esse alvo tem poucos detalhes rastreáveis (%1$d características KPM; são necessárias %2$d). Capture um trecho de parede mais rico.</string>
-    <string name="standalone_new_target">Novo alvo</string>
+    <string name="standalone_target_too_weak">Detalhes insuficientes para acompanhar ali (%1$d pontos; são necessários %2$d). Adicione mais algumas marcas fortes ou aponte para uma área mais detalhada.</string>
+    <string name="standalone_new_target">Novo Rabisco</string>
     <string name="standalone_copy_diagnostics">Copiar diagnóstico</string>
     <string name="standalone_wall_target_lost">Alvo da parede perdido</string>
-    <string name="standalone_recapture_target">Capturar o alvo de novo</string>
+    <string name="standalone_recapture_target">Capturar Rabisco de novo</string>
     <string name="standalone_sweep_hint">Gire devagar para mapear o espaço — %1$d%%</string>
-    <string name="standalone_failure_native_library_unavailable">O SphereSLAM não está disponível nesta versão.</string>
+    <string name="standalone_failure_native_library_unavailable">O rastreamento AR não está disponível nesta versão.</string>
     <string name="standalone_failure_camera_unavailable">A câmera não está disponível para a RA independente.</string>
     <string name="standalone_failure_intrinsics_unavailable">A calibração da câmera não está disponível para a RA independente.</string>
-    <string name="standalone_failure_reference_too_weak">Esse alvo da parede tem poucos detalhes rastreáveis. Capture um trecho mais rico.</string>
-    <string name="standalone_failure_no_page_match">Mantenha o alvo da parede à vista.</string>
+    <string name="standalone_failure_reference_too_weak">Detalhes insuficientes para acompanhar. Adicione mais algumas marcas fortes ou aponte para uma área mais detalhada.</string>
+    <string name="standalone_failure_no_page_match">Mantenha seu Rabisco à vista.</string>
     <string name="standalone_failure_stale_observation">O rastreamento está atrasado. Mova o telefone mais devagar.</string>
     <string name="standalone_failure_reprojection_error">A correspondência com a parede está instável. Reenquadre o alvo.</string>
     <string name="standalone_failure_insufficient_inliers">Não há detalhes suficientes do alvo visíveis.</string>
-    <string name="standalone_failure_pose_jump">Salto de rastreamento rejeitado. Mantenha o telefone parado sobre o alvo da parede.</string>
-    <string name="standalone_failure_persisted_target_corrupt">O alvo da parede salvo está ausente ou ilegível. Capture um novo alvo.</string>
-    <string name="standalone_failure_internal">O SphereSLAM não conseguiu continuar rastreando este alvo.</string>
-    <string name="standalone_tracking_stopped">O rastreamento do SphereSLAM parou. Capture o alvo novamente para reiniciá-lo.</string>
-    <string name="standalone_status_mapping">SphereSLAM mapeando • toque em Rabisco para adicionar seu Rabisco</string>
-    <string name="standalone_status_preparing">Preparando o alvo da parede…</string>
-    <string name="standalone_status_finding">Procurando o alvo da parede…</string>
-    <string name="standalone_quality_too_small">Esse alvo da parede ficou pequeno demais após a retificação. Capture um trecho maior.</string>
-    <string name="standalone_quality_low_contrast">Esse alvo da parede tem pouco contraste visual. Inclua mais textura ou detalhes.</string>
-    <string name="standalone_quality_blurry">Esse alvo da parede está borrado demais para um rastreamento confiável. Mantenha firme e capture novamente.</string>
-    <string name="standalone_quality_not_strong_enough">Esse alvo da parede não é forte o bastante para um rastreamento confiável.</string>
-    <string name="standalone_quality_too_dark">Este alvo está muito subexposto; o rastreamento pode ficar menos confiável.</string>
-    <string name="standalone_quality_too_bright">Este alvo está muito superexposto; o rastreamento pode ficar menos confiável.</string>
-    <string name="standalone_photosphere_no_sensor">Este telefone não tem sensor de rotação, então o SphereSLAM não pode posicionar um alvo aqui.</string>
+    <string name="standalone_failure_pose_jump">O rastreamento saltou — mantenha o celular no seu Rabisco.</string>
+    <string name="standalone_failure_persisted_target_corrupt">Não é possível ler o Rabisco salvo. Capture-o de novo.</string>
+    <string name="standalone_failure_internal">Rastreamento parado. Capture seu Rabisco de novo para reiniciar.</string>
+    <string name="standalone_tracking_stopped">Rastreamento parado. Capture seu Rabisco de novo para reiniciar.</string>
+    <string name="standalone_status_mapping">Reconhecendo a superfície • toque em Rabisco para capturar o seu</string>
+    <string name="standalone_status_preparing">Preparando seu Rabisco…</string>
+    <string name="standalone_status_finding">Procurando seu Rabisco…</string>
+    <string name="standalone_quality_too_small">O Rabisco está pequeno demais na imagem. Aproxime-se ou capture uma área maior.</string>
+    <string name="standalone_quality_low_contrast">Pouco contraste para acompanhar. Marcas mais fortes ou mais luz vão ajudar.</string>
+    <string name="standalone_quality_blurry">Desfocado demais para acompanhar. Segure firme e capture de novo.</string>
+    <string name="standalone_quality_not_strong_enough">Detalhes insuficientes para um rastreamento confiável. Adicione mais algumas marcas fortes.</string>
+    <string name="standalone_quality_too_dark">Muito escuro; o rastreamento pode ser menos confiável.</string>
+    <string name="standalone_quality_too_bright">Muito claro; o rastreamento pode ser menos confiável.</string>
+    <string name="standalone_photosphere_no_sensor">Este celular não tem sensor de rotação, então o AR não pode posicionar seu Rabisco aqui.</string>
     <string name="standalone_photosphere_compass_not_ready">A bússola ainda não está pronta: mantenha o telefone parado por um segundo e capture de novo.</string>
-    <string name="standalone_photosphere_not_mapped">O SphereSLAM ainda não mapeou esta visão: mantenha a câmera parada por um segundo sobre uma parte iluminada e detalhada da superfície e capture de novo.</string>
-    <string name="doodle_rectify_title">Retificar superfície</string>
+    <string name="standalone_photosphere_not_mapped">O app ainda não reconhece esta vista — segure firme por um segundo numa parte iluminada e detalhada da superfície e capture de novo.</string>
+    <string name="doodle_rectify_title">Endireitar a superfície</string>
     <string name="doodle_rectify_text">Agora arraste os cantos para alinhar a moldura ciano com a superfície plana da sua parede.</string>
     <string name="doodle_remove_marks_title">Remover marcas</string>
     <string name="doodle_erase_hint">Toque em uma marca para removê-la ou arraste sobre várias marcas para removê-las.</string>
@@ -719,7 +719,7 @@
     <string name="ar_feedback_backend_resolving">O backend de AR ainda está sendo definido — tente hospedar de novo em instantes</string>
     <string name="ar_feedback_open_project_first">Abra um projeto antes de compartilhar — ainda não há nada para enviar a um convidado</string>
     <string name="ar_feedback_host_need_doodle_arcore">Capture e trave um Rabisco atual antes de hospedar</string>
-    <string name="ar_feedback_host_need_target_standalone">Capture um alvo de parede independente antes de hospedar</string>
+    <string name="ar_feedback_host_need_target_standalone">Capture seu Rabisco antes de hospedar</string>
     <string name="ar_feedback_doodle_not_ready">O Rabisco ainda não está pronto — mantenha-o à vista e tente Hospedar de novo</string>
     <string name="ar_feedback_package_failed">Não foi possível empacotar este projeto para compartilhar — tente salvá-lo primeiro</string>
     <string name="ar_feedback_host_failed">Não foi possível iniciar o compartilhamento: %1$s</string>
@@ -732,7 +732,7 @@
     <string name="ar_feedback_camera_busy">A câmera está ocupada ou indisponível — feche outros apps de câmera e entre no AR novamente</string>
     <string name="ar_feedback_ar_start_failed">Não foi possível iniciar o AR — a câmera pode estar em uso por outro app</string>
     <string name="ar_feedback_camera_setting_apply_failed">Não foi possível aplicar a configuração da câmera à sessão de AR em andamento — saia do AR e entre novamente</string>
-    <string name="ar_feedback_sphere_target_save_failed">O rastreamento da parede funciona nesta sessão, mas não foi possível salvar o alvo do SphereSLAM.</string>
+    <string name="ar_feedback_sphere_target_save_failed">O rastreamento funciona nesta sessão, mas não foi possível salvar seu Rabisco.</string>
     <string name="ar_feedback_camera_not_resumed">A câmera do AR não retomou — tente sair do modo AR e entrar novamente</string>
     <string name="ar_feedback_camera_permission">Câmera indisponível — verifique a permissão da câmera e entre no AR novamente</string>
     <string name="ar_feedback_camera_not_paused">A câmera do AR não pausou corretamente — ela pode continuar em execução em segundo plano</string>
@@ -790,4 +790,61 @@
     <string name="cv_pass_warm_luma">Luz quente</string>
     <string name="cv_pass_stencil3">Estêncil</string>
     <string name="cv_pass_change">Mudança</string>
+    <string name="doodle_tap_grid_hint">Toque no seu Rabisco para capturá-lo.</string>
+    <string name="doodle_blank_wall_hint">Se a superfície estiver vazia, tire uma foto.</string>
+    <string name="doodle_blank_wall_saved_hint">Superfície vazia salva. Agora toque no seu Rabisco.</string>
+    <string name="update_title">Atualização disponível</string>
+    <string name="update_body_play">Há uma versão mais nova na Play Store.</string>
+    <string name="update_body_github">A versão %1$s está no GitHub.</string>
+    <string name="update_go_play">Abrir Play Store</string>
+    <string name="update_go_github">Abrir GitHub</string>
+    <string name="update_later">Mais tarde</string>
+    <string name="crash_title">O GraffitiXR fechou inesperadamente</string>
+    <string name="crash_body">Algo deu errado da última vez. Compartilhar o relatório ajuda a corrigir; ele contém o modelo do seu celular e o registro recente do app, nada dos seus projetos.</string>
+    <string name="crash_share">Compartilhar relatório</string>
+    <string name="crash_copy">Copiar</string>
+    <string name="crash_dismiss">Dispensar</string>
+    <string name="ar_feedback_host_no_lan">A conexão precisa de Wi-Fi. Entre numa rede Wi-Fi ou ative um ponto de acesso e hospede de novo.</string>
+    <string name="hud_progress">Progresso</string>
+    <string name="replace_design_title">Substituir o design?</string>
+    <string name="replace_design_text">Isso troca o design atual e seu posicionamento. Você pode desfazer.</string>
+    <string name="replace_design_confirm">Substituir</string>
+    <string name="dialog_cancel">Cancelar</string>
+    <string name="delete_project_title">Excluir “%1$s”?</string>
+    <string name="delete_project_text">Isso exclui o projeto para sempre: design, miniatura e Rabisco salvo. Um Rabisco não pode ser capturado de novo se a superfície tiver mudado. Não é possível desfazer.</string>
+    <string name="save_project_title">Salvar projeto</string>
+    <string name="doodle_not_locked_title">Rabisco não fixado</string>
+    <string name="doodle_not_locked_text">Seu design está posicionado, mas o app não conseguiu se fixar no seu Rabisco, então a sobreposição vai se deslocar. Capture de novo: de frente para a superfície, um pouco mais perto, com boa luz.</string>
+    <string name="doodle_recapture">Capturar Rabisco de novo</string>
+    <string name="msg_capture_incomplete">Captura incompleta. Capture seu Rabisco de novo.</string>
+    <string name="msg_map_not_ready">A superfície ainda não foi reconhecida. Mantenha a câmera nela e tente de novo.</string>
+    <string name="msg_no_project">Nenhum projeto aberto. Abra ou crie um primeiro: o Rabisco é salvo num projeto.</string>
+    <string name="msg_doodle_low_detail_selected">Detalhes insuficientes no que você manteve. Mantenha mais marcas do seu Rabisco.</string>
+    <string name="msg_doodle_changed">Seu Rabisco mudou durante o salvamento, então não foi salvo. Tente de novo.</string>
+    <string name="msg_doodle_saved">Rabisco salvo e fixado</string>
+    <string name="msg_doodle_save_failed">Não foi possível salvar o Rabisco. Tente de novo.</string>
+    <string name="msg_doodle_too_weak_kept">Detalhes insuficientes para acompanhar. Seu Rabisco anterior foi mantido.</string>
+    <string name="msg_doodle_low_detail">Detalhes insuficientes para acompanhar. Marcas mais fortes ou mais luz vão ajudar.</string>
+    <string name="msg_doodle_session_only">Rabisco salvo só para esta sessão: não foi possível fixá-lo, então ele não volta ao reabrir o projeto. Capture de novo segurando firme.</string>
+    <string name="msg_doodle_anchor_failed">Não foi possível fixar seu Rabisco. Segure o celular firme na superfície e tente de novo.</string>
+    <string name="msg_project_switched">Outro projeto foi aberto antes de o Rabisco ser salvo, então ele não foi salvo. Capture de novo.</string>
+    <string name="msg_image_invalid">Não é possível abrir essa imagem, ou nenhum projeto está aberto.</string>
+    <string name="msg_nothing_to_share">Nada para compartilhar ainda. Salve o projeto primeiro.</string>
+    <string name="msg_share_failed">Não foi possível preparar o projeto para compartilhar. Tente de novo.</string>
+    <string name="msg_export_failed">Falha ao exportar. Tente de novo.</string>
+    <string name="status_preparing_tracking">Preparando AR…</string>
+    <string name="msg_locked">Bloqueado. Toque em Bloquear de novo para movê-lo.</string>
+    <string name="msg_export_timeout">A exportação demorou demais. Tente de novo.</string>
+    <string name="msg_project_save_failed">Não foi possível salvar o projeto. Tente de novo.</string>
+    <string name="coop_none_title">Nenhuma sessão encontrada</string>
+    <string name="coop_none_text">Nenhuma sessão do GraffitiXR por perto. Procure de novo ou hospede a sua.</string>
+    <string name="coop_host">Hospedar</string>
+    <string name="coop_search">Procurar</string>
+    <string name="coop_need_doodle">Capture seu Rabisco primeiro para hospedar.</string>
+    <string name="coop_scan_to_join">Escaneie para entrar</string>
+    <string name="coop_stop_sharing">Parar de compartilhar</string>
+    <string name="coop_leave">Sair</string>
+    <string name="glasses_pairing">Pareando óculos Meta…</string>
+    <string name="glasses_reconnect">Reconectar</string>
+    <string name="glasses_end">Encerrar</string>
 </resources>

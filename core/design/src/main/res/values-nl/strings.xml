@@ -148,7 +148,7 @@
 
 
 
-    <string name="nav_lock_info">Vergrendel het touchscreen om onbedoelde wijzigingen tijdens het spuiten te voorkomen. Tik driemaal ergens om te ontgrendelen.</string>
+    <string name="nav_lock_info">Zet het ontwerp vast zodat knijpen en slepen het niet verplaatsen. Tik nogmaals op Vergrendelen om het los te maken.</string>
 
 
 
@@ -268,9 +268,9 @@
     <string name="open_settings">Instellingen openen</string>
 
 
-    <string name="doodle_creation_title">KRABBELRASTER</string>
+    <string name="doodle_creation_title">KRABBEL</string>
 
-    <string name="doodle_creation_text">Als je je Krabbelraster nog niet hebt gemaakt, maak dan een foto van de muur door op de opnameknop te drukken. Druk anders op Annuleren.</string>
+    <string name="doodle_creation_text">Je Krabbel bestaat uit een paar grote tekens die je op het oppervlak schildert, zodat de app het terugvindt. Schilder ze en fotografeer dan het oppervlak met de opnameknop.</string>
 
     <string name="cancel">Annuleren</string>
 
@@ -417,7 +417,7 @@
     <string name="settings_granted">Toegekend</string>
     <string name="settings_denied">Geweigerd</string>
     <string name="settings_open_app_settings">Open App-instellingen</string>
-    <string name="settings_copyright">GraffitiXR © 2025</string>
+    <string name="settings_copyright">GraffitiXR © 2025–2026</string>
 
 
     <string name="save_project_hint">Projectnaam</string>
@@ -455,7 +455,7 @@
 
 
 
-    <string name="help_mode_host">Modusschakelaar: schakel tussen app-modi. Instructies: Tik om uit te vouwen en selecteer vervolgens AR, Overlay, Mockup of Lightbox.</string>
+    <string name="help_mode_host">Moduswisselaar: wissel tussen app-modi. Instructies: tik om uit te klappen en kies AR, Overlay, Mock-up of Spoor.</string>
 
     <string name="help_ar">AR-modus: Projecteer ontwerp op een muur met behulp van ruimtelijke kaarten. Instructies: Scan de omgeving totdat de muur wordt gedetecteerd en tik vervolgens om het anker te plaatsen.</string>
 
@@ -463,11 +463,11 @@
 
     <string name="help_mockup">Mockup-modus: bekijk een voorbeeld van het ontwerp op een statische foto. Instructies: Gebruik \'Muur\' om een achtergrondafbeelding in te stellen en plaats vervolgens het ontwerp erbovenop.</string>
 
-    <string name="help_trace">Lightbox-modus: traceeroppervlak met hoge helderheid. Instructies: Plaats papier over het scherm en trek over. Druk snel op Volume Omhoog, Omlaag, Omhoog, Omlaag om af te sluiten.</string>
+    <string name="help_trace">Spoor-modus: zeer helder oppervlak om over te trekken. Instructies: leg papier op het scherm en trek over. Druk snel op Volume Omhoog, Omlaag, Omhoog, Omlaag om af te sluiten.</string>
 
 
 
-    <string name="help_create">Anker maken: Maak een foto van een markering op de muur om de projectie te vergrendelen. Instructies: Wijs naar een duidelijke textuur en tik erop. De app houdt deze markering bij.</string>
+    <string name="help_create">Krabbel vastleggen: fotografeer de tekens van je Krabbel om de projectie vast te zetten. Instructies: richt op de tekens en tik. Daarna volgt de app ze.</string>
 
 
     <string name="help_add_img">Afbeelding importeren: Voeg een schets- of referentiefoto toe. Instructies: Selecteer een afbeelding uit uw galerij. Die wordt het ontwerp.</string>
@@ -589,11 +589,11 @@
         <item>Zo staat je beeldmateriaal klaar en kan je telefoon zich volledig richten op augmented reality wanneer je op de AR-knop drukt.</item>
     </string-array>
     <string-array name="onboarding_ar">
-        <item>AR-projectie — projecteert je ontwerp op een echte muur met behulp van de dieptesensor en ruimtelijke tracking van de telefoon.</item>
-        <item>Richt op de muur en beweeg langzaam heen en weer. Er verschijnen gekleurde vormen terwijl de engine het oppervlak in kaart brengt. Wacht tot het hele muuroppervlak is gedekt.</item>
-        <item>Tik gewoon op het scherm. De app fotografeert de muur, haalt trackingkenmerken eruit en vergrendelt het anker direct.</item>
-        <item>Tik op \'Open\' om je ontwerp toe te voegen — het wordt op de muur geprojecteerd met behulp van het anker dat je zojuist hebt ingesteld.</item>
-        <item>Tip — lege witte muren, glad beton en effen oppervlakken kunnen niet worden getrackt. Richt je ankerpunt op graffiti, ruwe pleister of een ander duidelijk kenmerk.</item>
+        <item>AR – projecteert je ontwerp op het echte oppervlak en houdt het daar terwijl je beweegt.</item>
+        <item>Schilder je Krabbel: een paar grote, duidelijke tekens op het oppervlak, verspreid en niet allemaal dezelfde vorm.</item>
+        <item>Tik op Krabbel en fotografeer de tekens. De app zet je ontwerp eraan vast.</item>
+        <item>Tik op ‘Open’ om je ontwerp toe te voegen – het verschijnt op het oppervlak, op zijn plek gehouden door je Krabbel.</item>
+        <item>Tip – een effen oppervlak heeft zelf niets om te volgen. Daar is je Krabbel voor: duidelijke tekens die opvallen op het oppervlak.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Live overlay — je ontwerp zweeft boven het live camerabeeld, zonder dat een oppervlak hoeft te worden gescand.</item>
@@ -668,45 +668,45 @@
     <string name="first_run_detect_title">Richt je camera nu op wat je hebt getekend</string>
     <string name="first_run_detect_movement_hint">Beweeg je apparaat langzaam in een cirkel</string>
     <string name="standalone_width_prompt">Meet de werkelijke breedte tussen de linker- en rechterrand van het doel.</string>
-    <string name="standalone_width_label_metric">Breedte van het doel (meter)</string>
-    <string name="standalone_width_label_imperial">Breedte van het doel (voet en duim)</string>
+    <string name="standalone_width_label_metric">Breedte oppervlak (meter)</string>
+    <string name="standalone_width_label_imperial">Breedte oppervlak (voet en inch)</string>
     <string name="standalone_width_range_error">Voer een breedte in van %1$s tot %2$s.</string>
     <string name="standalone_use_measured_width">Gemeten breedte gebruiken</string>
     <string name="standalone_continue_without_scale">Doorgaan zonder fysieke schaal</string>
     <string name="standalone_recapture">Opnieuw opnemen</string>
-    <string name="standalone_capture_wall_target">Muurdoel opnemen</string>
-    <string name="standalone_capture_failed">Het muurdoel kon niet worden opgenomen – probeer het opnieuw.</string>
+    <string name="standalone_capture_wall_target">Krabbel vastleggen</string>
+    <string name="standalone_capture_failed">Krabbel vastleggen mislukt – probeer het opnieuw.</string>
     <string name="standalone_rectify_failed">Dat doel kon niet worden rechtgezet – markeer vier duidelijke hoeken.</string>
-    <string name="standalone_target_too_weak">Dat doel heeft te weinig volgbare details (%1$d KPM-kenmerken; %2$d nodig). Neem een rijker stuk muur op.</string>
-    <string name="standalone_new_target">Nieuw doel</string>
+    <string name="standalone_target_too_weak">Te weinig detail om daar te volgen (%1$d punten; %2$d nodig). Voeg een paar duidelijke tekens toe of richt op een gedetailleerder stuk.</string>
+    <string name="standalone_new_target">Nieuwe Krabbel</string>
     <string name="standalone_copy_diagnostics">Diagnose kopiëren</string>
     <string name="standalone_wall_target_lost">Muurdoel kwijt</string>
-    <string name="standalone_recapture_target">Doel opnieuw opnemen</string>
+    <string name="standalone_recapture_target">Krabbel opnieuw vastleggen</string>
     <string name="standalone_sweep_hint">Draai langzaam om de ruimte in kaart te brengen — %1$d%%</string>
-    <string name="standalone_failure_native_library_unavailable">SphereSLAM is niet beschikbaar in deze versie.</string>
+    <string name="standalone_failure_native_library_unavailable">AR-tracking is niet beschikbaar in deze versie.</string>
     <string name="standalone_failure_camera_unavailable">De camera is niet beschikbaar voor standalone AR.</string>
     <string name="standalone_failure_intrinsics_unavailable">Camerakalibratie is niet beschikbaar voor standalone AR.</string>
-    <string name="standalone_failure_reference_too_weak">Dat muurdoel heeft te weinig volgbare details. Neem een rijkere plek op.</string>
-    <string name="standalone_failure_no_page_match">Houd het muurdoel in beeld.</string>
+    <string name="standalone_failure_reference_too_weak">Te weinig detail om te volgen. Voeg een paar duidelijke tekens toe of richt op een gedetailleerder stuk.</string>
+    <string name="standalone_failure_no_page_match">Houd je Krabbel in beeld.</string>
     <string name="standalone_failure_stale_observation">De tracking loopt achter. Beweeg de telefoon langzamer.</string>
     <string name="standalone_failure_reprojection_error">De muurmatch is onstabiel. Kader het doel opnieuw in.</string>
     <string name="standalone_failure_insufficient_inliers">Er zijn niet genoeg details van het doel zichtbaar.</string>
-    <string name="standalone_failure_pose_jump">Trackingsprong geweigerd. Houd de telefoon stil op het muurdoel.</string>
-    <string name="standalone_failure_persisted_target_corrupt">Het opgeslagen muurdoel ontbreekt of is onleesbaar. Neem een nieuw doel op.</string>
-    <string name="standalone_failure_internal">SphereSLAM kon dit doel niet blijven volgen.</string>
-    <string name="standalone_tracking_stopped">De SphereSLAM-tracking is gestopt. Neem het doel opnieuw op om opnieuw te starten.</string>
-    <string name="standalone_status_mapping">SphereSLAM brengt in kaart • tik op Krabbel om je Krabbel toe te voegen</string>
-    <string name="standalone_status_preparing">Muurdoel voorbereiden…</string>
-    <string name="standalone_status_finding">Muurdoel zoeken…</string>
-    <string name="standalone_quality_too_small">Dat muurdoel is na het rechtzetten te klein. Neem een groter stuk op.</string>
-    <string name="standalone_quality_low_contrast">Dat muurdoel heeft te weinig visueel contrast. Neem meer textuur of detail mee.</string>
-    <string name="standalone_quality_blurry">Dat muurdoel is te onscherp voor betrouwbare tracking. Houd de telefoon stil en neem opnieuw op.</string>
-    <string name="standalone_quality_not_strong_enough">Dat muurdoel is niet sterk genoeg voor betrouwbare tracking.</string>
-    <string name="standalone_quality_too_dark">Dit doel is sterk onderbelicht; de tracking is mogelijk minder betrouwbaar.</string>
-    <string name="standalone_quality_too_bright">Dit doel is sterk overbelicht; de tracking is mogelijk minder betrouwbaar.</string>
-    <string name="standalone_photosphere_no_sensor">Deze telefoon heeft geen rotatiesensor, dus SphereSLAM kan hier geen doel plaatsen.</string>
+    <string name="standalone_failure_pose_jump">Tracking versprong – houd de telefoon op je Krabbel.</string>
+    <string name="standalone_failure_persisted_target_corrupt">De opgeslagen Krabbel is onleesbaar. Leg hem opnieuw vast.</string>
+    <string name="standalone_failure_internal">Tracking gestopt. Leg je Krabbel opnieuw vast om te herstarten.</string>
+    <string name="standalone_tracking_stopped">Tracking gestopt. Leg je Krabbel opnieuw vast om te herstarten.</string>
+    <string name="standalone_status_mapping">Oppervlak verkennen • tik op Krabbel om de jouwe vast te leggen</string>
+    <string name="standalone_status_preparing">Je Krabbel voorbereiden…</string>
+    <string name="standalone_status_finding">Je Krabbel zoeken…</string>
+    <string name="standalone_quality_too_small">De Krabbel is te klein in beeld. Kom dichterbij of leg een groter gebied vast.</string>
+    <string name="standalone_quality_low_contrast">Te weinig contrast om te volgen. Duidelijkere tekens of meer licht helpen.</string>
+    <string name="standalone_quality_blurry">Te wazig om te volgen. Houd stil en leg opnieuw vast.</string>
+    <string name="standalone_quality_not_strong_enough">Te weinig detail om betrouwbaar te volgen. Voeg een paar duidelijke tekens toe.</string>
+    <string name="standalone_quality_too_dark">Erg donker; tracking kan minder betrouwbaar zijn.</string>
+    <string name="standalone_quality_too_bright">Erg fel; tracking kan minder betrouwbaar zijn.</string>
+    <string name="standalone_photosphere_no_sensor">Deze telefoon heeft geen rotatiesensor, dus AR kan je Krabbel hier niet plaatsen.</string>
     <string name="standalone_photosphere_compass_not_ready">Het kompas is nog niet klaar – houd de telefoon een seconde stil en neem dan opnieuw op.</string>
-    <string name="standalone_photosphere_not_mapped">SphereSLAM heeft deze weergave nog niet in kaart gebracht – houd de camera een seconde stil op een verlicht, gedetailleerd deel van het oppervlak en neem dan opnieuw op.</string>
+    <string name="standalone_photosphere_not_mapped">De app kent dit beeld nog niet – houd een seconde stil op een verlicht, gedetailleerd deel van het oppervlak en leg dan opnieuw vast.</string>
     <string name="doodle_rectify_title">Oppervlak rechtzetten</string>
     <string name="doodle_rectify_text">Sleep nu de hoeken om het cyaan kader uit te lijnen met het vlakke oppervlak van je muur.</string>
     <string name="doodle_remove_marks_title">Markeringen verwijderen</string>
@@ -724,7 +724,7 @@
     <string name="ar_feedback_backend_resolving">De AR-backend wordt nog bepaald – probeer over een moment opnieuw te hosten</string>
     <string name="ar_feedback_open_project_first">Open een project voordat je deelt – er is nog niets om naar een gast te sturen</string>
     <string name="ar_feedback_host_need_doodle_arcore">Leg een actuele Krabbel vast en vergrendel die voordat je host</string>
-    <string name="ar_feedback_host_need_target_standalone">Leg een zelfstandig muurdoel vast voordat je host</string>
+    <string name="ar_feedback_host_need_target_standalone">Leg je Krabbel vast voordat je host</string>
     <string name="ar_feedback_doodle_not_ready">Krabbel is nog niet klaar — houd hem in beeld en probeer Hosten opnieuw</string>
     <string name="ar_feedback_package_failed">Dit project kon niet worden ingepakt om te delen – sla het eerst op</string>
     <string name="ar_feedback_host_failed">Delen starten is mislukt: %1$s</string>
@@ -737,7 +737,7 @@
     <string name="ar_feedback_camera_busy">De camera is bezet of niet beschikbaar – sluit andere camera-apps en ga daarna opnieuw naar AR</string>
     <string name="ar_feedback_ar_start_failed">AR starten is mislukt – je camera wordt mogelijk door een andere app gebruikt</string>
     <string name="ar_feedback_camera_setting_apply_failed">De camera-instelling kon niet worden toegepast op de lopende AR-sessie – verlaat AR en ga opnieuw naar AR</string>
-    <string name="ar_feedback_sphere_target_save_failed">Muurtracking werkt voor deze sessie, maar het SphereSLAM-doel kon niet worden opgeslagen.</string>
+    <string name="ar_feedback_sphere_target_save_failed">Tracking werkt voor deze sessie, maar je Krabbel kon niet worden opgeslagen.</string>
     <string name="ar_feedback_camera_not_resumed">De AR-camera is niet hervat – verlaat de AR-modus en ga er opnieuw in</string>
     <string name="ar_feedback_camera_permission">Camera niet beschikbaar – controleer de cameratoestemming en ga daarna opnieuw naar AR</string>
     <string name="ar_feedback_camera_not_paused">De AR-camera is niet netjes gepauzeerd – ze blijft mogelijk op de achtergrond actief</string>
@@ -795,4 +795,61 @@
     <string name="cv_pass_warm_luma">Warm licht</string>
     <string name="cv_pass_stencil3">Stencil</string>
     <string name="cv_pass_change">Verandering</string>
+    <string name="doodle_tap_grid_hint">Tik op je Krabbel om hem vast te leggen.</string>
+    <string name="doodle_blank_wall_hint">Is het oppervlak leeg, maak dan een foto.</string>
+    <string name="doodle_blank_wall_saved_hint">Leeg oppervlak opgeslagen. Tik nu op je Krabbel.</string>
+    <string name="update_title">Update beschikbaar</string>
+    <string name="update_body_play">Er staat een nieuwere versie in de Play Store.</string>
+    <string name="update_body_github">Versie %1$s staat op GitHub.</string>
+    <string name="update_go_play">Play Store openen</string>
+    <string name="update_go_github">GitHub openen</string>
+    <string name="update_later">Later</string>
+    <string name="crash_title">GraffitiXR is onverwacht gesloten</string>
+    <string name="crash_body">Er ging de vorige keer iets mis. Het rapport delen helpt het op te lossen; het bevat je telefoonmodel en het recente logboek van de app, niets uit je projecten.</string>
+    <string name="crash_share">Rapport delen</string>
+    <string name="crash_copy">Kopiëren</string>
+    <string name="crash_dismiss">Sluiten</string>
+    <string name="ar_feedback_host_no_lan">Verbinden vereist wifi. Maak verbinding met een wifinetwerk of start een hotspot en host dan opnieuw.</string>
+    <string name="hud_progress">Voortgang</string>
+    <string name="replace_design_title">Ontwerp vervangen?</string>
+    <string name="replace_design_text">Dit vervangt het huidige ontwerp en de plaatsing ervan. Je kunt het ongedaan maken.</string>
+    <string name="replace_design_confirm">Vervangen</string>
+    <string name="dialog_cancel">Annuleren</string>
+    <string name="delete_project_title">‘%1$s’ verwijderen?</string>
+    <string name="delete_project_text">Dit verwijdert het project definitief: ontwerp, miniatuur en opgeslagen Krabbel. Een Krabbel kan niet opnieuw worden vastgelegd als het oppervlak inmiddels is veranderd. Dit kan niet ongedaan worden gemaakt.</string>
+    <string name="save_project_title">Project opslaan</string>
+    <string name="doodle_not_locked_title">Krabbel niet vastgezet</string>
+    <string name="doodle_not_locked_text">Je ontwerp is geplaatst, maar de app kon je Krabbel niet vastzetten, dus de overlay gaat verschuiven. Leg hem opnieuw vast: recht voor het oppervlak, iets dichterbij, met goed licht.</string>
+    <string name="doodle_recapture">Krabbel opnieuw vastleggen</string>
+    <string name="msg_capture_incomplete">Opname onvolledig. Leg je Krabbel opnieuw vast.</string>
+    <string name="msg_map_not_ready">Het oppervlak is nog niet herkend. Houd de camera erop en probeer het opnieuw.</string>
+    <string name="msg_no_project">Geen project geopend. Open of maak er eerst een: een Krabbel wordt in een project opgeslagen.</string>
+    <string name="msg_doodle_low_detail_selected">Te weinig detail in wat je hebt bewaard. Bewaar meer tekens van je Krabbel.</string>
+    <string name="msg_doodle_changed">Je Krabbel veranderde tijdens het opslaan en is niet opgeslagen. Probeer het opnieuw.</string>
+    <string name="msg_doodle_saved">Krabbel opgeslagen en vastgezet</string>
+    <string name="msg_doodle_save_failed">Krabbel kon niet worden opgeslagen. Probeer het opnieuw.</string>
+    <string name="msg_doodle_too_weak_kept">Te weinig detail om te volgen. Je vorige Krabbel is behouden.</string>
+    <string name="msg_doodle_low_detail">Te weinig detail om te volgen. Duidelijkere tekens of meer licht helpen.</string>
+    <string name="msg_doodle_session_only">Krabbel alleen voor deze sessie opgeslagen: hij kon niet worden vastgezet en komt niet terug als je het project opnieuw opent. Leg hem opnieuw vast en houd stil.</string>
+    <string name="msg_doodle_anchor_failed">Je Krabbel kon niet worden vastgezet. Houd de telefoon stil op het oppervlak en probeer het opnieuw.</string>
+    <string name="msg_project_switched">Er werd een ander project geopend voordat de Krabbel was opgeslagen, dus hij is niet opgeslagen. Leg hem opnieuw vast.</string>
+    <string name="msg_image_invalid">Die afbeelding kan niet worden geopend, of er is geen project geopend.</string>
+    <string name="msg_nothing_to_share">Nog niets om te delen. Sla eerst het project op.</string>
+    <string name="msg_share_failed">Project kon niet worden voorbereid om te delen. Probeer het opnieuw.</string>
+    <string name="msg_export_failed">Exporteren mislukt. Probeer het opnieuw.</string>
+    <string name="status_preparing_tracking">AR voorbereiden…</string>
+    <string name="msg_locked">Vergrendeld. Tik nogmaals op Vergrendelen om het te verplaatsen.</string>
+    <string name="msg_export_timeout">Exporteren duurde te lang. Probeer het opnieuw.</string>
+    <string name="msg_project_save_failed">Project kon niet worden opgeslagen. Probeer het opnieuw.</string>
+    <string name="coop_none_title">Geen sessies gevonden</string>
+    <string name="coop_none_text">Geen GraffitiXR-sessies in de buurt. Zoek opnieuw of host je eigen sessie.</string>
+    <string name="coop_host">Hosten</string>
+    <string name="coop_search">Zoeken</string>
+    <string name="coop_need_doodle">Leg eerst je Krabbel vast om te hosten.</string>
+    <string name="coop_scan_to_join">Scan om mee te doen</string>
+    <string name="coop_stop_sharing">Stoppen met delen</string>
+    <string name="coop_leave">Verlaten</string>
+    <string name="glasses_pairing">Meta-bril koppelen…</string>
+    <string name="glasses_reconnect">Opnieuw verbinden</string>
+    <string name="glasses_end">Beëindigen</string>
 </resources>

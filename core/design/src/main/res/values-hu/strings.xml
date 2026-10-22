@@ -148,7 +148,7 @@
 
 
 
-    <string name="nav_lock_info">Zárold az érintőképernyőt, hogy megelőzd a véletlen módosításokat permetezés közben. Koppints háromszor bárhová a feloldáshoz.</string>
+    <string name="nav_lock_info">Rögzíti a dizájnt, hogy a csippentés és a húzás ne mozdítsa el. A feloldáshoz koppints újra a Zárolásra.</string>
 
 
 
@@ -268,9 +268,9 @@
     <string name="open_settings">Beállítások megnyitása</string>
 
 
-    <string name="doodle_creation_title">FIRKA-RÁCS</string>
+    <string name="doodle_creation_title">FIRKA</string>
 
-    <string name="doodle_creation_text">Ha még nem hoztad létre a Firka-rácsodat, készíts fényképet a falról a rögzítés gomb megnyomásával. Ellenkező esetben nyomd meg a Mégse gombot.</string>
+    <string name="doodle_creation_text">A Firkád néhány nagy jel, amit a felületre festesz, hogy az app újra megtalálja. Fesd fel őket, majd fotózd le a felületet a rögzítés gombbal.</string>
 
     <string name="cancel">Mégse</string>
 
@@ -417,7 +417,7 @@
     <string name="settings_granted">Engedélyezve</string>
     <string name="settings_denied">Megtagadva</string>
     <string name="settings_open_app_settings">Alkalmazásbeállítások megnyitása</string>
-    <string name="settings_copyright">GraffitiXR © 2025</string>
+    <string name="settings_copyright">GraffitiXR © 2025–2026</string>
 
 
     <string name="save_project_hint">Projekt neve</string>
@@ -455,7 +455,7 @@
 
 
 
-    <string name="help_mode_host">Módváltó: Váltás az alkalmazásmódok között. Utasítások: Koppints a kibontáshoz, majd válaszd ki az AR, Rétegzés, Makett vagy Világítótábla lehetőséget.</string>
+    <string name="help_mode_host">Módváltó: válts az app módjai között. Utasítások: koppints a kinyitáshoz, majd válaszd az AR, Rétegzés, Makett vagy Rajzolás módot.</string>
 
     <string name="help_ar">AR Mód: Tervezés vetítése falra térbeli térképezéssel. Utasítások: Szkenneld a környezetet, amíg a falat nem észleli, majd koppints a horgony elhelyezéséhez.</string>
 
@@ -463,11 +463,11 @@
 
     <string name="help_mockup">Makett Mód: A terv előnézete egy statikus fotón. Utasítások: Használd a \'Fal\' lehetőséget háttérkép beállításához, majd helyezd rá a tervet.</string>
 
-    <string name="help_trace">Világítótábla Mód: Nagy fényerejű rajzoló felület. Utasítások: Helyezz papírt a képernyőre és rajzolj. Nyomd meg gyorsan a Hangerő Fel, Le, Fel, Le gombokat a kilépéshez.</string>
+    <string name="help_trace">Rajzolás mód: nagy fényerejű átrajzoló felület. Utasítások: tegyél papírt a képernyőre és rajzold át. A kilépéshez nyomd meg gyorsan: Hangerő Fel, Le, Fel, Le.</string>
 
 
 
-    <string name="help_create">Horgony Létrehozása: Fényképezz le egy jelölést a falon a vetítés rögzítéséhez. Utasítások: Mutass egy jellegzetes textúrára, és koppints. Az alkalmazás követni fogja ezt a jelölést.</string>
+    <string name="help_create">Firka rögzítése: fotózd le a Firkád jeleit a vetítés rögzítéséhez. Utasítások: célozz a jelekre és koppints. Ettől kezdve az app követi őket.</string>
 
 
     <string name="help_add_img">Kép Importálása: Vázlat vagy referenciafotó hozzáadása. Utasítások: Válassz egy képet a galériádból. Ez lesz a terv.</string>
@@ -589,11 +589,11 @@
         <item>Így a képanyagod készen áll, és a telefonod az AR gomb megnyomásakor teljesen a kiterjesztett valóságra tud koncentrálni.</item>
     </string-array>
     <string-array name="onboarding_ar">
-        <item>AR-vetítés — a telefon mélységérzékelőjével és térbeli követésével vetíti a terved egy valódi falra.</item>
-        <item>Irányítsd a telefont a falra, és mozogj lassan oldalirányba. Színes formák jelennek meg, ahogy a motor feltérképezi a felületet. Várj, amíg a fal teljes területe le nem fedésre kerül.</item>
-        <item>Csak koppints a képernyőre. Az alkalmazás lefényképezi a falat, kinyeri a követési jellemzőket, és azonnal rögzíti a horgonyt.</item>
-        <item>Koppints a „Megnyitás” gombra a terved hozzáadásához — ez a most beállított horgony segítségével vetül a falra.</item>
-        <item>Tipp — az üres fehér falak, a sima beton és az egyszínű felületek nem követhetők. Célozd a horgonypontot graffitire, durva vakolatra vagy bármilyen jellegzetes jelre.</item>
+        <item>AR – a dizájnodat a valódi felületre vetíti, és ott tartja, miközben mozogsz.</item>
+        <item>Fesd fel a Firkádat: néhány nagy, erős jel a felületen, egymástól távol, nem mind egyforma alakú.</item>
+        <item>Koppints a Firkára, és fotózd le a jeleket. Az app hozzájuk rögzíti a dizájnodat.</item>
+        <item>Koppints a „Megnyitás” gombra a dizájn hozzáadásához – megjelenik a felületen, a Firkád tartja a helyén.</item>
+        <item>Tipp – egy sima felületen magában nincs mit követni. Erre való a Firkád: erős jelek, amelyek kiemelkednek a felületből.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Élő rétegzés — a terved a live kamerakép fölött lebeg, felületszkennelés nélkül.</item>
@@ -668,45 +668,45 @@
     <string name="first_run_detect_title">Most irányítsd a kamerát arra, amit rajzoltál</string>
     <string name="first_run_detect_movement_hint">Lassan mozgasd az eszközt körbe</string>
     <string name="standalone_width_prompt">Mérd meg a célpont bal és jobb széle közötti valódi szélességet.</string>
-    <string name="standalone_width_label_metric">Célpont szélessége (méter)</string>
-    <string name="standalone_width_label_imperial">Célpont szélessége (láb és hüvelyk)</string>
+    <string name="standalone_width_label_metric">Felület szélessége (méter)</string>
+    <string name="standalone_width_label_imperial">Felület szélessége (láb és hüvelyk)</string>
     <string name="standalone_width_range_error">Adj meg %1$s és %2$s közötti szélességet.</string>
     <string name="standalone_use_measured_width">Mért szélesség használata</string>
     <string name="standalone_continue_without_scale">Folytatás fizikai méretarány nélkül</string>
     <string name="standalone_recapture">Újrafelvétel</string>
-    <string name="standalone_capture_wall_target">Falcélpont rögzítése</string>
-    <string name="standalone_capture_failed">A falcélpontot nem sikerült rögzíteni – próbáld újra.</string>
+    <string name="standalone_capture_wall_target">Firka rögzítése</string>
+    <string name="standalone_capture_failed">Nem sikerült rögzíteni a Firkát – próbáld újra.</string>
     <string name="standalone_rectify_failed">A célpontot nem sikerült kiegyenesíteni – jelölj meg négy jól látható sarkot.</string>
-    <string name="standalone_target_too_weak">Ebben a célpontban túl kevés a követhető részlet (%1$d KPM-jellemző; %2$d szükséges). Rögzíts egy gazdagabb falrészletet.</string>
-    <string name="standalone_new_target">Új célpont</string>
+    <string name="standalone_target_too_weak">Ott nincs elég részlet a követéshez (%1$d pont; %2$d kell). Adj hozzá néhány erős jelet, vagy célozz egy részletesebb területre.</string>
+    <string name="standalone_new_target">Új Firka</string>
     <string name="standalone_copy_diagnostics">Diagnosztika másolása</string>
     <string name="standalone_wall_target_lost">Falcélpont elveszett</string>
-    <string name="standalone_recapture_target">Célpont újrafelvétele</string>
+    <string name="standalone_recapture_target">Firka újrarögzítése</string>
     <string name="standalone_sweep_hint">Fordulj lassan a tér feltérképezéséhez — %1$d%%</string>
-    <string name="standalone_failure_native_library_unavailable">A SphereSLAM nem érhető el ebben a buildben.</string>
+    <string name="standalone_failure_native_library_unavailable">Az AR-követés nem érhető el ebben a verzióban.</string>
     <string name="standalone_failure_camera_unavailable">A kamera nem érhető el az önálló AR-hez.</string>
     <string name="standalone_failure_intrinsics_unavailable">A kamerakalibráció nem érhető el az önálló AR-hez.</string>
-    <string name="standalone_failure_reference_too_weak">Ebben a falcélpontban túl kevés a követhető részlet. Rögzíts egy gazdagabb részt.</string>
-    <string name="standalone_failure_no_page_match">Tartsd látótérben a falcélpontot.</string>
+    <string name="standalone_failure_reference_too_weak">Nincs elég részlet a követéshez. Adj hozzá néhány erős jelet, vagy célozz egy részletesebb területre.</string>
+    <string name="standalone_failure_no_page_match">Tartsd a Firkádat a képben.</string>
     <string name="standalone_failure_stale_observation">A követés késik. Mozgasd lassabban a telefont.</string>
     <string name="standalone_failure_reprojection_error">A falillesztés instabil. Igazítsd újra a célpontot.</string>
     <string name="standalone_failure_insufficient_inliers">Nem látszik elég részlet a célpontból.</string>
-    <string name="standalone_failure_pose_jump">A követési ugrást elutasítottuk. Tartsd a telefont nyugodtan a falcélponton.</string>
-    <string name="standalone_failure_persisted_target_corrupt">A mentett falcélpont hiányzik vagy nem olvasható. Rögzíts új célpontot.</string>
-    <string name="standalone_failure_internal">A SphereSLAM nem tudta folytatni a célpont követését.</string>
-    <string name="standalone_tracking_stopped">A SphereSLAM-követés leállt. Az újraindításhoz rögzítsd újra a célpontot.</string>
-    <string name="standalone_status_mapping">SphereSLAM térképez • koppints a Firkára a Firkád hozzáadásához</string>
-    <string name="standalone_status_preparing">Falcélpont előkészítése…</string>
-    <string name="standalone_status_finding">Falcélpont keresése…</string>
-    <string name="standalone_quality_too_small">Ez a falcélpont a kiegyenesítés után túl kicsi. Rögzíts nagyobb részt.</string>
-    <string name="standalone_quality_low_contrast">Ennek a falcélpontnak túl kicsi a vizuális kontrasztja. Vonj be több textúrát vagy részletet.</string>
-    <string name="standalone_quality_blurry">Ez a falcélpont túl homályos a megbízható követéshez. Tartsd nyugodtan, és rögzítsd újra.</string>
-    <string name="standalone_quality_not_strong_enough">Ez a falcélpont nem elég erős a megbízható követéshez.</string>
-    <string name="standalone_quality_too_dark">Ez a célpont erősen alulexponált; a követés kevésbé lehet megbízható.</string>
-    <string name="standalone_quality_too_bright">Ez a célpont erősen túlexponált; a követés kevésbé lehet megbízható.</string>
-    <string name="standalone_photosphere_no_sensor">Ennek a telefonnak nincs forgásérzékelője, ezért a SphereSLAM itt nem tud célpontot elhelyezni.</string>
+    <string name="standalone_failure_pose_jump">A követés megugrott – tartsd a telefont a Firkádon.</string>
+    <string name="standalone_failure_persisted_target_corrupt">A mentett Firka nem olvasható. Rögzítsd újra.</string>
+    <string name="standalone_failure_internal">A követés leállt. Rögzítsd újra a Firkádat az újraindításhoz.</string>
+    <string name="standalone_tracking_stopped">A követés leállt. Rögzítsd újra a Firkádat az újraindításhoz.</string>
+    <string name="standalone_status_mapping">A felület felismerése • koppints a Firkára a sajátod rögzítéséhez</string>
+    <string name="standalone_status_preparing">A Firkád előkészítése…</string>
+    <string name="standalone_status_finding">A Firkád keresése…</string>
+    <string name="standalone_quality_too_small">A Firka túl kicsi a képen. Menj közelebb, vagy rögzíts nagyobb területet.</string>
+    <string name="standalone_quality_low_contrast">Túl kevés a kontraszt a követéshez. Erősebb jelek vagy több fény segít.</string>
+    <string name="standalone_quality_blurry">Túl elmosódott a követéshez. Tartsd stabilan, és rögzítsd újra.</string>
+    <string name="standalone_quality_not_strong_enough">Nincs elég részlet a megbízható követéshez. Adj hozzá néhány erős jelet.</string>
+    <string name="standalone_quality_too_dark">Nagyon sötét; a követés kevésbé lehet megbízható.</string>
+    <string name="standalone_quality_too_bright">Nagyon világos; a követés kevésbé lehet megbízható.</string>
+    <string name="standalone_photosphere_no_sensor">Ennek a telefonnak nincs forgásérzékelője, így az AR nem tudja ide helyezni a Firkádat.</string>
     <string name="standalone_photosphere_compass_not_ready">Az iránytű még nem áll készen – tartsd egy másodpercig nyugodtan a telefont, majd ismételd meg a felvételt.</string>
-    <string name="standalone_photosphere_not_mapped">A SphereSLAM még nem térképezte fel ezt a nézetet – tartsd a kamerát egy másodpercig nyugodtan a felület egy megvilágított, részletes részén, majd ismételd meg a felvételt.</string>
+    <string name="standalone_photosphere_not_mapped">Az app még nem ismeri ezt a nézetet – tartsd egy másodpercig stabilan a felület egy világos, részletes része felé, majd rögzíts újra.</string>
     <string name="doodle_rectify_title">Felület kiegyenesítése</string>
     <string name="doodle_rectify_text">Most húzd a sarkokat úgy, hogy a ciánkék keret illeszkedjen a fal sík felületéhez.</string>
     <string name="doodle_remove_marks_title">Jelölések eltávolítása</string>
@@ -724,7 +724,7 @@
     <string name="ar_feedback_backend_resolving">Az AR-háttér még kiválasztás alatt áll – próbáld újra a házigazdaként indítást egy pillanat múlva</string>
     <string name="ar_feedback_open_project_first">Megosztás előtt nyiss meg egy projektet – még nincs mit küldeni a vendégnek</string>
     <string name="ar_feedback_host_need_doodle_arcore">A „Hoszt” indítása előtt rögzíts és zárolj egy aktuális Firkát</string>
-    <string name="ar_feedback_host_need_target_standalone">Házigazdaként indítás előtt rögzíts egy önálló falcélpontot</string>
+    <string name="ar_feedback_host_need_target_standalone">Rögzítsd a Firkádat a megosztás előtt</string>
     <string name="ar_feedback_doodle_not_ready">A Firka még nem áll készen — tartsd a képben, és próbáld újra a „Hoszt” indítását</string>
     <string name="ar_feedback_package_failed">Nem sikerült becsomagolni a projektet a megosztáshoz – próbáld előbb elmenteni</string>
     <string name="ar_feedback_host_failed">Nem sikerült elindítani a megosztást: %1$s</string>
@@ -737,7 +737,7 @@
     <string name="ar_feedback_camera_busy">A kamera foglalt vagy nem érhető el – zárd be a többi kamera-alkalmazást, majd lépj be újra az AR-ba</string>
     <string name="ar_feedback_ar_start_failed">Nem sikerült elindítani az AR-t – lehet, hogy a kamerát egy másik alkalmazás használja</string>
     <string name="ar_feedback_camera_setting_apply_failed">Nem sikerült alkalmazni a kamerabeállítást a futó AR-munkamenetre – lépj ki az AR-ból, majd lépj be újra</string>
-    <string name="ar_feedback_sphere_target_save_failed">A falkövetés ebben a munkamenetben működik, de a SphereSLAM-célpontot nem sikerült elmenteni.</string>
+    <string name="ar_feedback_sphere_target_save_failed">A követés működik ebben a munkamenetben, de a Firkádat nem sikerült menteni.</string>
     <string name="ar_feedback_camera_not_resumed">Az AR-kamera nem indult újra – próbálj kilépni az AR módból, majd belépni újra</string>
     <string name="ar_feedback_camera_permission">A kamera nem érhető el – ellenőrizd a kamera-engedélyt, majd lépj be újra az AR-ba</string>
     <string name="ar_feedback_camera_not_paused">Az AR-kamera nem állt le tisztán – előfordulhat, hogy a háttérben tovább fut</string>
@@ -795,4 +795,61 @@
     <string name="cv_pass_warm_luma">Meleg fény</string>
     <string name="cv_pass_stencil3">Sablon</string>
     <string name="cv_pass_change">Változás</string>
+    <string name="doodle_tap_grid_hint">Koppints a Firkádra a rögzítéshez.</string>
+    <string name="doodle_blank_wall_hint">Ha a felület üres, készíts egy fotót.</string>
+    <string name="doodle_blank_wall_saved_hint">Üres felület mentve. Most koppints a Firkádra.</string>
+    <string name="update_title">Frissítés érhető el</string>
+    <string name="update_body_play">Újabb verzió érhető el a Play Áruházban.</string>
+    <string name="update_body_github">A(z) %1$s verzió elérhető a GitHubon.</string>
+    <string name="update_go_play">Play Áruház megnyitása</string>
+    <string name="update_go_github">GitHub megnyitása</string>
+    <string name="update_later">Később</string>
+    <string name="crash_title">A GraffitiXR váratlanul bezárult</string>
+    <string name="crash_body">Legutóbb valami hiba történt. A jelentés megosztása segít a javításban; a telefonod típusát és az app friss naplóját tartalmazza, semmit a projektjeidből.</string>
+    <string name="crash_share">Jelentés megosztása</string>
+    <string name="crash_copy">Másolás</string>
+    <string name="crash_dismiss">Elvetés</string>
+    <string name="ar_feedback_host_no_lan">A kapcsolathoz Wi-Fi kell. Csatlakozz egy Wi-Fi-hálózathoz vagy indíts hotspotot, majd oszd meg újra.</string>
+    <string name="hud_progress">Haladás</string>
+    <string name="replace_design_title">Lecseréled a dizájnt?</string>
+    <string name="replace_design_text">Ez lecseréli a jelenlegi dizájnt és az elhelyezését. Visszavonható.</string>
+    <string name="replace_design_confirm">Csere</string>
+    <string name="dialog_cancel">Mégse</string>
+    <string name="delete_project_title">Törlöd: „%1$s”?</string>
+    <string name="delete_project_text">Ez véglegesen törli a projektet: a dizájnt, a bélyegképet és a mentett Firkát. Egy Firka nem rögzíthető újra, ha a felület azóta megváltozott. Nem vonható vissza.</string>
+    <string name="save_project_title">Projekt mentése</string>
+    <string name="doodle_not_locked_title">A Firka nincs rögzítve</string>
+    <string name="doodle_not_locked_text">A dizájn a helyén van, de az app nem tudott a Firkádhoz rögzülni, ezért a réteg el fog csúszni. Rögzítsd újra: a felülettel szemben, kicsit közelebbről, jó fényben.</string>
+    <string name="doodle_recapture">Firka újrarögzítése</string>
+    <string name="msg_capture_incomplete">A rögzítés nem teljes. Rögzítsd újra a Firkádat.</string>
+    <string name="msg_map_not_ready">A felület még nincs felismerve. Tartsd rajta a kamerát, és próbáld újra.</string>
+    <string name="msg_no_project">Nincs megnyitott projekt. Előbb nyiss meg vagy hozz létre egyet: a Firka egy projektbe mentődik.</string>
+    <string name="msg_doodle_low_detail_selected">Nincs elég részlet abban, amit megtartottál. Tarts meg többet a Firkád jeleiből.</string>
+    <string name="msg_doodle_changed">A Firkád mentés közben megváltozott, ezért nem lett mentve. Próbáld újra.</string>
+    <string name="msg_doodle_saved">Firka mentve és rögzítve</string>
+    <string name="msg_doodle_save_failed">Nem sikerült menteni a Firkát. Próbáld újra.</string>
+    <string name="msg_doodle_too_weak_kept">Nincs elég részlet a követéshez. Az előző Firkád megmaradt.</string>
+    <string name="msg_doodle_low_detail">Nincs elég részlet a követéshez. Erősebb jelek vagy több fény segít.</string>
+    <string name="msg_doodle_session_only">A Firka csak erre a munkamenetre mentve: nem sikerült rögzíteni, ezért a projekt újranyitásakor nem lesz meg. Rögzítsd újra, stabilan tartva a telefont.</string>
+    <string name="msg_doodle_anchor_failed">Nem sikerült rögzíteni a Firkádat. Tartsd stabilan a telefont a felület felé, és próbáld újra.</string>
+    <string name="msg_project_switched">Egy másik projekt nyílt meg a Firka mentése előtt, ezért nem lett mentve. Rögzítsd újra.</string>
+    <string name="msg_image_invalid">Ez a kép nem nyitható meg, vagy nincs megnyitott projekt.</string>
+    <string name="msg_nothing_to_share">Még nincs mit megosztani. Előbb mentsd a projektet.</string>
+    <string name="msg_share_failed">Nem sikerült előkészíteni a projektet a megosztáshoz. Próbáld újra.</string>
+    <string name="msg_export_failed">Az exportálás sikertelen. Próbáld újra.</string>
+    <string name="status_preparing_tracking">Az AR előkészítése…</string>
+    <string name="msg_locked">Zárolva. A mozgatáshoz koppints újra a Zárolásra.</string>
+    <string name="msg_export_timeout">Az exportálás túllépte az időkorlátot. Próbáld újra.</string>
+    <string name="msg_project_save_failed">Nem sikerült menteni a projektet. Próbáld újra.</string>
+    <string name="coop_none_title">Nincs munkamenet</string>
+    <string name="coop_none_text">Nincs GraffitiXR-munkamenet a közelben. Keress újra, vagy indíts sajátot.</string>
+    <string name="coop_host">Megosztás</string>
+    <string name="coop_search">Keresés</string>
+    <string name="coop_need_doodle">A megosztáshoz előbb rögzítsd a Firkádat.</string>
+    <string name="coop_scan_to_join">Csatlakozás beolvasással</string>
+    <string name="coop_stop_sharing">Megosztás leállítása</string>
+    <string name="coop_leave">Kilépés</string>
+    <string name="glasses_pairing">Meta szemüveg párosítása…</string>
+    <string name="glasses_reconnect">Újracsatlakozás</string>
+    <string name="glasses_end">Befejezés</string>
 </resources>

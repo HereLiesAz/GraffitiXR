@@ -146,7 +146,7 @@
 
     <!-- Label for the touch input lock feature. -->
     <!-- Description of the touch lock, explaining how to unlock it. -->
-    <string name="nav_lock_info">Lås berøringsskjermen for å forhindre utilsiktede endringer mens du sprayer. Trippeltrykk hvor som helst for å låse opp.</string>
+    <string name="nav_lock_info">Fest designet så kniping og dra ikke flytter det. Trykk på Lås igjen for å løsne det.</string>
 
 
     <!-- Tooltip info for the brush tool. -->
@@ -266,9 +266,9 @@
     <string name="open_settings">Åpne Innstillinger</string>
 
     <!-- Title for target creation overlay. -->
-    <string name="doodle_creation_title">KRUSEDULL-RUTENETT</string>
+    <string name="doodle_creation_title">KRUSEDULL</string>
     <!-- Instructions for creating a target by tapping on reference marks. -->
-    <string name="doodle_creation_text">Hvis du ikke har laget Krusedull-rutenettet ditt ennå, tar du et bilde av veggen ved å trykke på utløserknappen. Ellers trykker du på Avbryt.</string>
+    <string name="doodle_creation_text">Krusedullen din er noen store merker du maler på flaten, så appen kan finne den igjen. Mal dem, og ta så bilde av flaten med opptaksknappen.</string>
     <!-- Generic cancel action. -->
     <string name="cancel">Avbryt</string>
 
@@ -412,7 +412,7 @@
     <string name="settings_granted">Gitt</string>
     <string name="settings_denied">Nektet</string>
     <string name="settings_open_app_settings">Åpne appinnstillinger</string>
-    <string name="settings_copyright">GraffitiXR © 2025</string>
+    <string name="settings_copyright">GraffitiXR © 2025–2026</string>
 
     <!-- Editor UI -->
     <string name="save_project_hint">Prosjektnavn</string>
@@ -450,7 +450,7 @@
 
     <!-- Help strings for main navigation rail. -->
     <!-- Mode Switcher help text. -->
-    <string name="help_mode_host">Modusveksler: Bytt mellom appmoduser. Instruksjoner: Trykk for å utvide, velg deretter AR, Overlegg, Mockup eller Lightbox.</string>
+    <string name="help_mode_host">Modusvelger: Bytt mellom appmoduser. Instruksjoner: Trykk for å utvide, og velg AR, Overlegg, Mockup eller Spor.</string>
     <!-- AR Mode help text. -->
     <string name="help_ar">AR-modus: Projiser design på en vegg ved hjelp av romlig kartlegging. Instruksjoner: Skann miljøet til veggen oppdages, og trykk deretter for å plassere ankeret.</string>
     <!-- Overlay Mode help text. -->
@@ -458,11 +458,11 @@
     <!-- Mockup Mode help text. -->
     <string name="help_mockup">Mockup-modus: Forhåndsvis designet på et statisk bilde. Instruksjoner: Bruk \'Vegg\' for å sette et bakgrunnsbilde, og plasser deretter designet oppå.</string>
     <!-- Lightbox Mode help text. -->
-    <string name="help_trace">Lysboksmodus: Sporingsoverflate med høy lysstyrke. Instruksjoner: Legg papir over skjermen og spor. Trykk raskt Volum Opp, Ned, Opp, Ned for å avslutte.</string>
+    <string name="help_trace">Spor-modus: Svært lys flate for å spore. Instruksjoner: Legg papir over skjermen og spor. Trykk raskt Volum Opp, Ned, Opp, Ned for å avslutte.</string>
     <!-- Target Management help text. -->
     <!-- Scan Resolution help text. -->
     <!-- Create Anchor help text. -->
-    <string name="help_create">Lag anker: Fotografer et merke på veggen for å låse projeksjonen. Instruksjoner: Pek på en distinkt tekstur og trykk. Appen vil spore dette merket.</string>
+    <string name="help_create">Ta bilde av Krusedull: Ta bilde av krusedullmerkene for å feste projeksjonen. Instruksjoner: Sikt mot merkene og trykk. Appen følger dem fra da av.</string>
     <!-- Layer Management help text. -->
     <!-- Import Image help text. -->
     <string name="help_add_img">Importer bilde: Legg til en skisse eller referansebilde. Instruksjoner: Velg et bilde fra galleriet ditt. Det blir designet.</string>
@@ -584,11 +584,11 @@
         <item>På den måten er bildene dine klare, og telefonen din kan fokusere på utvidet virkelighet når du trykker på AR-knappen.</item>
     </string-array>
     <string-array name="onboarding_ar">
-        <item>AR-projeksjon — projiserer designet ditt på en ekte vegg ved hjelp av telefonens dybdesensor og romlige sporing.</item>
-        <item>Pek på veggen og beveg deg sakte fra side til side. Fargede former dukker opp etter hvert som motoren kartlegger overflaten. Vent til hele veggarealet er dekket.</item>
-        <item>Bare trykk på skjermen. Appen fotograferer veggen, trekker ut sporingsfunksjoner og låser ankeret umiddelbart.</item>
-        <item>Trykk på «Åpne» for å legge til designet ditt — det projiseres på veggen ved hjelp av ankeret du nettopp satte.</item>
-        <item>Tips — tomme hvite vegger, glatt betong og ensfargede overflater kan ikke spores. Rett ankerpunktet mot graffiti, ru puss eller andre tydelige merker.</item>
+        <item>AR – projiserer designet ditt på den ekte flaten og holder det der mens du beveger deg.</item>
+        <item>Mal Krusedullen din: noen store, tydelige merker på flaten, spredt utover og ikke alle med samme form.</item>
+        <item>Trykk på Krusedull og ta bilde av merkene. Appen fester designet ditt til dem.</item>
+        <item>Trykk på «Åpne» for å legge til designet – det vises på flaten, holdt på plass av Krusedullen din.</item>
+        <item>Tips – en blank flate har ingenting å følge i seg selv. Det er det Krusedullen er til: tydelige merker som skiller seg ut fra flaten.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Live overlegg — designet ditt svever over live kamerabildet, uten behov for overflateskanning.</item>
@@ -663,45 +663,45 @@
     <string name="first_run_detect_title">Rett nå kameraet mot det du tegnet</string>
     <string name="first_run_detect_movement_hint">Beveg enheten sakte i en sirkel</string>
     <string name="standalone_width_prompt">Mål den faktiske bredden mellom venstre og høyre kant av målet.</string>
-    <string name="standalone_width_label_metric">Målets bredde (meter)</string>
-    <string name="standalone_width_label_imperial">Målets bredde (fot og tommer)</string>
+    <string name="standalone_width_label_metric">Bredde på flaten (meter)</string>
+    <string name="standalone_width_label_imperial">Bredde på flaten (fot og tommer)</string>
     <string name="standalone_width_range_error">Skriv inn en bredde fra %1$s til %2$s.</string>
     <string name="standalone_use_measured_width">Bruk målt bredde</string>
     <string name="standalone_continue_without_scale">Fortsett uten fysisk målestokk</string>
     <string name="standalone_recapture">Ta på nytt</string>
-    <string name="standalone_capture_wall_target">Fotografer veggmål</string>
-    <string name="standalone_capture_failed">Kunne ikke fotografere veggmålet – prøv igjen.</string>
+    <string name="standalone_capture_wall_target">Ta bilde av Krusedull</string>
+    <string name="standalone_capture_failed">Kunne ikke ta bilde av Krusedullen – prøv igjen.</string>
     <string name="standalone_rectify_failed">Kunne ikke rette opp målet – merk fire tydelige hjørner.</string>
-    <string name="standalone_target_too_weak">Dette målet har for få sporbare detaljer (%1$d KPM-egenskaper; %2$d trengs). Ta et mer detaljrikt veggutsnitt.</string>
-    <string name="standalone_new_target">Nytt mål</string>
+    <string name="standalone_target_too_weak">For lite detaljer å følge der (%1$d punkter; trenger %2$d). Legg til noen flere tydelige merker, eller sikt mot et mer detaljert parti.</string>
+    <string name="standalone_new_target">Ny Krusedull</string>
     <string name="standalone_copy_diagnostics">Kopier diagnostikk</string>
     <string name="standalone_wall_target_lost">Veggmål mistet</string>
-    <string name="standalone_recapture_target">Ta målet på nytt</string>
+    <string name="standalone_recapture_target">Ta nytt bilde av Krusedull</string>
     <string name="standalone_sweep_hint">Snu deg sakte for å kartlegge rommet — %1$d%%</string>
-    <string name="standalone_failure_native_library_unavailable">SphereSLAM er ikke tilgjengelig i denne versjonen.</string>
+    <string name="standalone_failure_native_library_unavailable">AR-sporing er ikke tilgjengelig i denne versjonen.</string>
     <string name="standalone_failure_camera_unavailable">Kameraet er ikke tilgjengelig for frittstående AR.</string>
     <string name="standalone_failure_intrinsics_unavailable">Kamerakalibrering er ikke tilgjengelig for frittstående AR.</string>
-    <string name="standalone_failure_reference_too_weak">Det veggmålet har for få sporbare detaljer. Ta et mer detaljrikt utsnitt.</string>
-    <string name="standalone_failure_no_page_match">Hold veggmålet i bildet.</string>
+    <string name="standalone_failure_reference_too_weak">For lite detaljer å følge. Legg til noen flere tydelige merker, eller sikt mot et mer detaljert parti.</string>
+    <string name="standalone_failure_no_page_match">Hold Krusedullen i bildet.</string>
     <string name="standalone_failure_stale_observation">Sporingen henger etter. Beveg telefonen saktere.</string>
     <string name="standalone_failure_reprojection_error">Veggmatchen er ustabil. Ramm inn målet på nytt.</string>
     <string name="standalone_failure_insufficient_inliers">Det er ikke nok målinformasjon synlig.</string>
-    <string name="standalone_failure_pose_jump">Sporingshopp avvist. Hold telefonen stødig mot veggmålet.</string>
-    <string name="standalone_failure_persisted_target_corrupt">Det lagrede veggmålet mangler eller kan ikke leses. Ta et nytt mål.</string>
-    <string name="standalone_failure_internal">SphereSLAM kunne ikke fortsette å spore dette målet.</string>
-    <string name="standalone_tracking_stopped">SphereSLAM-sporingen stoppet. Ta målet på nytt for å starte den igjen.</string>
-    <string name="standalone_status_mapping">SphereSLAM kartlegger • trykk på Krusedull for å legge til Krusedullen din</string>
-    <string name="standalone_status_preparing">Forbereder veggmål…</string>
-    <string name="standalone_status_finding">Finner veggmål…</string>
-    <string name="standalone_quality_too_small">Det veggmålet er for lite etter oppretting. Ta et større utsnitt.</string>
-    <string name="standalone_quality_low_contrast">Det veggmålet har for lite visuell kontrast. Ta med mer tekstur eller detaljer.</string>
-    <string name="standalone_quality_blurry">Det veggmålet er for uskarpt til pålitelig sporing. Hold stødig og ta det på nytt.</string>
-    <string name="standalone_quality_not_strong_enough">Det veggmålet er ikke sterkt nok til pålitelig sporing.</string>
-    <string name="standalone_quality_too_dark">Dette målet er kraftig undereksponert; sporingen kan bli mindre pålitelig.</string>
-    <string name="standalone_quality_too_bright">Dette målet er kraftig overeksponert; sporingen kan bli mindre pålitelig.</string>
-    <string name="standalone_photosphere_no_sensor">Denne telefonen har ingen rotasjonssensor, så SphereSLAM kan ikke plassere et mål her.</string>
+    <string name="standalone_failure_pose_jump">Sporingen hoppet – hold telefonen mot Krusedullen.</string>
+    <string name="standalone_failure_persisted_target_corrupt">Den lagrede Krusedullen kan ikke leses. Ta nytt bilde av den.</string>
+    <string name="standalone_failure_internal">Sporingen stoppet. Ta nytt bilde av Krusedullen for å starte på nytt.</string>
+    <string name="standalone_tracking_stopped">Sporingen stoppet. Ta nytt bilde av Krusedullen for å starte på nytt.</string>
+    <string name="standalone_status_mapping">Lærer flaten • trykk på Krusedull for å ta bilde av din</string>
+    <string name="standalone_status_preparing">Klargjør Krusedullen…</string>
+    <string name="standalone_status_finding">Leter etter Krusedullen…</string>
+    <string name="standalone_quality_too_small">Krusedullen er for liten i bildet. Gå nærmere eller ta bilde av et større område.</string>
+    <string name="standalone_quality_low_contrast">For lite kontrast til å følge. Tydeligere merker eller mer lys hjelper.</string>
+    <string name="standalone_quality_blurry">For uskarpt til å følge. Hold stødig og ta bilde igjen.</string>
+    <string name="standalone_quality_not_strong_enough">For lite detaljer til pålitelig sporing. Legg til noen flere tydelige merker.</string>
+    <string name="standalone_quality_too_dark">Svært mørkt; sporingen kan bli mindre pålitelig.</string>
+    <string name="standalone_quality_too_bright">Svært lyst; sporingen kan bli mindre pålitelig.</string>
+    <string name="standalone_photosphere_no_sensor">Denne telefonen har ingen rotasjonssensor, så AR kan ikke plassere Krusedullen her.</string>
     <string name="standalone_photosphere_compass_not_ready">Kompasset er ikke klart ennå – hold telefonen i ro et sekund, og ta deretter på nytt.</string>
-    <string name="standalone_photosphere_not_mapped">SphereSLAM har ikke kartlagt dette utsnittet ennå – hold kameraet i ro et sekund mot en opplyst, detaljrik del av overflaten, og ta deretter på nytt.</string>
+    <string name="standalone_photosphere_not_mapped">Appen har ikke lært denne visningen ennå – hold stødig mot en opplyst, detaljert del av flaten i et sekund, og ta så bilde igjen.</string>
     <string name="doodle_rectify_title">Rett opp flaten</string>
     <string name="doodle_rectify_text">Dra nå i hjørnene til den turkise rammen ligger langs den flate veggoverflaten.</string>
     <string name="doodle_remove_marks_title">Fjern merker</string>
@@ -719,7 +719,7 @@
     <string name="ar_feedback_backend_resolving">AR-motoren velges fortsatt – prøv å være vert igjen om litt</string>
     <string name="ar_feedback_open_project_first">Åpne et prosjekt før du deler – det er ikke noe å sende til en gjest ennå</string>
     <string name="ar_feedback_host_need_doodle_arcore">Ta opp og lås en oppdatert Krusedull før du er vert</string>
-    <string name="ar_feedback_host_need_target_standalone">Ta opp et frittstående veggmål før du er vert</string>
+    <string name="ar_feedback_host_need_target_standalone">Ta bilde av Krusedullen før du er vert</string>
     <string name="ar_feedback_doodle_not_ready">Krusedullen er ikke klar ennå — hold den i bildet og prøv Vert igjen</string>
     <string name="ar_feedback_package_failed">Kunne ikke pakke dette prosjektet for deling – prøv å lagre det først</string>
     <string name="ar_feedback_host_failed">Kunne ikke starte deling: %1$s</string>
@@ -732,7 +732,7 @@
     <string name="ar_feedback_camera_busy">Kameraet er opptatt eller utilgjengelig – lukk andre kameraapper og gå inn i AR igjen</string>
     <string name="ar_feedback_ar_start_failed">Kunne ikke starte AR – kameraet kan være i bruk av en annen app</string>
     <string name="ar_feedback_camera_setting_apply_failed">Kunne ikke bruke kamerainnstillingen på den pågående AR-økten – gå ut av AR og inn igjen</string>
-    <string name="ar_feedback_sphere_target_save_failed">Veggsporing fungerer i denne økten, men SphereSLAM-målet kunne ikke lagres.</string>
+    <string name="ar_feedback_sphere_target_save_failed">Sporingen virker i denne økten, men Krusedullen kunne ikke lagres.</string>
     <string name="ar_feedback_camera_not_resumed">AR-kameraet startet ikke igjen – prøv å gå ut av AR-modus og inn igjen</string>
     <string name="ar_feedback_camera_permission">Kameraet er utilgjengelig – sjekk kameratillatelsen og gå inn i AR igjen</string>
     <string name="ar_feedback_camera_not_paused">AR-kameraet ble ikke satt ordentlig på pause – det kan fortsette å kjøre i bakgrunnen</string>
@@ -790,4 +790,61 @@
     <string name="cv_pass_warm_luma">Varmt lys</string>
     <string name="cv_pass_stencil3">Sjablong</string>
     <string name="cv_pass_change">Endring</string>
+    <string name="doodle_tap_grid_hint">Trykk på Krusedullen for å ta bilde av den.</string>
+    <string name="doodle_blank_wall_hint">Hvis flaten er blank, ta et bilde.</string>
+    <string name="doodle_blank_wall_saved_hint">Blank flate lagret. Trykk nå på Krusedullen.</string>
+    <string name="update_title">Oppdatering tilgjengelig</string>
+    <string name="update_body_play">En nyere versjon finnes i Play Butikk.</string>
+    <string name="update_body_github">Versjon %1$s finnes på GitHub.</string>
+    <string name="update_go_play">Åpne Play Butikk</string>
+    <string name="update_go_github">Åpne GitHub</string>
+    <string name="update_later">Senere</string>
+    <string name="crash_title">GraffitiXR ble lukket uventet</string>
+    <string name="crash_body">Noe gikk galt sist. Å dele rapporten hjelper med å fikse det; den inneholder telefonmodellen og appens siste logg, ingenting fra prosjektene dine.</string>
+    <string name="crash_share">Del rapport</string>
+    <string name="crash_copy">Kopier</string>
+    <string name="crash_dismiss">Lukk</string>
+    <string name="ar_feedback_host_no_lan">Tilkobling krever Wi-Fi. Koble til et Wi-Fi-nettverk eller start en Wi-Fi-sone, og vær vert igjen.</string>
+    <string name="hud_progress">Fremdrift</string>
+    <string name="replace_design_title">Erstatte designet?</string>
+    <string name="replace_design_text">Dette bytter ut det nåværende designet og plasseringen. Du kan angre.</string>
+    <string name="replace_design_confirm">Erstatt</string>
+    <string name="dialog_cancel">Avbryt</string>
+    <string name="delete_project_title">Slette «%1$s»?</string>
+    <string name="delete_project_text">Dette sletter prosjektet for godt: designet, miniatyrbildet og den lagrede Krusedullen. En Krusedull kan ikke tas bilde av på nytt hvis flaten har endret seg. Dette kan ikke angres.</string>
+    <string name="save_project_title">Lagre prosjekt</string>
+    <string name="doodle_not_locked_title">Krusedull ikke festet</string>
+    <string name="doodle_not_locked_text">Designet er plassert, men appen klarte ikke å feste seg til Krusedullen, så overlegget vil drive. Ta nytt bilde: rett foran flaten, litt nærmere, med godt lys.</string>
+    <string name="doodle_recapture">Ta nytt bilde av Krusedull</string>
+    <string name="msg_capture_incomplete">Opptaket er ufullstendig. Ta nytt bilde av Krusedullen.</string>
+    <string name="msg_map_not_ready">Flaten er ikke lært ennå. Hold kameraet på den og prøv igjen.</string>
+    <string name="msg_no_project">Ingen prosjekter er åpne. Åpne eller lag et først: en Krusedull lagres i et prosjekt.</string>
+    <string name="msg_doodle_low_detail_selected">For lite detaljer i det du beholdt. Behold flere av Krusedullens merker.</string>
+    <string name="msg_doodle_changed">Krusedullen endret seg under lagring, så den ble ikke lagret. Prøv igjen.</string>
+    <string name="msg_doodle_saved">Krusedull lagret og festet</string>
+    <string name="msg_doodle_save_failed">Kunne ikke lagre Krusedullen. Prøv igjen.</string>
+    <string name="msg_doodle_too_weak_kept">For lite detaljer å følge. Beholdt den forrige Krusedullen.</string>
+    <string name="msg_doodle_low_detail">For lite detaljer å følge. Tydeligere merker eller mer lys hjelper.</string>
+    <string name="msg_doodle_session_only">Krusedull lagret bare for denne økten: den kunne ikke festes, så den kommer ikke tilbake når du åpner prosjektet igjen. Ta nytt bilde og hold stødig.</string>
+    <string name="msg_doodle_anchor_failed">Kunne ikke feste Krusedullen. Hold telefonen stødig mot flaten og prøv igjen.</string>
+    <string name="msg_project_switched">Et annet prosjekt ble åpnet før Krusedullen ble lagret, så den ble ikke lagret. Ta nytt bilde.</string>
+    <string name="msg_image_invalid">Det bildet kan ikke åpnes, eller ingen prosjekter er åpne.</string>
+    <string name="msg_nothing_to_share">Ingenting å dele ennå. Lagre prosjektet først.</string>
+    <string name="msg_share_failed">Kunne ikke klargjøre prosjektet for deling. Prøv igjen.</string>
+    <string name="msg_export_failed">Eksporten mislyktes. Prøv igjen.</string>
+    <string name="status_preparing_tracking">Klargjør AR…</string>
+    <string name="msg_locked">Låst. Trykk på Lås igjen for å flytte det.</string>
+    <string name="msg_export_timeout">Eksporten tok for lang tid. Prøv igjen.</string>
+    <string name="msg_project_save_failed">Kunne ikke lagre prosjektet. Prøv igjen.</string>
+    <string name="coop_none_title">Fant ingen økter</string>
+    <string name="coop_none_text">Ingen GraffitiXR-økter i nærheten. Søk igjen, eller vær vert selv.</string>
+    <string name="coop_host">Vær vert</string>
+    <string name="coop_search">Søk</string>
+    <string name="coop_need_doodle">Ta bilde av Krusedullen først for å være vert.</string>
+    <string name="coop_scan_to_join">Skann for å bli med</string>
+    <string name="coop_stop_sharing">Stopp deling</string>
+    <string name="coop_leave">Forlat</string>
+    <string name="glasses_pairing">Parer Meta-briller…</string>
+    <string name="glasses_reconnect">Koble til igjen</string>
+    <string name="glasses_end">Avslutt</string>
 </resources>

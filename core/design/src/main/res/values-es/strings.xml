@@ -146,7 +146,7 @@
 
     <!-- Label for the touch input lock feature. -->
     <!-- Description of the touch lock, explaining how to unlock it. -->
-    <string name="nav_lock_info">Bloquea la pantalla táctil para evitar cambios accidentales mientras rocías. Toca tres veces en cualquier lugar para desbloquear.</string>
+    <string name="nav_lock_info">Fija el diseño para que pellizcar y arrastrar no lo muevan. Toca Bloquear otra vez para soltarlo.</string>
 
 
     <!-- Tooltip info for the brush tool. -->
@@ -266,9 +266,9 @@
     <string name="open_settings">Abrir Ajustes</string>
 
     <!-- Title for target creation overlay. -->
-    <string name="doodle_creation_title">CUADRÍCULA DEL GARABATO</string>
+    <string name="doodle_creation_title">GARABATO</string>
     <!-- Instructions for creating a target by tapping on reference marks. -->
-    <string name="doodle_creation_text">Si aún no has creado la cuadrícula de tu Garabato, toma una foto de la pared pulsando el botón de captura. De lo contrario, pulsa Cancelar.</string>
+    <string name="doodle_creation_text">Tu Garabato son unas cuantas marcas grandes que pintas en la superficie para que la app pueda volver a encontrarla. Píntalas y luego fotografía la superficie con el botón de captura.</string>
     <!-- Generic cancel action. -->
     <string name="cancel">Cancelar</string>
 
@@ -412,7 +412,7 @@
     <string name="settings_granted">Concedido</string>
     <string name="settings_denied">Denegado</string>
     <string name="settings_open_app_settings">Abrir Ajustes de la Aplicación</string>
-    <string name="settings_copyright">GraffitiXR © 2025</string>
+    <string name="settings_copyright">GraffitiXR © 2025–2026</string>
 
     <!-- Editor UI -->
     <string name="save_project_hint">Nombre del Proyecto</string>
@@ -450,7 +450,7 @@
 
     <!-- Help strings for main navigation rail. -->
     <!-- Mode Switcher help text. -->
-    <string name="help_mode_host">Selector de Modo: Cambia entre los modos de la app. Instrucciones: Toca para expandir, luego selecciona AR, Superposición, Maqueta o Mesa de Luz.</string>
+    <string name="help_mode_host">Selector de modo: cambia entre los modos de la app. Instrucciones: toca para desplegar y elige AR, Superposición, Maqueta o Calco.</string>
     <!-- AR Mode help text. -->
     <string name="help_ar">Modo AR: Proyecta diseño en una pared mediante mapeo espacial. Instrucciones: Escanea el entorno hasta detectar la pared, luego toca para colocar el anclaje.</string>
     <!-- Overlay Mode help text. -->
@@ -458,11 +458,11 @@
     <!-- Mockup Mode help text. -->
     <string name="help_mockup">Modo Maqueta: Previsualiza el diseño en una foto estática. Instrucciones: Usa \'Pared\' para establecer una imagen de fondo, luego coloca el diseño encima.</string>
     <!-- Lightbox Mode help text. -->
-    <string name="help_trace">Modo Mesa de Luz: Superficie de calco de alto brillo. Instrucciones: Coloca papel sobre la pantalla y calca. Pulsa Subir, Bajar, Subir, Bajar el volumen rápido para salir.</string>
+    <string name="help_trace">Modo Calco: superficie de calco de alto brillo. Instrucciones: coloca papel sobre la pantalla y calca. Pulsa rápido Subir, Bajar, Subir, Bajar el volumen para salir.</string>
     <!-- Target Management help text. -->
     <!-- Scan Resolution help text. -->
     <!-- Create Anchor help text. -->
-    <string name="help_create">Crear Anclaje: Fotografía una marca en la pared para bloquear proyección. Instrucciones: Apunta a una textura distinta y toca. La app seguirá esta marca.</string>
+    <string name="help_create">Capturar Garabato: fotografía las marcas de tu Garabato para fijar la proyección. Instrucciones: apunta a las marcas y toca. Desde entonces la app las sigue.</string>
     <!-- Layer Management help text. -->
     <!-- Import Image help text. -->
     <string name="help_add_img">Importar Imagen: Añade un boceto o foto de referencia. Instrucciones: Selecciona una imagen de tu galería. Se convertirá en el diseño.</string>
@@ -584,11 +584,11 @@
         <item>Así tus imágenes estarán listas y tu teléfono podrá centrarse en la realidad aumentada al pulsar el botón AR.</item>
     </string-array>
     <string-array name="onboarding_ar">
-        <item>Proyección AR — proyecta tu diseño sobre una pared real usando el sensor de profundidad y el seguimiento espacial del teléfono.</item>
-        <item>Apunta a la pared y muévete despacio de lado a lado. Aparecerán formas de colores mientras el motor mapea la superficie. Espera hasta que se cubra toda el área de la pared.</item>
-        <item>Simplemente toca la pantalla. La app fotografía la pared, extrae puntos de seguimiento y fija el ancla al instante.</item>
-        <item>Toca «Abrir» para añadir tu diseño — se proyectará sobre la pared usando el ancla que acabas de fijar.</item>
-        <item>Consejo — las paredes blancas lisas, el hormigón liso y las superficies de un solo color no se pueden rastrear. Apunta tu ancla a grafitis, yeso rugoso o cualquier marca distintiva.</item>
+        <item>AR: proyecta tu diseño sobre la superficie real y lo mantiene ahí mientras te mueves.</item>
+        <item>Pinta tu Garabato: unas cuantas marcas grandes y llamativas en la superficie, separadas y no todas con la misma forma.</item>
+        <item>Toca Garabato y fotografía las marcas. La app fija tu diseño a ellas.</item>
+        <item>Toca «Abrir» para añadir tu diseño: aparece en la superficie, sujeto por tu Garabato.</item>
+        <item>Consejo: una superficie lisa no tiene nada que seguir por sí sola. Para eso está tu Garabato: marcas llamativas que destacan sobre la superficie.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Superposición en vivo — tu diseño flota sobre la imagen de la cámara en vivo, sin necesidad de escanear ninguna superficie.</item>
@@ -663,46 +663,46 @@
     <string name="first_run_detect_title">Ahora apunta la cámara a lo que dibujaste</string>
     <string name="first_run_detect_movement_hint">Mueve el dispositivo lentamente en círculo</string>
     <string name="standalone_width_prompt">Mide el ancho real entre los bordes izquierdo y derecho del objetivo.</string>
-    <string name="standalone_width_label_metric">Ancho del objetivo (metros)</string>
-    <string name="standalone_width_label_imperial">Ancho del objetivo (pies y pulgadas)</string>
+    <string name="standalone_width_label_metric">Ancho de la superficie (metros)</string>
+    <string name="standalone_width_label_imperial">Ancho de la superficie (pies y pulgadas)</string>
     <string name="standalone_width_range_error">Introduce un ancho entre %1$s y %2$s.</string>
     <string name="standalone_use_measured_width">Usar el ancho medido</string>
     <string name="standalone_continue_without_scale">Continuar sin escala física</string>
     <string name="standalone_recapture">Volver a capturar</string>
-    <string name="standalone_capture_wall_target">Capturar objetivo de pared</string>
-    <string name="standalone_capture_failed">No se pudo capturar el objetivo de pared. Inténtalo de nuevo.</string>
+    <string name="standalone_capture_wall_target">Capturar Garabato</string>
+    <string name="standalone_capture_failed">No se pudo capturar el Garabato. Inténtalo de nuevo.</string>
     <string name="standalone_rectify_failed">No se pudo rectificar ese objetivo. Marca cuatro esquinas claras.</string>
-    <string name="standalone_target_too_weak">Ese objetivo tiene muy pocos detalles rastreables (%1$d características KPM; se necesitan %2$d). Captura una zona de pared más rica.</string>
-    <string name="standalone_new_target">Nuevo objetivo</string>
+    <string name="standalone_target_too_weak">No hay suficiente detalle para seguir ahí (%1$d puntos; se necesitan %2$d). Añade unas cuantas marcas llamativas o apunta a una zona con más detalle.</string>
+    <string name="standalone_new_target">Nuevo Garabato</string>
     <string name="standalone_copy_diagnostics">Copiar diagnóstico</string>
     <string name="standalone_wall_target_lost">Objetivo de pared perdido</string>
-    <string name="standalone_recapture_target">Recapturar objetivo</string>
+    <string name="standalone_recapture_target">Capturar Garabato de nuevo</string>
     <string name="standalone_sweep_hint">Gira despacio para mapear el espacio — %1$d%%</string>
-    <string name="standalone_failure_native_library_unavailable">SphereSLAM no está disponible en esta versión.</string>
+    <string name="standalone_failure_native_library_unavailable">El seguimiento AR no está disponible en esta versión.</string>
     <string name="standalone_failure_camera_unavailable">La cámara no está disponible para la RA independiente.</string>
     <string name="standalone_failure_intrinsics_unavailable">La calibración de la cámara no está disponible para la RA independiente.</string>
-    <string name="standalone_failure_reference_too_weak">Ese objetivo de pared tiene muy pocos detalles rastreables. Captura una zona más rica.</string>
-    <string name="standalone_failure_no_page_match">Mantén el objetivo de pared a la vista.</string>
+    <string name="standalone_failure_reference_too_weak">No hay suficiente detalle para seguir. Añade unas cuantas marcas llamativas o apunta a una zona con más detalle.</string>
+    <string name="standalone_failure_no_page_match">Mantén tu Garabato a la vista.</string>
     <string name="standalone_failure_stale_observation">El seguimiento va con retraso. Mueve el teléfono más despacio.</string>
     <string name="standalone_failure_reprojection_error">La coincidencia con la pared es inestable. Vuelve a encuadrar el objetivo.</string>
     <string name="standalone_failure_insufficient_inliers">No se ven suficientes detalles del objetivo.</string>
-    <string name="standalone_failure_pose_jump">Salto de seguimiento rechazado. Mantén el teléfono fijo sobre el objetivo de pared.</string>
-    <string name="standalone_failure_persisted_target_corrupt">El objetivo de pared guardado falta o no se puede leer. Captura un objetivo nuevo.</string>
-    <string name="standalone_failure_internal">SphereSLAM no pudo seguir rastreando este objetivo.</string>
-    <string name="standalone_tracking_stopped">El seguimiento de SphereSLAM se detuvo. Vuelve a capturar el objetivo para reiniciarlo.</string>
-    <string name="standalone_status_mapping">SphereSLAM mapeando • toca Garabato para añadir tu Garabato</string>
-    <string name="standalone_status_preparing">Preparando el objetivo de pared…</string>
-    <string name="standalone_status_finding">Buscando el objetivo de pared…</string>
-    <string name="standalone_quality_too_small">Ese objetivo de pared es demasiado pequeño tras la rectificación. Captura una zona más grande.</string>
-    <string name="standalone_quality_low_contrast">Ese objetivo de pared tiene muy poco contraste visual. Incluye más textura o detalle.</string>
-    <string name="standalone_quality_blurry">Ese objetivo de pared está demasiado borroso para un seguimiento fiable. Mantén firme el teléfono y captúralo de nuevo.</string>
-    <string name="standalone_quality_not_strong_enough">Ese objetivo de pared no es lo bastante sólido para un seguimiento fiable.</string>
-    <string name="standalone_quality_too_dark">Este objetivo está muy subexpuesto; el seguimiento puede ser menos fiable.</string>
-    <string name="standalone_quality_too_bright">Este objetivo está muy sobreexpuesto; el seguimiento puede ser menos fiable.</string>
-    <string name="standalone_photosphere_no_sensor">Este teléfono no tiene sensor de rotación, así que SphereSLAM no puede colocar un objetivo aquí.</string>
+    <string name="standalone_failure_pose_jump">El seguimiento saltó: mantén el teléfono sobre tu Garabato.</string>
+    <string name="standalone_failure_persisted_target_corrupt">No se puede leer el Garabato guardado. Captúralo de nuevo.</string>
+    <string name="standalone_failure_internal">Seguimiento detenido. Captura tu Garabato de nuevo para reiniciar.</string>
+    <string name="standalone_tracking_stopped">Seguimiento detenido. Captura tu Garabato de nuevo para reiniciar.</string>
+    <string name="standalone_status_mapping">Reconociendo la superficie • toca Garabato para capturar el tuyo</string>
+    <string name="standalone_status_preparing">Preparando tu Garabato…</string>
+    <string name="standalone_status_finding">Buscando tu Garabato…</string>
+    <string name="standalone_quality_too_small">El Garabato se ve demasiado pequeño. Acércate o captura una zona más grande.</string>
+    <string name="standalone_quality_low_contrast">Muy poco contraste para seguir. Marcas más llamativas o más luz ayudarán.</string>
+    <string name="standalone_quality_blurry">Demasiado borroso para seguir. Mantén el pulso y captura de nuevo.</string>
+    <string name="standalone_quality_not_strong_enough">No hay suficiente detalle para un seguimiento fiable. Añade unas cuantas marcas llamativas.</string>
+    <string name="standalone_quality_too_dark">Muy oscuro; el seguimiento puede ser menos fiable.</string>
+    <string name="standalone_quality_too_bright">Muy brillante; el seguimiento puede ser menos fiable.</string>
+    <string name="standalone_photosphere_no_sensor">Este teléfono no tiene sensor de rotación, así que AR no puede colocar tu Garabato aquí.</string>
     <string name="standalone_photosphere_compass_not_ready">La brújula aún no está lista: mantén el teléfono quieto un segundo y vuelve a capturar.</string>
-    <string name="standalone_photosphere_not_mapped">SphereSLAM aún no ha mapeado esta vista: mantén la cámara quieta sobre una parte iluminada y con detalle de la superficie durante un segundo y vuelve a capturar.</string>
-    <string name="doodle_rectify_title">Rectificar superficie</string>
+    <string name="standalone_photosphere_not_mapped">La app aún no reconoce esta vista: mantén el teléfono quieto un segundo sobre una parte iluminada y detallada de la superficie y vuelve a capturar.</string>
+    <string name="doodle_rectify_title">Enderezar la superficie</string>
     <string name="doodle_rectify_text">Ahora arrastra las esquinas para alinear el marco cian con la superficie plana de tu pared.</string>
     <string name="doodle_remove_marks_title">Quitar marcas</string>
     <string name="doodle_erase_hint">Toca una marca para quitarla o arrastra sobre varias marcas para quitarlas.</string>
@@ -719,7 +719,7 @@
     <string name="ar_feedback_backend_resolving">El motor de AR aún se está determinando: vuelve a probar Alojar en un momento</string>
     <string name="ar_feedback_open_project_first">Abre un proyecto antes de compartir: todavía no hay nada que enviar a un invitado</string>
     <string name="ar_feedback_host_need_doodle_arcore">Captura y fija un Garabato actual antes de usar «Anfitrión»</string>
-    <string name="ar_feedback_host_need_target_standalone">Captura un objetivo de pared independiente antes de alojar</string>
+    <string name="ar_feedback_host_need_target_standalone">Captura tu Garabato antes de alojar</string>
     <string name="ar_feedback_doodle_not_ready">El Garabato aún no está listo — mantenlo a la vista y vuelve a probar «Anfitrión»</string>
     <string name="ar_feedback_package_failed">No se pudo empaquetar este proyecto para compartirlo: prueba a guardarlo primero</string>
     <string name="ar_feedback_host_failed">No se pudo iniciar el uso compartido: %1$s</string>
@@ -732,7 +732,7 @@
     <string name="ar_feedback_camera_busy">La cámara está ocupada o no disponible: cierra otras apps de cámara y vuelve a entrar en AR</string>
     <string name="ar_feedback_ar_start_failed">No se pudo iniciar AR: es posible que otra app esté usando la cámara</string>
     <string name="ar_feedback_camera_setting_apply_failed">No se pudo aplicar el ajuste de cámara a la sesión de AR en curso: sal de AR y vuelve a entrar</string>
-    <string name="ar_feedback_sphere_target_save_failed">El seguimiento de la pared funciona en esta sesión, pero no se pudo guardar el objetivo de SphereSLAM.</string>
+    <string name="ar_feedback_sphere_target_save_failed">El seguimiento funciona en esta sesión, pero no se pudo guardar tu Garabato.</string>
     <string name="ar_feedback_camera_not_resumed">La cámara de AR no se reanudó: prueba a salir del modo AR y volver a entrar</string>
     <string name="ar_feedback_camera_permission">Cámara no disponible: revisa el permiso de la cámara y vuelve a entrar en AR</string>
     <string name="ar_feedback_camera_not_paused">La cámara de AR no se pausó correctamente: puede seguir funcionando en segundo plano</string>
@@ -790,4 +790,61 @@
     <string name="cv_pass_warm_luma">Luz cálida</string>
     <string name="cv_pass_stencil3">Plantilla</string>
     <string name="cv_pass_change">Cambio</string>
+    <string name="doodle_tap_grid_hint">Toca tu Garabato para capturarlo.</string>
+    <string name="doodle_blank_wall_hint">Si la superficie está vacía, haz una foto.</string>
+    <string name="doodle_blank_wall_saved_hint">Superficie vacía guardada. Ahora toca tu Garabato.</string>
+    <string name="update_title">Actualización disponible</string>
+    <string name="update_body_play">Hay una versión más nueva en Play Store.</string>
+    <string name="update_body_github">La versión %1$s está en GitHub.</string>
+    <string name="update_go_play">Abrir Play Store</string>
+    <string name="update_go_github">Abrir GitHub</string>
+    <string name="update_later">Más tarde</string>
+    <string name="crash_title">GraffitiXR se cerró inesperadamente</string>
+    <string name="crash_body">Algo falló la última vez. Compartir el informe ayuda a arreglarlo; incluye el modelo de tu teléfono y el registro reciente de la app, nada de tus proyectos.</string>
+    <string name="crash_share">Compartir informe</string>
+    <string name="crash_copy">Copiar</string>
+    <string name="crash_dismiss">Descartar</string>
+    <string name="ar_feedback_host_no_lan">La conexión necesita Wi-Fi. Conéctate a una red Wi-Fi o activa un punto de acceso y vuelve a alojar.</string>
+    <string name="hud_progress">Progreso</string>
+    <string name="replace_design_title">¿Reemplazar el diseño?</string>
+    <string name="replace_design_text">Esto cambia el diseño actual y su ubicación. Puedes deshacerlo.</string>
+    <string name="replace_design_confirm">Reemplazar</string>
+    <string name="dialog_cancel">Cancelar</string>
+    <string name="delete_project_title">¿Eliminar «%1$s»?</string>
+    <string name="delete_project_text">Esto elimina el proyecto para siempre: su diseño, miniatura y Garabato guardado. Un Garabato no se puede volver a capturar si la superficie ha cambiado. No se puede deshacer.</string>
+    <string name="save_project_title">Guardar proyecto</string>
+    <string name="doodle_not_locked_title">Garabato no fijado</string>
+    <string name="doodle_not_locked_text">Tu diseño está colocado, pero la app no pudo fijarse a tu Garabato, así que la superposición se desplazará. Captúralo de nuevo: de frente a la superficie, un poco más cerca y con buena luz.</string>
+    <string name="doodle_recapture">Capturar Garabato de nuevo</string>
+    <string name="msg_capture_incomplete">Captura incompleta. Captura tu Garabato de nuevo.</string>
+    <string name="msg_map_not_ready">La superficie aún no está reconocida. Mantén la cámara sobre ella e inténtalo de nuevo.</string>
+    <string name="msg_no_project">No hay ningún proyecto abierto. Abre o crea uno primero: el Garabato se guarda en un proyecto.</string>
+    <string name="msg_doodle_low_detail_selected">No hay suficiente detalle en lo que conservaste. Conserva más marcas de tu Garabato.</string>
+    <string name="msg_doodle_changed">Tu Garabato cambió mientras se guardaba, así que no se guardó. Inténtalo de nuevo.</string>
+    <string name="msg_doodle_saved">Garabato guardado y fijado</string>
+    <string name="msg_doodle_save_failed">No se pudo guardar el Garabato. Inténtalo de nuevo.</string>
+    <string name="msg_doodle_too_weak_kept">No hay suficiente detalle para seguir. Se conservó tu Garabato anterior.</string>
+    <string name="msg_doodle_low_detail">No hay suficiente detalle para seguir. Marcas más llamativas o más luz ayudarán.</string>
+    <string name="msg_doodle_session_only">Garabato guardado solo para esta sesión: no se pudo fijar, así que no volverá al reabrir el proyecto. Captúralo de nuevo sin mover el teléfono.</string>
+    <string name="msg_doodle_anchor_failed">No se pudo fijar tu Garabato. Mantén el teléfono quieto sobre la superficie e inténtalo de nuevo.</string>
+    <string name="msg_project_switched">Se abrió otro proyecto antes de guardar el Garabato, así que no se guardó. Captúralo de nuevo.</string>
+    <string name="msg_image_invalid">No se puede abrir esa imagen, o no hay ningún proyecto abierto.</string>
+    <string name="msg_nothing_to_share">Aún no hay nada que compartir. Guarda el proyecto primero.</string>
+    <string name="msg_share_failed">No se pudo preparar el proyecto para compartir. Inténtalo de nuevo.</string>
+    <string name="msg_export_failed">Error al exportar. Inténtalo de nuevo.</string>
+    <string name="status_preparing_tracking">Preparando AR…</string>
+    <string name="msg_locked">Bloqueado. Toca Bloquear otra vez para moverlo.</string>
+    <string name="msg_export_timeout">La exportación tardó demasiado. Inténtalo de nuevo.</string>
+    <string name="msg_project_save_failed">No se pudo guardar el proyecto. Inténtalo de nuevo.</string>
+    <string name="coop_none_title">No se encontraron sesiones</string>
+    <string name="coop_none_text">No hay sesiones de GraffitiXR cerca. Busca de nuevo o aloja la tuya.</string>
+    <string name="coop_host">Alojar</string>
+    <string name="coop_search">Buscar</string>
+    <string name="coop_need_doodle">Captura tu Garabato primero para alojar.</string>
+    <string name="coop_scan_to_join">Escanea para unirte</string>
+    <string name="coop_stop_sharing">Dejar de compartir</string>
+    <string name="coop_leave">Salir</string>
+    <string name="glasses_pairing">Vinculando gafas Meta…</string>
+    <string name="glasses_reconnect">Reconectar</string>
+    <string name="glasses_end">Finalizar</string>
 </resources>

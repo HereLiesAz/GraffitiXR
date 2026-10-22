@@ -53,7 +53,7 @@
     <string name="nav_help_info">I-tap ang anumang button habang aktibo ang Help para makita kung ano ang ginagawa nito.</string>
     <string name="nav_light">Liwanag</string>
     <string name="nav_light_info">I-toggle ang flashlight ng device upang maipaliwanag ang iyong dingding habang nagtatrabaho sa mahinang ilaw.</string>
-    <string name="nav_lock_info">I-lock ang touchscreen upang maiwasan ang mga hindi sinasadyang pagbabago habang nag-iispray ka. Mag-triple-tap kahit saan para i-unlock.</string>
+    <string name="nav_lock_info">I-pin ang design para hindi ito gumalaw kapag nag-pinch o nag-drag. I-tap muli ang Lock para bitawan ito.</string>
     <string name="nav_size">Sukat</string>
     <string name="nav_color">Kulay</string>
     <string name="nav_kern">Kern</string>
@@ -84,8 +84,8 @@
     <string name="install_arcore">I-install ang ARCore</string>
     <string name="camera_permission_required">Kinakailangan ang pahintulot sa camera para sa AR mode.</string>
     <string name="open_settings">Buksan ang Mga Setting</string>
-    <string name="doodle_creation_title">GRID NG GUHIT-GUHIT</string>
-    <string name="doodle_creation_text">Kung hindi mo pa nagagawa ang iyong grid ng Guhit-guhit, kunan ng larawan ang pader sa pagpindot sa capture button. Kung hindi, pindutin ang Kanselahin.</string>
+    <string name="doodle_creation_title">GUHIT-GUHIT</string>
+    <string name="doodle_creation_text">Ang iyong Guhit-guhit ay ilang malalaking marka na ipinipinta mo sa surface para mahanap ulit ito ng app. Ipinta ang mga ito, saka kunan ng litrato ang surface gamit ang capture button.</string>
     <string name="cancel">Kanselahin</string>
     <string name="diag_copied">KINOPYA ✓</string>
     <string name="diag_title">DEPTH DIAG (i-tap para kopyahin)</string>
@@ -200,7 +200,7 @@
     <string name="settings_granted">ipinagkaloob</string>
     <string name="settings_denied">Tinanggihan</string>
     <string name="settings_open_app_settings">Buksan ang Mga Setting ng App</string>
-    <string name="settings_copyright">GraffitiXR © 2025</string>
+    <string name="settings_copyright">GraffitiXR © 2025–2026</string>
     <string name="save_project_hint">Pangalan ng Proyekto</string>
     <string name="doodle_guide_desc">Gabay sa Pag-align ng Guhit-guhit</string>
     <string name="doodle_captured_desc">Nakuhang Guhit-guhit</string>
@@ -225,12 +225,12 @@
     <string name="reacquiring_doodle">Hinahanap muli ang Guhit-guhit…</string>
     <string name="desc_bg_mockup">Background Mockup</string>
     <string name="desc_segmentation_preview">Preview ng Segmentation</string>
-    <string name="help_mode_host">Mode Switcher: Lumipat sa pagitan ng mga mode ng app. Mga Tagubilin: I-tap para palawakin, pagkatapos ay piliin ang AR, Overlay, Mockup, o Lightbox.</string>
+    <string name="help_mode_host">Mode Switcher: Lumipat sa pagitan ng mga mode ng app. Mga Tagubilin: I-tap para palawakin, saka piliin ang AR, Overlay, Mockup, o Bakas.</string>
     <string name="help_ar">AR Mode: Ang disenyo ng proyekto sa isang pader gamit ang spatial mapping. Mga Tagubilin: I-scan ang kapaligiran hanggang sa matukoy ang pader, pagkatapos ay tapikin upang ilagay ang anchor.</string>
     <string name="help_overlay">Overlay Mode: Ipakita ang disenyo sa ibabaw ng live na camera nang walang spatial na pagsubaybay. Mga Tagubilin: Manu-manong sukat at ilipat ang disenyo upang magkasya sa iyong frame.</string>
     <string name="help_mockup">Mockup Mode: I-preview ang disenyo sa isang static na larawan. Mga Tagubilin: Gamitin ang \'Wall\' upang magtakda ng larawan sa background, pagkatapos ay ilagay ang disenyo sa ibabaw nito.</string>
-    <string name="help_trace">Lightbox Mode: High-brightness tracing surface. Mga Tagubilin: Ilagay ang papel sa ibabaw ng screen at i-trace. Pindutin nang mabilis ang Volume Up, Down, Up, Down para lumabas.</string>
-    <string name="help_create">Gumawa ng Anchor: Kuhanan ng larawan ang isang marka sa dingding upang i-lock ang projection. Mga Tagubilin: Ituro ang isang natatanging texture at i-tap. Susubaybayan ng app ang markang ito.</string>
+    <string name="help_trace">Bakas Mode: Napakaliwanag na surface para mag-trace. Mga Tagubilin: Ilagay ang papel sa ibabaw ng screen at i-trace. Pindutin nang mabilis ang Volume Up, Down, Up, Down para lumabas.</string>
+    <string name="help_create">Kunan ang Guhit-guhit: Kunan ng litrato ang mga marka ng iyong Guhit-guhit para i-lock ang projection. Mga Tagubilin: Itutok sa mga marka at i-tap. Susundan na sila ng app mula noon.</string>
     <string name="help_add_img">Mag-import ng Larawan: Magdagdag ng sketch o reference na larawan. Mga Tagubilin: Pumili ng larawan mula sa iyong gallery. Ito ang magiging disenyo.</string>
     <string name="help_wall">Baguhin ang Wall: Itakda ang background para sa Mockup mode. Mga Tagubilin: Pumili ng larawan ng pisikal na pader na plano mong lagyan ng pintura.</string>
     <string name="help_project_host">Pamamahala ng Proyekto: I-save, i-load, at i-export ang trabaho. Mga Tagubilin: I-tap para ma-access ang mga administratibong gawain para sa iyong proyekto.</string>
@@ -299,11 +299,11 @@
         <item>Sa ganoong paraan, handa na ang iyong mga imahe at makakapag-focus ang iyong telepono sa augmented reality kapag pinindot mo ang AR button.</item>
     </string-array>
     <string-array name="onboarding_ar">
-        <item>AR Projection — inipoprojekta ang iyong disenyo sa isang tunay na pader gamit ang depth sensor at spatial tracking ng telepono.</item>
-        <item>Itutok ang telepono sa pader at dahan-dahang gumalaw paikot. Lalabas ang makukulay na hugis habang pinepeke-mapa ng engine ang ibabaw. Maghintay hanggang matakpan ang buong lugar ng pader.</item>
-        <item>Pindutin lang ang screen. Kukunan ng app ang larawan ng pader, kukunin ang mga tracking feature, at agad na iko-lock ang anchor.</item>
-        <item>Pindutin ang \'Bukas\' para idagdag ang iyong disenyo — ito ay ipoprojekta sa pader gamit ang anchor na kakalagay mo lang.</item>
-        <item>Tip — ang mga blangkong puting pader, makinis na semento, at solidong-kulay na ibabaw ay hindi matra-track. Ituon ang iyong anchor point sa graffiti, magaspang na plaster, o anumang natatanging marka.</item>
+        <item>AR — ipinoproject ang iyong design sa totoong surface at pinapanatili ito roon habang gumagalaw ka.</item>
+        <item>Ipinta ang iyong Guhit-guhit: ilang malalaki at matapang na marka sa surface, magkakalayo, at hindi pare-pareho ang hugis.</item>
+        <item>I-tap ang Guhit-guhit at kunan ng litrato ang mga marka. Ila-lock ng app ang iyong design sa mga ito.</item>
+        <item>I-tap ang \'Bukas\' para idagdag ang iyong design — lalabas ito sa surface, hawak sa puwesto ng iyong Guhit-guhit.</item>
+        <item>Tip — walang masusundan sa isang plain na surface nang mag-isa. Iyan ang silbi ng iyong Guhit-guhit: matatapang na marka na litaw sa surface.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Live Overlay — lumulutang ang iyong disenyo sa ibabaw ng live camera feed, walang kailangang i-scan na ibabaw.</item>
@@ -378,46 +378,46 @@
     <string name="first_run_detect_title">Ngayon, itutok ang camera sa iginuhit mo</string>
     <string name="first_run_detect_movement_hint">Dahan-dahang igalaw ang device nang pabilog</string>
     <string name="standalone_width_prompt">Sukatin ang tunay na lapad sa pagitan ng kaliwa at kanang gilid ng target.</string>
-    <string name="standalone_width_label_metric">Lapad ng target (metro)</string>
-    <string name="standalone_width_label_imperial">Lapad ng target (talampakan at pulgada)</string>
+    <string name="standalone_width_label_metric">Lapad ng surface (metro)</string>
+    <string name="standalone_width_label_imperial">Lapad ng surface (feet at inches)</string>
     <string name="standalone_width_range_error">Maglagay ng lapad mula %1$s hanggang %2$s.</string>
     <string name="standalone_use_measured_width">Gamitin ang sinukat na lapad</string>
     <string name="standalone_continue_without_scale">Magpatuloy nang walang pisikal na sukat</string>
     <string name="standalone_recapture">Kumuha muli</string>
-    <string name="standalone_capture_wall_target">Kunin ang target sa pader</string>
-    <string name="standalone_capture_failed">Hindi makuha ang target sa pader — subukan muli.</string>
+    <string name="standalone_capture_wall_target">Kunan ang Guhit-guhit</string>
+    <string name="standalone_capture_failed">Hindi makunan ang Guhit-guhit — subukan ulit.</string>
     <string name="standalone_rectify_failed">Hindi maituwid ang target na iyon — markahan ang apat na malinaw na sulok.</string>
-    <string name="standalone_target_too_weak">Masyadong kaunti ang masusubaybayang detalye ng target na iyon (%1$d KPM feature; kailangan ng %2$d). Kumuha ng mas detalyadong bahagi ng pader.</string>
-    <string name="standalone_new_target">Bagong target</string>
+    <string name="standalone_target_too_weak">Kulang ang detalye para masundan diyan (%1$d point; kailangan %2$d). Magdagdag ng ilang matapang na marka, o itutok sa mas detalyadong bahagi.</string>
+    <string name="standalone_new_target">Bagong Guhit-guhit</string>
     <string name="standalone_copy_diagnostics">Kopyahin ang diagnostics</string>
     <string name="standalone_wall_target_lost">Nawala ang target sa pader</string>
-    <string name="standalone_recapture_target">Kunin muli ang target</string>
+    <string name="standalone_recapture_target">Kunan ulit ang Guhit-guhit</string>
     <string name="standalone_sweep_hint">Dahan-dahang umikot para imapa ang espasyo — %1$d%%</string>
-    <string name="standalone_failure_native_library_unavailable">Hindi available ang SphereSLAM sa build na ito.</string>
+    <string name="standalone_failure_native_library_unavailable">Hindi available ang AR tracking sa build na ito.</string>
     <string name="standalone_failure_camera_unavailable">Hindi available ang camera para sa standalone AR.</string>
     <string name="standalone_failure_intrinsics_unavailable">Hindi available ang camera calibration para sa standalone AR.</string>
-    <string name="standalone_failure_reference_too_weak">Masyadong kaunti ang masusubaybayang detalye ng target sa pader na iyon. Kumuha ng mas detalyadong bahagi.</string>
-    <string name="standalone_failure_no_page_match">Panatilihin ang target sa pader sa view.</string>
+    <string name="standalone_failure_reference_too_weak">Kulang ang detalye para masundan. Magdagdag ng ilang matapang na marka, o itutok sa mas detalyadong bahagi.</string>
+    <string name="standalone_failure_no_page_match">Panatilihing nakikita ang iyong Guhit-guhit.</string>
     <string name="standalone_failure_stale_observation">Nahuhuli ang tracking. Igalaw nang mas mabagal ang telepono.</string>
     <string name="standalone_failure_reprojection_error">Hindi matatag ang tugma sa pader. I-frame muli ang target.</string>
     <string name="standalone_failure_insufficient_inliers">Hindi sapat ang nakikitang detalye ng target.</string>
-    <string name="standalone_failure_pose_jump">Tinanggihan ang biglaang pagtalon ng tracking. Ihawak nang matatag sa target sa pader.</string>
-    <string name="standalone_failure_persisted_target_corrupt">Nawawala o hindi mabasa ang naka-save na target sa pader. Kumuha ng bagong target.</string>
-    <string name="standalone_failure_internal">Hindi na naipagpatuloy ng SphereSLAM ang pagsubaybay sa target na ito.</string>
-    <string name="standalone_tracking_stopped">Huminto ang tracking ng SphereSLAM. Kunin muli ang target para i-restart ito.</string>
-    <string name="standalone_status_mapping">Nagma-map ang SphereSLAM • i-tap ang Guhit-guhit para idagdag ang iyong Guhit-guhit</string>
-    <string name="standalone_status_preparing">Inihahanda ang target sa pader…</string>
-    <string name="standalone_status_finding">Hinahanap ang target sa pader…</string>
-    <string name="standalone_quality_too_small">Masyadong maliit ang target sa pader na iyon pagkatapos ng pagtuwid. Kumuha ng mas malaking bahagi.</string>
-    <string name="standalone_quality_low_contrast">Masyadong mababa ang visual contrast ng target sa pader na iyon. Magsama ng mas maraming texture o detalye.</string>
-    <string name="standalone_quality_blurry">Masyadong malabo ang target sa pader na iyon para sa maaasahang tracking. Ihawak nang matatag at kunin muli.</string>
-    <string name="standalone_quality_not_strong_enough">Hindi sapat ang lakas ng target sa pader na iyon para sa maaasahang tracking.</string>
-    <string name="standalone_quality_too_dark">Lubhang kulang sa exposure ang target na ito; maaaring mas hindi maaasahan ang tracking.</string>
-    <string name="standalone_quality_too_bright">Lubhang sobra sa exposure ang target na ito; maaaring mas hindi maaasahan ang tracking.</string>
-    <string name="standalone_photosphere_no_sensor">Walang rotation sensor ang teleponong ito, kaya hindi makapaglagay ng target dito ang SphereSLAM.</string>
+    <string name="standalone_failure_pose_jump">Tumalon ang tracking — itutok ang phone sa iyong Guhit-guhit.</string>
+    <string name="standalone_failure_persisted_target_corrupt">Hindi mabasa ang naka-save na Guhit-guhit. Kunan ito ulit.</string>
+    <string name="standalone_failure_internal">Huminto ang tracking. Kunan ulit ang iyong Guhit-guhit para magsimula muli.</string>
+    <string name="standalone_tracking_stopped">Huminto ang tracking. Kunan ulit ang iyong Guhit-guhit para magsimula muli.</string>
+    <string name="standalone_status_mapping">Inaaral ang surface • i-tap ang Guhit-guhit para kunan ang sa iyo</string>
+    <string name="standalone_status_preparing">Inihahanda ang iyong Guhit-guhit…</string>
+    <string name="standalone_status_finding">Hinahanap ang iyong Guhit-guhit…</string>
+    <string name="standalone_quality_too_small">Masyadong maliit ang Guhit-guhit sa litrato. Lumapit o kunan ang mas malaking bahagi.</string>
+    <string name="standalone_quality_low_contrast">Kulang ang contrast para masundan. Makakatulong ang mas matapang na marka o mas maraming ilaw.</string>
+    <string name="standalone_quality_blurry">Masyadong malabo para masundan. Huwag gumalaw at kunan ulit.</string>
+    <string name="standalone_quality_not_strong_enough">Kulang ang detalye para maaasahang masundan. Magdagdag ng ilang matapang na marka.</string>
+    <string name="standalone_quality_too_dark">Napakadilim; maaaring hindi gaanong maaasahan ang tracking.</string>
+    <string name="standalone_quality_too_bright">Napakaliwanag; maaaring hindi gaanong maaasahan ang tracking.</string>
+    <string name="standalone_photosphere_no_sensor">Walang rotation sensor ang phone na ito, kaya hindi mailalagay ng AR ang iyong Guhit-guhit dito.</string>
     <string name="standalone_photosphere_compass_not_ready">Hindi pa handa ang compass — ihawak nang matatag ang telepono nang isang segundo, saka kumuha muli.</string>
-    <string name="standalone_photosphere_not_mapped">Hindi pa namamapa ng SphereSLAM ang view na ito — ihawak nang matatag ang camera nang isang segundo sa maliwanag at detalyadong bahagi ng ibabaw, saka kumuha muli.</string>
-    <string name="doodle_rectify_title">Ituwid ang ibabaw</string>
+    <string name="standalone_photosphere_not_mapped">Hindi pa naaaral ng app ang view na ito — itutok nang tuloy sa maliwanag at detalyadong bahagi ng surface nang isang segundo, saka kunan ulit.</string>
+    <string name="doodle_rectify_title">Ituwid ang surface</string>
     <string name="doodle_rectify_text">Ngayon, i-drag ang mga sulok para iayon ang cyan na frame sa patag na ibabaw ng iyong pader.</string>
     <string name="doodle_remove_marks_title">Alisin ang mga marka</string>
     <string name="doodle_erase_hint">I-tap ang isang marka para alisin ito, o mag-drag sa ibabaw ng ilang marka para alisin ang marami.</string>
@@ -434,7 +434,7 @@
     <string name="ar_feedback_backend_resolving">Tinutukoy pa ang AR backend — subukang mag-host ulit sa ilang saglit</string>
     <string name="ar_feedback_open_project_first">Magbukas ng proyekto bago magbahagi — wala pang maipapadala sa bisita</string>
     <string name="ar_feedback_host_need_doodle_arcore">Kunan at i-lock ang kasalukuyang Guhit-guhit bago mag-host</string>
-    <string name="ar_feedback_host_need_target_standalone">Kumuha ng standalone na Wall Target bago mag-host</string>
+    <string name="ar_feedback_host_need_target_standalone">Kunan ang iyong Guhit-guhit bago mag-host</string>
     <string name="ar_feedback_doodle_not_ready">Hindi pa handa ang Guhit-guhit — panatilihin ito sa view at subukan muli ang \"I-host\"</string>
     <string name="ar_feedback_package_failed">Hindi ma-package ang proyektong ito para ibahagi — subukan munang i-save ito</string>
     <string name="ar_feedback_host_failed">Hindi masimulan ang pagbabahagi: %1$s</string>
@@ -447,7 +447,7 @@
     <string name="ar_feedback_camera_busy">Abala o hindi available ang camera — isara ang iba pang camera app, saka muling pumasok sa AR</string>
     <string name="ar_feedback_ar_start_failed">Hindi masimulan ang AR — maaaring ginagamit ng ibang app ang iyong camera</string>
     <string name="ar_feedback_camera_setting_apply_failed">Hindi mailapat ang setting ng camera sa tumatakbong AR session — lumabas sa AR at muling pumasok</string>
-    <string name="ar_feedback_sphere_target_save_failed">Gumagana ang wall tracking sa session na ito, pero hindi na-save ang SphereSLAM target.</string>
+    <string name="ar_feedback_sphere_target_save_failed">Gumagana ang tracking sa session na ito, pero hindi na-save ang iyong Guhit-guhit.</string>
     <string name="ar_feedback_camera_not_resumed">Hindi nagpatuloy ang AR camera — subukang lumabas sa AR mode at muling pumasok</string>
     <string name="ar_feedback_camera_permission">Hindi available ang camera — suriin ang permiso sa camera, saka muling pumasok sa AR</string>
     <string name="ar_feedback_camera_not_paused">Hindi maayos na na-pause ang AR camera — maaari itong magpatuloy sa background</string>
@@ -504,4 +504,61 @@
     <string name="cv_pass_warm_luma">Mainit na liwanag</string>
     <string name="cv_pass_stencil3">Stencil</string>
     <string name="cv_pass_change">Pagbabago</string>
+    <string name="doodle_tap_grid_hint">I-tap ang iyong Guhit-guhit para kunan ito.</string>
+    <string name="doodle_blank_wall_hint">Kung blangko ang surface, kumuha ng litrato.</string>
+    <string name="doodle_blank_wall_saved_hint">Na-save ang blangkong surface. Ngayon, i-tap ang iyong Guhit-guhit.</string>
+    <string name="update_title">May available na update</string>
+    <string name="update_body_play">May mas bagong bersyon sa Play Store.</string>
+    <string name="update_body_github">Nasa GitHub ang bersyon %1$s.</string>
+    <string name="update_go_play">Buksan ang Play Store</string>
+    <string name="update_go_github">Buksan ang GitHub</string>
+    <string name="update_later">Mamaya</string>
+    <string name="crash_title">Biglang nagsara ang GraffitiXR</string>
+    <string name="crash_body">May nagkaproblema noong huli. Makakatulong sa pag-ayos ang pag-share ng report; laman nito ang model ng phone mo at ang kamakailang log ng app, walang galing sa iyong mga project.</string>
+    <string name="crash_share">I-share ang report</string>
+    <string name="crash_copy">Kopyahin</string>
+    <string name="crash_dismiss">Isara</string>
+    <string name="ar_feedback_host_no_lan">Kailangan ng Wi-Fi para sa Link. Kumonekta sa Wi-Fi network o magbukas ng hotspot, saka mag-host ulit.</string>
+    <string name="hud_progress">Progreso</string>
+    <string name="replace_design_title">Palitan ang design?</string>
+    <string name="replace_design_text">Papalitan nito ang kasalukuyang design at ang puwesto nito. Puwede mo itong i-undo.</string>
+    <string name="replace_design_confirm">Palitan</string>
+    <string name="dialog_cancel">Kanselahin</string>
+    <string name="delete_project_title">Burahin ang “%1$s”?</string>
+    <string name="delete_project_text">Permanenteng mabubura ang project: ang design, thumbnail, at naka-save na Guhit-guhit. Hindi na makukunan ulit ang Guhit-guhit kung nagbago na ang surface. Hindi na ito maibabalik.</string>
+    <string name="save_project_title">I-save ang project</string>
+    <string name="doodle_not_locked_title">Hindi naka-lock ang Guhit-guhit</string>
+    <string name="doodle_not_locked_text">Nakalagay na ang design mo, pero hindi ma-lock ng app sa iyong Guhit-guhit, kaya gagalaw ang overlay. Kunan ulit: harap sa surface, medyo mas malapit, at may magandang ilaw.</string>
+    <string name="doodle_recapture">Kunan ulit ang Guhit-guhit</string>
+    <string name="msg_capture_incomplete">Hindi kumpleto ang pagkuha. Kunan ulit ang iyong Guhit-guhit.</string>
+    <string name="msg_map_not_ready">Hindi pa naaaral ang surface. Itutok ang camera rito at subukan ulit.</string>
+    <string name="msg_no_project">Walang bukas na project. Magbukas o gumawa muna: sa isang project sine-save ang Guhit-guhit.</string>
+    <string name="msg_doodle_low_detail_selected">Kulang ang detalye sa itinira mo. Magtira ng mas maraming marka ng iyong Guhit-guhit.</string>
+    <string name="msg_doodle_changed">Nagbago ang iyong Guhit-guhit habang sine-save, kaya hindi ito na-save. Subukan ulit.</string>
+    <string name="msg_doodle_saved">Na-save at na-lock ang Guhit-guhit</string>
+    <string name="msg_doodle_save_failed">Hindi ma-save ang Guhit-guhit. Subukan ulit.</string>
+    <string name="msg_doodle_too_weak_kept">Kulang ang detalye para masundan. Itinira ang dati mong Guhit-guhit.</string>
+    <string name="msg_doodle_low_detail">Kulang ang detalye para masundan. Makakatulong ang mas matapang na marka o mas maraming ilaw.</string>
+    <string name="msg_doodle_session_only">Na-save ang Guhit-guhit para sa session na ito lang: hindi ito ma-lock, kaya hindi ito babalik pagbukas mo ulit ng project. Kunan ulit nang hindi gumagalaw.</string>
+    <string name="msg_doodle_anchor_failed">Hindi ma-lock ang iyong Guhit-guhit. Hawakan nang tuloy ang phone sa surface at subukan ulit.</string>
+    <string name="msg_project_switched">May ibang project na nabuksan bago na-save ang Guhit-guhit, kaya hindi ito na-save. Kunan ulit.</string>
+    <string name="msg_image_invalid">Hindi mabuksan ang larawang iyon, o walang bukas na project.</string>
+    <string name="msg_nothing_to_share">Wala pang maishe-share. I-save muna ang project.</string>
+    <string name="msg_share_failed">Hindi maihanda ang project para i-share. Subukan ulit.</string>
+    <string name="msg_export_failed">Nabigo ang pag-export. Subukan ulit.</string>
+    <string name="status_preparing_tracking">Inihahanda ang AR…</string>
+    <string name="msg_locked">Naka-lock. I-tap muli ang Lock para galawin ito.</string>
+    <string name="msg_export_timeout">Nag-time out ang pag-export. Subukan ulit.</string>
+    <string name="msg_project_save_failed">Hindi ma-save ang project. Subukan ulit.</string>
+    <string name="coop_none_title">Walang nahanap na session</string>
+    <string name="coop_none_text">Walang GraffitiXR session sa malapit. Maghanap ulit, o mag-host ng sarili mo.</string>
+    <string name="coop_host">Mag-host</string>
+    <string name="coop_search">Maghanap</string>
+    <string name="coop_need_doodle">Kunan muna ang iyong Guhit-guhit para makapag-host.</string>
+    <string name="coop_scan_to_join">I-scan para sumali</string>
+    <string name="coop_stop_sharing">Ihinto ang pag-share</string>
+    <string name="coop_leave">Umalis</string>
+    <string name="glasses_pairing">Ipinapares ang Meta glasses…</string>
+    <string name="glasses_reconnect">Kumonekta ulit</string>
+    <string name="glasses_end">Tapusin</string>
 </resources>

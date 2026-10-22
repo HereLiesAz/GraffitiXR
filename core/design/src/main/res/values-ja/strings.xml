@@ -148,7 +148,7 @@
 
 
 
-    <string name="nav_lock_info">タッチスクリーンをロックして、スプレー中の誤操作を防ぎます。どこでも3回タップするとロックが解除されます。</string>
+    <string name="nav_lock_info">デザインを固定し、ピンチやドラッグで動かないようにします。もう一度ロックをタップすると解除します。</string>
 
 
 
@@ -268,9 +268,9 @@
     <string name="open_settings">設定を開く</string>
 
 
-    <string name="doodle_creation_title">らくがきグリッド</string>
+    <string name="doodle_creation_title">らくがき</string>
 
-    <string name="doodle_creation_text">らくがきグリッドをまだ作成していない場合は、撮影ボタンを押して壁の写真を撮ってください。作成済みの場合は「キャンセル」を押してください。</string>
+    <string name="doodle_creation_text">らくがきは、アプリが面を見つけ直せるように描く、いくつかの大きな印です。描いたら、撮影ボタンで面を撮影します。</string>
 
     <string name="cancel">キャンセル</string>
 
@@ -421,7 +421,7 @@
     <string name="settings_granted">許可済み</string>
     <string name="settings_denied">拒否</string>
     <string name="settings_open_app_settings">アプリの設定を開く</string>
-    <string name="settings_copyright">GraffitiXR © 2025</string>
+    <string name="settings_copyright">GraffitiXR © 2025–2026</string>
 
 
     <string name="save_project_hint">プロジェクト名</string>
@@ -459,7 +459,7 @@
 
 
 
-    <string name="help_mode_host">モード切り替え: アプリのモードを切り替えます。手順: タップして展開し、AR、オーバーレイ、モックアップ、またはライトボックスを選択します。</string>
+    <string name="help_mode_host">モード切り替え: アプリのモードを切り替えます。手順: タップして展開し、AR、オーバーレイ、モックアップ、ライトボックスから選びます。</string>
 
     <string name="help_ar">ARモード: 空間マッピングを使用して壁にデザインを投影します。手順: 壁が検出されるまで周囲をスキャンし、タップしてアンカーを配置します。</string>
 
@@ -467,11 +467,11 @@
 
     <string name="help_mockup">モックアップモード: 静止画でデザインをプレビューします。手順:「壁」を使用して背景画像を設定し、その上にデザインを配置します。</string>
 
-    <string name="help_trace">ライトボックスモード: 高輝度のトレース面。手順: 画面の上に紙を置き、トレースします。音量を上・下・上・下、素早く押すと終了します。</string>
+    <string name="help_trace">ライトボックスモード: 高輝度のトレース面。手順: 画面に紙を置いてトレースします。音量の上・下・上・下を素早く押すと終了します。</string>
 
 
 
-    <string name="help_create">アンカーの作成: 壁のマークを撮影して投影を固定します。手順: はっきりしたテクスチャを指してタップします。アプリはこのマークを追跡します。</string>
+    <string name="help_create">らくがきを撮影: らくがきの印を撮影して投影を固定します。手順: 印に向けてタップします。以降はアプリが印を追跡します。</string>
 
 
     <string name="help_add_img">画像のインポート: スケッチや参考写真を追加します。手順: ギャラリーから画像を選択します。それがデザインになります。</string>
@@ -593,11 +593,11 @@
         <item>こうしておけば画像の準備が整い、ARボタンを押したときにスマートフォンは拡張現実に集中できます。</item>
     </string-array>
     <string-array name="onboarding_ar">
-        <item>AR投影 — スマートフォンの深度センサーと空間トラッキングを使って、デザインを実際の壁に投影します。</item>
-        <item>壁に向けて、ゆっくり左右に動かしてください。エンジンが表面をマッピングするにつれて、色の付いた図形が表示されます。壁のエリア全体がカバーされるまで待ちます。</item>
-        <item>画面をタップするだけです。アプリが壁を撮影し、トラッキング用の特徴を抽出して、即座にアンカーを固定します。</item>
-        <item>「開く」をタップしてデザインを追加します — 今設定したアンカーを使って壁に投影されます。</item>
-        <item>ヒント — 何もない白い壁、滑らかなコンクリート、単色の面は追跡できません。落書き、粗い漆喰、その他の明確な模様にアンカーポイントを合わせてください。</item>
+        <item>AR — デザインを実際の面に投影し、動いてもその位置に保ちます。</item>
+        <item>らくがきを描く: 面に大きくはっきりした印をいくつか、間隔をあけ、形を変えて描きます。</item>
+        <item>らくがきをタップして印を撮影します。アプリがデザインを印に固定します。</item>
+        <item>「開く」をタップしてデザインを追加 — らくがきに支えられて面の上に表示されます。</item>
+        <item>ヒント — 無地の面だけでは追跡できるものがありません。そのためのらくがきです: 面から目立つはっきりした印を描きましょう。</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>ライブオーバーレイ — 表面をスキャンする必要なく、ライブカメラ映像の上にデザインが浮かびます。</item>
@@ -672,46 +672,46 @@
     <string name="first_run_detect_title">描いたものにカメラを向けてください</string>
     <string name="first_run_detect_movement_hint">端末をゆっくり円を描くように動かしてください</string>
     <string name="standalone_width_prompt">ターゲットの左端から右端までの実際の幅を測ってください。</string>
-    <string name="standalone_width_label_metric">ターゲットの幅（メートル）</string>
-    <string name="standalone_width_label_imperial">ターゲットの幅（フィートとインチ）</string>
+    <string name="standalone_width_label_metric">面の幅（メートル）</string>
+    <string name="standalone_width_label_imperial">面の幅（フィートとインチ）</string>
     <string name="standalone_width_range_error">幅を %1$s から %2$s の範囲で入力してください。</string>
     <string name="standalone_use_measured_width">測定した幅を使用</string>
     <string name="standalone_continue_without_scale">実寸なしで続行</string>
     <string name="standalone_recapture">再撮影</string>
-    <string name="standalone_capture_wall_target">壁ターゲットを撮影</string>
-    <string name="standalone_capture_failed">壁ターゲットを撮影できませんでした。もう一度お試しください。</string>
+    <string name="standalone_capture_wall_target">らくがきを撮影</string>
+    <string name="standalone_capture_failed">らくがきを撮影できませんでした。もう一度お試しください。</string>
     <string name="standalone_rectify_failed">このターゲットを補正できませんでした。はっきりした 4 つの角を指定してください。</string>
-    <string name="standalone_target_too_weak">このターゲットは追跡できる特徴が少なすぎます（KPM 特徴 %1$d 個、必要数 %2$d 個）。より特徴の多い壁面を撮影し直してください。</string>
-    <string name="standalone_new_target">新しいターゲット</string>
+    <string name="standalone_target_too_weak">追跡するには細部が足りません（%1$d 点、必要数 %2$d）。はっきりした印を足すか、より細かい部分に向けてください。</string>
+    <string name="standalone_new_target">新しいらくがき</string>
     <string name="standalone_copy_diagnostics">診断情報をコピー</string>
     <string name="standalone_wall_target_lost">壁ターゲットを見失いました</string>
-    <string name="standalone_recapture_target">ターゲットを撮り直す</string>
+    <string name="standalone_recapture_target">らくがきを撮り直す</string>
     <string name="standalone_sweep_hint">ゆっくり向きを変えて空間をマッピングしてください — %1$d%%</string>
-    <string name="standalone_failure_native_library_unavailable">このビルドでは SphereSLAM を利用できません。</string>
+    <string name="standalone_failure_native_library_unavailable">このビルドでは AR 追跡を利用できません。</string>
     <string name="standalone_failure_camera_unavailable">スタンドアロン AR ではカメラを利用できません。</string>
     <string name="standalone_failure_intrinsics_unavailable">スタンドアロン AR ではカメラのキャリブレーションを利用できません。</string>
-    <string name="standalone_failure_reference_too_weak">この壁ターゲットは追跡できる細部が少なすぎます。より細部の多い部分を撮影してください。</string>
-    <string name="standalone_failure_no_page_match">壁ターゲットを視界に入れたままにしてください。</string>
+    <string name="standalone_failure_reference_too_weak">追跡するには細部が足りません。はっきりした印を足すか、より細かい部分に向けてください。</string>
+    <string name="standalone_failure_no_page_match">らくがきを画面内に入れておいてください。</string>
     <string name="standalone_failure_stale_observation">トラッキングが遅れています。スマートフォンをもっとゆっくり動かしてください。</string>
     <string name="standalone_failure_reprojection_error">壁との照合が不安定です。ターゲットを撮り直してください。</string>
     <string name="standalone_failure_insufficient_inliers">ターゲットの細部が十分に見えていません。</string>
-    <string name="standalone_failure_pose_jump">トラッキングの急な飛びを無視しました。壁ターゲットに向けて動かさずに保持してください。</string>
-    <string name="standalone_failure_persisted_target_corrupt">保存された壁ターゲットが見つからないか、読み取れません。新しいターゲットを撮影してください。</string>
-    <string name="standalone_failure_internal">SphereSLAM はこのターゲットの追跡を続行できませんでした。</string>
-    <string name="standalone_tracking_stopped">SphereSLAM のトラッキングが停止しました。ターゲットを撮り直して再開してください。</string>
-    <string name="standalone_status_mapping">SphereSLAM マッピング中 • 「らくがき」をタップしてらくがきを追加</string>
-    <string name="standalone_status_preparing">壁ターゲットを準備中…</string>
-    <string name="standalone_status_finding">壁ターゲットを探しています…</string>
-    <string name="standalone_quality_too_small">この壁ターゲットは補正後のサイズが小さすぎます。より広い範囲を撮影してください。</string>
-    <string name="standalone_quality_low_contrast">この壁ターゲットは視覚的なコントラストが低すぎます。テクスチャや細部をより多く含めてください。</string>
-    <string name="standalone_quality_blurry">この壁ターゲットはぼやけすぎていて、確実に追跡できません。手元を安定させて撮り直してください。</string>
-    <string name="standalone_quality_not_strong_enough">この壁ターゲットは、確実に追跡するには特徴が不十分です。</string>
-    <string name="standalone_quality_too_dark">このターゲットは大幅に露出不足です。トラッキングの信頼性が下がる場合があります。</string>
-    <string name="standalone_quality_too_bright">このターゲットは大幅に露出過多です。トラッキングの信頼性が下がる場合があります。</string>
-    <string name="standalone_photosphere_no_sensor">この端末には回転センサーがないため、SphereSLAM はここにターゲットを配置できません。</string>
+    <string name="standalone_failure_pose_jump">追跡がずれました — スマホをらくがきに向けたままにしてください。</string>
+    <string name="standalone_failure_persisted_target_corrupt">保存したらくがきを読み込めません。撮り直してください。</string>
+    <string name="standalone_failure_internal">追跡が止まりました。らくがきを撮り直して再開してください。</string>
+    <string name="standalone_tracking_stopped">追跡が止まりました。らくがきを撮り直して再開してください。</string>
+    <string name="standalone_status_mapping">面を認識中 • らくがきをタップして撮影</string>
+    <string name="standalone_status_preparing">らくがきを準備中…</string>
+    <string name="standalone_status_finding">らくがきを探しています…</string>
+    <string name="standalone_quality_too_small">画面内のらくがきが小さすぎます。近づくか、広い範囲を撮影してください。</string>
+    <string name="standalone_quality_low_contrast">コントラストが低すぎて追跡できません。印を濃くするか、明るくしてください。</string>
+    <string name="standalone_quality_blurry">ぶれていて追跡できません。しっかり構えて撮り直してください。</string>
+    <string name="standalone_quality_not_strong_enough">安定して追跡するには細部が足りません。はっきりした印を足してください。</string>
+    <string name="standalone_quality_too_dark">とても暗いため、追跡が不安定になる場合があります。</string>
+    <string name="standalone_quality_too_bright">とても明るいため、追跡が不安定になる場合があります。</string>
+    <string name="standalone_photosphere_no_sensor">このスマホには回転センサーがないため、AR でらくがきを配置できません。</string>
     <string name="standalone_photosphere_compass_not_ready">コンパスの準備がまだできていません。端末を 1 秒ほど動かさずに持ち、もう一度撮影してください。</string>
-    <string name="standalone_photosphere_not_mapped">SphereSLAM はまだこのビューをマッピングしていません。明るく細部の多い面にカメラを 1 秒ほど固定してから、もう一度撮影してください。</string>
-    <string name="doodle_rectify_title">面を補正</string>
+    <string name="standalone_photosphere_not_mapped">この視点はまだ認識されていません — 面の明るく細かい部分に 1 秒ほど静止して向け、撮り直してください。</string>
+    <string name="doodle_rectify_title">面をまっすぐにする</string>
     <string name="doodle_rectify_text">角をドラッグして、シアンの枠を壁の平らな面に合わせてください。</string>
     <string name="doodle_remove_marks_title">マークを削除</string>
     <string name="doodle_erase_hint">マークをタップして削除するか、複数のマークをなぞって削除します。</string>
@@ -728,7 +728,7 @@
     <string name="ar_feedback_backend_resolving">AR バックエンドを判定中です。しばらくしてからもう一度ホストを試してください</string>
     <string name="ar_feedback_open_project_first">共有する前にプロジェクトを開いてください。ゲストに送るものがまだありません</string>
     <string name="ar_feedback_host_need_doodle_arcore">ホストする前に、最新のらくがきを撮影してロックしてください</string>
-    <string name="ar_feedback_host_need_target_standalone">ホストする前に、スタンドアロンの壁ターゲットを撮影してください</string>
+    <string name="ar_feedback_host_need_target_standalone">ホストする前にらくがきを撮影してください</string>
     <string name="ar_feedback_doodle_not_ready">らくがきの準備がまだできていません — 画面内に保ったまま、もう一度「ホスト」を試してください</string>
     <string name="ar_feedback_package_failed">このプロジェクトを共有用にパッケージできませんでした。先に保存してみてください</string>
     <string name="ar_feedback_host_failed">共有を開始できませんでした：%1$s</string>
@@ -741,7 +741,7 @@
     <string name="ar_feedback_camera_busy">カメラが使用中か利用できません。他のカメラアプリを閉じてから、AR にもう一度入ってください</string>
     <string name="ar_feedback_ar_start_failed">AR を開始できませんでした。カメラが他のアプリで使用されている可能性があります</string>
     <string name="ar_feedback_camera_setting_apply_failed">カメラ設定を実行中の AR セッションに適用できませんでした。AR を終了して、もう一度入ってください</string>
-    <string name="ar_feedback_sphere_target_save_failed">このセッションでは壁のトラッキングは機能しますが、SphereSLAM ターゲットを保存できませんでした。</string>
+    <string name="ar_feedback_sphere_target_save_failed">このセッションでは追跡できますが、らくがきを保存できませんでした。</string>
     <string name="ar_feedback_camera_not_resumed">AR カメラが再開しませんでした。AR モードを終了して、もう一度入ってみてください</string>
     <string name="ar_feedback_camera_permission">カメラを利用できません。カメラの権限を確認してから、AR にもう一度入ってください</string>
     <string name="ar_feedback_camera_not_paused">AR カメラを正常に一時停止できませんでした。バックグラウンドで動き続ける可能性があります</string>
@@ -799,4 +799,61 @@
     <string name="cv_pass_warm_luma">暖色輝度</string>
     <string name="cv_pass_stencil3">ステンシル</string>
     <string name="cv_pass_change">変化</string>
+    <string name="doodle_tap_grid_hint">らくがきをタップして撮影します。</string>
+    <string name="doodle_blank_wall_hint">面に何もない場合は写真を撮ってください。</string>
+    <string name="doodle_blank_wall_saved_hint">無地の面を保存しました。次にらくがきをタップしてください。</string>
+    <string name="update_title">アップデートがあります</string>
+    <string name="update_body_play">Play ストアに新しいバージョンがあります。</string>
+    <string name="update_body_github">バージョン %1$s が GitHub にあります。</string>
+    <string name="update_go_play">Play ストアを開く</string>
+    <string name="update_go_github">GitHub を開く</string>
+    <string name="update_later">後で</string>
+    <string name="crash_title">GraffitiXR が予期せず終了しました</string>
+    <string name="crash_body">前回問題が発生しました。レポートを共有すると修正に役立ちます。内容はスマホの機種とアプリの最近のログのみで、プロジェクトの内容は含まれません。</string>
+    <string name="crash_share">レポートを共有</string>
+    <string name="crash_copy">コピー</string>
+    <string name="crash_dismiss">閉じる</string>
+    <string name="ar_feedback_host_no_lan">接続には Wi-Fi が必要です。Wi-Fi に接続するかテザリングを開始してから、もう一度ホストしてください。</string>
+    <string name="hud_progress">進捗</string>
+    <string name="replace_design_title">デザインを置き換えますか？</string>
+    <string name="replace_design_text">現在のデザインと配置を置き換えます。元に戻せます。</string>
+    <string name="replace_design_confirm">置き換える</string>
+    <string name="dialog_cancel">キャンセル</string>
+    <string name="delete_project_title">「%1$s」を削除しますか？</string>
+    <string name="delete_project_text">プロジェクトを完全に削除します: デザイン、サムネイル、保存したらくがき。面が変わっているとらくがきは撮り直せません。元に戻せません。</string>
+    <string name="save_project_title">プロジェクトを保存</string>
+    <string name="doodle_not_locked_title">らくがきが固定されていません</string>
+    <string name="doodle_not_locked_text">デザインは配置されましたが、らくがきに固定できなかったため、オーバーレイがずれていきます。面の正面に立ち、少し近づいて、明るい場所で撮り直してください。</string>
+    <string name="doodle_recapture">らくがきを撮り直す</string>
+    <string name="msg_capture_incomplete">撮影が完了していません。らくがきを撮り直してください。</string>
+    <string name="msg_map_not_ready">面がまだ認識されていません。カメラを向けたまま、もう一度お試しください。</string>
+    <string name="msg_no_project">プロジェクトが開かれていません。先に開くか作成してください: らくがきはプロジェクトに保存されます。</string>
+    <string name="msg_doodle_low_detail_selected">残した部分の細部が足りません。らくがきの印をもっと残してください。</string>
+    <string name="msg_doodle_changed">保存中にらくがきが変わったため、保存されませんでした。もう一度お試しください。</string>
+    <string name="msg_doodle_saved">らくがきを保存して固定しました</string>
+    <string name="msg_doodle_save_failed">らくがきを保存できませんでした。もう一度お試しください。</string>
+    <string name="msg_doodle_too_weak_kept">追跡するには細部が足りません。前のらくがきをそのまま使います。</string>
+    <string name="msg_doodle_low_detail">追跡するには細部が足りません。印を濃くするか、明るくしてください。</string>
+    <string name="msg_doodle_session_only">らくがきはこのセッションのみ保存されました: 固定できなかったため、プロジェクトを開き直すと消えます。しっかり構えて撮り直してください。</string>
+    <string name="msg_doodle_anchor_failed">らくがきを固定できませんでした。スマホを面に向けて静止させ、もう一度お試しください。</string>
+    <string name="msg_project_switched">らくがきの保存前に別のプロジェクトが開かれたため、保存されませんでした。撮り直してください。</string>
+    <string name="msg_image_invalid">その画像を開けないか、プロジェクトが開かれていません。</string>
+    <string name="msg_nothing_to_share">まだ共有するものがありません。先にプロジェクトを保存してください。</string>
+    <string name="msg_share_failed">共有の準備ができませんでした。もう一度お試しください。</string>
+    <string name="msg_export_failed">書き出しに失敗しました。もう一度お試しください。</string>
+    <string name="status_preparing_tracking">AR を準備中…</string>
+    <string name="msg_locked">ロックしました。動かすにはもう一度ロックをタップします。</string>
+    <string name="msg_export_timeout">書き出しがタイムアウトしました。もう一度お試しください。</string>
+    <string name="msg_project_save_failed">プロジェクトを保存できませんでした。もう一度お試しください。</string>
+    <string name="coop_none_title">セッションが見つかりません</string>
+    <string name="coop_none_text">近くに GraffitiXR のセッションがありません。もう一度探すか、自分でホストしてください。</string>
+    <string name="coop_host">ホスト</string>
+    <string name="coop_search">検索</string>
+    <string name="coop_need_doodle">ホストするには先にらくがきを撮影してください。</string>
+    <string name="coop_scan_to_join">スキャンして参加</string>
+    <string name="coop_stop_sharing">共有を停止</string>
+    <string name="coop_leave">退出</string>
+    <string name="glasses_pairing">Meta グラスをペアリング中…</string>
+    <string name="glasses_reconnect">再接続</string>
+    <string name="glasses_end">終了</string>
 </resources>
