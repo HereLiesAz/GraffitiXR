@@ -2949,6 +2949,14 @@ class ArViewModel @Inject constructor(
                     appendDiag("session.resume() took ${android.os.SystemClock.elapsedRealtime() - t0}ms")
                 } else if ((!isActivityResumed || !isInArMode) && isSessionResumed) {
                     pauseArSessionInternal()
+                    // A GL frame wedged in session.update() holds the session lock past every retry,
+                    // and giving up there left ARCore holding the camera in the background (battery
+                    // stats: minutes of background camera). Keep trying until it lets go or the app
+                    // returns; cancellation (a later lifecycle change) ends the loop.
+                    while (isSessionResumed && (!isActivityResumed || !isInArMode) && !isDestroying) {
+                        kotlinx.coroutines.delay(BACKGROUND_PAUSE_RETRY_MS)
+                        pauseArSessionInternal(reportFailure = false)
+                    }
                 }
             }
         }
@@ -3885,7 +3893,9 @@ class ArViewModel @Inject constructor(
      * Same race, same fix, same NoSession fallback reasoning as [resumeArSessionInternal] — see its
      * doc, including the [SessionLifecycleOutcome.LockTimeout] retry-then-notify handling.
      */
-    private fun pauseArSessionInternal() {
+    private fun pauseArSessionInternal() = pauseArSessionInternal(reportFailure = true)
+
+    private fun pauseArSessionInternal(reportFailure: Boolean) {
         val s = session ?: return
         val r = renderer
         try {
@@ -3904,7 +3914,7 @@ class ArViewModel @Inject constructor(
                         "Failed to pause ARCore session: GL thread did not release its session " +
                             "lock after ${LOCK_TIMEOUT_MAX_RETRIES} retries"
                     )
-                    _feedback.tryEmit(
+                    if (reportFailure) _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
                             appContext.getString(DesignR.string.ar_feedback_camera_not_paused)
                         )
@@ -6737,6 +6747,8 @@ class ArViewModel @Inject constructor(
         private const val STANDALONE_MAP_SAVE_INTERVAL_MS = 2_000L
         const val LOCK_TIMEOUT_MAX_RETRIES = 3
         const val LOCK_TIMEOUT_RETRY_DELAY_MS = 200L
+        /** Interval between pause attempts while a wedged GL frame keeps the camera open. */
+        const val BACKGROUND_PAUSE_RETRY_MS = 1000L
     }
     // @Volatile: written on main (setDoodlePhase) / IO (build result) and read on the GL thread
     // (onDoodleCaptured), so the GL thread must observe the latest value.
