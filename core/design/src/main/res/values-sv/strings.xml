@@ -148,7 +148,7 @@
 
 
 
-    <string name="nav_lock_info">Lås pekskärmen för att förhindra oavsiktliga ändringar medan du sprayar. Tryck tre gånger var som helst för att låsa upp.</string>
+    <string name="nav_lock_info">Fäster designen så att nyp och drag inte flyttar den. Tryck på Lås igen för att släppa den.</string>
 
 
 
@@ -254,7 +254,6 @@
     <string name="choose_from_gallery">Välj från Galleri</string>
 
 
-    <string name="depth_unsupported">Den här enheten stöder inte Depth API.\nVäxla till Canvas-läge i Inställningar.</string>
 
 
     <string name="arcore_required_title">ARCore krävs</string>
@@ -269,9 +268,9 @@
     <string name="open_settings">Öppna Inställningar</string>
 
 
-    <string name="doodle_creation_title">KRUMELURRUTNÄT</string>
+    <string name="doodle_creation_title">KRUMELUR</string>
 
-    <string name="doodle_creation_text">Om du inte har skapat ditt Krumelurrutnät än, ta en bild av väggen genom att trycka på fotoknappen. Tryck annars på Avbryt.</string>
+    <string name="doodle_creation_text">Din Krumelur är några stora märken du målar på ytan så att appen kan hitta den igen. Måla dem och fotografera sedan ytan med fotoknappen.</string>
 
     <string name="cancel">Avbryt</string>
 
@@ -335,10 +334,8 @@
     <string name="align_not_ready">Rikta in behöver först en Doodle och en placerad design.</string>
 
 
-    <string name="status_create_grid">Skapa ett rutnät för att börja.</string>
     <string name="status_scan_surfaces">Skanna ytor runt dig.</string>
     <string name="status_tap_surface">Tryck på en yta för att placera ankare.</string>
-    <string name="status_looking_grid">Letar du efter ditt Grid...</string>
     <string name="status_ready">Redo. (%1$d poäng)</string>
     <string name="unlock_hint">Volym Upp, Ner, Upp, Ner — snabbt — för att låsa upp</string>
 
@@ -420,7 +417,7 @@
     <string name="settings_granted">Beviljas</string>
     <string name="settings_denied">Nekad</string>
     <string name="settings_open_app_settings">Öppna Appinställningar</string>
-    <string name="settings_copyright">GraffitiXR © 2025</string>
+    <string name="settings_copyright">GraffitiXR © 2025–2026</string>
 
 
     <string name="save_project_hint">Projektnamn</string>
@@ -458,7 +455,7 @@
 
 
 
-    <string name="help_mode_host">Mode Switcher: Växla mellan applägen. Instruktioner: Tryck för att expandera och välj sedan AR, Overlay, Mockup eller Lightbox.</string>
+    <string name="help_mode_host">Lägesväljare: Växla mellan appens lägen. Instruktioner: Tryck för att fälla ut och välj AR, Täcka över, Mockup eller Spåra.</string>
 
     <string name="help_ar">AR-läge: Projicera design på en vägg med hjälp av rumslig kartläggning. Instruktioner: Skanna miljön tills väggen upptäcks, tryck sedan för att placera ankaret.</string>
 
@@ -466,11 +463,11 @@
 
     <string name="help_mockup">Mockup-läge: Förhandsgranska designen på ett statiskt foto. Instruktioner: Använd \'Vägg\' för att ställa in en bakgrundsbild och placera sedan designen ovanpå.</string>
 
-    <string name="help_trace">Lightbox-läge: Spårningsyta med hög ljusstyrka. Instruktioner: Lägg papper över skärmen och rita. Tryck snabbt Volym Upp, Ner, Upp, Ner för att avsluta.</string>
+    <string name="help_trace">Spåra-läge: Mycket ljus yta att rita av på. Instruktioner: Lägg papper över skärmen och rita av. Tryck snabbt Volym Upp, Ner, Upp, Ner för att avsluta.</string>
 
 
 
-    <string name="help_create">Skapa ankare: Fotografera ett märke på väggen för att låsa projektionen. Instruktioner: Peka på en distinkt textur och tryck. Appen kommer att spåra detta märke.</string>
+    <string name="help_create">Fota Krumelur: Fotografera din Krumelurs märken för att låsa projektionen. Instruktioner: Rikta mot märkena och tryck. Appen följer dem sedan.</string>
 
 
     <string name="help_add_img">Importera bild: Lägg till en skiss eller referensfoto. Instruktioner: Välj en bild från ditt galleri. Den blir din design.</string>
@@ -592,11 +589,11 @@
         <item>På så sätt är din bildmaterial redo, och din telefon kan fokusera på förstärkt verklighet när du trycker på AR-knappen.</item>
     </string-array>
     <string-array name="onboarding_ar">
-        <item>AR-projicering — projicerar din design på en riktig vägg med hjälp av telefonens djupsensor och rumsliga spårning.</item>
-        <item>Rikta mot väggen och rör dig långsamt i sidled. Färgade former dyker upp allt eftersom motorn kartlägger ytan. Vänta tills väggytan är täckt.</item>
-        <item>Tryck bara på skärmen. Appen fotograferar väggen, extraherar spårningsfunktioner och låser ankaret direkt.</item>
-        <item>Tryck på \"Öppna\" för att lägga till din design — den projiceras på väggen med hjälp av ankaret du just ställde in.</item>
-        <item>Tips — tomma vita väggar, slät betong och enfärgade ytor kan inte spåras. Rikta ditt ankarpunkt mot graffiti, grov puts eller något annat tydligt märke.</item>
+        <item>AR – projicerar din design på den riktiga ytan och håller den kvar medan du rör dig.</item>
+        <item>Måla din Krumelur: några stora, tydliga märken på ytan, utspridda och inte alla med samma form.</item>
+        <item>Tryck på Krumelur och fotografera märkena. Appen låser din design till dem.</item>
+        <item>Tryck på ”Öppna” för att lägga till din design – den visas på ytan, hållen på plats av din Krumelur.</item>
+        <item>Tips – en slät yta har inget att följa på egen hand. Det är vad din Krumelur är till för: tydliga märken som sticker ut från ytan.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Live-täckning — din design svävar över den direktsända kamerabilden, utan att behöva skanna någon yta.</item>
@@ -671,45 +668,45 @@
     <string name="first_run_detect_title">Rikta nu kameran mot det du ritade</string>
     <string name="first_run_detect_movement_hint">Rör enheten långsamt i en cirkel</string>
     <string name="standalone_width_prompt">Mät den verkliga bredden mellan målets vänstra och högra kant.</string>
-    <string name="standalone_width_label_metric">Målets bredd (meter)</string>
-    <string name="standalone_width_label_imperial">Målets bredd (fot och tum)</string>
+    <string name="standalone_width_label_metric">Ytans bredd (meter)</string>
+    <string name="standalone_width_label_imperial">Ytans bredd (fot och tum)</string>
     <string name="standalone_width_range_error">Ange en bredd från %1$s till %2$s.</string>
     <string name="standalone_use_measured_width">Använd uppmätt bredd</string>
     <string name="standalone_continue_without_scale">Fortsätt utan fysisk skala</string>
     <string name="standalone_recapture">Ta om</string>
-    <string name="standalone_capture_wall_target">Fånga väggmål</string>
-    <string name="standalone_capture_failed">Det gick inte att fånga väggmålet – försök igen.</string>
+    <string name="standalone_capture_wall_target">Fota Krumelur</string>
+    <string name="standalone_capture_failed">Kunde inte fota Krumeluren – försök igen.</string>
     <string name="standalone_rectify_failed">Det gick inte att räta upp målet – markera fyra tydliga hörn.</string>
-    <string name="standalone_target_too_weak">Målet har för få spårbara detaljer (%1$d KPM-egenskaper; %2$d behövs). Fånga ett rikare vägguttag.</string>
-    <string name="standalone_new_target">Nytt mål</string>
+    <string name="standalone_target_too_weak">För lite detaljer att följa där (%1$d punkter; behöver %2$d). Lägg till några fler tydliga märken, eller rikta mot ett mer detaljerat parti.</string>
+    <string name="standalone_new_target">Ny Krumelur</string>
     <string name="standalone_copy_diagnostics">Kopiera diagnostik</string>
     <string name="standalone_wall_target_lost">Väggmålet tappades</string>
-    <string name="standalone_recapture_target">Fånga målet igen</string>
+    <string name="standalone_recapture_target">Fota Krumelur igen</string>
     <string name="standalone_sweep_hint">Vrid dig långsamt för att kartlägga rummet — %1$d%%</string>
-    <string name="standalone_failure_native_library_unavailable">SphereSLAM är inte tillgängligt i den här versionen.</string>
+    <string name="standalone_failure_native_library_unavailable">AR-spårning är inte tillgänglig i den här versionen.</string>
     <string name="standalone_failure_camera_unavailable">Kameran är inte tillgänglig för fristående AR.</string>
     <string name="standalone_failure_intrinsics_unavailable">Kamerakalibrering är inte tillgänglig för fristående AR.</string>
-    <string name="standalone_failure_reference_too_weak">Det väggmålet har för få spårbara detaljer. Fånga ett rikare utsnitt.</string>
-    <string name="standalone_failure_no_page_match">Håll väggmålet i bild.</string>
+    <string name="standalone_failure_reference_too_weak">För lite detaljer att följa. Lägg till några fler tydliga märken, eller rikta mot ett mer detaljerat parti.</string>
+    <string name="standalone_failure_no_page_match">Håll din Krumelur i bild.</string>
     <string name="standalone_failure_stale_observation">Spårningen hänger efter. Rör telefonen långsammare.</string>
     <string name="standalone_failure_reprojection_error">Väggmatchningen är instabil. Rama in målet igen.</string>
     <string name="standalone_failure_insufficient_inliers">Det syns inte tillräckligt med detaljer från målet.</string>
-    <string name="standalone_failure_pose_jump">Spårningshopp avvisades. Håll telefonen stilla mot väggmålet.</string>
-    <string name="standalone_failure_persisted_target_corrupt">Det sparade väggmålet saknas eller går inte att läsa. Fånga ett nytt mål.</string>
-    <string name="standalone_failure_internal">SphereSLAM kunde inte fortsätta spåra det här målet.</string>
-    <string name="standalone_tracking_stopped">SphereSLAM-spårningen stoppades. Fånga målet igen för att starta om den.</string>
-    <string name="standalone_status_mapping">SphereSLAM kartlägger • tryck på Krumelur för att lägga till din Krumelur</string>
-    <string name="standalone_status_preparing">Förbereder väggmål…</string>
-    <string name="standalone_status_finding">Söker väggmål…</string>
-    <string name="standalone_quality_too_small">Det väggmålet är för litet efter uträtningen. Fånga ett större utsnitt.</string>
-    <string name="standalone_quality_low_contrast">Det väggmålet har för lite visuell kontrast. Ta med mer textur eller detaljer.</string>
-    <string name="standalone_quality_blurry">Det väggmålet är för suddigt för pålitlig spårning. Håll stilla och fånga det igen.</string>
-    <string name="standalone_quality_not_strong_enough">Det väggmålet är inte tillräckligt starkt för pålitlig spårning.</string>
-    <string name="standalone_quality_too_dark">Det här målet är kraftigt underexponerat; spårningen kan bli mindre pålitlig.</string>
-    <string name="standalone_quality_too_bright">Det här målet är kraftigt överexponerat; spårningen kan bli mindre pålitlig.</string>
-    <string name="standalone_photosphere_no_sensor">Den här telefonen saknar rotationssensor, så SphereSLAM kan inte placera ett mål här.</string>
+    <string name="standalone_failure_pose_jump">Spårningen hoppade – håll telefonen mot din Krumelur.</string>
+    <string name="standalone_failure_persisted_target_corrupt">Den sparade Krumeluren kan inte läsas. Fota den igen.</string>
+    <string name="standalone_failure_internal">Spårningen stoppades. Fota din Krumelur igen för att starta om.</string>
+    <string name="standalone_tracking_stopped">Spårningen stoppades. Fota din Krumelur igen för att starta om.</string>
+    <string name="standalone_status_mapping">Lär sig ytan • tryck på Krumelur för att fota din</string>
+    <string name="standalone_status_preparing">Förbereder din Krumelur…</string>
+    <string name="standalone_status_finding">Letar efter din Krumelur…</string>
+    <string name="standalone_quality_too_small">Krumeluren är för liten i bilden. Gå närmare eller fota ett större område.</string>
+    <string name="standalone_quality_low_contrast">För lite kontrast att följa. Tydligare märken eller mer ljus hjälper.</string>
+    <string name="standalone_quality_blurry">För suddigt att följa. Håll stilla och fota igen.</string>
+    <string name="standalone_quality_not_strong_enough">För lite detaljer för pålitlig spårning. Lägg till några fler tydliga märken.</string>
+    <string name="standalone_quality_too_dark">Mycket mörkt; spårningen kan bli mindre pålitlig.</string>
+    <string name="standalone_quality_too_bright">Mycket ljust; spårningen kan bli mindre pålitlig.</string>
+    <string name="standalone_photosphere_no_sensor">Den här telefonen saknar rotationssensor, så AR kan inte placera din Krumelur här.</string>
     <string name="standalone_photosphere_compass_not_ready">Kompassen är inte redo än – håll telefonen stilla en sekund och ta om bilden.</string>
-    <string name="standalone_photosphere_not_mapped">SphereSLAM har inte kartlagt den här vyn än – håll kameran stilla en sekund mot en upplyst, detaljrik del av ytan och ta sedan om bilden.</string>
+    <string name="standalone_photosphere_not_mapped">Appen har inte lärt sig den här vyn än – håll stilla mot en upplyst, detaljerad del av ytan en sekund och fota sedan igen.</string>
     <string name="doodle_rectify_title">Räta upp ytan</string>
     <string name="doodle_rectify_text">Dra nu i hörnen så att den cyanfärgade ramen ligger längs väggens plana yta.</string>
     <string name="doodle_remove_marks_title">Ta bort markeringar</string>
@@ -727,7 +724,7 @@
     <string name="ar_feedback_backend_resolving">AR-backend fastställs fortfarande – försök vara värd igen om en stund</string>
     <string name="ar_feedback_open_project_first">Öppna ett projekt innan du delar – det finns inget att skicka till en gäst än</string>
     <string name="ar_feedback_host_need_doodle_arcore">Fånga och lås en aktuell Krumelur innan du är värd</string>
-    <string name="ar_feedback_host_need_target_standalone">Fånga ett fristående väggmål innan du är värd</string>
+    <string name="ar_feedback_host_need_target_standalone">Fota din Krumelur innan du blir värd</string>
     <string name="ar_feedback_doodle_not_ready">Krumeluren är inte klar än — håll den i bild och försök med ”Vara värd” igen</string>
     <string name="ar_feedback_package_failed">Det gick inte att paketera projektet för delning – försök spara det först</string>
     <string name="ar_feedback_host_failed">Det gick inte att starta delningen: %1$s</string>
@@ -740,7 +737,7 @@
     <string name="ar_feedback_camera_busy">Kameran är upptagen eller otillgänglig – stäng andra kameraappar och gå sedan in i AR igen</string>
     <string name="ar_feedback_ar_start_failed">Det gick inte att starta AR – kameran kanske används av en annan app</string>
     <string name="ar_feedback_camera_setting_apply_failed">Det gick inte att tillämpa kamerainställningen på den pågående AR-sessionen – lämna AR och gå in igen</string>
-    <string name="ar_feedback_sphere_target_save_failed">Väggspårningen fungerar i den här sessionen, men SphereSLAM-målet kunde inte sparas.</string>
+    <string name="ar_feedback_sphere_target_save_failed">Spårningen fungerar under den här sessionen, men din Krumelur kunde inte sparas.</string>
     <string name="ar_feedback_camera_not_resumed">AR-kameran återupptogs inte – försök lämna AR-läget och gå in igen</string>
     <string name="ar_feedback_camera_permission">Kameran är otillgänglig – kontrollera kameratillståndet och gå sedan in i AR igen</string>
     <string name="ar_feedback_camera_not_paused">AR-kameran pausades inte ordentligt – den kan fortsätta köra i bakgrunden</string>
@@ -797,4 +794,68 @@
     <string name="cv_pass_warm_luma">Varmt ljus</string>
     <string name="cv_pass_stencil3">Stencil</string>
     <string name="cv_pass_change">Förändring</string>
+    <string name="doodle_tap_grid_hint">Tryck på din Krumelur för att fota den.</string>
+    <string name="doodle_blank_wall_hint">Om ytan är tom, ta en bild.</string>
+    <string name="doodle_blank_wall_saved_hint">Tom yta sparad. Tryck nu på din Krumelur.</string>
+    <string name="update_title">Uppdatering tillgänglig</string>
+    <string name="update_body_play">En nyare version finns i Play Butik.</string>
+    <string name="update_body_github">Version %1$s finns på GitHub.</string>
+    <string name="update_go_play">Öppna Play Butik</string>
+    <string name="update_go_github">Öppna GitHub</string>
+    <string name="update_later">Senare</string>
+    <string name="crash_title">GraffitiXR stängdes oväntat</string>
+    <string name="crash_body">Något gick fel förra gången. Att dela rapporten hjälper till att åtgärda det; den innehåller din telefonmodell och appens senaste logg, inget från dina projekt.</string>
+    <string name="crash_share">Dela rapport</string>
+    <string name="crash_copy">Kopiera</string>
+    <string name="crash_dismiss">Stäng</string>
+    <string name="ar_feedback_host_no_lan">Anslutning kräver Wi-Fi. Anslut till ett Wi-Fi-nätverk eller starta en surfzon och bli värd igen.</string>
+    <string name="hud_progress">Förlopp</string>
+    <string name="replace_design_title">Ersätta designen?</string>
+    <string name="replace_design_text">Detta byter ut den nuvarande designen och dess placering. Du kan ångra det.</string>
+    <string name="replace_design_confirm">Ersätt</string>
+    <string name="dialog_cancel">Avbryt</string>
+    <string name="delete_project_title">Radera ”%1$s”?</string>
+    <string name="delete_project_text">Detta raderar projektet för gott: designen, miniatyren och den sparade Krumeluren. En Krumelur kan inte fotas igen om ytan har ändrats sedan dess. Detta kan inte ångras.</string>
+    <string name="save_project_title">Spara projekt</string>
+    <string name="doodle_not_locked_title">Krumeluren är inte låst</string>
+    <string name="doodle_not_locked_text">Din design är placerad, men appen kunde inte låsa sig mot din Krumelur, så överlägget kommer att glida. Fota den igen: rakt framför ytan, lite närmare, i bra ljus.</string>
+    <string name="doodle_recapture">Fota Krumelur igen</string>
+    <string name="msg_capture_incomplete">Fotot är ofullständigt. Fota din Krumelur igen.</string>
+    <string name="msg_map_not_ready">Ytan är inte inlärd än. Håll kameran mot den och försök igen.</string>
+    <string name="msg_no_project">Inget projekt är öppet. Öppna eller skapa ett först: en Krumelur sparas i ett projekt.</string>
+    <string name="msg_doodle_low_detail_selected">För lite detaljer i det du behöll. Behåll fler av din Krumelurs märken.</string>
+    <string name="msg_doodle_changed">Din Krumelur ändrades medan den sparades, så den sparades inte. Försök igen.</string>
+    <string name="msg_doodle_saved">Krumelur sparad och låst</string>
+    <string name="msg_doodle_save_failed">Kunde inte spara Krumeluren. Försök igen.</string>
+    <string name="msg_doodle_too_weak_kept">För lite detaljer att följa. Din tidigare Krumelur behölls.</string>
+    <string name="msg_doodle_low_detail">För lite detaljer att följa. Tydligare märken eller mer ljus hjälper.</string>
+    <string name="msg_doodle_session_only">Krumelur sparad bara för den här sessionen: den kunde inte låsas, så den kommer inte tillbaka när du öppnar projektet igen. Fota den igen och håll stilla.</string>
+    <string name="msg_doodle_anchor_failed">Kunde inte låsa din Krumelur. Håll telefonen stilla mot ytan och försök igen.</string>
+    <string name="msg_project_switched">Ett annat projekt öppnades innan Krumeluren sparades, så den sparades inte. Fota den igen.</string>
+    <string name="msg_image_invalid">Bilden kan inte öppnas, eller så är inget projekt öppet.</string>
+    <string name="msg_nothing_to_share">Inget att dela än. Spara projektet först.</string>
+    <string name="msg_share_failed">Kunde inte förbereda projektet för delning. Försök igen.</string>
+    <string name="msg_export_failed">Exporten misslyckades. Försök igen.</string>
+    <string name="status_preparing_tracking">Förbereder AR…</string>
+    <string name="msg_locked">Låst. Tryck på Lås igen för att flytta den.</string>
+    <string name="msg_export_timeout">Exporten tog för lång tid. Försök igen.</string>
+    <string name="msg_project_save_failed">Kunde inte spara projektet. Försök igen.</string>
+    <string name="coop_none_title">Inga sessioner hittades</string>
+    <string name="coop_none_text">Inga GraffitiXR-sessioner i närheten. Sök igen, eller bli värd själv.</string>
+    <string name="coop_host">Bli värd</string>
+    <string name="coop_search">Sök</string>
+    <string name="coop_need_doodle">Fota din Krumelur först för att bli värd.</string>
+    <string name="coop_scan_to_join">Skanna för att gå med</string>
+    <string name="coop_stop_sharing">Sluta dela</string>
+    <string name="coop_leave">Lämna</string>
+    <string name="glasses_pairing">Parkopplar Meta-glasögon…</string>
+    <string name="glasses_reconnect">Återanslut</string>
+    <string name="glasses_end">Avsluta</string>
+    <string name="diag_confidence">Tillförlitlighet</string>
+    <string name="diag_sensors">Sensordata</string>
+    <string name="diag_log_start">Logg ▶</string>
+    <string name="diag_log_stop">Logg ■</string>
+    <string name="diag_induce_loss">Förlust</string>
+    <string name="diag_rec_start">Insp. ▶</string>
+    <string name="diag_rec_stop">Insp. ■</string>
 </resources>

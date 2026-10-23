@@ -52,7 +52,13 @@ data class ProjectSnapshot(
 
 /** Public API. Editor + AR features depend on this surface only. */
 @Singleton
+/** Hosting needs this device on a local network (Wi-Fi or hotspot): no LAN address was found. */
+class NoLanAddressException : IllegalStateException("no local network address: join Wi-Fi or start a hotspot")
+
 class CollaborationManager @Inject constructor() {
+
+    // The address a guest dials, or null with no local network. Replaceable for tests.
+    internal var lanAddress: () -> String? = { LocalIp.discover() }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -81,6 +87,9 @@ class CollaborationManager @Inject constructor() {
         snapshotProvider: () -> ProjectSnapshot,
     ): String {
         check(hostSession == null && guestSession == null) { "already in a session" }
+        // Without a LAN address the QR would advertise 127.0.0.1: the guest would dial itself and
+        // report "network lost". Refuse up front with the real reason instead.
+        val lanHost = lanAddress() ?: throw NoLanAddressException()
         // A previous session's undelivered guest edits belong to that session, not this one.
         while (_guestOps.tryReceive().isSuccess) Unit
         val token = QrPayload.newToken()
@@ -107,7 +116,7 @@ class CollaborationManager @Inject constructor() {
             throw e
         }
         val payload = QrPayload(
-            host = LocalIp.discover() ?: "127.0.0.1",
+            host = lanHost,
             port = port,
             token = token,
             protocolVersion = protocolVersion,

@@ -16,23 +16,34 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /** A newer build than the one running, and where to get it. */
-sealed class UpdateOffer(val versionLabel: String) {
-    /** Installed from the Play Store: Play has a newer version code. */
-    class Play(versionLabel: String) : UpdateOffer(versionLabel)
+sealed class UpdateOffer {
+    /** Installed from the Play Store: Play has a newer build (Play reports no version name). */
+    object Play : UpdateOffer()
 
-    /** Sideloaded: the latest GitHub release carries a newer version code. */
-    class GitHub(versionLabel: String, val url: String) : UpdateOffer(versionLabel)
+    /** Sideloaded: the latest GitHub release is newer; [versionLabel] is its version name. */
+    class GitHub(val versionLabel: String, val url: String) : UpdateOffer()
 }
 
 /**
  * Finds the update that matches how the app was installed. A Play install asks Play (the in-app
- * update API); anything else (a GitHub APK, a local build) reads the latest non-prerelease GitHub
- * release, whose body names its `versionCode` (the central release workflow writes
- * "Automated release build — M.m.p.b (versionCode N, sha)"). Debug builds are never offered one:
- * their version code is 1 and every release would look newer.
+ * update API); a sideloaded install (a GitHub APK) reads the latest non-prerelease GitHub release,
+ * whose body names its `versionCode` (the central release workflow writes "Automated release build —
+ * M.m.p.b (versionCode N, sha)"), falling back to the version name. Another store's install is left
+ * to that store. Debug builds are never offered one: their version code is 1 and every release
+ * would look newer.
  */
 object UpdateChecker {
     private const val PLAY_INSTALLER = "com.android.vending"
+
+    // Installs a GitHub release can update: the system package installer (an APK opened from a
+    // download), adb, or no recorded installer. Another store's install (Galaxy Store, F-Droid…) is
+    // updated by that store, so it is never pointed at GitHub.
+    private val SIDELOAD_INSTALLERS = setOf(
+        null,
+        "com.google.android.packageinstaller",
+        "com.android.packageinstaller",
+        "com.android.shell",
+    )
     private const val LATEST_RELEASE = "https://api.github.com/repos/HereLiesAz/GraffitiXR/releases/latest"
     private val VERSION_CODE = Regex("""versionCode\s+(\d+)""")
     private val VERSION_NAME = Regex("""—\s*([0-9][0-9.]*)""")
@@ -40,7 +51,11 @@ object UpdateChecker {
     suspend fun check(context: Context): UpdateOffer? {
         if (BuildConfig.DEBUG) return null
         return runCatching {
-            if (installedFromPlay(context)) checkPlay(context) else checkGitHub()
+            when (val installer = installer(context)) {
+                PLAY_INSTALLER -> checkPlay(context)
+                in SIDELOAD_INSTALLERS -> checkGitHub()
+                else -> null.also { Timber.i("Installed by %s: its store handles updates", installer) }
+            }
         }.onFailure { Timber.w(it, "Update check failed") }.getOrNull()
     }
 
@@ -62,21 +77,32 @@ object UpdateChecker {
         }
     }
 
-    private fun installedFromPlay(context: Context): Boolean {
+    private fun installer(context: Context): String? {
         val pm = context.packageManager
-        val installer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             pm.getInstallSourceInfo(context.packageName).installingPackageName
         } else {
             @Suppress("DEPRECATION")
             pm.getInstallerPackageName(context.packageName)
         }
-        return installer == PLAY_INSTALLER
     }
 
     private suspend fun checkPlay(context: Context): UpdateOffer? {
         val info = AppUpdateManagerFactory.create(context).requestAppUpdateInfo()
         if (info.updateAvailability() != UpdateAvailability.UPDATE_AVAILABLE) return null
-        return UpdateOffer.Play(info.availableVersionCode().toString())
+        return UpdateOffer.Play
+    }
+
+    /** True when dotted version [candidate] is greater than [current] (numeric, part by part). */
+    internal fun newerVersionName(candidate: String, current: String): Boolean {
+        val a = candidate.split('.').map { it.toLongOrNull() ?: 0L }
+        val b = current.split('.').map { it.toLongOrNull() ?: 0L }
+        for (i in 0 until maxOf(a.size, b.size)) {
+            val x = a.getOrElse(i) { 0L }
+            val y = b.getOrElse(i) { 0L }
+            if (x != y) return x > y
+        }
+        return false
     }
 
     private suspend fun checkGitHub(): UpdateOffer? = withContext(Dispatchers.IO) {
@@ -89,10 +115,22 @@ object UpdateChecker {
             if (conn.responseCode != HttpURLConnection.HTTP_OK) return@withContext null
             val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
             val body = json.optString("body")
-            val code = VERSION_CODE.find(body)?.groupValues?.get(1)?.toLongOrNull() ?: return@withContext null
-            if (code <= BuildConfig.VERSION_CODE) return@withContext null
-            val name = VERSION_NAME.find(body)?.groupValues?.get(1) ?: json.optString("tag_name")
-            UpdateOffer.GitHub(name, json.optString("html_url"))
+            val name = VERSION_NAME.find(body)?.groupValues?.get(1)
+            val code = VERSION_CODE.find(body)?.groupValues?.get(1)?.toLongOrNull()
+            val newer = when {
+                code != null -> code > BuildConfig.VERSION_CODE
+                // The release notes changed shape: fall back to the version name, and say so rather
+                // than letting update offers quietly stop.
+                name != null -> newerVersionName(name, BuildConfig.VERSION_NAME).also {
+                    Timber.w("Latest release names no versionCode; compared version names instead")
+                }
+                else -> {
+                    Timber.w("Latest release names neither versionCode nor version; no update offered")
+                    false
+                }
+            }
+            if (!newer) return@withContext null
+            UpdateOffer.GitHub(name ?: json.optString("tag_name"), json.optString("html_url"))
         } finally {
             conn.disconnect()
         }

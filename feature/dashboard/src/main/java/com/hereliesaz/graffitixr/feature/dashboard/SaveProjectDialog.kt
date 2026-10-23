@@ -1,25 +1,24 @@
 package com.hereliesaz.graffitixr.feature.dashboard
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import com.hereliesaz.aznavrail.AzTextBox
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import com.hereliesaz.graffitixr.design.R as DesignR
+import com.hereliesaz.graffitixr.design.components.GxrDialog
 import com.hereliesaz.graffitixr.design.theme.AppStrings
+import com.hereliesaz.graffitixr.design.theme.HotPink
 
 @Composable
 fun SaveProjectDialog(
@@ -33,45 +32,32 @@ fun SaveProjectDialog(
     // Force re-initialization if initialName changes, ensuring the field is editable
     // and correctly populated when the dialog appears.
     var name by remember(initialName) { mutableStateOf(initialName) }
+    val save = { if (!isBusy && name.isNotBlank()) onSaveRequest(name.trim()) }
 
-    Dialog(
-        onDismissRequest = { if (!isBusy) onDismissRequest() },
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+    GxrDialog(
+        title = stringResource(DesignR.string.save_project_title),
+        confirmLabel = strings.common.save,
+        onConfirm = save,
+        confirmEnabled = !isBusy && name.isNotBlank(),
+        dismissLabel = strings.common.cancel,
+        onDismiss = { if (!isBusy) onDismissRequest() },
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable(
-                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                    indication = null
-                ) { if (!isBusy) onDismissRequest() },
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .wrapContentSize()
-                    .padding(24.dp)
-                    .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        indication = null
-                    ) { } // prevent dismissing when clicking content
-            ) {
-                AzTextBox(
-                    value = name,
-                    enabled = !isBusy,
-                    onValueChange = { name = it },
-                    hint = strings.editor.saveProjectHint,
-                    // Bring back the Hot Pink outline (default)
-                    onSubmit = { text ->
-                        if (!isBusy && text.isNotBlank()) {
-                            onSaveRequest(text.trim())
-                        }
-                    },
-                    submitButtonContent = {
-                        Text(strings.common.save, color = Color.White)
-                    }
-                )
-            }
-        }
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            enabled = !isBusy,
+            singleLine = true,
+            placeholder = { Text(strings.editor.saveProjectHint) },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { save() }),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = HotPink,
+                unfocusedBorderColor = HotPink.copy(alpha = 0.6f),
+                cursorColor = HotPink,
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }

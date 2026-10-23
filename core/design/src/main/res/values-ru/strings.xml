@@ -148,7 +148,7 @@
 
 
 
-    <string name="nav_lock_info">Заблокируйте сенсорный экран, чтобы предотвратить случайные изменения во время распыления. </string>
+    <string name="nav_lock_info">Закрепляет дизайн, чтобы щипки и перетаскивание его не сдвигали. Нажмите «Замок» ещё раз, чтобы освободить.</string>
 
 
 
@@ -254,7 +254,6 @@
     <string name="choose_from_gallery">Выбрать из галереи</string>
 
 
-    <string name="depth_unsupported">Это устройство не поддерживает Depth API.\nПереключитесь в режим Canvas в настройках.</string>
 
 
     <string name="arcore_required_title">Требуется ARCore</string>
@@ -269,9 +268,9 @@
     <string name="open_settings">Открыть настройки</string>
 
 
-    <string name="doodle_creation_title">СЕТКА КАРАКУЛЕЙ</string>
+    <string name="doodle_creation_title">КАРАКУЛИ</string>
 
-    <string name="doodle_creation_text">Если вы ещё не создали сетку Каракулей, сфотографируйте стену, нажав кнопку съёмки. В противном случае нажмите «Отмена».</string>
+    <string name="doodle_creation_text">Ваши Каракули — это несколько крупных меток, которые вы рисуете на поверхности, чтобы приложение могло снова её найти. Нарисуйте их, затем сфотографируйте поверхность кнопкой съёмки.</string>
 
     <string name="cancel">Отмена</string>
 
@@ -335,10 +334,8 @@
     <string name="align_not_ready">Чтобы выровнять, сначала нужны Doodle и размещённый дизайн.</string>
 
 
-    <string name="status_create_grid">Для начала создайте сетку.</string>
     <string name="status_scan_surfaces">Сканируйте поверхности вокруг вас.</string>
     <string name="status_tap_surface">Коснитесь поверхности, чтобы разместить якорь.</string>
-    <string name="status_looking_grid">Ищем свою сетку...</string>
     <string name="status_ready">Готово. (%1$d точ.)</string>
     <string name="unlock_hint">Громкость: Вверх, Вниз, Вверх, Вниз — быстро — для разблокировки</string>
 
@@ -420,7 +417,7 @@
     <string name="settings_granted">Предоставленный</string>
     <string name="settings_denied">Отклонен</string>
     <string name="settings_open_app_settings">Откройте настройки приложения</string>
-    <string name="settings_copyright">ГраффитиXR © 2025</string>
+    <string name="settings_copyright">GraffitiXR © 2025–2026</string>
 
 
     <string name="save_project_hint">Название проекта</string>
@@ -458,7 +455,7 @@
 
 
 
-    <string name="help_mode_host">Переключатель режима: переключение между режимами приложения. </string>
+    <string name="help_mode_host">Переключатель режимов: переключение между режимами приложения. Инструкция: нажмите, чтобы развернуть, затем выберите AR, Наложение, Макет или След.</string>
 
     <string name="help_ar">Режим AR: проецируйте дизайн на стену с помощью пространственного картографирования. </string>
 
@@ -466,11 +463,11 @@
 
     <string name="help_mockup">Режим макета: предварительный просмотр дизайна на статичной фотографии. Инструкции: используйте «Стена», чтобы задать фоновое фото, а затем разместите дизайн поверх него.</string>
 
-    <string name="help_trace">Режим Lightbox: поверхность трассировки высокой яркости. Быстро нажмите Громкость Вверх, Вниз, Вверх, Вниз, чтобы выйти.</string>
+    <string name="help_trace">Режим «След»: очень яркая поверхность для обводки. Инструкция: положите бумагу на экран и обводите. Чтобы выйти, быстро нажмите Громкость Вверх, Вниз, Вверх, Вниз.</string>
 
 
 
-    <string name="help_create">Создать якорь: сфотографируйте отметку на стене, чтобы зафиксировать проекцию. </string>
+    <string name="help_create">Снять Каракули: сфотографируйте метки Каракулей, чтобы закрепить проекцию. Инструкция: наведите на метки и нажмите. Дальше приложение следит за ними.</string>
 
 
     <string name="help_add_img">Импортировать изображение: добавьте эскиз или эталонную фотографию. Инструкции: выберите изображение из галереи. Оно станет вашим дизайном.</string>
@@ -592,11 +589,11 @@
         <item>Так ваши изображения будут готовы, и телефон сможет сосредоточиться на дополненной реальности при нажатии кнопки AR.</item>
     </string-array>
     <string-array name="onboarding_ar">
-        <item>AR-проекция — проецирует ваш дизайн на настоящую стену с помощью датчика глубины и пространственного отслеживания телефона.</item>
-        <item>Наведите телефон на стену и медленно двигайте его из стороны в сторону. По мере картирования поверхности движком будут появляться цветные фигуры. Дождитесь, пока не будет охвачена вся область стены.</item>
-        <item>Просто коснитесь экрана. Приложение сфотографирует стену, извлечёт отслеживаемые признаки и мгновенно зафиксирует якорь.</item>
-        <item>Нажмите «Открыть», чтобы добавить дизайн — он будет проецироваться на стену с использованием только что установленного якоря.</item>
-        <item>Совет — пустые белые стены, гладкий бетон и однотонные поверхности не отслеживаются. Наведите точку привязки на граффити, грубую штукатурку или любой другой отчётливый узор.</item>
+        <item>AR — проецирует ваш дизайн на реальную поверхность и удерживает его там, пока вы двигаетесь.</item>
+        <item>Нарисуйте Каракули: несколько крупных, ярких меток на поверхности, на расстоянии друг от друга и разной формы.</item>
+        <item>Нажмите «Каракули» и сфотографируйте метки. Приложение закрепит на них ваш дизайн.</item>
+        <item>Нажмите «Открыть», чтобы добавить дизайн — он появится на поверхности и будет держаться на ваших Каракулях.</item>
+        <item>Совет — на гладкой поверхности самой по себе не за что зацепиться. Для этого и нужны Каракули: яркие метки, заметные на поверхности.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Живое наложение — ваш дизайн парит поверх изображения с камеры в реальном времени, без необходимости сканировать поверхность.</item>
@@ -671,45 +668,45 @@
     <string name="first_run_detect_title">Теперь наведите камеру на нарисованное</string>
     <string name="first_run_detect_movement_hint">Медленно двигайте устройство по кругу</string>
     <string name="standalone_width_prompt">Измерьте реальную ширину между левым и правым краями цели.</string>
-    <string name="standalone_width_label_metric">Ширина цели (метры)</string>
-    <string name="standalone_width_label_imperial">Ширина цели (футы и дюймы)</string>
+    <string name="standalone_width_label_metric">Ширина поверхности (метры)</string>
+    <string name="standalone_width_label_imperial">Ширина поверхности (футы и дюймы)</string>
     <string name="standalone_width_range_error">Введите ширину от %1$s до %2$s.</string>
     <string name="standalone_use_measured_width">Использовать измеренную ширину</string>
     <string name="standalone_continue_without_scale">Продолжить без физического масштаба</string>
     <string name="standalone_recapture">Переснять</string>
-    <string name="standalone_capture_wall_target">Снять цель на стене</string>
-    <string name="standalone_capture_failed">Не удалось снять цель на стене — повторите попытку.</string>
+    <string name="standalone_capture_wall_target">Снять Каракули</string>
+    <string name="standalone_capture_failed">Не удалось снять Каракули — попробуйте ещё раз.</string>
     <string name="standalone_rectify_failed">Не удалось выровнять эту цель — отметьте четыре чётких угла.</string>
-    <string name="standalone_target_too_weak">В этой цели слишком мало отслеживаемых деталей (признаков KPM: %1$d, нужно %2$d). Снимите более насыщенный участок стены.</string>
-    <string name="standalone_new_target">Новая цель</string>
+    <string name="standalone_target_too_weak">Здесь мало деталей для отслеживания (%1$d точек; нужно %2$d). Добавьте несколько ярких меток или наведите на более детальный участок.</string>
+    <string name="standalone_new_target">Новые Каракули</string>
     <string name="standalone_copy_diagnostics">Копировать диагностику</string>
     <string name="standalone_wall_target_lost">Цель на стене потеряна</string>
-    <string name="standalone_recapture_target">Переснять цель</string>
+    <string name="standalone_recapture_target">Снять Каракули заново</string>
     <string name="standalone_sweep_hint">Медленно поворачивайтесь, чтобы отсканировать пространство — %1$d%%</string>
-    <string name="standalone_failure_native_library_unavailable">SphereSLAM недоступен в этой сборке.</string>
+    <string name="standalone_failure_native_library_unavailable">Отслеживание AR недоступно в этой сборке.</string>
     <string name="standalone_failure_camera_unavailable">Камера недоступна для автономной AR.</string>
     <string name="standalone_failure_intrinsics_unavailable">Калибровка камеры недоступна для автономной AR.</string>
-    <string name="standalone_failure_reference_too_weak">В этой цели на стене слишком мало отслеживаемых деталей. Снимите более насыщенный участок.</string>
-    <string name="standalone_failure_no_page_match">Держите цель на стене в кадре.</string>
+    <string name="standalone_failure_reference_too_weak">Мало деталей для отслеживания. Добавьте несколько ярких меток или наведите на более детальный участок.</string>
+    <string name="standalone_failure_no_page_match">Держите Каракули в кадре.</string>
     <string name="standalone_failure_stale_observation">Отслеживание отстаёт. Двигайте телефон медленнее.</string>
     <string name="standalone_failure_reprojection_error">Совпадение со стеной нестабильно. Перекадрируйте цель.</string>
     <string name="standalone_failure_insufficient_inliers">Видно недостаточно деталей цели.</string>
-    <string name="standalone_failure_pose_jump">Скачок отслеживания отклонён. Держите телефон неподвижно, направив на цель на стене.</string>
-    <string name="standalone_failure_persisted_target_corrupt">Сохранённая цель на стене отсутствует или не читается. Снимите новую цель.</string>
-    <string name="standalone_failure_internal">SphereSLAM не смог продолжить отслеживание этой цели.</string>
-    <string name="standalone_tracking_stopped">Отслеживание SphereSLAM остановлено. Снимите цель заново, чтобы перезапустить его.</string>
-    <string name="standalone_status_mapping">SphereSLAM строит карту • нажмите «Каракули», чтобы добавить свои Каракули</string>
-    <string name="standalone_status_preparing">Подготовка цели на стене…</string>
-    <string name="standalone_status_finding">Поиск цели на стене…</string>
-    <string name="standalone_quality_too_small">Эта цель на стене слишком мала после выравнивания. Снимите участок побольше.</string>
-    <string name="standalone_quality_low_contrast">В этой цели на стене слишком мало визуального контраста. Захватите больше текстуры или деталей.</string>
-    <string name="standalone_quality_blurry">Эта цель на стене слишком размыта для надёжного отслеживания. Держите телефон ровно и снимите заново.</string>
-    <string name="standalone_quality_not_strong_enough">Эта цель на стене недостаточно выразительна для надёжного отслеживания.</string>
-    <string name="standalone_quality_too_dark">Эта цель сильно недоэкспонирована; отслеживание может быть менее надёжным.</string>
-    <string name="standalone_quality_too_bright">Эта цель сильно переэкспонирована; отслеживание может быть менее надёжным.</string>
-    <string name="standalone_photosphere_no_sensor">В этом телефоне нет датчика поворота, поэтому SphereSLAM не может здесь разместить цель.</string>
+    <string name="standalone_failure_pose_jump">Отслеживание сбилось — держите телефон на Каракулях.</string>
+    <string name="standalone_failure_persisted_target_corrupt">Сохранённые Каракули не читаются. Снимите их заново.</string>
+    <string name="standalone_failure_internal">Отслеживание остановлено. Снимите Каракули заново, чтобы перезапустить.</string>
+    <string name="standalone_tracking_stopped">Отслеживание остановлено. Снимите Каракули заново, чтобы перезапустить.</string>
+    <string name="standalone_status_mapping">Изучение поверхности • нажмите «Каракули», чтобы снять свои</string>
+    <string name="standalone_status_preparing">Подготовка Каракулей…</string>
+    <string name="standalone_status_finding">Поиск ваших Каракулей…</string>
+    <string name="standalone_quality_too_small">Каракули слишком маленькие в кадре. Подойдите ближе или снимите большую область.</string>
+    <string name="standalone_quality_low_contrast">Слишком низкий контраст для отслеживания. Помогут более яркие метки или больше света.</string>
+    <string name="standalone_quality_blurry">Слишком размыто для отслеживания. Держите телефон ровно и снимите заново.</string>
+    <string name="standalone_quality_not_strong_enough">Мало деталей для надёжного отслеживания. Добавьте несколько ярких меток.</string>
+    <string name="standalone_quality_too_dark">Очень темно; отслеживание может быть менее надёжным.</string>
+    <string name="standalone_quality_too_bright">Очень ярко; отслеживание может быть менее надёжным.</string>
+    <string name="standalone_photosphere_no_sensor">В этом телефоне нет датчика поворота, поэтому AR не может разместить здесь ваши Каракули.</string>
     <string name="standalone_photosphere_compass_not_ready">Компас ещё не готов — подержите телефон неподвижно секунду и снимите заново.</string>
-    <string name="standalone_photosphere_not_mapped">SphereSLAM ещё не построил карту этого вида — секунду держите камеру неподвижно, направив на освещённый детализированный участок поверхности, затем снимите заново.</string>
+    <string name="standalone_photosphere_not_mapped">Приложение ещё не изучило этот вид — задержите телефон на секунду на освещённой, детальной части поверхности, затем снимите заново.</string>
     <string name="doodle_rectify_title">Выровнять поверхность</string>
     <string name="doodle_rectify_text">Теперь перетащите углы так, чтобы голубая рамка совпала с плоской поверхностью стены.</string>
     <string name="doodle_remove_marks_title">Удалить метки</string>
@@ -727,7 +724,7 @@
     <string name="ar_feedback_backend_resolving">Движок AR ещё определяется — повторите запуск хоста через мгновение</string>
     <string name="ar_feedback_open_project_first">Откройте проект перед тем, как делиться, — гостю пока нечего отправлять</string>
     <string name="ar_feedback_host_need_doodle_arcore">Перед запуском хоста снимите и зафиксируйте актуальные Каракули</string>
-    <string name="ar_feedback_host_need_target_standalone">Перед запуском хоста снимите автономную цель на стене</string>
+    <string name="ar_feedback_host_need_target_standalone">Снимите Каракули, прежде чем начать сеанс</string>
     <string name="ar_feedback_doodle_not_ready">Каракули ещё не готовы — держите их в кадре и снова нажмите «Хост»</string>
     <string name="ar_feedback_package_failed">Не удалось подготовить проект к отправке — сначала попробуйте его сохранить</string>
     <string name="ar_feedback_host_failed">Не удалось начать совместный доступ: %1$s</string>
@@ -740,7 +737,7 @@
     <string name="ar_feedback_camera_busy">Камера занята или недоступна — закройте другие приложения с камерой и снова войдите в AR</string>
     <string name="ar_feedback_ar_start_failed">Не удалось запустить AR — возможно, камеру использует другое приложение</string>
     <string name="ar_feedback_camera_setting_apply_failed">Не удалось применить настройку камеры к текущему сеансу AR — выйдите из AR и войдите снова</string>
-    <string name="ar_feedback_sphere_target_save_failed">Отслеживание стены работает в этом сеансе, но цель SphereSLAM не удалось сохранить.</string>
+    <string name="ar_feedback_sphere_target_save_failed">Отслеживание работает в этом сеансе, но ваши Каракули не удалось сохранить.</string>
     <string name="ar_feedback_camera_not_resumed">Камера AR не возобновила работу — выйдите из режима AR и войдите снова</string>
     <string name="ar_feedback_camera_permission">Камера недоступна — проверьте разрешение на камеру и снова войдите в AR</string>
     <string name="ar_feedback_camera_not_paused">Камера AR не приостановилась корректно — она может продолжать работать в фоне</string>
@@ -798,4 +795,68 @@
     <string name="cv_pass_warm_luma">Тёплый свет</string>
     <string name="cv_pass_stencil3">Трафарет</string>
     <string name="cv_pass_change">Изменение</string>
+    <string name="doodle_tap_grid_hint">Нажмите на Каракули, чтобы снять их.</string>
+    <string name="doodle_blank_wall_hint">Если поверхность пустая, сделайте снимок.</string>
+    <string name="doodle_blank_wall_saved_hint">Пустая поверхность сохранена. Теперь нажмите на Каракули.</string>
+    <string name="update_title">Доступно обновление</string>
+    <string name="update_body_play">В Play Маркете есть новая версия.</string>
+    <string name="update_body_github">Версия %1$s доступна на GitHub.</string>
+    <string name="update_go_play">Открыть Play Маркет</string>
+    <string name="update_go_github">Открыть GitHub</string>
+    <string name="update_later">Позже</string>
+    <string name="crash_title">GraffitiXR неожиданно закрылось</string>
+    <string name="crash_body">В прошлый раз что-то пошло не так. Отправка отчёта поможет это исправить; в нём модель телефона и недавний журнал приложения, ничего из ваших проектов.</string>
+    <string name="crash_share">Поделиться отчётом</string>
+    <string name="crash_copy">Копировать</string>
+    <string name="crash_dismiss">Закрыть</string>
+    <string name="ar_feedback_host_no_lan">Для связи нужен Wi-Fi. Подключитесь к сети Wi-Fi или включите точку доступа, затем начните сеанс снова.</string>
+    <string name="hud_progress">Прогресс</string>
+    <string name="replace_design_title">Заменить дизайн?</string>
+    <string name="replace_design_text">Текущий дизайн и его размещение будут заменены. Это можно отменить.</string>
+    <string name="replace_design_confirm">Заменить</string>
+    <string name="dialog_cancel">Отмена</string>
+    <string name="delete_project_title">Удалить «%1$s»?</string>
+    <string name="delete_project_text">Проект будет удалён навсегда: дизайн, миниатюра и сохранённые Каракули. Каракули нельзя снять заново, если поверхность с тех пор изменилась. Это нельзя отменить.</string>
+    <string name="save_project_title">Сохранить проект</string>
+    <string name="doodle_not_locked_title">Каракули не закреплены</string>
+    <string name="doodle_not_locked_text">Дизайн размещён, но приложению не удалось закрепиться на Каракулях, поэтому наложение будет смещаться. Снимите их заново: прямо напротив поверхности, чуть ближе, при хорошем освещении.</string>
+    <string name="doodle_recapture">Снять Каракули заново</string>
+    <string name="msg_capture_incomplete">Съёмка не завершена. Снимите Каракули заново.</string>
+    <string name="msg_map_not_ready">Поверхность ещё не изучена. Держите камеру на ней и попробуйте снова.</string>
+    <string name="msg_no_project">Нет открытого проекта. Сначала откройте или создайте проект: Каракули сохраняются в проекте.</string>
+    <string name="msg_doodle_low_detail_selected">В оставленной части мало деталей. Оставьте больше меток Каракулей.</string>
+    <string name="msg_doodle_changed">Каракули изменились во время сохранения и не были сохранены. Попробуйте снова.</string>
+    <string name="msg_doodle_saved">Каракули сохранены и закреплены</string>
+    <string name="msg_doodle_save_failed">Не удалось сохранить Каракули. Попробуйте снова.</string>
+    <string name="msg_doodle_too_weak_kept">Мало деталей для отслеживания. Оставлены прежние Каракули.</string>
+    <string name="msg_doodle_low_detail">Мало деталей для отслеживания. Помогут более яркие метки или больше света.</string>
+    <string name="msg_doodle_session_only">Каракули сохранены только на этот сеанс: закрепить их не удалось, и при повторном открытии проекта их не будет. Снимите их заново, держа телефон ровно.</string>
+    <string name="msg_doodle_anchor_failed">Не удалось закрепить Каракули. Держите телефон ровно на поверхности и попробуйте снова.</string>
+    <string name="msg_project_switched">До сохранения Каракулей открылся другой проект, поэтому они не сохранены. Снимите их заново.</string>
+    <string name="msg_image_invalid">Это изображение нельзя открыть, или нет открытого проекта.</string>
+    <string name="msg_nothing_to_share">Пока нечем поделиться. Сначала сохраните проект.</string>
+    <string name="msg_share_failed">Не удалось подготовить проект к отправке. Попробуйте снова.</string>
+    <string name="msg_export_failed">Ошибка экспорта. Попробуйте снова.</string>
+    <string name="status_preparing_tracking">Подготовка AR…</string>
+    <string name="msg_locked">Закреплено. Нажмите «Замок» ещё раз, чтобы двигать.</string>
+    <string name="msg_export_timeout">Время экспорта истекло. Попробуйте снова.</string>
+    <string name="msg_project_save_failed">Не удалось сохранить проект. Попробуйте снова.</string>
+    <string name="coop_none_title">Сеансы не найдены</string>
+    <string name="coop_none_text">Рядом нет сеансов GraffitiXR. Повторите поиск или начните свой.</string>
+    <string name="coop_host">Создать</string>
+    <string name="coop_search">Поиск</string>
+    <string name="coop_need_doodle">Чтобы начать сеанс, сначала снимите Каракули.</string>
+    <string name="coop_scan_to_join">Сканируйте, чтобы присоединиться</string>
+    <string name="coop_stop_sharing">Остановить показ</string>
+    <string name="coop_leave">Выйти</string>
+    <string name="glasses_pairing">Сопряжение очков Meta…</string>
+    <string name="glasses_reconnect">Переподключить</string>
+    <string name="glasses_end">Завершить</string>
+    <string name="diag_confidence">Надёжность</string>
+    <string name="diag_sensors">Данные датчиков</string>
+    <string name="diag_log_start">Лог ▶</string>
+    <string name="diag_log_stop">Лог ■</string>
+    <string name="diag_induce_loss">Потеря</string>
+    <string name="diag_rec_start">Запись ▶</string>
+    <string name="diag_rec_stop">Запись ■</string>
 </resources>

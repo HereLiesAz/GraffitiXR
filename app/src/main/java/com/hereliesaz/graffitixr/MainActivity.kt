@@ -61,7 +61,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
@@ -297,12 +296,8 @@ class MainActivity : AppCompatActivity() {
                 putExtra(Intent.EXTRA_TEXT, text)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            Toast.makeText(
-                this@MainActivity,
-                if (text.isBlank()) "Report unreadable — ${uris.size} file(s) attached"
-                else "Report copied — ${uris.size} file(s) attached",
-                Toast.LENGTH_SHORT,
-            ).show()
+            com.hereliesaz.graffitixr.design.feedback.HudMessages.show(if (text.isBlank()) "Report unreadable — ${uris.size} file(s) attached"
+                else "Report copied — ${uris.size} file(s) attached", long = false)
             runCatching { startActivity(Intent.createChooser(send, "Share diagnostics")) }
                 .onFailure { Timber.w(it, "no share target for diagnostics") }
         }
@@ -336,9 +331,7 @@ class MainActivity : AppCompatActivity() {
             pendingGalleryExport = null
             when (val outcome = GalleryExportPolicy.onPermissionResult(pending, granted)) {
                 is GalleryPermissionOutcome.Run -> galleryExportToRun = outcome.request
-                GalleryPermissionOutcome.Fail -> Toast.makeText(
-                    this, getString(DesignR.string.export_failed_permission), Toast.LENGTH_LONG,
-                ).show()
+                GalleryPermissionOutcome.Fail -> com.hereliesaz.graffitixr.design.feedback.HudMessages.show(getString(DesignR.string.export_failed_permission), long = true)
             }
         }
 
@@ -395,7 +388,12 @@ class MainActivity : AppCompatActivity() {
     private fun incomingImageUri(intent: Intent?): Uri? {
         if (intent == null || intent.type?.startsWith("image/") != true) return null
         if (intent.action != Intent.ACTION_SEND) return null
-        return IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
+        val uri = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java) ?: return null
+        // This activity is exported: only content:// from another app's provider. A file:// path or
+        // a uri on our own FileProvider would have us load our own private files on a stranger's say.
+        if (uri.scheme != android.content.ContentResolver.SCHEME_CONTENT) return null
+        if (uri.authority == "$packageName.fileprovider") return null
+        return uri
     }
 
     // Trace ▸ Freeze's touch lock (mainUiState.isTouchLocked) used to fall to a 4-tap gesture to
@@ -507,63 +505,65 @@ class MainActivity : AppCompatActivity() {
 
         setContent {
             GraffitiXRTheme {
+                // Transient messages (formerly platform Toasts), drawn in the brand's HUD style.
+                com.hereliesaz.graffitixr.design.feedback.HudMessageHost()
                 pendingUpdate?.let { offer ->
-                    androidx.compose.material3.AlertDialog(
-                        onDismissRequest = { pendingUpdate = null },
-                        title = { Text(stringResource(DesignR.string.update_title)) },
-                        text = {
-                            Text(
-                                when (offer) {
-                                    is UpdateOffer.Play -> stringResource(DesignR.string.update_body_play)
-                                    is UpdateOffer.GitHub -> stringResource(DesignR.string.update_body_github, offer.versionLabel)
-                                }
-                            )
+                    com.hereliesaz.graffitixr.design.components.GxrDialog(
+                        title = stringResource(DesignR.string.update_title),
+                        confirmLabel = stringResource(
+                            if (offer is UpdateOffer.Play) DesignR.string.update_go_play else DesignR.string.update_go_github
+                        ),
+                        onConfirm = {
+                            UpdateChecker.open(this@MainActivity, offer)
+                            pendingUpdate = null
                         },
-                        confirmButton = {
-                            androidx.compose.material3.TextButton(onClick = {
-                                UpdateChecker.open(this@MainActivity, offer)
-                                pendingUpdate = null
-                            }) {
-                                Text(
-                                    stringResource(
-                                        if (offer is UpdateOffer.Play) DesignR.string.update_go_play else DesignR.string.update_go_github
-                                    )
-                                )
+                        dismissLabel = stringResource(DesignR.string.update_later),
+                        onDismiss = { pendingUpdate = null },
+                    ) {
+                        com.hereliesaz.graffitixr.design.components.GxrDialogText(
+                            when (offer) {
+                                UpdateOffer.Play -> stringResource(DesignR.string.update_body_play)
+                                is UpdateOffer.GitHub -> stringResource(DesignR.string.update_body_github, offer.versionLabel)
                             }
-                        },
-                        dismissButton = {
-                            androidx.compose.material3.TextButton(onClick = { pendingUpdate = null }) {
-                                Text(stringResource(DesignR.string.update_later))
-                            }
-                        }
-                    )
+                        )
+                    }
                 }
                 pendingCrashReport?.let { report ->
                     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
-                    androidx.compose.material3.AlertDialog(
-                        onDismissRequest = { pendingCrashReport = null },
-                        title = { androidx.compose.material3.Text("Previous crash captured") },
-                        text = {
+                    com.hereliesaz.graffitixr.design.components.GxrDialog(
+                        title = stringResource(DesignR.string.crash_title),
+                        confirmLabel = stringResource(if (BuildConfig.DEBUG) DesignR.string.crash_copy else DesignR.string.crash_share),
+                        onConfirm = {
+                            if (BuildConfig.DEBUG) {
+                                clipboard.setText(androidx.compose.ui.text.AnnotatedString(report))
+                            } else {
+                                // The user decides where the report goes (mail, chat): nothing is
+                                // uploaded on their behalf.
+                                val send = Intent(Intent.ACTION_SEND)
+                                    .setType("text/plain")
+                                    .putExtra(Intent.EXTRA_SUBJECT, "GraffitiXR crash report")
+                                    .putExtra(Intent.EXTRA_TEXT, report)
+                                runCatching { startActivity(Intent.createChooser(send, null)) }
+                                pendingCrashReport = null
+                            }
+                        },
+                        dismissLabel = stringResource(DesignR.string.crash_dismiss),
+                        onDismiss = { pendingCrashReport = null },
+                    ) {
+                        if (BuildConfig.DEBUG) {
+                            // Developers get the raw report; release users a sentence and a choice.
                             androidx.compose.foundation.text.selection.SelectionContainer {
-                                androidx.compose.material3.Text(
+                                Text(
                                     report,
                                     fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                                     fontSize = 10.sp,
                                     modifier = Modifier.verticalScroll(rememberScrollState())
                                 )
                             }
-                        },
-                        confirmButton = {
-                            androidx.compose.material3.TextButton(onClick = {
-                                clipboard.setText(androidx.compose.ui.text.AnnotatedString(report))
-                            }) { androidx.compose.material3.Text("Copy") }
-                        },
-                        dismissButton = {
-                            androidx.compose.material3.TextButton(onClick = { pendingCrashReport = null }) {
-                                androidx.compose.material3.Text("Dismiss")
-                            }
+                        } else {
+                            com.hereliesaz.graffitixr.design.components.GxrDialogText(stringResource(DesignR.string.crash_body))
                         }
-                    )
+                    }
                 }
                 val navController = rememberNavController()
                 val currentBackStackEntry by navController.currentBackStackEntryAsState()
@@ -683,11 +683,7 @@ class MainActivity : AppCompatActivity() {
                 val sharePending = sharedImage != null && projectIdForShare == null
                 LaunchedEffect(sharePending) {
                     if (sharePending) {
-                        Toast.makeText(
-                            shareToastContext,
-                            shareToastContext.getString(DesignR.string.shared_image_pick_project),
-                            Toast.LENGTH_LONG
-                        ).show()
+                        com.hereliesaz.graffitixr.design.feedback.HudMessages.show(shareToastContext.getString(DesignR.string.shared_image_pick_project), long = true)
                     }
                 }
 
@@ -735,7 +731,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 LaunchedEffect(dashboardUiState.projectErrorMessage) {
                     dashboardUiState.projectErrorMessage?.let {
-                        Toast.makeText(shareToastContext, it, Toast.LENGTH_LONG).show()
+                        com.hereliesaz.graffitixr.design.feedback.HudMessages.show(it, long = true)
                         dashboardViewModel.dismissProjectError()
                     }
                 }
@@ -1184,11 +1180,7 @@ class MainActivity : AppCompatActivity() {
                                     kotlinx.coroutines.delay(EXPORT_TIMEOUT_MS)
                                     if (isExporting) {
                                         isExporting = false
-                                        Toast.makeText(
-                                            context,
-                                            "Export timed out — try again",
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
+                                        com.hereliesaz.graffitixr.design.feedback.HudMessages.show(com.hereliesaz.graffitixr.design.feedback.HudMessages.appString(com.hereliesaz.graffitixr.design.R.string.msg_export_timeout), long = false)
                                     }
                                 }
                                 val requested = arViewModel.requestExport { bmp ->
@@ -1214,11 +1206,7 @@ class MainActivity : AppCompatActivity() {
                                     // successful export. Say why nothing was exported instead.
                                     timeoutJob.cancel()
                                     isExporting = false
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(DesignR.string.export_ar_unavailable),
-                                        Toast.LENGTH_LONG,
-                                    ).show()
+                                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(DesignR.string.export_ar_unavailable), long = true)
                                 }
                             }
                             EditorMode.OVERLAY -> {
@@ -1400,42 +1388,23 @@ class MainActivity : AppCompatActivity() {
                         // everywhere else in this flow, so declining doesn't re-offer the picker on
                         // every subsequent cold launch.
                         if (showFirstRunPhotoExplainer && !showSettings) {
-                            androidx.compose.material3.AlertDialog(
-                                onDismissRequest = {
+                            com.hereliesaz.graffitixr.design.components.GxrDialog(
+                                title = stringResource(DesignR.string.first_run_photo_title),
+                                confirmLabel = stringResource(DesignR.string.first_run_choose_photo),
+                                onConfirm = {
+                                    showFirstRunPhotoExplainer = false
+                                    firstRunImagePicker.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                    )
+                                },
+                                dismissLabel = stringResource(DesignR.string.first_run_not_now),
+                                onDismiss = {
                                     showFirstRunPhotoExplainer = false
                                     mainViewModel.markTutorialCompletePersistent(firstRunDoodleKey)
                                 },
-                                title = { Text(stringResource(DesignR.string.first_run_photo_title), color = Color.White) },
-                                text = {
-                                    Text(
-                                        stringResource(DesignR.string.first_run_photo_text),
-                                        color = Color.White
-                                    )
-                                },
-                                containerColor = Color(0xEE1A1A1A),
-                                confirmButton = {
-                                    AzButton(
-                                        text = stringResource(DesignR.string.first_run_choose_photo),
-                                        onClick = {
-                                            showFirstRunPhotoExplainer = false
-                                            firstRunImagePicker.launch(
-                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                            )
-                                        },
-                                        shape = AzButtonShape.RECTANGLE
-                                    )
-                                },
-                                dismissButton = {
-                                    AzButton(
-                                        text = stringResource(DesignR.string.first_run_not_now),
-                                        onClick = {
-                                            showFirstRunPhotoExplainer = false
-                                            mainViewModel.markTutorialCompletePersistent(firstRunDoodleKey)
-                                        },
-                                        shape = AzButtonShape.RECTANGLE
-                                    )
-                                }
-                            )
+                            ) {
+                                com.hereliesaz.graffitixr.design.components.GxrDialogText(stringResource(DesignR.string.first_run_photo_text))
+                            }
                         }
 
                         // First-run DRAW stage: the scribble owns the whole screen while the user
@@ -1614,14 +1583,24 @@ class MainActivity : AppCompatActivity() {
                             // produced no usable points — so the overlay could only ever drift, and
                             // the one screen that could have explained it claimed success instead.
                             // Gate on the thing that actually has to exist.
+                            // Not gated on "no design yet": adding artwork doesn't lock the doodle, and
+                            // that is exactly when the drift starts to matter.
                             val basePostTargetVisible = arUiState.isAnchorEstablished
-                                    && editorUiState.design == null
                                     && !mainUiState.isCapturingDoodle
+                                    && !mainUiState.isConfirmingDoodle
                                     && editorUiState.editorMode == EditorMode.AR
                                     && !showLibrary && !showSettings
                             val hasWallDoodle = arUiState.wallDoodlePoints > 0
                             if (basePostTargetVisible && !hasWallDoodle) {
                                 DoodleIncompleteOverlay(
+                                    onRecapture = {
+                                        // Same effect as the rail's Doodle item.
+                                        arViewModel.clearCaptureForRetry()
+                                        arViewModel.cancelMeasure()
+                                        // Close up or over a tabletop, an ARCore phone switches to the standalone tracker first.
+                                        arViewModel.prepareCloseRangeBackend()
+                                        mainViewModel.startDoodleCapture()
+                                    },
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
                                         .padding(bottom = 140.dp)
@@ -1678,14 +1657,14 @@ class MainActivity : AppCompatActivity() {
                                         modifier = Modifier
                                             .align(Alignment.TopCenter)
                                             .padding(top = 16.dp)
-                                            .background(Color(0xCC000000), RoundedCornerShape(20.dp))
+                                            .background(com.hereliesaz.graffitixr.design.theme.HudScrim, com.hereliesaz.graffitixr.design.theme.HudPillShape)
                                             .padding(horizontal = 14.dp, vertical = 6.dp),
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                     ) {
                                         Text(
                                             text = strings.ar.doodleCloseUpsProgress(step.stage, step.stages, step.done, step.total),
                                             color = Color.White,
-                                            fontSize = 12.sp,
+                                            style = MaterialTheme.typography.labelLarge,
                                         )
                                         Spacer(Modifier.height(4.dp))
                                         androidx.compose.material3.LinearProgressIndicator(
@@ -2000,6 +1979,7 @@ class MainActivity : AppCompatActivity() {
                                                 // view matrix now follows (Phase 0, convention B).
                                                 arUiState.doodleDisplayRotation,
                                                 arUiState.doodleCaptureEnvironment,
+                                                onAbandoned = { arViewModel.cancelInitialAnchorFromCapture() },
                                             )
                                         }
                                     },
@@ -2049,7 +2029,7 @@ class MainActivity : AppCompatActivity() {
                                                     isSavingProject = false
                                                     if (e is kotlinx.coroutines.CancellationException) throw e
                                                     android.util.Log.e("MainActivity", "Failed to save wall map", e)
-                                                    Toast.makeText(this@MainActivity, "Couldn't save the project", Toast.LENGTH_LONG).show()
+                                                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(com.hereliesaz.graffitixr.design.feedback.HudMessages.appString(com.hereliesaz.graffitixr.design.R.string.msg_project_save_failed), long = true)
                                                 }
                                             }
                                         }
@@ -2077,31 +2057,16 @@ class MainActivity : AppCompatActivity() {
                             // as a confirmation here rather than silently losing the artist's
                             // placement work.
                             if (editorUiState.pendingReplaceUri != null) {
-                                androidx.compose.material3.AlertDialog(
-                                    onDismissRequest = { editorViewModel.cancelReplaceDesign() },
-                                    title = { Text("Replace design?", color = Color.White) },
-                                    text = {
-                                        Text(
-                                            "This swaps out the current design and its placement. This can be undone.",
-                                            color = Color.White
-                                        )
-                                    },
-                                    containerColor = Color(0xEE1A1A1A),
-                                    confirmButton = {
-                                        AzButton(
-                                            text = "Replace",
-                                            onClick = { editorViewModel.confirmReplaceDesign() },
-                                            shape = AzButtonShape.RECTANGLE
-                                        )
-                                    },
-                                    dismissButton = {
-                                        AzButton(
-                                            text = "Cancel",
-                                            onClick = { editorViewModel.cancelReplaceDesign() },
-                                            shape = AzButtonShape.RECTANGLE
-                                        )
-                                    }
-                                )
+                                com.hereliesaz.graffitixr.design.components.GxrDialog(
+                                    title = stringResource(DesignR.string.replace_design_title),
+                                    confirmLabel = stringResource(DesignR.string.replace_design_confirm),
+                                    onConfirm = { editorViewModel.confirmReplaceDesign() },
+                                    dismissLabel = stringResource(DesignR.string.dialog_cancel),
+                                    onDismiss = { editorViewModel.cancelReplaceDesign() },
+                                    destructive = true,
+                                ) {
+                                    com.hereliesaz.graffitixr.design.components.GxrDialogText(stringResource(DesignR.string.replace_design_text))
+                                }
                             }
 
                             if (showSettings && !showSaveDialog && !dashboardUiState.showNewProjectDialog) {
@@ -2120,6 +2085,7 @@ class MainActivity : AppCompatActivity() {
                                     crashReportingConsent = crashReportingConsent,
                                     onCrashReportingConsentChanged = { settingsViewModel.setCrashReportingConsent(it) },
                                     crashReportToken = crashReportToken,
+                                    developerCrashUpload = BuildConfig.DEBUG,
                                     onCrashReportTokenChanged = { settingsViewModel.setCrashReportToken(it) },
                                     showDiagOverlay = editorUiState.showDiagOverlay,
                                     onDiagOverlayChanged = { editorViewModel.toggleDiagOverlay() },
@@ -2222,6 +2188,8 @@ class MainActivity : AppCompatActivity() {
                                             // Same effect as the rail's Target item.
                                             arViewModel.clearCaptureForRetry()
                                             arViewModel.cancelMeasure()
+                                            // Close up or over a tabletop, an ARCore phone switches to the standalone tracker first.
+                                            arViewModel.prepareCloseRangeBackend()
                                             mainViewModel.startDoodleCapture()
                                         },
                                         strings = strings
@@ -2567,7 +2535,7 @@ class MainActivity : AppCompatActivity() {
             // only blocks pan/zoom/rotate. toggleImageLock() was implemented and tested but had no
             // rail entry, so it could never actually be reached from the UI.
             azRailSubItem(
-                id = "design.lock", hostId = railHostOf("design.lock"), text = "Lock",
+                id = "design.lock", hostId = railHostOf("design.lock"), text = strings.editor.lock,
                 color = navItemColor, classifiers = setOf("toggle", "lock"),
                 shape = AzButtonShape.NONE, disabled = showLibrary,
                 onClick = { editorViewModel.toggleImageLock() },
@@ -2628,6 +2596,8 @@ class MainActivity : AppCompatActivity() {
                                 arViewModel.clearCaptureForRetry()
                                 // Target and Measure both own screen taps; only one at a time.
                                 arViewModel.cancelMeasure()
+                                // Close up or over a tabletop, an ARCore phone switches to the standalone tracker first.
+                                arViewModel.prepareCloseRangeBackend()
                                 mainViewModel.startDoodleCapture()
                             } else {
                                 requestPermissions()
@@ -2648,7 +2618,7 @@ class MainActivity : AppCompatActivity() {
                     azRailSubItem(
                         id = "mode.ar.lock",
                         hostId = railHostOf("mode.ar.lock"),
-                        text = "Lock",
+                        text = strings.editor.lock,
                         color = navItemColor,
                         classifiers = setOf("toggle", "lock"),
                         shape = AzButtonShape.NONE,
@@ -2660,7 +2630,7 @@ class MainActivity : AppCompatActivity() {
                     azRailSubItem(
                         id = "mode.ar.freeze",
                         hostId = railHostOf("mode.ar.freeze"),
-                        text = "Freeze",
+                        text = strings.editor.freeze,
                         color = navItemColor,
                         classifiers = setOf("toggle"),
                         shape = AzButtonShape.NONE,
@@ -2728,7 +2698,7 @@ class MainActivity : AppCompatActivity() {
                                         notReady -> DesignR.string.align_not_ready
                                         else -> DesignR.string.align_unavailable
                                     }
-                                    Toast.makeText(context, context.getString(msg), Toast.LENGTH_SHORT).show()
+                                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(msg), long = false)
                                 }
                             }
                         },
@@ -2831,7 +2801,7 @@ class MainActivity : AppCompatActivity() {
                 azRailSubItem(
                     id = "mode.overlay.lock",
                     hostId = railHostOf("mode.overlay.lock"),
-                    text = "Lock",
+                    text = strings.editor.lock,
                     color = navItemColor,
                     classifiers = setOf("toggle", "lock"),
                     shape = AzButtonShape.NONE,
@@ -2910,7 +2880,7 @@ class MainActivity : AppCompatActivity() {
                 azRailSubItem(
                     id = "mode.mockup.lock",
                     hostId = railHostOf("mode.mockup.lock"),
-                    text = "Lock",
+                    text = strings.editor.lock,
                     color = navItemColor,
                     classifiers = setOf("toggle", "lock"),
                     shape = AzButtonShape.NONE,
@@ -2937,7 +2907,7 @@ class MainActivity : AppCompatActivity() {
                 azRailSubItem(
                     id = "mode.trace.freeze",
                     hostId = railHostOf("mode.trace.freeze"),
-                    text = "Freeze",
+                    text = strings.editor.freeze,
                     color = navItemColor,
                     classifiers = setOf("toggle"),
                     shape = AzButtonShape.NONE,
@@ -3000,7 +2970,7 @@ class MainActivity : AppCompatActivity() {
                     // be composited; silently exporting "layers only" would violate the rail action's
                     // documented mode-screenshot contract.
                     if (exportBlockedReason != null) {
-                        Toast.makeText(context, context.getString(exportBlockedReason), Toast.LENGTH_LONG).show()
+                        com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(exportBlockedReason), long = true)
                     } else {
                         onExportRequested()
                     }
@@ -3089,7 +3059,7 @@ private fun ArCoreUnavailableOverlay(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     Card(
         modifier = modifier.padding(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xEE1A1A1A))
+        colors = CardDefaults.cardColors(containerColor = com.hereliesaz.graffitixr.design.theme.DialogSurface)
     ) {
         Column(
             modifier = Modifier.padding(24.dp),
@@ -3132,7 +3102,7 @@ private fun CameraPermissionDeniedBanner(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     Box(
         modifier = modifier
-            .background(Color(0xEE550000), RoundedCornerShape(12.dp))
+            .background(com.hereliesaz.graffitixr.design.theme.DialogSurface, com.hereliesaz.graffitixr.design.theme.HudPillShape)
             .padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
         Column(
@@ -3152,7 +3122,7 @@ private fun CameraPermissionDeniedBanner(modifier: Modifier = Modifier) {
                     }
                     context.startActivity(intent)
                 },
-                color = Color(0xFFCC2200),
+                color = com.hereliesaz.graffitixr.design.theme.Danger,
                 shape = AzButtonShape.RECTANGLE
             )
         }
@@ -3201,7 +3171,7 @@ private fun DiagPopup(
                 }
             }
             .background(
-                if (copied) Color(0xDD004444) else Color(0xDD000000),
+                if (copied) com.hereliesaz.graffitixr.design.theme.StatusWarn.copy(alpha = 0.3f) else com.hereliesaz.graffitixr.design.theme.HudScrim,
                 RoundedCornerShape(8.dp)
             )
             .border(
@@ -3287,21 +3257,21 @@ private fun CoopNotFoundDialog(
         Box(
             modifier = Modifier
                 .widthIn(max = 340.dp)
-                .background(Color(0xEE1A1A1A), RoundedCornerShape(16.dp))
+                .background(com.hereliesaz.graffitixr.design.theme.DialogSurface, com.hereliesaz.graffitixr.design.theme.HudPillShape)
                 .border(2.dp, Color.Cyan, RoundedCornerShape(16.dp))
                 .padding(24.dp)
                 .clickable(enabled = false) { }
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "NO SESSIONS FOUND",
+                    text = androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.coop_none_title),
                     color = Color.Cyan,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = "Nearby GraffitiXR sessions could not be located. You can try searching again or host your own session.",
+                    text = androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.coop_none_text),
                     color = Color.White,
                     textAlign = TextAlign.Center,
                     fontSize = 14.sp,
@@ -3310,14 +3280,14 @@ private fun CoopNotFoundDialog(
                 Spacer(Modifier.height(24.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     AzButton(
-                        text = "HOST",
+                        text = androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.coop_host),
                         onClick = { if (canHost) onHost() },
                         color = if (canHost) HotPink else Color.Gray,
                         shape = AzButtonShape.RECTANGLE,
                         modifier = Modifier.weight(1f)
                     )
                     AzButton(
-                        text = "SEARCH",
+                        text = androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.coop_search),
                         onClick = onSearch,
                         color = HotPink,
                         shape = AzButtonShape.RECTANGLE,
@@ -3327,7 +3297,7 @@ private fun CoopNotFoundDialog(
                 if (!canHost) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = "Create a Doodle first to host.",
+                        text = androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.coop_need_doodle),
                         color = Color.Gray,
                         fontSize = 12.sp
                     )
@@ -3351,7 +3321,7 @@ private fun DiagnosticOverlay(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                text = "AR DIAGNOSTICS",
+                text = stringResource(DesignR.string.diag_title),
                 color = Cyan,
                 fontWeight = FontWeight.Bold,
                 fontSize = 12.sp
@@ -3366,7 +3336,7 @@ private fun DiagnosticOverlay(
 
             Spacer(Modifier.height(4.dp))
 
-            Text(text = "CONFIDENCE", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text(text = stringResource(DesignR.string.diag_confidence), color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             // "Visible"/"Global" splat confidence removed: getConfidenceAvgs() assigns 0.0 to both
             // unconditionally ("voxel/splat map deleted"), so both bars rendered empty forever. A
             // progress bar pinned at zero reads as "the system is failing", not "this number no
@@ -3383,7 +3353,7 @@ private fun DiagnosticOverlay(
             val sensors = uiState.sensorData
             if (sensors != null) {
                 Spacer(Modifier.height(4.dp))
-                Text(text = "SENSOR DATA", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text(text = stringResource(DesignR.string.diag_sensors), color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 Text(
                     text = "A: %.1f° P: %.1f° R: %.1f°".format(sensors.azimuth, sensors.pitch, sensors.roll),
                     color = Color.White,
@@ -3471,7 +3441,7 @@ private fun RelocDiagnosticsOverlay(
     val locked = d.reject == RelocReject.OK
     androidx.compose.foundation.layout.Column(
         androidx.compose.ui.Modifier
-            .background(androidx.compose.ui.graphics.Color(0xAA000000))
+            .background(com.hereliesaz.graffitixr.design.theme.HudScrim)
             .padding(8.dp)
     ) {
         val sphereSignal = when (sphereSlamStatus.mode) {
@@ -3511,7 +3481,7 @@ private fun RelocDiagnosticsOverlay(
                     com.hereliesaz.graffitixr.common.model.HybridKpmOutcome.ACCEPTED ->
                         androidx.compose.ui.graphics.Color.Green
                     com.hereliesaz.graffitixr.common.model.HybridKpmOutcome.AWAITING_AGREEMENT ->
-                        androidx.compose.ui.graphics.Color(0xFFFFC107)
+                        com.hereliesaz.graffitixr.design.theme.StatusWarn
                     else -> androidx.compose.ui.graphics.Color.Yellow
                 },
             )
@@ -3619,7 +3589,7 @@ private fun RelocDiagnosticsOverlay(
                 com.hereliesaz.graffitixr.common.model.FusionState.NO_ANCHOR,
                 com.hereliesaz.graffitixr.common.model.FusionState.WAITING_FOR_LOCK,
                 com.hereliesaz.graffitixr.common.model.FusionState.AWAITING_AGREEMENT ->
-                    androidx.compose.ui.graphics.Color(0xFFFFC107)
+                    com.hereliesaz.graffitixr.design.theme.StatusWarn
                 else -> androidx.compose.ui.graphics.Color.White
             },
         )
@@ -3631,7 +3601,7 @@ private fun RelocDiagnosticsOverlay(
                 "Correction",
                 String.format(java.util.Locale.US, "%.0f mm · %.1f°", fusion.correctionMm, fusion.correctionDeg),
                 if (fusion.correctionMm > 500f) {
-                    androidx.compose.ui.graphics.Color(0xFFFFC107)
+                    com.hereliesaz.graffitixr.design.theme.StatusWarn
                 } else {
                     androidx.compose.ui.graphics.Color.White
                 },
@@ -3683,7 +3653,7 @@ private fun RelocDiagnosticsOverlay(
             // Amber, not red: zero predicted is the artist looking elsewhere, which is ordinary and
             // self-correcting. Red is reserved for the states that do not fix themselves.
             if (d.corrobPredicted == 0) {
-                androidx.compose.ui.graphics.Color(0xFFFFC107)
+                com.hereliesaz.graffitixr.design.theme.StatusWarn
             } else {
                 androidx.compose.ui.graphics.Color.White
             },
@@ -3701,7 +3671,7 @@ private fun RelocDiagnosticsOverlay(
                 if (corroboration.inlierSpread <
                     com.hereliesaz.graffitixr.feature.ar.anchor.PromotionGate.MIN_INLIER_SPREAD
                 ) {
-                    androidx.compose.ui.graphics.Color(0xFFFFC107)
+                    com.hereliesaz.graffitixr.design.theme.StatusWarn
                 } else {
                     androidx.compose.ui.graphics.Color.White
                 },
@@ -3756,7 +3726,7 @@ private fun RelocDiagnosticsOverlay(
         androidx.compose.material3.TextButton(onClick = { onToggleSelfGrow(!selfGrowEnabled) }) {
             androidx.compose.material3.Text(
                 if (selfGrowEnabled) "Self-grow: ON (writes the map)" else "Self-grow: OFF",
-                color = if (selfGrowEnabled) androidx.compose.ui.graphics.Color(0xFFFFC107)
+                color = if (selfGrowEnabled) com.hereliesaz.graffitixr.design.theme.StatusWarn
                 else androidx.compose.ui.graphics.Color.Gray,
             )
         }
@@ -3781,7 +3751,7 @@ private fun RelocDiagnosticsOverlay(
         androidx.compose.material3.TextButton(onClick = { onToggleFeatureMap(!featureMapEnabled) }) {
             androidx.compose.material3.Text(
                 if (featureMapEnabled) "Feature map: ON (builds + matches)" else "Feature map: OFF",
-                color = if (featureMapEnabled) androidx.compose.ui.graphics.Color(0xFFFFC107)
+                color = if (featureMapEnabled) com.hereliesaz.graffitixr.design.theme.StatusWarn
                 else androidx.compose.ui.graphics.Color.Gray,
             )
         }
@@ -3813,7 +3783,7 @@ private fun EvalOverlay(
 ) {
     androidx.compose.foundation.layout.Column(
         androidx.compose.ui.Modifier
-            .background(androidx.compose.ui.graphics.Color(0xAA000000))
+            .background(com.hereliesaz.graffitixr.design.theme.HudScrim)
             .padding(8.dp)
     ) {
         DiagnosticRow("Err", if (metrics.errMm >= 0) "%.0fmm / %.1f°".format(metrics.errMm, metrics.errDeg) else "no marks", androidx.compose.ui.graphics.Color.Cyan)
@@ -3830,11 +3800,11 @@ private fun EvalOverlay(
         DiagnosticRow("FP pts", metrics.wallCount.toString(), androidx.compose.ui.graphics.Color.Green)
         DiagnosticRow("Batt", "%.0fmA".format(metrics.batteryMa), androidx.compose.ui.graphics.Color.White)
         androidx.compose.foundation.layout.Row {
-            androidx.compose.material3.TextButton(onClick = onStartLog) { androidx.compose.material3.Text("Log▶") }
-            androidx.compose.material3.TextButton(onClick = onStopLog) { androidx.compose.material3.Text("Log■") }
-            androidx.compose.material3.TextButton(onClick = onInduceLoss) { androidx.compose.material3.Text("Loss") }
-            androidx.compose.material3.TextButton(onClick = onStartRecord) { androidx.compose.material3.Text("Rec▶") }
-            androidx.compose.material3.TextButton(onClick = onStopRecord) { androidx.compose.material3.Text("Rec■") }
+            androidx.compose.material3.TextButton(onClick = onStartLog) { androidx.compose.material3.Text(stringResource(DesignR.string.diag_log_start)) }
+            androidx.compose.material3.TextButton(onClick = onStopLog) { androidx.compose.material3.Text(stringResource(DesignR.string.diag_log_stop)) }
+            androidx.compose.material3.TextButton(onClick = onInduceLoss) { androidx.compose.material3.Text(stringResource(DesignR.string.diag_induce_loss)) }
+            androidx.compose.material3.TextButton(onClick = onStartRecord) { androidx.compose.material3.Text(stringResource(DesignR.string.diag_rec_start)) }
+            androidx.compose.material3.TextButton(onClick = onStopRecord) { androidx.compose.material3.Text(stringResource(DesignR.string.diag_rec_stop)) }
             // Fusion and self-grow used to live here. They are on RelocDiagnosticsOverlay now,
             // which renders in release behind the same Diagnostic Overlay setting — and which
             // renders in debug too, so this panel loses nothing by not duplicating them. Two
@@ -3892,31 +3862,37 @@ private fun DiagnosticRow(label: String, value: String, color: Color) {
  * doesn't work".
  */
 @Composable
-private fun DoodleIncompleteOverlay(modifier: Modifier = Modifier) {
+private fun DoodleIncompleteOverlay(onRecapture: () -> Unit, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .background(Color(0xEE1A1A1A), RoundedCornerShape(20.dp))
-            .border(2.dp, HotPink, RoundedCornerShape(20.dp))
+            .background(com.hereliesaz.graffitixr.design.theme.DialogSurface, com.hereliesaz.graffitixr.design.theme.HudPillShape)
+            .border(2.dp, HotPink, com.hereliesaz.graffitixr.design.theme.HudPillShape)
             .padding(horizontal = 24.dp, vertical = 20.dp)
             .widthIn(max = 340.dp)
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "DOODLE NOT LOCKED",
+                text = stringResource(DesignR.string.doodle_not_locked_title),
                 color = HotPink,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
+                style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "The anchor is placed, but no surface features were matched to it — the overlay " +
-                    "will drift. Re-capture the Doodle: get squarer to the surface, closer, and aim at " +
-                    "a patch with more detail.",
+                text = stringResource(DesignR.string.doodle_not_locked_text),
                 color = Color.White,
-                fontSize = 14.sp,
+                style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center
             )
+            Spacer(Modifier.height(16.dp))
+            // Not a dead end: the one fix is one tap away.
+            androidx.compose.material3.Button(
+                onClick = onRecapture,
+                modifier = Modifier.heightIn(min = 48.dp),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = HotPink, contentColor = Color.White),
+            ) {
+                Text(stringResource(DesignR.string.doodle_recapture), style = MaterialTheme.typography.labelLarge)
+            }
         }
     }
 }
@@ -3947,7 +3923,7 @@ private fun CvPreviewLegend(
 ) {
     Column(
         modifier = modifier
-            .background(Color(0xCC000000), RoundedCornerShape(16.dp))
+            .background(com.hereliesaz.graffitixr.design.theme.HudScrim, com.hereliesaz.graffitixr.design.theme.HudPillShape)
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Text(text = title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -3983,12 +3959,13 @@ private fun DistanceBadge(
     val label = formatDistance(distanceMeters, imperial, feetLabel, cmLabel, mLabel)
     Box(
         modifier = modifier
-            .background(Color(0xCC000000), RoundedCornerShape(20.dp))
+            .background(com.hereliesaz.graffitixr.design.theme.HudScrim, com.hereliesaz.graffitixr.design.theme.HudPillShape)
             .padding(horizontal = 14.dp, vertical = 6.dp)
     ) {
         Text(
             text = label,
             color = Color.White,
+            style = MaterialTheme.typography.labelLarge,
         )
     }
 }
@@ -4048,7 +4025,7 @@ private fun MeasurePanel(
                 // Consume taps on the chip itself so they don't fall through as measure taps; its
                 // buttons are children and still receive theirs first.
                 .pointerInput(Unit) { detectTapGestures { } }
-                .background(Color(0xCC000000), RoundedCornerShape(16.dp))
+                .background(com.hereliesaz.graffitixr.design.theme.HudScrim, com.hereliesaz.graffitixr.design.theme.HudPillShape)
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -4059,7 +4036,7 @@ private fun MeasurePanel(
                 else -> nav.measureTapSecond
             }
             Text(prompt, color = Color.White)
-            if (measure.failed) Text(nav.measureFailed, color = Color(0xFFFFC107))
+            if (measure.failed) Text(nav.measureFailed, color = com.hereliesaz.graffitixr.design.theme.StatusWarn)
             if (result == null && savedWidthMeters != null) {
                 Text(
                     "${nav.measureWallWidth}: ${formatDistance(savedWidthMeters, imperial, feet, cm, m)}",
@@ -4158,20 +4135,29 @@ private fun SavedDoodleSearchStatus(
     Column(
         modifier = modifier
             .widthIn(max = 220.dp)
-            .background(Color(0xCC000000), RoundedCornerShape(16.dp))
+            .background(com.hereliesaz.graffitixr.design.theme.HudScrim, com.hereliesaz.graffitixr.design.theme.HudPillShape)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(Modifier.size(8.dp).alpha(pulse).background(Color(0xFFFFCA28), CircleShape))
-            Text(strings.ar.relocLooking, fontSize = 12.sp, color = Color.White)
+            Box(Modifier.size(8.dp).alpha(pulse).background(com.hereliesaz.graffitixr.design.theme.StatusWarn, CircleShape))
+            Text(strings.ar.relocLooking, style = MaterialTheme.typography.labelLarge, color = Color.White)
         }
         if (hintText != null) {
-            Text(hintText, fontSize = 12.sp, color = Color(0xFFE0E0E0))
+            Text(hintText, style = MaterialTheme.typography.bodyMedium, color = Color.White)
         }
         if (phase == DoodleSearchPhase.OFFER_RECAPTURE) {
-            androidx.compose.material3.TextButton(onClick = onRecapture, enabled = canRecapture) {
-                Text(strings.ar.relocRecapture, fontSize = 12.sp, color = Color.Cyan)
+            // The only way out of a lost track: a full-size (48 dp) button, not a small text link.
+            androidx.compose.material3.Button(
+                onClick = onRecapture,
+                enabled = canRecapture,
+                modifier = Modifier.heightIn(min = 48.dp),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    containerColor = com.hereliesaz.graffitixr.design.theme.Cyan,
+                    contentColor = Color.Black,
+                ),
+            ) {
+                Text(strings.ar.relocRecapture, style = MaterialTheme.typography.labelLarge)
             }
         }
     }
@@ -4205,7 +4191,7 @@ private fun RelocStatusBadge(
     )
     val pulseAlpha = if (relocState == RelocState.SEARCHING) animatedAlpha else 1f
 
-    val dotColor = if (relocState == RelocState.TRACKING) Color(0xFF66BB6A) else Color(0xFFFFCA28)
+    val dotColor = if (relocState == RelocState.TRACKING) com.hereliesaz.graffitixr.design.theme.StatusOk else com.hereliesaz.graffitixr.design.theme.StatusWarn
     val label = when (relocState) {
         RelocState.SEARCHING -> strings.ar.scanning
         RelocState.TRACKING  -> strings.ar.matchedPercent((paintingProgress * 100).toInt())
@@ -4213,7 +4199,7 @@ private fun RelocStatusBadge(
 
     Row(
         modifier = modifier
-            .background(Color(0xCC000000), RoundedCornerShape(20.dp))
+            .background(com.hereliesaz.graffitixr.design.theme.HudScrim, com.hereliesaz.graffitixr.design.theme.HudPillShape)
             .padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -4224,7 +4210,7 @@ private fun RelocStatusBadge(
                 .alpha(pulseAlpha)
                 .background(dotColor, CircleShape)
         )
-        Text(label, fontSize = 12.sp, color = Color.White)
+        Text(label, style = MaterialTheme.typography.labelLarge, color = Color.White)
     }
 }
 
@@ -4246,14 +4232,14 @@ private fun AnchorLockFlash(isAnchorEstablished: Boolean, strings: AppStrings) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0x2200CC44)),
+                .background(com.hereliesaz.graffitixr.design.theme.StatusOk.copy(alpha = 0.13f)),
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
                     imageVector = Icons.Filled.CheckCircle,
                     contentDescription = null,
-                    tint = Color(0xFF66BB6A),
+                    tint = com.hereliesaz.graffitixr.design.theme.StatusOk,
                     modifier = Modifier.size(48.dp)
                 )
                 Spacer(Modifier.height(8.dp))
@@ -4288,7 +4274,7 @@ private fun SyncingBadge(
 
     Row(
         modifier = modifier
-            .background(Color(0xCC000000), RoundedCornerShape(20.dp))
+            .background(com.hereliesaz.graffitixr.design.theme.HudScrim, com.hereliesaz.graffitixr.design.theme.HudPillShape)
             .padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -4325,13 +4311,13 @@ private fun PaintingProgressIndicator(
 ) {
     val pct = (progress * 100f).toInt().coerceIn(0, 100)
     val barColor = when {
-        pct >= 80 -> Color(0xFF66BB6A)
-        pct >= 40 -> Color(0xFFFFCA28)
-        else      -> Color(0xFFEF5350)
+        // Painting progress is never an error: early is simply "under way".
+        pct >= 80 -> com.hereliesaz.graffitixr.design.theme.StatusOk
+        else      -> com.hereliesaz.graffitixr.design.theme.StatusWarn
     }
     Box(
         modifier = modifier
-            .background(Color(0xCC000000), RoundedCornerShape(20.dp))
+            .background(com.hereliesaz.graffitixr.design.theme.HudScrim, com.hereliesaz.graffitixr.design.theme.HudPillShape)
             .padding(horizontal = 14.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -4340,9 +4326,9 @@ private fun PaintingProgressIndicator(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "Progress",
+                text = stringResource(DesignR.string.hud_progress),
                 color = Color.White.copy(alpha = 0.7f),
-                style = MaterialTheme.typography.labelSmall
+                style = MaterialTheme.typography.labelLarge
             )
             LinearProgressIndicator(
                 progress = { progress.coerceIn(0f, 1f) },
@@ -4353,6 +4339,7 @@ private fun PaintingProgressIndicator(
             Text(
                 text = "$pct%",
                 color = Color.White,
+                style = MaterialTheme.typography.labelLarge,
             )
         }
     }

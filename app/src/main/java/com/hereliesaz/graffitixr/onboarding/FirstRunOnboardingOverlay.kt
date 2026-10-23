@@ -10,6 +10,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -82,10 +83,13 @@ fun FirstRunOnboardingOverlay(
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center,
+            // On a scrim: white text straight over the camera vanishes against a white wall.
             modifier = Modifier
                 .align(BiasAlignment(0f, titleBias))
                 .fillMaxWidth()
-                .padding(horizontal = 32.dp, vertical = 24.dp),
+                .padding(horizontal = 24.dp, vertical = 24.dp)
+                .background(com.hereliesaz.graffitixr.design.theme.HudScrim, com.hereliesaz.graffitixr.design.theme.HudPillShape)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
         )
 
         // Movement guidance: only while ARCore is up but hasn't found a surface yet.
@@ -112,13 +116,19 @@ private fun MovementGuidance(hint: String) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .background(com.hereliesaz.graffitixr.design.theme.HudScrim, com.hereliesaz.graffitixr.design.theme.HudPillShape)
+            .padding(16.dp),
     ) {
+        // A "move the phone around" glyph, not a reload arrow; the hint text below is what
+        // TalkBack reads, so the icon itself is decorative.
         Icon(
-            imageVector = Icons.Filled.Refresh,
+            imageVector = Icons.Filled.OpenWith,
             contentDescription = null,
             tint = Color.White,
-            modifier = Modifier.size(40.dp).rotate(angle),
+            modifier = Modifier.size(40.dp).rotate(angle / 8f - 22.5f),
         )
         Text(
             text = hint,

@@ -346,7 +346,15 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         },
         settings = anticipationSettings(),
         pressure = AndroidDevicePressure(context),
-    )
+    ).also { it.minFocusMeters = resolveMinFocusMeters(context, cameraId) }
+
+    // updatePrecisionLayer() is called from the UI thread but its work (a KPM sub-session rebuild)
+    // shares analyze()'s lock: it runs here instead, latest request wins, so the UI never waits out
+    // a solve.
+    private val precisionExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+        Thread(r, "graffitixr-precision-layer").apply { isDaemon = true }
+    }
+    private val pendingPrecisionLayer = java.util.concurrent.atomic.AtomicReference<(() -> Unit)?>(null)
 
     private var convertedReferenceSource: SphereSlamStandaloneReferenceImage? = null
     private var convertedReference: PhotosphereTrackingSession.ReferenceImage? = null
@@ -413,7 +421,10 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
             },
             onAtlasPageAdded = { page, attitude ->
                 depthCadence.onAtlasGrowth()
-                anticipation.setPage(page.pageNo, page.luma, page.width, page.height)
+                anticipation.setPage(
+                    page.pageNo, page.luma, page.width, page.height,
+                    page.referenceWidthUnits.toDouble().takeIf { page.physicallyMetric },
+                )
                 onAtlasPageAdded(
                     StandaloneAtlasGrowthCandidate(
                         pageNo = page.pageNo,
@@ -480,9 +491,35 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
      * The CameraX analyzer, gyro sampling, and base photosphere remain alive. Rebuilding the planar
      * KPM sub-session here is allowed because it is an enrichment consumer of the base map, not the
      * owner of SphereSLAM's runtime lifecycle.
+     *
+     * Returns at once, from any thread: the swap runs on a background thread under analyze()'s lock
+     * (a rebuild can take a whole KPM solve), and a request superseded before it starts is skipped.
      */
-    @Synchronized
     fun updatePrecisionLayer(
+        reference: SphereSlamStandaloneReferenceImage?,
+        atlasPages: List<SphereSlamStandaloneAtlasReferenceImage>,
+        doodle: Doodle?,
+        doodleFrameVersion: Int,
+        mapFromFingerprint: FloatArray?,
+        wallFeatureMap: WallFeatureMap?,
+        wallFeatureMapFrameVersion: Int,
+    ) {
+        if (closed) return
+        val transform = mapFromFingerprint?.copyOf()
+        pendingPrecisionLayer.set {
+            applyPrecisionLayer(reference, atlasPages, doodle, doodleFrameVersion, transform, wallFeatureMap, wallFeatureMapFrameVersion)
+        }
+        try {
+            precisionExecutor.execute {
+                val task = pendingPrecisionLayer.getAndSet(null) ?: return@execute
+                runCatching(task).onFailure { Timber.w(it, "Precision layer update failed") }
+            }
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
+        }
+    }
+
+    @Synchronized
+    private fun applyPrecisionLayer(
         reference: SphereSlamStandaloneReferenceImage?,
         atlasPages: List<SphereSlamStandaloneAtlasReferenceImage>,
         doodle: Doodle?,
@@ -526,9 +563,15 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     /** Anticipate [reference] (page 0) and [atlasPages] from scratch. */
     private fun anticipatePages(reference: SphereSlamStandaloneReferenceImage?, atlasPages: List<SphereSlamStandaloneAtlasReferenceImage>) {
         anticipation.reset()
-        reference?.let { anticipation.setPage(0, it.luma, it.width, it.height) }
-        atlasPages.forEach { anticipation.setPage(it.pageNo, it.luma, it.width, it.height) }
+        reference?.let { anticipation.setPage(0, it.luma, it.width, it.height, it.metricWidth()) }
+        atlasPages.forEach { anticipation.setPage(it.pageNo, it.luma, it.width, it.height, it.metricWidth()) }
     }
+
+    private fun SphereSlamStandaloneReferenceImage.metricWidth(): Double? =
+        referenceWidthMeters.toDouble().takeIf { physicallyMetric }
+
+    private fun SphereSlamStandaloneAtlasReferenceImage.metricWidth(): Double? =
+        referenceWidthMeters.toDouble().takeIf { physicallyMetric }
 
     private var lastLightLevelNs = Long.MIN_VALUE
 
@@ -1192,6 +1235,15 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
         }
     }.getOrDefault(StandaloneCameraTimestampSource.UNKNOWN)
 
+    /** Minimum focus distance of [cameraId] in metres (see [HalfSphere.minFocusMeters]). */
+    private fun resolveMinFocusMeters(context: Context, cameraId: String): Double =
+        com.hereliesaz.graffitixr.feature.ar.anticipation.HalfSphere.minFocusMeters(
+            runCatching {
+                context.getSystemService(CameraManager::class.java).getCameraCharacteristics(cameraId)
+                    .get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE)
+            }.getOrNull()
+        )
+
     private fun resolveSensorOrientation(context: Context, cameraId: String): Int = runCatching {
         val manager = context.getSystemService(CameraManager::class.java)
         val raw = manager.getCameraCharacteristics(cameraId)
@@ -1223,17 +1275,22 @@ internal class SphereSlamStandaloneTrackingAnalyzer(
     override fun close() {
         if (closed) return
         closed = true
+        // A queued precision-layer swap sees closed and does nothing; none is accepted from now on.
+        pendingPrecisionLayer.set(null)
+        precisionExecutor.shutdown()
         slamManager?.setTrackingPoseValid(false)
         ownAttitudeSource?.stop()
         session.displayPosePredictor?.clear()
         session.displayPosePredictor = null
         lastRelocSeq = 0f
+        // The anticipation builder feeds the session from its own thread: stop it (and let a batch in
+        // flight finish) before the session closes, so no views reach a closed session.
+        anticipation.close()
         session.close()
         lastDiagnosticKey = null
         lastFailureReason = null
         lastReportedTrackingState = null
         frameBuffer = null
-        anticipation.close()
         // Shuts the depth thread down; an inference already running finishes and is discarded.
         depthWorker?.close()
         depthCadence.reset()

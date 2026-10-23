@@ -40,9 +40,9 @@ fun CoopHostQrOverlay(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("Scan to join", color = Color.White)
+            Text(androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.coop_scan_to_join), color = Color.White)
             bitmap?.let { Image(bitmap = it.asImageBitmap(), contentDescription = "link QR") }
-            Button(onClick = onStopSharing) { Text("Stop sharing") }
+            Button(onClick = onStopSharing) { Text(androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.coop_stop_sharing)) }
         }
     }
 }

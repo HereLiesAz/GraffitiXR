@@ -156,7 +156,6 @@ fun rememberAppStrings(): AppStrings {
             posterGeneratePdf = stringResource(R.string.poster_generate_pdf)
         ),
         ar = AppStrings.Ar(
-            depthUnsupported = stringResource(R.string.depth_unsupported),
             arcoreRequiredTitle = stringResource(R.string.arcore_required_title),
             arcoreRequiredText = stringResource(R.string.arcore_required_text),
             installArcore = stringResource(R.string.install_arcore),
@@ -424,7 +423,6 @@ data class AppStrings(
      * plain string fields.
      */
     class Ar(
-        val depthUnsupported: String,
         val arcoreRequiredTitle: String,
         val arcoreRequiredText: String,
         val installArcore: String,
@@ -469,8 +467,7 @@ data class AppStrings(
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
             if (other !is Ar) return false
-            return depthUnsupported == other.depthUnsupported &&
-                arcoreRequiredTitle == other.arcoreRequiredTitle &&
+            return arcoreRequiredTitle == other.arcoreRequiredTitle &&
                 arcoreRequiredText == other.arcoreRequiredText &&
                 installArcore == other.installArcore &&
                 cameraPermissionRequired == other.cameraPermissionRequired &&
@@ -503,8 +500,7 @@ data class AppStrings(
         }
 
         override fun hashCode(): Int {
-            var result = depthUnsupported.hashCode()
-            result = 31 * result + arcoreRequiredTitle.hashCode()
+            var result = arcoreRequiredTitle.hashCode()
             result = 31 * result + arcoreRequiredText.hashCode()
             result = 31 * result + installArcore.hashCode()
             result = 31 * result + cameraPermissionRequired.hashCode()

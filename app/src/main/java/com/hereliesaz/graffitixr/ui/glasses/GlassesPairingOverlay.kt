@@ -28,12 +28,12 @@ fun GlassesPairingOverlay(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("Pairing Meta glasses…", color = Color.White)
+            Text(androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.glasses_pairing), color = Color.White)
             Text(
                 "Complete pairing in the Meta companion app, then return here.",
                 color = Color.White,
             )
-            Button(onClick = onCancel) { Text("Cancel") }
+            Button(onClick = onCancel) { Text(androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.dialog_cancel)) }
         }
     }
 }

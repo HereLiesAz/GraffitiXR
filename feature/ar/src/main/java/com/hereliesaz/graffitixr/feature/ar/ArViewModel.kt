@@ -264,15 +264,21 @@ class ArViewModel @Inject constructor(
     private val tripodEncoding = java.util.concurrent.atomic.AtomicBoolean(false)
 
     private fun applyTripodSink(wanted: Boolean) {
-        renderer?.streamSink = if (wanted) { bmp -> encodeTripodFrame(bmp) } else null
+        renderer?.let { r ->
+            r.streamMaxEdgePx = TRIPOD_MAX_EDGE_PX
+            r.streamBusy = { tripodEncoding.get() }
+            r.streamSink = if (wanted) { bmp -> encodeTripodFrame(bmp) } else null
+        }
     }
 
     /**
      * Runs on the GL thread, so it only hands the bitmap off: downscale and JPEG on a worker, one
-     * frame in flight (a frame arriving while the last is still encoding is dropped, latest wins).
+     * frame in flight. The renderer skips its readback while [tripodEncoding] is set, so a frame
+     * normally arrives only when the encoder is free; one that races in is dropped. The bitmap is the
+     * renderer's (reused next tick): read it, never recycle it.
      */
     private fun encodeTripodFrame(bmp: Bitmap) {
-        if (!tripodEncoding.compareAndSet(false, true)) { bmp.recycle(); return }
+        if (!tripodEncoding.compareAndSet(false, true)) return
         viewModelScope.launch(Dispatchers.Default) {
             try {
                 val edge = maxOf(bmp.width, bmp.height)
@@ -285,7 +291,6 @@ class ArViewModel @Inject constructor(
                 if (scaled !== bmp) scaled.recycle()
                 collaborationManager.offerVideo(out.toByteArray())
             } finally {
-                bmp.recycle()
                 tripodEncoding.set(false)
             }
         }
@@ -499,7 +504,11 @@ class ArViewModel @Inject constructor(
                 val tooLarge = generateSequence(e as Throwable) { it.cause }
                     .filterIsInstance<com.hereliesaz.graffitixr.core.collaboration.session.ProjectTooLargeToHostException>()
                     .firstOrNull()
-                val message = if (tooLarge != null) {
+                val noLan = generateSequence(e as Throwable) { it.cause }
+                    .any { it is com.hereliesaz.graffitixr.core.collaboration.NoLanAddressException }
+                val message = if (noLan) {
+                    appContext.getString(DesignR.string.ar_feedback_host_no_lan)
+                } else if (tooLarge != null) {
                     // Link holds one transfer in memory; export streams and takes twice that. Name
                     // the limit, and the way out.
                     appContext.getString(
@@ -1665,6 +1674,9 @@ class ArViewModel @Inject constructor(
 
     // ── Glasses session lifecycle ─────────────────────────────────────────────
 
+    // The live glasses session's connection-state collector (see startGlassesSession).
+    private var glassesStateJob: kotlinx.coroutines.Job? = null
+
     fun startGlassesSession() {
         if (
             _uiState.value.isArCoreAvailabilityResolved &&
@@ -1690,7 +1702,10 @@ class ArViewModel @Inject constructor(
         _glassesSessionState.value = GlassesSessionState.PairingPrompt
         wearableManager.activate(provider)
         slamManager.startSensorCollection()
-        viewModelScope.launch {
+        // One collector per session: a reconnect restarts the session, so the previous collector
+        // goes first instead of running every state handler once more per reconnect.
+        glassesStateJob?.cancel()
+        glassesStateJob = viewModelScope.launch {
             provider.connectionState.collect { state ->
                 when (state) {
                     is ConnectionState.Connected -> {
@@ -1717,6 +1732,8 @@ class ArViewModel @Inject constructor(
     }
 
     fun endGlassesSession() {
+        glassesStateJob?.cancel()
+        glassesStateJob = null
         wearableManager.deactivate()
         slamManager.stopSensorCollection()
         phoneToGlassesXform = null
@@ -1905,6 +1922,38 @@ class ArViewModel @Inject constructor(
     // checker, and so monocular depth knows whether ARCore depth can be the source. Null until resolved.
     @Volatile private var arCoreCheckResult: ArAvailabilityChecker.Result? = null
 
+    // The open project asked for the standalone tracker (see prepareCloseRangeBackend).
+    private val closeRangeStandalone = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+    /**
+     * Called as a Doodle capture starts. On an ARCore phone pointed at a surface under
+     * [com.hereliesaz.graffitixr.common.model.CLOSE_RANGE_METERS] away, or looking down at a
+     * tabletop, switch this project to the standalone (KPM) tracker before anything is captured —
+     * switching after would discard the capture — and remember it on the project. Far captures keep
+     * ARCore. A no-op off ARCore or without a tracked camera.
+     */
+    fun prepareCloseRangeBackend() {
+        if (!_uiState.value.isArCoreAvailable || closeRangeStandalone.value) return
+        val r = renderer ?: return
+        val pose = r.latestCameraPose ?: return
+        viewModelScope.launch {
+            val lookingDown = pose[4] < -com.hereliesaz.graffitixr.common.model.LOOKING_DOWN_COS
+            val hit = r.viewCenter()?.let { (cx, cy) ->
+                kotlinx.coroutines.withTimeoutOrNull(400L) { r.requestHitTest(cx, cy).await() }
+            }
+            val distance = hit?.let {
+                kotlin.math.sqrt(
+                    (it[0] - pose[0]) * (it[0] - pose[0]) + (it[1] - pose[1]) * (it[1] - pose[1]) + (it[2] - pose[2]) * (it[2] - pose[2])
+                )
+            }
+            val close = lookingDown || (distance != null && distance < com.hereliesaz.graffitixr.common.model.CLOSE_RANGE_METERS)
+            Timber.i("Close-range check: lookingDown=$lookingDown distance=$distance -> standalone=$close")
+            if (!close) return@launch
+            closeRangeStandalone.value = true
+            projectRepository.updateProject { it.copy(closeRangeStandalone = true) }
+        }
+    }
+
     // Serializes monocular-depth load/unload so rapid toggles can't interleave a self-test and a close.
     private val monocularDepthMutex = Mutex()
 
@@ -1964,7 +2013,11 @@ class ArViewModel @Inject constructor(
             // cleanup, same standalone routing. The checker result is cached above and the backend is
             // re-derived on every toggle, so a change switches backends immediately — mid-AR too.
             Timber.i("ArCore availability resolved: $result")
-            settingsRepository.arCoreEnabled.distinctUntilChanged().collect { arCoreOptIn ->
+            // A close-range project (GraffitiProject.closeRangeStandalone) takes the standalone path
+            // exactly like an opt-out, for as long as it is open.
+            kotlinx.coroutines.flow.combine(settingsRepository.arCoreEnabled, closeRangeStandalone) { optIn, close ->
+                optIn && !close
+            }.distinctUntilChanged().collect { arCoreOptIn ->
                 applyArCoreBackendSelection(result, arCoreOptIn)
             }
         }
@@ -1989,6 +2042,7 @@ class ArViewModel @Inject constructor(
         }
         viewModelScope.launch {
             projectRepository.currentProject.collect { project ->
+                closeRangeStandalone.value = project?.closeRangeStandalone == true
                 _uiState.update {
                     val nextReferenceUri = project?.sphereSlamReferenceUri
                     val referenceChanged = it.sphereSlamReferenceUri != nextReferenceUri
@@ -2895,6 +2949,14 @@ class ArViewModel @Inject constructor(
                     appendDiag("session.resume() took ${android.os.SystemClock.elapsedRealtime() - t0}ms")
                 } else if ((!isActivityResumed || !isInArMode) && isSessionResumed) {
                     pauseArSessionInternal()
+                    // A GL frame wedged in session.update() holds the session lock past every retry,
+                    // and giving up there left ARCore holding the camera in the background (battery
+                    // stats: minutes of background camera). Keep trying until it lets go or the app
+                    // returns; cancellation (a later lifecycle change) ends the loop.
+                    while (isSessionResumed && (!isActivityResumed || !isInArMode) && !isDestroying) {
+                        kotlinx.coroutines.delay(BACKGROUND_PAUSE_RETRY_MS)
+                        pauseArSessionInternal(reportFailure = false)
+                    }
                 }
             }
         }
@@ -3831,7 +3893,9 @@ class ArViewModel @Inject constructor(
      * Same race, same fix, same NoSession fallback reasoning as [resumeArSessionInternal] — see its
      * doc, including the [SessionLifecycleOutcome.LockTimeout] retry-then-notify handling.
      */
-    private fun pauseArSessionInternal() {
+    private fun pauseArSessionInternal() = pauseArSessionInternal(reportFailure = true)
+
+    private fun pauseArSessionInternal(reportFailure: Boolean) {
         val s = session ?: return
         val r = renderer
         try {
@@ -3850,7 +3914,7 @@ class ArViewModel @Inject constructor(
                         "Failed to pause ARCore session: GL thread did not release its session " +
                             "lock after ${LOCK_TIMEOUT_MAX_RETRIES} retries"
                     )
-                    _feedback.tryEmit(
+                    if (reportFailure) _feedback.tryEmit(
                         com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
                             appContext.getString(DesignR.string.ar_feedback_camera_not_paused)
                         )
@@ -6495,6 +6559,16 @@ class ArViewModel @Inject constructor(
         renderer?.pendingAnchorEstablishment = true
     }
 
+    /**
+     * Undoes [setInitialAnchorFromCapture] when the confirm it preceded was refused before building:
+     * no anchor is re-placed wherever the camera now points, and the replacement gate comes down.
+     */
+    fun cancelInitialAnchorFromCapture() {
+        renderer?.pendingAnchorEstablishment = false
+        renderer?.pendingCapturedWallPlane = null
+        slamManager.abortDoodleReplacement()
+    }
+
     fun requestCapture() {
         slamManager.setMappingPaused(true)
         _uiState.update { it.copy(isCaptureRequested = true) }
@@ -6673,6 +6747,8 @@ class ArViewModel @Inject constructor(
         private const val STANDALONE_MAP_SAVE_INTERVAL_MS = 2_000L
         const val LOCK_TIMEOUT_MAX_RETRIES = 3
         const val LOCK_TIMEOUT_RETRY_DELAY_MS = 200L
+        /** Interval between pause attempts while a wedged GL frame keeps the camera open. */
+        const val BACKGROUND_PAUSE_RETRY_MS = 1000L
     }
     // @Volatile: written on main (setDoodlePhase) / IO (build result) and read on the GL thread
     // (onDoodleCaptured), so the GL thread must observe the latest value.
@@ -6991,6 +7067,9 @@ class ArViewModel @Inject constructor(
     override fun onCleared() {
         isCleared = true
         super.onCleared()
+        // SlamManager is a singleton: left running, glasses frames and IMU samples would keep feeding
+        // native MobileGS for the life of the process after this screen is gone.
+        if (_glassesSessionState.value !is GlassesSessionState.Idle) endGlassesSession()
         stopSystemThrottleMonitoring()
         cameraAttitudeProvider.stop()
         if (depthEstimatorLazy.isInitialized()) depthEstimatorLazy.value.close()

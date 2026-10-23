@@ -146,7 +146,7 @@
 
     <!-- Label for the touch input lock feature. -->
     <!-- Description of the touch lock, explaining how to unlock it. -->
-    <string name="nav_lock_info">Blocca il touchscreen per evitare modifiche accidentali mentre spruzzi. Tocca tre volte ovunque per sbloccare.</string>
+    <string name="nav_lock_info">Blocca il design così pizzichi e trascinamenti non lo spostano. Tocca di nuovo Blocca per sbloccarlo.</string>
 
 
     <!-- Tooltip info for the brush tool. -->
@@ -252,7 +252,6 @@
     <string name="choose_from_gallery">Scegli dalla Galleria</string>
 
     <!-- Message shown when the device doesn\'t support the Depth API. -->
-    <string name="depth_unsupported">Questo dispositivo non supporta l\'API di Profondità.\nPassa alla modalità Tela in Impostazioni.</string>
 
     <!-- Title shown when ARCore is missing or unsupported. -->
     <string name="arcore_required_title">ARCore è richiesto</string>
@@ -267,9 +266,9 @@
     <string name="open_settings">Apri Impostazioni</string>
 
     <!-- Title for target creation overlay. -->
-    <string name="doodle_creation_title">GRIGLIA DELLO SCARABOCCHIO</string>
+    <string name="doodle_creation_title">SCARABOCCHIO</string>
     <!-- Instructions for creating a target by tapping on reference marks. -->
-    <string name="doodle_creation_text">Se non hai ancora creato la griglia del tuo Scarabocchio, scatta una foto del muro premendo il pulsante di acquisizione. Altrimenti premi Annulla.</string>
+    <string name="doodle_creation_text">Il tuo Scarabocchio è fatto di pochi segni grandi dipinti sulla superficie, così l\'app può ritrovarla. Dipingili, poi fotografa la superficie con il pulsante di acquisizione.</string>
     <!-- Generic cancel action. -->
     <string name="cancel">Annulla</string>
 
@@ -330,10 +329,8 @@
     <string name="align_not_ready">Allinea richiede prima un Doodle e un design posizionato.</string>
 
     <!-- Overlays & Status -->
-    <string name="status_create_grid">Crea una Griglia per iniziare.</string>
     <string name="status_scan_surfaces">Scansiona le superfici intorno a te.</string>
     <string name="status_tap_surface">Tocca una superficie per posizionare l\'ancora.</string>
-    <string name="status_looking_grid">Cerco la tua Griglia...</string>
     <string name="status_ready">Pronto. (%1$d punti)</string>
     <string name="unlock_hint">Volume Su, Giù, Su, Giù — rapidamente — per sbloccare</string>
 
@@ -415,7 +412,7 @@
     <string name="settings_granted">Concesso</string>
     <string name="settings_denied">Negato</string>
     <string name="settings_open_app_settings">Apri Impostazioni App</string>
-    <string name="settings_copyright">GraffitiXR © 2025</string>
+    <string name="settings_copyright">GraffitiXR © 2025–2026</string>
 
     <!-- Editor UI -->
     <string name="save_project_hint">Nome Progetto</string>
@@ -453,7 +450,7 @@
 
     <!-- Help strings for main navigation rail. -->
     <!-- Mode Switcher help text. -->
-    <string name="help_mode_host">Selettore Modalità: Passa tra le modalità dell\'app. Istruzioni: Tocca per espandere, poi seleziona AR, Sovrapposizione, Mockup o Tavolo luminoso.</string>
+    <string name="help_mode_host">Selettore modalità: passa da una modalità all\'altra. Istruzioni: tocca per espandere, poi scegli AR, Sovrapposizione, Mockup o Ricalco.</string>
     <!-- AR Mode help text. -->
     <string name="help_ar">Modalità AR: Proietta il design su un muro usando la mappatura spaziale. Istruzioni: Scansiona l\'ambiente finché il muro non viene rilevato, poi tocca per posizionare l\'ancora.</string>
     <!-- Overlay Mode help text. -->
@@ -461,11 +458,11 @@
     <!-- Mockup Mode help text. -->
     <string name="help_mockup">Modalità Mockup: Visualizza in anteprima il design su una foto statica. Istruzioni: Usa \'Muro\' per impostare un\'immagine di sfondo, poi posiziona il design sopra.</string>
     <!-- Lightbox Mode help text. -->
-    <string name="help_trace">Modalità Tavolo luminoso: Superficie di tracciamento ad alta luminosità. Istruzioni: Posiziona la carta sullo schermo e traccia. Premi rapidamente Volume Su, Giù, Su, Giù per uscire.</string>
+    <string name="help_trace">Modalità Ricalco: superficie di ricalco ad alta luminosità. Istruzioni: appoggia la carta sullo schermo e ricalca. Premi rapidamente Volume Su, Giù, Su, Giù per uscire.</string>
     <!-- Target Management help text. -->
     <!-- Scan Resolution help text. -->
     <!-- Create Anchor help text. -->
-    <string name="help_create">Crea Ancora: Fotografa un segno sul muro per bloccare la proiezione. Istruzioni: Punta verso una texture distinta e tocca. L\'app traccerà questo segno.</string>
+    <string name="help_create">Acquisisci Scarabocchio: fotografa i segni del tuo Scarabocchio per fissare la proiezione. Istruzioni: inquadra i segni e tocca. Da quel momento l\'app li segue.</string>
     <!-- Layer Management help text. -->
     <!-- Import Image help text. -->
     <string name="help_add_img">Importa Immagine: Aggiungi uno schizzo o una foto di riferimento. Istruzioni: Seleziona un\'immagine dalla tua galleria. Diventerà il design.</string>
@@ -587,11 +584,11 @@
         <item>Così le tue immagini sono pronte e il telefono può concentrarsi sulla realtà aumentata quando premi il pulsante AR.</item>
     </string-array>
     <string-array name="onboarding_ar">
-        <item>Proiezione AR — proietta il tuo design su un muro reale usando il sensore di profondità e il tracciamento spaziale del telefono.</item>
-        <item>Punta il muro e muoviti lentamente da un lato all\'altro. Appariranno forme colorate mentre il motore mappa la superficie. Attendi finché l\'area del muro non è coperta.</item>
-        <item>Basta toccare lo schermo. L\'app fotografa il muro, estrae punti di tracciamento e blocca l\'ancora all\'istante.</item>
-        <item>Tocca «Apri» per aggiungere il tuo design — verrà proiettato sul muro usando l\'ancora appena impostata.</item>
-        <item>Consiglio — muri bianchi vuoti, cemento liscio e superfici a tinta unita non possono essere tracciati. Punta l\'ancora su graffiti, intonaco ruvido o qualsiasi segno distintivo.</item>
+        <item>AR: proietta il tuo design sulla superficie reale e lo mantiene lì mentre ti muovi.</item>
+        <item>Dipingi il tuo Scarabocchio: pochi segni grandi e marcati sulla superficie, distanziati e non tutti della stessa forma.</item>
+        <item>Tocca Scarabocchio e fotografa i segni. L\'app vi aggancia il tuo design.</item>
+        <item>Tocca «Apri» per aggiungere il design: appare sulla superficie, tenuto in posizione dal tuo Scarabocchio.</item>
+        <item>Suggerimento: una superficie liscia da sola non offre nulla da seguire. A questo serve lo Scarabocchio: segni marcati che risaltano sulla superficie.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Overlay dal vivo — il tuo design fluttua sopra il flusso della fotocamera in diretta, senza bisogno di scansionare alcuna superficie.</item>
@@ -666,45 +663,45 @@
     <string name="first_run_detect_title">Ora inquadra con la fotocamera ciò che hai disegnato</string>
     <string name="first_run_detect_movement_hint">Muovi lentamente il dispositivo in cerchio</string>
     <string name="standalone_width_prompt">Misura la larghezza reale tra il bordo sinistro e quello destro del bersaglio.</string>
-    <string name="standalone_width_label_metric">Larghezza del bersaglio (metri)</string>
-    <string name="standalone_width_label_imperial">Larghezza del bersaglio (piedi e pollici)</string>
+    <string name="standalone_width_label_metric">Larghezza della superficie (metri)</string>
+    <string name="standalone_width_label_imperial">Larghezza della superficie (piedi e pollici)</string>
     <string name="standalone_width_range_error">Inserisci una larghezza da %1$s a %2$s.</string>
     <string name="standalone_use_measured_width">Usa la larghezza misurata</string>
     <string name="standalone_continue_without_scale">Continua senza scala fisica</string>
     <string name="standalone_recapture">Acquisisci di nuovo</string>
-    <string name="standalone_capture_wall_target">Acquisisci bersaglio a muro</string>
-    <string name="standalone_capture_failed">Impossibile acquisire il bersaglio a muro. Riprova.</string>
+    <string name="standalone_capture_wall_target">Acquisisci Scarabocchio</string>
+    <string name="standalone_capture_failed">Impossibile acquisire lo Scarabocchio. Riprova.</string>
     <string name="standalone_rectify_failed">Impossibile raddrizzare il bersaglio. Segna quattro angoli ben visibili.</string>
-    <string name="standalone_target_too_weak">Questo bersaglio ha troppi pochi dettagli tracciabili (%1$d caratteristiche KPM; ne servono %2$d). Acquisisci una porzione di muro più ricca.</string>
-    <string name="standalone_new_target">Nuovo bersaglio</string>
+    <string name="standalone_target_too_weak">Dettagli insufficienti da seguire lì (%1$d punti; ne servono %2$d). Aggiungi qualche segno marcato o inquadra una zona più dettagliata.</string>
+    <string name="standalone_new_target">Nuovo Scarabocchio</string>
     <string name="standalone_copy_diagnostics">Copia diagnostica</string>
     <string name="standalone_wall_target_lost">Bersaglio a muro perso</string>
-    <string name="standalone_recapture_target">Riacquisisci bersaglio</string>
+    <string name="standalone_recapture_target">Acquisisci di nuovo lo Scarabocchio</string>
     <string name="standalone_sweep_hint">Ruota lentamente per mappare lo spazio — %1$d%%</string>
-    <string name="standalone_failure_native_library_unavailable">SphereSLAM non è disponibile in questa versione.</string>
+    <string name="standalone_failure_native_library_unavailable">Il tracciamento AR non è disponibile in questa versione.</string>
     <string name="standalone_failure_camera_unavailable">La fotocamera non è disponibile per la AR autonoma.</string>
     <string name="standalone_failure_intrinsics_unavailable">La calibrazione della fotocamera non è disponibile per la AR autonoma.</string>
-    <string name="standalone_failure_reference_too_weak">Questo bersaglio a muro ha troppi pochi dettagli tracciabili. Acquisisci una porzione più ricca.</string>
-    <string name="standalone_failure_no_page_match">Mantieni il bersaglio a muro nell\'inquadratura.</string>
+    <string name="standalone_failure_reference_too_weak">Dettagli insufficienti da seguire. Aggiungi qualche segno marcato o inquadra una zona più dettagliata.</string>
+    <string name="standalone_failure_no_page_match">Tieni lo Scarabocchio nell\'inquadratura.</string>
     <string name="standalone_failure_stale_observation">Il tracciamento è in ritardo. Muovi il telefono più lentamente.</string>
     <string name="standalone_failure_reprojection_error">La corrispondenza con il muro è instabile. Reinquadra il bersaglio.</string>
     <string name="standalone_failure_insufficient_inliers">Non sono visibili abbastanza dettagli del bersaglio.</string>
-    <string name="standalone_failure_pose_jump">Salto di tracciamento rifiutato. Tieni il telefono fermo sul bersaglio a muro.</string>
-    <string name="standalone_failure_persisted_target_corrupt">Il bersaglio a muro salvato manca o non è leggibile. Acquisisci un nuovo bersaglio.</string>
-    <string name="standalone_failure_internal">SphereSLAM non è riuscito a continuare a tracciare questo bersaglio.</string>
-    <string name="standalone_tracking_stopped">Il tracciamento di SphereSLAM si è interrotto. Acquisisci di nuovo il bersaglio per riavviarlo.</string>
-    <string name="standalone_status_mapping">Mappatura SphereSLAM • tocca Scarabocchio per aggiungere il tuo Scarabocchio</string>
-    <string name="standalone_status_preparing">Preparazione del bersaglio a muro…</string>
-    <string name="standalone_status_finding">Ricerca del bersaglio a muro…</string>
-    <string name="standalone_quality_too_small">Questo bersaglio a muro è troppo piccolo dopo il raddrizzamento. Acquisisci una porzione più grande.</string>
-    <string name="standalone_quality_low_contrast">Questo bersaglio a muro ha poco contrasto visivo. Includi più texture o dettagli.</string>
-    <string name="standalone_quality_blurry">Questo bersaglio a muro è troppo sfocato per un tracciamento affidabile. Tieni fermo e acquisisci di nuovo.</string>
-    <string name="standalone_quality_not_strong_enough">Questo bersaglio a muro non è abbastanza solido per un tracciamento affidabile.</string>
-    <string name="standalone_quality_too_dark">Questo bersaglio è molto sottoesposto; il tracciamento potrebbe essere meno affidabile.</string>
-    <string name="standalone_quality_too_bright">Questo bersaglio è molto sovraesposto; il tracciamento potrebbe essere meno affidabile.</string>
-    <string name="standalone_photosphere_no_sensor">Questo telefono non ha un sensore di rotazione, quindi SphereSLAM non può posizionare un bersaglio qui.</string>
+    <string name="standalone_failure_pose_jump">Il tracciamento è saltato: tieni il telefono sul tuo Scarabocchio.</string>
+    <string name="standalone_failure_persisted_target_corrupt">Lo Scarabocchio salvato non è leggibile. Acquisiscilo di nuovo.</string>
+    <string name="standalone_failure_internal">Tracciamento interrotto. Acquisisci di nuovo lo Scarabocchio per ripartire.</string>
+    <string name="standalone_tracking_stopped">Tracciamento interrotto. Acquisisci di nuovo lo Scarabocchio per ripartire.</string>
+    <string name="standalone_status_mapping">Analisi della superficie • tocca Scarabocchio per acquisire il tuo</string>
+    <string name="standalone_status_preparing">Preparazione dello Scarabocchio…</string>
+    <string name="standalone_status_finding">Ricerca dello Scarabocchio…</string>
+    <string name="standalone_quality_too_small">Lo Scarabocchio è troppo piccolo nell\'immagine. Avvicinati o acquisisci un\'area più ampia.</string>
+    <string name="standalone_quality_low_contrast">Contrasto troppo basso per il tracciamento. Segni più marcati o più luce aiuteranno.</string>
+    <string name="standalone_quality_blurry">Troppo sfocato per il tracciamento. Tieni fermo e riprova.</string>
+    <string name="standalone_quality_not_strong_enough">Dettagli insufficienti per un tracciamento affidabile. Aggiungi qualche segno marcato.</string>
+    <string name="standalone_quality_too_dark">Molto scuro; il tracciamento potrebbe essere meno affidabile.</string>
+    <string name="standalone_quality_too_bright">Molto luminoso; il tracciamento potrebbe essere meno affidabile.</string>
+    <string name="standalone_photosphere_no_sensor">Questo telefono non ha un sensore di rotazione, quindi l\'AR non può posizionare qui il tuo Scarabocchio.</string>
     <string name="standalone_photosphere_compass_not_ready">La bussola non è ancora pronta: tieni il telefono fermo per un secondo, poi riprova.</string>
-    <string name="standalone_photosphere_not_mapped">SphereSLAM non ha ancora mappato questa vista: tieni la fotocamera ferma per un secondo su una parte illuminata e ricca di dettagli della superficie, poi riprova.</string>
+    <string name="standalone_photosphere_not_mapped">L\'app non conosce ancora questa vista: tieni fermo per un secondo su una parte illuminata e dettagliata della superficie, poi acquisisci di nuovo.</string>
     <string name="doodle_rectify_title">Raddrizza la superficie</string>
     <string name="doodle_rectify_text">Ora trascina gli angoli per allineare la cornice ciano alla superficie piana del tuo muro.</string>
     <string name="doodle_remove_marks_title">Rimuovi segni</string>
@@ -722,7 +719,7 @@
     <string name="ar_feedback_backend_resolving">Il backend AR è ancora in fase di selezione: riprova a fare da host tra un attimo</string>
     <string name="ar_feedback_open_project_first">Apri un progetto prima di condividere: non c\'è ancora nulla da inviare a un ospite</string>
     <string name="ar_feedback_host_need_doodle_arcore">Acquisisci e blocca uno Scarabocchio aggiornato prima di avviare «Ospita»</string>
-    <string name="ar_feedback_host_need_target_standalone">Acquisisci un target parete standalone prima di fare da host</string>
+    <string name="ar_feedback_host_need_target_standalone">Acquisisci lo Scarabocchio prima di ospitare</string>
     <string name="ar_feedback_doodle_not_ready">Lo Scarabocchio non è ancora pronto — tienilo inquadrato e riprova «Ospita»</string>
     <string name="ar_feedback_package_failed">Impossibile preparare questo progetto per la condivisione: prova prima a salvarlo</string>
     <string name="ar_feedback_host_failed">Impossibile avviare la condivisione: %1$s</string>
@@ -735,7 +732,7 @@
     <string name="ar_feedback_camera_busy">La fotocamera è occupata o non disponibile: chiudi le altre app che la usano, poi rientra in AR</string>
     <string name="ar_feedback_ar_start_failed">Impossibile avviare AR: la fotocamera potrebbe essere in uso da un\'altra app</string>
     <string name="ar_feedback_camera_setting_apply_failed">Impossibile applicare l\'impostazione della fotocamera alla sessione AR in corso: esci da AR e rientra</string>
-    <string name="ar_feedback_sphere_target_save_failed">Il tracciamento della parete funziona per questa sessione, ma non è stato possibile salvare il target SphereSLAM.</string>
+    <string name="ar_feedback_sphere_target_save_failed">Il tracciamento funziona per questa sessione, ma non è stato possibile salvare lo Scarabocchio.</string>
     <string name="ar_feedback_camera_not_resumed">La fotocamera AR non è ripartita: prova a uscire dalla modalità AR e a rientrare</string>
     <string name="ar_feedback_camera_permission">Fotocamera non disponibile: controlla l\'autorizzazione della fotocamera, poi rientra in AR</string>
     <string name="ar_feedback_camera_not_paused">La fotocamera AR non si è messa in pausa correttamente: potrebbe restare attiva in background</string>
@@ -793,4 +790,68 @@
     <string name="cv_pass_warm_luma">Luce calda</string>
     <string name="cv_pass_stencil3">Stencil</string>
     <string name="cv_pass_change">Cambiamento</string>
+    <string name="doodle_tap_grid_hint">Tocca il tuo Scarabocchio per acquisirlo.</string>
+    <string name="doodle_blank_wall_hint">Se la superficie è vuota, scatta una foto.</string>
+    <string name="doodle_blank_wall_saved_hint">Superficie vuota salvata. Ora tocca il tuo Scarabocchio.</string>
+    <string name="update_title">Aggiornamento disponibile</string>
+    <string name="update_body_play">Una versione più recente è sul Play Store.</string>
+    <string name="update_body_github">La versione %1$s è su GitHub.</string>
+    <string name="update_go_play">Apri Play Store</string>
+    <string name="update_go_github">Apri GitHub</string>
+    <string name="update_later">Più tardi</string>
+    <string name="crash_title">GraffitiXR si è chiusa inaspettatamente</string>
+    <string name="crash_body">L\'ultima volta qualcosa è andato storto. Condividere il rapporto aiuta a risolvere; contiene il modello del telefono e il log recente dell\'app, niente dei tuoi progetti.</string>
+    <string name="crash_share">Condividi rapporto</string>
+    <string name="crash_copy">Copia</string>
+    <string name="crash_dismiss">Ignora</string>
+    <string name="ar_feedback_host_no_lan">Il collegamento richiede il Wi-Fi. Connettiti a una rete Wi-Fi o avvia un hotspot, poi ospita di nuovo.</string>
+    <string name="hud_progress">Avanzamento</string>
+    <string name="replace_design_title">Sostituire il design?</string>
+    <string name="replace_design_text">Sostituisce il design attuale e la sua posizione. Puoi annullare.</string>
+    <string name="replace_design_confirm">Sostituisci</string>
+    <string name="dialog_cancel">Annulla</string>
+    <string name="delete_project_title">Eliminare «%1$s»?</string>
+    <string name="delete_project_text">Il progetto verrà eliminato per sempre: design, miniatura e Scarabocchio salvato. Uno Scarabocchio non si può riacquisire se nel frattempo la superficie è cambiata. Non si può annullare.</string>
+    <string name="save_project_title">Salva progetto</string>
+    <string name="doodle_not_locked_title">Scarabocchio non agganciato</string>
+    <string name="doodle_not_locked_text">Il design è posizionato, ma l\'app non è riuscita ad agganciarsi allo Scarabocchio, quindi la sovrapposizione si sposterà. Acquisiscilo di nuovo: di fronte alla superficie, un po\' più vicino, con buona luce.</string>
+    <string name="doodle_recapture">Acquisisci di nuovo lo Scarabocchio</string>
+    <string name="msg_capture_incomplete">Acquisizione incompleta. Acquisisci di nuovo lo Scarabocchio.</string>
+    <string name="msg_map_not_ready">La superficie non è ancora riconosciuta. Tieni la fotocamera puntata e riprova.</string>
+    <string name="msg_no_project">Nessun progetto aperto. Aprine o creane uno prima: lo Scarabocchio viene salvato in un progetto.</string>
+    <string name="msg_doodle_low_detail_selected">Dettagli insufficienti in ciò che hai tenuto. Tieni più segni del tuo Scarabocchio.</string>
+    <string name="msg_doodle_changed">Lo Scarabocchio è cambiato durante il salvataggio, quindi non è stato salvato. Riprova.</string>
+    <string name="msg_doodle_saved">Scarabocchio salvato e agganciato</string>
+    <string name="msg_doodle_save_failed">Impossibile salvare lo Scarabocchio. Riprova.</string>
+    <string name="msg_doodle_too_weak_kept">Dettagli insufficienti da seguire. È stato mantenuto lo Scarabocchio precedente.</string>
+    <string name="msg_doodle_low_detail">Dettagli insufficienti da seguire. Segni più marcati o più luce aiuteranno.</string>
+    <string name="msg_doodle_session_only">Scarabocchio salvato solo per questa sessione: non è stato agganciato, quindi non tornerà alla riapertura del progetto. Acquisiscilo di nuovo tenendo fermo il telefono.</string>
+    <string name="msg_doodle_anchor_failed">Impossibile agganciare lo Scarabocchio. Tieni il telefono fermo sulla superficie e riprova.</string>
+    <string name="msg_project_switched">Un altro progetto si è aperto prima del salvataggio dello Scarabocchio, quindi non è stato salvato. Acquisiscilo di nuovo.</string>
+    <string name="msg_image_invalid">Impossibile aprire l\'immagine, oppure nessun progetto è aperto.</string>
+    <string name="msg_nothing_to_share">Ancora niente da condividere. Salva prima il progetto.</string>
+    <string name="msg_share_failed">Impossibile preparare il progetto per la condivisione. Riprova.</string>
+    <string name="msg_export_failed">Esportazione non riuscita. Riprova.</string>
+    <string name="status_preparing_tracking">Preparazione AR…</string>
+    <string name="msg_locked">Bloccato. Tocca di nuovo Blocca per spostarlo.</string>
+    <string name="msg_export_timeout">Esportazione scaduta. Riprova.</string>
+    <string name="msg_project_save_failed">Impossibile salvare il progetto. Riprova.</string>
+    <string name="coop_none_title">Nessuna sessione trovata</string>
+    <string name="coop_none_text">Nessuna sessione GraffitiXR nelle vicinanze. Cerca di nuovo o ospitane una tua.</string>
+    <string name="coop_host">Ospita</string>
+    <string name="coop_search">Cerca</string>
+    <string name="coop_need_doodle">Acquisisci prima lo Scarabocchio per ospitare.</string>
+    <string name="coop_scan_to_join">Scansiona per unirti</string>
+    <string name="coop_stop_sharing">Interrompi condivisione</string>
+    <string name="coop_leave">Esci</string>
+    <string name="glasses_pairing">Associazione occhiali Meta…</string>
+    <string name="glasses_reconnect">Riconnetti</string>
+    <string name="glasses_end">Termina</string>
+    <string name="diag_confidence">Affidabilità</string>
+    <string name="diag_sensors">Dati sensori</string>
+    <string name="diag_log_start">Log ▶</string>
+    <string name="diag_log_stop">Log ■</string>
+    <string name="diag_induce_loss">Perdita</string>
+    <string name="diag_rec_start">Reg. ▶</string>
+    <string name="diag_rec_stop">Reg. ■</string>
 </resources>

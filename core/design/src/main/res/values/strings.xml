@@ -27,14 +27,13 @@
     <string name="nav_trace">Trace</string>
     <!-- Description of Trace mode, explaining its use as a light-table for physical tracing. -->
     <string name="nav_trace_info">Use your design as a light-table overlay to trace reference lines onto a physical surface.</string>
-    <!-- Alternative name for Trace mode, often referred to as Lightbox. -->
 
     <!-- Label for the Stencil generation tool. -->
     <!-- Description of the Stencil tool, explaining how it creates multi-layer printable templates. -->
 
-    <!-- Label for the Target/Grid management menu in AR mode. -->
+    <!-- Label for the Doodle menu in AR mode. -->
     <string name="nav_grid">Doodle</string>
-    <!-- Description of Target management, used for anchor creation and management. -->
+    <!-- Description of the Doodle menu: capturing and managing the marks AR tracks. -->
     <string name="nav_grid_info">Create and manage your Doodle. Photograph the painted reference marks on the surface to lock the projection in place.</string>
 
     <!-- Label for the wall survey tool, used to improve AR tracking. -->
@@ -167,7 +166,7 @@
 
     <!-- Label for the touch input lock feature. -->
     <!-- Description of the touch lock, explaining how to unlock it. -->
-    <string name="nav_lock_info">Lock the touchscreen to prevent accidental changes while you spray. Triple-tap anywhere to unlock.</string>
+    <string name="nav_lock_info">Pin the design so pinches and drags don\'t move it. Tap Lock again to release it.</string>
 
 
     <!-- Tooltip info for the brush tool. -->
@@ -281,7 +280,6 @@
     <string name="choose_from_gallery">Choose from Gallery</string>
 
     <!-- Message shown when the device doesn't support the Depth API. -->
-    <string name="depth_unsupported">This device doesn\'t support the Depth API.\nSwitch to Canvas mode in Settings.</string>
 
     <!-- Title shown when ARCore is missing or unsupported. -->
     <string name="arcore_required_title">ARCore is required</string>
@@ -297,10 +295,10 @@
     <!-- Action to open system settings. -->
     <string name="open_settings">Open Settings</string>
 
-    <!-- Title for the Doodle grid overlay. -->
-    <string name="doodle_creation_title">DOODLE GRID</string>
-    <!-- Instructions on the Doodle grid overlay: the bare-wall photo first, or Cancel to put the card away. -->
-    <string name="doodle_creation_text">If you haven\'t created your Doodle grid, then take a picture of the surface by pressing the capture button. Otherwise press Cancel.</string>
+    <!-- Title for the Doodle capture overlay. -->
+    <string name="doodle_creation_title">DOODLE</string>
+    <!-- Instructions on the Doodle capture overlay: what a Doodle is, then one step. -->
+    <string name="doodle_creation_text">Your Doodle is a few big marks you paint on the surface, so the app can find it again. Paint them, then photograph the surface with the capture button.</string>
     <!-- Generic cancel action. -->
     <string name="cancel">Cancel</string>
 
@@ -367,10 +365,8 @@
     <string name="align_not_ready">Align needs a Doodle and a placed design first.</string>
 
     <!-- Overlays & Status -->
-    <string name="status_create_grid">Create a Grid to start.</string>
     <string name="status_scan_surfaces">Scan surfaces around you.</string>
     <string name="status_tap_surface">Tap a surface to place anchor.</string>
-    <string name="status_looking_grid">Looking for your Grid...</string>
     <string name="status_world_mapped">WORLD MAPPED: %1$d%%</string>
     <string name="status_ready">Ready. (%1$d pts)</string>
     <string name="unlock_hint">Volume Up, Down, Up, Down — quickly — to unlock</string>
@@ -470,7 +466,7 @@
     <string name="settings_granted">Granted</string>
     <string name="settings_denied">Denied</string>
     <string name="settings_open_app_settings">Open App Settings</string>
-    <string name="settings_copyright">GraffitiXR © 2025</string>
+    <string name="settings_copyright">GraffitiXR © 2025–2026</string>
 
     <!-- Editor UI -->
     <string name="save_project_hint">Project Name</string>
@@ -508,20 +504,20 @@
 
     <!-- Help strings for main navigation rail. -->
     <!-- Mode Switcher help text. -->
-    <string name="help_mode_host">Mode Switcher: Switch between app modes. Instructions: Tap to expand, then select AR, Overlay, Mockup, or Lightbox.</string>
+    <string name="help_mode_host">Mode Switcher: Switch between app modes. Instructions: Tap to expand, then select AR, Overlay, Mockup, or Trace.</string>
     <!-- AR Mode help text. -->
     <string name="help_ar">AR Mode: Project design onto a surface using spatial mapping. Instructions: Scan environment until the surface is detected, then tap to place the anchor.</string>
     <!-- Overlay Mode help text. -->
     <string name="help_overlay">Overlay Mode: Display design over live camera without spatial tracking. Instructions: Manually scale and move the design to fit your frame.</string>
     <!-- Mockup Mode help text. -->
     <string name="help_mockup">Mockup Mode: Preview the design on a still photo. Instructions: Use \'Surface\' to set a background photo, then place the design on top.</string>
-    <!-- Lightbox Mode help text. -->
-    <string name="help_trace">Lightbox Mode: High-brightness tracing surface. Instructions: Place paper over the screen and trace. Press Volume Up, Down, Up, Down quickly to exit.</string>
+    <!-- Trace Mode help text. -->
+    <string name="help_trace">Trace Mode: High-brightness tracing surface. Instructions: Place paper over the screen and trace. Press Volume Up, Down, Up, Down quickly to exit.</string>
     <!-- Target Management help text. -->
     <!-- Scan Resolution help text. -->
     <!-- Cloud Offset help text. -->
     <!-- Create Anchor help text. -->
-    <string name="help_create">Create Anchor: Photograph a mark on the surface to lock projection. Instructions: Point at a distinct texture and tap. The app will track this mark.</string>
+    <string name="help_create">Capture Doodle: Photograph your Doodle marks to lock the projection. Instructions: Point at the marks and tap. The app tracks them from then on.</string>
     <!-- Layer Management help text. -->
     <!-- Import Image help text. -->
     <string name="help_add_img">Import Image: Add a sketch or reference photo. Instructions: Select an image from your gallery. It becomes the design.</string>
@@ -589,11 +585,11 @@
         <item>That way your imagery is all ready to go and your phone can focus on augmenting reality when you press the AR button.</item>
     </string-array>
     <string-array name="onboarding_ar">
-        <item>AR Projection — projects your design onto a real surface using the phone\'s depth sensor and spatial tracking.</item>
-        <item>Point at the surface and move slowly side-to-side. Coloured shapes appear as the engine maps the surface. Wait until the surface area is covered.</item>
-        <item>Just tap the screen. The app photographs the surface, extracts tracking features, and locks the anchor instantly.</item>
-        <item>Tap \'Open\' to add your design — it projects onto the surface using the anchor you just set.</item>
-        <item>Tip — blank white walls, smooth concrete, plain canvas and single-colour surfaces won\'t track. Aim your anchor point at graffiti, rough plaster, or any distinct mark.</item>
+        <item>AR — projects your design onto the real surface and keeps it there as you move.</item>
+        <item>Paint your Doodle: a few big, bold marks on the surface, spread out, not all the same shape.</item>
+        <item>Tap Doodle and photograph the marks. The app locks your design to them.</item>
+        <item>Tap \'Open\' to add your design — it appears on the surface, held in place by your Doodle.</item>
+        <item>Tip — a plain surface has nothing to track on its own. That is what your Doodle is for: bold marks that stand out from the surface.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Live Overlay — your design floats over the live camera view, no surface scanning needed.</item>
@@ -691,46 +687,46 @@
     <string name="first_run_detect_title">Now point your camera at what you drew</string>
     <string name="first_run_detect_movement_hint">Slowly move your device in a circle</string>
     <string name="standalone_width_prompt">Measure the real width between the left and right edges of the target.</string>
-    <string name="standalone_width_label_metric">Target width (meters)</string>
-    <string name="standalone_width_label_imperial">Target width (feet and inches)</string>
+    <string name="standalone_width_label_metric">Surface width (meters)</string>
+    <string name="standalone_width_label_imperial">Surface width (feet and inches)</string>
     <string name="standalone_width_range_error">Enter a width from %1$s to %2$s.</string>
     <string name="standalone_use_measured_width">Use Measured Width</string>
     <string name="standalone_continue_without_scale">Continue Without Physical Scale</string>
     <string name="standalone_recapture">Recapture</string>
-    <string name="standalone_capture_wall_target">Capture Surface Target</string>
-    <string name="standalone_capture_failed">Couldn\'t capture the surface target — try again.</string>
+    <string name="standalone_capture_wall_target">Capture Doodle</string>
+    <string name="standalone_capture_failed">Couldn\'t capture the Doodle — try again.</string>
     <string name="standalone_rectify_failed">Couldn\'t rectify that target — mark four clear corners.</string>
-    <string name="standalone_target_too_weak">That target has too little trackable detail (%1$d KPM features; need %2$d). Recapture a richer surface patch.</string>
-    <string name="standalone_new_target">New Target</string>
+    <string name="standalone_target_too_weak">Not enough detail to track there (%1$d points; need %2$d). Add a few more bold marks, or aim at a more detailed patch.</string>
+    <string name="standalone_new_target">New Doodle</string>
     <string name="standalone_copy_diagnostics">Copy Diagnostics</string>
     <string name="standalone_wall_target_lost">Surface target lost</string>
-    <string name="standalone_recapture_target">Recapture Target</string>
+    <string name="standalone_recapture_target">Capture Doodle again</string>
     <string name="standalone_sweep_hint">Turn slowly to map the space — %1$d%%</string>
-    <string name="standalone_failure_native_library_unavailable">SphereSLAM isn\'t available in this build.</string>
+    <string name="standalone_failure_native_library_unavailable">AR tracking isn\'t available in this build.</string>
     <string name="standalone_failure_camera_unavailable">Camera isn\'t available for standalone AR.</string>
     <string name="standalone_failure_intrinsics_unavailable">Camera calibration is unavailable for standalone AR.</string>
-    <string name="standalone_failure_reference_too_weak">That surface target has too little trackable detail. Capture a richer patch.</string>
-    <string name="standalone_failure_no_page_match">Keep the surface target in view.</string>
+    <string name="standalone_failure_reference_too_weak">Not enough detail to track. Add a few more bold marks, or aim at a more detailed patch.</string>
+    <string name="standalone_failure_no_page_match">Keep your Doodle in view.</string>
     <string name="standalone_failure_stale_observation">Tracking is lagging. Move the phone more slowly.</string>
     <string name="standalone_failure_reprojection_error">Surface match is unstable. Reframe the target.</string>
     <string name="standalone_failure_insufficient_inliers">Not enough target detail is visible.</string>
-    <string name="standalone_failure_pose_jump">Tracking jump rejected. Hold on the surface target.</string>
-    <string name="standalone_failure_persisted_target_corrupt">Saved surface target is missing or unreadable. Capture a new target.</string>
-    <string name="standalone_failure_internal">SphereSLAM couldn\'t continue tracking this target.</string>
-    <string name="standalone_tracking_stopped">SphereSLAM tracking stopped. Recapture the target to restart it.</string>
-    <string name="standalone_status_mapping">SphereSLAM mapping • tap Doodle to add your Doodle</string>
-    <string name="standalone_status_preparing">Preparing surface target…</string>
-    <string name="standalone_status_finding">Finding surface target…</string>
-    <string name="standalone_quality_too_small">That surface target is too small after rectification. Capture a larger patch.</string>
-    <string name="standalone_quality_low_contrast">That surface target has too little visual contrast. Include more texture or detail.</string>
-    <string name="standalone_quality_blurry">That surface target is too blurry for reliable tracking. Hold steady and recapture.</string>
-    <string name="standalone_quality_not_strong_enough">That surface target is not strong enough for reliable tracking.</string>
-    <string name="standalone_quality_too_dark">This target is heavily underexposed; tracking may be less reliable.</string>
-    <string name="standalone_quality_too_bright">This target is heavily overexposed; tracking may be less reliable.</string>
-    <string name="standalone_photosphere_no_sensor">This phone has no rotation sensor, so SphereSLAM can\'t place a target here.</string>
+    <string name="standalone_failure_pose_jump">Tracking jumped — hold the phone on your Doodle.</string>
+    <string name="standalone_failure_persisted_target_corrupt">The saved Doodle can\'t be read. Capture it again.</string>
+    <string name="standalone_failure_internal">Tracking stopped. Capture your Doodle again to restart.</string>
+    <string name="standalone_tracking_stopped">Tracking stopped. Capture your Doodle again to restart.</string>
+    <string name="standalone_status_mapping">Learning the surface • tap Doodle to capture yours</string>
+    <string name="standalone_status_preparing">Preparing your Doodle…</string>
+    <string name="standalone_status_finding">Looking for your Doodle…</string>
+    <string name="standalone_quality_too_small">The Doodle is too small in the picture. Step closer or capture a larger area.</string>
+    <string name="standalone_quality_low_contrast">Too little contrast to track. Bolder marks, or more light, will help.</string>
+    <string name="standalone_quality_blurry">Too blurry to track. Hold steady and capture again.</string>
+    <string name="standalone_quality_not_strong_enough">Not enough detail to track reliably. Add a few more bold marks.</string>
+    <string name="standalone_quality_too_dark">Very dark; tracking may be less reliable.</string>
+    <string name="standalone_quality_too_bright">Very bright; tracking may be less reliable.</string>
+    <string name="standalone_photosphere_no_sensor">This phone has no rotation sensor, so AR can\'t place your Doodle here.</string>
     <string name="standalone_photosphere_compass_not_ready">Compass isn\'t ready yet — hold the phone still for a second, then retake.</string>
-    <string name="standalone_photosphere_not_mapped">SphereSLAM hasn\'t mapped this view yet — hold the camera steady on a lit, detailed part of the surface for a second, then retake.</string>
-    <string name="doodle_rectify_title">Rectify surface</string>
+    <string name="standalone_photosphere_not_mapped">The app hasn\'t learned this view yet — hold steady on a lit, detailed part of the surface for a second, then capture again.</string>
+    <string name="doodle_rectify_title">Straighten the surface</string>
     <string name="doodle_rectify_text">Now, drag the corners to align the cyan frame with the edges of the surface you\'re painting.</string>
     <string name="doodle_remove_marks_title">Remove marks</string>
     <string name="doodle_erase_hint">Tap a mark to remove it, or drag across marks to remove several.</string>
@@ -743,7 +739,7 @@
     <string name="ar_feedback_backend_resolving">AR backend is still being resolved — try Host again in a moment</string>
     <string name="ar_feedback_open_project_first">Open a project before sharing — there\'s nothing to send to a guest yet</string>
     <string name="ar_feedback_host_need_doodle_arcore">Capture and lock a current Doodle before hosting</string>
-    <string name="ar_feedback_host_need_target_standalone">Capture a standalone Surface Target before hosting</string>
+    <string name="ar_feedback_host_need_target_standalone">Capture your Doodle before hosting</string>
     <string name="ar_feedback_doodle_not_ready">Doodle is not ready yet — keep it in view and try Host again</string>
     <string name="ar_feedback_package_failed">Couldn\'t package this project to share — try saving it first</string>
     <string name="ar_feedback_host_failed">Couldn\'t start sharing: %1$s</string>
@@ -756,7 +752,7 @@
     <string name="ar_feedback_camera_busy">Camera is busy or unavailable — close other camera apps, then re-enter AR</string>
     <string name="ar_feedback_ar_start_failed">Couldn\'t start AR — your camera may be in use by another app</string>
     <string name="ar_feedback_camera_setting_apply_failed">Couldn\'t apply the camera setting to the running AR session — exit and re-enter AR</string>
-    <string name="ar_feedback_sphere_target_save_failed">Surface tracking works for this session, but the SphereSLAM target couldn\'t be saved.</string>
+    <string name="ar_feedback_sphere_target_save_failed">Tracking works for this session, but your Doodle couldn\'t be saved.</string>
     <string name="ar_feedback_camera_not_resumed">AR camera did not resume — try leaving and re-entering AR mode</string>
     <string name="ar_feedback_camera_permission">Camera unavailable — check the camera permission, then re-enter AR</string>
     <string name="ar_feedback_camera_not_paused">AR camera did not pause cleanly — it may keep running in the background</string>
@@ -791,10 +787,10 @@
     <string name="doodle_shutter_cd">Photograph the bare surface</string>
     <string name="doodle_shutter_retake_cd">Retake the bare-surface photo</string>
     <!-- Doodle grid screen: each line sits above the thing it explains. Over the middle of the screen: -->
-    <string name="doodle_tap_grid_hint">Tap your doodle grid to capture it.</string>
+    <string name="doodle_tap_grid_hint">Tap your Doodle to capture it.</string>
     <!-- Above the shutter, before and after the bare-wall photo is kept. -->
     <string name="doodle_blank_wall_hint">If the surface is blank, take a picture.</string>
-    <string name="doodle_blank_wall_saved_hint">Blank surface saved. Now tap your doodle grid.</string>
+    <string name="doodle_blank_wall_saved_hint">Blank surface saved. Now tap your Doodle.</string>
 
     <!-- The CV view: a preview of everything the computer vision is looking for. -->
     <string name="nav_cv_view">CV view</string>
@@ -825,4 +821,59 @@
     <string name="update_go_play">Open Play Store</string>
     <string name="update_go_github">Open GitHub</string>
     <string name="update_later">Later</string>
+    <string name="crash_title">GraffitiXR closed unexpectedly</string>
+    <string name="crash_body">Something went wrong last time. Sharing the report helps get it fixed; it holds your phone model and the app\'s recent log, nothing from your projects.</string>
+    <string name="crash_share">Share report</string>
+    <string name="crash_copy">Copy</string>
+    <string name="crash_dismiss">Dismiss</string>
+    <string name="ar_feedback_host_no_lan">Link needs Wi-Fi. Join a Wi-Fi network or start a hotspot, then host again.</string>
+    <string name="hud_progress">Progress</string>
+    <string name="replace_design_title">Replace design?</string>
+    <string name="replace_design_text">This swaps out the current design and its placement. You can undo it.</string>
+    <string name="replace_design_confirm">Replace</string>
+    <string name="dialog_cancel">Cancel</string>
+    <string name="delete_project_title">Delete “%1$s”?</string>
+    <string name="delete_project_text">This deletes the project for good: its design, thumbnail and saved Doodle. A Doodle can\'t be captured again if the surface has changed since. This can\'t be undone.</string>
+    <string name="save_project_title">Save project</string>
+    <string name="doodle_not_locked_title">Doodle not locked</string>
+    <string name="doodle_not_locked_text">Your design is placed, but the app couldn\'t lock onto your Doodle, so the overlay will drift. Capture it again: stand square to the surface, a little closer, with good light.</string>
+    <string name="doodle_recapture">Capture Doodle again</string>
+    <string name="msg_capture_incomplete">Capture incomplete. Capture your Doodle again.</string>
+    <string name="msg_map_not_ready">The surface isn\'t learned yet. Keep the camera on it and try again.</string>
+    <string name="msg_no_project">No project open. Open or create one first: a Doodle is saved into a project.</string>
+    <string name="msg_doodle_low_detail_selected">Not enough detail in what you kept. Keep more of your Doodle\'s marks.</string>
+    <string name="msg_doodle_changed">Your Doodle changed while saving, so it wasn\'t saved. Try again.</string>
+    <string name="msg_doodle_saved">Doodle saved and locked</string>
+    <string name="msg_doodle_save_failed">Couldn\'t save the Doodle. Try again.</string>
+    <string name="msg_doodle_too_weak_kept">Not enough detail to track. Kept your previous Doodle.</string>
+    <string name="msg_doodle_low_detail">Not enough detail to track. Bolder marks or more light will help.</string>
+    <string name="msg_doodle_session_only">Doodle saved for this session only: it couldn\'t be locked, so it won\'t come back when you reopen the project. Capture it again, holding steady.</string>
+    <string name="msg_doodle_anchor_failed">Couldn\'t lock your Doodle. Hold the phone steady on the surface and try again.</string>
+    <string name="msg_project_switched">Another project opened before the Doodle saved, so it wasn\'t saved. Capture it again.</string>
+    <string name="msg_image_invalid">That image can\'t be opened, or no project is open.</string>
+    <string name="msg_nothing_to_share">Nothing to share yet. Save the project first.</string>
+    <string name="msg_share_failed">Couldn\'t prepare the project to share. Try again.</string>
+    <string name="msg_export_failed">Export failed. Try again.</string>
+    <string name="status_preparing_tracking">Preparing AR…</string>
+    <string name="msg_locked">Locked. Tap Lock again to move it.</string>
+    <string name="msg_export_timeout">Export timed out. Try again.</string>
+    <string name="msg_project_save_failed">Couldn\'t save the project. Try again.</string>
+    <string name="coop_none_title">No sessions found</string>
+    <string name="coop_none_text">No GraffitiXR sessions nearby. Search again, or host your own.</string>
+    <string name="coop_host">Host</string>
+    <string name="coop_search">Search</string>
+    <string name="coop_need_doodle">Capture your Doodle first to host.</string>
+    <string name="coop_scan_to_join">Scan to join</string>
+    <string name="coop_stop_sharing">Stop sharing</string>
+    <string name="coop_leave">Leave</string>
+    <string name="glasses_pairing">Pairing Meta glasses…</string>
+    <string name="glasses_reconnect">Reconnect</string>
+    <string name="glasses_end">End</string>
+    <string name="diag_confidence">Confidence</string>
+    <string name="diag_sensors">Sensor data</string>
+    <string name="diag_log_start">Log ▶</string>
+    <string name="diag_log_stop">Log ■</string>
+    <string name="diag_induce_loss">Loss</string>
+    <string name="diag_rec_start">Rec ▶</string>
+    <string name="diag_rec_stop">Rec ■</string>
 </resources>

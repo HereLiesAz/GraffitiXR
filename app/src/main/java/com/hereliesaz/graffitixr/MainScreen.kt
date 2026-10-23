@@ -49,7 +49,6 @@ import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.common.model.FeedbackEvent
-import android.widget.Toast
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.CameraPreview
 import com.hereliesaz.graffitixr.feature.ar.takePictureAsBitmap
@@ -98,7 +97,7 @@ fun MainScreen(
     val bgColor = if (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY) Transparent else uiState.canvasBackground
     Box(modifier = Modifier.fillMaxSize().background(bgColor)) {
 
-        // Surface one-off AR failures (camera unavailable, session-init failure) as a toast
+        // Surface one-off AR failures (camera unavailable, session-init failure) as a HUD message
         // so the user isn't left on a silent frozen preview.
         LaunchedEffect(Unit) {
             arViewModel.feedback.collect { event ->
@@ -107,7 +106,9 @@ fun MainScreen(
                     is FeedbackEvent.Toast -> event.message
                     else -> null
                 }
-                if (message != null) Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                if (message != null) {
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(message, long = true, error = event is FeedbackEvent.Error)
+                }
             }
         }
 
@@ -166,6 +167,8 @@ fun MainScreen(
                 !mainUiState.isCapturingDoodle &&
                 !mainUiState.isConfirmingDoodle
             ) {
+                // Close up or over a tabletop, an ARCore phone switches to the standalone tracker first.
+                arViewModel.prepareCloseRangeBackend()
                 mainViewModel.startDoodleCapture()
             }
         }
@@ -195,7 +198,7 @@ fun MainScreen(
                             contentAlignment = Alignment.TopCenter,
                         ) {
                             androidx.compose.material3.Text(
-                                text = "Preparing SphereSLAM…",
+                                text = androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.status_preparing_tracking),
                                 color = Color.White,
                                 modifier = Modifier
                                     .padding(top = 32.dp)
@@ -222,7 +225,7 @@ fun MainScreen(
                             contentAlignment = Alignment.Center,
                         ) {
                             androidx.compose.material3.Text(
-                                text = "SphereSLAM tracking isn't available in this build.",
+                                text = androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.standalone_failure_native_library_unavailable),
                                 color = Color.White,
                                 modifier = Modifier
                                     .background(
@@ -283,11 +286,7 @@ fun MainScreen(
                                         "SphereSLAM shared target capture failed: " +
                                             (error.message ?: error.javaClass.simpleName)
                                     )
-                                    Toast.makeText(
-                                        context,
-                                        "Couldn't capture the target — try again.",
-                                        Toast.LENGTH_LONG,
-                                    ).show()
+                                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(com.hereliesaz.graffitixr.design.feedback.HudMessages.appString(com.hereliesaz.graffitixr.design.R.string.standalone_capture_failed), long = true)
                                 }
                             }
                         }
@@ -381,6 +380,8 @@ fun MainScreen(
                                     // Same reset as the rail's Target action, then the shared flow.
                                     arViewModel.clearCaptureForRetry()
                                     arViewModel.cancelMeasure()
+                                    // Close up or over a tabletop, an ARCore phone switches to the standalone tracker first.
+                                    arViewModel.prepareCloseRangeBackend()
                                     mainViewModel.startDoodleCapture()
                                 }
                             },
@@ -583,11 +584,7 @@ fun MainScreen(
                                     // a best-effort recovery for budget HALs (e.g. Galaxy A26) that open a
                                     // config but never feed it.
                                     arViewModel.onCameraStreamStalled()
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(DesignR.string.camera_stalled_error),
-                                        Toast.LENGTH_LONG
-                                    ).show()
+                                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(DesignR.string.camera_stalled_error), long = true)
                                     editorViewModel.setEditorMode(EditorMode.DESIGN)
                                     break
                                 }
@@ -832,11 +829,7 @@ fun MainScreen(
         // clearing the flag immediately so it doesn't repeat on every subsequent blocked gesture.
         LaunchedEffect(uiState.showLockedFeedback) {
             if (uiState.showLockedFeedback) {
-                android.widget.Toast.makeText(
-                    context,
-                    "Locked — tap Lock again to move this",
-                    android.widget.Toast.LENGTH_SHORT,
-                ).show()
+                com.hereliesaz.graffitixr.design.feedback.HudMessages.show(com.hereliesaz.graffitixr.design.feedback.HudMessages.appString(com.hereliesaz.graffitixr.design.R.string.msg_locked), long = false)
                 editorViewModel.onLockedFeedbackShown()
             }
         }
@@ -847,7 +840,7 @@ fun MainScreen(
         LaunchedEffect(uiState.effectFailureMessage) {
             val message = uiState.effectFailureMessage
             if (message != null) {
-                android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                com.hereliesaz.graffitixr.design.feedback.HudMessages.show(message, long = true)
                 editorViewModel.onEffectFailureMessageShown()
             }
         }
@@ -886,7 +879,7 @@ fun MainScreen(
                     com.hereliesaz.graffitixr.feature.ar.OverlayGyroRelease.SENSOR_UNAVAILABLE ->
                         context.getString(DesignR.string.gyro_unavailable)
                 }
-                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                com.hereliesaz.graffitixr.design.feedback.HudMessages.show(message, long = false)
             },
         )
         val gyroMatrix = remember { Matrix() }
@@ -1104,7 +1097,7 @@ fun MainScreen(
             ) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(56.dp),
-                    color = Color(0xFFFFAA00),
+                    color = com.hereliesaz.graffitixr.design.theme.HotPink,
                     strokeWidth = 4.dp
                 )
             }

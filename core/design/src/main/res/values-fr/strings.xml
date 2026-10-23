@@ -27,10 +27,8 @@
     <string name="align_not_ready">Aligner a d’abord besoin d’un Doodle et d’un design placé.</string>
 
     <!-- Overlays & Status -->
-    <string name="status_create_grid">Créez une Grille pour commencer.</string>
     <string name="status_scan_surfaces">Scannez les surfaces autour de vous.</string>
     <string name="status_tap_surface">Appuyez sur une surface pour placer l\'ancre.</string>
-    <string name="status_looking_grid">Recherche de votre Grille...</string>
     <string name="status_ready">Prêt. (%1$d pts)</string>
     <string name="unlock_hint">Volume Haut, Bas, Haut, Bas — rapidement — pour déverrouiller</string>
 
@@ -112,7 +110,7 @@
     <string name="settings_granted">Accordé</string>
     <string name="settings_denied">Refusé</string>
     <string name="settings_open_app_settings">Ouvrir les paramètres de l\'application</string>
-    <string name="settings_copyright">GraffitiXR © 2025</string>
+    <string name="settings_copyright">GraffitiXR © 2025–2026</string>
 
     <!-- Editor UI -->
     <string name="save_project_hint">Nom du projet</string>
@@ -204,7 +202,7 @@
     <string name="nav_help_info">Appuyez sur n\'importe quel bouton pendant que l\'Aide est active pour voir ce qu\'il fait.</string>
     <string name="nav_light">Lumière</string>
     <string name="nav_light_info">Activer/désactiver la lampe de poche de l\'appareil pour éclairer votre mur en travaillant par faible luminosité.</string>
-    <string name="nav_lock_info">Verrouiller l\'écran tactile pour éviter les modifications accidentelles pendant que vous peignez. Appuyez trois fois n\'importe où pour déverrouiller.</string>
+    <string name="nav_lock_info">Fige le design pour que pincer et glisser ne le déplacent pas. Touchez à nouveau Verrouiller pour le libérer.</string>
     <string name="nav_size">Taille</string>
     <string name="nav_color">Couleur</string>
     <string name="nav_kern">Créne</string>
@@ -230,14 +228,13 @@
     <string name="wall_source_text">Comment souhaitez-vous définir le mur d\'arrière-plan ?</string>
     <string name="take_photo">Prendre photo</string>
     <string name="choose_from_gallery">Choisir depuis la galerie</string>
-    <string name="depth_unsupported">Cet appareil ne prend pas en charge l\'API Depth.\nPassez en mode Toile dans les paramètres.</string>
     <string name="arcore_required_title">ARCore requis</string>
     <string name="arcore_required_text">Cet appareil n\'a pas ARCore d\'installé ou n\'est pas pris en charge. Installez ARCore depuis le Play Store pour utiliser les fonctionnalités AR.</string>
     <string name="install_arcore">Installer ARCore</string>
     <string name="camera_permission_required">La permission de la caméra est requise pour le mode AR.</string>
     <string name="open_settings">Ouvrir Paramètres</string>
-    <string name="doodle_creation_title">GRILLE DU GRIBOUILLIS</string>
-    <string name="doodle_creation_text">Si vous n\'avez pas encore créé la grille de votre Gribouillis, prenez une photo du mur en appuyant sur le bouton de capture. Sinon, appuyez sur Annuler.</string>
+    <string name="doodle_creation_title">GRIBOUILLIS</string>
+    <string name="doodle_creation_text">Votre Gribouillis, ce sont quelques grandes marques peintes sur la surface pour que l\'app puisse la retrouver. Peignez-les, puis photographiez la surface avec le bouton de capture.</string>
     <string name="cancel">Annuler</string>
     <string name="diag_copied">COPIÉ ✓</string>
     <string name="diag_title">DIAG PROFONDEUR (appuyer pour copier)</string>
@@ -251,12 +248,12 @@
     <string name="matched_percent">%1$d%% peint</string>
     <string name="anchor_locked">Ancre verrouillée</string>
     <string name="choose_font">Choisir Police</string>
-    <string name="help_mode_host">Commutateur de mode : Basculer entre les modes de l\'application. Instructions : Appuyez pour développer, puis sélectionnez AR, Superposition, Maquette ou Table lumineuse.</string>
+    <string name="help_mode_host">Sélecteur de mode : passez d\'un mode de l\'app à l\'autre. Instructions : touchez pour déplier, puis choisissez AR, Superposition, Maquette ou Calque.</string>
     <string name="help_ar">Mode AR : Projeter la conception sur un mur à l\'aide de la cartographie spatiale. Instructions : Scannez l\'environnement jusqu\'à ce que le mur soit détecté, puis appuyez pour placer l\'ancre.</string>
     <string name="help_overlay">Mode Superposition : Afficher la conception sur la caméra en direct sans suivi spatial. Instructions : Mettez à l\'échelle et déplacez manuellement la conception pour l\'adapter à votre cadre.</string>
     <string name="help_mockup">Mode Maquette : Prévisualiser la conception sur une photo statique. Instructions : Utilisez \'Mur\' pour définir une image d\'arrière-plan, puis placez la conception par-dessus.</string>
-    <string name="help_trace">Mode Table lumineuse : Surface de traçage haute luminosité. Instructions : Placez du papier sur l\'écran et tracez. Appuyez rapidement sur Volume Haut, Bas, Haut, Bas pour quitter.</string>
-    <string name="help_create">Créer une Ancre : Photographier une marque sur le mur pour verrouiller la projection. Instructions : Pointez sur une texture distincte et appuyez. L\'application suivra cette marque.</string>
+    <string name="help_trace">Mode Calque : surface de traçage très lumineuse. Instructions : posez du papier sur l\'écran et tracez. Appuyez rapidement sur Volume Haut, Bas, Haut, Bas pour quitter.</string>
+    <string name="help_create">Capturer le Gribouillis : photographiez les marques de votre Gribouillis pour fixer la projection. Instructions : visez les marques et touchez. L\'app les suit ensuite.</string>
     <string name="help_add_img">Importer Image : Ajouter un croquis ou une photo de référence. Instructions : Sélectionnez une image dans votre galerie. Elle deviendra la conception.</string>
     <string name="help_wall">Changer de Mur : Définir l\'arrière-plan pour le mode Maquette. Instructions : Sélectionnez une photo du mur physique sur lequel vous prévoyez de peindre.</string>
     <string name="help_project_host">Gestion de Projet : Sauvegarder, charger et exporter le travail. Instructions : Appuyez pour accéder aux tâches administratives de votre projet.</string>
@@ -323,11 +320,11 @@
         <item>Ainsi, vos visuels sont prêts et votre téléphone peut se concentrer sur la réalité augmentée quand vous appuyez sur le bouton AR.</item>
     </string-array>
     <string-array name="onboarding_ar">
-        <item>Projection AR — projette votre design sur un vrai mur à l\'aide du capteur de profondeur et du suivi spatial du téléphone.</item>
-        <item>Pointez le mur et déplacez-vous lentement d\'un côté à l\'autre. Des formes colorées apparaissent au fur et à mesure que le moteur cartographie la surface. Attendez que toute la zone du mur soit couverte.</item>
-        <item>Appuyez simplement sur l\'écran. L\'application photographie le mur, extrait des points de suivi et verrouille l\'ancre instantanément.</item>
-        <item>Appuyez sur « Ouvrir » pour ajouter votre design — il se projette sur le mur à l\'aide de l\'ancre que vous venez de définir.</item>
-        <item>Astuce — les murs blancs vides, le béton lisse et les surfaces unies ne peuvent pas être suivis. Visez votre point d\'ancrage sur un graffiti, un enduit rugueux ou toute marque distincte.</item>
+        <item>AR : projette votre design sur la vraie surface et l\'y maintient pendant que vous bougez.</item>
+        <item>Peignez votre Gribouillis : quelques grandes marques bien visibles sur la surface, espacées et de formes variées.</item>
+        <item>Touchez Gribouillis et photographiez les marques. L\'app y fixe votre design.</item>
+        <item>Touchez « Ouvrir » pour ajouter votre design : il apparaît sur la surface, maintenu par votre Gribouillis.</item>
+        <item>Astuce : une surface unie n\'offre rien à suivre. C\'est le rôle de votre Gribouillis : des marques bien visibles qui ressortent sur la surface.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Superposition en direct — votre design flotte au-dessus du flux caméra en direct, sans avoir besoin de scanner une surface.</item>
@@ -402,46 +399,46 @@
     <string name="first_run_detect_title">Pointez maintenant la caméra vers ce que vous avez dessiné</string>
     <string name="first_run_detect_movement_hint">Déplacez lentement votre appareil en cercle</string>
     <string name="standalone_width_prompt">Mesurez la largeur réelle entre les bords gauche et droit de la cible.</string>
-    <string name="standalone_width_label_metric">Largeur de la cible (mètres)</string>
-    <string name="standalone_width_label_imperial">Largeur de la cible (pieds et pouces)</string>
+    <string name="standalone_width_label_metric">Largeur de la surface (mètres)</string>
+    <string name="standalone_width_label_imperial">Largeur de la surface (pieds et pouces)</string>
     <string name="standalone_width_range_error">Saisissez une largeur comprise entre %1$s et %2$s.</string>
     <string name="standalone_use_measured_width">Utiliser la largeur mesurée</string>
     <string name="standalone_continue_without_scale">Continuer sans échelle physique</string>
     <string name="standalone_recapture">Reprendre</string>
-    <string name="standalone_capture_wall_target">Capturer la cible murale</string>
-    <string name="standalone_capture_failed">Impossible de capturer la cible murale. Réessayez.</string>
+    <string name="standalone_capture_wall_target">Capturer le Gribouillis</string>
+    <string name="standalone_capture_failed">Impossible de capturer le Gribouillis. Réessayez.</string>
     <string name="standalone_rectify_failed">Impossible de rectifier cette cible. Marquez quatre coins bien nets.</string>
-    <string name="standalone_target_too_weak">Cette cible comporte trop peu de détails exploitables (%1$d caractéristiques KPM ; %2$d requises). Capturez une zone de mur plus riche.</string>
-    <string name="standalone_new_target">Nouvelle cible</string>
+    <string name="standalone_target_too_weak">Pas assez de détails à suivre ici (%1$d points ; il en faut %2$d). Ajoutez quelques marques bien visibles, ou visez une zone plus détaillée.</string>
+    <string name="standalone_new_target">Nouveau Gribouillis</string>
     <string name="standalone_copy_diagnostics">Copier le diagnostic</string>
     <string name="standalone_wall_target_lost">Cible murale perdue</string>
-    <string name="standalone_recapture_target">Reprendre la cible</string>
+    <string name="standalone_recapture_target">Recapturer le Gribouillis</string>
     <string name="standalone_sweep_hint">Tournez lentement pour cartographier l\'espace — %1$d%%</string>
-    <string name="standalone_failure_native_library_unavailable">SphereSLAM n\'est pas disponible dans cette version.</string>
+    <string name="standalone_failure_native_library_unavailable">Le suivi AR n\'est pas disponible dans cette version.</string>
     <string name="standalone_failure_camera_unavailable">La caméra n\'est pas disponible pour la RA autonome.</string>
     <string name="standalone_failure_intrinsics_unavailable">L\'étalonnage de la caméra n\'est pas disponible pour la RA autonome.</string>
-    <string name="standalone_failure_reference_too_weak">Cette cible murale comporte trop peu de détails exploitables. Capturez une zone plus riche.</string>
-    <string name="standalone_failure_no_page_match">Gardez la cible murale dans le champ.</string>
+    <string name="standalone_failure_reference_too_weak">Pas assez de détails à suivre. Ajoutez quelques marques bien visibles, ou visez une zone plus détaillée.</string>
+    <string name="standalone_failure_no_page_match">Gardez votre Gribouillis dans le cadre.</string>
     <string name="standalone_failure_stale_observation">Le suivi prend du retard. Déplacez le téléphone plus lentement.</string>
     <string name="standalone_failure_reprojection_error">La correspondance avec le mur est instable. Recadrez la cible.</string>
     <string name="standalone_failure_insufficient_inliers">Les détails visibles de la cible sont insuffisants.</string>
-    <string name="standalone_failure_pose_jump">Saut de suivi rejeté. Maintenez le téléphone stable sur la cible murale.</string>
-    <string name="standalone_failure_persisted_target_corrupt">La cible murale enregistrée est introuvable ou illisible. Capturez une nouvelle cible.</string>
-    <string name="standalone_failure_internal">SphereSLAM n\'a pas pu continuer à suivre cette cible.</string>
-    <string name="standalone_tracking_stopped">Le suivi SphereSLAM s\'est arrêté. Recapturez la cible pour le relancer.</string>
-    <string name="standalone_status_mapping">Cartographie SphereSLAM • touchez Gribouillis pour ajouter votre Gribouillis</string>
-    <string name="standalone_status_preparing">Préparation de la cible murale…</string>
-    <string name="standalone_status_finding">Recherche de la cible murale…</string>
-    <string name="standalone_quality_too_small">Cette cible murale est trop petite après rectification. Capturez une zone plus grande.</string>
-    <string name="standalone_quality_low_contrast">Cette cible murale manque de contraste visuel. Incluez plus de texture ou de détails.</string>
-    <string name="standalone_quality_blurry">Cette cible murale est trop floue pour un suivi fiable. Restez stable et recapturez.</string>
-    <string name="standalone_quality_not_strong_enough">Cette cible murale n\'est pas assez solide pour un suivi fiable.</string>
-    <string name="standalone_quality_too_dark">Cette cible est fortement sous-exposée ; le suivi peut être moins fiable.</string>
-    <string name="standalone_quality_too_bright">Cette cible est fortement surexposée ; le suivi peut être moins fiable.</string>
-    <string name="standalone_photosphere_no_sensor">Ce téléphone n\'a pas de capteur de rotation, SphereSLAM ne peut donc pas y placer de cible.</string>
+    <string name="standalone_failure_pose_jump">Le suivi a sauté : gardez le téléphone sur votre Gribouillis.</string>
+    <string name="standalone_failure_persisted_target_corrupt">Le Gribouillis enregistré est illisible. Capturez-le à nouveau.</string>
+    <string name="standalone_failure_internal">Suivi arrêté. Recapturez votre Gribouillis pour relancer.</string>
+    <string name="standalone_tracking_stopped">Suivi arrêté. Recapturez votre Gribouillis pour relancer.</string>
+    <string name="standalone_status_mapping">Analyse de la surface • touchez Gribouillis pour capturer le vôtre</string>
+    <string name="standalone_status_preparing">Préparation de votre Gribouillis…</string>
+    <string name="standalone_status_finding">Recherche de votre Gribouillis…</string>
+    <string name="standalone_quality_too_small">Le Gribouillis est trop petit à l\'image. Rapprochez-vous ou capturez une zone plus grande.</string>
+    <string name="standalone_quality_low_contrast">Trop peu de contraste pour le suivi. Des marques plus visibles ou plus de lumière aideront.</string>
+    <string name="standalone_quality_blurry">Trop flou pour le suivi. Restez stable et recapturez.</string>
+    <string name="standalone_quality_not_strong_enough">Pas assez de détails pour un suivi fiable. Ajoutez quelques marques bien visibles.</string>
+    <string name="standalone_quality_too_dark">Très sombre ; le suivi peut être moins fiable.</string>
+    <string name="standalone_quality_too_bright">Très lumineux ; le suivi peut être moins fiable.</string>
+    <string name="standalone_photosphere_no_sensor">Ce téléphone n\'a pas de capteur de rotation : l\'AR ne peut pas placer votre Gribouillis ici.</string>
     <string name="standalone_photosphere_compass_not_ready">La boussole n\'est pas encore prête : tenez le téléphone immobile une seconde, puis reprenez.</string>
-    <string name="standalone_photosphere_not_mapped">SphereSLAM n\'a pas encore cartographié cette vue : tenez l\'appareil photo immobile sur une zone éclairée et détaillée de la surface pendant une seconde, puis reprenez.</string>
-    <string name="doodle_rectify_title">Rectifier la surface</string>
+    <string name="standalone_photosphere_not_mapped">L\'app ne connaît pas encore cette vue. Restez une seconde immobile sur une partie éclairée et détaillée de la surface, puis recapturez.</string>
+    <string name="doodle_rectify_title">Redresser la surface</string>
     <string name="doodle_rectify_text">Faites maintenant glisser les coins pour aligner le cadre cyan sur la surface plane de votre mur.</string>
     <string name="doodle_remove_marks_title">Supprimer les marques</string>
     <string name="doodle_erase_hint">Appuyez sur une marque pour la supprimer, ou glissez sur plusieurs marques pour les supprimer.</string>
@@ -458,7 +455,7 @@
     <string name="ar_feedback_backend_resolving">Le moteur AR est encore en cours de sélection : réessayez d\'héberger dans un instant</string>
     <string name="ar_feedback_open_project_first">Ouvrez un projet avant de partager : il n\'y a encore rien à envoyer à un invité</string>
     <string name="ar_feedback_host_need_doodle_arcore">Capturez et verrouillez un Gribouillis à jour avant de lancer « Héberger »</string>
-    <string name="ar_feedback_host_need_target_standalone">Capturez une cible murale autonome avant d\'héberger</string>
+    <string name="ar_feedback_host_need_target_standalone">Capturez votre Gribouillis avant d\'héberger</string>
     <string name="ar_feedback_doodle_not_ready">Le Gribouillis n\'est pas encore prêt — gardez-le dans le champ et relancez « Héberger »</string>
     <string name="ar_feedback_package_failed">Impossible d\'empaqueter ce projet pour le partager : essayez d\'abord de l\'enregistrer</string>
     <string name="ar_feedback_host_failed">Impossible de démarrer le partage : %1$s</string>
@@ -471,7 +468,7 @@
     <string name="ar_feedback_camera_busy">La caméra est occupée ou indisponible : fermez les autres applications de caméra, puis rouvrez l\'AR</string>
     <string name="ar_feedback_ar_start_failed">Impossible de démarrer l\'AR : votre caméra est peut-être utilisée par une autre application</string>
     <string name="ar_feedback_camera_setting_apply_failed">Impossible d\'appliquer le réglage de la caméra à la session AR en cours : quittez l\'AR puis rouvrez-la</string>
-    <string name="ar_feedback_sphere_target_save_failed">Le suivi du mur fonctionne pour cette session, mais la cible SphereSLAM n\'a pas pu être enregistrée.</string>
+    <string name="ar_feedback_sphere_target_save_failed">Le suivi fonctionne pour cette session, mais votre Gribouillis n\'a pas pu être enregistré.</string>
     <string name="ar_feedback_camera_not_resumed">La caméra AR n\'a pas repris : essayez de quitter le mode AR puis d\'y revenir</string>
     <string name="ar_feedback_camera_permission">Caméra indisponible : vérifiez l\'autorisation de la caméra, puis rouvrez l\'AR</string>
     <string name="ar_feedback_camera_not_paused">La caméra AR ne s\'est pas mise en pause proprement : elle peut continuer à tourner en arrière-plan</string>
@@ -529,4 +526,68 @@
     <string name="cv_pass_warm_luma">Lumière chaude</string>
     <string name="cv_pass_stencil3">Pochoir</string>
     <string name="cv_pass_change">Changement</string>
+    <string name="doodle_tap_grid_hint">Touchez votre Gribouillis pour le capturer.</string>
+    <string name="doodle_blank_wall_hint">Si la surface est vierge, prenez une photo.</string>
+    <string name="doodle_blank_wall_saved_hint">Surface vierge enregistrée. Touchez maintenant votre Gribouillis.</string>
+    <string name="update_title">Mise à jour disponible</string>
+    <string name="update_body_play">Une version plus récente est sur le Play Store.</string>
+    <string name="update_body_github">La version %1$s est sur GitHub.</string>
+    <string name="update_go_play">Ouvrir le Play Store</string>
+    <string name="update_go_github">Ouvrir GitHub</string>
+    <string name="update_later">Plus tard</string>
+    <string name="crash_title">GraffitiXR s\'est fermé de façon inattendue</string>
+    <string name="crash_body">Un problème est survenu la dernière fois. Partager le rapport aide à le corriger ; il contient le modèle de votre téléphone et le journal récent de l\'app, rien de vos projets.</string>
+    <string name="crash_share">Partager le rapport</string>
+    <string name="crash_copy">Copier</string>
+    <string name="crash_dismiss">Ignorer</string>
+    <string name="ar_feedback_host_no_lan">La liaison nécessite le Wi-Fi. Connectez-vous à un réseau Wi-Fi ou lancez un point d\'accès, puis hébergez à nouveau.</string>
+    <string name="hud_progress">Progression</string>
+    <string name="replace_design_title">Remplacer le design ?</string>
+    <string name="replace_design_text">Cela remplace le design actuel et son placement. Vous pouvez l\'annuler.</string>
+    <string name="replace_design_confirm">Remplacer</string>
+    <string name="dialog_cancel">Annuler</string>
+    <string name="delete_project_title">Supprimer « %1$s » ?</string>
+    <string name="delete_project_text">Cela supprime définitivement le projet : son design, sa miniature et son Gribouillis enregistré. Un Gribouillis ne peut pas être recapturé si la surface a changé depuis. Action irréversible.</string>
+    <string name="save_project_title">Enregistrer le projet</string>
+    <string name="doodle_not_locked_title">Gribouillis non fixé</string>
+    <string name="doodle_not_locked_text">Votre design est placé, mais l\'app n\'a pas pu se fixer sur votre Gribouillis : la superposition va dériver. Recapturez-le face à la surface, un peu plus près, avec une bonne lumière.</string>
+    <string name="doodle_recapture">Recapturer le Gribouillis</string>
+    <string name="msg_capture_incomplete">Capture incomplète. Recapturez votre Gribouillis.</string>
+    <string name="msg_map_not_ready">La surface n\'est pas encore reconnue. Gardez la caméra dessus et réessayez.</string>
+    <string name="msg_no_project">Aucun projet ouvert. Ouvrez-en ou créez-en un d\'abord : un Gribouillis est enregistré dans un projet.</string>
+    <string name="msg_doodle_low_detail_selected">Pas assez de détails dans ce que vous avez gardé. Gardez davantage de marques de votre Gribouillis.</string>
+    <string name="msg_doodle_changed">Votre Gribouillis a changé pendant l\'enregistrement, il n\'a donc pas été enregistré. Réessayez.</string>
+    <string name="msg_doodle_saved">Gribouillis enregistré et fixé</string>
+    <string name="msg_doodle_save_failed">Impossible d\'enregistrer le Gribouillis. Réessayez.</string>
+    <string name="msg_doodle_too_weak_kept">Pas assez de détails à suivre. Votre Gribouillis précédent est conservé.</string>
+    <string name="msg_doodle_low_detail">Pas assez de détails à suivre. Des marques plus visibles ou plus de lumière aideront.</string>
+    <string name="msg_doodle_session_only">Gribouillis enregistré pour cette session seulement : il n\'a pas pu être fixé et ne reviendra pas à la réouverture du projet. Recapturez-le en restant stable.</string>
+    <string name="msg_doodle_anchor_failed">Impossible de fixer votre Gribouillis. Tenez le téléphone stable face à la surface et réessayez.</string>
+    <string name="msg_project_switched">Un autre projet s\'est ouvert avant l\'enregistrement du Gribouillis, il n\'a donc pas été enregistré. Recapturez-le.</string>
+    <string name="msg_image_invalid">Impossible d\'ouvrir cette image, ou aucun projet n\'est ouvert.</string>
+    <string name="msg_nothing_to_share">Rien à partager pour l\'instant. Enregistrez d\'abord le projet.</string>
+    <string name="msg_share_failed">Impossible de préparer le projet pour le partage. Réessayez.</string>
+    <string name="msg_export_failed">Échec de l\'export. Réessayez.</string>
+    <string name="status_preparing_tracking">Préparation de l\'AR…</string>
+    <string name="msg_locked">Verrouillé. Touchez à nouveau Verrouiller pour le déplacer.</string>
+    <string name="msg_export_timeout">L\'export a expiré. Réessayez.</string>
+    <string name="msg_project_save_failed">Impossible d\'enregistrer le projet. Réessayez.</string>
+    <string name="coop_none_title">Aucune session trouvée</string>
+    <string name="coop_none_text">Aucune session GraffitiXR à proximité. Relancez la recherche ou hébergez la vôtre.</string>
+    <string name="coop_host">Héberger</string>
+    <string name="coop_search">Rechercher</string>
+    <string name="coop_need_doodle">Capturez d\'abord votre Gribouillis pour héberger.</string>
+    <string name="coop_scan_to_join">Scannez pour rejoindre</string>
+    <string name="coop_stop_sharing">Arrêter le partage</string>
+    <string name="coop_leave">Quitter</string>
+    <string name="glasses_pairing">Association des lunettes Meta…</string>
+    <string name="glasses_reconnect">Reconnecter</string>
+    <string name="glasses_end">Terminer</string>
+    <string name="diag_confidence">Confiance</string>
+    <string name="diag_sensors">Données capteurs</string>
+    <string name="diag_log_start">Journal ▶</string>
+    <string name="diag_log_stop">Journal ■</string>
+    <string name="diag_induce_loss">Perte</string>
+    <string name="diag_rec_start">Enr. ▶</string>
+    <string name="diag_rec_stop">Enr. ■</string>
 </resources>

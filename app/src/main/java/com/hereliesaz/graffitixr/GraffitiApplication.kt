@@ -35,6 +35,7 @@ class GraffitiApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        com.hereliesaz.graffitixr.design.feedback.HudMessages.init(this)
 
         // 1. Initialize Logging
         if (BuildConfig.DEBUG) {
@@ -101,7 +102,12 @@ class GraffitiApplication : Application() {
                     java.io.File(cacheDir, "last_native_crash.txt") to "Auto-Report: Native Crash",
                 ),
             )
-            if (crashQueue.pending().isNotEmpty()) {
+            // Uploading posts to the project's public issue tracker with a developer's token: a
+            // developer tool, never run by a release build (paying users share reports themselves
+            // from the crash dialog instead).
+            if (!BuildConfig.DEBUG) {
+                crashQueue.clear()
+            } else if (crashQueue.pending().isNotEmpty()) {
                 MainScope().launch(Dispatchers.IO + crashUploadErrorHandler) {
                     if (!settingsRepository.crashReportingConsent.first()) {
                         Log.i("GraffitiApplication", "Crash reporting not opted in; not uploading.")

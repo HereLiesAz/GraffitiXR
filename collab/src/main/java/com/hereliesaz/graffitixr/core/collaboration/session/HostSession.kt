@@ -93,7 +93,7 @@ internal class HostSession(
                 writeSecure(output, crypto, FrameType.VIDEO, jpeg)
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                enterReconnecting()
+                enterReconnecting(crypto)
                 return
             }
         }
@@ -139,8 +139,11 @@ internal class HostSession(
     // overflowed during a reconnect window before they ever reached the DeltaBuffer, so the
     // guest's canvas diverged with no signal.
     private val outQueue: Channel<EncodedDelta> = Channel(capacity = Channel.UNLIMITED)
-    private val deltaBuffer = DeltaBuffer()
-    private val seqCounter = AtomicLong(0L)
+    // internal (not private) so tests can shrink it and fill it directly; nothing else touches it.
+    @androidx.annotation.VisibleForTesting
+    internal var deltaBuffer = DeltaBuffer()
+    @androidx.annotation.VisibleForTesting
+    internal val seqCounter = AtomicLong(0L)
     // Orders seq assignment with channel insertion so send order always matches seq order.
     private val enqueueLock = Any()
     // Guards the check-then-set phase transition in enterReconnecting(): outbound, inbound and
@@ -155,6 +158,9 @@ internal class HostSession(
     // Crypto for the current live connection, so close()/BYE can seal on the active channel.
     @Volatile private var activeCrypto: SessionCrypto? = null
     @Volatile private var lastAppliedSeq: Long = 0L
+    // The seqCutoff of the most recent bulk sent: every op through it is in a snapshot the current
+    // guest already has, so outboundLoop never treats one of those as an evicted-before-sent hole.
+    @Volatile private var resyncedThroughSeq: Long = 0L
     // Bumped each time a connection completes handshake + bulk/replay and goes Live. The reconnect
     // watcher waits for this to change rather than for clientSocket to be set: clientSocket is
     // adopted before bulk/replay, so a reconnect that failed partway used to satisfy the watcher,
@@ -174,7 +180,8 @@ internal class HostSession(
     // inbound (PONG) and heartbeat (PING) loops write concurrently, and Frame.write issues
     // several stream writes per frame, so without this lock their bytes interleave and
     // corrupt the wire framing.
-    private val writeMutex = Mutex()
+    @androidx.annotation.VisibleForTesting
+    internal val writeMutex = Mutex()
 
     // Seal-then-write every post-handshake frame under the write lock. The lock also serializes
     // access to crypto's send counter (each of the outbound/inbound/heartbeat loops writes here).
@@ -187,10 +194,9 @@ internal class HostSession(
     /**
      * Write one frame with a bound on wall-clock time, so a guest that stops reading
      * (backgrounded app, throttled network, or a hostile peer that just never calls read())
-     * cannot block this write forever. acceptLoop calls handleConnection synchronously and
-     * single-threaded, so an unbounded write here — the handshake replies, [sendBulk], and the
-     * reconnect replay all go through this path — would wedge the accept loop for every
-     * subsequent joiner indefinitely.
+     * cannot block this write forever. Adoption is serialized under [adoptMutex], so an unbounded
+     * write here — the handshake replies, [sendBulk], and the reconnect replay all go through this
+     * path — would wedge adoption for every subsequent joiner indefinitely.
      *
      * `java.net.Socket` exposes no write-side timeout (`soTimeout` only bounds reads), so the
      * actual write runs on a plain IO thread and this coroutine only waits up to
@@ -328,32 +334,39 @@ internal class HostSession(
                 _state.value = CoopSessionState.Ended(CoopSessionState.EndReason.NetworkLost)
                 return
             }
+            // Each pre-auth handshake runs in its own coroutine. It used to run inline, so every
+            // idle socket from any LAN peer held this loop for up to HANDSHAKE_TOTAL_TIMEOUT_MS
+            // before the next accept() — a handful of them starved a legitimate guest's reconnect
+            // past its 30 s window. Only adopting an authenticated guest is serialized (see
+            // [adoptMutex]); everything before that is per-socket and runs concurrently.
+            //
             // A failed handshake (peer vanished mid-HELLO, garbage payload, write error) must
-            // never kill this loop: before this guard, a single flaky or hostile client
-            // permanently disabled hosting and leaked its socket.
-            try {
-                handleConnection(socket)
-            } catch (_: Exception) {
-                // handleConnection only throws before the live loops start (loop failures are
-                // caught inside the loops and route to enterReconnecting). If it adopted this
-                // socket (clientSocket === socket) but then threw — e.g. a write failed during
-                // bulk/replay — reset host state too, or the host stays wedged pointing at a dead
-                // socket, rejecting new guests as AlreadyHosting with no reconnect watcher running.
-                if (clientSocket === socket) {
-                    clientSocket = null
-                    activeCrypto = null
+            // never escape: before this guard, a single flaky or hostile client permanently
+            // disabled hosting and leaked its socket.
+            scope.launch {
+                try {
+                    handleConnection(socket)
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    try { socket.close() } catch (_: Exception) {}
                 }
-                try { socket.close() } catch (_: Exception) {}
             }
         }
     }
 
+    /**
+     * Serializes adopting an authenticated guest ([adopt]): the single-guest slot, the bulk/replay
+     * and the switch to Live. Pre-auth handshakes run concurrently and never take it, so a stalled
+     * unauthenticated peer can't hold it either.
+     */
+    private val adoptMutex = Mutex()
+
     private suspend fun handleConnection(socket: Socket) {
-        // acceptLoop handles connections serially, so the pre-auth HELLO read must be bound tightly:
-        // an unauthenticated peer that opens a socket and sends nothing would otherwise hold the accept
-        // loop for the full live READ_TIMEOUT_MS (15s), a trivial pre-auth DoS. Use the shorter handshake
-        // timeout for the HELLO read, then widen to READ_TIMEOUT_MS for the live phase (guests ack every
-        // 1s and answer 5s PINGs, so 15s of live silence means a dead/half-open peer).
+        // The pre-auth HELLO read is bound tightly: it no longer blocks other accepts (each runs in
+        // its own coroutine), but an unauthenticated peer must not pin a socket and a coroutine for the
+        // full live READ_TIMEOUT_MS (15s). Use the shorter handshake timeout for the HELLO read, then
+        // widen to READ_TIMEOUT_MS for the live phase (guests ack every 1s and answer 5s PINGs, so 15s
+        // of live silence means a dead/half-open peer).
         socket.soTimeout = HANDSHAKE_READ_TIMEOUT_MS
         val input = socket.getInputStream()
         val output = socket.getOutputStream()
@@ -427,16 +440,57 @@ internal class HostSession(
             socket.close(); return
         }
 
-        // Single guest only. A reconnecting guest is fine because enterReconnecting() nulls
-        // clientSocket before the new connection; a *second* concurrent guest is rejected so
-        // two live phases never share (and interleave on) the same outQueue/output.
-        if (clientSocket != null) {
-            writeFrameTimed(
-                output,
-                FrameType.HELLO_REJECTED,
-                OpCodec.encode(HelloRejectedPayload(HelloRejectedPayload.RejectReason.AlreadyHosting)),
-            )
-            socket.close(); return
+        adoptMutex.withLock {
+            try {
+                adopt(socket, input, output, hello, prk)
+            } catch (e: Exception) {
+                // adopt only throws before the live loops start (loop failures are caught inside
+                // the loops and route to enterReconnecting). If it adopted this socket
+                // (clientSocket === socket) but then threw — e.g. a write failed during
+                // bulk/replay — reset host state too, or the host stays pointing at a dead socket
+                // with nothing to clear it. Done under adoptMutex so a later adopt can't interleave.
+                if (clientSocket === socket) {
+                    clientSocket = null
+                    activeCrypto = null
+                }
+                throw e
+            }
+        }
+    }
+
+    /**
+     * Second half of the handshake, for a guest whose HELLO already verified. Runs under
+     * [adoptMutex].
+     */
+    private suspend fun adopt(
+        socket: Socket,
+        input: java.io.InputStream,
+        output: OutputStream,
+        hello: HelloPayload,
+        prk: ByteArray,
+    ) {
+        if (phase == Phase.Ended) { socket.close(); return }
+
+        // Single guest only, but a verified HELLO while a connection is still live REPLACES it rather
+        // than being refused. Only a token holder gets here (proof checked, nonce fresh), and in
+        // practice that is the same guest reconnecting before this host noticed its old connection
+        // die: a phone switching Wi-Fi, or a half-open TCP connection that won't time out for up to
+        // READ_TIMEOUT_MS. Refusing it with AlreadyHosting used to end the guest's session (it mapped
+        // that to HostClosed) — killing exactly the session the reconnect window exists to save.
+        // enterReconnecting() closes the old socket, stops its live loops and starts the reconnect
+        // watcher, which this adoption then satisfies by going Live. Two live phases still never
+        // share outQueue/output: the old loops are cancelled, and their stale failures are ignored
+        // (enterReconnecting's crypto check).
+        val previous = clientSocket
+        if (previous != null) {
+            if (phase == Phase.Live) {
+                enterReconnecting(activeCrypto)
+            } else {
+                // Adopted but never went Live: adopt's failure path would normally have cleared it.
+                clientSocket = null
+                activeCrypto = null
+                try { previous.close() } catch (_: Exception) {}
+            }
         }
 
         // Accept. Build the per-connection crypto from token + both nonces (fresh keys every
@@ -479,24 +533,23 @@ internal class HostSession(
         // state it has. Serve it a bulk too.
         val inRange = lastAppliedSeq <= seqCounter.get()
         val replay = if (isReconnect && inRange) deltaBuffer.opsAfter(lastAppliedSeq) else null
-        if (replay != null) {
+        // Any replay failure falls back to a bulk. It used to log and skip the failed entry and go
+        // Live anyway, leaving the guest one op short of the host with nothing to ever repair it.
+        // (enqueueOp rejects an op that can't fit a single Frame, but a bad buffered entry can still
+        // come from elsewhere, e.g. version skew with a peer running an older cap.) A bulk carries the
+        // whole project, so the partial replay already written doesn't matter: the guest resets to the
+        // snapshot (it accepts BULK_BEGIN mid-stream). If the stream itself is broken the bulk throws
+        // too, which ends this attempt and leaves the reconnect watcher running, as before.
+        val replayed = replay != null && try {
             replay.forEach { (seq, op) ->
-                // Each entry gets its own try/catch: enqueueOp now rejects an op that can't fit a
-                // single Frame before it ever reaches deltaBuffer, but this stays defensive against
-                // any other cause of a bad/oversized buffered entry (e.g. version skew with a peer
-                // running an older cap). Without this, one bad entry threw uncaught here, which
-                // killed this fresh connection on every reconnect attempt — the guest reconnects
-                // successfully at the transport layer and is killed again each time, stranded until
-                // its reconnect window expires. Log and skip instead.
-                try {
-                    writeSecure(output, crypto, FrameType.DELTA, OpCodec.encode(DeltaPayload(seq, op)))
-                } catch (e: Exception) {
-                    Log.w(TAG, "skipping unsendable replay entry (seq=$seq, ${op.javaClass.simpleName})", e)
-                }
+                writeSecure(output, crypto, FrameType.DELTA, OpCodec.encode(DeltaPayload(seq, op)))
             }
-        } else {
-            sendBulk(output, crypto)
+            true
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            false
         }
+        if (!replayed) sendBulk(output, crypto)
 
         // Handshake done — widen the read timeout for the live phase.
         socket.soTimeout = READ_TIMEOUT_MS
@@ -570,6 +623,9 @@ internal class HostSession(
         // re-applying (or double-appending, for e.g. StrokeComplete) state the snapshot already
         // has. Only ops enqueued strictly after this point are genuinely new and must ship live.
         dropStaleQueueEntries(seqCutoff)
+        // Everything through seqCutoff is in the snapshot, so a queued seq at or below it whose op
+        // is gone from deltaBuffer is not a hole for this guest (see outboundLoop).
+        resyncedThroughSeq = seqCutoff
         writeSecure(
             output, crypto, FrameType.BULK_BEGIN,
             OpCodec.encode(
@@ -625,10 +681,25 @@ internal class HostSession(
 
     private suspend fun outboundLoop(output: OutputStream, crypto: SessionCrypto) {
         // The queue carries only seqs; re-encode each from deltaBuffer at send time. A null means the op
-        // is no longer buffered — superseded by a newer op (whose seq is also queued and carries the
-        // absolute state) or covered by a gap resync — so skipping it is correct, not a lost update.
+        // is no longer buffered. Usually it was superseded by a newer op (whose seq is also queued and
+        // carries the absolute state), or a bulk already covered it, and skipping it is correct.
+        //
+        // But eviction can also drop an op BEFORE it was ever sent (a burst of big ops overflowing the
+        // buffer while this loop is behind). Skipping that silently left a guest that stayed connected
+        // diverged for good: only a reconnect was ever checked against the gap. So a missing op inside
+        // the evicted range ([DeltaBuffer.mayHaveEvicted]) that no bulk has covered forces a resync:
+        // drop this connection, and the guest's reconnect resumes below the gap, which [opsAfter]
+        // answers with null and [adopt] answers with a bulk. A superseded op in that range triggers
+        // it too — we can't tell the two apart cheaply, and a spurious bulk costs only bandwidth.
         for (delta in outQueue) {
-            val op = deltaBuffer.opBySeq(delta.seq) ?: continue
+            val op = deltaBuffer.opBySeq(delta.seq)
+            if (op == null) {
+                if (delta.seq > resyncedThroughSeq && deltaBuffer.mayHaveEvicted(delta.seq)) {
+                    enterReconnecting(crypto)
+                    return
+                }
+                continue
+            }
             try {
                 writeSecure(output, crypto, FrameType.DELTA, OpCodec.encode(DeltaPayload(delta.seq, op)))
             } catch (e: Exception) {
@@ -641,7 +712,7 @@ internal class HostSession(
                 if (e is CancellationException) throw e
                 // Connection broken; enter reconnecting. The op stays in deltaBuffer and is
                 // replayed to the reconnecting guest from there.
-                enterReconnecting()
+                enterReconnecting(crypto)
                 return
             }
         }
@@ -650,13 +721,13 @@ internal class HostSession(
     private suspend fun inboundLoop(input: java.io.InputStream, output: OutputStream, crypto: SessionCrypto) {
         while (scope.isActive) {
             val frame = try {
-                readSecure(input, crypto) ?: run { enterReconnecting(); return }
+                readSecure(input, crypto) ?: run { enterReconnecting(crypto); return }
             } catch (e: Exception) {
                 // See outboundLoop's matching comment: a reconnect handoff cancels this loop via
                 // liveJob, and that must propagate as cancellation, not be misread as the read
                 // itself failing and trigger a second, spurious enterReconnecting().
                 if (e is CancellationException) throw e
-                enterReconnecting(); return
+                enterReconnecting(crypto); return
             }
             try {
                 when (frame.type) {
@@ -670,7 +741,7 @@ internal class HostSession(
                             writeSecure(output, crypto, FrameType.PONG, OpCodec.encode(ping))
                         } catch (e: Exception) {
                             if (e is CancellationException) throw e
-                            enterReconnecting(); return
+                            enterReconnecting(crypto); return
                         }
                     }
                     FrameType.BULK_ACK -> { /* bulk done; ignore */ }
@@ -687,7 +758,7 @@ internal class HostSession(
                             )
                         } catch (e: Exception) {
                             if (e is CancellationException) throw e
-                            enterReconnecting(); return
+                            enterReconnecting(crypto); return
                         }
                     }
                     FrameType.BYE -> {
@@ -709,7 +780,7 @@ internal class HostSession(
                 // payload is not valid CBOR for its declared type. Decoding threw — drop the connection
                 // instead of letting it escape this loop and crash the process.
                 Log.w(TAG, "undecodable ${frame.type} frame from guest; reconnecting", e)
-                enterReconnecting(); return
+                enterReconnecting(crypto); return
             }
         }
     }
@@ -748,16 +819,23 @@ internal class HostSession(
             } catch (e: Exception) {
                 // See outboundLoop's matching comment.
                 if (e is CancellationException) throw e
-                enterReconnecting(); return
+                enterReconnecting(crypto); return
             }
         }
     }
 
-    private fun enterReconnecting() {
+    /**
+     * Drop the live connection and open the reconnect window. [from] is the crypto of the
+     * connection whose loop is reporting the failure: a report from a connection that is no longer
+     * the active one (its loops were cancelled by a replacement HELLO, but a blocked read only
+     * fails once its socket closes) is ignored, so it can't knock the new connection offline.
+     */
+    private fun enterReconnecting(from: SessionCrypto?) {
         // Atomic check-then-set: concurrent failures in the outbound/inbound/heartbeat loops
         // must collapse into a single transition (and a single 30s timeout watcher below).
         synchronized(phaseLock) {
             if (phase == Phase.Reconnecting || phase == Phase.Ended) return
+            if (from !== activeCrypto) return
             phase = Phase.Reconnecting
         }
         _state.value = CoopSessionState.Reconnecting
@@ -831,9 +909,9 @@ internal class HostSession(
         // half-open peer.
         const val READ_TIMEOUT_MS = 15_000
 
-        // Pre-auth HELLO read bound. acceptLoop is serial, so a peer that connects and sends nothing
-        // blocks hosting for this long — kept short (5s) to limit that pre-auth stall, while the live
-        // phase widens back to READ_TIMEOUT_MS.
+        // Pre-auth HELLO read bound. Handshakes run concurrently (acceptLoop launches each), so a peer
+        // that connects and sends nothing only pins its own socket and coroutine for this long — kept
+        // short (5s) anyway, while the live phase widens back to READ_TIMEOUT_MS.
         const val HANDSHAKE_READ_TIMEOUT_MS = 5_000
 
         /** Total budget for the pre-auth HELLO frame, however slowly the peer trickles it. */
@@ -844,7 +922,7 @@ internal class HostSession(
 
         // Plain java.net.Socket exposes no write-side timeout, so writeFrameTimed enforces one
         // itself. Mirrors READ_TIMEOUT_MS: a guest that stops reading for this long (backgrounded,
-        // throttled, or hostile) is treated as gone rather than left to block the accept loop.
+        // throttled, or hostile) is treated as gone rather than left to block adoption.
         const val WRITE_TIMEOUT_MS = 15_000L
     }
 

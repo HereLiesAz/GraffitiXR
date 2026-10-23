@@ -76,8 +76,8 @@ internal class AnticipationFeeder(
     @Volatile private var generation = 0
 
     // Executor-only.
-    private class Page(val pageNo: Int, val luma: ByteArray, val width: Int, val height: Int) {
-        var planKey: Pair<AnticipationSettings, CameraIntrinsics>? = null
+    private class Page(val pageNo: Int, val luma: ByteArray, val width: Int, val height: Int, val widthMeters: Double?) {
+        var planKey: Triple<AnticipationSettings, CameraIntrinsics, Double>? = null
         var plans: List<HalfSphere.Plan> = emptyList()
         val built = LinkedHashMap<String, HalfSphere.Site>()
     }
@@ -94,14 +94,23 @@ internal class AnticipationFeeder(
         }
     }
 
-    /** Page [pageNo] of the current reference ([luma], [width] × [height], tightly packed; copied). */
-    fun setPage(pageNo: Int, luma: ByteArray, width: Int, height: Int) {
+    /**
+     * The camera's minimum focus distance (metres, see [HalfSphere.minFocusMeters]): views nearer than
+     * it are not built. Applies to plans made from now on.
+     */
+    @Volatile var minFocusMeters: Double = HalfSphere.DEFAULT_MIN_FOCUS_M
+
+    /**
+     * Page [pageNo] of the current reference ([luma], [width] × [height], tightly packed; copied),
+     * [widthMeters] wide when its physical width is known (null: zoom conservatively, see [HalfSphere.plans]).
+     */
+    fun setPage(pageNo: Int, luma: ByteArray, width: Int, height: Int, widthMeters: Double? = null) {
         require(luma.size == width * height)
         val copy = luma.copyOf()
         val gen = generation
         submit {
             if (gen != generation) return@submit
-            pages[pageNo] = Page(pageNo, copy, width, height)
+            pages[pageNo] = Page(pageNo, copy, width, height, widthMeters)
         }
         applied = null // build its views at the next frame
     }
@@ -177,7 +186,8 @@ internal class AnticipationFeeder(
                 )
             }
             perfRenderMs.addAndGet((System.nanoTime() - renderStartNs) / 1_000_000L)
-            if (gen != generation) return
+            // Checked again right before handing over: close() may have run during the render.
+            if (gen != generation || closed.get()) return
             sink.addViews(target.pageNo, views)
             viewsAdded += views.size
         }
@@ -196,10 +206,13 @@ internal class AnticipationFeeder(
 
     /** [p]'s plans for [max] and [cam], farthest first, views from steeply above or below last. */
     private fun planFor(p: Page, max: AnticipationSettings, cam: CameraIntrinsics) {
-        val key = max to cam
+        val focus = minFocusMeters
+        val key = Triple(max, cam, focus)
         if (p.planKey == key) return
         p.planKey = key
-        p.plans = HalfSphere.prioritized(HalfSphere.plans(p.width, p.height, cam, max), ::priorityCost, ::isSteepVertical)
+        p.plans = HalfSphere.prioritized(
+            HalfSphere.plans(p.width, p.height, cam, max, p.widthMeters, focus), ::priorityCost, ::isSteepVertical,
+        )
     }
 
     private fun submit(task: () -> Unit) {
@@ -213,11 +226,24 @@ internal class AnticipationFeeder(
         }
     }
 
+    /**
+     * Stops building and waits (bounded) for a batch in flight to finish, so a caller may close the
+     * sink right after this returns without a late [AnticipationSink.addViews] reaching it.
+     */
     override fun close() {
-        if (closed.compareAndSet(false, true)) executor.shutdownNow()
+        if (!closed.compareAndSet(false, true)) return
+        executor.shutdownNow()
+        try {
+            executor.awaitTermination(CLOSE_WAIT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
     }
 
     companion object {
+        /** Longest [close] waits for an in-flight batch (a batch renders in well under this). */
+        const val CLOSE_WAIT_MS = 1_000L
+
         /** Views rendered and handed over together; the governor is read again between batches. */
         const val BATCH = 4
 

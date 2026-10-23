@@ -23,7 +23,7 @@ fun GlassesStatusBanner(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(if (isFallback) Color(0xFFB94B4B) else Color.Black.copy(alpha = 0.7f))
+            .background(if (isFallback) com.hereliesaz.graffitixr.design.theme.Danger else com.hereliesaz.graffitixr.design.theme.HudScrim)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -37,9 +37,9 @@ fun GlassesStatusBanner(
             modifier = Modifier.weight(1f),
         )
         if (isFallback) {
-            Button(onClick = onReconnect) { Text("Reconnect") }
+            Button(onClick = onReconnect) { Text(androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.glasses_reconnect)) }
         } else {
-            Button(onClick = onLeave) { Text("End") }
+            Button(onClick = onLeave) { Text(androidx.compose.ui.res.stringResource(com.hereliesaz.graffitixr.design.R.string.glasses_end)) }
         }
     }
 }

@@ -87,6 +87,8 @@ fun SettingsScreen(
     onCrashReportingConsentChanged: (Boolean) -> Unit,
     crashReportToken: String,
     onCrashReportTokenChanged: (String) -> Unit,
+    // Debug builds only: the developer's crash upload (public issue tracker, developer token).
+    developerCrashUpload: Boolean = false,
     showDiagOverlay: Boolean,
     onDiagOverlayChanged: () -> Unit,
     showFeaturePoints: Boolean,
@@ -172,10 +174,16 @@ fun SettingsScreen(
         // overwrites the stored one. Prefilled with the current value so editing (not just replacing)
         // works. The field masks the token like a password — it grants issue-write to the repo.
         var draft by remember { mutableStateOf(crashReportToken) }
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showTokenDialog = false },
-            title = { Text(strings.settings.crashTokenLabel) },
-            text = {
+        com.hereliesaz.graffitixr.design.components.GxrDialog(
+            title = strings.settings.crashTokenLabel,
+            confirmLabel = strings.common.done,
+            onConfirm = {
+                onCrashReportTokenChanged(draft)
+                showTokenDialog = false
+            },
+            dismissLabel = strings.common.close,
+            onDismiss = { showTokenDialog = false },
+        ) {
                 Column {
                     Text(
                         text = strings.settings.crashTokenDesc,
@@ -195,24 +203,16 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-            },
-            confirmButton = {
-                AzButton(text = strings.common.done, onClick = {
-                    onCrashReportTokenChanged(draft)
-                    showTokenDialog = false
-                })
-            },
-            dismissButton = {
-                AzButton(text = strings.common.close, onClick = { showTokenDialog = false })
-            }
-        )
+        }
     }
 
     if (showLanguageDialog) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showLanguageDialog = false },
-            title = { Text(strings.settings.languageLabel) },
-            text = {
+        com.hereliesaz.graffitixr.design.components.GxrDialog(
+            title = strings.settings.languageLabel,
+            confirmLabel = strings.common.done,
+            onConfirm = { showLanguageDialog = false },
+            onDismiss = { showLanguageDialog = false },
+        ) {
                 Box(modifier = Modifier.fillMaxWidth().height(300.dp)) {
                     LazyColumn {
                         items(AppLanguage.entries.size) { index ->
@@ -247,11 +247,7 @@ fun SettingsScreen(
                         }
                     }
                 }
-            },
-            confirmButton = {
-                AzButton(text = strings.common.done, onClick = { showLanguageDialog = false })
-            }
-        )
+        }
     }
 
 
@@ -332,30 +328,6 @@ fun SettingsScreen(
                             // stabilizes the feature cloud; off is the escape hatch for hardware whose
                             // ML depth graph destabilizes VIO. Both apply immediately, mid-AR included.
                             SettingsSwitch(strings.settings.useArCore, arCoreEnabled, onArCoreEnabledChanged)
-                            SettingsSwitch(strings.settings.arCoreDepth, arCoreDepthEnabled, onArCoreDepthEnabledChanged)
-                            // Monocular depth (MiDaS Small) — standalone (non-ARCore) backend only:
-                            // calibrates the sphere map's point radii while the feature map builds.
-                            // Default on; never loaded on the ARCore backend (MiDaS depth is relative,
-                            // so it can't stand in for ARCore depth). A self-test runs when it loads;
-                            // its result shows in the diag overlay.
-                            SettingsSwitch(strings.settings.monocularDepth, monocularDepthEnabled, onMonocularDepthEnabledChanged)
-                            SettingsSwitch(strings.settings.ambientScan, ambientScanEnabled, onAmbientScanEnabledChanged)
-                            // Pass B: also judge progress by what has changed since the clean-wall photo. Off
-                            // by default, never switched on for the user; it needs that photo to do anything.
-                            SettingsSwitch(strings.settings.changePass, changePassEnabled, onChangePassEnabledChanged)
-                            // CV view: everything the computer vision is looking for, drawn over the design
-                            // in AR (moved here from the rail).
-                            SettingsSwitch(strings.nav.cvView, cvPreviewOn, onCvPreviewChanged)
-                            SettingsItem(
-                                label = strings.settings.cameraFps,
-                                value = cameraTargetFpsLabel(cameraTargetFps, strings),
-                                modifier = Modifier.clickable {
-                                    onCameraTargetFpsChanged(
-                                        com.hereliesaz.graffitixr.common.model.CameraTargetFps
-                                            .next(cameraTargetFps),
-                                    )
-                                }
-                            )
                         }
 
                         item {
@@ -388,34 +360,14 @@ fun SettingsScreen(
                             SettingsSwitch(strings.settings.adaptiveRate, adaptiveRateEnabled, onAdaptiveRateEnabledChanged)
                         }
 
-                        item {
-                            SettingsSectionTitle(strings.settings.anticipationSection)
-                            AnticipationSettingsControls(anticipation, onAnticipationChanged, strings)
-                            // What the next target's doodle is made of: tap to cycle.
-                            SettingsItem(
-                                label = strings.settings.doodleFeatures,
-                                value = doodleFeaturesLabel(doodleFeatures, strings),
-                                modifier = Modifier.clickable {
-                                    onDoodleFeaturesChanged(
-                                        com.hereliesaz.graffitixr.common.model.DoodleFeatures.next(doodleFeatures),
-                                    )
-                                },
-                            )
-                            Text(
-                                text = doodleFeaturesDescription(doodleFeatures, strings),
-                                color = Color.Gray,
-                                fontSize = 12.sp,
-                            )
-                        }
-
-                        item {
+                        if (developerCrashUpload) item {
                             SettingsSectionTitle(strings.settings.privacy)
-                            // Off by default and must ask, not assume. On a crash, the report (device
-                            // model + recent logcat) goes to this project's PUBLIC GitHub issue
-                            // tracker — never silently, and never anywhere else. Apart from co-op
-                            // sessions the artist starts, this is the only network call the app
-                            // makes: there is no update check (Updates below just opens the
-                            // releases page in the browser when tapped).
+                            // Debug builds only. Off by default and must ask, not assume. On a crash,
+                            // the report (device model + recent logcat) goes to this project's PUBLIC
+                            // GitHub issue tracker with the developer's token. Release builds never
+                            // upload: the crash dialog offers the user a report to share themselves.
+                            // Other network calls: co-op sessions the artist starts, and the launch
+                            // update check (UpdateChecker: Play's update API or GitHub releases).
                             SettingsSwitch(
                                 label = strings.settings.crashReports,
                                 checked = crashReportingConsent,
@@ -473,6 +425,50 @@ fun SettingsScreen(
                                 onToggle = { developerExpanded = !developerExpanded },
                             )
                             if (developerExpanded) {
+                                // Engine-level tuning lives here, out of an artist's way: depth and
+                                // scan passes, camera rate, and what the anticipation and Doodle
+                                // feature builders produce.
+                                SettingsSwitch(strings.settings.arCoreDepth, arCoreDepthEnabled, onArCoreDepthEnabledChanged)
+                                // Monocular depth (MiDaS Small) — standalone (non-ARCore) backend only:
+                                // calibrates the sphere map's point radii while the feature map builds.
+                                // Default on; never loaded on the ARCore backend (MiDaS depth is relative,
+                                // so it can't stand in for ARCore depth). A self-test runs when it loads;
+                                // its result shows in the diag overlay.
+                                SettingsSwitch(strings.settings.monocularDepth, monocularDepthEnabled, onMonocularDepthEnabledChanged)
+                                SettingsSwitch(strings.settings.ambientScan, ambientScanEnabled, onAmbientScanEnabledChanged)
+                                // Pass B: also judge progress by what has changed since the clean-wall photo. Off
+                                // by default, never switched on for the user; it needs that photo to do anything.
+                                SettingsSwitch(strings.settings.changePass, changePassEnabled, onChangePassEnabledChanged)
+                                // CV view: everything the computer vision is looking for, drawn over the design
+                                // in AR (moved here from the rail).
+                                SettingsSwitch(strings.nav.cvView, cvPreviewOn, onCvPreviewChanged)
+                                SettingsItem(
+                                    label = strings.settings.cameraFps,
+                                    value = cameraTargetFpsLabel(cameraTargetFps, strings),
+                                    modifier = Modifier.clickable {
+                                        onCameraTargetFpsChanged(
+                                            com.hereliesaz.graffitixr.common.model.CameraTargetFps
+                                                .next(cameraTargetFps),
+                                        )
+                                    }
+                                )
+                                SettingsSectionTitle(strings.settings.anticipationSection)
+                                AnticipationSettingsControls(anticipation, onAnticipationChanged, strings)
+                                // What the next target's doodle is made of: tap to cycle.
+                                SettingsItem(
+                                    label = strings.settings.doodleFeatures,
+                                    value = doodleFeaturesLabel(doodleFeatures, strings),
+                                    modifier = Modifier.clickable {
+                                        onDoodleFeaturesChanged(
+                                            com.hereliesaz.graffitixr.common.model.DoodleFeatures.next(doodleFeatures),
+                                        )
+                                    },
+                                )
+                                Text(
+                                    text = doodleFeaturesDescription(doodleFeatures, strings),
+                                    color = Color.Gray,
+                                    fontSize = 12.sp,
+                                )
                                 SettingsSwitch(strings.settings.diagOverlay, showDiagOverlay, { onDiagOverlayChanged() })
                                 SettingsSwitch(strings.settings.layerFeaturePoints, showFeaturePoints, { onFeaturePointsChanged() })
                                 SettingsSwitch(strings.settings.layerPlaneGrids, showPlaneGrids, { onPlaneGridsChanged() })

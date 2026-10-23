@@ -79,6 +79,29 @@ class HalfSphereTest {
     }
 
     @Test
+    fun `no half-sphere is nearer than the lens focuses`() {
+        val s = AnticipationSettings(6, 0, 0)
+        val capture = HalfSphere.captureDistance(w, h, camera)
+        fun shellsOf(p: List<HalfSphere.Plan>) = p.map { it.site.shell }.toSortedSet()
+        // A 40 cm page, a lens focusing from 10 cm (12.5 cm with the margin): shells under 0.3125
+        // widths are dropped; the rest keep their index (stable labels).
+        val metric = HalfSphere.plans(w, h, camera, s, widthMeters = 0.40, minFocusMeters = 0.10)
+        val radii = HalfSphere.shells(6, capture)
+        assertEquals(radii.indices.filter { radii[it] * 0.40 >= 0.125 }.toSortedSet(), shellsOf(metric))
+        assertTrue(0 !in shellsOf(metric))
+        assertTrue(metric.isNotEmpty())
+        // A 4 m wall: every shell is far enough.
+        assertEquals((0 until 6).toSortedSet(), shellsOf(HalfSphere.plans(w, h, camera, s, widthMeters = 4.0, minFocusMeters = 0.10)))
+        // No metric width: at most 3x nearer than the capture (shells 2..6 of 6).
+        assertEquals((1 until 6).toSortedSet(), shellsOf(HalfSphere.plans(w, h, camera, s)))
+        // Diopters → metres; fixed focus (0) and unknown fall back to 10 cm.
+        assertEquals(0.1, HalfSphere.minFocusMeters(10f), 1e-9)
+        assertEquals(0.25, HalfSphere.minFocusMeters(4f), 1e-9)
+        assertEquals(HalfSphere.DEFAULT_MIN_FOCUS_M, HalfSphere.minFocusMeters(0f), 0.0)
+        assertEquals(HalfSphere.DEFAULT_MIN_FOCUS_M, HalfSphere.minFocusMeters(null), 0.0)
+    }
+
+    @Test
     fun `half-spheres zoom in from the capture distance`() {
         val capture = HalfSphere.captureDistance(w, h, camera)
         assertEquals(260.0 / 320.0, capture, 1e-9)

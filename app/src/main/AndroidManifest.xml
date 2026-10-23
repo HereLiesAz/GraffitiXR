@@ -28,9 +28,13 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- Network: co-op sessions (plain TCP sockets between devices on the same LAN, paired by QR —
-         no Wi-Fi scanning, Wi-Fi Direct or Nearby, so no Wi-Fi/nearby-device permission), and the
-         opt-in crash-report upload. Nothing else contacts a server. -->
+    <!-- Network, all of it (keep the Play Data Safety form in step):
+         - co-op sessions: plain TCP sockets between devices on the same LAN, paired by QR (no Wi-Fi
+           scanning, Wi-Fi Direct or Nearby, so no Wi-Fi/nearby-device permission);
+         - the update check at launch (UpdateChecker): Play's in-app update API for Play installs,
+           else GitHub's public releases API; it sends nothing about the user;
+         - downloadable Google Fonts (ui-text-google-fonts), fetched through Google Play services;
+         - debug builds only: the opt-in crash-report upload to the project's GitHub issues. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!--

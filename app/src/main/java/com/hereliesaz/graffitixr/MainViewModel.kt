@@ -282,19 +282,11 @@ class MainViewModel @Inject constructor(
     ) {
         if (bitmap == null) {
             resetCaptureUi()
-            Toast.makeText(
-                context,
-                "Capture incomplete. Try creating the Doodle again.",
-                Toast.LENGTH_LONG,
-            ).show()
+            com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_capture_incomplete), long = true)
             return
         }
         if (placement == null) {
-            Toast.makeText(
-                context,
-                "SphereSLAM map is not ready to anchor this Doodle yet. Keep the camera on the surface and try again.",
-                Toast.LENGTH_LONG,
-            ).show()
+            com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_map_not_ready), long = true)
             return
         }
 
@@ -309,11 +301,7 @@ class MainViewModel @Inject constructor(
                         "no project open to save the standalone target into",
                     )
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(
-                            context,
-                            "No project open — a Doodle is saved into a project. Open or create one first.",
-                            Toast.LENGTH_LONG,
-                        ).show()
+                        com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_no_project), long = true)
                     }
                     return@launch
                 }
@@ -333,11 +321,7 @@ class MainViewModel @Inject constructor(
                         "standalone target produced too few selected SphereSLAM fingerprint features",
                     )
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(
-                            context,
-                            "Doodle lacks enough selected visual detail. Keep more distinctive surface marks.",
-                            Toast.LENGTH_LONG,
-                        ).show()
+                        com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_low_detail_selected), long = true)
                     }
                     return@launch
                 }
@@ -413,11 +397,7 @@ class MainViewModel @Inject constructor(
                         candidateUri,
                     )
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(
-                            context,
-                            "The Doodle changed while this one was saving — not saved. Try again.",
-                            Toast.LENGTH_LONG,
-                        ).show()
+                        com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_changed), long = true)
                     }
                     return@launch
                 }
@@ -458,7 +438,7 @@ class MainViewModel @Inject constructor(
                 projectRepository.loadProject(currentProject.id)
                 _uiState.update { it.copy(doodleCapturedThisSession = true) }
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Doodle Saved & Locked", Toast.LENGTH_SHORT).show()
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_saved), long = false)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -476,11 +456,7 @@ class MainViewModel @Inject constructor(
                     "standalone target save failed: ${e.message ?: e.javaClass.simpleName}",
                 )
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        context,
-                        "Couldn't save the SphereSLAM target. Try again.",
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_save_failed), long = true)
                 }
             } finally {
                 // A build that failed or was abandoned leaves the replacement gate up; restore the old pair.
@@ -568,11 +544,7 @@ class MainViewModel @Inject constructor(
             runCatching { projectManager.deleteSphereSlamReference(context, rejected.projectId, uri) }
             projectRepository.loadProject(rejected.projectId)
             withContext(Dispatchers.Main) {
-                Toast.makeText(
-                    context,
-                    "That target has too little trackable detail — kept the previous one.",
-                    Toast.LENGTH_LONG,
-                ).show()
+                com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_too_weak_kept), long = true)
             }
         }
         return true
@@ -595,18 +567,23 @@ class MainViewModel @Inject constructor(
         rotationDeg: Int = 0,
         /** How and where the device was held at capture; persisted onto the project. */
         captureEnvironment: com.hereliesaz.graffitixr.common.model.CaptureEnvironment? = null,
+        /**
+         * Undoes what the caller armed for this capture (the pending anchor request) when confirm
+         * refuses before the build starts. The replacement gate is lowered here either way.
+         */
+        onAbandoned: () -> Unit = {},
     ) {
         if (bitmap == null || intrinsics == null || viewMatrix == null) {
+            // Refused before the build's own `finally` exists: lower the replacement gate and drop
+            // the pending anchor here, or reloc and fusion stay off for the rest of the session.
+            slamManager.abortDoodleReplacement()
+            onAbandoned()
             // Was a bare reset: the artist confirmed a target and the capture simply vanished with no
             // message, indistinguishable from the app ignoring the tap. Name it — these are ARCore
             // frame values that should always be present by confirm time, so if this fires it is a
             // real bug worth reporting rather than something to re-aim around.
             resetCaptureUi()
-            Toast.makeText(
-                context,
-                "Capture incomplete (missing camera pose). Try creating the Doodle again.",
-                Toast.LENGTH_LONG,
-            ).show()
+            com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_capture_incomplete), long = true)
             return
         }
         val safeIntr = intrinsics
@@ -619,7 +596,7 @@ class MainViewModel @Inject constructor(
             // co-registration (intrinsics, anchor, display-oriented view, captureAnchorCam), without
             // which a project can neither be drift-corrected nor re-anchored on a return visit. The
             // depth path below is the fallback for a capture with depth but no wall plane.
-            handleSingleCapture(bitmap, safeIntr, safeView, wallPlane, rotationDeg, captureEnvironment, selectionMask)
+            handleSingleCapture(bitmap, safeIntr, safeView, wallPlane, rotationDeg, captureEnvironment, selectionMask, onAbandoned)
             return
         }
         resetCaptureUi()
@@ -634,11 +611,7 @@ class MainViewModel @Inject constructor(
             if (currentProject == null) {
                 MetricDoodleBuilder.recordPreconditionFailure("no project open to save the target into")
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        context,
-                        "No project open — a Doodle is saved into a project. Open or create one first.",
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_no_project), long = true)
                 }
                 return@launch
             }
@@ -676,7 +649,7 @@ class MainViewModel @Inject constructor(
 
             if (fp == null) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Doodle lacks visual detail. Please use a surface with more contrast.", Toast.LENGTH_LONG).show()
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_low_detail), long = true)
                 }
                 return@launch
             }
@@ -785,14 +758,9 @@ class MainViewModel @Inject constructor(
 
             withContext(Dispatchers.Main) {
                 if (coreg != null) {
-                    Toast.makeText(context, "Doodle Saved & Locked", Toast.LENGTH_SHORT).show()
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_saved), long = false)
                 } else {
-                    Toast.makeText(
-                        context,
-                        "Doodle saved for this session only: no anchor locked, so it won't re-anchor " +
-                            "when the project is reopened. Create it again holding steady on the surface.",
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_session_only), long = true)
                 }
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -850,8 +818,12 @@ class MainViewModel @Inject constructor(
         bitmap: Bitmap, intr: FloatArray, view: FloatArray, wallPlane: FloatArray?, rotationDeg: Int,
         captureEnvironment: com.hereliesaz.graffitixr.common.model.CaptureEnvironment?,
         selectionMask: Bitmap? = null,
+        onAbandoned: () -> Unit = {},
     ) {
         if (wallPlane == null || wallPlane.size < 6) {
+            // As above: refused before the build starts, so nothing else lowers the gate.
+            slamManager.abortDoodleReplacement()
+            onAbandoned()
             resetCaptureUi()
             // Recorded into the SAME shared field `buildSingle` writes to below, on the OTHER two
             // preconditions here and in ArViewModel's doodle path — this call never reaches
@@ -862,7 +834,7 @@ class MainViewModel @Inject constructor(
             MetricDoodleBuilder.recordPreconditionFailure(
                 "no surface under the tap — face the surface more squarely, closer, or with more light",
             )
-            Toast.makeText(context, notOnGreenWallMessage, Toast.LENGTH_LONG).show()
+            com.hereliesaz.graffitixr.design.feedback.HudMessages.show(notOnGreenWallMessage, long = true)
             return
         }
         resetCaptureUi()
@@ -892,12 +864,7 @@ class MainViewModel @Inject constructor(
                     "anchor never established for this capture — held steady long enough?",
                 )
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        context,
-                        "Couldn't lock an anchor for this Doodle — hold the phone steady on the " +
-                            "wall and try again.",
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_anchor_failed), long = true)
                 }
                 return@launch
             }
@@ -908,11 +875,7 @@ class MainViewModel @Inject constructor(
             if (currentProject == null) {
                 MetricDoodleBuilder.recordPreconditionFailure("no project open to save the target into")
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        context,
-                        "No project open — a Doodle is saved into a project. Open or create one first.",
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_no_project), long = true)
                 }
                 return@launch
             }
@@ -938,7 +901,7 @@ class MainViewModel @Inject constructor(
                             "(need $need). Aim at the middle of the detected surface, square on."
                 }
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(message, long = true)
                 }
                 return@launch
             }
@@ -961,7 +924,7 @@ class MainViewModel @Inject constructor(
             // not, say so while the artist is still at the wall and can retake it.
             if (slamManager.cleanWallStatus() == com.hereliesaz.graffitixr.nativebridge.SlamManager.CleanWallStatus.FAILED) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, context.getString(com.hereliesaz.graffitixr.design.R.string.ar_feedback_clean_wall_register_failed), Toast.LENGTH_LONG).show()
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.ar_feedback_clean_wall_register_failed), long = true)
                 }
             }
             // Guarded on id: see the depth path above.
@@ -1016,7 +979,7 @@ class MainViewModel @Inject constructor(
             projectRepository.loadProject(currentProject.id)
             _uiState.update { it.copy(doodleCapturedThisSession = true) }
             withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Doodle Saved & Locked", Toast.LENGTH_SHORT).show()
+                com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_saved), long = false)
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -1035,11 +998,7 @@ class MainViewModel @Inject constructor(
     private suspend fun notifyProjectChangedDuringSave() {
         MetricDoodleBuilder.recordPreconditionFailure("project changed before the target was saved")
         withContext(Dispatchers.Main) {
-            Toast.makeText(
-                context,
-                "Another project was opened before the Doodle saved — it was not saved. Capture it again.",
-                Toast.LENGTH_LONG,
-            ).show()
+            com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_project_switched), long = true)
         }
     }
 
@@ -1050,7 +1009,7 @@ class MainViewModel @Inject constructor(
             "target save failed: ${e.message ?: e.javaClass.simpleName}",
         )
         withContext(Dispatchers.Main) {
-            Toast.makeText(context, "Couldn't save the Doodle. Try again.", Toast.LENGTH_LONG).show()
+            com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_doodle_save_failed), long = true)
         }
     }
 
@@ -1070,7 +1029,7 @@ class MainViewModel @Inject constructor(
      * re-aim and tap again.
      */
     fun notifyDoodleNotOnWall() {
-        Toast.makeText(context, notOnGreenWallMessage, Toast.LENGTH_LONG).show()
+        com.hereliesaz.graffitixr.design.feedback.HudMessages.show(notOnGreenWallMessage, long = true)
     }
 
     private companion object {

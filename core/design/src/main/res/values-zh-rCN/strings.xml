@@ -148,7 +148,7 @@
 
 
 
-    <string name="nav_lock_info">锁定触摸屏以防止在喷漆时发生意外更改。在任意位置连按三次即可解锁。</string>
+    <string name="nav_lock_info">固定设计，捏合和拖动都不会移动它。再次点按“锁定”即可解除。</string>
 
 
 
@@ -254,8 +254,6 @@
     <string name="choose_from_gallery">从图库中选择</string>
 
 
-    <string name="depth_unsupported">此设备不支持 Depth API。
-请在设置中切换到画布模式。</string>
 
 
     <string name="arcore_required_title">需要 ARCore</string>
@@ -270,9 +268,9 @@
     <string name="open_settings">打开设置</string>
 
 
-    <string name="doodle_creation_title">随手画网格</string>
+    <string name="doodle_creation_title">随手画</string>
 
-    <string name="doodle_creation_text">如果您还没有创建随手画网格，请按拍摄按钮拍一张墙面照片。否则请按“取消”。</string>
+    <string name="doodle_creation_text">随手画就是你在表面上画的几个大标记，好让应用能再次找到它。画好后，用拍摄按钮拍下表面。</string>
 
     <string name="cancel">取消</string>
 
@@ -336,10 +334,8 @@
     <string name="align_not_ready">对齐需要先有 Doodle 和已放置的设计。</string>
 
 
-    <string name="status_create_grid">创建一个网格以开始。</string>
     <string name="status_scan_surfaces">扫描您周围的表面。</string>
     <string name="status_tap_surface">点按一个表面以放置锚点。</string>
-    <string name="status_looking_grid">正在寻找您的网格...</string>
     <string name="status_ready">准备就绪。(%1$d 点)</string>
     <string name="unlock_hint">快速按 音量上、下、上、下 解锁</string>
 
@@ -425,7 +421,7 @@
     <string name="settings_granted">已授予</string>
     <string name="settings_denied">已拒绝</string>
     <string name="settings_open_app_settings">打开应用程序设置</string>
-    <string name="settings_copyright">GraffitiXR © 2025</string>
+    <string name="settings_copyright">GraffitiXR © 2025–2026</string>
 
 
     <string name="save_project_hint">项目名称</string>
@@ -463,7 +459,7 @@
 
 
 
-    <string name="help_mode_host">模式切换器：在应用程序模式之间切换。说明：点按以展开，然后选择 AR、覆盖、效果图或透写台。</string>
+    <string name="help_mode_host">模式切换：在应用模式之间切换。说明：点按展开，然后选择 AR、覆盖、效果图或追踪。</string>
 
     <string name="help_ar">AR 模式：使用空间映射将设计投影到墙壁上。说明：扫描环境直至检测到墙壁，然后点击放置锚点。</string>
 
@@ -471,11 +467,11 @@
 
     <string name="help_mockup">效果图模式：在静态照片上预览设计。说明：使用“墙壁”设置背景图像，然后将设计放在上面。</string>
 
-    <string name="help_trace">透写台模式：高亮度描摹表面。说明：将纸张放在屏幕上进行描摹。快速按 音量上、下、上、下 即可退出。</string>
+    <string name="help_trace">追踪模式：高亮度描摹表面。说明：将纸张放在屏幕上进行描摹。快速按 音量上、下、上、下 即可退出。</string>
 
 
 
-    <string name="help_create">创建锚点：拍摄墙上的标记以锁定投影。说明：指向明显的纹理并点按。应用程序将追踪此标记。</string>
+    <string name="help_create">拍摄随手画：拍下随手画的标记以固定投影。说明：对准标记并点按。之后应用会持续跟踪它们。</string>
 
 
     <string name="help_add_img">导入图像：添加草图或参考照片。说明：从您的图库中选择一张图片。它将成为您的设计。</string>
@@ -597,11 +593,11 @@
         <item>这样你的图像就准备就绪，按下AR按钮时手机就能专注于增强现实。</item>
     </string-array>
     <string-array name="onboarding_ar">
-        <item>AR投影 — 利用手机的深度传感器和空间追踪，将你的设计投影到真实墙面上。</item>
-        <item>将手机对准墙面并缓慢左右移动。随着引擎对表面进行建图，会出现彩色形状。请等待墙面区域被完全覆盖。</item>
-        <item>只需点击屏幕。应用会拍摄墙面照片，提取追踪特征，并立即锁定锚点。</item>
-        <item>点击“打开”添加你的设计 — 它会使用你刚设置的锚点投影到墙面上。</item>
-        <item>提示 — 空白的白墙、光滑的混凝土和纯色表面无法被追踪。请将锚点对准涂鸦、粗糙的灰泥或任何明显的标记。</item>
+        <item>AR — 将你的设计投影到真实表面上，并在你移动时保持在原位。</item>
+        <item>画出你的随手画：在表面上画几个醒目的大标记，彼此分开，形状各不相同。</item>
+        <item>点按“随手画”并拍下这些标记。应用会把设计固定在上面。</item>
+        <item>点按“打开”添加你的设计 — 它会出现在表面上，由你的随手画固定位置。</item>
+        <item>提示 — 素净的表面本身没有可跟踪的东西。这正是随手画的用途：在表面上醒目的粗标记。</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>实时叠加 — 你的设计悬浮在实时摄像头画面上方，无需扫描任何表面。</item>
@@ -676,45 +672,45 @@
     <string name="first_run_detect_title">现在把相机对准你画的图案</string>
     <string name="first_run_detect_movement_hint">请缓慢地沿圆形移动设备</string>
     <string name="standalone_width_prompt">请测量目标左右两边之间的实际宽度。</string>
-    <string name="standalone_width_label_metric">目标宽度（米）</string>
-    <string name="standalone_width_label_imperial">目标宽度（英尺和英寸）</string>
+    <string name="standalone_width_label_metric">表面宽度（米）</string>
+    <string name="standalone_width_label_imperial">表面宽度（英尺和英寸）</string>
     <string name="standalone_width_range_error">请输入 %1$s 到 %2$s 之间的宽度。</string>
     <string name="standalone_use_measured_width">使用测得的宽度</string>
     <string name="standalone_continue_without_scale">不使用实际尺寸，继续</string>
     <string name="standalone_recapture">重新拍摄</string>
-    <string name="standalone_capture_wall_target">拍摄墙面目标</string>
-    <string name="standalone_capture_failed">无法拍摄墙面目标 — 请重试。</string>
+    <string name="standalone_capture_wall_target">拍摄随手画</string>
+    <string name="standalone_capture_failed">无法拍摄随手画，请重试。</string>
     <string name="standalone_rectify_failed">无法校正该目标 — 请标出四个清晰的角点。</string>
-    <string name="standalone_target_too_weak">该目标可追踪的细节太少（KPM 特征 %1$d 个，至少需要 %2$d 个）。请重新拍摄细节更丰富的墙面区域。</string>
-    <string name="standalone_new_target">新建目标</string>
+    <string name="standalone_target_too_weak">那里的细节不足以跟踪（%1$d 个点；需要 %2$d 个）。再添加几个醒目的标记，或对准细节更多的区域。</string>
+    <string name="standalone_new_target">新的随手画</string>
     <string name="standalone_copy_diagnostics">复制诊断信息</string>
     <string name="standalone_wall_target_lost">墙面目标已丢失</string>
-    <string name="standalone_recapture_target">重新拍摄目标</string>
+    <string name="standalone_recapture_target">重新拍摄随手画</string>
     <string name="standalone_sweep_hint">请缓慢转动以建立空间地图 — %1$d%%</string>
-    <string name="standalone_failure_native_library_unavailable">此版本中无法使用 SphereSLAM。</string>
+    <string name="standalone_failure_native_library_unavailable">此版本不支持 AR 跟踪。</string>
     <string name="standalone_failure_camera_unavailable">独立 AR 无法使用相机。</string>
     <string name="standalone_failure_intrinsics_unavailable">独立 AR 无法使用相机标定。</string>
-    <string name="standalone_failure_reference_too_weak">该墙面目标可追踪的细节太少。请拍摄细节更丰富的区域。</string>
-    <string name="standalone_failure_no_page_match">请让墙面目标保持在画面内。</string>
+    <string name="standalone_failure_reference_too_weak">细节不足以跟踪。再添加几个醒目的标记，或对准细节更多的区域。</string>
+    <string name="standalone_failure_no_page_match">请让随手画保持在画面中。</string>
     <string name="standalone_failure_stale_observation">追踪出现延迟。请更缓慢地移动手机。</string>
     <string name="standalone_failure_reprojection_error">墙面匹配不稳定。请重新取景对准目标。</string>
     <string name="standalone_failure_insufficient_inliers">可见的目标细节不足。</string>
-    <string name="standalone_failure_pose_jump">已拒绝追踪跳变。请将手机稳定对准墙面目标。</string>
-    <string name="standalone_failure_persisted_target_corrupt">已保存的墙面目标丢失或无法读取。请拍摄新的目标。</string>
-    <string name="standalone_failure_internal">SphereSLAM 无法继续追踪此目标。</string>
-    <string name="standalone_tracking_stopped">SphereSLAM 追踪已停止。请重新拍摄目标以重新启动。</string>
-    <string name="standalone_status_mapping">SphereSLAM 建图中 • 点按“随手画”以添加您的随手画</string>
-    <string name="standalone_status_preparing">正在准备墙面目标…</string>
-    <string name="standalone_status_finding">正在查找墙面目标…</string>
-    <string name="standalone_quality_too_small">该墙面目标校正后太小。请拍摄更大的区域。</string>
-    <string name="standalone_quality_low_contrast">该墙面目标的视觉对比度太低。请包含更多纹理或细节。</string>
-    <string name="standalone_quality_blurry">该墙面目标太模糊，无法可靠追踪。请保持稳定后重新拍摄。</string>
-    <string name="standalone_quality_not_strong_enough">该墙面目标不够突出，无法可靠追踪。</string>
-    <string name="standalone_quality_too_dark">此目标严重曝光不足；追踪可能不够可靠。</string>
-    <string name="standalone_quality_too_bright">此目标严重曝光过度；追踪可能不够可靠。</string>
-    <string name="standalone_photosphere_no_sensor">此手机没有旋转传感器，因此 SphereSLAM 无法在此放置目标。</string>
+    <string name="standalone_failure_pose_jump">跟踪发生跳动 — 请将手机对准你的随手画。</string>
+    <string name="standalone_failure_persisted_target_corrupt">无法读取已保存的随手画。请重新拍摄。</string>
+    <string name="standalone_failure_internal">跟踪已停止。重新拍摄随手画即可重新开始。</string>
+    <string name="standalone_tracking_stopped">跟踪已停止。重新拍摄随手画即可重新开始。</string>
+    <string name="standalone_status_mapping">正在识别表面 • 点按“随手画”拍摄你的随手画</string>
+    <string name="standalone_status_preparing">正在准备你的随手画…</string>
+    <string name="standalone_status_finding">正在寻找你的随手画…</string>
+    <string name="standalone_quality_too_small">随手画在画面中太小。请靠近或拍摄更大的区域。</string>
+    <string name="standalone_quality_low_contrast">对比度太低，无法跟踪。标记更醒目或光线更亮会有帮助。</string>
+    <string name="standalone_quality_blurry">太模糊，无法跟踪。请拿稳后重新拍摄。</string>
+    <string name="standalone_quality_not_strong_enough">细节不足，无法稳定跟踪。请再添加几个醒目的标记。</string>
+    <string name="standalone_quality_too_dark">非常暗；跟踪可能不太稳定。</string>
+    <string name="standalone_quality_too_bright">非常亮；跟踪可能不太稳定。</string>
+    <string name="standalone_photosphere_no_sensor">此手机没有旋转传感器，AR 无法在这里放置你的随手画。</string>
     <string name="standalone_photosphere_compass_not_ready">指南针尚未就绪 — 请将手机静止一秒钟，然后重新拍摄。</string>
-    <string name="standalone_photosphere_not_mapped">SphereSLAM 尚未对此视角建图 — 请将相机对准表面上光线充足、细节丰富的部分并保持稳定一秒钟，然后重新拍摄。</string>
+    <string name="standalone_photosphere_not_mapped">应用尚未识别此视角 — 请对准表面上光线充足、细节丰富的部分稳住一秒，然后重新拍摄。</string>
     <string name="doodle_rectify_title">校正表面</string>
     <string name="doodle_rectify_text">现在拖动四个角，使青色边框对齐你墙面上的平整区域。</string>
     <string name="doodle_remove_marks_title">移除标记</string>
@@ -732,7 +728,7 @@
     <string name="ar_feedback_backend_resolving">AR 后端仍在确定中，请稍后再次尝试托管</string>
     <string name="ar_feedback_open_project_first">分享前请先打开一个项目，目前没有可发送给访客的内容</string>
     <string name="ar_feedback_host_need_doodle_arcore">托管前请先捕获并锁定当前的随手画</string>
-    <string name="ar_feedback_host_need_target_standalone">托管前请先捕获独立的墙面目标</string>
+    <string name="ar_feedback_host_need_target_standalone">发起前请先拍摄你的随手画</string>
     <string name="ar_feedback_doodle_not_ready">随手画尚未就绪 — 请让它保持在画面中，然后再次尝试 “主持”</string>
     <string name="ar_feedback_package_failed">无法打包此项目以供分享，请先尝试保存</string>
     <string name="ar_feedback_host_failed">无法开始分享：%1$s</string>
@@ -745,7 +741,7 @@
     <string name="ar_feedback_camera_busy">相机正忙或不可用，请关闭其他相机应用，然后重新进入 AR</string>
     <string name="ar_feedback_ar_start_failed">无法启动 AR，您的相机可能正被其他应用使用</string>
     <string name="ar_feedback_camera_setting_apply_failed">无法将相机设置应用到正在运行的 AR 会话，请退出 AR 后重新进入</string>
-    <string name="ar_feedback_sphere_target_save_failed">此会话中墙面跟踪可用，但无法保存 SphereSLAM 目标。</string>
+    <string name="ar_feedback_sphere_target_save_failed">本次会话中跟踪正常，但你的随手画未能保存。</string>
     <string name="ar_feedback_camera_not_resumed">AR 相机未能恢复，请尝试退出 AR 模式后重新进入</string>
     <string name="ar_feedback_camera_permission">相机不可用，请检查相机权限，然后重新进入 AR</string>
     <string name="ar_feedback_camera_not_paused">AR 相机未能正常暂停，可能会在后台继续运行</string>
@@ -802,4 +798,68 @@
     <string name="cv_pass_warm_luma">暖光</string>
     <string name="cv_pass_stencil3">模板</string>
     <string name="cv_pass_change">变化</string>
+    <string name="doodle_tap_grid_hint">点按你的随手画进行拍摄。</string>
+    <string name="doodle_blank_wall_hint">如果表面是空白的，请拍一张照片。</string>
+    <string name="doodle_blank_wall_saved_hint">已保存空白表面。现在点按你的随手画。</string>
+    <string name="update_title">有可用更新</string>
+    <string name="update_body_play">Play 商店中有新版本。</string>
+    <string name="update_body_github">版本 %1$s 已在 GitHub 上发布。</string>
+    <string name="update_go_play">打开 Play 商店</string>
+    <string name="update_go_github">打开 GitHub</string>
+    <string name="update_later">稍后</string>
+    <string name="crash_title">GraffitiXR 意外关闭</string>
+    <string name="crash_body">上次出了问题。分享报告有助于修复；报告只包含你的手机型号和应用最近的日志，不含任何项目内容。</string>
+    <string name="crash_share">分享报告</string>
+    <string name="crash_copy">复制</string>
+    <string name="crash_dismiss">关闭</string>
+    <string name="ar_feedback_host_no_lan">连接需要 Wi-Fi。请连接 Wi-Fi 网络或开启热点，然后重新发起。</string>
+    <string name="hud_progress">进度</string>
+    <string name="replace_design_title">替换设计？</string>
+    <string name="replace_design_text">这会替换当前设计及其位置。你可以撤销。</string>
+    <string name="replace_design_confirm">替换</string>
+    <string name="dialog_cancel">取消</string>
+    <string name="delete_project_title">删除“%1$s”？</string>
+    <string name="delete_project_text">这会永久删除该项目：包括设计、缩略图和已保存的随手画。如果表面已经改变，随手画将无法重新拍摄。此操作无法撤销。</string>
+    <string name="save_project_title">保存项目</string>
+    <string name="doodle_not_locked_title">随手画未固定</string>
+    <string name="doodle_not_locked_text">设计已放置，但应用未能固定到你的随手画上，因此覆盖层会漂移。请重新拍摄：正对表面，稍微靠近，光线充足。</string>
+    <string name="doodle_recapture">重新拍摄随手画</string>
+    <string name="msg_capture_incomplete">拍摄未完成。请重新拍摄你的随手画。</string>
+    <string name="msg_map_not_ready">尚未识别表面。请将相机对准表面后重试。</string>
+    <string name="msg_no_project">没有打开的项目。请先打开或创建一个：随手画会保存在项目中。</string>
+    <string name="msg_doodle_low_detail_selected">保留部分的细节不足。请保留更多随手画标记。</string>
+    <string name="msg_doodle_changed">保存时随手画发生了变化，因此未保存。请重试。</string>
+    <string name="msg_doodle_saved">随手画已保存并固定</string>
+    <string name="msg_doodle_save_failed">无法保存随手画。请重试。</string>
+    <string name="msg_doodle_too_weak_kept">细节不足以跟踪。已保留之前的随手画。</string>
+    <string name="msg_doodle_low_detail">细节不足以跟踪。标记更醒目或光线更亮会有帮助。</string>
+    <string name="msg_doodle_session_only">随手画仅保存在本次会话中：未能固定，重新打开项目后将不会恢复。请拿稳手机重新拍摄。</string>
+    <string name="msg_doodle_anchor_failed">无法固定你的随手画。请将手机稳稳对准表面后重试。</string>
+    <string name="msg_project_switched">随手画保存前打开了另一个项目，因此未保存。请重新拍摄。</string>
+    <string name="msg_image_invalid">无法打开该图片，或没有打开的项目。</string>
+    <string name="msg_nothing_to_share">暂时没有可分享的内容。请先保存项目。</string>
+    <string name="msg_share_failed">无法准备要分享的项目。请重试。</string>
+    <string name="msg_export_failed">导出失败。请重试。</string>
+    <string name="status_preparing_tracking">正在准备 AR…</string>
+    <string name="msg_locked">已锁定。再次点按“锁定”即可移动。</string>
+    <string name="msg_export_timeout">导出超时。请重试。</string>
+    <string name="msg_project_save_failed">无法保存项目。请重试。</string>
+    <string name="coop_none_title">未找到会话</string>
+    <string name="coop_none_text">附近没有 GraffitiXR 会话。重新搜索，或自己发起一个。</string>
+    <string name="coop_host">发起</string>
+    <string name="coop_search">搜索</string>
+    <string name="coop_need_doodle">请先拍摄随手画再发起。</string>
+    <string name="coop_scan_to_join">扫码加入</string>
+    <string name="coop_stop_sharing">停止共享</string>
+    <string name="coop_leave">离开</string>
+    <string name="glasses_pairing">正在配对 Meta 眼镜…</string>
+    <string name="glasses_reconnect">重新连接</string>
+    <string name="glasses_end">结束</string>
+    <string name="diag_confidence">置信度</string>
+    <string name="diag_sensors">传感器数据</string>
+    <string name="diag_log_start">日志 ▶</string>
+    <string name="diag_log_stop">日志 ■</string>
+    <string name="diag_induce_loss">丢失</string>
+    <string name="diag_rec_start">录制 ▶</string>
+    <string name="diag_rec_stop">录制 ■</string>
 </resources>

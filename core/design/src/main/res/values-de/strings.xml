@@ -146,7 +146,7 @@
 
     <!-- Label for the touch input lock feature. -->
     <!-- Description of the touch lock, explaining how to unlock it. -->
-    <string name="nav_lock_info">Sperren Sie den Touchscreen, um versehentliche Änderungen beim Sprühen zu verhindern. Tippen Sie dreimal auf eine beliebige Stelle, um die Sperre aufzuheben.</string>
+    <string name="nav_lock_info">Fixiert das Design, damit Ziehen und Zoomen es nicht verschieben. Tippe erneut auf Sperren, um es zu lösen.</string>
 
 
     <!-- Tooltip info for the brush tool. -->
@@ -252,7 +252,6 @@
     <string name="choose_from_gallery">Aus Galerie auswählen</string>
 
     <!-- Message shown when the device doesn't support the Depth API. -->
-    <string name="depth_unsupported">Dieses Gerät unterstützt die Depth API nicht.\nWechseln Sie in den Einstellungen zum Leinwand-Modus.</string>
 
     <!-- Title shown when ARCore is missing or unsupported. -->
     <string name="arcore_required_title">ARCore ist erforderlich</string>
@@ -267,9 +266,9 @@
     <string name="open_settings">Einstellungen öffnen</string>
 
     <!-- Title for target creation overlay. -->
-    <string name="doodle_creation_title">KRITZELEI-RASTER</string>
+    <string name="doodle_creation_title">KRITZELEI</string>
     <!-- Instructions for creating a target by tapping on reference marks. -->
-    <string name="doodle_creation_text">Wenn Sie Ihr Kritzelei-Raster noch nicht erstellt haben, fotografieren Sie die Wand, indem Sie die Aufnahmetaste drücken. Andernfalls tippen Sie auf Abbrechen.</string>
+    <string name="doodle_creation_text">Deine Kritzelei besteht aus ein paar großen Markierungen, die du auf die Fläche malst, damit die App sie wiederfindet. Male sie und fotografiere dann die Fläche mit dem Aufnahmeknopf.</string>
     <!-- Generic cancel action. -->
     <string name="cancel">Abbrechen</string>
 
@@ -330,10 +329,8 @@
     <string name="align_not_ready">Ausrichten braucht zuerst ein Doodle und ein platziertes Design.</string>
 
     <!-- Overlays & Status -->
-    <string name="status_create_grid">Erstellen Sie ein Raster, um zu beginnen.</string>
     <string name="status_scan_surfaces">Scannen Sie Oberflächen in Ihrer Nähe.</string>
     <string name="status_tap_surface">Tippen Sie auf eine Oberfläche, um einen Anker zu platzieren.</string>
-    <string name="status_looking_grid">Suche nach Ihrem Raster...</string>
     <string name="status_ready">Bereit. (%1$d Pkt.)</string>
     <string name="unlock_hint">Lautstärke Hoch, Runter, Hoch, Runter — schnell — zum Entsperren</string>
 
@@ -415,7 +412,7 @@
     <string name="settings_granted">Gewährt</string>
     <string name="settings_denied">Verweigert</string>
     <string name="settings_open_app_settings">App-Einstellungen öffnen</string>
-    <string name="settings_copyright">GraffitiXR © 2025</string>
+    <string name="settings_copyright">GraffitiXR © 2025–2026</string>
 
     <!-- Editor UI -->
     <string name="save_project_hint">Projektname</string>
@@ -453,7 +450,7 @@
 
     <!-- Help strings for main navigation rail. -->
     <!-- Mode Switcher help text. -->
-    <string name="help_mode_host">Moduswechsler: Wechseln Sie zwischen App-Modi. Anweisungen: Tippen Sie zum Erweitern und wählen Sie dann AR, Overlay, Mockup oder Leuchtkasten.</string>
+    <string name="help_mode_host">Moduswechsler: Zwischen App-Modi wechseln. Anleitung: Tippen zum Aufklappen, dann AR, Overlay, Mockup oder Pause wählen.</string>
     <!-- AR Mode help text. -->
     <string name="help_ar">AR-Modus: Projizieren Sie das Design mithilfe räumlicher Kartierung auf eine Wand. Anweisungen: Scannen Sie die Umgebung, bis eine Wand erkannt wird, und tippen Sie dann, um den Anker zu platzieren.</string>
     <!-- Overlay Mode help text. -->
@@ -461,11 +458,11 @@
     <!-- Mockup Mode help text. -->
     <string name="help_mockup">Mockup-Modus: Sehen Sie sich eine Vorschau des Designs auf einem statischen Foto an. Anweisungen: Verwenden Sie \'Wand\', um ein Hintergrundbild festzulegen, und platzieren Sie dann das Design darauf.</string>
     <!-- Lightbox Mode help text. -->
-    <string name="help_trace">Leuchtkasten-Modus: Pausoberfläche mit hoher Helligkeit. Anweisungen: Legen Sie Papier auf den Bildschirm und pausen Sie ab. Drücken Sie schnell Lautstärke Hoch, Runter, Hoch, Runter, um zu beenden.</string>
+    <string name="help_trace">Pause-Modus: Sehr helle Fläche zum Abpausen. Anleitung: Papier auf den Bildschirm legen und abpausen. Zum Beenden schnell Lauter, Leiser, Lauter, Leiser drücken.</string>
     <!-- Target Management help text. -->
     <!-- Scan Resolution help text. -->
     <!-- Create Anchor help text. -->
-    <string name="help_create">Anker erstellen: Fotografieren Sie eine Marke an der Wand, um die Projektion zu arretieren. Anweisungen: Zielen Sie auf eine deutlich sichtbare Textur und tippen Sie. Die App verfolgt diese Marke.</string>
+    <string name="help_create">Kritzelei aufnehmen: Fotografiere deine Kritzelei-Markierungen, um die Projektion zu fixieren. Anleitung: Auf die Markierungen richten und tippen. Ab dann verfolgt die App sie.</string>
     <!-- Layer Management help text. -->
     <!-- Import Image help text. -->
     <string name="help_add_img">Bild importieren: Fügen Sie eine Skizze oder ein Referenzfoto hinzu. Anweisungen: Wählen Sie ein Bild aus Ihrer Galerie. Es wird zum Design.</string>
@@ -587,11 +584,11 @@
         <item>So ist dein Bildmaterial startklar, und dein Handy kann sich beim Drücken der AR-Taste ganz auf die erweiterte Realität konzentrieren.</item>
     </string-array>
     <string-array name="onboarding_ar">
-        <item>AR-Projektion — projiziert dein Design mithilfe des Tiefensensors und der räumlichen Verfolgung des Handys auf eine echte Wand.</item>
-        <item>Richte das Handy auf die Wand und bewege es langsam hin und her. Farbige Formen erscheinen, während die Engine die Oberfläche erfasst. Warte, bis der Wandbereich abgedeckt ist.</item>
-        <item>Tippe einfach auf den Bildschirm. Die App fotografiert die Wand, extrahiert Tracking-Merkmale und verankert sofort.</item>
-        <item>Tippe auf „Öffnen“, um dein Design hinzuzufügen — es wird mithilfe des soeben gesetzten Ankers auf die Wand projiziert.</item>
-        <item>Tipp — leere weiße Wände, glatter Beton und einfarbige Flächen lassen sich nicht verfolgen. Richte deinen Ankerpunkt auf Graffiti, rauen Putz oder ein anderes markantes Merkmal.</item>
+        <item>AR – projiziert dein Design auf die echte Fläche und hält es dort, während du dich bewegst.</item>
+        <item>Male deine Kritzelei: ein paar große, kräftige Markierungen auf der Fläche, verteilt und nicht alle gleich geformt.</item>
+        <item>Tippe auf Kritzelei und fotografiere die Markierungen. Die App fixiert dein Design daran.</item>
+        <item>Tippe auf „Öffnen“, um dein Design hinzuzufügen – es erscheint auf der Fläche, gehalten von deiner Kritzelei.</item>
+        <item>Tipp – eine leere Fläche bietet allein nichts zum Verfolgen. Dafür ist deine Kritzelei da: kräftige Markierungen, die sich von der Fläche abheben.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Live-Overlay — dein Design schwebt über dem Live-Kamerabild, ohne dass eine Oberfläche gescannt werden muss.</item>
@@ -666,46 +663,46 @@
     <string name="first_run_detect_title">Richte die Kamera jetzt auf das Gezeichnete</string>
     <string name="first_run_detect_movement_hint">Bewege dein Gerät langsam im Kreis</string>
     <string name="standalone_width_prompt">Miss die tatsächliche Breite zwischen dem linken und dem rechten Rand des Ziels.</string>
-    <string name="standalone_width_label_metric">Zielbreite (Meter)</string>
-    <string name="standalone_width_label_imperial">Zielbreite (Fuß und Zoll)</string>
+    <string name="standalone_width_label_metric">Breite der Fläche (Meter)</string>
+    <string name="standalone_width_label_imperial">Breite der Fläche (Fuß und Zoll)</string>
     <string name="standalone_width_range_error">Gib eine Breite von %1$s bis %2$s ein.</string>
     <string name="standalone_use_measured_width">Gemessene Breite verwenden</string>
     <string name="standalone_continue_without_scale">Ohne physischen Maßstab fortfahren</string>
     <string name="standalone_recapture">Neu aufnehmen</string>
-    <string name="standalone_capture_wall_target">Wandziel aufnehmen</string>
-    <string name="standalone_capture_failed">Das Wandziel konnte nicht aufgenommen werden – versuche es erneut.</string>
+    <string name="standalone_capture_wall_target">Kritzelei aufnehmen</string>
+    <string name="standalone_capture_failed">Kritzelei konnte nicht aufgenommen werden – versuch es erneut.</string>
     <string name="standalone_rectify_failed">Das Ziel konnte nicht entzerrt werden – markiere vier klare Ecken.</string>
-    <string name="standalone_target_too_weak">Dieses Ziel hat zu wenige verfolgbare Details (%1$d KPM-Merkmale; nötig sind %2$d). Nimm einen strukturreicheren Wandausschnitt auf.</string>
-    <string name="standalone_new_target">Neues Ziel</string>
+    <string name="standalone_target_too_weak">Zu wenig Details zum Verfolgen (%1$d Punkte; benötigt %2$d). Füge ein paar kräftige Markierungen hinzu oder richte auf eine detailreichere Stelle.</string>
+    <string name="standalone_new_target">Neue Kritzelei</string>
     <string name="standalone_copy_diagnostics">Diagnose kopieren</string>
     <string name="standalone_wall_target_lost">Wandziel verloren</string>
-    <string name="standalone_recapture_target">Ziel neu aufnehmen</string>
+    <string name="standalone_recapture_target">Kritzelei neu aufnehmen</string>
     <string name="standalone_sweep_hint">Drehe dich langsam, um den Raum zu erfassen – %1$d%%</string>
-    <string name="standalone_failure_native_library_unavailable">SphereSLAM ist in dieser Version nicht verfügbar.</string>
+    <string name="standalone_failure_native_library_unavailable">AR-Verfolgung ist in dieser Version nicht verfügbar.</string>
     <string name="standalone_failure_camera_unavailable">Die Kamera ist für Standalone-AR nicht verfügbar.</string>
     <string name="standalone_failure_intrinsics_unavailable">Die Kamerakalibrierung ist für Standalone-AR nicht verfügbar.</string>
-    <string name="standalone_failure_reference_too_weak">Dieses Wandziel hat zu wenige verfolgbare Details. Nimm einen strukturreicheren Ausschnitt auf.</string>
-    <string name="standalone_failure_no_page_match">Behalte das Wandziel im Blick.</string>
+    <string name="standalone_failure_reference_too_weak">Zu wenig Details zum Verfolgen. Füge ein paar kräftige Markierungen hinzu oder richte auf eine detailreichere Stelle.</string>
+    <string name="standalone_failure_no_page_match">Behalte deine Kritzelei im Bild.</string>
     <string name="standalone_failure_stale_observation">Das Tracking hinkt hinterher. Bewege das Telefon langsamer.</string>
     <string name="standalone_failure_reprojection_error">Der Wandabgleich ist instabil. Richte das Ziel neu aus.</string>
     <string name="standalone_failure_insufficient_inliers">Es sind nicht genügend Zieldetails sichtbar.</string>
-    <string name="standalone_failure_pose_jump">Tracking-Sprung abgelehnt. Halte das Telefon ruhig auf das Wandziel.</string>
-    <string name="standalone_failure_persisted_target_corrupt">Das gespeicherte Wandziel fehlt oder ist nicht lesbar. Nimm ein neues Ziel auf.</string>
-    <string name="standalone_failure_internal">SphereSLAM konnte dieses Ziel nicht weiter verfolgen.</string>
-    <string name="standalone_tracking_stopped">Das SphereSLAM-Tracking wurde beendet. Nimm das Ziel erneut auf, um es neu zu starten.</string>
-    <string name="standalone_status_mapping">SphereSLAM kartiert • tippe auf Kritzelei, um deine Kritzelei hinzuzufügen</string>
-    <string name="standalone_status_preparing">Wandziel wird vorbereitet…</string>
-    <string name="standalone_status_finding">Wandziel wird gesucht…</string>
-    <string name="standalone_quality_too_small">Dieses Wandziel ist nach der Entzerrung zu klein. Nimm einen größeren Ausschnitt auf.</string>
-    <string name="standalone_quality_low_contrast">Dieses Wandziel hat zu wenig visuellen Kontrast. Beziehe mehr Textur oder Details ein.</string>
-    <string name="standalone_quality_blurry">Dieses Wandziel ist für zuverlässiges Tracking zu unscharf. Halte ruhig und nimm es erneut auf.</string>
-    <string name="standalone_quality_not_strong_enough">Dieses Wandziel ist für zuverlässiges Tracking nicht aussagekräftig genug.</string>
-    <string name="standalone_quality_too_dark">Dieses Ziel ist stark unterbelichtet; das Tracking ist möglicherweise weniger zuverlässig.</string>
-    <string name="standalone_quality_too_bright">Dieses Ziel ist stark überbelichtet; das Tracking ist möglicherweise weniger zuverlässig.</string>
-    <string name="standalone_photosphere_no_sensor">Dieses Telefon hat keinen Rotationssensor, daher kann SphereSLAM hier kein Ziel platzieren.</string>
+    <string name="standalone_failure_pose_jump">Verfolgung gesprungen – halte das Handy auf deine Kritzelei.</string>
+    <string name="standalone_failure_persisted_target_corrupt">Die gespeicherte Kritzelei ist nicht lesbar. Nimm sie neu auf.</string>
+    <string name="standalone_failure_internal">Verfolgung gestoppt. Nimm deine Kritzelei neu auf, um neu zu starten.</string>
+    <string name="standalone_tracking_stopped">Verfolgung gestoppt. Nimm deine Kritzelei neu auf, um neu zu starten.</string>
+    <string name="standalone_status_mapping">Fläche wird erfasst • tippe auf Kritzelei, um deine aufzunehmen</string>
+    <string name="standalone_status_preparing">Kritzelei wird vorbereitet…</string>
+    <string name="standalone_status_finding">Suche nach deiner Kritzelei…</string>
+    <string name="standalone_quality_too_small">Die Kritzelei ist im Bild zu klein. Geh näher heran oder nimm einen größeren Bereich auf.</string>
+    <string name="standalone_quality_low_contrast">Zu wenig Kontrast zum Verfolgen. Kräftigere Markierungen oder mehr Licht helfen.</string>
+    <string name="standalone_quality_blurry">Zu unscharf zum Verfolgen. Ruhig halten und erneut aufnehmen.</string>
+    <string name="standalone_quality_not_strong_enough">Zu wenig Details für zuverlässiges Verfolgen. Füge ein paar kräftige Markierungen hinzu.</string>
+    <string name="standalone_quality_too_dark">Sehr dunkel; die Verfolgung kann unzuverlässiger sein.</string>
+    <string name="standalone_quality_too_bright">Sehr hell; die Verfolgung kann unzuverlässiger sein.</string>
+    <string name="standalone_photosphere_no_sensor">Dieses Handy hat keinen Drehsensor, daher kann AR deine Kritzelei hier nicht platzieren.</string>
     <string name="standalone_photosphere_compass_not_ready">Der Kompass ist noch nicht bereit – halte das Telefon eine Sekunde ruhig und nimm dann erneut auf.</string>
-    <string name="standalone_photosphere_not_mapped">SphereSLAM hat diese Ansicht noch nicht kartiert – halte die Kamera eine Sekunde ruhig auf einen hellen, detailreichen Teil der Oberfläche und nimm dann erneut auf.</string>
-    <string name="doodle_rectify_title">Fläche entzerren</string>
+    <string name="standalone_photosphere_not_mapped">Die App kennt diese Ansicht noch nicht – halte eine Sekunde ruhig auf einen hellen, detailreichen Teil der Fläche und nimm dann erneut auf.</string>
+    <string name="doodle_rectify_title">Fläche begradigen</string>
     <string name="doodle_rectify_text">Ziehe nun die Ecken, bis der cyanfarbene Rahmen an der ebenen Fläche deiner Wand ausgerichtet ist.</string>
     <string name="doodle_remove_marks_title">Markierungen entfernen</string>
     <string name="doodle_erase_hint">Tippe auf eine Markierung, um sie zu entfernen, oder wische über mehrere Markierungen.</string>
@@ -722,7 +719,7 @@
     <string name="ar_feedback_backend_resolving">Das AR-Backend wird noch ermittelt – versuche es in einem Moment erneut mit „Hosten“</string>
     <string name="ar_feedback_open_project_first">Öffne ein Projekt, bevor du teilst – es gibt noch nichts, was an einen Gast gesendet werden könnte</string>
     <string name="ar_feedback_host_need_doodle_arcore">Erfasse und fixiere eine aktuelle Kritzelei, bevor du „Hosten“ startest</string>
-    <string name="ar_feedback_host_need_target_standalone">Erfasse vor dem Hosten ein eigenständiges Wandziel</string>
+    <string name="ar_feedback_host_need_target_standalone">Nimm deine Kritzelei auf, bevor du hostest</string>
     <string name="ar_feedback_doodle_not_ready">Die Kritzelei ist noch nicht bereit — halte sie im Bild und versuche es erneut mit „Hosten“</string>
     <string name="ar_feedback_package_failed">Dieses Projekt konnte nicht zum Teilen gepackt werden – speichere es zuerst</string>
     <string name="ar_feedback_host_failed">Das Teilen konnte nicht gestartet werden: %1$s</string>
@@ -735,7 +732,7 @@
     <string name="ar_feedback_camera_busy">Die Kamera ist belegt oder nicht verfügbar – schließe andere Kamera-Apps und öffne AR dann erneut</string>
     <string name="ar_feedback_ar_start_failed">AR konnte nicht gestartet werden – deine Kamera wird möglicherweise von einer anderen App verwendet</string>
     <string name="ar_feedback_camera_setting_apply_failed">Die Kameraeinstellung konnte nicht auf die laufende AR-Sitzung angewendet werden – verlasse AR und öffne es erneut</string>
-    <string name="ar_feedback_sphere_target_save_failed">Die Wandverfolgung funktioniert in dieser Sitzung, aber das SphereSLAM-Ziel konnte nicht gespeichert werden.</string>
+    <string name="ar_feedback_sphere_target_save_failed">Die Verfolgung funktioniert in dieser Sitzung, aber deine Kritzelei konnte nicht gespeichert werden.</string>
     <string name="ar_feedback_camera_not_resumed">Die AR-Kamera wurde nicht fortgesetzt – verlasse den AR-Modus und öffne ihn erneut</string>
     <string name="ar_feedback_camera_permission">Kamera nicht verfügbar – prüfe die Kameraberechtigung und öffne AR dann erneut</string>
     <string name="ar_feedback_camera_not_paused">Die AR-Kamera wurde nicht sauber pausiert – sie läuft möglicherweise im Hintergrund weiter</string>
@@ -793,4 +790,68 @@
     <string name="cv_pass_warm_luma">Warmlicht</string>
     <string name="cv_pass_stencil3">Schablone</string>
     <string name="cv_pass_change">Änderung</string>
+    <string name="doodle_tap_grid_hint">Tippe auf deine Kritzelei, um sie aufzunehmen.</string>
+    <string name="doodle_blank_wall_hint">Ist die Fläche leer, mach ein Foto.</string>
+    <string name="doodle_blank_wall_saved_hint">Leere Fläche gespeichert. Tippe jetzt auf deine Kritzelei.</string>
+    <string name="update_title">Update verfügbar</string>
+    <string name="update_body_play">Eine neuere Version ist im Play Store.</string>
+    <string name="update_body_github">Version %1$s ist auf GitHub.</string>
+    <string name="update_go_play">Play Store öffnen</string>
+    <string name="update_go_github">GitHub öffnen</string>
+    <string name="update_later">Später</string>
+    <string name="crash_title">GraffitiXR wurde unerwartet beendet</string>
+    <string name="crash_body">Beim letzten Mal ist etwas schiefgelaufen. Das Teilen des Berichts hilft bei der Behebung; er enthält dein Handymodell und das letzte Protokoll der App, nichts aus deinen Projekten.</string>
+    <string name="crash_share">Bericht teilen</string>
+    <string name="crash_copy">Kopieren</string>
+    <string name="crash_dismiss">Schließen</string>
+    <string name="ar_feedback_host_no_lan">Verbinden braucht WLAN. Verbinde dich mit einem WLAN oder starte einen Hotspot und hoste dann erneut.</string>
+    <string name="hud_progress">Fortschritt</string>
+    <string name="replace_design_title">Design ersetzen?</string>
+    <string name="replace_design_text">Das ersetzt das aktuelle Design und seine Platzierung. Du kannst es rückgängig machen.</string>
+    <string name="replace_design_confirm">Ersetzen</string>
+    <string name="dialog_cancel">Abbrechen</string>
+    <string name="delete_project_title">„%1$s“ löschen?</string>
+    <string name="delete_project_text">Das löscht das Projekt endgültig: Design, Vorschaubild und gespeicherte Kritzelei. Eine Kritzelei lässt sich nicht neu aufnehmen, wenn sich die Fläche inzwischen verändert hat. Das kann nicht rückgängig gemacht werden.</string>
+    <string name="save_project_title">Projekt speichern</string>
+    <string name="doodle_not_locked_title">Kritzelei nicht fixiert</string>
+    <string name="doodle_not_locked_text">Dein Design ist platziert, aber die App konnte deine Kritzelei nicht fixieren, daher wird die Überlagerung verrutschen. Nimm sie neu auf: gerade vor der Fläche, etwas näher, bei gutem Licht.</string>
+    <string name="doodle_recapture">Kritzelei neu aufnehmen</string>
+    <string name="msg_capture_incomplete">Aufnahme unvollständig. Nimm deine Kritzelei neu auf.</string>
+    <string name="msg_map_not_ready">Die Fläche ist noch nicht erfasst. Halte die Kamera darauf und versuch es erneut.</string>
+    <string name="msg_no_project">Kein Projekt geöffnet. Öffne oder erstelle zuerst eines: Eine Kritzelei wird in einem Projekt gespeichert.</string>
+    <string name="msg_doodle_low_detail_selected">Zu wenig Details in deiner Auswahl. Behalte mehr von den Markierungen deiner Kritzelei.</string>
+    <string name="msg_doodle_changed">Deine Kritzelei hat sich beim Speichern geändert und wurde nicht gespeichert. Versuch es erneut.</string>
+    <string name="msg_doodle_saved">Kritzelei gespeichert und fixiert</string>
+    <string name="msg_doodle_save_failed">Kritzelei konnte nicht gespeichert werden. Versuch es erneut.</string>
+    <string name="msg_doodle_too_weak_kept">Zu wenig Details zum Verfolgen. Deine vorherige Kritzelei wurde behalten.</string>
+    <string name="msg_doodle_low_detail">Zu wenig Details zum Verfolgen. Kräftigere Markierungen oder mehr Licht helfen.</string>
+    <string name="msg_doodle_session_only">Kritzelei nur für diese Sitzung gespeichert: Sie konnte nicht fixiert werden und ist beim erneuten Öffnen des Projekts weg. Nimm sie neu auf und halte dabei ruhig.</string>
+    <string name="msg_doodle_anchor_failed">Deine Kritzelei konnte nicht fixiert werden. Halte das Handy ruhig auf die Fläche und versuch es erneut.</string>
+    <string name="msg_project_switched">Ein anderes Projekt wurde geöffnet, bevor die Kritzelei gespeichert war, daher wurde sie nicht gespeichert. Nimm sie neu auf.</string>
+    <string name="msg_image_invalid">Dieses Bild lässt sich nicht öffnen, oder es ist kein Projekt geöffnet.</string>
+    <string name="msg_nothing_to_share">Noch nichts zu teilen. Speichere zuerst das Projekt.</string>
+    <string name="msg_share_failed">Projekt konnte nicht zum Teilen vorbereitet werden. Versuch es erneut.</string>
+    <string name="msg_export_failed">Export fehlgeschlagen. Versuch es erneut.</string>
+    <string name="status_preparing_tracking">AR wird vorbereitet…</string>
+    <string name="msg_locked">Gesperrt. Tippe erneut auf Sperren, um es zu bewegen.</string>
+    <string name="msg_export_timeout">Zeitüberschreitung beim Export. Versuch es erneut.</string>
+    <string name="msg_project_save_failed">Projekt konnte nicht gespeichert werden. Versuch es erneut.</string>
+    <string name="coop_none_title">Keine Sitzungen gefunden</string>
+    <string name="coop_none_text">Keine GraffitiXR-Sitzungen in der Nähe. Such erneut oder hoste deine eigene.</string>
+    <string name="coop_host">Hosten</string>
+    <string name="coop_search">Suchen</string>
+    <string name="coop_need_doodle">Nimm zuerst deine Kritzelei auf, um zu hosten.</string>
+    <string name="coop_scan_to_join">Scannen zum Beitreten</string>
+    <string name="coop_stop_sharing">Teilen beenden</string>
+    <string name="coop_leave">Verlassen</string>
+    <string name="glasses_pairing">Meta-Brille wird gekoppelt…</string>
+    <string name="glasses_reconnect">Neu verbinden</string>
+    <string name="glasses_end">Beenden</string>
+    <string name="diag_confidence">Zuverlässigkeit</string>
+    <string name="diag_sensors">Sensordaten</string>
+    <string name="diag_log_start">Log ▶</string>
+    <string name="diag_log_stop">Log ■</string>
+    <string name="diag_induce_loss">Verlust</string>
+    <string name="diag_rec_start">Aufn. ▶</string>
+    <string name="diag_rec_stop">Aufn. ■</string>
 </resources>

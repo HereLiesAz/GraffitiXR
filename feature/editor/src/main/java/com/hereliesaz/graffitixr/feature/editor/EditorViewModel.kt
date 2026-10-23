@@ -4,7 +4,6 @@ package com.hereliesaz.graffitixr.feature.editor
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
-import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
@@ -643,7 +642,7 @@ class EditorViewModel @Inject constructor(
                 if (!adopted) runCatching { File(path).delete() }
             } else {
                 withContext(dispatchers.main) {
-                    Toast.makeText(context, "Invalid image format or missing project", Toast.LENGTH_SHORT).show()
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_image_invalid), long = false)
                 }
             }
             } catch (e: Exception) {
@@ -971,7 +970,7 @@ class EditorViewModel @Inject constructor(
                     "Couldn't save the project — storage may be full"
                 }
                 withContext(dispatchers.main) {
-                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(message, long = true)
                     onComplete(false)
                 }
             }
@@ -1064,7 +1063,7 @@ class EditorViewModel @Inject constructor(
      */
     fun shareProject() {
         if (projectRepository.currentProject.value == null) {
-            Toast.makeText(context, "Nothing to share yet — save a project first.", Toast.LENGTH_SHORT).show()
+            com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_nothing_to_share), long = false)
             return
         }
         // exportProjectToUri reads project.json straight off disk, not the editor's in-memory state.
@@ -1107,7 +1106,7 @@ class EditorViewModel @Inject constructor(
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 withContext(dispatchers.main) {
-                    Toast.makeText(context, "Couldn't prepare this wall to share: ${e.message}", Toast.LENGTH_LONG).show()
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_share_failed), long = true)
                 }
             }
         }
@@ -1162,22 +1161,18 @@ class EditorViewModel @Inject constructor(
                     // Only a refused write is a permissions problem (API 26-28 without
                     // WRITE_EXTERNAL_STORAGE); every other failure says it plainly instead of
                     // sending the user to settings that cannot fix it.
-                    Toast.makeText(
-                        context,
-                        when (result) {
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(when (result) {
                             GallerySaveResult.SAVED -> "Image exported to gallery"
                             GallerySaveResult.PERMISSION_DENIED ->
                                 context.getString(DesignR.string.export_failed_permission)
                             GallerySaveResult.FAILED -> context.getString(DesignR.string.export_failed)
-                        },
-                        Toast.LENGTH_LONG
-                    ).show()
+                        }, long = true)
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 withContext(dispatchers.main) {
                     dispatch(EditorIntent.SetLoading(false))
-                    Toast.makeText(context, "Export error: ${e.message}", Toast.LENGTH_LONG).show()
+                    com.hereliesaz.graffitixr.design.feedback.HudMessages.show(context.getString(com.hereliesaz.graffitixr.design.R.string.msg_export_failed), long = true)
                 }
             }
         }

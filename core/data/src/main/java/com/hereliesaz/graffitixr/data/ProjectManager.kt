@@ -184,13 +184,15 @@ class ProjectManager @Inject constructor(
         // already-saved doodle gets the full merge, and the frame-independent state below
         // (SphereSLAM's own page group, the measured wall width) is preserved either way.
         val mergedCapture = if (preserveExistingCaptureState) {
-            val existing = try {
-                val f = File(root, "project.json")
-                if (f.exists()) json.decodeFromString<GraffitiProject>(f.readText()) else null
+            val f = File(root, "project.json")
+            val existing = if (!f.exists()) null else try {
+                json.decodeFromString<GraffitiProject>(f.readText())
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e // never swallow cancellation
-            } catch (_: Exception) {
-                null
+            } catch (e: Exception) {
+                // The saved target can't be read, so it can't be preserved: overwriting would drop it
+                // for good (a later decoder fix could still recover it). Refuse, as for damaged projects.
+                throw java.io.IOException("Refusing to save ${projectData.id}: its project.json does not decode", e)
             }
             if (existing != null) {
                 val replacesDoodle =
@@ -887,11 +889,18 @@ class ProjectManager @Inject constructor(
         if (!sourceFolder.exists()) return false
 
         return try {
+            // Where the wall is stays on this device: a shared .gxr carries project.json with every
+            // location removed, exactly as Link does (serializeCurrentProject).
+            val manifest = File(sourceFolder, "project.json")
+            val stripped = json.encodeToString(withoutLocation(json.decodeFromString<GraffitiProject>(manifest.readText())))
             val os = context.contentResolver.openOutputStream(uri) ?: return false
             os.use {
                 ZipOutputStream(it).use { zos ->
                     // Use empty string for parent to zip contents directly into the root.
-                    zipFolder(sourceFolder, "", zos, unreferencedDesignFiles(sourceFolder))
+                    zipFolder(sourceFolder, "", zos, unreferencedDesignFiles(sourceFolder) + "project.json")
+                    zos.putNextEntry(ZipEntry("project.json"))
+                    zos.write(stripped.toByteArray(Charsets.UTF_8))
+                    zos.closeEntry()
                 }
             }
             true
