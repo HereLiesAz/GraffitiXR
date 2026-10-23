@@ -41,6 +41,10 @@ internal class GuestSession(
     // assigns it. Without @Volatile a writer's assignment is not guaranteed visible to a reader
     // on another thread, unlike its neighbours sessionId/lastAppliedSeq above.
     @Volatile private var socket: Socket? = null
+
+    /** The live socket, for tests that break one side of it. */
+    @androidx.annotation.VisibleForTesting
+    internal val socketForTest: Socket? get() = socket
     // The crypto for the current live connection, so close() can seal a BYE on it. Cleared on
     // every reconnect attempt (mirrors HostSession.activeCrypto) so close() never seals a BYE
     // with keys bound to an already-dead connection.

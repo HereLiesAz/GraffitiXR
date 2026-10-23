@@ -847,4 +847,11 @@
     <string name="glasses_pairing">Pareando óculos Meta…</string>
     <string name="glasses_reconnect">Reconectar</string>
     <string name="glasses_end">Encerrar</string>
+    <string name="diag_confidence">Confiança</string>
+    <string name="diag_sensors">Dados dos sensores</string>
+    <string name="diag_log_start">Registo ▶</string>
+    <string name="diag_log_stop">Registo ■</string>
+    <string name="diag_induce_loss">Perda</string>
+    <string name="diag_rec_start">Grav. ▶</string>
+    <string name="diag_rec_stop">Grav. ■</string>
 </resources>

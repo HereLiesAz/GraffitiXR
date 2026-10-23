@@ -847,4 +847,11 @@
     <string name="glasses_pairing">Parer Meta-briller…</string>
     <string name="glasses_reconnect">Koble til igjen</string>
     <string name="glasses_end">Avslutt</string>
+    <string name="diag_confidence">Pålitelighet</string>
+    <string name="diag_sensors">Sensordata</string>
+    <string name="diag_log_start">Logg ▶</string>
+    <string name="diag_log_stop">Logg ■</string>
+    <string name="diag_induce_loss">Tap</string>
+    <string name="diag_rec_start">Opptak ▶</string>
+    <string name="diag_rec_stop">Opptak ■</string>
 </resources>

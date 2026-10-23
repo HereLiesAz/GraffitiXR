@@ -852,4 +852,11 @@
     <string name="glasses_pairing">Meta szemüveg párosítása…</string>
     <string name="glasses_reconnect">Újracsatlakozás</string>
     <string name="glasses_end">Befejezés</string>
+    <string name="diag_confidence">Megbízhatóság</string>
+    <string name="diag_sensors">Szenzoradatok</string>
+    <string name="diag_log_start">Napló ▶</string>
+    <string name="diag_log_stop">Napló ■</string>
+    <string name="diag_induce_loss">Vesztés</string>
+    <string name="diag_rec_start">Felv. ▶</string>
+    <string name="diag_rec_stop">Felv. ■</string>
 </resources>

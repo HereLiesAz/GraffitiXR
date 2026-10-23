@@ -274,7 +274,8 @@ object MetricDoodleBuilder {
                 // close-ups below only add to it.
                 if (features.closeUps) early.installBase(basePixels, baseDescs, bitmap)
                 val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps,
-                    onQuickSet = { p, d -> early.install(p, d) }, firstStage = 2, stages = 3, stepsBefore = 1) { view, _ ->
+                    onQuickSet = { p, d -> early.install(p, d) }, firstStage = 2, stages = 3, stepsBefore = 1,
+                    captureDistanceMeters = captureDistanceMeters(glView, planePointWorld, planeNormalWorld)) { view, _ ->
                     StandaloneFingerprintBuilder.detectSuperPoint(slam, view)
                 }
                 if (baseDescs !== descs && baseDescs !== mDescs) baseDescs.release()
@@ -316,7 +317,8 @@ object MetricDoodleBuilder {
                 minPoints, glView, rotationDeg, mask, bitmap.width, bitmap.height)
             if (features.closeUps) early.installBase(basePixels, baseDescs, bitmap)
             val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps,
-                onQuickSet = { p, dd -> early.install(p, dd) }, firstStage = 2, stages = 3, stepsBefore = 1) { view, n ->
+                onQuickSet = { p, dd -> early.install(p, dd) }, firstStage = 2, stages = 3, stepsBefore = 1,
+                captureDistanceMeters = captureDistanceMeters(glView, planePointWorld, planeNormalWorld)) { view, n ->
                 StandaloneFingerprintBuilder.detectOrb(view, null, n, slam)
             }
             if (baseDescs !== d && baseDescs !== mDescs) baseDescs.release()
@@ -374,6 +376,21 @@ object MetricDoodleBuilder {
      * [detect] (the same detector, so the descriptors match), kept to [mask]. Returns the inputs
      * unchanged when there are none; otherwise a new descriptor Mat the caller must release.
      */
+    /**
+     * The camera's distance to the wall plane at capture, metres (ARCore world units): the camera
+     * centre `-Rᵀt` of the column-major GL world-to-view [glView], measured along [normal] from
+     * [point]. Null when the normal is degenerate.
+     */
+    internal fun captureDistanceMeters(glView: FloatArray, point: FloatArray, normal: FloatArray): Double? {
+        val cx = -(glView[0] * glView[12] + glView[1] * glView[13] + glView[2] * glView[14]).toDouble()
+        val cy = -(glView[4] * glView[12] + glView[5] * glView[13] + glView[6] * glView[14]).toDouble()
+        val cz = -(glView[8] * glView[12] + glView[9] * glView[13] + glView[10] * glView[14]).toDouble()
+        val len = kotlin.math.sqrt((normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).toDouble())
+        if (len < 1e-9) return null
+        val d = ((cx - point[0]) * normal[0] + (cy - point[1]) * normal[1] + (cz - point[2]) * normal[2]) / len
+        return kotlin.math.abs(d)
+    }
+
     private fun withCloseUps(
         bitmap: Bitmap, mask: Bitmap?, pixels: List<Pixel>, descs: Mat, enabled: Boolean,
         /**
@@ -382,6 +399,8 @@ object MetricDoodleBuilder {
          */
         onQuickSet: ((List<Pixel>, Mat) -> Unit)? = null,
         firstStage: Int = 1, stages: Int = 2, stepsBefore: Int = 0,
+        /** The camera's distance to the wall at capture, metres; null leaves the conservative zoom cap. */
+        captureDistanceMeters: Double? = null,
         detect: (Bitmap, Int) -> StandaloneFingerprintBuilder.DetectedFeatures?,
     ): Pair<List<Pixel>, Mat> {
         if (!enabled || pixels.isEmpty() || descs.empty()) return pixels to descs
@@ -392,7 +411,11 @@ object MetricDoodleBuilder {
                 }
             }
         }
-        val extra = CloseUpFeatures.detect(bitmap, pixels.size, quick, firstStage, stages, stepsBefore, detect)
+        val extra = CloseUpFeatures.detect(
+            bitmap, pixels.size, quick, firstStage, stages, stepsBefore,
+            maxZoom = CloseUpFeatures.maxZoomFor(captureDistanceMeters),
+            detect = detect,
+        )
         return mergeCloseUps(bitmap, mask, pixels, descs, extra) ?: (pixels to descs)
     }
 

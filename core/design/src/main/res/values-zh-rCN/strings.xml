@@ -855,4 +855,11 @@
     <string name="glasses_pairing">正在配对 Meta 眼镜…</string>
     <string name="glasses_reconnect">重新连接</string>
     <string name="glasses_end">结束</string>
+    <string name="diag_confidence">置信度</string>
+    <string name="diag_sensors">传感器数据</string>
+    <string name="diag_log_start">日志 ▶</string>
+    <string name="diag_log_stop">日志 ■</string>
+    <string name="diag_induce_loss">丢失</string>
+    <string name="diag_rec_start">录制 ▶</string>
+    <string name="diag_rec_stop">录制 ■</string>
 </resources>

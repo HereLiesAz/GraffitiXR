@@ -869,4 +869,11 @@
     <string name="glasses_pairing">Pairing Meta glasses…</string>
     <string name="glasses_reconnect">Reconnect</string>
     <string name="glasses_end">End</string>
+    <string name="diag_confidence">Confidence</string>
+    <string name="diag_sensors">Sensor data</string>
+    <string name="diag_log_start">Log ▶</string>
+    <string name="diag_log_stop">Log ■</string>
+    <string name="diag_induce_loss">Loss</string>
+    <string name="diag_rec_start">Rec ▶</string>
+    <string name="diag_rec_stop">Rec ■</string>
 </resources>

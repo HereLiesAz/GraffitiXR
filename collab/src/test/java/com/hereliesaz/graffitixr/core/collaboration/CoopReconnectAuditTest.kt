@@ -110,9 +110,6 @@ class CoopReconnectAuditTest {
 
     private fun stroke(i: Int) = Op.StrokeComplete(BrushStroke(points = listOf(i.toFloat())))
 
-    private fun hostField(host: HostSession, name: String): Any? =
-        HostSession::class.java.getDeclaredField(name).apply { isAccessible = true }.get(host)
-
     // ── 1. A reconnect before the host noticed the drop ───────────────────────────────────────
 
     @Test
@@ -282,8 +279,7 @@ class CoopReconnectAuditTest {
         withTimeout(5_000) { guest.state.first { it is CoopSessionState.Connected } }
 
         // Break only the write side: reads keep blocking normally, so only the DELTA_ACK loop sees it.
-        val socket = GuestSession::class.java.getDeclaredField("socket")
-            .apply { isAccessible = true }.get(guest) as Socket
+        val socket = guest.socketForTest!!
         socket.shutdownOutput()
 
         // The ack loop writes every 1 s; well inside the 15 s read timeout.
@@ -322,8 +318,7 @@ class CoopReconnectAuditTest {
     fun `an op evicted before it reached a connected guest forces a resync`() = runBlocking {
         val host = newHost()
         // A tiny buffer so a short burst overflows it.
-        HostSession::class.java.getDeclaredField("deltaBuffer").apply { isAccessible = true }
-            .set(host, DeltaBuffer(maxOps = 3))
+        host.deltaBuffer = DeltaBuffer(maxOps = 3)
         val port = host.startListening()
 
         val guest = RawGuest(port, lastAppliedSeq = 0L)
@@ -333,7 +328,7 @@ class CoopReconnectAuditTest {
         // Stall every writer while a burst is enqueued, so eviction discards ops the outbound loop
         // has not sent yet. Before the fix those were silently skipped and the guest — still
         // connected, never reconnecting — was left without them for good.
-        val writeMutex = hostField(host, "writeMutex") as Mutex
+        val writeMutex = host.writeMutex
         writeMutex.lock()
         repeat(10) { i -> host.enqueueOp(stroke(i + 1)) }
         writeMutex.unlock()
@@ -374,8 +369,8 @@ class CoopReconnectAuditTest {
 
         // A buffered entry too big for any frame (enqueueOp refuses these, so plant it directly —
         // standing in for any other bad entry), followed by an ordinary op.
-        val buffer = hostField(host, "deltaBuffer") as DeltaBuffer
-        (hostField(host, "seqCounter") as AtomicLong).set(2L)
+        val buffer = host.deltaBuffer
+        host.seqCounter.set(2L)
         buffer.append(2L, Op.DesignBitmapReplace(png = ByteArray(Frame.MAX_PAYLOAD_BYTES + 1)), 0)
         host.enqueueOp(stroke(3))
 

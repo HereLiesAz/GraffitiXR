@@ -583,4 +583,11 @@
     <string name="glasses_pairing">Association des lunettes Meta…</string>
     <string name="glasses_reconnect">Reconnecter</string>
     <string name="glasses_end">Terminer</string>
+    <string name="diag_confidence">Confiance</string>
+    <string name="diag_sensors">Données capteurs</string>
+    <string name="diag_log_start">Journal ▶</string>
+    <string name="diag_log_stop">Journal ■</string>
+    <string name="diag_induce_loss">Perte</string>
+    <string name="diag_rec_start">Enr. ▶</string>
+    <string name="diag_rec_stop">Enr. ■</string>
 </resources>

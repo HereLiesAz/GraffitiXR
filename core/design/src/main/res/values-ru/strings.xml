@@ -852,4 +852,11 @@
     <string name="glasses_pairing">Сопряжение очков Meta…</string>
     <string name="glasses_reconnect">Переподключить</string>
     <string name="glasses_end">Завершить</string>
+    <string name="diag_confidence">Надёжность</string>
+    <string name="diag_sensors">Данные датчиков</string>
+    <string name="diag_log_start">Лог ▶</string>
+    <string name="diag_log_stop">Лог ■</string>
+    <string name="diag_induce_loss">Потеря</string>
+    <string name="diag_rec_start">Запись ▶</string>
+    <string name="diag_rec_stop">Запись ■</string>
 </resources>

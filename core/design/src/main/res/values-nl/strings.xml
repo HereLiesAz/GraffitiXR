@@ -852,4 +852,11 @@
     <string name="glasses_pairing">Meta-bril koppelen…</string>
     <string name="glasses_reconnect">Opnieuw verbinden</string>
     <string name="glasses_end">Beëindigen</string>
+    <string name="diag_confidence">Betrouwbaarheid</string>
+    <string name="diag_sensors">Sensorgegevens</string>
+    <string name="diag_log_start">Log ▶</string>
+    <string name="diag_log_stop">Log ■</string>
+    <string name="diag_induce_loss">Verlies</string>
+    <string name="diag_rec_start">Opn. ▶</string>
+    <string name="diag_rec_stop">Opn. ■</string>
 </resources>

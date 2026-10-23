@@ -851,4 +851,11 @@
     <string name="glasses_pairing">Parkopplar Meta-glasögon…</string>
     <string name="glasses_reconnect">Återanslut</string>
     <string name="glasses_end">Avsluta</string>
+    <string name="diag_confidence">Tillförlitlighet</string>
+    <string name="diag_sensors">Sensordata</string>
+    <string name="diag_log_start">Logg ▶</string>
+    <string name="diag_log_stop">Logg ■</string>
+    <string name="diag_induce_loss">Förlust</string>
+    <string name="diag_rec_start">Insp. ▶</string>
+    <string name="diag_rec_stop">Insp. ■</string>
 </resources>

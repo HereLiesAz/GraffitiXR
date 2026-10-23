@@ -139,8 +139,11 @@ internal class HostSession(
     // overflowed during a reconnect window before they ever reached the DeltaBuffer, so the
     // guest's canvas diverged with no signal.
     private val outQueue: Channel<EncodedDelta> = Channel(capacity = Channel.UNLIMITED)
-    private val deltaBuffer = DeltaBuffer()
-    private val seqCounter = AtomicLong(0L)
+    // internal (not private) so tests can shrink it and fill it directly; nothing else touches it.
+    @androidx.annotation.VisibleForTesting
+    internal var deltaBuffer = DeltaBuffer()
+    @androidx.annotation.VisibleForTesting
+    internal val seqCounter = AtomicLong(0L)
     // Orders seq assignment with channel insertion so send order always matches seq order.
     private val enqueueLock = Any()
     // Guards the check-then-set phase transition in enterReconnecting(): outbound, inbound and
@@ -177,7 +180,8 @@ internal class HostSession(
     // inbound (PONG) and heartbeat (PING) loops write concurrently, and Frame.write issues
     // several stream writes per frame, so without this lock their bytes interleave and
     // corrupt the wire framing.
-    private val writeMutex = Mutex()
+    @androidx.annotation.VisibleForTesting
+    internal val writeMutex = Mutex()
 
     // Seal-then-write every post-handshake frame under the write lock. The lock also serializes
     // access to crypto's send counter (each of the outbound/inbound/heartbeat loops writes here).

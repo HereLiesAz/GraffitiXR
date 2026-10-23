@@ -3315,7 +3315,7 @@ private fun DiagnosticOverlay(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                text = "AR DIAGNOSTICS",
+                text = stringResource(DesignR.string.diag_title),
                 color = Cyan,
                 fontWeight = FontWeight.Bold,
                 fontSize = 12.sp
@@ -3330,7 +3330,7 @@ private fun DiagnosticOverlay(
 
             Spacer(Modifier.height(4.dp))
 
-            Text(text = "CONFIDENCE", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text(text = stringResource(DesignR.string.diag_confidence), color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             // "Visible"/"Global" splat confidence removed: getConfidenceAvgs() assigns 0.0 to both
             // unconditionally ("voxel/splat map deleted"), so both bars rendered empty forever. A
             // progress bar pinned at zero reads as "the system is failing", not "this number no
@@ -3347,7 +3347,7 @@ private fun DiagnosticOverlay(
             val sensors = uiState.sensorData
             if (sensors != null) {
                 Spacer(Modifier.height(4.dp))
-                Text(text = "SENSOR DATA", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text(text = stringResource(DesignR.string.diag_sensors), color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 Text(
                     text = "A: %.1f° P: %.1f° R: %.1f°".format(sensors.azimuth, sensors.pitch, sensors.roll),
                     color = Color.White,
@@ -3794,11 +3794,11 @@ private fun EvalOverlay(
         DiagnosticRow("FP pts", metrics.wallCount.toString(), androidx.compose.ui.graphics.Color.Green)
         DiagnosticRow("Batt", "%.0fmA".format(metrics.batteryMa), androidx.compose.ui.graphics.Color.White)
         androidx.compose.foundation.layout.Row {
-            androidx.compose.material3.TextButton(onClick = onStartLog) { androidx.compose.material3.Text("Log▶") }
-            androidx.compose.material3.TextButton(onClick = onStopLog) { androidx.compose.material3.Text("Log■") }
-            androidx.compose.material3.TextButton(onClick = onInduceLoss) { androidx.compose.material3.Text("Loss") }
-            androidx.compose.material3.TextButton(onClick = onStartRecord) { androidx.compose.material3.Text("Rec▶") }
-            androidx.compose.material3.TextButton(onClick = onStopRecord) { androidx.compose.material3.Text("Rec■") }
+            androidx.compose.material3.TextButton(onClick = onStartLog) { androidx.compose.material3.Text(stringResource(DesignR.string.diag_log_start)) }
+            androidx.compose.material3.TextButton(onClick = onStopLog) { androidx.compose.material3.Text(stringResource(DesignR.string.diag_log_stop)) }
+            androidx.compose.material3.TextButton(onClick = onInduceLoss) { androidx.compose.material3.Text(stringResource(DesignR.string.diag_induce_loss)) }
+            androidx.compose.material3.TextButton(onClick = onStartRecord) { androidx.compose.material3.Text(stringResource(DesignR.string.diag_rec_start)) }
+            androidx.compose.material3.TextButton(onClick = onStopRecord) { androidx.compose.material3.Text(stringResource(DesignR.string.diag_rec_stop)) }
             // Fusion and self-grow used to live here. They are on RelocDiagnosticsOverlay now,
             // which renders in release behind the same Diagnostic Overlay setting — and which
             // renders in debug too, so this panel loses nothing by not duplicating them. Two

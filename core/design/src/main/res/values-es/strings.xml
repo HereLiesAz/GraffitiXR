@@ -847,4 +847,11 @@
     <string name="glasses_pairing">Vinculando gafas Meta…</string>
     <string name="glasses_reconnect">Reconectar</string>
     <string name="glasses_end">Finalizar</string>
+    <string name="diag_confidence">Confianza</string>
+    <string name="diag_sensors">Datos de sensores</string>
+    <string name="diag_log_start">Registro ▶</string>
+    <string name="diag_log_stop">Registro ■</string>
+    <string name="diag_induce_loss">Pérdida</string>
+    <string name="diag_rec_start">Grab. ▶</string>
+    <string name="diag_rec_stop">Grab. ■</string>
 </resources>

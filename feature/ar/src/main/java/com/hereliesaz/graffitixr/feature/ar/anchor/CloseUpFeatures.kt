@@ -165,10 +165,14 @@ internal object CloseUpFeatures {
         stages: Int = 2,
         /** Steps the caller already finished (counted in the overall done/total). */
         stepsBefore: Int = 0,
+        /**
+         * Highest zoom worth learning: [maxZoomFor] the capture distance when the caller knows it in
+         * metres (an ARCore capture onto a tracked plane), else the conservative [NON_METRIC_MAX_ZOOM].
+         */
+        maxZoom: Float = NON_METRIC_MAX_ZOOM,
         detect: (Bitmap, Int) -> DetectedFeatures?,
     ): DetectedFeatures? {
-        // No caller knows the capture distance in metres yet: the conservative cap.
-        val views = views(photo.width, photo.height)
+        val views = views(photo.width, photo.height, maxZoom = maxZoom)
         val quickCount = views.count { it.zoom <= QUICK_MAX_ZOOM }
         val per = perViewBudget(baseRows, views.size)
         val parts = ArrayList<DetectedFeatures>(views.size)

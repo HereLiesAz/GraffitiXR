@@ -11,7 +11,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
@@ -44,22 +43,6 @@ private val DarkColorScheme = darkColorScheme(
     onError = White,
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = HotPink,
-    secondary = Cyan,
-    tertiary = NeonGreen
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
-)
-
 /**
  * The main theme composable for GraffitiXR.
  * Applies the Material 3 color scheme and typography.
@@ -81,8 +64,8 @@ fun GraffitiXRTheme(
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
 
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+        // The brand is dark-only: there is no light scheme to fall back to.
+        else -> DarkColorScheme
     }
     val view = LocalView.current
     if (!view.isInEditMode) {
