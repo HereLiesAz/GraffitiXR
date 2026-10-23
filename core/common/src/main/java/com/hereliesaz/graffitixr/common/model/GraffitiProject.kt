@@ -118,6 +118,14 @@ data class GraffitiProject(
     val lastModified: Long = System.currentTimeMillis(),
 
     /**
+     * Track this project with the standalone (KPM) tracker even on an ARCore phone: set when its
+     * Doodle capture started up close (under [com.hereliesaz.graffitixr.common.model.CLOSE_RANGE_METERS])
+     * or looking down at a table, where ARCore's world tracking is weakest. Decided before capture,
+     * because switching tracker afterwards would discard the capture.
+     */
+    val closeRangeStandalone: Boolean = false,
+
+    /**
      * A library placeholder for a project whose project.json could not be read: listed so it is not
      * lost from sight, never opened, never written (its files stay exactly as they are). Not saved.
      */
@@ -402,3 +410,9 @@ data class GraffitiProject(
     // MainActivity) whenever the rail's expansion state changes.
     val railExpansion: Map<String, Boolean> = emptyMap()
 )
+
+/** Below this capture distance (metres) an ARCore phone tracks the project with the standalone tracker. */
+const val CLOSE_RANGE_METERS = 1.0f
+
+/** Looking down at least this steeply (cosine of the angle from straight down) counts as a tabletop capture. */
+const val LOOKING_DOWN_COS = 0.85f

@@ -1922,6 +1922,38 @@ class ArViewModel @Inject constructor(
     // checker, and so monocular depth knows whether ARCore depth can be the source. Null until resolved.
     @Volatile private var arCoreCheckResult: ArAvailabilityChecker.Result? = null
 
+    // The open project asked for the standalone tracker (see prepareCloseRangeBackend).
+    private val closeRangeStandalone = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+    /**
+     * Called as a Doodle capture starts. On an ARCore phone pointed at a surface under
+     * [com.hereliesaz.graffitixr.common.model.CLOSE_RANGE_METERS] away, or looking down at a
+     * tabletop, switch this project to the standalone (KPM) tracker before anything is captured —
+     * switching after would discard the capture — and remember it on the project. Far captures keep
+     * ARCore. A no-op off ARCore or without a tracked camera.
+     */
+    fun prepareCloseRangeBackend() {
+        if (!_uiState.value.isArCoreAvailable || closeRangeStandalone.value) return
+        val r = renderer ?: return
+        val pose = r.latestCameraPose ?: return
+        viewModelScope.launch {
+            val lookingDown = pose[4] < -com.hereliesaz.graffitixr.common.model.LOOKING_DOWN_COS
+            val hit = r.viewCenter()?.let { (cx, cy) ->
+                kotlinx.coroutines.withTimeoutOrNull(400L) { r.requestHitTest(cx, cy).await() }
+            }
+            val distance = hit?.let {
+                kotlin.math.sqrt(
+                    (it[0] - pose[0]) * (it[0] - pose[0]) + (it[1] - pose[1]) * (it[1] - pose[1]) + (it[2] - pose[2]) * (it[2] - pose[2])
+                )
+            }
+            val close = lookingDown || (distance != null && distance < com.hereliesaz.graffitixr.common.model.CLOSE_RANGE_METERS)
+            Timber.i("Close-range check: lookingDown=$lookingDown distance=$distance -> standalone=$close")
+            if (!close) return@launch
+            closeRangeStandalone.value = true
+            projectRepository.updateProject { it.copy(closeRangeStandalone = true) }
+        }
+    }
+
     // Serializes monocular-depth load/unload so rapid toggles can't interleave a self-test and a close.
     private val monocularDepthMutex = Mutex()
 
@@ -1981,7 +2013,11 @@ class ArViewModel @Inject constructor(
             // cleanup, same standalone routing. The checker result is cached above and the backend is
             // re-derived on every toggle, so a change switches backends immediately — mid-AR too.
             Timber.i("ArCore availability resolved: $result")
-            settingsRepository.arCoreEnabled.distinctUntilChanged().collect { arCoreOptIn ->
+            // A close-range project (GraffitiProject.closeRangeStandalone) takes the standalone path
+            // exactly like an opt-out, for as long as it is open.
+            kotlinx.coroutines.flow.combine(settingsRepository.arCoreEnabled, closeRangeStandalone) { optIn, close ->
+                optIn && !close
+            }.distinctUntilChanged().collect { arCoreOptIn ->
                 applyArCoreBackendSelection(result, arCoreOptIn)
             }
         }
@@ -2006,6 +2042,7 @@ class ArViewModel @Inject constructor(
         }
         viewModelScope.launch {
             projectRepository.currentProject.collect { project ->
+                closeRangeStandalone.value = project?.closeRangeStandalone == true
                 _uiState.update {
                     val nextReferenceUri = project?.sphereSlamReferenceUri
                     val referenceChanged = it.sphereSlamReferenceUri != nextReferenceUri

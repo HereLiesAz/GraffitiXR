@@ -167,6 +167,8 @@ fun MainScreen(
                 !mainUiState.isCapturingDoodle &&
                 !mainUiState.isConfirmingDoodle
             ) {
+                // Close up or over a tabletop, an ARCore phone switches to the standalone tracker first.
+                arViewModel.prepareCloseRangeBackend()
                 mainViewModel.startDoodleCapture()
             }
         }
@@ -378,6 +380,8 @@ fun MainScreen(
                                     // Same reset as the rail's Target action, then the shared flow.
                                     arViewModel.clearCaptureForRetry()
                                     arViewModel.cancelMeasure()
+                                    // Close up or over a tabletop, an ARCore phone switches to the standalone tracker first.
+                                    arViewModel.prepareCloseRangeBackend()
                                     mainViewModel.startDoodleCapture()
                                 }
                             },

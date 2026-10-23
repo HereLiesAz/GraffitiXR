@@ -150,6 +150,14 @@ class ArRenderer(
      * session, or renderer destroyed). Callers should await with a timeout — if the render loop
      * is paused, no frame will arrive to serve the request.
      */
+    /** The GL surface's centre in pixels, for a centre hit test; null before the surface has a size. */
+    fun viewCenter(): Pair<Float, Float>? =
+        if (surfaceWidth > 0 && surfaceHeight > 0) surfaceWidth / 2f to surfaceHeight / 2f else null
+
+    /** The last tracked camera position (x, y, z) and viewing direction (x, y, z), world metres; null before tracking. */
+    @Volatile var latestCameraPose: FloatArray? = null
+        private set
+
     fun requestHitTest(x: Float, y: Float): kotlinx.coroutines.Deferred<FloatArray?> {
         val d = kotlinx.coroutines.CompletableDeferred<FloatArray?>()
         if (isDestroying || session == null) {
@@ -2100,6 +2108,13 @@ class ArRenderer(
             // (MobileGS::updateMappingCamera wrote it and nothing ever read it back) and was removed.
             val mappingViewMatrix = mappingViewMatrixScratch
             camera.pose.inverse().toMatrix(mappingViewMatrix, 0)
+            // Where the camera is and which way it looks (world, metres), for decisions made off the
+            // GL thread (the close-range backend choice at capture start).
+            if (camera.trackingState == TrackingState.TRACKING) {
+                val pose = camera.pose
+                val forward = pose.zAxis
+                latestCameraPose = floatArrayOf(pose.tx(), pose.ty(), pose.tz(), -forward[0], -forward[1], -forward[2])
+            }
 
             val intrinsics = camera.imageIntrinsics
 

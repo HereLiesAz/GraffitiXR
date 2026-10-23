@@ -1597,6 +1597,8 @@ class MainActivity : AppCompatActivity() {
                                         // Same effect as the rail's Doodle item.
                                         arViewModel.clearCaptureForRetry()
                                         arViewModel.cancelMeasure()
+                                        // Close up or over a tabletop, an ARCore phone switches to the standalone tracker first.
+                                        arViewModel.prepareCloseRangeBackend()
                                         mainViewModel.startDoodleCapture()
                                     },
                                     modifier = Modifier
@@ -2186,6 +2188,8 @@ class MainActivity : AppCompatActivity() {
                                             // Same effect as the rail's Target item.
                                             arViewModel.clearCaptureForRetry()
                                             arViewModel.cancelMeasure()
+                                            // Close up or over a tabletop, an ARCore phone switches to the standalone tracker first.
+                                            arViewModel.prepareCloseRangeBackend()
                                             mainViewModel.startDoodleCapture()
                                         },
                                         strings = strings
@@ -2592,6 +2596,8 @@ class MainActivity : AppCompatActivity() {
                                 arViewModel.clearCaptureForRetry()
                                 // Target and Measure both own screen taps; only one at a time.
                                 arViewModel.cancelMeasure()
+                                // Close up or over a tabletop, an ARCore phone switches to the standalone tracker first.
+                                arViewModel.prepareCloseRangeBackend()
                                 mainViewModel.startDoodleCapture()
                             } else {
                                 requestPermissions()
