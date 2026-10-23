@@ -6,6 +6,8 @@
     </cloud-backup>
     <device-transfer>
         <include domain="root" path="."/>
+        <!-- Lint matches excludes against includes of the same domain, so files/ is named too. -->
+        <include domain="file" path="."/>
         <!-- The crash-report credential (SettingsRepositoryImpl.crashTokenStore) stays on this device. -->
         <exclude domain="file" path="datastore/crash_token.preferences_pb"/>
     </device-transfer>
