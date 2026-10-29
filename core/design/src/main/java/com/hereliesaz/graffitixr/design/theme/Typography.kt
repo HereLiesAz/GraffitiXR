@@ -8,23 +8,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.hereliesaz.graffitixr.design.R
 
-// Blackout Midnight is the brand's display face, and its cmap covers only ~100 ASCII codepoints:
-// accented Latin, Cyrillic and CJK fall back per glyph to the system sans (Android's minikin does
-// that beneath the Typeface), so "café" would render "caf" in Blackout and "é" in sans — a visible
-// seam mid-word. So the display face is kept to short display/headline/title/label text, and every
-// body style (paragraphs, dialog text, descriptions, translated sentences) uses the system sans.
+// Blackout Midnight is the app's chosen typeface for all typography.
+// Its limited cmap means Android substitutes system glyphs for unsupported characters;
+// keep that fallback behavior rather than changing the user's chosen font.
 val BlackoutFontFamily = FontFamily(
     Font(R.font.blackout_midnight),
 )
-
-/** Running text: the system sans, which covers every script the app is translated into. */
-val BodyFontFamily: FontFamily = FontFamily.SansSerif
 
 // Body sizes are set for comfortable reading on phone screens; display/headline sizes are decorative
 // and stay large. Every line height is at least its font size (a smaller one clips or crowds).
 val Typography = Typography(
     bodyLarge = TextStyle(
-        fontFamily = BodyFontFamily,
+        fontFamily = BlackoutFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
         lineHeight = 24.sp,
@@ -45,7 +40,7 @@ val Typography = Typography(
         letterSpacing = 0.5.sp
     ),
     bodyMedium = TextStyle(
-        fontFamily = BodyFontFamily,
+        fontFamily = BlackoutFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
         lineHeight = 20.sp,
@@ -115,7 +110,7 @@ val Typography = Typography(
         letterSpacing = 0.1.sp
     ),
     bodySmall = TextStyle(
-        fontFamily = BodyFontFamily,
+        fontFamily = BlackoutFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp,
         lineHeight = 16.sp,
