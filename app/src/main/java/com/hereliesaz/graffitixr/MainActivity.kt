@@ -2241,17 +2241,19 @@ class MainActivity : AppCompatActivity() {
                 }
                 guidanceControllerRef = guidanceController
 
-                // In AR the screen also locks itself while the proximity sensor is covered (in a
-                // pocket, against a jacket): touches there are fabric, not the artist. It lifts the
-                // moment the sensor is uncovered; no gesture is needed.
-                val pocketed = rememberProximityCovered(enabled = editorUiState.editorMode == EditorMode.AR)
+                // In the active AR editor, block touches while the proximity sensor is covered
+                // (pocket, jacket). EditorUiState defaults to AR even on the project library, so
+                // the current navigation route must also be AR before this can intercept input.
+                val proximityLockActive = currentRoute == EditorMode.AR.name &&
+                    editorUiState.editorMode == EditorMode.AR && !showSettings
+                val pocketed = rememberProximityCovered(enabled = proximityLockActive)
 
                 // Trace ▸ Freeze: absorb EVERY pointer event above the (now folded) rail so nothing
                 // responds — including the rail's app-icon unfold tap, which would otherwise bring the
                 // rail back. Drawn as the last sibling in the theme Surface, so it sits on top of the
                 // host layout and the rail it renders. Unlock stays volume-key only (key events don't
                 // go through this), matching the existing touch lock.
-                if (mainUiState.isTouchLocked || pocketed) {
+                if (mainUiState.isTouchLocked || (proximityLockActive && pocketed)) {
                     Box(
                         Modifier
                             .fillMaxSize()
