@@ -3,7 +3,7 @@ buildscript {
     val commonForcedDependencies = listOf(
         "commons-beanutils:commons-beanutils:1.11.0",
         "org.jdom:jdom2:2.0.6.1",
-        "io.netty:netty-codec:4.2.19.Final",
+        "io.netty:netty-codec:4.2.20.Final",
         "io.netty:netty-codec-http2:4.2.19.Final",
         "io.netty:netty-handler:4.2.19.Final",
         "io.netty:netty-handler-proxy:4.2.19.Final",
