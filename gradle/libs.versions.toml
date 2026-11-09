@@ -2,7 +2,7 @@
 [versions]
 playAppUpdate = "2.1.0"
 activityCompose = "1.13.0"
-agp = "9.5.0"
+agp = "9.5.1"
 appcompat = "1.8.0"
 arcore = "1.57.0"
 azNavRail = "12.0"
