@@ -63,3 +63,23 @@ Goal: usable in seconds, finished within the user's attention, safe to interrupt
   call sites compile, any timing on a device. The clock (45 s) is a guess to tune on a device.
 - Trade: a measured wall on a slow phone loses the tail of the zoom-6 crops. Mark-dense crops go
   first, so what is cut is the least dense.
+
+# Marks: black text on white not highlighted (dark scene)
+
+Report (screenshot, AR target review): white text on red is highlighted, black text on white is not.
+
+- Cause: `markMap` picks one polarity for the whole frame. Median luma < 96 means "marks are light";
+  a dark mark then also has to be darker than the frame's median minus 25. Black print on a white flyer
+  in a dark bar is lighter than the bar, so it fails that test. Only the paper's edge band (where the
+  w/16 window puts it above its local average) lights up.
+- Fix: `litPatchStrength` (dark scenes only): print is a pixel well below the "patch layer" it sits on,
+  the closing of luma by a stroke-sized window then the opening by a letter-exceeding window, where
+  that layer is lighter than the surface. Halo, thick-letter counter and the gaps between bright
+  letters are 0 by construction. It must stand clear of the frame's noise (4 sigma): without that,
+  uniform dark noise added ~105k false marks (found by comparing against the original loop).
+- Verified on the JVM (real `ImageExt.kt`, stubbed `Bitmap`): 25 tests (existing 15 + 10 new); the
+  flyer test finds 0 of 7680 print pixels with the rule off; markMap equals the original loop exactly
+  on a light scene, a dark chalk scene, dark noise and light noise; 116 ms for 1633x1224 on a desktop JVM.
+- Not verified: the real photo (only a synthetic flyer and coaster), the Android build, speed on a phone.
+- Not changed: the paper's own edge band is still highlighted (pre-existing, the same in the screenshot);
+  the mirror case (white print on a dark patch in a light scene) is untouched.

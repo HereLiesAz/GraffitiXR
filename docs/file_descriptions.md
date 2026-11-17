@@ -33,7 +33,10 @@ This document lists key files in the repository and their purposes.
 *   `common/model/DoodleFeatures.kt`: Settings → Doodle — SuperPoint, Half sphere (ORB plus
     close-ups) or Both; what the next target's doodle is built from.
 *   `common/util/ImageExt.kt`: target-review helpers — `isolateMarkings` (adaptive threshold, whole
-    marks highlighted, specks and marks touching the photo's edge excluded via `highlightWholeMarks`)
+    marks highlighted, specks and marks touching the photo's edge excluded via `highlightWholeMarks`;
+    the map itself is `markMap`, and in a dark scene `litPatchStrength` adds dark print on a lit patch
+    (black text on a white flyer), which the median rule alone loses; it stands clear of the frame's
+    measured noise and is not applied in a light scene)
     and mark erasing (tap or drag removes a whole mark): `MarkEraser` holds the mask's pixels and flood
     queue for a gesture's many erases and publishes one bitmap per batch; `eraseColorBlob` is the
     one-shot form (returns the same bitmap, allocation-free, when nothing was in reach).

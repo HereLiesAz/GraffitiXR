@@ -110,6 +110,22 @@ fun Bitmap.isolateMarkings(tapPos: Pair<Float, Float>? = null): Bitmap {
         }
     }
 
+    // 1) Adaptive threshold → binary mark map (see markMap).
+    val isMark = markMap(luma, integral, w, h, tapPos)
+
+    // 2) Despeckle, drop marks cut by the frame, highlight the rest (see highlightWholeMarks).
+    // Reuses the integral buffer as the flood queue: it is no longer needed after thresholding.
+    val outPixels = highlightWholeMarks(isMark, w, h, maxOf(MIN_MARK_PIXELS_FLOOR, n / NOISE_AREA_DIVISOR), integral)
+    out.setPixels(outPixels, 0, w, 0, 0, w, h)
+    return out
+}
+
+/**
+ * The binary mark map of [luma] ([w] × [h]) for [isolateMarkings]; [integral] is its summed-area table
+ * (see there). [tapPos] makes the threshold more discerning the farther a pixel is from the tap.
+ */
+internal fun markMap(luma: IntArray, integral: IntArray, w: Int, h: Int, tapPos: Pair<Float, Float>? = null): BooleanArray {
+    val n = w * h
     // Chalk or paint marks on a black canvas board are lighter than their surface, not darker. The
     // surface's own polarity is found by the local (adaptive) threshold, as before; marks of the other
     // polarity also count, but only past the surface's median too, so the halo a dark mark casts on a
@@ -122,6 +138,11 @@ fun Bitmap.isolateMarkings(tapPos: Pair<Float, Float>? = null): Bitmap {
     val tapX = tapPos?.first?.let { it * w }
     val tapY = tapPos?.second?.let { it * h }
     val maxDist = Math.sqrt((w * w + h * h).toDouble()).toFloat()
+
+    // In a dark scene a dark mark has to be darker than the surface (below), which loses dark print on
+    // a lit patch -- black text on a white flyer is lighter than the dark wall behind it. Those marks
+    // are found by what they sit on instead (see litPatchStrength). Light scenes need no such rule.
+    val onPatch = if (lightMarks) litPatchStrength(luma, w, h, median, baseThresholdOffset) else null
 
     // 1) Adaptive threshold → binary mark map.
     val isMark = BooleanArray(n)
@@ -151,15 +172,113 @@ fun Bitmap.isolateMarkings(tapPos: Pair<Float, Float>? = null): Bitmap {
             val effectiveOffset = (baseThresholdOffset * distFactor).toInt()
 
             val i = y * w + x
-            isMark[i] = isMarkPixel(luma[i], avg, median, effectiveOffset, lightMarks)
+            isMark[i] = isMarkPixel(luma[i], avg, median, effectiveOffset, lightMarks) ||
+                (onPatch != null && (onPatch[i].toInt() and 0xFF) > effectiveOffset)
         }
     }
 
-    // 2) Despeckle, drop marks cut by the frame, highlight the rest (see highlightWholeMarks).
-    // Reuses the integral buffer as the flood queue: it is no longer needed after thresholding.
-    val outPixels = highlightWholeMarks(isMark, w, h, maxOf(MIN_MARK_PIXELS_FLOOR, n / NOISE_AREA_DIVISOR), integral)
-    out.setPixels(outPixels, 0, w, 0, 0, w, h)
+    return isMark
+}
+
+/**
+ * How much darker each pixel of [luma] ([w] × [h]) is than the lit patch it sits on, 0 where it sits
+ * on none: the dark print (text, line work) on paper or a bright panel in a dark scene, which the
+ * median test in [isMarkPixel] cannot tell from the dark surface around the patch.
+ *
+ * The patch layer is the grayscale closing of [luma] by a window that fills a stroke (the print's
+ * gaps), then the opening of that by a window wider than a letter (so a bright word is not a patch,
+ * and a paper sheet is). Where that layer is lighter than the surface ([median] + [floorOffset])
+ * the pixel's strength is how far below it the pixel is. A wide dark region (the surface, a halo,
+ * the inside of a thick painted letter) is not filled by the closing, so it has strength 0, and the
+ * gaps between bright letters are not on a patch, so they have 0 too.
+ */
+internal fun litPatchStrength(luma: IntArray, w: Int, h: Int, median: Int, floorOffset: Int): ByteArray {
+    val n = w * h
+    val src = ByteArray(n) { luma[it].coerceIn(0, 255).toByte() }
+    val stroke = maxOf(2, w / PATCH_STROKE_DIVISOR)
+    val patch = maxOf(3 * stroke, w / PATCH_DIVISOR)
+    val closed = slide(slide(src, w, h, stroke, true), w, h, stroke, false)
+    val layer = slide(slide(closed, w, h, patch, false), w, h, patch, true)
+    // Sensor noise on a dark frame fills like print does (the closing lifts every dark speck to its
+    // neighbours' level), so the patch and the print's depth must stand well clear of the noise.
+    val margin = maxOf(floorOffset, Math.ceil(NOISE_SIGMAS * noiseSigma(luma, w, h)).toInt())
+    val out = ByteArray(n)
+    val floor = median + margin
+    for (i in 0 until n) {
+        val top = layer[i].toInt() and 0xFF
+        if (top <= floor) continue
+        val depth = top - (src[i].toInt() and 0xFF)
+        if (depth > margin) out[i] = depth.toByte()
+    }
     return out
+}
+
+// How many standard deviations of the frame's noise a lit patch, and the print on it, must stand above it.
+private const val NOISE_SIGMAS = 4.0
+
+/**
+ * The standard deviation of [luma]'s ([w] × [h]) noise, from the median absolute difference between
+ * horizontal neighbours (robust: edges and print are a small share of the pairs). 0 for a flat frame.
+ */
+internal fun noiseSigma(luma: IntArray, w: Int, h: Int): Double {
+    val histogram = IntArray(256)
+    var pairs = 0
+    for (y in 0 until h) {
+        val row = y * w
+        for (x in 0 until w - 1) {
+            histogram[minOf(255, Math.abs(luma[row + x] - luma[row + x + 1]))]++
+            pairs++
+        }
+    }
+    if (pairs == 0) return 0.0
+    var seen = 0
+    var median = 0
+    for (d in 0..255) {
+        seen += histogram[d]
+        if (seen * 2 >= pairs) { median = d; break }
+    }
+    // |difference of two noise samples| has median 0.6745 * sigma * sqrt(2).
+    return median / (0.6745 * Math.sqrt(2.0))
+}
+
+// Half-size, as 1 / this of the width, of the window that fills a stroke of dark print (it fills
+// gaps up to twice that wide), and of the window a lit patch must be wider than a letter to contain.
+private const val PATCH_STROKE_DIVISOR = 200
+private const val PATCH_DIVISOR = 25
+
+/**
+ * Grayscale dilation ([max]) or erosion of [src] ([w] × [h]) by the square window of half-size [r]
+ * (clipped at the image's edge), as two separable sliding extrema.
+ */
+internal fun slide(src: ByteArray, w: Int, h: Int, r: Int, max: Boolean): ByteArray {
+    val tmp = ByteArray(w * h)
+    val out = ByteArray(w * h)
+    val deque = IntArray(maxOf(w, h))
+    for (y in 0 until h) slideLine(src, y * w, 1, w, r, max, tmp, deque)
+    for (x in 0 until w) slideLine(tmp, x, w, h, r, max, out, deque)
+    return out
+}
+
+/** One line of [slide]: [len] samples from [start] by [stride], the extreme of each window of half-size [r]. */
+private fun slideLine(src: ByteArray, start: Int, stride: Int, len: Int, r: Int, max: Boolean, dst: ByteArray, deque: IntArray) {
+    var head = 0
+    var tail = 0
+    var next = 0
+    for (i in 0 until len) {
+        val hi = minOf(len - 1, i + r)
+        while (next <= hi) {
+            val v = src[start + next * stride].toInt() and 0xFF
+            while (tail > head) {
+                val last = src[start + deque[tail - 1] * stride].toInt() and 0xFF
+                if (if (max) last <= v else last >= v) tail-- else break
+            }
+            deque[tail++] = next
+            next++
+        }
+        val lo = i - r
+        while (deque[head] < lo) head++
+        dst[start + i * stride] = src[start + deque[head] * stride]
+    }
 }
 
 // A surface whose median luma is below this is dark, so its marks are the lighter pixels.
