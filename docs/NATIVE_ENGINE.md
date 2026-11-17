@@ -13,7 +13,14 @@ photo's **close-ups** (`CloseUpFeatures`): crops at zooms 6×, 3× and 2× (the 
 half-spheres, square-on), each tiled by its grid of aim points, enlarged to about a live frame's size
 and run through the base doodle's own detector. Their features map back to the photo's pixels
 and onto the wall like the capture's own, so a close-up of any corner meets dense features at the
-size it sees them. At most as many as the capture's own (≤ 2000), shared across the 49 crops.
+size it sees them. At most as many as the capture's own (≤ 2000), shared across the crops.
+The build is bounded in time, since it has to be sat through: the quick set (zoom 2×, four crops)
+always completes and is installed early; the crops after it (zoom 3×, then 6×, which exist only
+when the capture distance is known) stop starting `CloseUpFeatures.FINE_BUDGET_MS` (45 s) after the
+quick set, so a fast phone makes every crop and a slow one keeps what it has. The 6× crops over
+wall where the capture's own detection found nothing are skipped, and the rest go densest first
+(`CloseUpFeatures.prioritized`). A SuperPoint crop is enlarged to 640 px, its network's input
+size, not 960. The crops cut by the clock are not made up later yet.
 Settings → Doodle chooses what a new target's doodle is made of (`DoodleFeatures`):
 **SuperPoint** (SuperPoint features of the capture only, ~1.5 MB), **Half sphere** (ORB features of
 the capture and its close-ups, < 0.1 MB) or **Both** (SuperPoint and the close-ups, ~2–3 MB; the

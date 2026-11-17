@@ -36,6 +36,21 @@ internal object CloseUpFeatures {
     /** A close-up's long side: about a live camera frame, so marks appear at the size it sees them. */
     const val MAX_VIEW_SIDE = 960
 
+    /**
+     * A close-up's long side when the detector is SuperPoint: its network takes at most 640 px
+     * (`SuperPointDetector::kMaxInputSide`) and downsizes anything larger before inference, so
+     * enlarging a crop past that only costs the scaling and the copy into native.
+     */
+    const val SUPERPOINT_VIEW_SIDE = 640
+
+    /**
+     * How long, in milliseconds, the crops past the quick set may keep starting once the quick set is
+     * learned. A build has to be sat through (there is no foreground service to carry it), and an
+     * inference costs seconds on a slow phone, so the tail is bounded by time, not by count: a fast
+     * phone finishes every crop, a slow one stops early with what it has.
+     */
+    const val FINE_BUDGET_MS = 45_000L
+
     /** At most this many close-up features, and never more than the capture's own count. */
     const val MAX_EXTRA = 2000
 
@@ -94,13 +109,62 @@ internal object CloseUpFeatures {
         return out
     }
 
+    /** How many of the photo's own features ([positions], `[u0, v0, u1, v1, …]`) fall inside [view]. */
+    fun featuresIn(view: View, positions: FloatArray): Int {
+        var n = 0
+        var k = 0
+        while (k + 1 < positions.size) {
+            val x = positions[k]
+            val y = positions[k + 1]
+            if (x >= view.x && x < view.x + view.w && y >= view.y && y < view.y + view.h) n++
+            k += 2
+        }
+        return n
+    }
+
+    /**
+     * [views] in the order to detect them. The crops up to [NON_METRIC_MAX_ZOOM] (the ones every build
+     * has always made) keep their place; the finer ones, which exist only when the capture distance is
+     * known, drop the crops over wall where the photo's own detection ([basePositions]) found nothing
+     * (no marks, so nothing a close-up could match) and go densest first, so a bounded build spends
+     * its time over the marks. Null [basePositions] leaves [views] as given.
+     */
+    fun prioritized(views: List<View>, basePositions: FloatArray?): List<View> {
+        if (basePositions == null) return views
+        val kept = ArrayList<View>(views.size)
+        val fine = ArrayList<Pair<View, Int>>()
+        for (v in views) {
+            if (v.zoom <= NON_METRIC_MAX_ZOOM * (1 + 1e-6f)) kept += v
+            else featuresIn(v, basePositions).let { if (it > 0) fine += v to it }
+        }
+        // sortedByDescending is stable: equally dense crops stay in grid order.
+        fine.sortedByDescending { it.second }.mapTo(kept) { it.first }
+        return kept
+    }
+
+    /**
+     * When the crops past the quick set must stop starting: [budgetMs] after the quick set is learned
+     * (after the first call when there is none), by [now] in milliseconds. A crop under way is finished.
+     */
+    class FineBudget(private val budgetMs: Long, private val now: () -> Long) {
+        private var deadline = Long.MAX_VALUE
+
+        /** The quick set (or, with none, the build's start) is done: the tail's clock starts. */
+        fun start() {
+            if (deadline == Long.MAX_VALUE) deadline = now() + budgetMs
+        }
+
+        /** True when a crop at [zoom] must not start: it is past the quick set and the clock ran out. */
+        fun exhausted(zoom: Float): Boolean = zoom > QUICK_MAX_ZOOM && now() >= deadline
+    }
+
     /** Features per close-up: the capture's count (at most [MAX_EXTRA]) shared out, at least [MIN_PER_VIEW]. */
     fun perViewBudget(baseRows: Int, viewCount: Int): Int =
         if (viewCount <= 0) 0 else max(MIN_PER_VIEW, min(baseRows, MAX_EXTRA) / viewCount)
 
-    /** The close-up's enlarged size: the photo's long side, at most [MAX_VIEW_SIDE]. */
-    fun outputSize(view: View, photoWidth: Int, photoHeight: Int): Pair<Int, Int> {
-        val side = min(MAX_VIEW_SIDE, max(photoWidth, photoHeight)).toFloat()
+    /** The close-up's enlarged size: the photo's long side, at most [maxSide] ([MAX_VIEW_SIDE], or [SUPERPOINT_VIEW_SIDE]). */
+    fun outputSize(view: View, photoWidth: Int, photoHeight: Int, maxSide: Int = MAX_VIEW_SIDE): Pair<Int, Int> {
+        val side = min(maxSide, max(photoWidth, photoHeight)).toFloat()
         val s = side / max(view.w, view.h)
         return max(1, (view.w * s).roundToInt()) to max(1, (view.h * s).roundToInt())
     }
@@ -170,10 +234,23 @@ internal object CloseUpFeatures {
          * metres (an ARCore capture onto a tracked plane), else the conservative [NON_METRIC_MAX_ZOOM].
          */
         maxZoom: Float = NON_METRIC_MAX_ZOOM,
+        /**
+         * The photo's own features (`[u0, v0, u1, v1, …]`, in the photo's pixels): crops past
+         * [NON_METRIC_MAX_ZOOM] over wall where it found none are skipped, the densest go first
+         * ([prioritized]). Null skips nothing.
+         */
+        basePositions: FloatArray? = null,
+        /** The crop's long side, see [outputSize]: [SUPERPOINT_VIEW_SIDE] for SuperPoint. */
+        viewSide: Int = MAX_VIEW_SIDE,
+        /** How long the crops past the quick set may keep starting, see [FineBudget]. */
+        budgetMs: Long = FINE_BUDGET_MS,
+        now: () -> Long = { System.nanoTime() / 1_000_000L },
         detect: (Bitmap, Int) -> DetectedFeatures?,
     ): DetectedFeatures? {
-        val views = views(photo.width, photo.height, maxZoom = maxZoom)
+        val views = prioritized(views(photo.width, photo.height, maxZoom = maxZoom), basePositions)
         val quickCount = views.count { it.zoom <= QUICK_MAX_ZOOM }
+        val budget = FineBudget(budgetMs, now)
+        if (quickCount == 0) budget.start()
         val per = perViewBudget(baseRows, views.size)
         val parts = ArrayList<DetectedFeatures>(views.size)
         // The slow part of building a target: the artist sees it count down.
@@ -193,8 +270,10 @@ internal object CloseUpFeatures {
         report(0)
         try {
             for ((i, v) in views.withIndex()) {
+                // Out of time: stop with what was learned (the views are coarsest first, densest first).
+                if (budget.exhausted(v.zoom)) break
                 val crop = Bitmap.createBitmap(photo, v.x, v.y, v.w, v.h)
-                val (outW, outH) = outputSize(v, photo.width, photo.height)
+                val (outW, outH) = outputSize(v, photo.width, photo.height, viewSide)
                 val view = Bitmap.createScaledBitmap(crop, outW, outH, true)
                 try {
                     detect(view, per)?.let { parts += mapBack(truncated(it, per), v, outW, outH) }
@@ -202,6 +281,7 @@ internal object CloseUpFeatures {
                     if (view !== crop) view.recycle()
                     if (crop !== photo) crop.recycle()
                 }
+                if (i + 1 == quickCount) budget.start()
                 if (i + 1 == quickCount && i + 1 < views.size) onQuickSet?.invoke(concat(parts))
                 // After the quick set's hand-off, so the pill moves to stage 2/3 as its crops start.
                 if (i + 1 < views.size) report(i + 1)

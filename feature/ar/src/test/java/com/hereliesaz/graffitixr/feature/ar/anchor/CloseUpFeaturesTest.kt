@@ -94,6 +94,81 @@ class CloseUpFeaturesTest {
     }
 
     @Test
+    fun `a SuperPoint close-up is no bigger than its network input`() {
+        val v = CloseUpFeatures.View(400, 300, 267, 200, 6f)
+        val (outW, outH) = CloseUpFeatures.outputSize(v, w, h, CloseUpFeatures.SUPERPOINT_VIEW_SIDE)
+        assertEquals(640, outW)
+        assertEquals(479, outH)
+        // The default is unchanged: ORB keeps the live-frame size.
+        assertEquals(CloseUpFeatures.MAX_VIEW_SIDE, CloseUpFeatures.outputSize(v, w, h).first)
+        // A photo smaller than the cap is never enlarged past its own long side.
+        assertEquals(500, CloseUpFeatures.outputSize(CloseUpFeatures.View(0, 0, 100, 75, 2f), 500, 375, 640).first)
+    }
+
+    @Test
+    fun `features inside a crop are counted by its half-open pixel rectangle`() {
+        val v = CloseUpFeatures.View(100, 200, 50, 40, 6f)
+        // Corner (100, 200) is in; (150, 200) and (100, 240) are on the far edges, out.
+        val pos = floatArrayOf(100f, 200f, 149.9f, 239.9f, 150f, 200f, 100f, 240f, 10f, 10f)
+        assertEquals(2, CloseUpFeatures.featuresIn(v, pos))
+        assertEquals(0, CloseUpFeatures.featuresIn(v, FloatArray(0)))
+    }
+
+    @Test
+    fun `finer crops over bare wall are dropped, the rest densest first, coarser crops untouched`() {
+        val views = CloseUpFeatures.views(w, h, maxZoom = 6f)
+        assertEquals(49, views.size)
+        // No base features at all: only the crops every build has always made remain.
+        val bare = CloseUpFeatures.prioritized(views, FloatArray(0))
+        assertEquals(views.filter { it.zoom <= CloseUpFeatures.NON_METRIC_MAX_ZOOM }, bare)
+        assertEquals(13, bare.size)
+        // Null base positions: nothing is touched.
+        assertEquals(views, CloseUpFeatures.prioritized(views, null))
+        // Marks in two zoom-6 cells (one with 3 features, one with 1): both kept, denser first.
+        val fine = views.filter { it.zoom == 6f }
+        val a = fine[7]; val b = fine[20]
+        val pos = floatArrayOf(
+            b.x + 1f, b.y + 1f,
+            a.x + 1f, a.y + 1f, a.x + 2f, a.y + 2f, a.x + 3f, a.y + 3f,
+        )
+        val out = CloseUpFeatures.prioritized(views, pos)
+        assertEquals(13 + 2, out.size)
+        assertEquals(listOf(a, b), out.filter { it.zoom == 6f })
+        // Still coarsest first, so the quick set stays a leading prefix.
+        assertEquals(out.sortedBy { it.zoom }.map { it.zoom }, out.map { it.zoom })
+        assertTrue(out.take(4).all { it.zoom <= CloseUpFeatures.QUICK_MAX_ZOOM })
+    }
+
+    @Test
+    fun `equally dense finer crops keep their grid order`() {
+        val fine = CloseUpFeatures.views(w, h, maxZoom = 6f).filter { it.zoom == 6f }
+        val pos = floatArrayOf(fine[30].x + 1f, fine[30].y + 1f, fine[3].x + 1f, fine[3].y + 1f)
+        assertEquals(listOf(fine[3], fine[30]), CloseUpFeatures.prioritized(fine, pos))
+    }
+
+    @Test
+    fun `the tail's clock starts with the quick set and only stops the crops past it`() {
+        var t = 0L
+        val budget = CloseUpFeatures.FineBudget(1_000L, { t })
+        // Before start there is no deadline.
+        t = 1_000_000L
+        assertEquals(false, budget.exhausted(6f))
+        t = 5_000L
+        budget.start()
+        t = 5_999L
+        assertEquals(false, budget.exhausted(6f))
+        t = 6_000L
+        assertEquals(true, budget.exhausted(3f))
+        assertEquals(true, budget.exhausted(6f))
+        // The quick set is never cut, however late.
+        assertEquals(false, budget.exhausted(CloseUpFeatures.QUICK_MAX_ZOOM))
+        // A second start does not move the deadline.
+        t = 7_000L
+        budget.start()
+        assertEquals(true, budget.exhausted(6f))
+    }
+
+    @Test
     fun `progress counts close-ups done of the total`() {
         // The bar is the current stage's progress, not the whole build's.
         assertEquals(0.5f, DoodleBuildProgress.Step(2, 3, 2, 4, 15, 50).fraction, 0f)

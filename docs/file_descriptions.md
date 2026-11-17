@@ -163,6 +163,8 @@ the real (non-stub) tracker is packaged.
     (ARCore), and tells it which to search.
 *   `anchor/CloseUpFeatures.kt`: the doodle's close-ups — square-on crops of the capture photo
     at zooms 6×, 3×, 2× over the aim grid, detected with the base detector, mapped back to its pixels.
+    The 6× crops over featureless wall are skipped and the rest go densest first; the crops past the
+    quick set stop starting `FINE_BUDGET_MS` after it; a SuperPoint crop is 640 px (`SUPERPOINT_VIEW_SIDE`).
 *   `RelocAttitude.kt`: the earth ← OpenCV-camera rotation MobileGS turns a lost frame by, from the
     rotation-vector quaternion and the frame's camera ← device rotation.
 *   `SphereSlamStandaloneOverlay.kt`: non-ARCore AR surface. Owns rectified wall-target capture,
