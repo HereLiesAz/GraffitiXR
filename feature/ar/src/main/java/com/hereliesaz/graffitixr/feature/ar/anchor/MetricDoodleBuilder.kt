@@ -275,7 +275,8 @@ object MetricDoodleBuilder {
                 if (features.closeUps) early.installBase(basePixels, baseDescs, bitmap)
                 val (mPixels, mDescs) = withCloseUps(bitmap, mask, basePixels, baseDescs, features.closeUps,
                     onQuickSet = { p, d -> early.install(p, d) }, firstStage = 2, stages = 3, stepsBefore = 1,
-                    captureDistanceMeters = captureDistanceMeters(glView, planePointWorld, planeNormalWorld)) { view, _ ->
+                    captureDistanceMeters = captureDistanceMeters(glView, planePointWorld, planeNormalWorld),
+                    viewSide = CloseUpFeatures.SUPERPOINT_VIEW_SIDE) { view, _ ->
                     StandaloneFingerprintBuilder.detectSuperPoint(slam, view)
                 }
                 if (baseDescs !== descs && baseDescs !== mDescs) baseDescs.release()
@@ -401,6 +402,8 @@ object MetricDoodleBuilder {
         firstStage: Int = 1, stages: Int = 2, stepsBefore: Int = 0,
         /** The camera's distance to the wall at capture, metres; null leaves the conservative zoom cap. */
         captureDistanceMeters: Double? = null,
+        /** The close-up's long side, see [CloseUpFeatures.outputSize]; SuperPoint takes no more than 640. */
+        viewSide: Int = CloseUpFeatures.MAX_VIEW_SIDE,
         detect: (Bitmap, Int) -> StandaloneFingerprintBuilder.DetectedFeatures?,
     ): Pair<List<Pixel>, Mat> {
         if (!enabled || pixels.isEmpty() || descs.empty()) return pixels to descs
@@ -414,6 +417,8 @@ object MetricDoodleBuilder {
         val extra = CloseUpFeatures.detect(
             bitmap, pixels.size, quick, firstStage, stages, stepsBefore,
             maxZoom = CloseUpFeatures.maxZoomFor(captureDistanceMeters),
+            basePositions = pixelArray(pixels),
+            viewSide = viewSide,
             detect = detect,
         )
         return mergeCloseUps(bitmap, mask, pixels, descs, extra) ?: (pixels to descs)

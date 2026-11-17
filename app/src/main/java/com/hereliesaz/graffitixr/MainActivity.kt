@@ -1940,9 +1940,17 @@ class MainActivity : AppCompatActivity() {
                             // No separate "just tap the screen" hint here: DoodleCreationUi's own card is the one
                             // instruction while a capture is up (the guidance graph is suppressed for it too).
                             if (mainUiState.isCapturingDoodle) {
+                                // The detector's features in the review photo, found once per capture, off the
+                                // main thread; the review draws them split by the marks mask.
+                                val reviewPhoto = arUiState.tempCaptureBitmap
+                                val reviewKeypoints by produceState<FloatArray?>(initialValue = null, key1 = reviewPhoto) {
+                                    value = null
+                                    value = reviewPhoto?.let { arViewModel.detectReviewKeypoints(it) }
+                                }
                                 DoodleCreationUi(
                                     rawBitmap = arUiState.tempCaptureBitmap,
                                     annotatedBitmap = arUiState.annotatedCaptureBitmap,
+                                    keypoints = reviewKeypoints,
                                     // Confirm reads the mask AFTER the queued mark erases are applied,
                                     // not from this composition's snapshot.
                                     latestCapture = { arViewModel.awaitLatestDoodleCapture() },

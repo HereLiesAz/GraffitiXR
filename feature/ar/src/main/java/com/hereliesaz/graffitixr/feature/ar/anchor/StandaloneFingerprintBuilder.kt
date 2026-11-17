@@ -71,7 +71,11 @@ object StandaloneFingerprintBuilder {
         // The close-ups, by the base's own detector (its descriptors are the ones the relocalizer
         // matches against), kept to the same selected marks.
         val superPoint = base.type == CvType.CV_32F
-        val closeUps = if (!features.closeUps) null else CloseUpFeatures.detect(bitmap, base.rows) { view, n ->
+        val closeUps = if (!features.closeUps) null else CloseUpFeatures.detect(
+            bitmap, base.rows,
+            basePositions = base.positions,
+            viewSide = if (superPoint) CloseUpFeatures.SUPERPOINT_VIEW_SIDE else CloseUpFeatures.MAX_VIEW_SIDE,
+        ) { view, n ->
             if (superPoint) detectSuperPoint(slam, view) else detectOrb(view, null, n, slam)
         }?.let { filterByMask(it, mask, bitmap.width, bitmap.height) }
         val detected = CloseUpFeatures.concat(listOfNotNull(base, closeUps)) ?: base
