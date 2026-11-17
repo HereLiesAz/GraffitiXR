@@ -5,7 +5,7 @@ buildscript {
         "org.jdom:jdom2:2.0.6.1",
         "io.netty:netty-codec:4.2.20.Final",
         "io.netty:netty-codec-http2:4.2.19.Final",
-        "io.netty:netty-handler:4.2.19.Final",
+        "io.netty:netty-handler:4.2.20.Final",
         "io.netty:netty-handler-proxy:4.2.19.Final",
         "org.bitbucket.b_c:jose4j:0.9.7",
         "org.apache.commons:commons-lang3:3.21.0",
