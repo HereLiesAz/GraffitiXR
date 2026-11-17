@@ -61,6 +61,9 @@ import com.hereliesaz.graffitixr.design.theme.HotPink
  *   mark erase has been applied (`ArViewModel.awaitLatestDoodleCapture`). Erases are asynchronous, so
  *   the composition's own bitmaps can predate the last tap; Confirm uses this instead. The default
  *   just returns the composition's bitmaps (previews, tests).
+ * @param keypoints the features the doodle's detector finds in [rawBitmap] (`[u0, v0, …]` in its pixels),
+ *   drawn over the review as dots: pink where the marks mask keeps them, faint white where it drops them,
+ *   with the two counts. Null draws nothing (not found yet, or none).
  */
 @Composable
 fun DoodleCreationUi(
@@ -76,6 +79,7 @@ fun DoodleCreationUi(
     onRetake: () -> Unit,
     onEraseAtPoint: (Float, Float) -> Unit,
     latestCapture: suspend () -> Pair<Bitmap?, Bitmap?> = { rawBitmap to annotatedBitmap },
+    keypoints: FloatArray? = null,
 ) {
     val scope = rememberCoroutineScope()
     val currentLatestCapture by rememberUpdatedState(latestCapture)
@@ -95,6 +99,7 @@ fun DoodleCreationUi(
                 FeatureSelectionReview(
                     annotatedBitmap = annotatedBitmap,
                     rawBitmap = rawBitmap,
+                    keypoints = keypoints,
                     strings = strings,
                     onConfirm = {
                         if (!confirming) {
@@ -283,6 +288,7 @@ private fun ShutterButton(saved: Boolean, onClick: () -> Unit, modifier: Modifie
 private fun FeatureSelectionReview(
     annotatedBitmap: Bitmap?,
     rawBitmap: Bitmap?,
+    keypoints: FloatArray?,
     strings: AppStrings,
     onConfirm: () -> Unit,
     onRetake: () -> Unit,
@@ -345,6 +351,49 @@ private fun FeatureSelectionReview(
             } else {
                 imgH = boxH; imgW = boxH * bmpAspect
                 imgX = (boxW - imgW) / 2f; imgY = 0f
+            }
+
+            // -- The detector's features over the photo: kept by the marks mask (pink) or dropped (white) --
+            keypoints?.let { pts ->
+                val split = remember(pts, annotatedBitmap, rawBitmap) {
+                    val mask = annotatedBitmap
+                    if (mask == null) {
+                        DoodleKeypointPreview.split(pts, rawBitmap.width, rawBitmap.height, 1, 1) { _, _ -> true }
+                    } else {
+                        DoodleKeypointPreview.split(pts, rawBitmap.width, rawBitmap.height, mask.width, mask.height) { x, y ->
+                            (mask.getPixel(x, y) ushr 24) != 0
+                        }
+                    }
+                }
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val sx = imgW / bmpW
+                    val sy = imgH / bmpH
+                    var k = 0
+                    while (k + 1 < split.dropped.size) {
+                        drawCircle(Color.White.copy(alpha = 0.5f), 1.5.dp.toPx(), Offset(imgX + split.dropped[k] * sx, imgY + split.dropped[k + 1] * sy))
+                        k += 2
+                    }
+                    k = 0
+                    while (k + 1 < split.kept.size) {
+                        drawCircle(HotPink, 2.5.dp.toPx(), Offset(imgX + split.kept[k] * sx, imgY + split.kept[k + 1] * sy))
+                        k += 2
+                    }
+                }
+                // Counts, with no words to translate: pink = used, white = left out by the marks.
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 16.dp, top = 16.dp)
+                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(24.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.size(8.dp).background(HotPink, CircleShape))
+                    Text("${split.keptCount}", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                    Box(Modifier.size(8.dp).background(Color.White.copy(alpha = 0.5f), CircleShape))
+                    Text("${split.droppedCount}", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                }
             }
 
             Box(

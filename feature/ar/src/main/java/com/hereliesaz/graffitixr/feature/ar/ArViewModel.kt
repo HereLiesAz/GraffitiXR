@@ -6324,6 +6324,21 @@ class ArViewModel @Inject constructor(
         return state.tempCaptureBitmap to state.annotatedCaptureBitmap
     }
 
+    /**
+     * The features the doodle builder's detector finds in the review [bitmap] (`[u0, v0, …]` in its
+     * pixels), for the review's keypoint overlay: SuperPoint when Settings → Doodle asks for it and the
+     * engine has it, else ORB, as the builders choose. Detected over the whole photo, before the marks
+     * mask, so the overlay can show which the mask keeps. Null when nothing could be detected.
+     */
+    suspend fun detectReviewKeypoints(bitmap: Bitmap): FloatArray? = withContext(dispatchers.default) {
+        runCatching {
+            val sp = if (_uiState.value.doodleFeatures.superPoint) {
+                StandaloneFingerprintBuilder.detectSuperPoint(slamManager, bitmap)
+            } else null
+            (sp ?: StandaloneFingerprintBuilder.detectOrb(bitmap, null, slam = slamManager))?.positions
+        }.getOrNull()
+    }
+
     // ── AR Measure (BACKLOG Phase 6 step 1) ─────────────────────────────────────────────────────
     // Points of the in-progress measurement in the unfused anchor frame, parallel to MeasureUi.points.
     // Main-thread only (tap handler, its viewModelScope continuation, rail clicks).

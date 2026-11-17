@@ -83,3 +83,21 @@ Report (screenshot, AR target review): white text on red is highlighted, black t
 - Not verified: the real photo (only a synthetic flyer and coaster), the Android build, speed on a phone.
 - Not changed: the paper's own edge band is still highlighted (pre-existing, the same in the screenshot);
   the mirror case (white print on a dark patch in a light scene) is untouched.
+
+# Target review: show the CV's keypoints, and the cap-before-mask question
+
+- Done: the review draws the detector's keypoints over the photo, pink where the marks mask keeps them,
+  white where it drops them, with both counts (no words, so no new strings). `detectReviewKeypoints`
+  (ArViewModel) runs the builder's own detector once per capture, off the main thread. The classification is
+  `DoodleKeypointPreview.split` (4 JVM tests). The Compose and view-model wiring is unbuilt (no Android SDK here).
+- Finding, for "should relocalization use ALL SuperPoint and ORB keypoints?": the builders detect over the
+  whole photo with the detector's default cap (SuperPoint `maxKps` 500, ORB 1500), THEN drop what falls
+  outside the marks mask (`filterByMask` / `applyMask`). `SuperPointDetector::detect` documents this exact
+  trap for its own masked overload ("the top-K is chosen from the WHOLE FRAME, and the mask then keeps
+  only whichever of those survive") and avoids it there; the Kotlin builders go through the unmasked
+  `nativeDetectSuperPoint` and reintroduce it. So the marks keep only the share of the top 500/1500 that
+  happens to land on them. The overlay's two counts measure it on a real capture.
+- Not "all": the live matcher is brute-force knnMatch, cost ~ doodle rows x live rows (256-float rows for
+  SuperPoint), and low-score keypoints repeat worst across viewpoint (see `kDefaultScoreThresh`). The change
+  to consider is "mask first, cap after" (uncapped candidates, mask, then the budget), not removing the cap.
+  Not done: it changes relocalization behaviour and wants a device measurement first.

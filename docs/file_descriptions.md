@@ -164,6 +164,9 @@ the real (non-stub) tracker is packaged.
     first (views from more than 45° above or below the wall's normal, which a camera at a wall rarely
     takes, last; none dropped), four at a time, into a `PhotosphereTrackingSession` (standalone) or `SphereSlamTracker`
     (ARCore), and tells it which to search.
+*   `DoodleKeypointPreview.kt`: the target review's keypoint overlay — the features the doodle's detector
+    (SuperPoint, else ORB) finds in the capture photo, split by the marks mask into those the doodle keeps
+    (pink) and those it drops (white), by the builders' own rule. Detected by `ArViewModel.detectReviewKeypoints`.
 *   `anchor/CloseUpFeatures.kt`: the doodle's close-ups — square-on crops of the capture photo
     at zooms 6×, 3×, 2× over the aim grid, detected with the base detector, mapped back to its pixels.
     The 6× crops over featureless wall are skipped and the rest go densest first; the crops past the
