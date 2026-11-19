@@ -37,6 +37,11 @@ updates:
         patterns:
           - "com.squareup.okhttp3*"
           - "com.squareup.retrofit2*"
+      # The netty pins sit side by side in the root build.gradle.kts, so separate PRs for them
+      # conflict with each other (#2094 after #2095); one grouped PR does not.
+      netty:
+        patterns:
+          - "io.netty*"
       kotlin:
         patterns:
           - "org.jetbrains.kotlin*"
