@@ -9,7 +9,8 @@
 
 ## **2. CI/CD Pipeline**
 
--   **Pull requests.** No build workflow lives here. `label.yml` (central `pr-labeler.yml`) labels PRs.
+-   **Pull requests.** No build workflow lives here, and nothing labels PRs automatically (the labeler
+    workflow, a `pull_request_target` job calling a central workflow at `@main`, was removed).
 -   **Merge to `main` → central builds.** Signed AAB/APK, Google Play and the GitHub release are run by
     the central HereLiesAz/workflows repository (Android Play Release / Android GitHub Release). No
     workflow in this repository builds on push to `main`.
