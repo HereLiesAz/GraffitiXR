@@ -24,7 +24,7 @@ buildscript {
         // a covert timing channel (HIGH), LDAP injection, and a risky-crypto-algo issue in
         // bcpkix — all first patched in 1.84. Forced here to 1.86 (a later release that still
         // carries those fixes); the bcprov/bcpkix/bcutil versions must match.
-        "org.bouncycastle:bcprov-jdk18on:1.86",
+        "org.bouncycastle:bcprov-jdk18on:1.87",
         "org.bouncycastle:bcpkix-jdk18on:1.86",
         "org.bouncycastle:bcutil-jdk18on:1.86",
         // Kotlin (currently 2.4.20, see `kotlin` in libs.versions.toml) emits class metadata at
