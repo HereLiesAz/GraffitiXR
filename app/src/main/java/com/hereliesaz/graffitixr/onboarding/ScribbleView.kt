@@ -48,7 +48,7 @@ fun ScribbleView(
     }
 }
 
-private fun drawScribble(
+internal fun drawScribble(
     nc: AndroidCanvas,
     scribble: Scribble,
     w: Float,

@@ -10,16 +10,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.model.AzButtonShape
+import com.hereliesaz.graffitixr.design.R as DesignR
 
 /**
  * First-run step one: show the scribble and wait while the user copies it onto their wall.
@@ -47,7 +54,10 @@ fun ScribbleDrawScreen(
     onDrawn: () -> Unit,
     onSkip: () -> Unit,
     modifier: Modifier = Modifier,
+    artwork: FirstRunArtwork? = null,
 ) {
+    // How much of the picture shows under the glyphs. The glyphs themselves are always fully opaque.
+    var artworkAlpha by rememberSaveable { mutableFloatStateOf(DEFAULT_ARTWORK_ALPHA) }
     Box(
         modifier
             .fillMaxSize()
@@ -76,16 +86,39 @@ fun ScribbleDrawScreen(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 contentAlignment = Alignment.Center,
             ) {
-                ScribbleView(
-                    scribble = scribble,
-                    modifier = Modifier.aspectRatio(scribble.aspect),
-                )
+                if (artwork != null) {
+                    ScribbleOverArtwork(
+                        scribble = scribble,
+                        artwork = artwork,
+                        artworkAlpha = artworkAlpha,
+                        modifier = Modifier.aspectRatio(scribble.aspect),
+                    )
+                } else {
+                    ScribbleView(
+                        scribble = scribble,
+                        modifier = Modifier.aspectRatio(scribble.aspect),
+                    )
+                }
             }
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
+                if (artwork != null) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = stringResource(DesignR.string.adj_opacity),
+                            color = Color.White.copy(alpha = 0.75f),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                        Slider(
+                            value = artworkAlpha,
+                            onValueChange = { artworkAlpha = it },
+                            valueRange = 0f..1f,
+                        )
+                    }
+                }
                 Text(
                     text = hint,
                     color = Color.White.copy(alpha = 0.75f),
@@ -108,3 +141,6 @@ fun ScribbleDrawScreen(
         }
     }
 }
+
+/** The picture starts half shown: the glyphs are clear on it, and so is what it is a picture of. */
+private const val DEFAULT_ARTWORK_ALPHA = 0.5f

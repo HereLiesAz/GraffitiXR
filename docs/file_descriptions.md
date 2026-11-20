@@ -24,8 +24,14 @@ This document lists key files in the repository and their purposes.
     first-run "draw this on your surface" step. The characters are distinct ones from `GLYPH_POOL`, chosen
     for how much the tracker has to hold on to (corners and crossings: `#`, `&`, `m`, `4`, not the smooth
     `O`, `l`, `C`), one per look-alike group since they are drawn at random angles. The layout is made after
-    the artwork is picked, in the shape of its subject (`ScribbleFit.aspectOfSubject`: the opaque part of a
-    cut-out, or what differs from a plain backdrop), and `ScribbleDrawScreen` draws it at that aspect ratio.
+    the artwork is picked, in the shape of its subject (`ScribbleFit.subjectOf`: the opaque part of a
+    cut-out, or what differs from a plain backdrop, grown to a drawable aspect inside the picture), and
+    `ScribbleDrawScreen` draws it at that aspect ratio **over that part of the artwork**
+    (`ScribbleOverArtwork`): the picture at the slider's opacity on black, the glyphs on top as a mask that
+    inverts whatever is behind them (the backdrop, kept through a glyph-shaped bitmap by `DST_IN` and turned
+    over by a colour matrix as the layer lands, so it needs no API 29 blend mode), always fully opaque, with a
+    dark halo underneath for the mid-tones an inversion cannot separate. `FirstRunArtwork` / `FirstRunDraw` /
+    `loadFirstRunArtwork` carry the decoded picture from `MainActivity`.
 *   `HelpItemsBuilder.kt`: Builds the `helpList` map for the rail's help overlay (rail-item id → help text).
 *   `RailIntegrityCheck.kt`: Debug-only invariants — validates helpList keys and guidance highlight ids against the registered rail items.
 
