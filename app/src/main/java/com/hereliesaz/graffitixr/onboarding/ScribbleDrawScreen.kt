@@ -30,8 +30,8 @@ import com.hereliesaz.aznavrail.model.AzButtonShape
  * established yet. Detection happens afterwards, as its own step, once there is actually something
  * drawn to detect.
  *
- * The scribble fills a square that tracks the screen width, which is what makes it big enough to
- * copy at arm's length.
+ * The scribble fills the biggest box of its own shape (the artwork's, see [ScribbleFit]) that fits the
+ * screen, which is what makes it big enough to copy at arm's length.
  *
  * [onSkip] is not optional garnish. This screen is opaque and mounted ahead of everything else in its
  * layer, so without a way out the marks would be a toll gate on reaching the app at all — and they are
@@ -69,15 +69,18 @@ fun ScribbleDrawScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            ScribbleView(
-                scribble = scribble,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    // Square, so the generator's normalized [0,1]x[0,1] layout is drawn without
-                    // distorting the glyph spread.
-                    .aspectRatio(1f)
-                    .weight(1f, fill = false),
-            )
+            // The scribble's own shape, which is the artwork's: it is drawn at its aspect ratio, as big as
+            // fits, so the generator's normalized layout is not stretched and a wide mural is not asked
+            // to be copied as a square block.
+            Box(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                ScribbleView(
+                    scribble = scribble,
+                    modifier = Modifier.aspectRatio(scribble.aspect),
+                )
+            }
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,

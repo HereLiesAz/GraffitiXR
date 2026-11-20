@@ -996,7 +996,27 @@ class MainActivity : AppCompatActivity() {
                 var firstRunTriggered by rememberSaveable { mutableStateOf(false) }
                 // Set on a successful pick; the effect below sets it as the design once the project id exists.
                 var firstRunPendingUri by rememberSaveable { mutableStateOf<Uri?>(null) }
-                val firstRunScribble = remember { com.hereliesaz.graffitixr.onboarding.ScribbleGenerator.generate() }
+                // The picked image, kept after the effect below has applied it as the design (it nulls
+                // firstRunPendingUri), so the scribble can be shaped to it.
+                var firstRunImageUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+                // Saved, so rotating the phone mid-draw gives back the same scribble.
+                val firstRunScribbleSeed = rememberSaveable { kotlin.random.Random.nextLong() }
+                // The scribble is made once the artwork is known, in the artwork's shape (its subject's
+                // bounding box), and the draw screen waits for it: null until then. A picture that cannot
+                // be read gives the square layout.
+                val firstRunScribble by produceState<com.hereliesaz.graffitixr.onboarding.Scribble?>(
+                    initialValue = null, firstRunImageUri, firstRunScribbleSeed,
+                ) {
+                    val picked = firstRunImageUri
+                    value = if (picked == null) null else {
+                        val aspect = runCatching {
+                            com.hereliesaz.graffitixr.onboarding.scribbleAspectFor(this@MainActivity, picked)
+                        }.getOrDefault(1f)
+                        com.hereliesaz.graffitixr.onboarding.ScribbleGenerator.generate(
+                            kotlin.random.Random(firstRunScribbleSeed), aspect = aspect,
+                        )
+                    }
+                }
                 // Gates firstRunImagePicker behind a one-or-two-sentence explainer so a brand-new user
                 // doesn't get an unexplained OS photo picker as their very first thing on launch. The
                 // "Not now" action marks the tutorial complete (same mechanism as every other exit from
@@ -1023,6 +1043,7 @@ class MainActivity : AppCompatActivity() {
                         // has propagated — onAddLayer no-ops on a null projectId, so we can't add here.
                         dashboardViewModel.createAndOpenProject()
                         firstRunPendingUri = uri
+                        firstRunImageUri = uri
                         // Straight to DRAW; AR is not entered until the marks exist.
                         firstRunStage = FirstRunStage.DRAW
                     }
@@ -1410,9 +1431,10 @@ class MainActivity : AppCompatActivity() {
                         // First-run DRAW stage: the scribble owns the whole screen while the user
                         // copies it. Mounted before the AR coaching below and returns early, so
                         // nothing else in this layer can draw over it.
-                        if (firstRunStage == FirstRunStage.DRAW && !showSettings) {
+                        val drawScribble = firstRunScribble
+                        if (firstRunStage == FirstRunStage.DRAW && !showSettings && drawScribble != null) {
                             com.hereliesaz.graffitixr.onboarding.ScribbleDrawScreen(
-                                scribble = firstRunScribble,
+                                scribble = drawScribble,
                                 title = stringResource(DesignR.string.first_run_draw_title),
                                 hint = stringResource(DesignR.string.first_run_draw_hint),
                                 doneLabel = stringResource(DesignR.string.first_run_draw_done),

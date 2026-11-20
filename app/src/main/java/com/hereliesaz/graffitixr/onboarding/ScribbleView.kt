@@ -13,7 +13,8 @@ import androidx.compose.ui.graphics.toArgb
 import kotlin.math.min
 
 /**
- * Renders a [Scribble] — the glyphs are laid out in a normalized [0,1] square, so this scales the
+ * Renders a [Scribble] — the glyphs are laid out in a normalized [0,1] x [0,1] canvas of the scribble's
+ * [Scribble.aspect] (the caller gives it a box of that shape), so this scales the
  * generator's output to whatever box the caller gives it. Each glyph is drawn centred on its
  * ([ScribbleGlyph.cx], [ScribbleGlyph.cy]) and rotated by [ScribbleGlyph.rotationDeg]. A soft shadow
  * keeps it legible whether it is drawn on the dark draw-step ground or over a camera feed.

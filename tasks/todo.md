@@ -101,3 +101,21 @@ Report (screenshot, AR target review): white text on red is highlighted, black t
   SuperPoint), and low-score keypoints repeat worst across viewpoint (see `kDefaultScoreThresh`). The change
   to consider is "mask first, cap after" (uncapped candidates, mask, then the budget), not removing the cap.
   Not done: it changes relocalization behaviour and wants a device measurement first.
+
+# First-run scribble: curated glyphs, fitted to the artwork
+
+- Measured (not guessed): per-character keypoints with the app's own SuperPoint/ORB reproduction, black marks
+  on a pale wall, two glyph sizes, three rotations. SuperPoint 2-32 per glyph (median 10), ORB repeatability under
+  tilt 0.08 (`O`) to 0.54 (`#`). A random scribble: median ~50 SuperPoint keypoints, p5 ~33; from the pool: ~74, min 46.
+  Never below the app's own 16-20 floor either way, so this is quality, not a fix for failures.
+- Pool `#&m%t4f8@RaHX?`, one per look-alike group (rotation equivalents: M/W, +/x, 6/9...), `*` left out
+  (small and raised in the app font, which the glyph is not centred for). Not used: the hint sentence about corners
+  (needs 14 translations).
+- Layout: `generate(aspect)`: grid chosen for the biggest cells on the canvas (a row for a wide box, a column for a
+  tall one); `ScribbleFit` reads the subject's bounding box from a 96 px decode (opaque pixels of a cut-out, else
+  what differs from the border colour; specks trimmed; 0.4..2.5). The scribble is generated after the pick and the
+  draw screen waits for it; the seed is saved so rotating the phone keeps it.
+- Verified on the JVM (real sources, 24 tests; 3 mutations each fail the test meant for them). Unbuilt: the Android
+  wiring (`MainActivity` produceState, `ScribbleDrawScreen` layout, `ScribbleFitLoader`).
+- Known limits: the subject is a bounding box, not a silhouette; on API 26-27 an EXIF-rotated photo can have its
+  sides swapped; measured on DejaVu Bold, not the app's font, and on synthetic marks, not hand-painted ones.
