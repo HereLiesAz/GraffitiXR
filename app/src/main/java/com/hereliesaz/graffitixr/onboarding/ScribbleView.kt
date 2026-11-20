@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.onboarding
 
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -48,6 +49,9 @@ fun ScribbleView(
     }
 }
 
+/** The light weight small scribbles are drawn in (the device's own, where it has no thin face, the plain one). */
+private val THIN_TYPEFACE: Typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
+
 internal fun drawScribble(
     nc: AndroidCanvas,
     scribble: Scribble,
@@ -57,6 +61,9 @@ internal fun drawScribble(
     paint: Paint,
     fontMetrics: Paint.FontMetrics,
 ) {
+    // A scribble laid out inside a small or narrow subject has small glyphs; a heavy stroke would clog them.
+    paint.isFakeBoldText = !scribble.thin
+    paint.typeface = if (scribble.thin) THIN_TYPEFACE else Typeface.DEFAULT
     scribble.glyphs.forEach { g ->
         val px = g.cx * w
         val py = g.cy * h

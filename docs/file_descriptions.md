@@ -20,18 +20,25 @@ This document lists key files in the repository and their purposes.
     use its separate legacy homography tracker on non-ARCore devices; Mockup/Trace are static.
 *   `MainViewModel.kt`: Cross-cutting state — touch lock, Overlay ▸ Gyro toggle (`isOverlayGyroActive`), `CaptureStep` wizard for target creation, and the persisted first-run flag for the AR-unavailable explainer.
 *   `GuidanceDefinitions.kt`: The reactive status-driven guidance graph (AzNavRail 10.18) that replaced the old scripted-tutorial API and the hand-built onboarding coach. Declares `azStatus`/`azEdge`/`azGoal`/`azSuppressGuide` reusing the existing `onboarding_*` strings; per-mode goals self-activate on mode entry and persist completion.
-*   `onboarding/ScribbleGenerator.kt`, `ScribbleFit.kt`, `ScribbleFitLoader.kt`, `ScribbleDrawScreen.kt`, `ScribbleView.kt`: the
-    first-run "draw this on your surface" step. The characters are distinct ones from `GLYPH_POOL`, chosen
-    for how much the tracker has to hold on to (corners and crossings: `#`, `&`, `m`, `4`, not the smooth
-    `O`, `l`, `C`), one per look-alike group since they are drawn at random angles. The layout is made after
-    the artwork is picked, in the shape of its subject (`ScribbleFit.subjectOf`: the opaque part of a
-    cut-out, or what differs from a plain backdrop, grown to a drawable aspect inside the picture), and
-    `ScribbleDrawScreen` draws it at that aspect ratio **over that part of the artwork**
-    (`ScribbleOverArtwork`): the picture at the slider's opacity on black, the glyphs on top as a mask that
-    inverts whatever is behind them (the backdrop, kept through a glyph-shaped bitmap by `DST_IN` and turned
-    over by a colour matrix as the layer lands, so it needs no API 29 blend mode), always fully opaque, with a
-    dark halo underneath for the mid-tones an inversion cannot separate. `FirstRunArtwork` / `FirstRunDraw` /
-    `loadFirstRunArtwork` carry the decoded picture from `MainActivity`.
+*   `onboarding/ScribbleGenerator.kt`, `ScribbleFit.kt`, `ScribbleFitLoader.kt`, `ScribbleDrawScreen.kt`, `ScribbleView.kt`,
+    `ScribbleOverArtwork.kt`, `GlyphColor.kt`: the first-run "draw this on your surface" step. The characters are
+    distinct ones from `GLYPH_POOL`, chosen for how much the tracker has to hold on to (corners and crossings:
+    `#`, `&`, `m`, `4`, not the smooth `O`, `l`, `C`), one per look-alike group since they are drawn at random
+    angles. The layout is made after the artwork is picked, **inside the subject's silhouette**
+    (`ScribbleFit.subjectOf`: the opaque part of a cut-out, or what differs from a plain backdrop; specks dropped,
+    small holes filled, sampled to a 24-cell-per-edge `SubjectMask`; none when the subject fills its box). With a
+    mask, `ScribbleGenerator` keeps every glyph's whole footprint circle inside it: the biggest size at which
+    four to six fit apart, shrinking by a tenth until they do, and when even the smallest does not (a sliver,
+    a speck) a pile on the deepest part of the subject, each as big as its spot allows. There is no layout
+    outside the subject; small glyphs (`Scribble.thin`) are drawn in a thin typeface so they stay legible. Without
+    a mask (no artwork, or a subject that fills its box) the old grid at the subject's aspect is used.
+    `ScribbleDrawScreen` draws it at that aspect ratio **over that part of the artwork** (`ScribbleOverArtwork`):
+    the picture at the slider's opacity on black, and over it each glyph pixel in `GlyphColor.opposite` of the
+    pixel behind it: not the per-channel negative (a grey's is a grey) but the vivid opposite, hue half way round
+    the wheel (cyan over a dark neutral, hot pink over a light one), saturation and value turned over, and
+    pushed away until it is `MIN_SEPARATION` from the backdrop. Always fully opaque, with a dark halo underneath.
+    The glyph pixels are recoloured only when the slider crosses one of 32 steps. `FirstRunArtwork` /
+    `FirstRunDraw` / `loadFirstRunArtwork` carry the decoded picture from `MainActivity`.
 *   `HelpItemsBuilder.kt`: Builds the `helpList` map for the rail's help overlay (rail-item id → help text).
 *   `RailIntegrityCheck.kt`: Debug-only invariants — validates helpList keys and guidance highlight ids against the registered rail items.
 

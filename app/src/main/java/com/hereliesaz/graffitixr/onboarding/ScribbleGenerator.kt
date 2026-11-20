@@ -22,8 +22,9 @@ data class ScribbleGlyph(
  * A set of glyphs forming one scribble for the user to copy. [aspect] is the width / height of the
  * canvas the glyphs' normalized coordinates are for: 1 is the square the scribble always used to be,
  * and a different value lays the glyphs out to fit a wider or taller box (the shape of the artwork).
+ * [thin] says the glyphs were made too small for the usual bold weight: they are drawn in a thin one.
  */
-data class Scribble(val glyphs: List<ScribbleGlyph>, val aspect: Float = 1f)
+data class Scribble(val glyphs: List<ScribbleGlyph>, val aspect: Float = 1f, val thin: Boolean = false)
 
 /**
  * Generates the random "draw this" scribble shown at first run: a handful of large characters
@@ -76,6 +77,10 @@ object ScribbleGenerator {
     private const val MIN_SIZE = 0.20f
     private const val MAX_SIZE = 0.34f
 
+    /** The usual range of a glyph's size, as a fraction of the canvas' shorter edge (smaller ones are drawn thin). */
+    const val MIN_SIZE_FRAC = MIN_SIZE
+    const val MAX_SIZE_FRAC = MAX_SIZE
+
     /** Keep centres inside a margin so rotated glyphs don't clip the canvas edge. */
     private const val MARGIN = 0.12f
 
@@ -95,14 +100,18 @@ object ScribbleGenerator {
      * @param aspect the canvas' width / height, so the glyphs fit the shape they will be drawn in (the
      *   artwork's) instead of always filling a square. 1 is the square layout; not finite or not
      *   positive is treated as 1, and the rest is clamped to [[MIN_ASPECT], [MAX_ASPECT]].
+     * @param subject the artwork's silhouette over the canvas, when it does not fill it: every glyph then
+     *   lies wholly inside it (see [generateInSubject]); null lays the glyphs over the whole canvas.
      */
     fun generate(
         random: Random = Random.Default,
         glyphCount: Int = random.nextInt(MIN_GLYPHS, MAX_GLYPHS + 1),
         aspect: Float = 1f,
+        subject: ScribbleFit.SubjectMask? = null,
     ): Scribble {
         val n = glyphCount.coerceIn(MIN_GLYPHS, MAX_GLYPHS)
         val a = if (aspect.isFinite() && aspect > 0f) aspect.coerceIn(MIN_ASPECT, MAX_ASPECT) else 1f
+        if (subject != null) return generateInSubject(random, n, a, subject)
 
         // The canvas in units of its shorter edge (glyph sizes are fractions of that edge): the shorter
         // edge is 1, the longer is a or 1 / a.
@@ -149,6 +158,117 @@ object ScribbleGenerator {
 
         return Scribble(glyphs, a)
     }
+
+    /** Radius of the biggest glyph footprint the silhouette layout starts from: half [MAX_SIZE]. */
+    private const val START_RADIUS = MAX_SIZE / 2f
+
+    /** Glyph footprints are kept this far apart, as a multiple of their diameter, while there is room to. */
+    private const val SPACING = 0.8f
+
+    /** A glyph's footprint radius, as a share of the room it has: no more than this, so it stays clear of the edge. */
+    private const val FILL_LOW = 0.75f
+    private const val FILL_HIGH = 0.95f
+
+    /**
+     * The scribble laid out inside the artwork's silhouette, [mask] over a canvas of aspect [a]: every glyph's
+     * footprint (a circle of radius `sizeFrac / 2` round its centre) lies wholly inside the subject, never on
+     * the backdrop the artist has no intention of painting. There is no fallback to a layout that leaves it.
+     *
+     * The footprints start as big as the usual glyphs and spread as far apart as the shape allows (farthest-point
+     * sampling over the cells that are deep enough inside it). Where the shape cannot hold [n] of them that
+     * size, they shrink until it can; where it cannot hold them apart at any size (a sliver, a speck) they are
+     * piled up on its deepest part, each as big as its own spot allows. Glyphs made smaller than the usual
+     * range are drawn thin, so a pile still reads ([Scribble.thin]).
+     */
+    private fun generateInSubject(random: Random, n: Int, a: Float, mask: ScribbleFit.SubjectMask): Scribble {
+        val canvasW = if (a >= 1f) a else 1f
+        val canvasH = if (a >= 1f) 1f else 1f / a
+        val cellW = canvasW / mask.width
+        val cellH = canvasH / mask.height
+        val cell = minOf(cellW, cellH)
+
+        // The cells inside the subject, and how deep each is: the radius of the largest circle about its
+        // centre that stays inside the subject and the canvas.
+        val ix = ArrayList<Float>(); val iy = ArrayList<Float>()
+        val ox = ArrayList<Float>(); val oy = ArrayList<Float>()
+        for (cy in 0 until mask.height) for (cx in 0 until mask.width) {
+            val x = (cx + 0.5f) * cellW; val y = (cy + 0.5f) * cellH
+            if (mask[cx, cy]) { ix += x; iy += y } else { ox += x; oy += y }
+        }
+        if (ix.isEmpty()) { ix += canvasW / 2f; iy += canvasH / 2f } // a speck the cells missed: its middle
+        val m = ix.size
+        val depth = FloatArray(m) { i ->
+            var d = minOf(ix[i], canvasW - ix[i], iy[i], canvasH - iy[i])
+            for (k in ox.indices) {
+                // 0.71 of a cell: its half-diagonal, so a circle that clears this centre clears the whole cell.
+                d = minOf(d, hypot(ix[i] - ox[k], iy[i] - oy[k]) - 0.71f * cell)
+            }
+            maxOf(d, 0f)
+        }
+        val maxDepth = depth.max()
+
+        // The biggest size at which n footprints fit apart; smaller until they do.
+        var radius = minOf(START_RADIUS, maxDepth)
+        var chosen: IntArray? = null
+        val smallest = 0.5f * cell
+        while (chosen == null && radius >= smallest) {
+            val deepEnough = (0 until m).filter { depth[it] >= radius }
+            chosen = spread(random, deepEnough, n, ix, iy, SPACING * 2f * radius)
+            if (chosen == null) radius *= 0.9f
+        }
+
+        val picks: IntArray
+        val radii: FloatArray
+        if (chosen != null) {
+            picks = chosen
+            radii = FloatArray(n) { radius }
+        } else {
+            // No room to keep them apart: a pile on the deepest part of the subject, each as big as its spot allows.
+            val deep = (0 until m).filter { depth[it] >= 0.5f * maxDepth }.ifEmpty { listOf(depth.indices.maxByOrNull { depth[it] } ?: 0) }
+            picks = spread(random, deep, n, ix, iy, 0f) ?: IntArray(n) { deep[random.nextInt(deep.size)] }
+            radii = FloatArray(n) { minOf(depth[picks[it]], START_RADIUS) }
+        }
+
+        val chars = GLYPH_POOL.shuffled(random)
+        val glyphs = (0 until n).map { k ->
+            val i = picks[k]
+            val rad = maxOf(radii[k] * (FILL_LOW + random.nextFloat() * (FILL_HIGH - FILL_LOW)), 0.3f * cell)
+            ScribbleGlyph(
+                char = chars[k],
+                cx = ix[i] / canvasW,
+                cy = iy[i] / canvasH,
+                rotationDeg = randomRotation(random),
+                sizeFrac = 2f * rad,
+            )
+        }
+        return Scribble(glyphs, a, thin = glyphs.any { it.sizeFrac < MIN_SIZE })
+    }
+
+    /**
+     * [n] of the [candidates] (indices into [xs], [ys]) as far from one another as they go: the first at random,
+     * each next the one farthest from those chosen (with a little noise, so equal choices vary), and null when the
+     * next would be nearer than [minDistance]. Fewer candidates than [n] reuse them.
+     */
+    private fun spread(random: Random, candidates: List<Int>, n: Int, xs: List<Float>, ys: List<Float>, minDistance: Float): IntArray? {
+        if (candidates.isEmpty()) return null
+        val chosen = IntArray(n)
+        chosen[0] = candidates[random.nextInt(candidates.size)]
+        val nearest = FloatArray(candidates.size) { k -> dist(xs, ys, candidates[k], chosen[0]) }
+        for (c in 1 until n) {
+            var best = -1; var bestScore = -1f
+            for (k in candidates.indices) {
+                val score = nearest[k] * (1f + 0.25f * random.nextFloat())
+                if (score > bestScore) { bestScore = score; best = k }
+            }
+            if (best < 0 || nearest[best] < minDistance) return null
+            chosen[c] = candidates[best]
+            for (k in candidates.indices) nearest[k] = minOf(nearest[k], dist(xs, ys, candidates[k], chosen[c]))
+        }
+        return chosen
+    }
+
+    private fun dist(xs: List<Float>, ys: List<Float>, a: Int, b: Int): Float =
+        hypot(xs[a] - xs[b], ys[a] - ys[b])
 
     /**
      * Columns and rows for [n] cells on a [usableW] x [usableH] area: the biggest cells that hold n,

@@ -134,4 +134,67 @@ class ScribbleFitTest {
             assertEquals("$w x $h $r", s.aspect, (r.right - r.left) * w / ((r.bottom - r.top) * h), 0.02f)
         }
     }
+
+    // --- the silhouette ---
+
+    private fun disc(w: Int, h: Int, cx: Int, cy: Int, r: Int, bg: Int = white, fg: Int = black): IntArray {
+        val px = image(w, h, bg)
+        for (y in 0 until h) for (x in 0 until w) if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r) px[y * w + x] = fg
+        return px
+    }
+
+    @Test
+    fun `a round subject gets a round silhouette, empty in the corners`() {
+        val m = ScribbleFit.subjectOf(disc(96, 96, 48, 48, 40), 96, 96).mask!!
+        assertTrue(m[m.width / 2, m.height / 2])
+        assertTrue(!m[0, 0] && !m[m.width - 1, 0] && !m[0, m.height - 1] && !m[m.width - 1, m.height - 1])
+        val filled = m.bits.count { it }.toFloat() / m.bits.size
+        assertTrue("filled $filled", filled in 0.6f..0.9f) // pi/4 of a square, about 0.785
+    }
+
+    @Test
+    fun `the silhouette's cells keep the region's proportions`() {
+        val px = image(96, 96, white).also { it.rect(96, 8, 30, 88, 66, black); it.rect(96, 20, 20, 40, 76, black) } // a plus-ish shape, wider than tall
+        val s = ScribbleFit.subjectOf(px, 96, 96)
+        val m = s.mask!!
+        assertEquals(s.aspect, m.width.toFloat() / m.height, 0.08f)
+    }
+
+    @Test
+    fun `a subject that fills its box has no silhouette to hold glyphs to`() {
+        val px = image(96, 96, white).also { it.rect(96, 10, 20, 80, 70, black) }
+        assertEquals(null, ScribbleFit.subjectOf(px, 96, 96).mask)
+    }
+
+    @Test
+    fun `a small hole inside the subject is filled, not avoided`() {
+        val px = disc(96, 96, 48, 48, 40)
+        for (y in 44..52) for (x in 44..52) px[y * 96 + x] = white // a pupil
+        val m = ScribbleFit.subjectOf(px, 96, 96).mask!!
+        assertTrue(m[m.width / 2, m.height / 2])
+    }
+
+    @Test
+    fun `a big gap, as in a ring, stays a gap`() {
+        val px = disc(96, 96, 48, 48, 44)
+        for (y in 0 until 96) for (x in 0 until 96) if ((x - 48) * (x - 48) + (y - 48) * (y - 48) <= 24 * 24) px[y * 96 + x] = white
+        val m = ScribbleFit.subjectOf(px, 96, 96).mask!!
+        assertTrue(!m[m.width / 2, m.height / 2])
+    }
+
+    @Test
+    fun `a stray speck away from the subject is left out of the silhouette`() {
+        val px = disc(96, 96, 30, 48, 24)
+        for (y in 4..8) for (x in 88..92) px[y * 96 + x] = black
+        val s = ScribbleFit.subjectOf(px, 96, 96)
+        val m = s.mask!!
+        assertTrue("far corner must stay empty", !m[m.width - 1, 0])
+    }
+
+    @Test
+    fun `a cut-out's silhouette follows its transparent surround`() {
+        val px = disc(96, 96, 48, 48, 40, bg = clear, fg = black)
+        val m = ScribbleFit.subjectOf(px, 96, 96).mask!!
+        assertTrue(m[m.width / 2, m.height / 2] && !m[0, 0])
+    }
 }
