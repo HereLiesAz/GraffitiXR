@@ -137,3 +137,22 @@ Report (screenshot, AR target review): white text on red is highlighted, black t
   black, whichever is farther from the backdrop) instead of a per-channel inversion; it loses the colour inversion.
 - Verified on the JVM: the region logic (29 tests). Unbuilt: `ScribbleOverArtwork`, `ScribbleDrawScreen`, the loader,
   the `MainActivity` wiring, and the drawing itself (`saveLayer` + colour filter + `DST_IN` on a hardware canvas).
+
+# First-run scribble: inside the subject, vivid over the picture
+
+- Request: the doodles must be contained within the subject of the image (not just its aspect ratio), glyphs over
+  grey must be full-blown saturation, not more grey, and no layout fallback outside the subject: thin glyphs,
+  stacked in a pile, smaller, but in bounds.
+- Done: `SubjectMask` (24 cells per edge, specks dropped, small holes filled) from `ScribbleFit.subjectOf`;
+  `ScribbleGenerator.generate(subject = mask)` keeps every glyph's footprint circle inside the mask, shrinking
+  then piling on the deepest part, and sets `Scribble.thin` when any glyph is under the usual size (drawn in the
+  thin typeface). `GlyphColor.opposite` colours each glyph pixel; `ScribbleOverArtwork` recolours on slider steps.
+  The old `DST_IN` + colour-matrix inversion layer is gone. At opacity 0 the glyphs are vivid cyan on black.
+- Verified on the JVM (real sources): 52 tests (ScribbleGenerator 24, ScribbleFit 19, GlyphColor 8 +1 shared);
+  containment over disc, ellipses, L, ring, two blobs, bar, column, speck, 150 seeds each; two mutations
+  (no clean-up; depth ignoring outside cells) each fail the tests meant for them. Simulated the overlay in Python:
+  0 glyph pixels outside the subject, vivid colours over greys.
+- Not verified: any Android compile or draw (`ScribbleOverArtwork`, `ScribbleView` typeface, `MainActivity`
+  wiring), `sans-serif-thin` on a real device, recolour cost on a phone (per glyph pixel, 32 steps).
+- Known limits: the thin face is not the face the glyph pool was measured in (DejaVu Bold); a one-cell-wide
+  subject holds the glyph centre and a 0.3-cell footprint only.

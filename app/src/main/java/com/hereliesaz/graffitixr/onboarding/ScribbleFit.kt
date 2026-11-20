@@ -46,9 +46,33 @@ object ScribbleFit {
      * The part of a picture the scribble is laid out over: its [region] and that region's [aspect]
      * (width / height, in pixels), always within [[MIN_ASPECT], [MAX_ASPECT]].
      */
-    data class Subject(val region: Region, val aspect: Float)
+    data class Subject(val region: Region, val aspect: Float, val mask: SubjectMask? = null)
+
+    /**
+     * The subject's silhouette over its [Subject.region]: [bits], row-major [width] x [height] cells of about
+     * 1 / [CELLS_PER_EDGE] of the region's shorter edge, true where the subject is. Small holes are filled
+     * and stray specks dropped. Null on a [Subject] when the subject fills its region (nothing to keep out of).
+     */
+    class SubjectMask(val width: Int, val height: Int, val bits: BooleanArray) {
+        init { require(width > 0 && height > 0 && bits.size == width * height) }
+
+        /** True where the cell is inside the picture's subject; false outside the region. */
+        operator fun get(x: Int, y: Int): Boolean = x in 0 until width && y in 0 until height && bits[y * width + x]
+    }
 
     private val WHOLE = Region(0f, 0f, 1f, 1f)
+
+    /** Cells in the silhouette mask along the region's shorter edge. */
+    const val CELLS_PER_EDGE = 24
+
+    /** A subject component smaller than this share of the largest is a speck and is dropped. */
+    private const val KEEP_COMPONENT = 0.08f
+
+    /** An enclosed gap smaller than this share of the subject's area is the subject's own colour showing, and is filled. */
+    private const val FILL_HOLE = 0.25f
+
+    /** A silhouette that covers at least this share of its region is not worth keeping glyphs out of. */
+    private const val FULL_REGION = 0.985f
 
     /** The width / height of the subject in [argb] ([width] x [height], row-major ARGB): see [subjectOf]. */
     fun aspectOfSubject(argb: IntArray, width: Int, height: Int): Float = subjectOf(argb, width, height).aspect
@@ -72,7 +96,73 @@ object ScribbleFit {
         val (x0, x1) = trimmedExtent(cols, count)
         val (y0, y1) = trimmedExtent(rows, count)
         if (x1 - x0 + 1 < 1 || y1 - y0 + 1 < 1) return fitted(0f, 0f, width.toFloat(), height.toFloat(), width, height)
-        return fitted(x0.toFloat(), y0.toFloat(), (x1 + 1).toFloat(), (y1 + 1).toFloat(), width, height)
+        val box = fitted(x0.toFloat(), y0.toFloat(), (x1 + 1).toFloat(), (y1 + 1).toFloat(), width, height)
+        return box.copy(mask = silhouette(cleaned(mask, width, height), width, height, box.region, box.aspect))
+    }
+
+    /** The [clean] subject mask of a [width] x [height] picture, sampled over [region] into cells; null when it fills the region. */
+    private fun silhouette(clean: BooleanArray, width: Int, height: Int, region: Region, aspect: Float): SubjectMask? {
+        val mw = if (aspect >= 1f) Math.round(CELLS_PER_EDGE * aspect) else CELLS_PER_EDGE
+        val mh = if (aspect >= 1f) CELLS_PER_EDGE else Math.round(CELLS_PER_EDGE / aspect)
+        val bits = BooleanArray(mw * mh)
+        var inside = 0
+        for (cy in 0 until mh) for (cx in 0 until mw) {
+            val px = ((region.left + (cx + 0.5f) / mw * (region.right - region.left)) * width).toInt().coerceIn(0, width - 1)
+            val py = ((region.top + (cy + 0.5f) / mh * (region.bottom - region.top)) * height).toInt().coerceIn(0, height - 1)
+            if (clean[py * width + px]) { bits[cy * mw + cx] = true; inside++ }
+        }
+        return if (inside >= bits.size * FULL_REGION) null else SubjectMask(mw, mh, bits)
+    }
+
+    /** [mask] with its specks dropped and its small enclosed gaps filled (4-connected). */
+    private fun cleaned(mask: BooleanArray, width: Int, height: Int): BooleanArray {
+        val n = width * height
+        val out = mask.copyOf()
+        val queue = IntArray(n)
+        val label = IntArray(n) { -1 }
+
+        // Subject components: keep those that are not specks beside the largest.
+        val sizes = ArrayList<Int>()
+        for (start in 0 until n) {
+            if (!mask[start] || label[start] >= 0) continue
+            val id = sizes.size
+            var head = 0; var tail = 0
+            queue[tail++] = start; label[start] = id
+            while (head < tail) {
+                val p = queue[head++]
+                val x = p % width; val y = p / width
+                if (x > 0 && mask[p - 1] && label[p - 1] < 0) { label[p - 1] = id; queue[tail++] = p - 1 }
+                if (x < width - 1 && mask[p + 1] && label[p + 1] < 0) { label[p + 1] = id; queue[tail++] = p + 1 }
+                if (y > 0 && mask[p - width] && label[p - width] < 0) { label[p - width] = id; queue[tail++] = p - width }
+                if (y < height - 1 && mask[p + width] && label[p + width] < 0) { label[p + width] = id; queue[tail++] = p + width }
+            }
+            sizes.add(tail)
+        }
+        val largest = sizes.maxOrNull() ?: return out
+        var area = 0
+        for (i in 0 until n) if (mask[i]) {
+            if (sizes[label[i]] < largest * KEEP_COMPONENT) out[i] = false else area++
+        }
+
+        // Gaps: background components that do not reach the picture's edge, filled when small.
+        val seen = BooleanArray(n)
+        for (start in 0 until n) {
+            if (out[start] || seen[start]) continue
+            var head = 0; var tail = 0
+            var touchesEdge = false
+            queue[tail++] = start; seen[start] = true
+            while (head < tail) {
+                val p = queue[head++]
+                val x = p % width; val y = p / width
+                if (x == 0 || y == 0 || x == width - 1 || y == height - 1) touchesEdge = true
+                if (x > 0 && !out[p - 1] && !seen[p - 1]) { seen[p - 1] = true; queue[tail++] = p - 1 }
+                if (x < width - 1 && !out[p + 1] && !seen[p + 1]) { seen[p + 1] = true; queue[tail++] = p + 1 }
+                if (y > 0 && !out[p - width] && !seen[p - width]) { seen[p - width] = true; queue[tail++] = p - width }
+                if (y < height - 1 && !out[p + width] && !seen[p + width]) { seen[p + width] = true; queue[tail++] = p + width }
+            }
+            if (!touchesEdge && tail <= area * FILL_HOLE) for (k in 0 until tail) out[queue[k]] = true
+        }
+        return out
     }
 
     /** The box ([x0], [y0]) to ([x1], [y1]) in pixels, brought to a drawable aspect inside a [width] x [height] picture. */

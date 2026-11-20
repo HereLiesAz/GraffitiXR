@@ -3,11 +3,7 @@ package com.hereliesaz.graffitixr.onboarding
 import android.graphics.Bitmap
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Color as AndroidColor
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
 import android.graphics.RectF
 import androidx.compose.foundation.Canvas
@@ -21,16 +17,16 @@ import kotlin.math.roundToInt
 
 /**
  * The first-run scribble drawn over the artwork it will be copied for: the subject's part of the
- * picture at [artworkAlpha] (0 to 1) on black, and the glyphs on top as an inverting mask, so each
- * glyph is the colour of whatever is behind it, turned over. They read on a light patch and a dark one
- * alike, and with the picture at 0 they are the white-on-black they used to be. The glyphs are always
- * fully opaque: the slider that sets [artworkAlpha] changes the picture only.
+ * picture at [artworkAlpha] (0 to 1) on black, and the glyphs on top, each pixel of a glyph the
+ * [GlyphColor.opposite] of the pixel behind it: vivid over muted, light over dark, the other half of the
+ * colour wheel over a colour. With the picture at 0 the glyphs are vivid cyan on black. The glyphs are
+ * always fully opaque: the slider that sets [artworkAlpha] changes the picture, and so the colours, only.
  *
  * Drawn into a canvas of the scribble's own aspect ratio: the picture's region is stretched over it, so
  * the glyph layout (made for that aspect) covers the picture shown.
  *
- * Inverting a mid-tone gives a mid-tone, so a thin dark halo is drawn first and the inverted glyph on top
- * of it: where the picture is the colour the glyph would be, the halo still shows its edge.
+ * A thin dark halo is drawn under the glyphs, so a glyph still has an edge where a backdrop that varies
+ * under it pulls its colour close to the picture's.
  */
 @Composable
 fun ScribbleOverArtwork(
@@ -40,71 +36,141 @@ fun ScribbleOverArtwork(
     modifier: Modifier = Modifier,
 ) {
     val paints = remember { ArtworkPaints() }
-    // The glyph mask only depends on the scribble and the size drawn at: rendered once, not per slider move.
-    val maskCache = remember { MaskCache() }
+    // What depends only on the scribble, the picture and the size drawn at: made once, not per slider move.
+    val layer = remember { GlyphLayer() }
     Canvas(modifier) {
         val w = size.width.roundToInt()
         val h = size.height.roundToInt()
         if (w <= 0 || h <= 0) return@Canvas
-        val mask = maskCache.get(scribble, w, h, paints)
+        layer.prepare(scribble, artwork, w, h, paints)
+        val alpha = layer.step(artworkAlpha)
+        val doodle = layer.doodle(alpha)
         drawIntoCanvas { canvas ->
-            drawOverArtwork(canvas.nativeCanvas, w.toFloat(), h.toFloat(), scribble, artwork, artworkAlpha, mask, paints)
+            drawOverArtwork(canvas.nativeCanvas, w.toFloat(), h.toFloat(), scribble, layer, alpha, doodle, paints)
         }
     }
 }
+
+/** How many distinct picture opacities the glyph colours are worked out for: a drag over the slider recolours at most this often. */
+private const val ALPHA_STEPS = 32
 
 /** Paints reused across frames: nothing here allocates in the draw loop. */
 private class ArtworkPaints {
     val black = Paint().apply { color = AndroidColor.BLACK; style = Paint.Style.FILL }
     val image = Paint(Paint.FILTER_BITMAP_FLAG)
+    val doodle = Paint(Paint.FILTER_BITMAP_FLAG)
     val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = AndroidColor.argb(220, 0, 0, 0)
         textAlign = Paint.Align.CENTER
         style = Paint.Style.FILL
-        isFakeBoldText = true
         setShadowLayer(14f, 0f, 0f, AndroidColor.argb(230, 0, 0, 0))
     }
     val maskGlyph = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = AndroidColor.WHITE
         textAlign = Paint.Align.CENTER
         style = Paint.Style.FILL
-        isFakeBoldText = true
-    }
-    /** Keeps the layer only where the mask has alpha: DST_IN, with the mask drawn as a full-size bitmap. */
-    val keepInsideMask = Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
-    /** Applied to the layer as it is composited: every colour channel turned over, alpha kept. */
-    val invertLayer = Paint().apply {
-        colorFilter = ColorMatrixColorFilter(
-            ColorMatrix(
-                floatArrayOf(
-                    -1f, 0f, 0f, 0f, 255f,
-                    0f, -1f, 0f, 0f, 255f,
-                    0f, 0f, -1f, 0f, 255f,
-                    0f, 0f, 0f, 1f, 0f,
-                ),
-            ),
-        )
     }
     val fontMetrics = Paint.FontMetrics()
 }
 
-/** The glyphs as white-on-transparent alpha, for the scribble and size it was made for. */
-private class MaskCache {
+/**
+ * The picture's crop scaled to the canvas, and the glyph pixels with the picture's hue, saturation and
+ * value under each, so that a new opacity only recolours the glyphs: [doodle] is the glyphs as
+ * [GlyphColor.opposite] of that backdrop, transparent elsewhere.
+ */
+private class GlyphLayer {
     private var scribble: Scribble? = null
+    private var artwork: FirstRunArtwork? = null
     private var width = 0
     private var height = 0
-    private var bitmap: Bitmap? = null
 
-    fun get(scribble: Scribble, w: Int, h: Int, paints: ArtworkPaints): Bitmap {
-        val cached = bitmap
-        if (cached != null && this.scribble === scribble && width == w && height == h) return cached
-        val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        drawScribble(AndroidCanvas(out), scribble, w.toFloat(), h.toFloat(), min(w, h).toFloat(), paints.maskGlyph, paints.fontMetrics)
+    /** The picture's subject scaled to the canvas, over black: what is behind the glyphs at opacity 1. */
+    var crop: Bitmap? = null
+        private set
+
+    private var doodleBitmap: Bitmap? = null
+    private var doodleStep = -1
+
+    // Per glyph pixel: where it is, how much of it is glyph (0..255), and the backdrop at opacity 1.
+    private var index = IntArray(0)
+    private var cover = IntArray(0)
+    private var hue = FloatArray(0)
+    private var sat = FloatArray(0)
+    private var value = FloatArray(0)
+    private var out = IntArray(0)
+
+    fun step(alpha: Float): Int = (alpha.coerceIn(0f, 1f) * ALPHA_STEPS).roundToInt()
+
+    fun prepare(scribble: Scribble, artwork: FirstRunArtwork, w: Int, h: Int, p: ArtworkPaints) {
+        if (crop != null && this.scribble === scribble && this.artwork === artwork && width == w && height == h) return
+        crop?.recycle()
+        doodleBitmap?.recycle()
+
+        val c = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val cc = AndroidCanvas(c)
+        cc.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p.black)
+        val r = artwork.subject.region
+        val bw = artwork.bitmap.width
+        val bh = artwork.bitmap.height
+        val src = Rect(
+            (r.left * bw).roundToInt().coerceIn(0, bw - 1),
+            (r.top * bh).roundToInt().coerceIn(0, bh - 1),
+            (r.right * bw).roundToInt().coerceIn(1, bw),
+            (r.bottom * bh).roundToInt().coerceIn(1, bh),
+        )
+        p.image.alpha = 255
+        cc.drawBitmap(artwork.bitmap, src, RectF(0f, 0f, w.toFloat(), h.toFloat()), p.image)
+
+        // Where the glyphs are, as coverage.
+        val mask = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        drawScribble(AndroidCanvas(mask), scribble, w.toFloat(), h.toFloat(), min(w, h).toFloat(), p.maskGlyph, p.fontMetrics)
+        val maskPx = IntArray(w * h)
+        mask.getPixels(maskPx, 0, w, 0, 0, w, h)
+        mask.recycle()
+        val backPx = IntArray(w * h)
+        c.getPixels(backPx, 0, w, 0, 0, w, h)
+
+        var n = 0
+        for (v in maskPx) if ((v ushr 24) != 0) n++
+        index = IntArray(n)
+        cover = IntArray(n)
+        hue = FloatArray(n)
+        sat = FloatArray(n)
+        value = FloatArray(n)
+        out = IntArray(w * h)
+        val hsv = FloatArray(3)
+        var k = 0
+        for (i in maskPx.indices) {
+            val a = maskPx[i] ushr 24
+            if (a == 0) continue
+            GlyphColor.toHsv(backPx[i], hsv)
+            index[k] = i; cover[k] = a; hue[k] = hsv[0]; sat[k] = hsv[1]; value[k] = hsv[2]
+            k++
+        }
+
+        crop = c
+        doodleBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        doodleStep = -1
         this.scribble = scribble
+        this.artwork = artwork
         width = w
         height = h
-        bitmap = out
-        return out
+    }
+
+    /** The glyphs coloured for picture opacity [step] of [ALPHA_STEPS]; recoloured only when the step changes. */
+    fun doodle(step: Int): Bitmap {
+        val bmp = doodleBitmap!!
+        if (step == doodleStep) return bmp
+        val a = step.toFloat() / ALPHA_STEPS
+        java.util.Arrays.fill(out, 0)
+        for (k in index.indices) {
+            // The picture at opacity a over black is the same colour with its value scaled by a.
+            val rgb = GlyphColor.opposite(hue[k], sat[k], value[k] * a)
+            out[index[k]] = (cover[k] shl 24) or (rgb and 0xFFFFFF)
+        }
+        bmp.setPixels(out, 0, width, 0, 0, width, height)
+        doodleStep = step
+        return bmp
     }
 }
 
@@ -113,36 +179,15 @@ private fun drawOverArtwork(
     w: Float,
     h: Float,
     scribble: Scribble,
-    artwork: FirstRunArtwork,
-    artworkAlpha: Float,
-    mask: Bitmap,
+    layer: GlyphLayer,
+    step: Int,
+    doodle: Bitmap,
     p: ArtworkPaints,
 ) {
-    val dst = RectF(0f, 0f, w, h)
-    val r = artwork.subject.region
-    val bw = artwork.bitmap.width
-    val bh = artwork.bitmap.height
-    val src = Rect(
-        (r.left * bw).roundToInt().coerceIn(0, bw - 1),
-        (r.top * bh).roundToInt().coerceIn(0, bh - 1),
-        (r.right * bw).roundToInt().coerceIn(1, bw),
-        (r.bottom * bh).roundToInt().coerceIn(1, bh),
-    )
-    p.image.alpha = (artworkAlpha.coerceIn(0f, 1f) * 255f).roundToInt()
-
-    // What is behind the glyphs: black, then the picture at the chosen opacity.
-    fun backdrop() {
-        nc.drawRect(dst, p.black)
-        if (p.image.alpha > 0) nc.drawBitmap(artwork.bitmap, src, dst, p.image)
-    }
-
-    backdrop()
+    nc.drawRect(0f, 0f, w, h, p.black)
+    p.image.alpha = (step.toFloat() / ALPHA_STEPS * 255f).roundToInt()
+    if (p.image.alpha > 0) layer.crop?.let { nc.drawBitmap(it, 0f, 0f, p.image) }
     // A dark halo round each glyph, so a glyph the colour of its surroundings still has an edge.
     drawScribble(nc, scribble, w, h, min(w, h), p.halo, p.fontMetrics)
-    // The glyphs: the backdrop again, kept only where the mask is set, turned over as the layer lands.
-    // (A text draw in DST_IN would only touch the pixels it covers, so the mask is a full-size bitmap.)
-    val layer = nc.saveLayer(dst, p.invertLayer)
-    backdrop()
-    nc.drawBitmap(mask, 0f, 0f, p.keepInsideMask)
-    nc.restoreToCount(layer)
+    nc.drawBitmap(doodle, 0f, 0f, p.doodle)
 }

@@ -1015,6 +1015,7 @@ class MainActivity : AppCompatActivity() {
                         com.hereliesaz.graffitixr.onboarding.FirstRunDraw(
                             com.hereliesaz.graffitixr.onboarding.ScribbleGenerator.generate(
                                 kotlin.random.Random(firstRunScribbleSeed), aspect = artwork?.subject?.aspect ?: 1f,
+                                subject = artwork?.subject?.mask,
                             ),
                             artwork,
                         )
