@@ -1001,19 +1001,22 @@ class MainActivity : AppCompatActivity() {
                 var firstRunImageUri by rememberSaveable { mutableStateOf<Uri?>(null) }
                 // Saved, so rotating the phone mid-draw gives back the same scribble.
                 val firstRunScribbleSeed = rememberSaveable { kotlin.random.Random.nextLong() }
-                // The scribble is made once the artwork is known, in the artwork's shape (its subject's
-                // bounding box), and the draw screen waits for it: null until then. A picture that cannot
-                // be read gives the square layout.
-                val firstRunScribble by produceState<com.hereliesaz.graffitixr.onboarding.Scribble?>(
+                // The scribble is made once the artwork is known, in the shape of its subject, and the draw
+                // screen waits for it: null until then. It is shown over the artwork (an inverting mask over
+                // the picture). A picture that cannot be read gives the square layout on black.
+                val firstRunDraw by produceState<com.hereliesaz.graffitixr.onboarding.FirstRunDraw?>(
                     initialValue = null, firstRunImageUri, firstRunScribbleSeed,
                 ) {
                     val picked = firstRunImageUri
                     value = if (picked == null) null else {
-                        val aspect = runCatching {
-                            com.hereliesaz.graffitixr.onboarding.scribbleAspectFor(this@MainActivity, picked)
-                        }.getOrDefault(1f)
-                        com.hereliesaz.graffitixr.onboarding.ScribbleGenerator.generate(
-                            kotlin.random.Random(firstRunScribbleSeed), aspect = aspect,
+                        val artwork = runCatching {
+                            com.hereliesaz.graffitixr.onboarding.loadFirstRunArtwork(this@MainActivity, picked)
+                        }.getOrNull()
+                        com.hereliesaz.graffitixr.onboarding.FirstRunDraw(
+                            com.hereliesaz.graffitixr.onboarding.ScribbleGenerator.generate(
+                                kotlin.random.Random(firstRunScribbleSeed), aspect = artwork?.subject?.aspect ?: 1f,
+                            ),
+                            artwork,
                         )
                     }
                 }
@@ -1431,10 +1434,11 @@ class MainActivity : AppCompatActivity() {
                         // First-run DRAW stage: the scribble owns the whole screen while the user
                         // copies it. Mounted before the AR coaching below and returns early, so
                         // nothing else in this layer can draw over it.
-                        val drawScribble = firstRunScribble
-                        if (firstRunStage == FirstRunStage.DRAW && !showSettings && drawScribble != null) {
+                        val drawState = firstRunDraw
+                        if (firstRunStage == FirstRunStage.DRAW && !showSettings && drawState != null) {
                             com.hereliesaz.graffitixr.onboarding.ScribbleDrawScreen(
-                                scribble = drawScribble,
+                                scribble = drawState.scribble,
+                                artwork = drawState.artwork,
                                 title = stringResource(DesignR.string.first_run_draw_title),
                                 hint = stringResource(DesignR.string.first_run_draw_hint),
                                 doneLabel = stringResource(DesignR.string.first_run_draw_done),

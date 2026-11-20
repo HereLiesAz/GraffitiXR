@@ -119,3 +119,21 @@ Report (screenshot, AR target review): white text on red is highlighted, black t
   wiring (`MainActivity` produceState, `ScribbleDrawScreen` layout, `ScribbleFitLoader`).
 - Known limits: the subject is a bounding box, not a silhouette; on API 26-27 an EXIF-rotated photo can have its
   sides swapped; measured on DejaVu Bold, not the app's font, and on synthetic marks, not hand-painted ones.
+
+# First-run scribble over the artwork (inverting mask, adjustable picture opacity)
+
+- Request: show the suggested doodle over the user's image as a mask that inverts whatever is behind it, with the
+  picture's opacity adjustable while the doodle's stays fixed.
+- Done: `ScribbleOverArtwork` draws black, the subject's crop of the picture at the slider's opacity, a dark halo, then
+  the backdrop again through a glyph-shaped bitmap mask (`DST_IN`) and inverted by a colour matrix as the layer is
+  composited. Only PorterDuff modes and a colour filter, so it works on API 26+ (Compose/Android `BlendMode.Difference`
+  would not before API 29). The glyph pass never changes opacity; at 0 it is the old white on black. The slider reuses
+  `adj_opacity` (already translated). `ScribbleFit.subjectOf` returns the region as well as the aspect, so the crop
+  and the glyph layout share one canvas. Default opacity 0.5.
+- Simulated (not run on Android): the same steps on a test painting with every tone, a real generated scribble.
+  Glyph pixels with contrast < 0.15 against the backdrop: 0% at opacity 0, 5% at 0.5, 19% at 1.0 (median contrast
+  1.00 / 0.70 / 0.47). An inversion of a mid-tone is a mid-tone, so the weak spots are where the backdrop is near
+  50% grey; the halo gives those glyphs an edge but not contrast. If that matters: binarise the inverted luma (white or
+  black, whichever is farther from the backdrop) instead of a per-channel inversion; it loses the colour inversion.
+- Verified on the JVM: the region logic (29 tests). Unbuilt: `ScribbleOverArtwork`, `ScribbleDrawScreen`, the loader,
+  the `MainActivity` wiring, and the drawing itself (`saveLayer` + colour filter + `DST_IN` on a hardware canvas).

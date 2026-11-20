@@ -7,7 +7,8 @@ import kotlin.math.abs
  * artwork is picked, and "make it big, roughly the size of your artwork" is the instruction, so a square
  * block of glyphs for a wide mural (or a tall banner) is the wrong thing to copy onto the wall.
  *
- * The shape is the bounding box of the picture's *subject*, not of the whole file: a cut-out on a
+ * The shape is the bounding box of the picture's *subject*, not of the whole file (the draw screen shows
+ * that part of the picture under the glyphs, see [Subject.region]): a cut-out on a
  * transparent background, or an object on a plain backdrop, is as wide and tall as the subject is. A
  * busy photo has no plain backdrop to cut away, so its box is the picture's own.
  *
@@ -38,28 +39,62 @@ object ScribbleFit {
     /** Share of the subject's pixels dropped from each end of each axis, so a stray speck cannot stretch the box. */
     private const val TRIM = 0.01f
 
+    /** A rectangle of a picture, as fractions of its width and height (0 is the left or top edge, 1 the right or bottom). */
+    data class Region(val left: Float, val top: Float, val right: Float, val bottom: Float)
+
     /**
-     * The width / height of the subject in [argb] ([width] x [height], row-major ARGB), within
-     * [[MIN_ASPECT], [MAX_ASPECT]]. The whole picture's aspect when it has no separable subject.
+     * The part of a picture the scribble is laid out over: its [region] and that region's [aspect]
+     * (width / height, in pixels), always within [[MIN_ASPECT], [MAX_ASPECT]].
      */
-    fun aspectOfSubject(argb: IntArray, width: Int, height: Int): Float {
-        if (width <= 0 || height <= 0 || argb.size < width * height) return 1f
-        val whole = (width.toFloat() / height).coerceIn(MIN_ASPECT, MAX_ASPECT)
+    data class Subject(val region: Region, val aspect: Float)
+
+    private val WHOLE = Region(0f, 0f, 1f, 1f)
+
+    /** The width / height of the subject in [argb] ([width] x [height], row-major ARGB): see [subjectOf]. */
+    fun aspectOfSubject(argb: IntArray, width: Int, height: Int): Float = subjectOf(argb, width, height).aspect
+
+    /**
+     * The subject of [argb] ([width] x [height], row-major ARGB): the region of its bounding box, grown
+     * about its centre (and kept inside the picture) when it is too slim or too wide to draw, so the
+     * region's own aspect is always within range. The whole picture when it has no separable subject.
+     */
+    fun subjectOf(argb: IntArray, width: Int, height: Int): Subject {
+        if (width <= 0 || height <= 0 || argb.size < width * height) return Subject(WHOLE, 1f)
         val n = width * height
         val mask = subjectMask(argb, width, height)
         var count = 0
         for (i in 0 until n) if (mask[i]) count++
-        if (count < n * MIN_SUBJECT_FRACTION) return whole
+        if (count < n * MIN_SUBJECT_FRACTION) return fitted(0f, 0f, width.toFloat(), height.toFloat(), width, height)
 
         val cols = IntArray(width)
         val rows = IntArray(height)
         for (y in 0 until height) for (x in 0 until width) if (mask[y * width + x]) { cols[x]++; rows[y]++ }
         val (x0, x1) = trimmedExtent(cols, count)
         val (y0, y1) = trimmedExtent(rows, count)
-        val bw = x1 - x0 + 1
-        val bh = y1 - y0 + 1
-        if (bw < 1 || bh < 1) return whole
-        return (bw.toFloat() / bh).coerceIn(MIN_ASPECT, MAX_ASPECT)
+        if (x1 - x0 + 1 < 1 || y1 - y0 + 1 < 1) return fitted(0f, 0f, width.toFloat(), height.toFloat(), width, height)
+        return fitted(x0.toFloat(), y0.toFloat(), (x1 + 1).toFloat(), (y1 + 1).toFloat(), width, height)
+    }
+
+    /** The box ([x0], [y0]) to ([x1], [y1]) in pixels, brought to a drawable aspect inside a [width] x [height] picture. */
+    private fun fitted(x0: Float, y0: Float, x1: Float, y1: Float, width: Int, height: Int): Subject {
+        var bw = x1 - x0
+        var bh = y1 - y0
+        val raw = bw / bh
+        if (raw > MAX_ASPECT) {            // too wide: taller, about its centre, as far as the picture allows
+            bh = minOf(height.toFloat(), bw / MAX_ASPECT)
+            bw = bh * MAX_ASPECT
+        } else if (raw < MIN_ASPECT) {     // too tall: wider
+            bw = minOf(width.toFloat(), bh * MIN_ASPECT)
+            bh = bw / MIN_ASPECT
+        }
+        val cx = (x0 + x1) / 2f
+        val cy = (y0 + y1) / 2f
+        val left = (cx - bw / 2f).coerceIn(0f, width - bw)
+        val top = (cy - bh / 2f).coerceIn(0f, height - bh)
+        return Subject(
+            Region(left / width, top / height, (left + bw) / width, (top + bh) / height),
+            (bw / bh).coerceIn(MIN_ASPECT, MAX_ASPECT),
+        )
     }
 
     /** The subject's pixels: the opaque ones of a cut-out, else those unlike the backdrop round the edge. */
