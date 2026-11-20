@@ -20,6 +20,12 @@ This document lists key files in the repository and their purposes.
     use its separate legacy homography tracker on non-ARCore devices; Mockup/Trace are static.
 *   `MainViewModel.kt`: Cross-cutting state — touch lock, Overlay ▸ Gyro toggle (`isOverlayGyroActive`), `CaptureStep` wizard for target creation, and the persisted first-run flag for the AR-unavailable explainer.
 *   `GuidanceDefinitions.kt`: The reactive status-driven guidance graph (AzNavRail 10.18) that replaced the old scripted-tutorial API and the hand-built onboarding coach. Declares `azStatus`/`azEdge`/`azGoal`/`azSuppressGuide` reusing the existing `onboarding_*` strings; per-mode goals self-activate on mode entry and persist completion.
+*   `onboarding/ScribbleGenerator.kt`, `ScribbleFit.kt`, `ScribbleFitLoader.kt`, `ScribbleDrawScreen.kt`, `ScribbleView.kt`: the
+    first-run "draw this on your surface" step. The characters are distinct ones from `GLYPH_POOL`, chosen
+    for how much the tracker has to hold on to (corners and crossings: `#`, `&`, `m`, `4`, not the smooth
+    `O`, `l`, `C`), one per look-alike group since they are drawn at random angles. The layout is made after
+    the artwork is picked, in the shape of its subject (`ScribbleFit.aspectOfSubject`: the opaque part of a
+    cut-out, or what differs from a plain backdrop), and `ScribbleDrawScreen` draws it at that aspect ratio.
 *   `HelpItemsBuilder.kt`: Builds the `helpList` map for the rail's help overlay (rail-item id → help text).
 *   `RailIntegrityCheck.kt`: Debug-only invariants — validates helpList keys and guidance highlight ids against the registered rail items.
 

@@ -95,4 +95,108 @@ class ScribbleGeneratorTest {
             }
         }
     }
+
+    // --- the curated pool ---
+
+    @Test
+    fun `the pool has no repeats and enough characters for any scribble`() {
+        val pool = ScribbleGenerator.GLYPH_POOL
+        assertEquals(pool.size, pool.toSet().size)
+        assertTrue(pool.size >= ScribbleGenerator.MAX_GLYPHS)
+    }
+
+    @Test
+    fun `the pool holds at most one character of each look-alike group`() {
+        // The glyphs are drawn at random angles, so an M turned over is a W: one slot per shape.
+        for (group in ScribbleGenerator.LOOKALIKES) {
+            val inPool = ScribbleGenerator.GLYPH_POOL.filter { it in group }
+            assertTrue("group $group has $inPool", inPool.size <= 1)
+        }
+        // A character is in one group only, or the rule above would not mean one thing.
+        val all = ScribbleGenerator.LOOKALIKES.joinToString("")
+        assertEquals(all.length, all.toSet().size)
+    }
+
+    @Test
+    fun `the asterisk is left out because the font centres it badly`() {
+        assertTrue('*' !in ScribbleGenerator.GLYPH_POOL)
+    }
+
+    @Test
+    fun `a scribble never repeats a character and draws only from the pool`() {
+        seeds.forEach { seed ->
+            val chars = ScribbleGenerator.generate(Random(seed)).glyphs.map { it.char }
+            assertEquals("seed=$seed $chars", chars.size, chars.toSet().size)
+            assertTrue("seed=$seed $chars", chars.all { it in ScribbleGenerator.GLYPH_POOL })
+        }
+    }
+
+    // --- fitting the artwork's shape ---
+
+    private val aspects = listOf(0.4f, 0.6f, 1f, 1.6f, 2.5f)
+
+    @Test
+    fun `the scribble records the aspect it was laid out for, clamped`() {
+        assertEquals(1f, ScribbleGenerator.generate(Random(1)).aspect, 0f)
+        assertEquals(1.6f, ScribbleGenerator.generate(Random(1), aspect = 1.6f).aspect, 0f)
+        assertEquals(ScribbleGenerator.MAX_ASPECT, ScribbleGenerator.generate(Random(1), aspect = 99f).aspect, 0f)
+        assertEquals(ScribbleGenerator.MIN_ASPECT, ScribbleGenerator.generate(Random(1), aspect = 0.01f).aspect, 0f)
+        // Nonsense falls back to the square.
+        for (bad in listOf(0f, -2f, Float.NaN, Float.POSITIVE_INFINITY)) {
+            assertEquals("aspect=$bad", 1f, ScribbleGenerator.generate(Random(1), aspect = bad).aspect, 0f)
+        }
+    }
+
+    @Test
+    fun `at any aspect the glyphs stay inside the canvas, apart, and big enough`() {
+        for (a in aspects) seeds.forEach { seed ->
+            val s = ScribbleGenerator.generate(Random(seed), aspect = a)
+            s.glyphs.forEach { g ->
+                assertTrue("a=$a seed=$seed cx=${g.cx}", g.cx in 0f..1f)
+                assertTrue("a=$a seed=$seed cy=${g.cy}", g.cy in 0f..1f)
+                assertTrue("a=$a seed=$seed size=${g.sizeFrac}", g.sizeFrac >= 0.15f)
+            }
+            for (i in s.glyphs.indices) for (j in i + 1 until s.glyphs.size) {
+                val d = ScribbleGenerator.centreDistance(s.glyphs[i], s.glyphs[j], s.aspect)
+                assertTrue("a=$a seed=$seed [$i]/[$j] only $d apart", d > 0.10f)
+            }
+        }
+    }
+
+    @Test
+    fun `a wide canvas gets a wide scribble and a tall one a tall scribble`() {
+        // Spans in units of the canvas' shorter edge, so they compare across the two axes.
+        fun spans(a: Float, seed: Long): Pair<Float, Float> {
+            val w = if (a >= 1f) a else 1f
+            val h = if (a >= 1f) 1f else 1f / a
+            val g = ScribbleGenerator.generate(Random(seed), aspect = a).glyphs
+            return (g.maxOf { it.cx } - g.minOf { it.cx }) * w to (g.maxOf { it.cy } - g.minOf { it.cy }) * h
+        }
+        seeds.forEach { seed ->
+            val (wx, wy) = spans(2.5f, seed)
+            assertTrue("wide seed=$seed x=$wx y=$wy", wx > 1.5f * wy)
+            val (tx, ty) = spans(0.4f, seed)
+            assertTrue("tall seed=$seed x=$tx y=$ty", ty > 1.5f * tx)
+        }
+    }
+
+    @Test
+    fun `the square layout is unchanged in shape and still spreads over the canvas`() {
+        seeds.forEach { seed ->
+            val g = ScribbleGenerator.generate(Random(seed), aspect = 1f).glyphs
+            assertTrue((g.maxOf { it.cx } - g.minOf { it.cx }) >= 0.15f)
+            assertTrue((g.maxOf { it.cy } - g.minOf { it.cy }) >= 0.15f)
+        }
+    }
+
+    @Test
+    fun `the grid gives the biggest cells, a row for a wide box and a column for a tall one`() {
+        assertEquals(2 to 2, ScribbleGenerator.bestGrid(4, 0.76f, 0.76f, wide = true))
+        assertEquals(3 to 2, ScribbleGenerator.bestGrid(5, 0.76f, 0.76f, wide = true))
+        assertEquals(3 to 2, ScribbleGenerator.bestGrid(6, 0.76f, 0.76f, wide = true))
+        assertEquals(4 to 1, ScribbleGenerator.bestGrid(4, 2.26f, 0.76f, wide = true))
+        assertEquals(1 to 4, ScribbleGenerator.bestGrid(4, 0.76f, 2.26f, wide = false))
+        // A tall box with a tie puts the longer count down the long side.
+        assertEquals(2 to 3, ScribbleGenerator.bestGrid(6, 0.76f, 0.76f, wide = false))
+    }
 }

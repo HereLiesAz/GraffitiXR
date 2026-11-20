@@ -2,7 +2,6 @@ package com.hereliesaz.graffitixr.onboarding
 
 import kotlin.math.ceil
 import kotlin.math.hypot
-import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
@@ -19,8 +18,12 @@ data class ScribbleGlyph(
     val sizeFrac: Float,
 )
 
-/** A set of glyphs forming one scribble for the user to copy. */
-data class Scribble(val glyphs: List<ScribbleGlyph>)
+/**
+ * A set of glyphs forming one scribble for the user to copy. [aspect] is the width / height of the
+ * canvas the glyphs' normalized coordinates are for: 1 is the square the scribble always used to be,
+ * and a different value lays the glyphs out to fit a wider or taller box (the shape of the artwork).
+ */
+data class Scribble(val glyphs: List<ScribbleGlyph>, val aspect: Float = 1f)
 
 /**
  * Generates the random "draw this" scribble shown at first run: a handful of large characters
@@ -41,8 +44,29 @@ object ScribbleGenerator {
     const val MAX_GLYPHS = 6
     const val MIN_GLYPHS = 4
 
-    private val ALPHABET: List<Char> =
-        (('A'..'Z') + ('a'..'z') + ('2'..'9') + listOf('#', '@', '&', '%', '*', '?', '!', '+', '=')).toList()
+    /**
+     * The characters worth drawing, best first. Not every character gives the tracker the same amount
+     * to hold on to: the detectors find corners and crossings, so `#`, `&`, `m` and `4` give it several
+     * times what the smooth `O`, `o`, `l`, `I`, `C` and `D` do. Measured with the app's own detectors
+     * (SuperPoint at its threshold, ORB after CLAHE) on thick, blurred, noisy black marks on a pale wall,
+     * at two glyph sizes and three rotations: a random scribble from the whole alphabet had a median of
+     * about 50 SuperPoint keypoints, one from this pool about 74, and the worst draw went from about 33
+     * (5th percentile) to 46. ORB agrees, and it also keeps far more of them when the view tilts.
+     *
+     * Chosen by that score, then kept to one per [LOOKALIKES] group, and `*` is left out: in the app's
+     * font it is a small raised mark, which the glyph is not centred for.
+     */
+    val GLYPH_POOL: List<Char> = "#&m%t4f8@RaHX?".toList()
+
+    /**
+     * Characters that are one shape to a tracker, or to someone copying by hand, because the glyphs are
+     * drawn at random angles: an `M` turned over is a `W`, a `+` turned a little is an `x`, and the
+     * round `O`/`o`, the bars `I`/`l`/`!` and the two cases of a letter are near enough alike. The
+     * pool holds at most one of each group, so a scribble never asks for two of one shape.
+     */
+    val LOOKALIKES: List<String> = listOf(
+        "MWmwE3", "69", "nuU", "NZz2", "Ss5", "OoQ", "Il!", "Ppqdb", "Xx+", "Cc", "Vv", "Kk", "8B",
+    )
 
     /**
      * Glyph footprint size range, as a fraction of the canvas' smaller edge. Deliberately large —
@@ -61,56 +85,109 @@ object ScribbleGenerator {
      */
     private const val JITTER = 0.45f
 
+    /** Smallest and largest canvas aspect (width / height) the layout is asked to fit; outside it is clamped. */
+    const val MIN_ASPECT = 0.25f
+    const val MAX_ASPECT = 4f
+
     /**
      * @param random seeded for determinism/testability.
      * @param glyphCount desired glyph count; coerced into [[MIN_GLYPHS], [MAX_GLYPHS]].
+     * @param aspect the canvas' width / height, so the glyphs fit the shape they will be drawn in (the
+     *   artwork's) instead of always filling a square. 1 is the square layout; not finite or not
+     *   positive is treated as 1, and the rest is clamped to [[MIN_ASPECT], [MAX_ASPECT]].
      */
     fun generate(
         random: Random = Random.Default,
         glyphCount: Int = random.nextInt(MIN_GLYPHS, MAX_GLYPHS + 1),
+        aspect: Float = 1f,
     ): Scribble {
         val n = glyphCount.coerceIn(MIN_GLYPHS, MAX_GLYPHS)
+        val a = if (aspect.isFinite() && aspect > 0f) aspect.coerceIn(MIN_ASPECT, MAX_ASPECT) else 1f
 
-        // Near-square grid big enough to hold n cells; shuffle which cells get used so a count that
-        // doesn't fill the grid leaves its gaps in a random place rather than always the last row.
-        val cols = ceil(sqrt(n.toFloat())).toInt().coerceAtLeast(1)
-        val rows = ceil(n / cols.toFloat()).toInt().coerceAtLeast(1)
-        val usable = 1f - 2f * MARGIN
-        val cellW = usable / cols
-        val cellH = usable / rows
+        // The canvas in units of its shorter edge (glyph sizes are fractions of that edge): the shorter
+        // edge is 1, the longer is a or 1 / a.
+        val canvasW = if (a >= 1f) a else 1f
+        val canvasH = if (a >= 1f) 1f else 1f / a
+        val usableW = canvasW - 2f * MARGIN
+        val usableH = canvasH - 2f * MARGIN
+
+        // The grid that gives the biggest cells for n glyphs on this canvas, so a wide box gets a row
+        // and a tall one a column instead of a square block lost in the middle of it.
+        val (cols, rows) = bestGrid(n, usableW, usableH, wide = a >= 1f)
+        val cellW = usableW / cols
+        val cellH = usableH / rows
 
         // A glyph may exceed its cell a little (marks touching still reads as one scribble, which is
         // fine) but not so much that neighbours bury each other.
         val maxSize = minOf(MAX_SIZE, minOf(cellW, cellH) * 1.15f)
         val minSize = minOf(MIN_SIZE, maxSize * 0.75f)
 
+        // Shuffle which cells get used so a count that doesn't fill the grid leaves its gaps in a random
+        // place rather than always the last row.
         val cells = ArrayList<Pair<Int, Int>>(rows * cols)
         for (r in 0 until rows) for (c in 0 until cols) cells += r to c
         cells.shuffle(random)
 
-        val glyphs = cells.take(n).map { (r, c) ->
+        // Distinct characters, from the pool of ones that give the tracker the most to hold on to.
+        val chars = GLYPH_POOL.shuffled(random)
+
+        val glyphs = cells.take(n).mapIndexed { i, (r, c) ->
             val jx = (random.nextFloat() - 0.5f) * cellW * JITTER
             val jy = (random.nextFloat() - 0.5f) * cellH * JITTER
+            // Clamped into the margin band: jitter is at most half a cell, so the clamp is a safety net
+            // rather than something the common case relies on.
+            val x = (MARGIN + cellW * (c + 0.5f) + jx).coerceIn(MARGIN, canvasW - MARGIN)
+            val y = (MARGIN + cellH * (r + 0.5f) + jy).coerceIn(MARGIN, canvasH - MARGIN)
             ScribbleGlyph(
-                char = ALPHABET.random(random),
-                // Clamped into the margin band: jitter is at most half a cell, so the clamp is a
-                // safety net rather than something the common case relies on.
-                cx = (MARGIN + cellW * (c + 0.5f) + jx).coerceIn(MARGIN, 1f - MARGIN),
-                cy = (MARGIN + cellH * (r + 0.5f) + jy).coerceIn(MARGIN, 1f - MARGIN),
+                char = chars[i],
+                cx = x / canvasW,
+                cy = y / canvasH,
                 rotationDeg = randomRotation(random),
                 sizeFrac = minSize + random.nextFloat() * (maxSize - minSize),
             )
         }
 
-        return Scribble(glyphs)
+        return Scribble(glyphs, a)
+    }
+
+    /**
+     * Columns and rows for [n] cells on a [usableW] x [usableH] area: the biggest cells that hold n,
+     * then the fewest empty ones, then the longer count along the longer side ([wide]: columns).
+     */
+    internal fun bestGrid(n: Int, usableW: Float, usableH: Float, wide: Boolean): Pair<Int, Int> {
+        var best = 1 to n
+        var bestCell = -1f
+        var bestEmpty = Int.MAX_VALUE
+        for (cols in 1..n) {
+            val rows = ceil(n / cols.toFloat()).toInt()
+            val cell = minOf(usableW / cols, usableH / rows)
+            val empty = cols * rows - n
+            val longer = if (wide) cols >= rows else rows >= cols
+            val bestLonger = if (wide) best.first >= best.second else best.second >= best.first
+            val better = cell > bestCell + 1e-6f ||
+                (cell > bestCell - 1e-6f && (empty < bestEmpty || (empty == bestEmpty && longer && !bestLonger)))
+            if (better) {
+                best = cols to rows
+                bestCell = cell
+                bestEmpty = empty
+            }
+        }
+        return best
     }
 
     /** True iff glyph [a]'s circular footprint overlaps glyph [b]'s (centre distance < radius sum). */
-    fun overlaps(a: ScribbleGlyph, b: ScribbleGlyph): Boolean =
-        centreDistance(a, b) < (a.sizeFrac / 2f + b.sizeFrac / 2f)
+    fun overlaps(a: ScribbleGlyph, b: ScribbleGlyph, aspect: Float = 1f): Boolean =
+        centreDistance(a, b, aspect) < (a.sizeFrac / 2f + b.sizeFrac / 2f)
 
-    /** Centre-to-centre distance between two glyphs, in normalized canvas units. */
-    fun centreDistance(a: ScribbleGlyph, b: ScribbleGlyph): Float = hypot(a.cx - b.cx, a.cy - b.cy)
+    /**
+     * Centre-to-centre distance between two glyphs, in units of the canvas' shorter edge: the same
+     * unit as [ScribbleGlyph.sizeFrac], whatever the canvas' [aspect].
+     */
+    fun centreDistance(a: ScribbleGlyph, b: ScribbleGlyph, aspect: Float = 1f): Float {
+        val w = if (aspect >= 1f) aspect else 1f
+        val h = if (aspect >= 1f) 1f else 1f / aspect
+        return hypot((a.cx - b.cx) * w, (a.cy - b.cy) * h)
+    }
 
     private fun randomRotation(random: Random): Float = random.nextFloat() * 360f
 }
