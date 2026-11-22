@@ -14,8 +14,8 @@ import kotlin.math.roundToInt
  *
  * A capture spreads its ~1500 features over the whole wall, so a close-up of one corner meets only
  * the few that fell there, and at a size the capture never saw them at (SuperPoint has no scale
- * invariance; ORB's pyramid spans about 3.6x). The same half-spheres as the anticipation settings
- * (`AnticipationSettings.DEFAULT_DISTANCE` of them, from the capture distance in) give the zooms:
+ * invariance; ORB's pyramid spans about 3.6x). [DISTANCE] half-spheres, from the capture distance in
+ * (laid out like the anticipation settings', but fewer), give the zooms:
  * zoom `distance / i` on half-sphere i, over a grid of `ceil(distance / i)` aims per side
  * ([AnticipationSettings.aimsPerSide]), square-on (the relocalizer turns a live frame square-on by
  * the sensors). Each close-up is a crop of the photo enlarged to about a live frame's size, run through
@@ -23,12 +23,16 @@ import kotlin.math.roundToInt
  * places them on the wall exactly like its own. Zooms under [MIN_ZOOM] are left to the matcher's own
  * scale passes, and zooms over the cap ([NON_METRIC_MAX_ZOOM], or [maxZoomFor] when the capture
  * distance is known in metres) are dropped: nearer than the lens can focus, the camera never sees
- * the wall that sharp, so those crops (most of them, at zoom 6) were wasted work.
+ * the wall that sharp, so those crops were wasted work.
  */
 internal object CloseUpFeatures {
 
-    /** Half-spheres, from the capture distance in: zooms 6, 3 and 2 before the [NON_METRIC_MAX_ZOOM] cap. */
-    const val DISTANCE = AnticipationSettings.DEFAULT_DISTANCE
+    /**
+     * Half-spheres, from the capture distance in: zooms 4 and 2 (a 4 x 4 and a 2 x 2 grid, 20 crops) before
+     * the [NON_METRIC_MAX_ZOOM] cap. Its own number, not [AnticipationSettings.DEFAULT_DISTANCE]: the
+     * 6, 3, 2 zooms of that default were 49 crops, 36 of them at zoom 6, minutes of SuperPoint inference.
+     */
+    const val DISTANCE = 4
 
     /** Smaller zooms are covered by the relocalizer's own 0.5x/2x passes and ORB's pyramid. */
     const val MIN_ZOOM = 2f
