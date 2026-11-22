@@ -14,16 +14,16 @@ class CloseUpFeaturesTest {
     private val h = 1200
 
     @Test
-    fun `zooms 6, 3 and 2, each tiled by its aims, every crop inside the photo`() {
+    fun `zooms 4 and 2, each tiled by its aims, every crop inside the photo`() {
         val views = CloseUpFeatures.views(w, h, maxZoom = 6f)
-        assertEquals(mapOf(6f to 36, 3f to 9, 2f to 4), views.groupingBy { it.zoom }.eachCount())
+        assertEquals(mapOf(4f to 16, 2f to 4), views.groupingBy { it.zoom }.eachCount())
         for (v in views) {
             assertTrue(v.toString(), v.x >= 0 && v.y >= 0 && v.x + v.w <= w && v.y + v.h <= h)
             assertEquals(v.toString(), w / v.zoom, v.w.toFloat(), 1f)
             assertEquals(v.toString(), h / v.zoom, v.h.toFloat(), 1f)
         }
         // Each zoom's crops cover the whole photo.
-        for (zoom in listOf(6f, 3f, 2f)) {
+        for (zoom in listOf(4f, 2f)) {
             val crops = views.filter { it.zoom == zoom }
             for (y in 0 until h step 50) for (x in 0 until w step 50) {
                 assertTrue("zoom $zoom ($x,$y)", crops.any { x in it.x until it.x + it.w && y in it.y until it.y + it.h })
@@ -36,19 +36,19 @@ class CloseUpFeaturesTest {
 
     @Test
     fun `without a metric distance the zoom stops at 3, nearer than most lenses focus`() {
-        // The zoom-6 grid (36 of 49 crops) is a sixth of the capture distance: blur on a phone.
-        assertEquals(mapOf(3f to 9, 2f to 4), CloseUpFeatures.views(w, h).groupingBy { it.zoom }.eachCount())
+        // The zoom-4 grid (16 of 20 crops) is a quarter of the capture distance: past the cap, so only zoom 2 is left.
+        assertEquals(mapOf(2f to 4), CloseUpFeatures.views(w, h).groupingBy { it.zoom }.eachCount())
         assertEquals(CloseUpFeatures.NON_METRIC_MAX_ZOOM, CloseUpFeatures.maxZoomFor(null))
-        // Captured from 1.5 m with a lens focusing from 10 cm (+25 %): zoom 12 is still sharp, all three kept.
+        // Captured from 1.5 m with a lens focusing from 10 cm (+25 %): zoom 12 is still sharp, both kept.
         assertEquals(12f, CloseUpFeatures.maxZoomFor(1.5, 0.10), 1e-4f)
-        assertEquals(3, CloseUpFeatures.views(w, h, maxZoom = CloseUpFeatures.maxZoomFor(1.5, 0.10)).map { it.zoom }.distinct().size)
+        assertEquals(2, CloseUpFeatures.views(w, h, maxZoom = CloseUpFeatures.maxZoomFor(1.5, 0.10)).map { it.zoom }.distinct().size)
         // Captured from 30 cm with a 10 cm lens: only zoom 2 (2.4 max).
         assertEquals(setOf(2f), CloseUpFeatures.views(w, h, maxZoom = CloseUpFeatures.maxZoomFor(0.30, 0.10)).map { it.zoom }.toSet())
     }
 
     @Test
     fun `coarsest crops come first and the quick set is a leading prefix`() {
-        val views = CloseUpFeatures.views(w, h)
+        val views = CloseUpFeatures.views(w, h, maxZoom = 6f)
         assertEquals(views.sortedBy { it.zoom }.map { it.zoom }, views.map { it.zoom })
         val quick = views.count { it.zoom <= CloseUpFeatures.QUICK_MAX_ZOOM }
         assertEquals(4, quick)
@@ -117,23 +117,23 @@ class CloseUpFeaturesTest {
     @Test
     fun `finer crops over bare wall are dropped, the rest densest first, coarser crops untouched`() {
         val views = CloseUpFeatures.views(w, h, maxZoom = 6f)
-        assertEquals(49, views.size)
+        assertEquals(20, views.size)
         // No base features at all: only the crops every build has always made remain.
         val bare = CloseUpFeatures.prioritized(views, FloatArray(0))
         assertEquals(views.filter { it.zoom <= CloseUpFeatures.NON_METRIC_MAX_ZOOM }, bare)
-        assertEquals(13, bare.size)
+        assertEquals(4, bare.size)
         // Null base positions: nothing is touched.
         assertEquals(views, CloseUpFeatures.prioritized(views, null))
-        // Marks in two zoom-6 cells (one with 3 features, one with 1): both kept, denser first.
-        val fine = views.filter { it.zoom == 6f }
-        val a = fine[7]; val b = fine[20]
+        // Marks in two zoom-4 cells (one with 3 features, one with 1): both kept, denser first.
+        val fine = views.filter { it.zoom == 4f }
+        val a = fine[7]; val b = fine[12]
         val pos = floatArrayOf(
             b.x + 1f, b.y + 1f,
             a.x + 1f, a.y + 1f, a.x + 2f, a.y + 2f, a.x + 3f, a.y + 3f,
         )
         val out = CloseUpFeatures.prioritized(views, pos)
-        assertEquals(13 + 2, out.size)
-        assertEquals(listOf(a, b), out.filter { it.zoom == 6f })
+        assertEquals(4 + 2, out.size)
+        assertEquals(listOf(a, b), out.filter { it.zoom == 4f })
         // Still coarsest first, so the quick set stays a leading prefix.
         assertEquals(out.sortedBy { it.zoom }.map { it.zoom }, out.map { it.zoom })
         assertTrue(out.take(4).all { it.zoom <= CloseUpFeatures.QUICK_MAX_ZOOM })
@@ -141,9 +141,9 @@ class CloseUpFeaturesTest {
 
     @Test
     fun `equally dense finer crops keep their grid order`() {
-        val fine = CloseUpFeatures.views(w, h, maxZoom = 6f).filter { it.zoom == 6f }
-        val pos = floatArrayOf(fine[30].x + 1f, fine[30].y + 1f, fine[3].x + 1f, fine[3].y + 1f)
-        assertEquals(listOf(fine[3], fine[30]), CloseUpFeatures.prioritized(fine, pos))
+        val fine = CloseUpFeatures.views(w, h, maxZoom = 6f).filter { it.zoom == 4f }
+        val pos = floatArrayOf(fine[14].x + 1f, fine[14].y + 1f, fine[3].x + 1f, fine[3].y + 1f)
+        assertEquals(listOf(fine[3], fine[14]), CloseUpFeatures.prioritized(fine, pos))
     }
 
     @Test

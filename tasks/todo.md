@@ -156,3 +156,16 @@ Report (screenshot, AR target review): white text on red is highlighted, black t
   wiring), `sans-serif-thin` on a real device, recolour cost on a phone (per glyph pixel, 32 steps).
 - Known limits: the thin face is not the face the glyph pool was measured in (DejaVu Bold); a one-cell-wide
   subject holds the glyph centre and a 0.3-cell footprint only.
+
+# Close-ups: distance 4 (20 crops, not 49)
+
+- Request: lower the default for the zoom crops; "change the distance to 4".
+- Done: `CloseUpFeatures.DISTANCE` is 4 (its own number, no longer `AnticipationSettings.DEFAULT_DISTANCE`, so the
+  anticipated half-spheres are untouched): zoom 4 (4 x 4 = 16 crops) and zoom 2 (2 x 2 = 4), 20 crops on a measured
+  wall, down from 49 (zoom 6: 36, zoom 3: 9, zoom 2: 4); about 2.5x fewer SuperPoint inferences.
+- Consequence to know: `NON_METRIC_MAX_ZOOM` (3) is unchanged, so a wall without a metric capture distance now
+  gets only the zoom-2 quick set (4 crops), where it used to get zoom 3 as well (13). Raising that cap to 4 would give
+  such a wall all 20.
+- `perViewBudget` shares the same extra features over fewer crops: about 75 per crop at 20 (was 30 at 49).
+- Verified on the JVM (real `CloseUpFeatures.kt` + `CloseUpFeaturesTest.kt`, stubbed `Bitmap`/`HalfSphere`): 11 tests;
+  restoring distance 6 fails 4 of them. Not verified: Android build, any timing on a device.
