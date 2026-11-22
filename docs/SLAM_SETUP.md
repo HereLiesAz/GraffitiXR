@@ -9,6 +9,7 @@ The relocalizer's real constants live in `core/nativebridge/src/main/cpp/include
 | Parameter | Value | Description |
 | :--- | :--- | :--- |
 | `kRelocLoweRatio` | `0.75` | Lowe's-ratio threshold for a relocalization descriptor match. |
+| `kRelocLoweRatioSuperPoint` | `0.90` | The same for SuperPoint (float, L2) descriptors, which lose most true matches at 0.75. See `MobileGS::relocLoweRatioFor`. |
 | `kCorrobLoweRatio` | `0.85` | Same test, for the teleological corroboration path (see `TELEOLOGICAL_SLAM.md`). |
 | `kBigLockInliers` | `20` | Inlier count above which a PnP solve is accepted outright. |
 | `kMaxWallMarks` | `5000` | Cap on doodle points, including any self-grow additions. |

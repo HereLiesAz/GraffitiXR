@@ -169,3 +169,21 @@ Report (screenshot, AR target review): white text on red is highlighted, black t
 - `perViewBudget` shares the same extra features over fewer crops: about 75 per crop at 20 (was 30 at 49).
 - Verified on the JVM (real `CloseUpFeatures.kt` + `CloseUpFeaturesTest.kt`, stubbed `Bitmap`/`HalfSphere`): 11 tests;
   restoring distance 6 fails 4 of them. Not verified: Android build, any timing on a device.
+
+# SuperPoint relocalization: its own Lowe ratio
+
+- Finding (host, synthetic wall, 48 live frames per scenario, close-ups on): at the shared ratio 0.75 SuperPoint
+  localised 23 of 48 in normal light, 0 of 48 with a dark live frame and a bright capture, 1 of 24 at 45 deg tilt;
+  at 0.90 it localised 47, 23 and 23 (ORB at 0.75: 48, 38, 8). Accepted-but-wrong poses: 0 for SuperPoint at 0.90
+  (ORB at 0.75: 3-4 in dim and dark). Queries of a different wall were never accepted by either.
+- Done: `MobileGS::kRelocLoweRatioSuperPoint = 0.9f` and `relocLoweRatioFor(descs)` (float descriptors = SuperPoint);
+  the wall, paint and map reloc matches use it. The map-association match and the pre-Phase-4 corroboration
+  match keep `kRelocLoweRatio`. `CorroborationTranslitTest` pins it.
+- Verified: see the review note below. Not verified: any device run; PnP/`PoseFusion` gates against false locks at
+  the looser ratio; repetitive walls (brick, tile), where a high ratio admits more false matches.
+- Consequence: `kCorrobLoweRatio` (0.85) is now tighter than the SuperPoint reloc ratio, so "corroboration is looser than
+  reloc" holds for ORB only (see `docs/research/PARAMETERS.md`).
+- Review: native host tests (real `MobileGS.cpp`/`MobileGS.h` against OpenCV 4.6 + GoogleTest, `tools/run_native_host_tests.sh`):
+  98 pass, so the change compiles and the ORB reloc paths are unchanged. `CorroborationTranslitTest`: 10 pass; reverting
+  the map call site to `kRelocLoweRatio` fails the new test. No native test drives SuperPoint (float) descriptors
+  through a reloc, so the 0.9 path itself is covered by the source pin and the host measurement only.

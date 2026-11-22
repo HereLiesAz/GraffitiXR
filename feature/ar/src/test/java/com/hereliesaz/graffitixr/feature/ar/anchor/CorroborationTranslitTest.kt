@@ -161,6 +161,29 @@ class CorroborationTranslitTest {
     }
 
     /**
+     * SuperPoint's descriptors (float, L2) need a looser reloc ratio than ORB's: at the shared 0.75 most of
+     * their true matches were rejected (host measurement, see `MobileGS.h`). The three global reloc
+     * matches (wall, paint, map) must take the ratio for their descriptor kind; the map-association and
+     * pre-Phase-4 corroboration matches keep the plain one.
+     */
+    @Test
+    fun `SuperPoint relocalization uses its own, looser Lowe ratio`() {
+        val native = constants(source("core/nativebridge/src/main/cpp/include/MobileGS.h"))
+        val sp = native["kRelocLoweRatioSuperPoint"]
+        assertTrue("MobileGS.h must declare kRelocLoweRatioSuperPoint; found ${native.keys}", sp != null)
+        assertTrue("the SuperPoint ratio ($sp) must be looser than the ORB one", sp!! > native["kRelocLoweRatio"]!!)
+        assertEquals(0.9f, sp, 0f)
+        val cpp = source("core/nativebridge/src/main/cpp/MobileGS.cpp").readText()
+        assertEquals(
+            "the wall, paint and map reloc matches must use relocLoweRatioFor",
+            3, Regex("""relocLoweRatioFor\(""").findAll(cpp).count(),
+        )
+        assertTrue("the wall match", cpp.contains("match[0].distance < relocLoweRatioFor(descs) * match[1].distance"))
+        assertTrue("the paint match", cpp.contains("m[0].distance < relocLoweRatioFor(descs) * m[1].distance"))
+        assertTrue("the map match", cpp.contains("m[0].distance < relocLoweRatioFor(baseDescs) * m[1].distance"))
+    }
+
+    /**
      * `IMPLEMENTATION.md` **4.8** — zero predicted-visible is "the artist is looking away", not
      * "the wall does not corroborate". Pinned against the source because the two differ by one
      * ternary and the wrong one is the shorter, more obvious expression.
