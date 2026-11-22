@@ -864,7 +864,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
         std::vector<uint8_t> usedQuery(kps.size(), 0);
         for (auto& match : matches) {
             if (match.size() < 2) continue;
-            if (match[0].distance < kRelocLoweRatio * match[1].distance) {
+            if (match[0].distance < relocLoweRatioFor(descs) * match[1].distance) {
                 // PAPER.md §5: the reloc PnP solves the GLOBAL problem, with no prior, and must
                 // therefore see only the backbone. Points under the artwork (INSIDE) are the
                 // work surface — they decay as it is painted, which is exactly what makes
@@ -898,7 +898,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
         std::vector<std::vector<cv::DMatch>> pm;
         matcher->knnMatch(descs, paintDescs, pm, 2);
         for (auto& m : pm) {
-            if (m.size() < 2 || !(m[0].distance < kRelocLoweRatio * m[1].distance)) continue;
+            if (m.size() < 2 || !(m[0].distance < relocLoweRatioFor(descs) * m[1].distance)) continue;
             if (usedQuery[(size_t)m[0].queryIdx] || paintSeen[(size_t)m[0].trainIdx]) continue;
             cv::Point2f p = kps[m[0].queryIdx].pt;
             if (!Hback.empty()) {
@@ -1059,7 +1059,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView, const 
                 size_t before = imgPts.size();
                 for (auto& m : matches) {
                     if (m.size() < 2) continue;
-                    if (m[0].distance < kRelocLoweRatio * m[1].distance) {
+                    if (m[0].distance < relocLoweRatioFor(baseDescs) * m[1].distance) {
                         imgPts.push_back(baseKps[m[0].queryIdx].pt);
                         objPts.push_back(mapKps3d[visible[m[0].trainIdx]]);
                         corrRow.push_back(-1);

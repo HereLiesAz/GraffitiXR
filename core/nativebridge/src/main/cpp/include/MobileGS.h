@@ -335,6 +335,23 @@ public:
     static constexpr float kCorrobLoweRatio = 0.85f;
 
     /**
+     * The reloc ratio for SuperPoint descriptors (256-float, L2-normalised), which spread their
+     * nearest-neighbour distances more narrowly than ORB's Hamming distances: the same 0.75 throws away
+     * most of their true matches. Host measurement (synthetic wall, close-ups, 48 live frames per
+     * scenario): localised 23 of 48 at 0.75, 33 at 0.80, 41 at 0.85, 47 at 0.90, with ORB at 0.75
+     * on 48; accepted-but-wrong poses stayed at 0 for SuperPoint at 0.90, and a different wall was never
+     * accepted. Used by the three global reloc matches (wall, paint, map) through [relocLoweRatioFor];
+     * ORB keeps [kRelocLoweRatio]. Not a replacement for a device measurement: see
+     * `docs/research/PARAMETERS.md` section 5.
+     */
+    static constexpr float kRelocLoweRatioSuperPoint = 0.9f;
+
+    /** The reloc ratio for descriptors of [descs]' kind: SuperPoint's are CV_32F, ORB's are not. */
+    static float relocLoweRatioFor(const cv::Mat& descs) {
+        return descs.type() == CV_32F ? kRelocLoweRatioSuperPoint : kRelocLoweRatio;
+    }
+
+    /**
      * How many separate gated attempts must corroborate a design feature before it counts toward
      * painting progress.
      *
