@@ -28,7 +28,7 @@ internal object StencilPackReader {
                     val name = entry.name
                     if (entry.isDirectory || name.isBlank() || name.startsWith("/") ||
                         name.contains("..") || name.contains('\\') || name.contains('/') ||
-                        files.containsKey(name) || files.size >= 130
+                        files.containsKey(name) || files.size >= 1026
                     ) return null
                     val bytes = ByteArrayOutputStream()
                     val buffer = ByteArray(8192)
@@ -52,8 +52,8 @@ internal object StencilPackReader {
             val width = json.optInt("width")
             val height = json.optInt("height")
             val layers = json.optJSONArray("layers") ?: return null
-            if (width !in 1..4096 || height !in 1..4096 ||
-                layers.length() !in 1..128 ||
+            if (width !in 1..8192 || height !in 1..8192 ||
+                layers.length() !in 1..1024 ||
                 width.toLong() * height.toLong() * layers.length() > MAX_TOTAL_PIXELS
             ) return null
             val result = ArrayList<StencilPackSheet>(layers.length())
