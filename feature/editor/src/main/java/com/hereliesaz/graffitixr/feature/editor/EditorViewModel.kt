@@ -585,8 +585,9 @@ class EditorViewModel @Inject constructor(
     override fun confirmReplaceDesign() {
         val uri = _uiState.value.pendingReplaceUri ?: return
         dispatch(EditorIntent.SetPendingReplaceUri(null))
-        if (context.contentResolver.getType(uri) == "application/vnd.hereliesaz.stencilpack+zip")
-            applyNewStencilPack(uri)
+        if (context.contentResolver.getType(uri) == "application/vnd.hereliesaz.stencilpack+zip" ||
+            uri.lastPathSegment?.endsWith(".stencilpack", ignoreCase = true) == true
+        ) applyNewStencilPack(uri)
         else applyNewDesign(uri)
     }
 
