@@ -56,6 +56,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import androidx.core.content.ContextCompat
 import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.graffitixr.common.model.AppLanguage
@@ -452,6 +453,24 @@ fun SettingsScreen(
                                         )
                                     }
                                 )
+                                // Developer measurement, English only: how fast each SuperPoint model file runs on this
+                                // phone through ONNX Runtime (CPU, XNNPACK, NNAPI). Results also go to logcat (SPBench).
+                                var benchText by remember { mutableStateOf("") }
+                                var benchRunning by remember { mutableStateOf(false) }
+                                val benchScope = androidx.compose.runtime.rememberCoroutineScope()
+                                SettingsItem(
+                                    label = "SuperPoint speed test",
+                                    value = if (benchRunning) "running..." else "run",
+                                    modifier = Modifier.clickable(enabled = !benchRunning) {
+                                        benchRunning = true
+                                        benchText = ""
+                                        benchScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+                                            SuperPointBench.run(context) { line -> benchText = benchText + line + "\n" }
+                                            benchRunning = false
+                                        }
+                                    },
+                                )
+                                if (benchText.isNotEmpty()) Text(text = benchText, color = Color.Gray, fontSize = 12.sp)
                                 SettingsSectionTitle(strings.settings.anticipationSection)
                                 AnticipationSettingsControls(anticipation, onAnticipationChanged, strings)
                                 // What the next target's doodle is made of: tap to cycle.

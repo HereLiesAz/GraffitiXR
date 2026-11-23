@@ -290,3 +290,4 @@ standalone CameraX/KPM files, co-op frame calibration, and metric hybrid KPM→P
 `VoxelHash.*` / `StereoProcessor.cpp` claims (none of those files or methods exist), corrected the
 `:core:nativebridge` and `:feature:ar` sections against the current native/Kotlin source. Prior
 update: 2026-03-17, website redesign and Stencil generation integration phase.*
+*   `feature/dashboard/.../SuperPointBench.kt`: Developer-only measurement behind Settings > Developer > "SuperPoint speed test" (English only). Times one 640 x 480 SuperPoint pass for three model files (the shipped fp32, `assets/superpoint_bench/superpoint.fp16.onnx`, `superpoint.int8.onnx`) on ONNX Runtime CPU, XNNPACK and NNAPI; lines go to the screen and to logcat (`SPBench`). Does not touch the app's OpenCV-DNN SuperPoint.

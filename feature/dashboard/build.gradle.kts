@@ -41,6 +41,7 @@ dependencies {
     implementation(project(":core:data"))
 
     implementation(libs.az.nav.rail)
+    implementation(libs.onnxruntime.android) // SuperPointBench (Settings > Developer)
 
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
