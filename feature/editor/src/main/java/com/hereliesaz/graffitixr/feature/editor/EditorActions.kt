@@ -32,6 +32,8 @@ interface EditorActions {
 
     /** Toggle an existing stencil sheet in the saved layer stack; this does not generate stencils. */
     fun onToggleStencilSheet(sheet: com.hereliesaz.graffitixr.common.model.StencilView)
+    /** Toggle one named sheet imported from Stencil Artist without changing the other sheets. */
+    fun onToggleImportedStencilSheet(index: Int)
 
     fun onUndoClicked()
     fun onRedoClicked()
