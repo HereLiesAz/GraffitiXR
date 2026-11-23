@@ -30,14 +30,8 @@ interface EditorActions {
     /** Subject isolation: keep the segmented subject, drop the rest to transparent. */
     fun onToggleSubjectIsolation()
 
-    /**
-     * Stencil: split the design into three tonal sheets (black, grey, white). Tap to generate,
-     * tap again to bring the original back. Turns Outline off, since both rewrite the same pixels.
-     */
-    fun onToggleStencil()
-
-    /** Steps which stencil sheets are shown: all, black, grey, white, and around again. */
-    fun onCycleStencilView()
+    /** Toggle an existing stencil sheet in the saved layer stack; this does not generate stencils. */
+    fun onToggleStencilSheet(sheet: com.hereliesaz.graffitixr.common.model.StencilView)
 
     fun onUndoClicked()
     fun onRedoClicked()
