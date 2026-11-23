@@ -235,12 +235,15 @@ Every layer carries the full property set below; all except the runtime `bitmap`
 | `isSketch` | `false` | Bool | **Outline** effect — render as a traceable pencil sketch (dark lines opaque, light areas transparent); re-derived from `uri` each time, not baked in |
 | `isSubjectIsolated` | `false` | Bool | **Subject isolation** — the bundled U²-Net segmenter drops everything but the subject to transparent (see §4) |
 | `isStencil` | `false` | Bool | Saved stencil state for imported sheets or older three-tone projects (§5) |
-| `stencilView` | `ALL` | `ALL`/`BASE`/`MIDTONE`/`SECONDARY` | Which sheets are shown while `isStencil` is on |
+| `stencilView` | `ALL` | `ALL`/`BASE`/`MIDTONE`/`SECONDARY` | Original view selector, retained for older three-tone projects |
+| `stencilVisibleLayers` | `null` | nullable bitmask | Independently visible legacy Base, Midtone and Secondary sheets; null uses `stencilView` |
+| `stencilSheets` | empty list | `List<StencilSheetSource>` | Imported sheet name, project-owned PNG URI, colour and independent visibility in paint order |
 | `stencilDark` | `true` | Bool | The last run's dark-or-light call, which names the cycler's options |
 
 `warpMesh`, `stencilType`, `stencilSourceId`, and `textParams` do not exist on `Layer` — Liquify and
-rasterized text layers have no implementing code (see §3.3, §2.4). Stencil is the `isStencil` /
-`stencilView` pair above (§5), not the old multi-layer pipeline.
+rasterized text layers have no implementing code (see §3.3, §2.4). Imported StencilPack
+sheets are nested **display assets** of the one placed design; this does not restore arbitrary
+multiple independent artboards or the removed painting/editor authoring system (§5).
 
 ### 2.2 Setting/replacing the design
 
