@@ -40,5 +40,6 @@ data class OverlayLayer(
     val isStencil: Boolean = false,
     val stencilView: StencilView = StencilView.ALL,
     val stencilVisibleLayers: Int? = null,
+    val stencilSheets: List<StencilSheetSource> = emptyList(),
     val stencilDark: Boolean = true,
 )
