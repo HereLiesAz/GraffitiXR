@@ -144,7 +144,7 @@ object StencilTones {
     const val VISIBLE_BASE = 1
     const val VISIBLE_MIDTONE = 2
     const val VISIBLE_SECONDARY = 4
-    const val VISIBLE_ALL = VISIBLE_BASE or VISIBLE_MIDTONE or VISIBLE_SECONDARY
+    const val VISIBLE_ALL = 7
 
     /** Original single-sheet selector, retained so older project files render as saved. */
     fun visibleMask(view: StencilView): Int = when (view) {
