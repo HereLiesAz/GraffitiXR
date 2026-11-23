@@ -249,6 +249,11 @@ internal object CloseUpFeatures {
         /** How long the crops past the quick set may keep starting, see [FineBudget]. */
         budgetMs: Long = FINE_BUDGET_MS,
         now: () -> Long = { System.nanoTime() / 1_000_000L },
+        /**
+         * Called once, at the end, with the crops the [budgetMs] clock cut off (empty when none): they are
+         * not detected here, so a caller can build them later, on demand, instead of losing them.
+         */
+        onDeferred: ((List<View>) -> Unit)? = null,
         detect: (Bitmap, Int) -> DetectedFeatures?,
     ): DetectedFeatures? {
         val views = prioritized(views(photo.width, photo.height, maxZoom = maxZoom), basePositions)
@@ -272,10 +277,11 @@ internal object CloseUpFeatures {
             )
         }
         report(0)
+        var cutAt = views.size
         try {
             for ((i, v) in views.withIndex()) {
                 // Out of time: stop with what was learned (the views are coarsest first, densest first).
-                if (budget.exhausted(v.zoom)) break
+                if (budget.exhausted(v.zoom)) { cutAt = i; break }
                 val crop = Bitmap.createBitmap(photo, v.x, v.y, v.w, v.h)
                 val (outW, outH) = outputSize(v, photo.width, photo.height, viewSide)
                 val view = Bitmap.createScaledBitmap(crop, outW, outH, true)
@@ -301,6 +307,7 @@ internal object CloseUpFeatures {
         } finally {
             DoodleBuildProgress.set(null)
         }
+        onDeferred?.invoke(views.subList(cutAt, views.size).toList())
         return concat(parts)
     }
 }

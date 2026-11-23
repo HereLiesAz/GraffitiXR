@@ -206,8 +206,8 @@ Measured (host, synthetic): SuperPoint (ratio 0.9) localises as well from "zoom-
 - No code projects the live frame onto the photo: new, pure and JVM-testable (corners -> photo rect, `CloseUpFeatures.View` overlap).
 
 ## Steps
-1. [ ] `detect` returns deferred views; behaviour otherwise unchanged (JVM tests).
-2. [ ] Pure `AimedCloseUps.select(footprint, deferred)` + tests.
+1. [x] `detect` reports deferred views (`onDeferred`); behaviour otherwise unchanged (JVM tests).
+2. [x] Pure `AimedCloseUps.select(footprint, deferred)` + 6 tests. `detect`'s `onDeferred` checked ad hoc in the JVM harness with a stub Bitmap and a fake clock (not a repo test: no Bitmap off-device); callers do not use either yet.
 3. [ ] Standalone flow: background builder (loads reference image, `detectSuperPoint`, `mapBack`, merge, `restoreWallDoodleMetric` extension, project update); trigger from `fuseWithReloc` pose.
 4. [ ] Native: reorder `mWallLastSeen` on extension; host test.
 5. [ ] ARCore flow after 1-4 hold on a device.
