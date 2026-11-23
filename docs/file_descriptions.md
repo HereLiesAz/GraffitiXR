@@ -278,6 +278,7 @@ the real (non-stub) tracker is packaged.
 *   `DashboardViewModel.kt`: Project library, settings navigation, new/open/delete project.
 *   `ProjectLibraryScreen.kt`: Full-screen project list UI.
 
+*   `feature/dashboard/.../SuperPointBench.kt`: Developer-only measurement behind Settings > Developer > "SuperPoint speed test" (English only). Times one 640 x 480 SuperPoint pass for three model files (the shipped fp32, `assets/superpoint_bench/superpoint.fp16.onnx`, `superpoint.int8.onnx`) on ONNX Runtime CPU, XNNPACK and NNAPI; lines go to the screen and to logcat (`SPBench`). Does not touch the app's OpenCV-DNN SuperPoint.
 ---
 *Documentation updated on 2026-10-11: SphereSLAM 0.24.3 — display-rate full-rotation glow (two new
 outline styles), display-rate artwork pose prediction, one rotation-vector attitude sensor, pooled

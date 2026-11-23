@@ -187,3 +187,32 @@ Report (screenshot, AR target review): white text on red is highlighted, black t
   98 pass, so the change compiles and the ORB reloc paths are unchanged. `CorroborationTranslitTest`: 10 pass; reverting
   the map call site to `kRelocLoweRatio` fails the new test. No native test drives SuperPoint (float) descriptors
   through a reloc, so the 0.9 path itself is covered by the source pin and the host measurement only.
+
+# Close-ups: pre-build the key crops, build the rest on demand (plan, not started)
+
+Measured (host, synthetic): SuperPoint (ratio 0.9) localises as well from "zoom-2 quick set + the zoom-4 crops the frame overlaps" as from the full 20-crop grid (a zoom-4 frame overlaps 3.2 of 16 on average); the quick set alone gets 0 of 16 at zoom 4.
+
+## Design
+- Pre-build (today's order): quick set (4 zoom-2 crops), then the densest zoom-4 crops (`prioritized`) until the 45 s `FineBudget`.
+- Today the crops the clock cuts are dropped. Instead `CloseUpFeatures.detect` returns them (`deferred: List<View>`).
+- On demand: when a relocalization result gives the camera pose, project the frame's corners onto the photo, pick deferred views overlapping >= 5% of the footprint, build one at a time in the background, append, persist.
+
+## Findings that shape it (code survey; nothing run)
+- No append API. `restoreWallDoodleMetric` extension path (MobileGS.cpp `extensionOfSame`): resend old rows unchanged and in order, then new rows, same anchor and intrinsics -> pose and generation survive. Call it directly, not `ingestSingle` (its `carryDoodleFrameState` can re-carry marks with an identity pose).
+- The extended doodle must be written to `liveDoodle`, `loadedDoodle` and `project.doodle` (or `sphereSlamFingerprint`) together via `updateProject`, or a design-move re-push (`growthOfSame`) demotes the new rows to evictable "grown" rows and a reload replaces them.
+- Native `mWallLastSeen` is resized, not reordered, on extension: grown-row eviction order skews. Fix with a reorder in `restoreWallDoodleMetric`, or accept.
+- The SuperPoint model lock is shared with live relocalization: on-demand inference contends with it. Build one crop at a time, only while tracking is stable.
+- Photo: not held after build. Standalone: `sphereSlamReferenceUri` (already decoded in `SphereSlamStandaloneOverlay`). ARCore: `arCoreCaptureImageUri`; the wall plane is not saved (refit from `points3d`).
+- No code projects the live frame onto the photo: new, pure and JVM-testable (corners -> photo rect, `CloseUpFeatures.View` overlap).
+
+## Steps
+1. [ ] `detect` returns deferred views; behaviour otherwise unchanged (JVM tests).
+2. [ ] Pure `AimedCloseUps.select(footprint, deferred)` + tests.
+3. [ ] Standalone flow: background builder (loads reference image, `detectSuperPoint`, `mapBack`, merge, `restoreWallDoodleMetric` extension, project update); trigger from `fuseWithReloc` pose.
+4. [ ] Native: reorder `mWallLastSeen` on extension; host test.
+5. [ ] ARCore flow after 1-4 hold on a device.
+
+## Model speed (measured on host, not on a phone)
+- ONNX Runtime fp32 is 1.7x faster than OpenCV DNN (436 vs 729 ms, 1 thread, 640x480); int8 1.2x more on a VNNI Xeon and slower at 4 threads; fp16 no speed change on x86 but lossless and half the size. int8 vs fp32: keypoint repeatability 0.93, descriptor cosine 0.99, localisation within 2 of 48.
+- Open: time `superpoint.fp16.onnx` / `superpoint.int8.onnx` on the phone before any runtime change. Files: scratchpad `qm/`.
+- Built: Settings > Developer > "SuperPoint speed test" (`SuperPointBench`) loads fp32/fp16/int8 on ORT CPU, XNNPACK, NNAPI. Android code, never compiled here. Compare its fp32 CPU line with the app's existing SuperPoint timing to see the runtime gain.
