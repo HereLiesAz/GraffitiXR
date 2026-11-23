@@ -60,8 +60,10 @@ composites the AR overlay; it does **not** render any persistent 3D map — ther
 ### `:feature:editor`
 Placement and legibility tools for the one design image being traced: transform (pan/scale/rotate),
 lock, opacity/brightness/contrast/saturation/colour-balance/invert, plus Outline and subject
-isolation, plus the three-sheet Stencil (its view state lives here; the processing, `StencilProcessor`
-and `StencilTones`, is in `:core:common` beside `SketchProcessor`). Authoring (multi-layer compositing,
+isolation, and an imported StencilPack sheet-visibility interface. Stencil Artist
+creates the masks; GraffitiXR stores the named sheet PNGs and composites the visible layers.
+Legacy three-tone projects still render through `StencilProcessor`/`StencilTones` in
+`:core:common`, but new stencil generation has no UI action. Other authoring (multi-layer compositing,
 painting, warp/Liquify) does not live here — see [`FEATURE_REFERENCE.md`](FEATURE_REFERENCE.md) for what was removed and why.
 
 ### `:core:nativebridge`
