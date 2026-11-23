@@ -2138,6 +2138,62 @@ class MainActivity : AppCompatActivity() {
                                 }
                             }
 
+                            if (showStencilLayers && editorUiState.design?.isStencil == true) {
+                                val stencil = editorUiState.design!!
+                                androidx.compose.material3.AlertDialog(
+                                    onDismissRequest = { showStencilLayers = false },
+                                    title = { Text("Stencil layers") },
+                                    text = {
+                                        LazyColumn(Modifier.heightIn(max = 440.dp)) {
+                                            if (stencil.stencilSheets.isNotEmpty()) {
+                                                items(stencil.stencilSheets.size) { index ->
+                                                    val sheet = stencil.stencilSheets[index]
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                    ) {
+                                                        androidx.compose.material3.Checkbox(
+                                                            checked = sheet.visible,
+                                                            onCheckedChange = {
+                                                                editorViewModel.onToggleImportedStencilSheet(index)
+                                                            },
+                                                        )
+                                                        Text(sheet.name)
+                                                    }
+                                                }
+                                            } else {
+                                                // Older .gxr projects retain their three-tone stencil masks.
+                                                val legacy = listOf(
+                                                    com.hereliesaz.graffitixr.common.model.StencilView.BASE,
+                                                    com.hereliesaz.graffitixr.common.model.StencilView.MIDTONE,
+                                                    com.hereliesaz.graffitixr.common.model.StencilView.SECONDARY,
+                                                )
+                                                val visible = stencil.stencilVisibleLayers
+                                                    ?: StencilTones.visibleMask(stencil.stencilView)
+                                                items(legacy.size) { index ->
+                                                    val sheet = legacy[index]
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                    ) {
+                                                        androidx.compose.material3.Checkbox(
+                                                            checked = visible and StencilTones.visibleMask(sheet) != 0,
+                                                            onCheckedChange = { editorViewModel.onToggleStencilSheet(sheet) },
+                                                        )
+                                                        Text(sheet.name.lowercase().replaceFirstChar { it.uppercase() })
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    confirmButton = {
+                                        androidx.compose.material3.TextButton(
+                                            onClick = { showStencilLayers = false },
+                                        ) { Text("Done") }
+                                    },
+                                )
+                            }
+
                             if (showSettings && !showSaveDialog && !dashboardUiState.showNewProjectDialog) {
                                 androidx.compose.ui.window.Dialog(
                                     onDismissRequest = { showSettings = false },
@@ -2517,9 +2573,8 @@ class MainActivity : AppCompatActivity() {
                     overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
             )
-            // Stencil — splits the design into three tonal sheets (black, grey, white). Tap to
-            // generate, tap again to get the original back. Once a stencil exists, the cycler right
-            // beneath it steps which sheets are shown: all, black, grey, white.
+            // The stencil item owns the sheet-visibility manager, never stencil generation.
+            // Without a stencil loaded, it opens the separate Stencil Artist app's project page.
             azRailSubItem(
                 id = "design.stencil",
                 hostId = railHostOf("design.stencil"),
@@ -2527,30 +2582,17 @@ class MainActivity : AppCompatActivity() {
                 color = navItemColor,
                 classifiers = setOf("toggle", "effect"),
                 shape = AzButtonShape.NONE,
-                disabled = designToolsDisabled,
-                onClick = { editorViewModel.onToggleStencil() }
+                disabled = showLibrary,
+                onClick = {
+                    if (editorUiState.design?.isStencil == true) {
+                        onManageStencilLayers()
+                    } else {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, "https://github.com/HereLiesAz/stencil-artist".toUri())
+                        )
+                    }
+                },
             )
-            if (editorUiState.design?.isStencil == true) {
-                // All, then the sheets in the order they are laid: base, midtone, secondary. A light
-                // image goes white, grey, black; a dark one black, grey, white.
-                val colourName = mapOf(
-                    StencilTones.BLACK to navStrings.stencilViewBlack,
-                    StencilTones.GREY to navStrings.stencilViewGrey,
-                    StencilTones.WHITE to navStrings.stencilViewWhite,
-                )
-                val stencilLabels = listOf(navStrings.stencilViewAll) +
-                    StencilTones.sheetOrder(editorUiState.design?.stencilDark ?: true).map { colourName.getValue(it) }
-                azRailSubCycler(
-                    id = "design.stencil.view",
-                    hostId = railHostOf("design.stencil.view"),
-                    options = stencilLabels,
-                    selectedOption = stencilLabels[editorUiState.design?.stencilView?.ordinal ?: 0],
-                    color = navItemColor,
-                    shape = AzButtonShape.NONE,
-                    disabled = designToolsDisabled,
-                    onClick = { editorViewModel.onCycleStencilView() }
-                )
-            }
             // Edit ▸ the per-design controls. Every one of these drives an EditorViewModel action
             // that was already implemented and tested but had no way to be invoked: the layer list had
             // no opener (so add-a-layer was one-way — nothing could remove, rename, reorder or hide
