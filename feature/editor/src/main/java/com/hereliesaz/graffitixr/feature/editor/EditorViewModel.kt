@@ -525,7 +525,8 @@ class EditorViewModel @Inject constructor(
             restored?.isSubjectIsolated != _uiState.value.design?.isSubjectIsolated ||
             restored?.isStencil != _uiState.value.design?.isStencil ||
             restored?.stencilView != _uiState.value.design?.stencilView ||
-            restored?.stencilVisibleLayers != _uiState.value.design?.stencilVisibleLayers
+            restored?.stencilVisibleLayers != _uiState.value.design?.stencilVisibleLayers ||
+            restored?.stencilSheets != _uiState.value.design?.stencilSheets
         dispatch(EditorIntent.RestoreDesign(restored))
         // Restore the mode adjustment the snapshot was taken alongside, if any — without this, an
         // outside-DESIGN Undo restored an (unchanged) design and left modeAdjustments exactly where
@@ -760,7 +761,7 @@ class EditorViewModel @Inject constructor(
             val composite = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(composite)
             for (sheet in design.stencilSheets.filter { it.visible }) {
-                val bitmap = ImageUtils.loadBitmapAsync(context, sheet.uri.toUri(), maxDimension = 2048)
+                val bitmap = ImageUtils.loadBitmapAsync(context, sheet.uri.toUri())
                 if (bitmap == null) {
                     failure = "A saved stencil sheet could not be loaded."
                     continue
