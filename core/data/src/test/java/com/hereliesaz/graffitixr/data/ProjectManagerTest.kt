@@ -84,6 +84,40 @@ class ProjectManagerTest {
     }
 
     @Test
+    fun `duplicate id import relocates all stencil sheets with their project`() = runTest {
+        manager.saveProject(mockContext, GraffitiProject(id = "stencil", name = "Existing"))
+        val manifest = (
+            """{"id":"stencil","name":"Imported","design":{"uri":""" +
+                """"file:///sender/files/projects/stencil/design.png","isStencil":true,"stencilSheets":[""" +
+                """{"name":"Base","uri":"file:///sender/files/projects/stencil/stencil_001.png","color":4278190080,"visible":true},""" +
+                """{"name":"Top","uri":"file:///sender/files/projects/stencil/stencil_002.png","color":4294967295,"visible":false}]}}"""
+        ).toByteArray()
+        val imported = importZip(
+            zipOf(
+                "project.json" to manifest,
+                "design.png" to byteArrayOf(0),
+                "stencil_001.png" to byteArrayOf(1),
+                "stencil_002.png" to byteArrayOf(2),
+            ),
+        )
+        assertNotNull(imported)
+        assertTrue(imported!!.id != "stencil")
+        val sheets = requireNotNull(imported.design).stencilSheets
+        assertEquals(listOf("Base", "Top"), sheets.map { it.name })
+        assertEquals(listOf(true, false), sheets.map { it.visible })
+        assertEquals(
+            listOf("stencil_001.png", "stencil_002.png"),
+            sheets.map { File(Uri.parse(it.uri).path!!).name },
+        )
+        sheets.forEach { sheet ->
+            val file = File(requireNotNull(Uri.parse(sheet.uri).path))
+            assertTrue(file.exists())
+            assertEquals("projects/${imported.id}", file.parentFile.parentFile.name + "/" + file.parentFile.name)
+        }
+        assertEquals(sheets, manager.loadProjectMetadata(mockContext, imported.id)?.design?.stencilSheets)
+    }
+
+    @Test
     fun `getProjectList returns empty list when directory is missing or empty`() = runTest {
         val list = manager.getProjectList(mockContext)
         assertTrue(list.isEmpty())
