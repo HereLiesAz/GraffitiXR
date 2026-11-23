@@ -67,6 +67,8 @@ data class Layer(
      * A visibility mask is display state, never a request to generate a new stencil.
      */
     val stencilVisibleLayers: Int? = null,
+    /** Separate authored sheet PNGs imported from Stencil Artist, in bottom-to-top paint order. */
+    val stencilSheets: List<StencilSheetSource> = emptyList(),
     /**
      * What the last stencil run decided about the image: dark (black is the base sheet) or light
      * (white is). Kept so the rail can name the cycler's options in the right order before anything
