@@ -140,23 +140,43 @@ object StencilTones {
      * ALL shows them stacked (every pixel in its own tone). A single view shows that one sheet, in its
      * colour, and leaves the rest transparent. [NONE] is always transparent.
      */
-    fun render(ranks: IntArray, view: StencilView, dark: Boolean): IntArray {
+    /** Independent stencil-sheet visibility bits. Used only to display an existing stencil. */
+    const val VISIBLE_BASE = 1
+    const val VISIBLE_MIDTONE = 2
+    const val VISIBLE_SECONDARY = 4
+    const val VISIBLE_ALL = VISIBLE_BASE or VISIBLE_MIDTONE or VISIBLE_SECONDARY
+
+    /** Original single-sheet selector, retained so older project files render as saved. */
+    fun visibleMask(view: StencilView): Int = when (view) {
+        StencilView.ALL -> VISIBLE_ALL
+        StencilView.BASE -> VISIBLE_BASE
+        StencilView.MIDTONE -> VISIBLE_MIDTONE
+        StencilView.SECONDARY -> VISIBLE_SECONDARY
+    }
+
+    fun render(ranks: IntArray, view: StencilView, dark: Boolean): IntArray =
+        renderVisible(ranks, visibleMask(view), dark)
+
+    /**
+     * Render existing stencil sheets as an ordered stack. Each bit is independently toggleable:
+     * the base covers the silhouette; the midtone and then the secondary overlay their cutouts.
+     * A disabled layer contributes nothing, never silently changes the other layers.
+     */
+    fun renderVisible(ranks: IntArray, mask: Int, dark: Boolean): IntArray {
         val baseColor = if (dark) ARGB_BLACK else ARGB_WHITE
         val secondaryColor = if (dark) ARGB_WHITE else ARGB_BLACK
         val secondaryRank = if (dark) WHITE else BLACK
         return IntArray(ranks.size) { i ->
             val rank = ranks[i]
             if (rank == NONE) return@IntArray 0
-            when (view) {
-                StencilView.ALL -> when (rank) {
-                    BLACK -> ARGB_BLACK
-                    GREY -> ARGB_GREY
-                    else -> ARGB_WHITE
-                }
-                StencilView.BASE -> baseColor
-                StencilView.MIDTONE -> if (if (dark) rank >= GREY else rank <= GREY) ARGB_GREY else 0
-                StencilView.SECONDARY -> if (rank == secondaryRank) secondaryColor else 0
+            var color = if (mask and VISIBLE_BASE != 0) baseColor else 0
+            if (mask and VISIBLE_MIDTONE != 0 && (if (dark) rank >= GREY else rank <= GREY)) {
+                color = ARGB_GREY
             }
+            if (mask and VISIBLE_SECONDARY != 0 && rank == secondaryRank) {
+                color = secondaryColor
+            }
+            color
         }
     }
 
