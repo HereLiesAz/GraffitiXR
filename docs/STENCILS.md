@@ -75,6 +75,5 @@ Previously, compositing operated in *Screen Space*, tying the generated bitmap d
 **Result:** Sharing identically scaled pixel grids and synchronized UI transformation properties ensures the Stencil output accurately mirrors the source element and behaves identically inside the Editor/AR space.
 
 ---
-*Documentation updated on 2026-09-04: marked the whole document historical/unimplemented — no
-stencil-generation code exists in the current tree. Design content below the status line preserved
-unchanged as reference.*
+*Historical algorithm notes retained as reference. The legacy three-tone renderer is still
+present only to display existing projects; new stencil authoring lives in Stencil Artist.*
