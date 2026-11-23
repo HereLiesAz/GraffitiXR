@@ -571,7 +571,11 @@ class EditorViewModel @Inject constructor(
 
     // ── The design ────────────────────────────────────────────────────────────
 
+    /** Keeps the validated share type through the existing-design replacement confirmation. */
+    private var pendingStencilPackUri: Uri? = null
+
     override fun onAddLayer(uri: Uri) {
+        pendingStencilPackUri = null
         // A design already sitting on the wall is placement work an artist can lose minutes of —
         // replacing it outright with no confirmation is how "Open" ends up eating a mural in
         // progress. Ask first when there is something to lose; a first import has nothing to
@@ -585,14 +589,14 @@ class EditorViewModel @Inject constructor(
 
     override fun confirmReplaceDesign() {
         val uri = _uiState.value.pendingReplaceUri ?: return
+        val stencil = uri == pendingStencilPackUri
+        pendingStencilPackUri = null
         dispatch(EditorIntent.SetPendingReplaceUri(null))
-        if (context.contentResolver.getType(uri) == "application/vnd.hereliesaz.stencilpack+zip" ||
-            uri.lastPathSegment?.endsWith(".stencilpack", ignoreCase = true) == true
-        ) applyNewStencilPack(uri)
-        else applyNewDesign(uri)
+        if (stencil) applyNewStencilPack(uri) else applyNewDesign(uri)
     }
 
     override fun cancelReplaceDesign() {
+        pendingStencilPackUri = null
         dispatch(EditorIntent.SetPendingReplaceUri(null))
     }
 
@@ -600,6 +604,7 @@ class EditorViewModel @Inject constructor(
     fun onImportStencilPack(uri: Uri) {
         if (_uiState.value.projectId == null) return
         if (_uiState.value.design != null) {
+            pendingStencilPackUri = uri
             dispatch(EditorIntent.SetPendingReplaceUri(uri))
         } else {
             applyNewStencilPack(uri)
