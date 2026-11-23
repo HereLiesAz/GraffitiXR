@@ -14,6 +14,7 @@ import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.common.util.ImageUtils
 import com.hereliesaz.graffitixr.common.util.SketchProcessor
 import com.hereliesaz.graffitixr.common.util.StencilProcessor
+import com.hereliesaz.graffitixr.common.util.StencilTones
 import com.hereliesaz.graffitixr.common.util.computeAutoTune
 import com.hereliesaz.graffitixr.common.util.imageStats
 import com.hereliesaz.graffitixr.common.util.GallerySaveResult
@@ -519,7 +520,8 @@ class EditorViewModel @Inject constructor(
         val effectsChanged = restored?.isSketch != _uiState.value.design?.isSketch ||
             restored?.isSubjectIsolated != _uiState.value.design?.isSubjectIsolated ||
             restored?.isStencil != _uiState.value.design?.isStencil ||
-            restored?.stencilView != _uiState.value.design?.stencilView
+            restored?.stencilView != _uiState.value.design?.stencilView ||
+            restored?.stencilVisibleLayers != _uiState.value.design?.stencilVisibleLayers
         dispatch(EditorIntent.RestoreDesign(restored))
         // Restore the mode adjustment the snapshot was taken alongside, if any — without this, an
         // outside-DESIGN Undo restored an (unchanged) design and left modeAdjustments exactly where
@@ -692,7 +694,7 @@ class EditorViewModel @Inject constructor(
             // and choose its base sheet. Segmentation is the slow part and cycling the view repeats
             // this, so the result for a given source is kept.
             val forStencil = if (design.isSubjectIsolated) out else (isolateCached(out) ?: out)
-            val result = StencilProcessor.stencil(forStencil, design.stencilView)
+            val result = StencilProcessor.stencil(forStencil, design.stencilView, design.stencilVisibleLayers)
             if (result != null) {
                 out = result.bitmap
                 stencilDark = result.dark
@@ -773,7 +775,8 @@ class EditorViewModel @Inject constructor(
             return
         }
         pushHistory()
-        updateDesign { it.copy(isSketch = !it.isSketch, isStencil = if (it.isSketch) it.isStencil else false) }
+        // Keep persisted stencil sheets available when Outline is switched back off.
+        updateDesign { it.copy(isSketch = !it.isSketch) }
         recomputeDesignEffects()
     }
 
@@ -789,27 +792,15 @@ class EditorViewModel @Inject constructor(
         recomputeDesignEffects()
     }
 
-    /** Stencil: three tonal sheets (black, grey, white) the artist can cycle through. */
-    override fun onToggleStencil() {
-        if (_uiState.value.design == null) return
-        if (designSourceBitmap == null) {
-            _uiState.update { it.copy(effectFailureMessage = "Couldn't make a stencil from this image.") }
-            return
-        }
-        pushHistory()
-        // Turning it on starts from all three sheets, and takes Outline off: both rewrite the pixels.
-        updateDesign {
-            if (it.isStencil) it.copy(isStencil = false)
-            else it.copy(isStencil = true, stencilView = StencilView.ALL, isSketch = false)
-        }
-        recomputeDesignEffects()
-    }
-
-    override fun onCycleStencilView() {
+    /** Individual sheets of an existing stencil remain viewable; no stencil is generated here. */
+    override fun onToggleStencilSheet(sheet: StencilView) {
+        if (sheet == StencilView.ALL) return
         val design = _uiState.value.design ?: return
-        if (!design.isStencil) return
+        if (!design.isStencil || designSourceBitmap == null) return
+        val bit = StencilTones.visibleMask(sheet)
+        val visible = design.stencilVisibleLayers ?: StencilTones.visibleMask(design.stencilView)
         pushHistory()
-        updateDesign { it.copy(stencilView = it.stencilView.next()) }
+        updateDesign { it.copy(stencilVisibleLayers = visible xor bit) }
         recomputeDesignEffects()
     }
 
