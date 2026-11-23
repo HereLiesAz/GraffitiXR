@@ -3,6 +3,10 @@ package com.hereliesaz.graffitixr.feature.editor
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Rect
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -581,11 +585,87 @@ class EditorViewModel @Inject constructor(
     override fun confirmReplaceDesign() {
         val uri = _uiState.value.pendingReplaceUri ?: return
         dispatch(EditorIntent.SetPendingReplaceUri(null))
-        applyNewDesign(uri)
+        if (context.contentResolver.getType(uri) == "application/vnd.hereliesaz.stencilpack+zip")
+            applyNewStencilPack(uri)
+        else applyNewDesign(uri)
     }
 
     override fun cancelReplaceDesign() {
         dispatch(EditorIntent.SetPendingReplaceUri(null))
+    }
+
+    /** Import authored stencil sheets without running any in-app separation. */
+    fun onImportStencilPack(uri: Uri) {
+        if (_uiState.value.projectId == null) return
+        if (_uiState.value.design != null) {
+            dispatch(EditorIntent.SetPendingReplaceUri(uri))
+        } else {
+            applyNewStencilPack(uri)
+        }
+    }
+
+    private fun applyNewStencilPack(uri: Uri) {
+        val projectId = _uiState.value.projectId ?: return
+        importJob?.cancel()
+        designEffectJob?.cancel()
+        importJob = viewModelScope.launch(dispatchers.io) {
+            try {
+                val pack = context.contentResolver.openInputStream(uri)?.use(StencilPackReader::read)
+                if (pack == null) {
+                    withContext(dispatchers.main) {
+                        _uiState.update { it.copy(effectFailureMessage = "Invalid or unsupported StencilPack.") }
+                    }
+                    return@launch
+                }
+                val persisted = ArrayList<StencilSheetSource>(pack.sheets.size)
+                val composite = Bitmap.createBitmap(pack.width, pack.height, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(composite)
+                for ((index, sheet) in pack.sheets.withIndex()) {
+                    val saved = projectRepository.saveArtifact(
+                        projectId, "stencil_${UUID.randomUUID()}_sheet_${index + 1}.png", sheet.png,
+                    )
+                    persisted += StencilSheetSource(sheet.name, "file://$saved", sheet.color, sheet.visible)
+                    if (sheet.visible) {
+                        val bitmap = BitmapFactory.decodeByteArray(sheet.png, 0, sheet.png.size)
+                            ?: error("Could not decode stencil sheet ${index + 1}")
+                        try {
+                            canvas.drawBitmap(bitmap, 0f, 0f, Paint(Paint.FILTER_BITMAP_FLAG))
+                        } finally {
+                            bitmap.recycle()
+                        }
+                    }
+                }
+                val filename = "design_${UUID.randomUUID()}.png"
+                val path = projectRepository.saveArtifact(
+                    projectId, filename, ImageUtils.bitmapToByteArray(composite),
+                )
+                val design = Layer(
+                    id = UUID.randomUUID().toString(),
+                    name = "Stencil",
+                    uri = "file://$path".toUri(),
+                    bitmap = composite,
+                    isStencil = true,
+                    stencilSheets = persisted,
+                )
+                withContext(dispatchers.main) {
+                    if (!isCurrentProject(projectId)) return@withContext
+                    pushHistory()
+                    designSourceBitmap = composite
+                    dispatch(EditorIntent.SetDesign(design))
+                    opEmitter.emit(Op.DesignReplace(design))
+                    emitDesignPixels(composite)
+                    writtenDesignPaths += path
+                    saveProject()
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                withContext(dispatchers.main) {
+                    if (isCurrentProject(projectId)) {
+                        _uiState.update { it.copy(effectFailureMessage = "Couldn't import those stencil layers.") }
+                    }
+                }
+            }
+        }
     }
 
     private fun applyNewDesign(uri: Uri) {
@@ -675,6 +755,22 @@ class EditorViewModel @Inject constructor(
         var out = source
         var failure: String? = null
         var stencilDark: Boolean? = null
+        if (design.stencilSheets.isNotEmpty()) {
+            val composite = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(composite)
+            for (sheet in design.stencilSheets.filter { it.visible }) {
+                val bitmap = ImageUtils.loadBitmapAsync(context, sheet.uri.toUri(), maxDimension = 2048)
+                if (bitmap == null) {
+                    failure = "A saved stencil sheet could not be loaded."
+                    continue
+                }
+                canvas.drawBitmap(
+                    bitmap, null, Rect(0, 0, source.width, source.height),
+                    Paint(Paint.FILTER_BITMAP_FLAG),
+                )
+            }
+            out = composite
+        }
         if (design.isSubjectIsolated) {
             val isolated = isolateCached(out)
             if (isolated != null) out = isolated
@@ -687,7 +783,7 @@ class EditorViewModel @Inject constructor(
         }
         // Outline and Stencil are exclusive (the toggles keep it so); a stored design with both
         // flags set, e.g. from a hand-edited project, gets the outline.
-        if (design.isStencil && !design.isSketch) {
+        if (design.isStencil && design.stencilSheets.isEmpty() && !design.isSketch) {
             // The stencil tool always tries to remove the background first. If the design is not
             // already isolated, this tries it here, and if no subject can be found it carries on with
             // the whole image. Only then does the stencil decide whether the image is light or dark
@@ -801,6 +897,19 @@ class EditorViewModel @Inject constructor(
         val visible = design.stencilVisibleLayers ?: StencilTones.visibleMask(design.stencilView)
         pushHistory()
         updateDesign { it.copy(stencilVisibleLayers = visible xor bit) }
+        recomputeDesignEffects()
+    }
+
+    /** Toggle an imported sheet's visibility while retaining every other saved sheet and its order. */
+    override fun onToggleImportedStencilSheet(index: Int) {
+        val design = _uiState.value.design ?: return
+        if (index !in design.stencilSheets.indices || designSourceBitmap == null) return
+        pushHistory()
+        updateDesign {
+            it.copy(stencilSheets = it.stencilSheets.mapIndexed { i, sheet ->
+                if (i == index) sheet.copy(visible = !sheet.visible) else sheet
+            })
+        }
         recomputeDesignEffects()
     }
 
