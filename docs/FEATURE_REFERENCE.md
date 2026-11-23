@@ -234,7 +234,7 @@ Every layer carries the full property set below; all except the runtime `bitmap`
 | `isInverted` | `false` | Bool | Colour invert |
 | `isSketch` | `false` | Bool | **Outline** effect — render as a traceable pencil sketch (dark lines opaque, light areas transparent); re-derived from `uri` each time, not baked in |
 | `isSubjectIsolated` | `false` | Bool | **Subject isolation** — the bundled U²-Net segmenter drops everything but the subject to transparent (see §4) |
-| `isStencil` | `false` | Bool | **Stencil** — the design is split into three tonal sheets (black, grey, white); exclusive with `isSketch` (§5) |
+| `isStencil` | `false` | Bool | Saved stencil state for imported sheets or older three-tone projects (§5) |
 | `stencilView` | `ALL` | `ALL`/`BASE`/`MIDTONE`/`SECONDARY` | Which sheets are shown while `isStencil` is on |
 | `stencilDark` | `true` | Bool | The last run's dark-or-light call, which names the cycler's options |
 
@@ -296,8 +296,8 @@ These act on the design (contrast with §1.1, which acts on the whole design **p
 | `ToggleInvert` | `false` | — | |
 | `onToggleOutline` | `isSketch = false` | — | The traceable-sketch effect (§2.1) |
 | `onToggleSubjectIsolation` | `isSubjectIsolated = false` | — | Drop everything but the segmented subject (§4) |
-| `onToggleStencil` | `isStencil = false` | — | Three tonal sheets; turns Outline off (§5) |
-| `onCycleStencilView` | `stencilView = ALL` | `ALL` → `BASE` → `MIDTONE` → `SECONDARY` → `ALL` | Only while a stencil exists (§5) |
+| `onToggleStencilSheet` | saved stencil | sheet role | Toggles one legacy mask without new generation (§5) |
+| `onToggleImportedStencilSheet` | imported StencilPack | sheet index | Toggles one imported PNG sheet (§5) |
 
 Colour maths run through `ColorMatrixUtils`.
 
@@ -358,38 +358,35 @@ the design's two toggleable rendering effects.
 
 ---
 
-## 5. Stencil
+## 5. Stencil import and layer visibility
 
-The design can be split into three tonal sheets: black, grey and white.
+Stencil generation and cut-ready output belong to
+[Stencil Artist](https://github.com/HereLiesAz/stencil-artist), not GraffitiXR.
+Stencil Artist exports StencilPack v1 (versioned ZIP with a manifest, named
+full-canvas transparent PNGs, and explicit bottom-to-top paint order).
+GraffitiXR imports the archive through Android `ACTION_SEND` after the user
+opens/creates a project. Every sheet becomes a project-owned PNG in
+`Layer.stencilSheets` (serialised through `OverlayLayer`).
 
-- **Rail**: `Stencil` (`design.stencil`) is a sub-item of the Design folder. Tap to generate, tap
-  again to bring the original back. While a stencil exists, a cycler (`design.stencil.view`) appears
-  directly beneath it and steps **All → base → midtone → secondary**: All, Black, Grey, White for a
-  dark image; All, White, Grey, Black for a light one.
-- **State**: `Layer.isStencil` and `Layer.stencilView`. Like Outline and Isolate they are flags;
-  the shown bitmap is re-derived from the untouched import (`uri`), so turning it off is exact.
-  Stencil and Outline are exclusive.
-- **Pipeline** (`StencilProcessor`, `StencilTones`, `core/common`), restored from the old tool: it
-  first tries to **remove the background** (the same segmenter as Isolate; if no subject is found it
-  carries on with the whole image, and Isolate's own flag is not touched), and only then judges the image **dark or light**: the isolated subject's luminance (0.299R + 0.587G +
-  0.114B) is turned down by 40 levels and its contrast doubled about mid-grey, which leaves each pixel
-  clearly dark or light, and whichever covers more **area** wins (a tie is dark). That picks the **base sheet**: black for a dark image, white for
-  a light one. The value channel (brightest of R, G, B) is median-blurred (9x9), split into three
-  tones by a deterministic 1-D K-means, and the two sheets laid over the base are closed 5x5 so cut
-  edges are smooth. Transparent pixels stay transparent, so Isolate then Stencil keeps the cut-out.
-- **Sheets** are sequential, as paint is. Dark image: black = the whole subject, grey = grey and
-  lighter, white = the lightest. Light image: white = the whole subject, grey = grey and darker,
-  black = the darkest.
-- **Invariants** (`StencilTones.ranks`, unit-tested): the base is always the complete silhouette of
-  the isolated subject, holes in the cut-out filled in; if the background could not be removed, the
-  silhouette is the whole frame. The midtone always covers at least the secondary: a secondary
-  pixel is a midtone pixel, so the midtone's area is never smaller.
-- **Views**: All stacks the sheets (every pixel in its own tone). Base, Midtone or Secondary shows that
-  one sheet in its colour and leaves the rest transparent.
-- The same method also drives the `stencil3` filter of the SLAM passes (`docs/PASSES.md`).
+**Rail and display:** `design.stencil` opens the **Stencil layers** dialog
+for a loaded stencil; otherwise it links to Stencil Artist. Each imported
+sheet has its own visibility checkbox. The visible sheets are composited
+in paint order without regeneration, source replacement, or resampling.
+`onToggleImportedStencilSheet` pushes history and rebuilds the composite;
+Undo/Redo compare sheet metadata as well as classic effect flags.
 
-Not rebuilt: the old multi-sheet PDF export and tiling (`docs/STENCILS.md` still describes that as a
-design document).
+**Legacy projects:** Old `isStencil`, `stencilView`, and `stencilDark`
+fields remain in project and wire models. A stored stencil without imported
+sheets continues to render the original three tonal masks through
+`StencilProcessor`. The dialog exposes independent Base, Midtone, Secondary
+visibility via `stencilVisibleLayers`, falling back to the original selector.
+No new in-app stencil generation action remains.
+
+Archive import/rekey relocates each stored sheet URI alongside the design URI;
+all sheets remain associated with the same canvas, placement and project.
+
+Details: [STENCILS.md](STENCILS.md). The portable archive schema is
+[StencilPack v1](https://github.com/HereLiesAz/stencil-artist/blob/main/docs/STENCILPACK_V1.md).
 
 ---
 
