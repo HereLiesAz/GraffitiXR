@@ -67,7 +67,7 @@ object StencilProcessor {
      * @return the design rendered as [view], an ARGB_8888 bitmap the size of [bitmap] together with
      *   the dark-or-light call that chose the base sheet, or null if processing fails (the caller falls back to the original, as with the other effects).
      */
-    fun stencil(bitmap: Bitmap, view: StencilView): StencilResult? {
+    fun stencil(bitmap: Bitmap, view: StencilView, visibleLayers: Int? = null): StencilResult? {
         val mats = mutableListOf<Mat>()
         return try {
             // Loaded here and not in an init block, for the reason given in SketchProcessor.
@@ -146,7 +146,8 @@ object StencilProcessor {
                 dark = dark,
             )
             val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-            out.setPixels(StencilTones.render(ranks, view, dark), 0, w, 0, 0, w, h)
+            val shown = StencilTones.renderVisible(ranks, visibleLayers ?: StencilTones.visibleMask(view), dark)
+            out.setPixels(shown, 0, w, 0, 0, w, h)
             StencilResult(out, dark)
         } catch (e: Exception) {
             Timber.e(e, "StencilProcessor: stencil failed")

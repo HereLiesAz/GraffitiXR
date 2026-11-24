@@ -186,6 +186,7 @@ private const val PROXIMITY_NEAR_CM = 3f
 
 /** Saved-state key for a shared-in image still waiting for a project to land in. */
 private const val STATE_PENDING_SHARED_IMAGE = "pending_shared_image"
+private const val STATE_PENDING_SHARED_STENCIL = "pending_shared_stencil"
 private const val STATE_PENDING_GALLERY_EXPORT = "pending_gallery_export"
 
 /**
@@ -252,6 +253,7 @@ class MainActivity : AppCompatActivity() {
     // Interop: an image handed in via ACTION_SEND (e.g. an edited overlay returning from Graffux),
     // consumed once by the editor as the project's design. Set from the launch intent / onNewIntent.
     private var incomingSharedImage by mutableStateOf<Uri?>(null)
+    private var incomingSharedStencil by mutableStateOf<Uri?>(null)
 
     /**
      * Copies the diagnostic report to the clipboard and offers the whole bundle to a share sheet.
@@ -355,6 +357,7 @@ class MainActivity : AppCompatActivity() {
         setIntent(intent)
         if (SharedImageIntentPolicy.shouldConsume(isRestoredInstance = false, launchFlags = intent.flags)) {
             incomingImageUri(intent)?.let { incomingSharedImage = it }
+            incomingStencilPackUri(intent)?.let { incomingSharedStencil = it }
         }
         markShareHandled(intent)
     }
@@ -364,7 +367,8 @@ class MainActivity : AppCompatActivity() {
      * `getIntent()` later can apply the same image a second time.
      */
     private fun markShareHandled(intent: Intent?) {
-        if (intent == null || incomingImageUri(intent) == null) return
+        if (intent == null ||
+            (incomingImageUri(intent) == null && incomingStencilPackUri(intent) == null)) return
         intent.removeExtra(Intent.EXTRA_STREAM)
         intent.data = null
         intent.action = null
@@ -375,6 +379,7 @@ class MainActivity : AppCompatActivity() {
         // A share still waiting for a project survives recreation (locale switch, process death)
         // through saved state — the launch intent is NOT re-read on restore (see onCreate).
         incomingSharedImage?.let { outState.putParcelable(STATE_PENDING_SHARED_IMAGE, it) }
+        incomingSharedStencil?.let { outState.putParcelable(STATE_PENDING_SHARED_STENCIL, it) }
         // An export waiting on the storage-permission dialog survives recreation as a plain value.
         pendingGalleryExport?.let { outState.putString(STATE_PENDING_GALLERY_EXPORT, it.name) }
     }
@@ -385,6 +390,17 @@ class MainActivity : AppCompatActivity() {
      * without an image MIME type is ignored. The sender grants read permission on the Uri, so the
      * editor's ContentResolver load succeeds.
      */
+    /** Receive a StencilPack through the same narrowly scoped content-URI share contract. */
+    private fun incomingStencilPackUri(intent: Intent?): Uri? {
+        if (intent?.action != Intent.ACTION_SEND ||
+            intent.type != "application/vnd.hereliesaz.stencilpack+zip") return null
+        val uri = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java) ?: return null
+        return uri.takeIf {
+            it.scheme == android.content.ContentResolver.SCHEME_CONTENT &&
+                it.authority != "$packageName.fileprovider"
+        }
+    }
+
     private fun incomingImageUri(intent: Intent?): Uri? {
         if (intent == null || intent.type?.startsWith("image/") != true) return null
         if (intent.action != Intent.ACTION_SEND) return null
@@ -457,6 +473,15 @@ class MainActivity : AppCompatActivity() {
         } else {
             savedInstanceState?.let {
                 androidx.core.os.BundleCompat.getParcelable(it, STATE_PENDING_SHARED_IMAGE, Uri::class.java)
+            }
+        }
+        incomingSharedStencil = if (
+            SharedImageIntentPolicy.shouldConsume(savedInstanceState != null, intent?.flags ?: 0)
+        ) {
+            incomingStencilPackUri(intent)
+        } else {
+            savedInstanceState?.let {
+                androidx.core.os.BundleCompat.getParcelable(it, STATE_PENDING_SHARED_STENCIL, Uri::class.java)
             }
         }
         markShareHandled(intent)
@@ -634,6 +659,7 @@ class MainActivity : AppCompatActivity() {
                 val crashReportToken by settingsViewModel.crashReportToken.collectAsState()
                 val coopState = arUiState.coopSessionState
                 var showJoinScanner by remember { mutableStateOf(false) }
+                var showStencilLayers by rememberSaveable { mutableStateOf(false) }
                 // Standalone overlay ↔ host: its status/actions render in onscreen (AzNavRail safe
                 // zones). The rail's Target action opens the shared capture flow directly.
                 val standaloneUiHost = remember { com.hereliesaz.graffitixr.feature.ar.StandaloneOverlayUiHost() }
@@ -666,6 +692,7 @@ class MainActivity : AppCompatActivity() {
                 // on exactly the launch path it exists for. Hold the Uri until the user opens or
                 // creates a project, then add it.
                 val sharedImage = incomingSharedImage
+                val sharedStencil = incomingSharedStencil
                 val projectIdForShare = editorUiState.projectId
                 // Also held while frozen: adding it raises the replace prompt, which would take the
                 // touches Freeze exists to refuse. It lands on unlock.
@@ -680,7 +707,13 @@ class MainActivity : AppCompatActivity() {
                 // them on the library screen wondering whether the share worked. (`context` proper is
                 // declared further down this composable, so capture the local here.)
                 val shareToastContext = LocalContext.current
-                val sharePending = sharedImage != null && projectIdForShare == null
+                LaunchedEffect(sharedStencil, projectIdForShare, shareFrozen) {
+                    if (sharedStencil != null && projectIdForShare != null && !shareFrozen) {
+                        editorViewModel.onImportStencilPack(sharedStencil)
+                        incomingSharedStencil = null
+                    }
+                }
+                val sharePending = (sharedImage != null || sharedStencil != null) && projectIdForShare == null
                 LaunchedEffect(sharePending) {
                     if (sharePending) {
                         com.hereliesaz.graffitixr.design.feedback.HudMessages.show(shareToastContext.getString(DesignR.string.shared_image_pick_project), long = true)
@@ -1280,6 +1313,7 @@ class MainActivity : AppCompatActivity() {
                         isConfirmingDoodle = mainUiState.isConfirmingDoodle,
                         isOverlayGyroActive = mainUiState.isOverlayGyroActive,
                         onShowJoinScanner = { showJoinScanner = true },
+                        onManageStencilLayers = { showStencilLayers = true },
                         onWallPhoto = {
                             if (hasCameraPermission) {
                                 val tmpFile = File(context.cacheDir, "wall_camera_${System.currentTimeMillis()}.jpg")
@@ -2104,6 +2138,62 @@ class MainActivity : AppCompatActivity() {
                                 }
                             }
 
+                            if (showStencilLayers && editorUiState.design?.isStencil == true) {
+                                val stencil = editorUiState.design!!
+                                androidx.compose.material3.AlertDialog(
+                                    onDismissRequest = { showStencilLayers = false },
+                                    title = { Text("Stencil layers") },
+                                    text = {
+                                        LazyColumn(Modifier.heightIn(max = 440.dp)) {
+                                            if (stencil.stencilSheets.isNotEmpty()) {
+                                                items(stencil.stencilSheets.size) { index ->
+                                                    val sheet = stencil.stencilSheets[index]
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                    ) {
+                                                        androidx.compose.material3.Checkbox(
+                                                            checked = sheet.visible,
+                                                            onCheckedChange = {
+                                                                editorViewModel.onToggleImportedStencilSheet(index)
+                                                            },
+                                                        )
+                                                        Text(sheet.name)
+                                                    }
+                                                }
+                                            } else {
+                                                // Older .gxr projects retain their three-tone stencil masks.
+                                                val legacy = listOf(
+                                                    com.hereliesaz.graffitixr.common.model.StencilView.BASE,
+                                                    com.hereliesaz.graffitixr.common.model.StencilView.MIDTONE,
+                                                    com.hereliesaz.graffitixr.common.model.StencilView.SECONDARY,
+                                                )
+                                                val visible = stencil.stencilVisibleLayers
+                                                    ?: StencilTones.visibleMask(stencil.stencilView)
+                                                items(legacy.size) { index ->
+                                                    val sheet = legacy[index]
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                    ) {
+                                                        androidx.compose.material3.Checkbox(
+                                                            checked = visible and StencilTones.visibleMask(sheet) != 0,
+                                                            onCheckedChange = { editorViewModel.onToggleStencilSheet(sheet) },
+                                                        )
+                                                        Text(sheet.name.lowercase().replaceFirstChar { it.uppercase() })
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    confirmButton = {
+                                        androidx.compose.material3.TextButton(
+                                            onClick = { showStencilLayers = false },
+                                        ) { Text("Done") }
+                                    },
+                                )
+                            }
+
                             if (showSettings && !showSaveDialog && !dashboardUiState.showNewProjectDialog) {
                                 androidx.compose.ui.window.Dialog(
                                     onDismissRequest = { showSettings = false },
@@ -2416,6 +2506,7 @@ class MainActivity : AppCompatActivity() {
         isConfirmingDoodle: Boolean = false,
         isOverlayGyroActive: Boolean = false,
         onShowJoinScanner: () -> Unit = {},
+        onManageStencilLayers: () -> Unit = {},
         onWallPhoto: () -> Unit = {},
         onExportRequested: () -> Unit,
     ) {
@@ -2482,9 +2573,8 @@ class MainActivity : AppCompatActivity() {
                     overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
             )
-            // Stencil — splits the design into three tonal sheets (black, grey, white). Tap to
-            // generate, tap again to get the original back. Once a stencil exists, the cycler right
-            // beneath it steps which sheets are shown: all, black, grey, white.
+            // The stencil item owns the sheet-visibility manager, never stencil generation.
+            // Without a stencil loaded, it opens the separate Stencil Artist app's project page.
             azRailSubItem(
                 id = "design.stencil",
                 hostId = railHostOf("design.stencil"),
@@ -2492,30 +2582,17 @@ class MainActivity : AppCompatActivity() {
                 color = navItemColor,
                 classifiers = setOf("toggle", "effect"),
                 shape = AzButtonShape.NONE,
-                disabled = designToolsDisabled,
-                onClick = { editorViewModel.onToggleStencil() }
+                disabled = showLibrary,
+                onClick = {
+                    if (editorUiState.design?.isStencil == true) {
+                        onManageStencilLayers()
+                    } else {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, "https://github.com/HereLiesAz/stencil-artist".toUri())
+                        )
+                    }
+                },
             )
-            if (editorUiState.design?.isStencil == true) {
-                // All, then the sheets in the order they are laid: base, midtone, secondary. A light
-                // image goes white, grey, black; a dark one black, grey, white.
-                val colourName = mapOf(
-                    StencilTones.BLACK to navStrings.stencilViewBlack,
-                    StencilTones.GREY to navStrings.stencilViewGrey,
-                    StencilTones.WHITE to navStrings.stencilViewWhite,
-                )
-                val stencilLabels = listOf(navStrings.stencilViewAll) +
-                    StencilTones.sheetOrder(editorUiState.design?.stencilDark ?: true).map { colourName.getValue(it) }
-                azRailSubCycler(
-                    id = "design.stencil.view",
-                    hostId = railHostOf("design.stencil.view"),
-                    options = stencilLabels,
-                    selectedOption = stencilLabels[editorUiState.design?.stencilView?.ordinal ?: 0],
-                    color = navItemColor,
-                    shape = AzButtonShape.NONE,
-                    disabled = designToolsDisabled,
-                    onClick = { editorViewModel.onCycleStencilView() }
-                )
-            }
             // Edit ▸ the per-design controls. Every one of these drives an EditorViewModel action
             // that was already implemented and tested but had no way to be invoked: the layer list had
             // no opener (so add-a-layer was one-way — nothing could remove, rename, reorder or hide

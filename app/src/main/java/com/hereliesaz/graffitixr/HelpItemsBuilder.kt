@@ -66,7 +66,6 @@ internal fun buildHelpItems(strings: AppStrings): Map<String, Any> = mapOf(
     "design.outline" to strings.nav.outlineInfo,
     "design.isolate" to strings.nav.isolateInfo,
     "design.stencil" to strings.nav.stencilInfo,
-    "design.stencil.view" to strings.nav.stencilViewInfo,
     "design.lock" to strings.nav.lockInfo,
 
     // Project menu

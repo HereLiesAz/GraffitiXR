@@ -787,7 +787,12 @@ class ProjectManager @Inject constructor(
         fun uri(u: Uri?): Uri? = u?.let { uri(it) }
         return project.copy(
             id = newId,
-            design = project.design?.let { it.copy(uri = uri(it.uri)) },
+            design = project.design?.let { layer ->
+                layer.copy(
+                    uri = uri(layer.uri),
+                    stencilSheets = layer.stencilSheets.map { sheet -> sheet.copy(uri = path(sheet.uri)) },
+                )
+            },
             layers = project.layers.map { it.copy(uri = uri(it.uri)) },
             backgroundImageUri = uri(project.backgroundImageUri),
             overlayImageUri = uri(project.overlayImageUri),
@@ -1135,7 +1140,14 @@ class ProjectManager @Inject constructor(
         }
         return migrateInMemory(project).let { migrated ->
             migrated.copy(
-                design = migrated.design?.let { it.copy(uri = localUri(it.uri)!!) },
+                design = migrated.design?.let { layer ->
+                    layer.copy(
+                        uri = localUri(layer.uri)!!,
+                        stencilSheets = layer.stencilSheets.map { sheet ->
+                            sheet.copy(uri = localUri(Uri.parse(sheet.uri))!!.toString())
+                        },
+                    )
+                },
                 backgroundImageUri = localUri(migrated.backgroundImageUri),
                 overlayImageUri = localUri(migrated.overlayImageUri),
                 originalOverlayImageUri = localUri(migrated.originalOverlayImageUri),
