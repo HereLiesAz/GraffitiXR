@@ -774,7 +774,7 @@
 
     <!-- Stencil tool: split the design into black, grey and white sheets, and cycle which are shown. -->
     <string name="nav_stencil">Stencil</string>
-    <string name="nav_stencil_info">Split the design into three sheets: black, grey and white. Tap again to bring the original back.</string>
+    <string name="nav_stencil_info">Manage saved stencil sheets individually, or open Stencil Artist to create new ones.</string>
     <string name="nav_stencil_view_all">All</string>
     <string name="nav_stencil_view_black">Black</string>
     <string name="nav_stencil_view_grey">Grey</string>

@@ -31,6 +31,8 @@ fun Layer.toOverlayLayer(): OverlayLayer {
         isSubjectIsolated = isSubjectIsolated,
         isStencil = isStencil,
         stencilView = stencilView,
+        stencilVisibleLayers = stencilVisibleLayers,
+        stencilSheets = stencilSheets,
         stencilDark = stencilDark,
     )
 }
@@ -61,6 +63,8 @@ fun OverlayLayer.toLayer(): Layer {
         isSubjectIsolated = isSubjectIsolated,
         isStencil = isStencil,
         stencilView = stencilView,
+        stencilVisibleLayers = stencilVisibleLayers,
+        stencilSheets = stencilSheets,
         stencilDark = stencilDark,
     )
 }

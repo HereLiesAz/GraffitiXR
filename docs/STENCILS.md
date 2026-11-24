@@ -1,12 +1,29 @@
-# STENCILS: Architectural Bible
+# Stencils: Stencil Artist handoff and legacy rendering
 
-**Status: historical/unimplemented.** This document was written as an "Architectural Bible...
-reflecting the active implementation," but there is no implementing code anywhere in the current
-tree — `StencilProcessor.kt`, `StencilPrintEngine.kt`, and `ExportManager`'s stencil path do not
-exist (`find . -iname "*stencil*"` returns only this doc file); `EditorMode.STENCIL` was deleted
-from the mode enum with no route. Stencil generation was removed per `README.md`'s 2026-09-04
-changelog for having no implementing code. The design content below is preserved as reference for a
-future reimplementation — read it as a proposal, not as documentation of shipped behavior.
+**Current contract (2026-11-22):** [Stencil Artist](https://github.com/HereLiesAz/stencil-artist)
+is the sole stencil authoring/generation app. GraffitiXR accepts
+[StencilPack v1](https://github.com/HereLiesAz/stencil-artist/blob/main/docs/STENCILPACK_V1.md):
+a bounded ZIP with `manifest.json` and one aligned transparent PNG per sheet,
+in bottom-to-top paint order. Inbound Android `ACTION_SEND` carries
+`application/vnd.hereliesaz.stencilpack+zip` and a granted `content://` URI.
+
+A received stencil is saved as one design with independently persisted
+`StencilSheetSource` assets. The **Stencil layers** dialog toggles individual
+sheet visibility, preserving name, order, and full PNG detail.
+Undo/Redo, project saves, co-op metadata and `.gxr` archive relocation retain
+the sheet list and per-sheet visibility. Only imported sheets are used to
+rebuild the rendered composite; the sender performs all separation.
+
+Older projects with `isStencil` and `stencilView` but no
+`stencilSheets` continue to use `StencilProcessor`/`StencilTones` to
+render their original three tonal masks. The legacy generator remains internal
+for **reading existing projects**, not for producing new stencils. The
+three independent view toggles use `stencilVisibleLayers`, with a fallback to
+the original `stencilView` when that field is absent.
+
+The algorithm notes below are **historical design notes**, not the current
+authoring workflow. Current cutting, registration, tiling and print exports
+belong to Stencil Artist.
 
 ## 1. Core Philosophy and Topology
 The Stencil Creation feature in GraffitiXR is designed to generate physically reproducible stencils from digital assets. 
@@ -58,6 +75,5 @@ Previously, compositing operated in *Screen Space*, tying the generated bitmap d
 **Result:** Sharing identically scaled pixel grids and synchronized UI transformation properties ensures the Stencil output accurately mirrors the source element and behaves identically inside the Editor/AR space.
 
 ---
-*Documentation updated on 2026-09-04: marked the whole document historical/unimplemented — no
-stencil-generation code exists in the current tree. Design content below the status line preserved
-unchanged as reference.*
+*Historical algorithm notes retained as reference. The legacy three-tone renderer is still
+present only to display existing projects; new stencil authoring lives in Stencil Artist.*

@@ -90,6 +90,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Accept authored StencilPack sheets from Stencil Artist; preserve all layer PNGs. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/vnd.hereliesaz.stencilpack+zip" />
+            </intent-filter>
+
             <!-- Interop: receive an image shared from Graffux (e.g. an edited overlay returning from
                  the rich editor) and open it as an AR overlay layer. -->
             <intent-filter>

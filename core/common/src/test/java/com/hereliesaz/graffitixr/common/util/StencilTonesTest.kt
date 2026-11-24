@@ -148,6 +148,26 @@ class StencilTonesTest {
     }
 
     @Test
+    fun `imported sheet mask shows only selected overpaint layers`() {
+        // Transparent, black, grey, white: literal paint coverage, not values derived from renderVisible.
+        val paintOrder = intArrayOf(-1, 0, 1, 2)
+        assertArrayEquals(
+            intArrayOf(0, 0, grey, white),
+            StencilTones.renderVisible(paintOrder,
+                StencilTones.VISIBLE_MIDTONE or StencilTones.VISIBLE_SECONDARY, dark = true),
+        )
+        assertArrayEquals(
+            intArrayOf(0, black, white, white),
+            StencilTones.renderVisible(paintOrder,
+                StencilTones.VISIBLE_BASE or StencilTones.VISIBLE_SECONDARY, dark = false),
+        )
+        assertArrayEquals(
+            intArrayOf(0, 0, 0, 0),
+            StencilTones.renderVisible(paintOrder, 0, dark = true),
+        )
+    }
+
+    @Test
     fun `the cycler steps all, base, midtone, secondary and wraps`() {
         assertEquals(StencilView.BASE, StencilView.ALL.next())
         assertEquals(StencilView.MIDTONE, StencilView.BASE.next())

@@ -66,9 +66,8 @@ internal fun enumerateRailItemIdRegistrations(mode: EditorMode): List<String> {
     ids += listOf(
         "mode.design", "host.design", "design.adjust", "design.balance", "design.invert",
         "design.blend", "design.outline", "design.isolate", "design.lock",
-        // The stencil item always; its view cycler only once a stencil has been generated (included
-        // here unconditionally, like wall.clear, because this is the universe of legal ids).
-        "design.stencil", "design.stencil.view",
+        // Opens Stencil Artist or the existing stencil sheet manager.
+        "design.stencil",
     )
 
     // Project menu
@@ -107,7 +106,6 @@ internal val RAIL_ITEM_HOST_ID: Map<String, String> = mapOf(
     "design.outline" to "host.design",
     "design.isolate" to "host.design",
     "design.stencil" to "mode.design",
-    "design.stencil.view" to "mode.design",
     "design.lock" to "host.design",
     // mode.ar / mode.overlay / mode.mockup / mode.trace are top-level host items (no hostId).
     "doodle.create" to "mode.ar",
